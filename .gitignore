@@ -1,0 +1,14 @@
+.DS_Store
+Thumbs.db
+
+.env
+.env.local
+.env.*.local
+
+apps/web/.next
+apps/web/node_modules
+apps/web/out
+apps/web/dist
+apps/web/coverage
+apps/web/*.log
+*.tsbuildinfo

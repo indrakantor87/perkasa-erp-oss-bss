@@ -1,0 +1,385 @@
+import type { DomainKey, DomainPageContent } from '@/lib/types'
+
+export const domainPages: Record<DomainKey, DomainPageContent> = {
+  sales: {
+    key: 'sales',
+    resource: 'sales',
+    eyebrow: 'Commercial',
+    title: 'Penjualan dan Order Acquisition',
+    description:
+      'Shell awal untuk lead, coverage, survey, order, dan status delivery supaya alur home broadband sampai corporate bisa ditempatkan dalam satu modul.',
+    primaryAction: { label: 'Buka Import Center', href: '/import' },
+    secondaryAction: { label: 'Lihat Dashboard', href: '/dashboard' },
+    summaries: [
+      { label: 'Lead Review', value: '184' },
+      { label: 'Order Aktif', value: '512' },
+      { label: 'Survey Pending', value: '29' },
+    ],
+    highlights: [
+      { title: 'Flow Home Broadband', detail: 'Lead -> Coverage -> Registration -> Order -> Work Order -> Activation' },
+      { title: 'Flow Corporate', detail: 'Lead -> Feasibility -> Quotation -> Contract -> Delivery -> Billing' },
+    ],
+    reviewSections: [
+      {
+        title: 'Lead Terbaru',
+        description: 'Sampel lead terbaru untuk menyiapkan review funnel marketing dari sumber masuk sampai follow up.',
+        rows: [
+          {
+            id: 'LEAD-2026-0104',
+            primary: 'Ahmad Hidayat',
+            secondary: 'HOME',
+            status: 'NEW',
+            detail: 'Lead baru dari referral pelanggan lama dan menunggu validasi coverage area.',
+            meta: ['Source: Referral', 'Marketing: Dhimas', 'Phone: 628523110022'],
+          },
+          {
+            id: 'LEAD-2026-0103',
+            primary: 'PT Maju Lancar Abadi',
+            secondary: 'CORPORATE',
+            status: 'FOLLOW_UP',
+            detail: 'Prospek corporate membutuhkan dedicated link dan sedang menunggu jadwal survey teknis.',
+            meta: ['Source: Direct Sales', 'Marketing: Chalis', 'Phone: 62295214567'],
+          },
+          {
+            id: 'LEAD-2026-0102',
+            primary: 'Rina Setyawati',
+            secondary: 'HOME',
+            status: 'COVERAGE_CHECK',
+            detail: 'Lead retail meminta pemasangan baru, coverage sekitar rumah masih diverifikasi.',
+            meta: ['Source: WhatsApp', 'Marketing: Kantor', 'Phone: 628133445566'],
+          },
+        ],
+      },
+      {
+        title: 'Survey Dan Order Berjalan',
+        description: 'Sampel alur survey dan order aktif untuk menghubungkan lead, feasibility, dan delivery ke domain lain.',
+        rows: [
+          {
+            id: 'SVY-2026-0048',
+            primary: 'SVY-2026-0048',
+            secondary: 'Ahmad Hidayat',
+            status: 'SCHEDULED',
+            detail: 'Survey rumah dijadwalkan untuk memastikan port ODP dan jalur instalasi tersedia.',
+            meta: ['Feasibility: PENDING', 'Scheduled: 07 Jul 2026 09:00', 'Marketing: Dhimas'],
+          },
+          {
+            id: 'ORD-2026-0177',
+            primary: 'ORD-2026-0177',
+            secondary: 'PT Maju Lancar Abadi',
+            status: 'REGISTERED',
+            detail: 'Order corporate sudah teregistrasi dan menunggu finalisasi paket serta jadwal instalasi.',
+            meta: ['Type: NEW_INSTALL', 'Package: Dedicated 50 Mbps', 'Marketing: Chalis'],
+          },
+          {
+            id: 'SVY-2026-0047',
+            primary: 'SVY-2026-0047',
+            secondary: 'Rina Setyawati',
+            status: 'ON_PROGRESS',
+            detail: 'Survey lapangan sedang berjalan untuk validasi tiang, kabel, dan estimasi instalasi.',
+            meta: ['Feasibility: NEED_REVIEW', 'Scheduled: 06 Jul 2026 14:00', 'Marketing: Kantor'],
+          },
+        ],
+      },
+    ],
+  },
+  customers: {
+    key: 'customers',
+    resource: 'customers',
+    eyebrow: 'Customer Lifecycle',
+    title: 'Customer, Address, dan Subscription',
+    description:
+      'Modul ini menjadi tempat customer master, service address, subscription aktif, dan histori perubahan layanan dalam satu model data.',
+    primaryAction: { label: 'Review Transform Tahap 2', href: '/import/sample-webpsb-user-001' },
+    secondaryAction: { label: 'Lihat Billing', href: '/billing' },
+    summaries: [
+      { label: 'Customer Aktif', value: '10.284' },
+      { label: 'Subscription Aktif', value: '9.876' },
+      { label: 'Address Terkait', value: '10.941' },
+    ],
+    highlights: [
+      { title: 'Master Tunggal', detail: 'Customer dipisah dari order agar billing dan support tidak menggandakan data.' },
+      { title: 'Histori Layanan', detail: 'Perubahan paket dan status layanan disiapkan untuk lifecycle jangka panjang.' },
+    ],
+    reviewSections: [
+      {
+        title: 'Customer Terbaru',
+        description: 'Sampel customer master terbaru untuk menyiapkan review data customer lintas alamat dan layanan aktif.',
+        rows: [
+          {
+            id: 'CUST-001024',
+            primary: 'CUST-001024',
+            secondary: 'Ahmad Fauzi',
+            status: 'HOME',
+            detail: 'Customer rumah tangga dengan alamat utama sudah terpetakan dan siap ditautkan ke billing serta support.',
+            meta: ['Phone: 6285234567890', 'Email: ahmad.fauzi@perkasa.id', 'Address: Jl. Melati No. 18, Pati'],
+          },
+          {
+            id: 'CUST-001023',
+            primary: 'CUST-001023',
+            secondary: 'PT Delta Pangan Nusantara',
+            status: 'CORPORATE',
+            detail: 'Customer corporate dengan kebutuhan layanan dedicated dan potensi multi-address.',
+            meta: ['Phone: 62295220011', 'Email: it@deltapangan.co.id', 'Address: Kawasan Industri Pati Blok C2'],
+          },
+          {
+            id: 'CUST-001022',
+            primary: 'CUST-001022',
+            secondary: 'Rina Maharani',
+            status: 'HOME',
+            detail: 'Customer aktif baru hasil transform tahap 2 dengan kontak dasar sudah siap direview.',
+            meta: ['Phone: 6281333221100', 'Email: rina.maharani@perkasa.id', 'Address: Ds. Sukoharjo RT 03 RW 01'],
+          },
+        ],
+      },
+      {
+        title: 'Subscription Aktif',
+        description: 'Sampel layanan aktif untuk menghubungkan customer master dengan paket, harga bulanan, dan status layanan.',
+        rows: [
+          {
+            id: 'SVC-000812',
+            primary: 'SVC-000812',
+            secondary: 'Home 30 Mbps',
+            status: 'ACTIVE',
+            detail: 'Subscription aktif dengan harga bulanan yang sudah siap mengalir ke invoice dan kontrol suspend.',
+            meta: ['Customer: Ahmad Fauzi', 'Harga: Rp350.000', 'Activated: 04 Jul 2026 09:30'],
+          },
+          {
+            id: 'SVC-000811',
+            primary: 'SVC-000811',
+            secondary: 'Dedicated 50 Mbps',
+            status: 'ACTIVE',
+            detail: 'Layanan corporate aktif dengan dependency tinggi ke uptime dan ticket support prioritas.',
+            meta: ['Customer: PT Delta Pangan Nusantara', 'Harga: Rp1.750.000', 'Activated: 02 Jul 2026 13:15'],
+          },
+          {
+            id: 'SVC-000809',
+            primary: 'SVC-000809',
+            secondary: 'Home 20 Mbps',
+            status: 'ACTIVE',
+            detail: 'Layanan retail standar yang menjadi baseline alur customer -> subscription -> billing.',
+            meta: ['Customer: Rina Maharani', 'Harga: Rp275.000', 'Activated: 30 Jun 2026 10:00'],
+          },
+        ],
+      },
+    ],
+  },
+  support: {
+    key: 'support',
+    resource: 'support',
+    eyebrow: 'Support',
+    title: 'Trouble Ticket, Isolir, dan Dismantle',
+    description:
+      'Area support menampung TT operasional, preventive, isolir aktif, dan histori dismantle dalam satu shell yang konsisten dengan dashboard.',
+    primaryAction: { label: 'Review Batch Support', href: '/import/sample-webpsb-user-001' },
+    secondaryAction: { label: 'Lihat Dashboard', href: '/dashboard' },
+    summaries: [
+      { label: 'TT Open', value: '48' },
+      { label: 'Preventive Open', value: '6' },
+      { label: 'Isolir Aktif', value: '93' },
+    ],
+    highlights: [
+      { title: 'Definisi Sinkron', detail: 'Metrik TT dan repeated ticket disiapkan agar nanti membaca backend yang sama.' },
+      { title: 'Histori Aman', detail: 'Dismantle closed diarahkan ke histori terpisah agar tidak hilang saat sumber aktif dibersihkan.' },
+    ],
+    reviewSections: [
+      {
+        title: 'Trouble Ticket Open',
+        description: 'Sampel queue ticket terbuka untuk menyiapkan review operasional support yang lebih dekat ke data kerja lapangan.',
+        rows: [
+          {
+            id: 'TT-2026-0012',
+            primary: 'TT-2026-0012',
+            secondary: 'Budi Santoso',
+            status: 'OPEN',
+            detail: 'Koneksi putus sejak pagi, menunggu pengecekan ODP terdekat.',
+            meta: ['Type: KONEKSI', 'Customer User: budi.santoso', 'Opened: 06 Jul 2026 08:10'],
+          },
+          {
+            id: 'TT-2026-0011',
+            primary: 'TT-2026-0011',
+            secondary: 'PT Sinar Jaya',
+            status: 'OPEN',
+            detail: 'Keluhan latency tinggi di area kantor cabang, butuh tracing backbone.',
+            meta: ['Type: LATENCY', 'Category: TT', 'Opened: 06 Jul 2026 07:25'],
+          },
+          {
+            id: 'TT-2026-0009',
+            primary: 'TT-2026-0009',
+            secondary: 'Lina Maharani',
+            status: 'OPEN',
+            detail: 'Customer melaporkan modem menyala tetapi internet tidak browsing.',
+            meta: ['Type: MODEM', 'Customer User: lina.maharani', 'Opened: 05 Jul 2026 22:14'],
+          },
+        ],
+      },
+      {
+        title: 'Isolir Aktif',
+        description: 'Sampel pelanggan isolir aktif yang nanti menjadi penghubung ke alur suspend dan dismantle history.',
+        rows: [
+          {
+            id: 'ISO-2026-0042',
+            primary: 'Sri Lestari',
+            secondary: 'Radbox 26',
+            status: 'OPEN',
+            detail: 'Tunggakan berjalan 1 bulan dan masih menunggu follow up penagihan.',
+            meta: ['Phone: 628123456789', 'Marketing: Dhimas', 'Isolasi: 01 Jul 2026'],
+          },
+          {
+            id: 'ISO-2026-0041',
+            primary: 'Hafizh Awangga',
+            secondary: 'Radbox 18',
+            status: 'OPEN',
+            detail: 'Pelanggan belum memberi kepastian restorasi, perlu pemantauan CS.',
+            meta: ['Phone: 628987654321', 'Marketing: Chalis', 'Isolasi: 29 Jun 2026'],
+          },
+          {
+            id: 'ISO-2026-0038',
+            primary: 'Toko Berkah Jaya',
+            secondary: 'Radbox 11',
+            status: 'OPEN',
+            detail: 'Akun bisnis masuk daftar suspend kandidat dan perlu koordinasi billing.',
+            meta: ['Phone: 628111000222', 'Marketing: Kantor', 'Isolasi: 27 Jun 2026'],
+          },
+        ],
+      },
+    ],
+  },
+  inventory: {
+    key: 'inventory',
+    resource: 'inventory',
+    eyebrow: 'Inventory & Network Asset',
+    title: 'Item, Stock Movement, ODP, dan Device Assignment',
+    description:
+      'Shell inventory dipakai untuk menggabungkan GA inventory dengan kebutuhan network asset ISP seperti ODP, port, dan device assignment.',
+    primaryAction: { label: 'Review Inventory Batch', href: '/import/sample-ga-inventory-001' },
+    secondaryAction: { label: 'Lihat Work Order', href: '/support' },
+    summaries: [
+      { label: 'Item Master', value: '1.248' },
+      { label: 'Movement Bulan Ini', value: '312' },
+      { label: 'ODP Terdeteksi', value: '427' },
+    ],
+    highlights: [
+      { title: 'Stock ke Work Order', detail: 'Pergerakan stok nantinya harus bisa ditautkan ke delivery dan support lapangan.' },
+      { title: 'ODP Port Detail', detail: 'Port dan device assignment menjadi penghubung antara inventory dan layanan aktif.' },
+    ],
+  },
+  hr: {
+    key: 'hr',
+    resource: 'hr',
+    eyebrow: 'HR & Internal',
+    title: 'Employee, Attendance, Salary, dan Loan',
+    description:
+      'Shell HR menyatukan data karyawan, absensi, slip gaji, dan kasbon sebagai fondasi kontrol internal yang masih satu platform.',
+    primaryAction: { label: 'Review HR Batch', href: '/import/sample-finance-hr-001' },
+    secondaryAction: { label: 'Buka Dashboard', href: '/dashboard' },
+    summaries: [
+      { label: 'Employee', value: '86' },
+      { label: 'Attendance Hari Ini', value: '79' },
+      { label: 'Loan Aktif', value: '14' },
+    ],
+    highlights: [
+      { title: 'Payroll Dasar', detail: 'Slip gaji dan loan diposisikan sebagai core, bukan add-on terpisah.' },
+      { title: 'Shared Access', detail: 'Data HR tetap masuk satu website, tetapi permission dibatasi secara tegas.' },
+    ],
+  },
+  billing: {
+    key: 'billing',
+    resource: 'billing',
+    eyebrow: 'Billing & Collection',
+    title: 'Invoice, Payment, dan Collection Control',
+    description:
+      'Modul billing menghubungkan subscription, invoice, payment, dan collection action supaya overdue bisa dipantau dari platform yang sama.',
+    primaryAction: { label: 'Review Billing Batch', href: '/import/sample-webpsb-billing-001' },
+    secondaryAction: { label: 'Buka Customer', href: '/customers' },
+    summaries: [
+      { label: 'Invoice Overdue', value: '173' },
+      { label: 'Payment Partial', value: '41' },
+      { label: 'Suspend Candidate', value: '23' },
+    ],
+    highlights: [
+      { title: 'Subscription First', detail: 'Invoice hanya dianggap valid jika terhubung ke layanan yang valid.' },
+      { title: 'Collection Historis', detail: 'Aksi reminder, visit, dan suspend disiapkan sebagai histori operasional yang rapi.' },
+    ],
+    reviewSections: [
+      {
+        title: 'Invoice Perlu Tindak Lanjut',
+        description: 'Sampel invoice overdue atau partial untuk menyiapkan review kontrol penagihan dari database terpadu.',
+        rows: [
+          {
+            id: 'INV-2026-0701',
+            primary: 'INV-2026-0701',
+            secondary: 'Ahmad Fauzi',
+            status: 'OVERDUE',
+            detail: 'Tagihan bulan berjalan belum lunas dan sudah melewati jatuh tempo, perlu reminder lanjutan.',
+            meta: ['Total: Rp350.000', 'Terbayar: Rp0', 'Jatuh Tempo: 05 Jul 2026'],
+          },
+          {
+            id: 'INV-2026-0698',
+            primary: 'INV-2026-0698',
+            secondary: 'PT Delta Pangan Nusantara',
+            status: 'PARTIAL',
+            detail: 'Invoice corporate baru terbayar sebagian dan menunggu konfirmasi pelunasan sisa tagihan.',
+            meta: ['Total: Rp1.750.000', 'Terbayar: Rp1.000.000', 'Jatuh Tempo: 03 Jul 2026'],
+          },
+          {
+            id: 'INV-2026-0687',
+            primary: 'INV-2026-0687',
+            secondary: 'Rina Maharani',
+            status: 'OVERDUE',
+            detail: 'Invoice retail masuk daftar suspend candidate bila belum ada pembayaran lanjutan.',
+            meta: ['Total: Rp275.000', 'Terbayar: Rp0', 'Jatuh Tempo: 30 Jun 2026'],
+          },
+        ],
+      },
+      {
+        title: 'Collection Action Terbaru',
+        description: 'Sampel aktivitas collection terbaru untuk menyiapkan histori reminder, promise to pay, dan suspend.',
+        rows: [
+          {
+            id: 'COL-2026-0104',
+            primary: 'REMINDER',
+            secondary: 'INV-2026-0701',
+            status: 'OPEN',
+            detail: 'Reminder pertama sudah dijadwalkan dan masih menunggu follow up tim collection.',
+            meta: ['Customer: Ahmad Fauzi', 'At: 06 Jul 2026 09:00', 'Follow Up: 07 Jul 2026 09:00'],
+          },
+          {
+            id: 'COL-2026-0103',
+            primary: 'PROMISE_TO_PAY',
+            secondary: 'INV-2026-0698',
+            status: 'DONE',
+            detail: 'Pelanggan corporate memberi komitmen pembayaran sisa tagihan pada jadwal yang disepakati.',
+            meta: ['Customer: PT Delta Pangan Nusantara', 'At: 05 Jul 2026 15:30', 'Follow Up: 08 Jul 2026 10:00'],
+          },
+          {
+            id: 'COL-2026-0099',
+            primary: 'SUSPEND',
+            secondary: 'INV-2026-0687',
+            status: 'OPEN',
+            detail: 'Aksi suspend masih terbuka sambil menunggu validasi akhir dari billing control.',
+            meta: ['Customer: Rina Maharani', 'At: 05 Jul 2026 11:15', 'Follow Up: 06 Jul 2026 16:00'],
+          },
+        ],
+      },
+    ],
+  },
+  access: {
+    key: 'access',
+    resource: 'access_settings',
+    eyebrow: 'Access Control',
+    title: 'Role, Permission, dan Data Access',
+    description:
+      'Halaman ini menyiapkan fondasi untuk auth tunggal, permission lintas modul, dan pembatasan akses data tanpa memecah aplikasi per divisi.',
+    primaryAction: { label: 'Kembali ke Dashboard', href: '/dashboard' },
+    secondaryAction: { label: 'Buka Import Center', href: '/import' },
+    summaries: [
+      { label: 'Role Master', value: '8' },
+      { label: 'Permission Group', value: '14' },
+      { label: 'Menu Shell', value: '9' },
+    ],
+    highlights: [
+      { title: 'Shared Auth', detail: 'Satu pintu login untuk satu domain dan satu website.' },
+      { title: 'Menu per Permission', detail: 'Navigasi lintas modul tetap satu shell, tapi data dibatasi oleh role dan domain access.' },
+    ],
+  },
+}
