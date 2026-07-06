@@ -7,8 +7,11 @@ type ReviewAuthUserRow = {
   fullName: string
   username: string
   email: string | null
+  roleId: number | null
   roleCode: string
+  divisionId: number | null
   divisionName: string | null
+  branchId: number | null
   branchName: string | null
   status: string
 }
@@ -24,8 +27,12 @@ export type AuthUserListItem = {
   fullName: string
   username: string
   email: string
+  roleId: string | null
+  roleCode: string
   roleLabel: string
+  divisionId: string | null
   divisionLabel: string
+  branchId: string | null
   branchLabel: string
   status: string
   source: 'review-db' | 'mock'
@@ -57,8 +64,12 @@ function mapMockUsers(): AuthUserListItem[] {
     fullName: user.displayName,
     username: user.username,
     email: '-',
+    roleId: null,
+    roleCode: user.role,
     roleLabel: formatRoleLabel(user.role),
+    divisionId: null,
     divisionLabel: getMockDivisionLabel(user.username),
+    branchId: null,
     branchLabel: 'Cabang Pati',
     status: 'ACTIVE',
     source: 'mock',
@@ -97,8 +108,11 @@ async function getReviewDbUsers() {
         au.full_name AS fullName,
         au.username AS username,
         au.email AS email,
+        ar.id AS roleId,
         ar.code AS roleCode,
+        od.id AS divisionId,
         od.name AS divisionName,
+        ob.id AS branchId,
         ob.name AS branchName,
         au.status AS status
       FROM auth_users au
@@ -124,8 +138,12 @@ async function getReviewDbUsers() {
     fullName: row.fullName,
     username: row.username,
     email: row.email?.trim() || '-',
+    roleId: row.roleId == null ? null : String(row.roleId),
+    roleCode: row.roleCode,
     roleLabel: formatRoleLabel(row.roleCode),
+    divisionId: row.divisionId == null ? null : String(row.divisionId),
     divisionLabel: row.divisionName?.trim() || 'Semua Divisi',
+    branchId: row.branchId == null ? null : String(row.branchId),
     branchLabel: row.branchName?.trim() || 'Tanpa Cabang',
     status: row.status,
     source: 'review-db',

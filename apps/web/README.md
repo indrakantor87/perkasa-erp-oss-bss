@@ -39,6 +39,7 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 - detail batch import sekarang memiliki tombol validasi batch dan trigger transform tahap 1-4 dari web untuk role yang memiliki izin approve
 - detail batch import sekarang juga menampilkan histori aksi terstruktur untuk create, upload, validasi, dan transform
 - shell domain `sales`, `customers`, `support`, `inventory`, `hr`, dan `billing` sudah bisa mengganti angka summary dari query review DB
+- `settings/users` sekarang mendukung create user, edit profil inti, ubah role/divisi/cabang/status, dan reset password review dari web
 - shell domain `sales` sudah menampilkan review operasional awal berupa daftar `lead terbaru` dan `survey/order berjalan` dari review DB, lalu fallback ke sampel mock saat koneksi tidak siap
 - domain `sales` sudah memiliki write action awal berupa form `lead review` yang menulis prospek baru ke `sales_leads` saat mode `review-db` aktif
 - domain `support` sudah memiliki write action awal berupa form `trouble ticket review` yang menulis ticket open baru ke `support_trouble_tickets` saat mode `review-db` aktif

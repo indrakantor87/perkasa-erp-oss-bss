@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { AuthUserCreateForm } from '@/components/auth-user-create-form'
+import { AuthUserManagementTable } from '@/components/auth-user-management-table'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { canAccessPath, canPerformAction } from '@/lib/access-control'
 import { requireSession } from '@/lib/auth'
@@ -81,79 +82,24 @@ export default async function UserSettingsPage() {
         branchOptions={branchOptions}
       />
 
-      <section className="panel overflow-hidden">
-        <div className="border-b border-line px-6 py-5">
-          <p className="section-title">Auth Directory</p>
-          <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
-            Daftar akun review
-          </h3>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-line text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.16em] text-mute">
-              <tr>
-                <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4">Divisi</th>
-                <th className="px-6 py-4">Cabang</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Sumber</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line bg-white">
-              {users.length ? (
-                users.map((user) => (
-                  <tr key={user.id}>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-950">{user.fullName}</div>
-                      <div className="mt-1 text-xs text-mute">
-                        {user.username} • {user.email}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-700">{user.roleLabel}</td>
-                    <td className="px-6 py-4 text-slate-700">{user.divisionLabel}</td>
-                    <td className="px-6 py-4 text-slate-700">{user.branchLabel}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`badge ${
-                          user.status === 'ACTIVE'
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'border-slate-200 bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {user.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="badge border-line bg-slate-50 text-slate-700">
-                        {user.source}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-mute">
-                    Belum ada user review di `auth_users`. Jalankan seed auth internal untuk mulai
-                    menguji login review DB.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <AuthUserManagementTable
+        users={users}
+        canManage={canManage}
+        reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+        roleOptions={roleOptions}
+        divisionOptions={divisionOptions}
+        branchOptions={branchOptions}
+      />
 
       <section className="panel p-6">
         <p className="section-title">Arah Berikutnya</p>
         <div className="mt-4 space-y-4">
           <article className="rounded-2xl border border-line bg-slate-50 p-5">
-            <h3 className="text-sm font-semibold text-slate-950">Create dulu, reset menyusul</h3>
+            <h3 className="text-sm font-semibold text-slate-950">Create, edit, lalu reset</h3>
             <p className="mt-3 text-sm leading-6 text-mute">
               Halaman ini sekarang sudah bisa dipakai untuk menambah akun internal baru ke
-              `auth_users`. Langkah berikutnya yang paling logis adalah reset password, edit profil,
-              dan deactivate user.
+              `auth_users`, mengubah profil inti, mengaktifkan atau menonaktifkan user, dan reset
+              password dari web review.
             </p>
           </article>
           <article className="rounded-2xl border border-line bg-slate-50 p-5">

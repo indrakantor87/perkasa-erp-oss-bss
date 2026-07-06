@@ -96,16 +96,16 @@ Status dipakai dengan arti:
 
 ## Prioritas Implementasi Berikutnya
 
-1. Aktifkan write action Import Center:
-   create batch, validasi, dan trigger transform tahap 1-4.
-2. Lengkapi user internal:
-   edit user, reset password, deactivate/reactivate.
-3. Lengkapi workflow domain inti:
+1. Lengkapi workflow domain inti:
    sales order, work order, payment, dan support close flow.
-4. Hidupkan inventory dan HR:
+2. Hidupkan inventory dan HR:
    review section operasional + write action awal.
-5. Rapikan mobile behavior:
+3. Rapikan mobile behavior:
    pola card/stacked row untuk tabel sempit dan form panjang.
+4. Tambahkan audit perubahan user internal:
+   catat perubahan role, status, dan reset password ke log yang lebih formal.
+5. Perluas parser legacy per domain:
+   dukung format input yang lebih longgar di luar JSON/XLSX terstruktur.
 
 ## Catatan
 

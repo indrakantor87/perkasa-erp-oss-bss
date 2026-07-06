@@ -10,6 +10,24 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.38.0] - 2026-07-06
+
+### Added
+
+- komponen `apps/web/components/auth-user-management-table.tsx` untuk mengelola user internal langsung dari halaman `settings/users`
+- endpoint `PATCH /api/settings/users/[id]` di `apps/web/app/api/settings/users/[id]/route.ts` untuk update profil inti user dan reset password review
+
+### Changed
+
+- `apps/web/lib/services/auth-user-service.ts` diperluas agar list user membawa `roleId`, `roleCode`, `divisionId`, dan `branchId` sebagai basis form edit
+- `apps/web/app/settings/users/page.tsx` sekarang menampilkan table manage user, bukan hanya direktori read-only
+- `apps/web/README.md`, `docs/prd-web-checklist.md`, dan `VERSION` diperbarui untuk mencerminkan milestone manajemen user internal yang lebih lengkap
+
+### Notes
+
+- versi `0.38.0` menutup gap utama pada `settings/users`: user review sekarang bisa dibuat, diedit, dinonaktifkan/diaktifkan kembali, dan password-nya direset dari web
+- username sengaja tetap dikunci pada tahap ini agar identitas login tidak berubah sembarangan saat fondasi auth internal masih distabilkan
+
 ## [0.37.0] - 2026-07-06
 
 ### Added
