@@ -76,6 +76,19 @@ CREATE TABLE IF NOT EXISTS auth_users (
   CONSTRAINT fk_auth_users_role FOREIGN KEY (role_id) REFERENCES auth_roles(id)
 );
 
+CREATE TABLE IF NOT EXISTS auth_user_audit_logs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  auth_user_id BIGINT UNSIGNED NOT NULL,
+  action_type ENUM('CREATE','UPDATE','RESET_PASSWORD') NOT NULL,
+  actor_name VARCHAR(150) NOT NULL,
+  target_username VARCHAR(80) NOT NULL,
+  detail_text TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_auth_user_audit_logs_user (auth_user_id),
+  CONSTRAINT fk_auth_user_audit_logs_user FOREIGN KEY (auth_user_id) REFERENCES auth_users(id)
+);
+
 CREATE TABLE IF NOT EXISTS crm_customers (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   customer_code VARCHAR(50) NOT NULL,

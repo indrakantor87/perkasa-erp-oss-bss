@@ -99,6 +99,8 @@ async function main() {
   assert.equal(authUsersPage.users[0]?.source.length > 0, true)
   assert.equal(authUsersPage.roleOptions.length > 0, true)
   assert.equal(authUsersPage.branchOptions.length > 0, true)
+  assert.equal((authUsersPage.auditItems.length ?? 0) > 0, true)
+  assert.equal((authUsersPage.auditItems[0]?.targetUser.length ?? 0) > 0, true)
 
   const supportDomain = await getDomainPageData('support', 'OPERATOR')
   assert.equal(supportDomain?.content.resource, 'support')

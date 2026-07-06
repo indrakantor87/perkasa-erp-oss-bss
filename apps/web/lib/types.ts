@@ -119,6 +119,15 @@ export type BatchDetail = {
   rows: BatchRow[]
 }
 
+export type AuthUserAuditItem = {
+  id: string
+  actionType: 'CREATE' | 'UPDATE' | 'RESET_PASSWORD'
+  actor: string
+  targetUser: string
+  detail: string
+  happenedAt: string
+}
+
 export type ImportOverview = {
   items: ImportBatch[]
   stages: TransformStage[]

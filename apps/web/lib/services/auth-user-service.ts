@@ -1,6 +1,8 @@
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { mockAuthUsers } from '@/lib/auth-session'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { getRecentAuthUserAudits } from '@/lib/services/auth-user-audit-service'
+import type { AuthUserAuditItem } from '@/lib/types'
 
 type ReviewAuthUserRow = {
   id: number
@@ -90,6 +92,27 @@ function mapMockLookupOptions() {
     ],
     branchOptions: [{ id: '1', code: 'PATI', label: 'Cabang Pati' }],
   }
+}
+
+function mapMockAudits(): AuthUserAuditItem[] {
+  return [
+    {
+      id: 'mock-audit-create-admin',
+      actionType: 'CREATE',
+      actor: 'System Review',
+      targetUser: 'admin.perkasa',
+      detail: 'Akun bootstrap admin tersedia untuk menjaga alur review tetap hidup.',
+      happenedAt: '2026-07-06 09:00',
+    },
+    {
+      id: 'mock-audit-create-cs',
+      actionType: 'CREATE',
+      actor: 'System Review',
+      targetUser: 'cs.review',
+      detail: 'Akun bootstrap CS disediakan sebagai fallback saat review DB auth belum siap penuh.',
+      happenedAt: '2026-07-06 09:05',
+    },
+  ]
 }
 
 function mapLookupRows(rows: ReviewLookupRow[]) {
@@ -209,16 +232,22 @@ export async function getAuthUsersPageData() {
       source,
       users,
       summary: buildSummary(users),
+      auditItems: mapMockAudits(),
       ...lookupOptions,
     }
   }
 
   try {
-    const [users, lookupOptions] = await Promise.all([getReviewDbUsers(), getReviewDbLookupOptions()])
+    const [users, lookupOptions, auditItems] = await Promise.all([
+      getReviewDbUsers(),
+      getReviewDbLookupOptions(),
+      getRecentAuthUserAudits().catch(() => []),
+    ])
     return {
       source,
       users,
       summary: buildSummary(users),
+      auditItems,
       ...lookupOptions,
     }
   } catch (error) {
@@ -228,6 +257,7 @@ export async function getAuthUsersPageData() {
       source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
       users,
       summary: buildSummary(users),
+      auditItems: mapMockAudits(),
       ...lookupOptions,
     }
   }

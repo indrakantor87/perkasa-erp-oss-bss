@@ -3,6 +3,7 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { recordAuthUserAudit } from '@/lib/services/auth-user-audit-service'
 
 type LookupRow = {
   id: number
@@ -10,6 +11,13 @@ type LookupRow = {
 
 type UserLookupRow = {
   id: number
+  username: string
+  fullName: string
+  email: string | null
+  roleId: number | null
+  divisionId: number | null
+  branchId: number | null
+  status: string
 }
 
 type CountRow = {
@@ -41,6 +49,13 @@ async function getUserById(id: number) {
   const [row] = await runReviewDbQuery<UserLookupRow>(
     `
       SELECT id
+        , username AS username
+        , full_name AS fullName
+        , email AS email
+        , role_id AS roleId
+        , division_id AS divisionId
+        , branch_id AS branchId
+        , status AS status
       FROM auth_users
       WHERE id = ?
       LIMIT 1
@@ -49,6 +64,43 @@ async function getUserById(id: number) {
   )
 
   return row ?? null
+}
+
+function getUpdateDetail(params: {
+  previous: UserLookupRow
+  next: {
+    fullName: string
+    email: string | null
+    roleId: number
+    divisionId: number | null
+    branchId: number | null
+    status: string
+  }
+}) {
+  const changes: string[] = []
+
+  if (params.previous.fullName !== params.next.fullName) {
+    changes.push(`nama: ${params.previous.fullName} -> ${params.next.fullName}`)
+  }
+  if ((params.previous.email ?? '') !== (params.next.email ?? '')) {
+    changes.push(`email: ${params.previous.email ?? '-'} -> ${params.next.email ?? '-'}`)
+  }
+  if ((params.previous.roleId ?? 0) !== params.next.roleId) {
+    changes.push(`role ID: ${params.previous.roleId ?? '-'} -> ${params.next.roleId}`)
+  }
+  if ((params.previous.divisionId ?? 0) !== (params.next.divisionId ?? 0)) {
+    changes.push(`divisi ID: ${params.previous.divisionId ?? '-'} -> ${params.next.divisionId ?? '-'}`)
+  }
+  if ((params.previous.branchId ?? 0) !== (params.next.branchId ?? 0)) {
+    changes.push(`cabang ID: ${params.previous.branchId ?? '-'} -> ${params.next.branchId ?? '-'}`)
+  }
+  if (params.previous.status !== params.next.status) {
+    changes.push(`status: ${params.previous.status} -> ${params.next.status}`)
+  }
+
+  return changes.length
+    ? `Profil user internal diperbarui (${changes.join('; ')}).`
+    : 'Profil user internal disimpan ulang tanpa perubahan field utama.'
 }
 
 export async function PATCH(
@@ -169,6 +221,21 @@ export async function PATCH(
       [branchId, divisionId, roleId, fullName, email, status, userId]
     )
 
+    try {
+      await recordAuthUserAudit({
+        authUserId: userId,
+        actionType: 'UPDATE',
+        actor: session.displayName,
+        targetUsername: existingUser.username,
+        detail: getUpdateDetail({
+          previous: existingUser,
+          next: { fullName, email, roleId, divisionId, branchId, status },
+        }),
+      })
+    } catch {
+      // Audit tidak boleh membatalkan update utama.
+    }
+
     if (newPassword) {
       const passwordHash = `sha256:${createHash('sha256').update(newPassword).digest('hex')}`
       await runReviewDbExecute(
@@ -179,6 +246,18 @@ export async function PATCH(
         `,
         [passwordHash, userId]
       )
+
+      try {
+        await recordAuthUserAudit({
+          authUserId: userId,
+          actionType: 'RESET_PASSWORD',
+          actor: session.displayName,
+          targetUsername: existingUser.username,
+          detail: 'Password user internal direset melalui halaman settings/users.',
+        })
+      } catch {
+        // Audit tidak boleh membatalkan reset password utama.
+      }
     }
 
     return Response.json({

@@ -10,6 +10,25 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.39.0] - 2026-07-06
+
+### Added
+
+- service `apps/web/lib/services/auth-user-audit-service.ts` untuk ensure table, mencatat, dan membaca audit log perubahan user internal
+- komponen `apps/web/components/auth-user-audit-list.tsx` untuk menampilkan jejak create, update, dan reset password di halaman `settings/users`
+- tabel `auth_user_audit_logs` pada `database/xampp_review_schema.sql` sebagai fondasi audit formal user internal
+
+### Changed
+
+- `apps/web/app/api/settings/users/route.ts` sekarang mencatat audit saat user internal baru dibuat
+- `apps/web/app/api/settings/users/[id]/route.ts` sekarang mencatat audit update profil dan reset password tanpa memblokir aksi utama
+- `apps/web/app/settings/users/page.tsx`, `apps/web/lib/services/auth-user-service.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone audit user internal tercermin di UI, fallback mock, pengujian, dan tracker PRD
+
+### Notes
+
+- versi `0.39.0` menutup gap audit dasar pada modul `settings/users`, sehingga create, edit, change status, dan reset password kini punya jejak formal di web review
+- audit tetap dirancang defensif: kegagalan pencatatan log tidak membatalkan aksi utama create/update/reset password
+
 ## [0.38.0] - 2026-07-06
 
 ### Added

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { AuthUserAuditList } from '@/components/auth-user-audit-list'
 import { AuthUserCreateForm } from '@/components/auth-user-create-form'
 import { AuthUserManagementTable } from '@/components/auth-user-management-table'
 import { DataSourceStatus } from '@/components/data-source-status'
@@ -13,7 +14,7 @@ export default async function UserSettingsPage() {
     redirect('/dashboard')
   }
 
-  const { source, users, summary, roleOptions, divisionOptions, branchOptions } =
+  const { source, users, summary, auditItems, roleOptions, divisionOptions, branchOptions } =
     await getAuthUsersPageData()
   const canManage = canPerformAction(session.role, 'user_settings', 'manage')
 
@@ -90,6 +91,8 @@ export default async function UserSettingsPage() {
         divisionOptions={divisionOptions}
         branchOptions={branchOptions}
       />
+
+      <AuthUserAuditList items={auditItems} />
 
       <section className="panel p-6">
         <p className="section-title">Arah Berikutnya</p>

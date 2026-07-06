@@ -26,7 +26,7 @@ Status dipakai dengan arti:
 | Inventory | BELUM | Masih shell + summary |
 | HR | BELUM | Masih shell + summary |
 | Settings access | PARSIAL | Matrix akses ada, permission master dinamis belum |
-| Settings users | PARSIAL | List + create sudah ada, edit/reset/deactivate belum |
+| Settings users | SUDAH | List, create, edit, reset password, deactivate/reactivate, dan audit perubahan user sudah ada |
 | Mobile readiness | PARSIAL | Shell adaptif, mode detail mobile belum merata |
 | Prisma target | BELUM | Saat ini masih memakai `mysql2` langsung |
 
@@ -48,8 +48,8 @@ Status dipakai dengan arti:
 | HR shell: employee, attendance, salary, loan | BELUM | Baru shell domain dan summary | Review section dan write action belum ada | Tinggi |
 | Billing shell: invoice, payment, collection, overdue | PARSIAL | Collection action dan review invoice sudah ada | Payment entry dan lifecycle invoice belum lengkap | Sangat Tinggi |
 | Settings access dan permission | PARSIAL | Permission matrix dan access summary sudah ada | Permission master dinamis dan audit perubahan belum ada | Tinggi |
-| Settings users internal | PARSIAL | Direktori user + create user ke `auth_users` sudah ada | Edit user, reset password, deactivate/reactivate belum ada | Sangat Tinggi |
-| Audit log dasar | BELUM | Belum ada modul/layar khusus audit | Perubahan write action belum tercatat terpusat | Tinggi |
+| Settings users internal | SUDAH | Direktori user, create user, edit profil, reset password, deactivate/reactivate, dan panel audit perubahan sudah ada | Audit masih terfokus pada user internal, belum lintas seluruh modul write action | Tinggi |
+| Audit log dasar | PARSIAL | Audit perubahan user internal sudah tercatat di `auth_user_audit_logs` dan tampil di web | Belum menjadi audit terpusat lintas import, sales, support, billing, dan modul lain | Tinggi |
 | Kompatibilitas mobile web | PARSIAL | Shell dan login cukup aman di layar kecil | Tabel review/detail belum punya pola card/stacked merata | Tinggi |
 | Android wrapper readiness | PARSIAL | Arsitektur mengarah ke sana dan shell aman sebagai basis | Integrasi wrapper dan pengujian jalur mobile belum formal | Sedang |
 | Prisma sebagai target data layer | BELUM | Service layer sudah ada | Implementasi masih memakai `mysql2/promise` langsung | Sedang |
@@ -102,8 +102,8 @@ Status dipakai dengan arti:
    review section operasional + write action awal.
 3. Rapikan mobile behavior:
    pola card/stacked row untuk tabel sempit dan form panjang.
-4. Tambahkan audit perubahan user internal:
-   catat perubahan role, status, dan reset password ke log yang lebih formal.
+4. Perluas audit perubahan lintas modul:
+   bawa pola audit formal dari `settings/users` ke import, sales, support, dan billing.
 5. Perluas parser legacy per domain:
    dukung format input yang lebih longgar di luar JSON/XLSX terstruktur.
 

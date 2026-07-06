@@ -3,6 +3,7 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { recordAuthUserAudit } from '@/lib/services/auth-user-audit-service'
 
 type ExecuteResult = {
   insertId?: number
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
 
     const passwordHash = `sha256:${createHash('sha256').update(password).digest('hex')}`
 
-    await runReviewDbExecute<ExecuteResult>(
+    const result = await runReviewDbExecute<ExecuteResult>(
       `
         INSERT INTO auth_users (
           branch_id,
@@ -157,6 +158,20 @@ export async function POST(request: Request) {
       `,
       [branchId, divisionId, roleId, fullName, username, email, passwordHash, status]
     )
+
+    if (typeof result.insertId === 'number' && result.insertId > 0) {
+      try {
+        await recordAuthUserAudit({
+          authUserId: result.insertId,
+          actionType: 'CREATE',
+          actor: session.displayName,
+          targetUsername: username,
+          detail: `User internal dibuat dengan role ID ${roleId}, status ${status}, dan nama ${fullName}.`,
+        })
+      } catch {
+        // Audit tidak boleh membatalkan pembuatan user utama.
+      }
+    }
 
     return Response.json({
       message: `User internal ${fullName} berhasil disimpan.`,
