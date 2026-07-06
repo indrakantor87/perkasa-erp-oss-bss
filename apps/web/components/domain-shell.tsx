@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
 import { CustomerCreateForm } from '@/components/customer-create-form'
 import { SalesLeadCreateForm } from '@/components/sales-lead-create-form'
+import { SupportTicketCloseForm } from '@/components/support-ticket-close-form'
 import { SupportTicketCreateForm } from '@/components/support-ticket-create-form'
 import { DataSourceStatus } from '@/components/data-source-status'
 import type { DomainCapability, DomainPageContent, DataSourceSnapshot } from '@/lib/types'
@@ -17,6 +18,7 @@ export function DomainShell({
 }) {
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
+  const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
   const billingInvoiceSuggestions =
     content.key === 'billing'
       ? (content.reviewSections?.[0]?.rows ?? []).map((row) => row.primary)
@@ -50,6 +52,13 @@ export function DomainShell({
               ),
           ),
         )
+      : []
+  const supportTicketSuggestions =
+    content.key === 'support'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('TROUBLE'))
+          .flatMap((section) => section.rows)
+          .map((row) => row.primary)
       : []
 
   return (
@@ -159,11 +168,18 @@ export function DomainShell({
       ) : null}
 
       {content.key === 'support' ? (
-        <SupportTicketCreateForm
-          canCreate={canCreate}
-          reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-          typeSuggestions={supportTypeSuggestions}
-        />
+        <section className="grid gap-6 xl:grid-cols-2">
+          <SupportTicketCreateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            typeSuggestions={supportTypeSuggestions}
+          />
+          <SupportTicketCloseForm
+            canUpdate={canUpdate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            ticketSuggestions={supportTicketSuggestions}
+          />
+        </section>
       ) : null}
 
       {content.reviewSections && content.reviewSections.length > 0 ? (

@@ -10,6 +10,23 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.40.0] - 2026-07-06
+
+### Added
+
+- komponen `apps/web/components/support-ticket-close-form.tsx` untuk menutup trouble ticket open langsung dari halaman domain `support`
+- route `POST /api/support/trouble-tickets/[ticketCode]/close` di `apps/web/app/api/support/trouble-tickets/[ticketCode]/close/route.ts` untuk menyimpan hasil close ke review DB
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan dua form write action pada domain `support`: create ticket dan close ticket
+- `apps/web/README.md` dan `docs/prd-web-checklist.md` diperbarui agar milestone close flow support tercermin pada dokumentasi implementasi web
+
+### Notes
+
+- versi `0.40.0` menutup gap penting pada domain `support`: web review sekarang tidak hanya bisa membuat trouble ticket open, tetapi juga menutup ticket yang masih aktif langsung ke `support_trouble_tickets`
+- cakupan support masih bersifat parsial karena SLA penuh, isolir action, dan dismantle flow belum dihidupkan dari web
+
 ## [0.39.0] - 2026-07-06
 
 ### Added

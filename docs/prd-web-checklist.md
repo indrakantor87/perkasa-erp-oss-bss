@@ -21,7 +21,7 @@ Status dipakai dengan arti:
 | Detail batch | SUDAH | Row review dan summary batch sudah ada |
 | Sales | PARSIAL | Lead review sudah bisa create, workflow belum lengkap |
 | Customers | PARSIAL | Customer master sudah bisa create, lifecycle belum lengkap |
-| Support | PARSIAL | TT review sudah bisa create, close/SLA belum lengkap |
+| Support | PARSIAL | TT review sudah bisa create dan close, SLA belum lengkap |
 | Billing | PARSIAL | Collection action sudah bisa create, payment/invoice penuh belum |
 | Inventory | BELUM | Masih shell + summary |
 | HR | BELUM | Masih shell + summary |
@@ -43,7 +43,7 @@ Status dipakai dengan arti:
 | Filter review batch dan row bermasalah | PARSIAL | Detail row sudah ada | Filter interaktif per status/domain/source belum penuh | Sedang |
 | Sales shell: lead, coverage, survey, order | PARSIAL | Lead review sudah bisa create | Coverage, survey, dan sales order belum hidup | Sangat Tinggi |
 | Customer shell: master, address, subscription, histori | PARSIAL | Create customer + primary address sudah ada | Subscription lifecycle dan histori layanan belum lengkap | Tinggi |
-| Support shell: TT, isolir, dismantle, SLA | PARSIAL | TT open review sudah ada, create TT sudah ada | Close ticket, SLA penuh, isolir action, dismantle flow belum ada | Sangat Tinggi |
+| Support shell: TT, isolir, dismantle, SLA | PARSIAL | TT open review sudah ada, create TT dan close ticket sudah ada | SLA penuh, isolir action, dan dismantle flow belum ada | Sangat Tinggi |
 | Inventory shell: item, stock movement, ODP, device assignment | BELUM | Baru shell domain dan summary | Review section dan write action belum ada | Tinggi |
 | HR shell: employee, attendance, salary, loan | BELUM | Baru shell domain dan summary | Review section dan write action belum ada | Tinggi |
 | Billing shell: invoice, payment, collection, overdue | PARSIAL | Collection action dan review invoice sudah ada | Payment entry dan lifecycle invoice belum lengkap | Sangat Tinggi |
