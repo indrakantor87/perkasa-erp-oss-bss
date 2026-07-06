@@ -64,6 +64,12 @@ type ReviewDbSupportIsolationRow = {
   isolationDate: string | Date
 }
 
+type ReviewDbSupportSlaRow = {
+  troubleType: string
+  durationDays: number
+  updatedAt: string | Date
+}
+
 type ReviewDbCustomerRow = {
   customerCode: string
   customerName: string
@@ -282,6 +288,16 @@ async function getReviewDbSupportSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const slaRows = await runReviewDbQuery<ReviewDbSupportSlaRow>(`
+    SELECT
+      trouble_type AS troubleType,
+      duration_days AS durationDays,
+      updated_at AS updatedAt
+    FROM support_trouble_ticket_sla
+    ORDER BY updated_at DESC, trouble_type ASC
+    LIMIT 5
+  `)
+
   return [
     {
       title: 'Trouble Ticket Open',
@@ -312,6 +328,21 @@ async function getReviewDbSupportSections(): Promise<DomainReviewSection[]> {
           `Phone: ${item.customerPhone || '-'}`,
           `Marketing: ${item.marketingName || '-'}`,
           `Isolasi: ${formatDateTime(item.isolationDate)}`,
+        ],
+      })),
+    },
+    {
+      title: 'SLA Trouble Ticket',
+      description: 'Master SLA aktif dari review DB untuk menjaga target penanganan per tipe ticket tetap terukur.',
+      rows: slaRows.map((item) => ({
+        id: `SLA-${item.troubleType}`,
+        primary: item.troubleType,
+        secondary: `${item.durationDays} hari`,
+        status: 'ACTIVE',
+        detail: `Ticket dengan tipe ${item.troubleType} ditargetkan selesai maksimal ${item.durationDays} hari sejak dibuka.`,
+        meta: [
+          `Durasi: ${item.durationDays} hari`,
+          `Updated: ${formatDateTime(item.updatedAt)}`,
         ],
       })),
     },

@@ -10,6 +10,58 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.43.0] - 2026-07-06
+
+### Added
+
+- komponen `apps/web/components/support-isolation-restore-form.tsx` untuk menutup isolir aktif langsung dari halaman domain `support`
+- route `POST /api/support/isolations/[id]/restore` di `apps/web/app/api/support/isolations/[id]/restore/route.ts` untuk menyimpan restorasi isolir ke tabel `support_isolations`
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan write action restorasi isolir di samping create ticket, close ticket, kelola SLA, dan tambah isolir aktif
+- `apps/web/README.md` dan `docs/prd-web-checklist.md` diperbarui agar milestone restorasi isolir tercermin pada dokumentasi implementasi web
+
+### Notes
+
+- versi `0.43.0` menutup loop dasar workflow isolir: web sekarang bisa menambah isolir aktif dan menutupnya kembali melalui restorasi
+- cakupan support tetap parsial karena dismantle flow web dan automasi SLA penuh masih belum tersedia
+
+## [0.42.0] - 2026-07-06
+
+### Added
+
+- komponen `apps/web/components/support-isolation-form.tsx` untuk menambah pelanggan isolir aktif langsung dari halaman domain `support`
+- route `POST /api/support/isolations` di `apps/web/app/api/support/isolations/route.ts` untuk menyimpan data isolir aktif ke tabel `support_isolations`
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan empat write action awal pada domain `support`: create ticket, close ticket, kelola SLA, dan tambah isolir aktif
+- `apps/web/README.md` dan `docs/prd-web-checklist.md` diperbarui agar milestone isolir support tercermin pada dokumentasi implementasi web
+
+### Notes
+
+- versi `0.42.0` memperluas domain `support` ke write action isolir dasar yang menjadi jembatan menuju workflow suspend, restorasi, dan dismantle
+- cakupan support masih parsial karena close/open TT, SLA, dan isolir sudah hidup, tetapi restorasi isolir dan dismantle flow web masih belum tersedia
+
+## [0.41.0] - 2026-07-06
+
+### Added
+
+- komponen `apps/web/components/support-sla-form.tsx` untuk membuat atau memperbarui SLA trouble ticket langsung dari halaman domain `support`
+- route `POST /api/support/trouble-ticket-sla` di `apps/web/app/api/support/trouble-ticket-sla/route.ts` untuk menyimpan SLA ke tabel `support_trouble_ticket_sla`
+
+### Changed
+
+- `apps/web/lib/services/domain-service.ts` sekarang memuat daftar SLA aktif dari review DB dan menampilkannya sebagai review section baru pada domain `support`
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan form SLA support untuk role yang memiliki izin approve
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone SLA support tercermin pada fallback mock, pengujian, dan dokumentasi
+
+### Notes
+
+- versi `0.41.0` memperluas domain `support` dari open/close trouble ticket ke kontrol SLA dasar per tipe ticket
+- cakupan support masih parsial karena isolir action dan dismantle flow web masih belum dihidupkan
+
 ## [0.40.0] - 2026-07-06
 
 ### Added

@@ -2,8 +2,11 @@ import Link from 'next/link'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
 import { CustomerCreateForm } from '@/components/customer-create-form'
 import { SalesLeadCreateForm } from '@/components/sales-lead-create-form'
+import { SupportIsolationForm } from '@/components/support-isolation-form'
+import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
 import { SupportTicketCloseForm } from '@/components/support-ticket-close-form'
 import { SupportTicketCreateForm } from '@/components/support-ticket-create-form'
+import { SupportSlaForm } from '@/components/support-sla-form'
 import { DataSourceStatus } from '@/components/data-source-status'
 import type { DomainCapability, DomainPageContent, DataSourceSnapshot } from '@/lib/types'
 
@@ -19,6 +22,7 @@ export function DomainShell({
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
+  const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
   const billingInvoiceSuggestions =
     content.key === 'billing'
       ? (content.reviewSections?.[0]?.rows ?? []).map((row) => row.primary)
@@ -59,6 +63,41 @@ export function DomainShell({
           .filter((section) => section.title.toUpperCase().includes('TROUBLE'))
           .flatMap((section) => section.rows)
           .map((row) => row.primary)
+      : []
+  const supportRadboxSuggestions =
+    content.key === 'support'
+      ? Array.from(
+          new Set(
+            (content.reviewSections ?? [])
+              .filter((section) => section.title.toUpperCase().includes('ISOLIR'))
+              .flatMap((section) => section.rows)
+              .map((row) => row.secondary.trim())
+              .filter((item) => item && !item.toLowerCase().includes('belum terpetakan')),
+          ),
+        )
+      : []
+  const supportMarketingSuggestions =
+    content.key === 'support'
+      ? Array.from(
+          new Set(
+            (content.reviewSections ?? [])
+              .filter((section) => section.title.toUpperCase().includes('ISOLIR'))
+              .flatMap((section) => section.rows)
+              .flatMap((row) =>
+                row.meta
+                  .filter((item) => item.startsWith('Marketing: '))
+                  .map((item) => item.replace('Marketing: ', '').trim())
+                  .filter((item) => item && item !== '-'),
+              ),
+          ),
+        )
+      : []
+  const supportIsolationSuggestions =
+    content.key === 'support'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('ISOLIR'))
+          .flatMap((section) => section.rows)
+          .map((row) => `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`)
       : []
 
   return (
@@ -178,6 +217,22 @@ export function DomainShell({
             canUpdate={canUpdate}
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
             ticketSuggestions={supportTicketSuggestions}
+          />
+          <SupportSlaForm
+            canApprove={canApprove}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            typeSuggestions={supportTypeSuggestions}
+          />
+          <SupportIsolationForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            radboxSuggestions={supportRadboxSuggestions}
+            marketingSuggestions={supportMarketingSuggestions}
+          />
+          <SupportIsolationRestoreForm
+            canUpdate={canUpdate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            isolationSuggestions={supportIsolationSuggestions}
           />
         </section>
       ) : null}

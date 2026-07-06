@@ -107,8 +107,9 @@ async function main() {
   assert.equal(supportDomain?.source.effectiveMode, 'mock')
   assert.equal(supportDomain?.capabilities.find((item) => item.action === 'create')?.enabled, true)
   assert.equal(supportDomain?.capabilities.find((item) => item.action === 'approve')?.enabled, false)
-  assert.equal((supportDomain?.content.reviewSections?.length ?? 0) > 0, true)
+  assert.equal((supportDomain?.content.reviewSections?.length ?? 0) >= 3, true)
   assert.equal(supportDomain?.content.reviewSections?.[0]?.rows.length, 3)
+  assert.equal(supportDomain?.content.reviewSections?.[2]?.title, 'SLA Trouble Ticket')
 
   const salesDomain = await getDomainPageData('sales', 'ADMIN_DIVISI')
   assert.equal(salesDomain?.content.resource, 'sales')

@@ -242,6 +242,36 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
           },
         ],
       },
+      {
+        title: 'SLA Trouble Ticket',
+        description: 'Sampel SLA aktif untuk menyiapkan kontrol target penanganan per tipe ticket.',
+        rows: [
+          {
+            id: 'SLA-KONEKSI',
+            primary: 'KONEKSI',
+            secondary: '1 hari',
+            status: 'ACTIVE',
+            detail: 'Gangguan koneksi utama ditargetkan selesai maksimal 1 hari sejak ticket dibuka.',
+            meta: ['Durasi: 1 hari', 'Updated: 06 Jul 2026 08:00'],
+          },
+          {
+            id: 'SLA-LATENCY',
+            primary: 'LATENCY',
+            secondary: '2 hari',
+            status: 'ACTIVE',
+            detail: 'Keluhan latency diberi target penyelesaian 2 hari karena sering membutuhkan tracing lanjutan.',
+            meta: ['Durasi: 2 hari', 'Updated: 05 Jul 2026 16:30'],
+          },
+          {
+            id: 'SLA-PREVENTIVE',
+            primary: 'PREVENTIVE',
+            secondary: '7 hari',
+            status: 'ACTIVE',
+            detail: 'Pekerjaan preventive dijaga pada siklus 7 hari agar backlog maintenance tetap terukur.',
+            meta: ['Durasi: 7 hari', 'Updated: 04 Jul 2026 10:15'],
+          },
+        ],
+      },
     ],
   },
   inventory: {
