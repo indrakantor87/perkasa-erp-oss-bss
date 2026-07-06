@@ -10,6 +10,133 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.37.0] - 2026-07-06
+
+### Added
+
+- tabel `staging_import_batch_actions` pada `database/xampp_review_staging_import.sql` untuk menyimpan histori aksi batch import secara terstruktur
+- timeline histori aksi pada detail batch import melalui `apps/web/components/import-batch-detail-view.tsx`
+
+### Changed
+
+- `apps/web/lib/services/import-write-service.ts` sekarang menangani ensure table histori, pencatatan aksi, dan pembacaan action log per batch
+- `apps/web/app/api/import/batches/route.ts`, `apps/web/app/api/import/batches/[id]/route.ts`, serta flow validasi/transform sekarang mencatat event `CREATE`, `UPLOAD`, `VALIDATE`, dan `TRANSFORM`
+- `apps/web/lib/services/import-service.ts` dan `apps/web/lib/mock-import.ts` diperluas agar detail batch membawa histori aksi
+- `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone histori aksi batch tercatat
+
+### Notes
+
+- versi `0.37.0` menutup gap histori aksi Import Center sehingga jejak create, upload, validasi, dan transform bisa direview langsung dari web
+- pencatatan histori dirancang tidak memblokir aksi utama, jadi create/upload/validasi/transform tetap berjalan meskipun tabel histori belum bisa dibuat di database review
+
+## [0.36.0] - 2026-07-06
+
+### Added
+
+- service `apps/web/lib/services/import-file-loader.ts` untuk mem-parse file upload dan memuat row ke tabel `staging_*` sesuai scope batch
+- dokumentasi `docs/import-file-format.md` yang menjelaskan format JSON/XLSX/XLS/CSV yang didukung oleh Import Center web
+- dependency `xlsx` pada `apps/web/package.json` untuk membaca workbook upload dari browser
+
+### Changed
+
+- `POST /api/import/batches/[id]` di `apps/web/app/api/import/batches/[id]/route.ts` sekarang tidak hanya menyimpan file lokal, tetapi juga otomatis mengisi row staging dan memperbarui total row batch
+- `apps/web/components/import-batch-upload-form.tsx` dan `apps/web/README.md` diperbarui agar menjelaskan batasan format file yang aman untuk parser otomatis
+- `docs/README.md`, `README.md`, dan `docs/prd-web-checklist.md` diperbarui agar status parser upload ke staging tercatat
+
+### Notes
+
+- versi `0.36.0` menutup gap terbesar pada Import Center web: file upload sekarang bisa langsung menjadi row staging yang siap divalidasi dan ditransform dari web
+- parser saat ini paling kuat untuk `JSON` terstruktur dan workbook `XLSX/XLS` multi-sheet per scope, sedangkan `CSV` disarankan hanya untuk scope satu section
+
+## [0.35.0] - 2026-07-06
+
+### Added
+
+- service `apps/web/lib/services/import-write-service.ts` untuk validasi row staging, rekap batch, dan eksekusi baseline SQL transform tahap 1-4
+- endpoint `POST /api/import/batches/[id]/validate` untuk memvalidasi row staging batch dari web
+- endpoint `POST /api/import/batches/[id]/transform` untuk menjalankan transform tahap 1-4 dari web
+- komponen `apps/web/components/import-batch-action-panel.tsx` untuk tombol validasi dan transform pada detail batch
+
+### Changed
+
+- `apps/web/app/import/[batchId]/page.tsx` dan `apps/web/components/import-batch-detail-view.tsx` diperluas agar detail batch sekarang memuat area approval, validasi, dan trigger transform
+- `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone approve/transform pada Import Center tercatat
+
+### Notes
+
+- versi `0.35.0` membuat Import Center jauh lebih utuh di web: alur create batch, upload file, validasi batch, lalu trigger transform tahap 1-4 sekarang sudah tersedia dari satu halaman detail batch
+- transform saat ini menjalankan baseline SQL review yang ada di folder `database/`, sehingga eksekusi masih mengikuti model review global dan belum memiliki histori eksekusi terstruktur per batch
+
+## [0.34.0] - 2026-07-06
+
+### Added
+
+- form `apps/web/components/import-batch-upload-form.tsx` untuk upload file sumber pada detail batch import
+- dukungan `POST /api/import/batches/[id]` di `apps/web/app/api/import/batches/[id]/route.ts` untuk menerima file `xlsx`, `xls`, `csv`, atau `json`
+
+### Changed
+
+- `apps/web/lib/types.ts`, `apps/web/lib/services/import-service.ts`, dan `apps/web/lib/mock-import.ts` diperluas agar batch membawa metadata `sourceFileName`
+- `apps/web/components/import-batch-detail-view.tsx` dan `apps/web/components/import-batch-table.tsx` sekarang menampilkan file sumber batch
+- `.gitignore`, `apps/web/README.md`, `docs/prd-web-checklist.md`, dan `apps/web/tests/mock-data.test.ts` diperbarui untuk mencerminkan milestone upload file import
+
+### Notes
+
+- versi `0.34.0` menambahkan langkah kedua pada write-side Import Center: file sumber bisa diunggah ke storage lokal project dan metadata batch otomatis diperbarui ke status `UPLOADED`
+- langkah berikutnya yang paling logis adalah validasi batch dan trigger transform tahap 1-4 dari web
+
+## [0.33.0] - 2026-07-06
+
+### Added
+
+- form `apps/web/components/import-batch-create-form.tsx` untuk membuat batch review baru dari Import Center
+- dukungan `POST /api/import/batches` di `apps/web/app/api/import/batches/route.ts` untuk menambah row baru ke `staging_import_batches`
+
+### Changed
+
+- halaman `apps/web/app/import/page.tsx` sekarang menampilkan write action awal Import Center untuk role yang memiliki izin create
+- smoke test `apps/web/tests/mock-data.test.ts` diperluas agar memverifikasi izin create pada `import_center`
+- dokumentasi `apps/web/README.md` dan `docs/prd-web-checklist.md` diperbarui agar status Import Center mencerminkan create batch dari web
+
+### Notes
+
+- versi `0.33.0` menandai write-side pertama pada Import Center, dimulai dari pembuatan batch review tanpa menyentuh transform
+- langkah berikutnya yang paling logis adalah upload file sumber, validasi batch, lalu trigger transform tahap 1-4 dari web
+
+## [0.32.0] - 2026-07-06
+
+### Added
+
+- dokumen `docs/prd-web-checklist.md` sebagai tracker status implementasi web terhadap requirement PRD aplikasi web utama
+
+### Changed
+
+- `docs/README.md` dan `README.md` root diperbarui agar checklist PRD web masuk ke indeks dokumen resmi project
+
+### Notes
+
+- versi `0.32.0` menambahkan artefak kendali implementasi agar gap antara PRD dan web bisa dipantau lebih objektif per iterasi
+- checklist ini dirancang sebagai acuan fase berikutnya, terutama untuk import pipeline, inventory, HR, dan CRUD user internal lanjutan
+
+## [0.31.0] - 2026-07-06
+
+### Added
+
+- form `apps/web/components/auth-user-create-form.tsx` untuk menambah user internal baru dari halaman `settings/users`
+- route `POST /api/settings/users` di `apps/web/app/api/settings/users/route.ts` untuk menyimpan user baru ke `auth_users`
+- lookup role, divisi, dan cabang pada service `apps/web/lib/services/auth-user-service.ts` agar create user memakai referensi master review DB
+
+### Changed
+
+- halaman `apps/web/app/settings/users/page.tsx` sekarang tidak lagi read-only; halaman ini sudah bisa dipakai untuk review sekaligus create user internal
+- smoke test `apps/web/tests/mock-data.test.ts` diperluas untuk memverifikasi lookup option user internal tetap tersedia
+- dokumentasi `apps/web/README.md` diperbarui agar status auth internal mencakup write action awal user management
+
+### Notes
+
+- versi `0.31.0` menandai langkah awal CRUD user internal, dimulai dari create user langsung ke `auth_users`
+- langkah berikutnya yang paling logis adalah edit user, reset password, dan deactivate/reactivate akun
+
 ## [0.30.0] - 2026-07-06
 
 ### Added

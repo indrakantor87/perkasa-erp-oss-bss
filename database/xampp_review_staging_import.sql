@@ -21,6 +21,19 @@ CREATE TABLE IF NOT EXISTS staging_import_batches (
   UNIQUE KEY uq_staging_import_batches_code (batch_code)
 );
 
+CREATE TABLE IF NOT EXISTS staging_import_batch_actions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  batch_id BIGINT UNSIGNED NOT NULL,
+  action_type ENUM('CREATE','UPLOAD','VALIDATE','TRANSFORM') NOT NULL,
+  action_status ENUM('SUCCESS','FAILED','INFO') NOT NULL DEFAULT 'INFO',
+  actor_name VARCHAR(150) NULL,
+  detail_text TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_staging_import_batch_actions_batch (batch_id),
+  CONSTRAINT fk_staging_import_batch_actions_batch FOREIGN KEY (batch_id) REFERENCES staging_import_batches(id)
+);
+
 CREATE TABLE IF NOT EXISTS staging_legacy_user_records (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   batch_id BIGINT UNSIGNED NOT NULL,

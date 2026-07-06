@@ -1,6 +1,7 @@
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { getBatchDetail, getImportBatch, importBatches, transformStages } from '@/lib/mock-import'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { getImportBatchActions } from '@/lib/services/import-write-service'
 import type { BatchDetail, BatchRow, ImportBatch } from '@/lib/types'
 
 type ImportBatchRow = {
@@ -8,6 +9,7 @@ type ImportBatchRow = {
   batchCode: string
   sourceSystem: 'WEB_PSB' | 'FINANCE' | 'GA'
   scope: string
+  sourceFileName: string | null
   status: string
   totalRows: number
   validRows: number
@@ -69,6 +71,7 @@ function mapImportBatch(row: ImportBatchRow): ImportBatch {
     batchCode: row.batchCode,
     sourceSystem: row.sourceSystem,
     scope: row.scope,
+    sourceFileName: row.sourceFileName?.trim() || null,
     status: normalizeBatchStatus(row.status),
     totalRows: Number(row.totalRows ?? 0),
     validRows: Number(row.validRows ?? 0),
@@ -96,6 +99,7 @@ async function getReviewDbImportBatches() {
       batch_code AS batchCode,
       source_system AS sourceSystem,
       import_scope AS scope,
+      source_file_name AS sourceFileName,
       import_status AS status,
       total_rows AS totalRows,
       valid_rows AS validRows,
@@ -117,6 +121,7 @@ async function getReviewDbImportBatchRecord(batchId: string) {
       batch_code AS batchCode,
       source_system AS sourceSystem,
       import_scope AS scope,
+      source_file_name AS sourceFileName,
       import_status AS status,
       total_rows AS totalRows,
       valid_rows AS validRows,
@@ -455,6 +460,9 @@ export async function getImportBatchDetail(batchId: string) {
 
     const batchPk = numericBatchRows[0]?.id
     const rows = batchPk ? mapBatchRows(await getReviewDbBatchRows(batchPk)) : []
+    const actions = batchPk
+      ? await getImportBatchActions(batchPk).catch(() => [])
+      : []
 
     const detail: BatchDetail = {
       id: batch.id,
@@ -463,6 +471,7 @@ export async function getImportBatchDetail(batchId: string) {
       scope: batch.scope,
       status: batch.status,
       summary: batch.note,
+      actions,
       rows,
     }
 

@@ -1,4 +1,4 @@
-import type { BatchDetail, ImportBatch, TransformStage } from '@/lib/types'
+import type { BatchDetail, ImportBatch, ImportBatchAction, TransformStage } from '@/lib/types'
 
 export const importBatches: ImportBatch[] = [
   {
@@ -6,6 +6,7 @@ export const importBatches: ImportBatch[] = [
     batchCode: 'SAMPLE-WEBPSB-USER-001',
     sourceSystem: 'WEB_PSB',
     scope: 'USER_AND_ORDER_SAMPLE',
+    sourceFileName: 'sample-webpsb-user.xlsx',
     status: 'MAPPED',
     totalRows: 6,
     validRows: 6,
@@ -18,6 +19,7 @@ export const importBatches: ImportBatch[] = [
     batchCode: 'SAMPLE-WEBPSB-BILLING-001',
     sourceSystem: 'WEB_PSB',
     scope: 'BILLING_SAMPLE',
+    sourceFileName: 'sample-webpsb-billing.xlsx',
     status: 'MAPPED',
     totalRows: 4,
     validRows: 4,
@@ -30,6 +32,7 @@ export const importBatches: ImportBatch[] = [
     batchCode: 'SAMPLE-GA-INVENTORY-001',
     sourceSystem: 'GA',
     scope: 'INVENTORY_SAMPLE',
+    sourceFileName: 'sample-ga-inventory.xlsx',
     status: 'VALIDATED',
     totalRows: 2,
     validRows: 2,
@@ -42,6 +45,7 @@ export const importBatches: ImportBatch[] = [
     batchCode: 'SAMPLE-FINANCE-HR-001',
     sourceSystem: 'FINANCE',
     scope: 'HR_SAMPLE',
+    sourceFileName: 'sample-finance-hr.xlsx',
     status: 'IMPORTED',
     totalRows: 4,
     validRows: 4,
@@ -90,6 +94,24 @@ const batchRows: Record<string, BatchDetail> = {
     scope: 'USER_AND_ORDER_SAMPLE',
     status: 'MAPPED',
     summary: 'Batch ini menampung jalur user, customer, order, TT, isolation, dan dismantle history.',
+    actions: [
+      {
+        id: 'sample-webpsb-user-001-create',
+        actionType: 'CREATE',
+        status: 'SUCCESS',
+        actor: 'System Review',
+        detail: 'Batch sample dibuat untuk review jalur user, customer, order, dan support.',
+        happenedAt: '2026-07-06 08:10',
+      },
+      {
+        id: 'sample-webpsb-user-001-upload',
+        actionType: 'UPLOAD',
+        status: 'SUCCESS',
+        actor: 'System Review',
+        detail: 'Workbook sample memuat section users, customers, orders, dan support.',
+        happenedAt: '2026-07-06 08:15',
+      },
+    ],
     rows: [
       {
         id: '1',
@@ -124,6 +146,16 @@ const batchRows: Record<string, BatchDetail> = {
     scope: 'BILLING_SAMPLE',
     status: 'MAPPED',
     summary: 'Batch ini berisi invoice, invoice item, payment, dan collection action untuk jalur overdue control.',
+    actions: [
+      {
+        id: 'sample-webpsb-billing-001-create',
+        actionType: 'CREATE',
+        status: 'SUCCESS',
+        actor: 'System Review',
+        detail: 'Batch billing sample dibuat untuk review invoice, payment, dan collection.',
+        happenedAt: '2026-07-06 08:20',
+      },
+    ],
     rows: [
       {
         id: '1',
@@ -150,6 +182,16 @@ const batchRows: Record<string, BatchDetail> = {
     scope: 'INVENTORY_SAMPLE',
     status: 'VALIDATED',
     summary: 'Batch inventory dipakai untuk item dan stock movement awal.',
+    actions: [
+      {
+        id: 'sample-ga-inventory-001-validate',
+        actionType: 'VALIDATE',
+        status: 'SUCCESS',
+        actor: 'System Review',
+        detail: 'Semua row inventory sample lolos validasi staging.',
+        happenedAt: '2026-07-06 08:30',
+      },
+    ],
     rows: [
       {
         id: '1',
@@ -168,6 +210,16 @@ const batchRows: Record<string, BatchDetail> = {
     scope: 'HR_SAMPLE',
     status: 'IMPORTED',
     summary: 'Batch HR menutup employee, attendance, salary, dan loan pada tahap 1.',
+    actions: [
+      {
+        id: 'sample-finance-hr-001-transform',
+        actionType: 'TRANSFORM',
+        status: 'SUCCESS',
+        actor: 'System Review',
+        detail: 'Transform tahap 1 berhasil memindahkan sample HR ke tabel final.',
+        happenedAt: '2026-07-06 08:45',
+      },
+    ],
     rows: [
       {
         id: '1',

@@ -13,6 +13,12 @@ type ReviewAuthUserRow = {
   status: string
 }
 
+type ReviewLookupRow = {
+  id: number
+  code: string
+  name: string
+}
+
 export type AuthUserListItem = {
   id: string
   fullName: string
@@ -23,6 +29,12 @@ export type AuthUserListItem = {
   branchLabel: string
   status: string
   source: 'review-db' | 'mock'
+}
+
+export type AuthUserLookupOption = {
+  id: string
+  code: string
+  label: string
 }
 
 function formatRoleLabel(roleCode: string) {
@@ -50,6 +62,30 @@ function mapMockUsers(): AuthUserListItem[] {
     branchLabel: 'Cabang Pati',
     status: 'ACTIVE',
     source: 'mock',
+  }))
+}
+
+function mapMockLookupOptions() {
+  return {
+    roleOptions: [
+      { id: '1', code: 'SUPER_ADMIN', label: 'Super Admin' },
+      { id: '2', code: 'ADMIN_CS', label: 'Admin CS' },
+      { id: '3', code: 'OPERATOR', label: 'Operator' },
+    ],
+    divisionOptions: [
+      { id: '1', code: 'CS', label: 'CS' },
+      { id: '2', code: 'NOC', label: 'NOC' },
+      { id: '3', code: 'PENJUALAN', label: 'Penjualan' },
+    ],
+    branchOptions: [{ id: '1', code: 'PATI', label: 'Cabang Pati' }],
+  }
+}
+
+function mapLookupRows(rows: ReviewLookupRow[]) {
+  return rows.map<AuthUserLookupOption>((row) => ({
+    id: String(row.id),
+    code: row.code,
+    label: row.name,
   }))
 }
 
@@ -96,6 +132,46 @@ async function getReviewDbUsers() {
   }))
 }
 
+async function getReviewDbLookupOptions() {
+  const [roles, divisions, branches] = await Promise.all([
+    runReviewDbQuery<ReviewLookupRow>(
+      `
+        SELECT id, code, name
+        FROM auth_roles
+        ORDER BY
+          CASE
+            WHEN code = 'SUPER_ADMIN' THEN 1
+            WHEN code IN ('ADMIN', 'ADMIN_CS') THEN 2
+            WHEN code IN ('OPERATOR', 'NOC') THEN 3
+            ELSE 4
+          END,
+          name ASC,
+          id ASC
+      `
+    ),
+    runReviewDbQuery<ReviewLookupRow>(
+      `
+        SELECT id, code, name
+        FROM org_divisions
+        ORDER BY name ASC, id ASC
+      `
+    ),
+    runReviewDbQuery<ReviewLookupRow>(
+      `
+        SELECT id, code, name
+        FROM org_branches
+        ORDER BY name ASC, id ASC
+      `
+    ),
+  ])
+
+  return {
+    roleOptions: mapLookupRows(roles),
+    divisionOptions: mapLookupRows(divisions),
+    branchOptions: mapLookupRows(branches),
+  }
+}
+
 function buildSummary(users: AuthUserListItem[]) {
   return {
     totalUsers: users.length,
@@ -110,26 +186,31 @@ export async function getAuthUsersPageData() {
 
   if (source.effectiveMode !== 'review-db') {
     const users = mapMockUsers()
+    const lookupOptions = mapMockLookupOptions()
     return {
       source,
       users,
       summary: buildSummary(users),
+      ...lookupOptions,
     }
   }
 
   try {
-    const users = await getReviewDbUsers()
+    const [users, lookupOptions] = await Promise.all([getReviewDbUsers(), getReviewDbLookupOptions()])
     return {
       source,
       users,
       summary: buildSummary(users),
+      ...lookupOptions,
     }
   } catch (error) {
     const users = mapMockUsers()
+    const lookupOptions = mapMockLookupOptions()
     return {
       source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
       users,
       summary: buildSummary(users),
+      ...lookupOptions,
     }
   }
 }

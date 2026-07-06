@@ -11,4 +11,5 @@ apps/web/out
 apps/web/dist
 apps/web/coverage
 apps/web/*.log
+apps/web/storage
 *.tsbuildinfo

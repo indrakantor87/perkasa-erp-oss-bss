@@ -53,6 +53,12 @@
 - `schema-gap.md`  
   Daftar gap schema, prioritas iterasi berikutnya, dan rekomendasi tabel tambahan.
 
+- `prd-web-checklist.md`  
+  Checklist status implementasi web terhadap requirement PRD aplikasi web utama.
+
+- `import-file-format.md`  
+  Format file JSON/XLSX/XLS/CSV yang didukung Import Center web untuk memuat row staging otomatis.
+
 - `versioning.md`  
   Aturan versioning, changelog, dan pola release project.
 

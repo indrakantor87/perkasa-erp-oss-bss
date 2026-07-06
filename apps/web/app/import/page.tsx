@@ -1,7 +1,8 @@
 import { DataSourceStatus } from '@/components/data-source-status'
+import { ImportBatchCreateForm } from '@/components/import-batch-create-form'
 import { ImportBatchTable } from '@/components/import-batch-table'
 import { ImportTransformStageList } from '@/components/import-transform-stage-list'
-import { canAccessPath } from '@/lib/access-control'
+import { canAccessPath, canPerformAction } from '@/lib/access-control'
 import { requireSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { getImportOverview } from '@/lib/services/import-service'
@@ -13,6 +14,7 @@ export default async function ImportPage() {
   }
 
   const { source, overview } = await getImportOverview()
+  const canCreate = canPerformAction(session.role, 'import_center', 'create')
 
   return (
     <div className="space-y-6">
@@ -37,6 +39,11 @@ export default async function ImportPage() {
           </p>
         </article>
       </section>
+
+      <ImportBatchCreateForm
+        canCreate={canCreate}
+        reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+      />
 
       <ImportBatchTable items={overview.items} />
       <ImportTransformStageList items={overview.stages} />

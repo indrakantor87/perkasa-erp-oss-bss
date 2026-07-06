@@ -38,6 +38,9 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
                 <td className="px-6 py-5">
                   <p className="font-semibold text-slate-950">{item.batchCode}</p>
                   <p className="mt-1 text-xs text-mute">{item.scope}</p>
+                  <p className="mt-1 text-xs text-mute">
+                    File: {item.sourceFileName || '-'}
+                  </p>
                 </td>
                 <td className="px-6 py-5 font-medium text-slate-700">{item.sourceSystem}</td>
                 <td className="px-6 py-5">
@@ -67,6 +70,7 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
               <div>
                 <p className="font-semibold text-slate-950">{item.batchCode}</p>
                 <p className="mt-1 text-xs text-mute">{item.sourceSystem} • {item.scope}</p>
+                <p className="mt-1 text-xs text-mute">File: {item.sourceFileName || '-'}</p>
               </div>
               <span className={`badge border-transparent ${statusTone[item.status]}`}>{item.status}</span>
             </div>

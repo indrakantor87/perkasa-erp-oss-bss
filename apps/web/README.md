@@ -33,6 +33,11 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 
 - `dashboard` sudah bisa membaca agregat dari tabel final review seperti `crm_customers`, `sales_orders`, `support_trouble_tickets`, `support_isolations`, `inventory_items`, `hr_employees`, dan `billing_invoices`
 - `import center` sudah bisa membaca `staging_import_batches` dan detail row lintas tabel staging
+- `import center` sekarang memiliki write action awal untuk membuat batch baru langsung ke `staging_import_batches` saat mode `review-db` aktif
+- detail batch import sekarang memiliki upload file sumber yang menyimpan file lokal ke `apps/web/storage/import-batches`
+- upload file sumber sekarang bisa otomatis memuat row ke tabel `staging_*` dari `JSON` terstruktur atau workbook `XLSX/XLS` multi-sheet sesuai scope batch
+- detail batch import sekarang memiliki tombol validasi batch dan trigger transform tahap 1-4 dari web untuk role yang memiliki izin approve
+- detail batch import sekarang juga menampilkan histori aksi terstruktur untuk create, upload, validasi, dan transform
 - shell domain `sales`, `customers`, `support`, `inventory`, `hr`, dan `billing` sudah bisa mengganti angka summary dari query review DB
 - shell domain `sales` sudah menampilkan review operasional awal berupa daftar `lead terbaru` dan `survey/order berjalan` dari review DB, lalu fallback ke sampel mock saat koneksi tidak siap
 - domain `sales` sudah memiliki write action awal berupa form `lead review` yang menulis prospek baru ke `sales_leads` saat mode `review-db` aktif
@@ -41,6 +46,7 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 - auth login sekarang memakai mode hybrid: memprioritaskan `auth_users/auth_roles` dari review DB saat tersedia, lalu fallback ke akun bootstrap mock bila user review belum siap
 - seed review DB untuk akun internal sekarang disiapkan di `database/xampp_review_auth_seed.sql` agar mode hybrid bisa diuji tanpa menunggu import user legacy
 - halaman `settings/users` sekarang menampilkan direktori user internal dari `auth_users` atau fallback mock agar fondasi manajemen user mulai terlihat di UI
+- halaman `settings/users` sekarang juga memiliki write action awal untuk membuat user baru langsung ke `auth_users` saat mode `review-db` aktif
 - shell domain `billing` sudah menampilkan review operasional awal berupa daftar `invoice perlu tindak lanjut` dan `collection action terbaru` dari review DB, lalu fallback ke sampel mock saat koneksi tidak siap
 - domain `billing` sudah memiliki write action awal berupa form `collection action` yang menulis histori reminder / promise to pay / suspend ke review DB saat mode `review-db` aktif
 - shell domain `customers` sudah menampilkan review operasional awal berupa daftar `customer terbaru` dan `subscription aktif` dari review DB, lalu fallback ke sampel mock saat koneksi tidak siap

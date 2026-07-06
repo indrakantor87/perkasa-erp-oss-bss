@@ -73,6 +73,7 @@ export type ImportBatch = {
   batchCode: string
   sourceSystem: 'WEB_PSB' | 'FINANCE' | 'GA'
   scope: string
+  sourceFileName?: string | null
   status: 'DRAFT' | 'UPLOADED' | 'MAPPED' | 'VALIDATED' | 'IMPORTED' | 'FAILED'
   totalRows: number
   validRows: number
@@ -98,6 +99,15 @@ export type BatchRow = {
   note: string
 }
 
+export type ImportBatchAction = {
+  id: string
+  actionType: 'CREATE' | 'UPLOAD' | 'VALIDATE' | 'TRANSFORM'
+  status: 'SUCCESS' | 'FAILED' | 'INFO'
+  actor: string
+  detail: string
+  happenedAt: string
+}
+
 export type BatchDetail = {
   id: string
   title: string
@@ -105,6 +115,7 @@ export type BatchDetail = {
   scope: string
   status: ImportBatch['status']
   summary: string
+  actions: ImportBatchAction[]
   rows: BatchRow[]
 }
 

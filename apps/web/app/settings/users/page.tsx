@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { AuthUserCreateForm } from '@/components/auth-user-create-form'
 import { DataSourceStatus } from '@/components/data-source-status'
-import { canAccessPath } from '@/lib/access-control'
+import { canAccessPath, canPerformAction } from '@/lib/access-control'
 import { requireSession } from '@/lib/auth'
 import { getAuthUsersPageData } from '@/lib/services/auth-user-service'
 
@@ -11,7 +12,9 @@ export default async function UserSettingsPage() {
     redirect('/dashboard')
   }
 
-  const { source, users, summary } = await getAuthUsersPageData()
+  const { source, users, summary, roleOptions, divisionOptions, branchOptions } =
+    await getAuthUsersPageData()
+  const canManage = canPerformAction(session.role, 'user_settings', 'manage')
 
   return (
     <div className="space-y-6">
@@ -69,6 +72,14 @@ export default async function UserSettingsPage() {
           </p>
         </article>
       </section>
+
+      <AuthUserCreateForm
+        canManage={canManage}
+        reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+        roleOptions={roleOptions}
+        divisionOptions={divisionOptions}
+        branchOptions={branchOptions}
+      />
 
       <section className="panel overflow-hidden">
         <div className="border-b border-line px-6 py-5">
@@ -138,10 +149,11 @@ export default async function UserSettingsPage() {
         <p className="section-title">Arah Berikutnya</p>
         <div className="mt-4 space-y-4">
           <article className="rounded-2xl border border-line bg-slate-50 p-5">
-            <h3 className="text-sm font-semibold text-slate-950">Seed dulu, CRUD menyusul</h3>
+            <h3 className="text-sm font-semibold text-slate-950">Create dulu, reset menyusul</h3>
             <p className="mt-3 text-sm leading-6 text-mute">
-              Dengan seed `auth_users` yang sudah disiapkan, halaman ini bisa langsung dipakai
-              untuk review user internal sebelum ditambah create, reset password, atau deactivate.
+              Halaman ini sekarang sudah bisa dipakai untuk menambah akun internal baru ke
+              `auth_users`. Langkah berikutnya yang paling logis adalah reset password, edit profil,
+              dan deactivate user.
             </p>
           </article>
           <article className="rounded-2xl border border-line bg-slate-50 p-5">

@@ -33,6 +33,8 @@ Target sistem:
 - `docs/staging-transform-stage-3.md`
 - `docs/staging-transform-stage-4.md`
 - `docs/schema-gap.md`
+- `docs/prd-web-checklist.md`
+- `docs/import-file-format.md`
 - `docs/versioning.md`
 - `VERSION`
 - `CHANGELOG.md`
