@@ -48,6 +48,9 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 - domain `support` sekarang juga memiliki pengaturan SLA dasar per tipe ticket melalui tabel `support_trouble_ticket_sla` untuk role yang memiliki izin approve
 - domain `support` sekarang juga memiliki write action awal untuk menambah pelanggan isolir aktif ke tabel `support_isolations`
 - domain `support` sekarang juga memiliki write action restorasi isolir untuk menutup data isolir aktif melalui `restoration_date` dan `close_note`
+- domain `support` sekarang juga memiliki flow dismantle yang memindahkan data ke `support_dismantle_history` dan mengarsipkan sumber isolir
+- domain `billing` sekarang juga memiliki payment entry yang menulis ke `billing_payments` dan menyelaraskan `paid_amount` serta `invoice_status`
+- domain `sales` sekarang juga memiliki sales order create dari lead yang valid dengan `order_no` otomatis
 - domain `customers` sudah memiliki write action awal berupa form `customer review` yang menulis customer master baru beserta alamat utama ke `crm_customers` dan `crm_customer_addresses`
 - auth login sekarang memakai mode hybrid: memprioritaskan `auth_users/auth_roles` dari review DB saat tersedia, lalu fallback ke akun bootstrap mock bila user review belum siap
 - seed review DB untuk akun internal sekarang disiapkan di `database/xampp_review_auth_seed.sql` agar mode hybrid bisa diuji tanpa menunggu import user legacy

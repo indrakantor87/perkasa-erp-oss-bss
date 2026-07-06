@@ -70,6 +70,16 @@ type ReviewDbSupportSlaRow = {
   updatedAt: string | Date
 }
 
+type ReviewDbSupportDismantleRow = {
+  dismantleId: number
+  customerName: string
+  radboxName: string | null
+  customerPhone: string | null
+  marketingName: string | null
+  closeNote: string | null
+  closedAt: string | Date
+}
+
 type ReviewDbCustomerRow = {
   customerCode: string
   customerName: string
@@ -103,6 +113,17 @@ type ReviewDbCollectionActionRow = {
   actionStatus: string
   actionAt: string | Date
   dueFollowUpAt: string | Date | null
+  customerName: string
+  invoiceNo: string
+  notes: string | null
+}
+
+type ReviewDbPaymentRow = {
+  paymentNo: string | null
+  paymentDate: string | Date
+  amount: number
+  paymentMethod: string
+  referenceNo: string | null
   customerName: string
   invoiceNo: string
   notes: string | null
@@ -298,6 +319,20 @@ async function getReviewDbSupportSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const dismantles = await runReviewDbQuery<ReviewDbSupportDismantleRow>(`
+    SELECT
+      id AS dismantleId,
+      customer_name AS customerName,
+      radbox_name AS radboxName,
+      customer_phone AS customerPhone,
+      marketing_name AS marketingName,
+      close_note AS closeNote,
+      closed_at AS closedAt
+    FROM support_dismantle_history
+    ORDER BY closed_at DESC, id DESC
+    LIMIT 5
+  `)
+
   return [
     {
       title: 'Trouble Ticket Open',
@@ -343,6 +378,22 @@ async function getReviewDbSupportSections(): Promise<DomainReviewSection[]> {
         meta: [
           `Durasi: ${item.durationDays} hari`,
           `Updated: ${formatDateTime(item.updatedAt)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Histori Dismantle',
+      description: 'Riwayat perangkat dan layanan yang sudah ditutup permanen agar jejak operasional tidak hilang.',
+      rows: dismantles.map((item) => ({
+        id: `DIS-${item.dismantleId}`,
+        primary: item.customerName,
+        secondary: item.radboxName || 'Radbox belum terpetakan',
+        status: 'CLOSED',
+        detail: item.closeNote?.trim() || 'Belum ada catatan dismantle yang tercatat.',
+        meta: [
+          `Phone: ${item.customerPhone || '-'}`,
+          `Marketing: ${item.marketingName || '-'}`,
+          `Closed: ${formatDateTime(item.closedAt)}`,
         ],
       })),
     },
@@ -465,6 +516,27 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const payments = await runReviewDbQuery<ReviewDbPaymentRow>(`
+    SELECT
+      bp.payment_no AS paymentNo,
+      bp.payment_date AS paymentDate,
+      bp.amount,
+      bp.payment_method AS paymentMethod,
+      bp.reference_no AS referenceNo,
+      c.full_name AS customerName,
+      bi.invoice_no AS invoiceNo,
+      bp.notes
+    FROM billing_payments bp
+    JOIN billing_invoices bi
+      ON bi.id = bp.invoice_id
+    JOIN service_subscriptions ss
+      ON ss.id = bi.subscription_id
+    JOIN crm_customers c
+      ON c.id = ss.customer_id
+    ORDER BY bp.payment_date DESC, bp.id DESC
+    LIMIT 5
+  `)
+
   return [
     {
       title: 'Invoice Perlu Tindak Lanjut',
@@ -495,6 +567,23 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
           `Customer: ${item.customerName}`,
           `At: ${formatDateTime(item.actionAt)}`,
           `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Payment Terbaru',
+      description: 'Pembayaran terbaru dari review DB untuk memantau invoice yang mulai bergerak ke partial atau paid.',
+      rows: payments.map((item, index) => ({
+        id: item.paymentNo || `${item.invoiceNo}-${index}`,
+        primary: item.paymentNo || `PAY-${index + 1}`,
+        secondary: item.invoiceNo,
+        status: item.paymentMethod,
+        detail: item.notes?.trim() || 'Belum ada catatan tambahan pada payment entry ini.',
+        meta: [
+          `Customer: ${item.customerName}`,
+          `Amount: ${formatCurrency(item.amount)}`,
+          `Paid At: ${formatDateTime(item.paymentDate)}`,
+          `Reference: ${item.referenceNo || '-'}`,
         ],
       })),
     },

@@ -10,6 +10,59 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.46.0] - 2026-07-06
+
+### Added
+
+- komponen `apps/web/components/sales-order-create-form.tsx` untuk membuat sales order baru dari lead yang sudah ada langsung dari halaman domain `sales`
+- route `POST /api/sales/orders` di `apps/web/app/api/sales/orders/route.ts` untuk menyimpan order ke tabel `sales_orders` dengan `order_no` otomatis
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan dua write action pada domain `sales`: create lead dan create sales order
+- `apps/web/README.md` dan `docs/prd-web-checklist.md` diperbarui agar milestone sales order flow tercermin pada dokumentasi implementasi web
+
+### Notes
+
+- versi `0.46.0` menutup gap awal transisi lead ke order tanpa menunggu integrasi work order penuh
+- sales order saat ini tetap defensif: sumber wajib berasal dari lead yang valid, `order_no` dibuat otomatis, dan jadwal instalasi masih opsional
+
+## [0.45.0] - 2026-07-06
+
+### Added
+
+- komponen `apps/web/components/billing-payment-form.tsx` untuk menambah pembayaran invoice langsung dari halaman domain `billing`
+- route `POST /api/billing/payments` di `apps/web/app/api/billing/payments/route.ts` untuk menyimpan payment entry ke `billing_payments`
+
+### Changed
+
+- `apps/web/lib/services/domain-service.ts` sekarang memuat daftar pembayaran terbaru dari review DB sebagai review section baru pada domain `billing`
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan dua write action pada domain `billing`: collection action dan payment entry
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone payment billing tercermin pada fallback mock, pengujian, dan dokumentasi
+
+### Notes
+
+- versi `0.45.0` menutup gap awal lifecycle invoice dengan menambahkan payment entry yang menyelaraskan `paid_amount` dan `invoice_status`
+- payment entry bersifat defensif: overpayment ditolak, invoice `PAID` tidak bisa dibayar ulang, dan invoice lunas otomatis menutup `collection_status` serta membersihkan `suspend_candidate`
+
+## [0.44.0] - 2026-07-06
+
+### Added
+
+- komponen `apps/web/components/support-dismantle-form.tsx` untuk memindahkan pelanggan dari isolir aktif ke histori dismantle langsung dari halaman domain `support`
+- route `POST /api/support/isolations/[id]/dismantle` di `apps/web/app/api/support/isolations/[id]/dismantle/route.ts` untuk menyimpan snapshot ke `support_dismantle_history` dan mengarsipkan sumber isolir
+
+### Changed
+
+- `apps/web/lib/services/domain-service.ts` sekarang memuat histori dismantle terbaru dari review DB sebagai review section baru pada domain `support`
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan flow dismantle di samping create/close ticket, SLA, isolir aktif, dan restorasi isolir
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone dismantle support tercermin pada fallback mock, pengujian, dan dokumentasi
+
+### Notes
+
+- versi `0.44.0` melengkapi loop awal domain `support` dengan histori dismantle yang aman dan terpisah dari data aktif
+- flow ini mengikuti prinsip arsip: data dengan histori dismantle dipindahkan ke `support_dismantle_history` dan sumber isolir ditandai `is_archived = 1`
+
 ## [0.43.0] - 2026-07-06
 
 ### Added

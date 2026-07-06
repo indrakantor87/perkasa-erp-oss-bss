@@ -19,10 +19,10 @@ Status dipakai dengan arti:
 | Navigasi shell | SUDAH | Sidebar, topbar, RBAC menu sudah aktif |
 | Import center | PARSIAL | Read-side kuat, action pipeline belum penuh |
 | Detail batch | SUDAH | Row review dan summary batch sudah ada |
-| Sales | PARSIAL | Lead review sudah bisa create, workflow belum lengkap |
+| Sales | PARSIAL | Lead review dan sales order sudah bisa create, workflow belum lengkap |
 | Customers | PARSIAL | Customer master sudah bisa create, lifecycle belum lengkap |
-| Support | PARSIAL | TT review sudah bisa create, close, kelola SLA dasar, tambah isolir aktif, dan restorasi isolir |
-| Billing | PARSIAL | Collection action sudah bisa create, payment/invoice penuh belum |
+| Support | PARSIAL | TT review sudah bisa create, close, kelola SLA dasar, tambah isolir aktif, restorasi isolir, dan dismantle history |
+| Billing | PARSIAL | Collection action dan payment entry sudah bisa create, invoice lifecycle penuh belum |
 | Inventory | BELUM | Masih shell + summary |
 | HR | BELUM | Masih shell + summary |
 | Settings access | PARSIAL | Matrix akses ada, permission master dinamis belum |
@@ -41,12 +41,12 @@ Status dipakai dengan arti:
 | Pusat import sebagai modul kelas satu | PARSIAL | Halaman daftar batch, detail batch, create batch, upload file sumber, parser ke row staging, validasi, trigger transform, dan histori aksi batch sudah hidup | Parser format bebas per domain dan eksekusi transform per batch yang benar-benar terisolasi belum aktif penuh | Sangat Tinggi |
 | Pipeline transform tahap 1-4 | PARSIAL | Tombol eksekusi transform tahap 1-4 dari web sudah ada | Eksekusi masih mengikuti baseline SQL review global, belum punya histori eksekusi terstruktur per batch | Sangat Tinggi |
 | Filter review batch dan row bermasalah | PARSIAL | Detail row sudah ada | Filter interaktif per status/domain/source belum penuh | Sedang |
-| Sales shell: lead, coverage, survey, order | PARSIAL | Lead review sudah bisa create | Coverage, survey, dan sales order belum hidup | Sangat Tinggi |
+| Sales shell: lead, coverage, survey, order | PARSIAL | Lead review, sales order create, dan review survey/order sudah ada | Coverage, survey write action, dan work order belum hidup | Sangat Tinggi |
 | Customer shell: master, address, subscription, histori | PARSIAL | Create customer + primary address sudah ada | Subscription lifecycle dan histori layanan belum lengkap | Tinggi |
-| Support shell: TT, isolir, dismantle, SLA | PARSIAL | TT open review sudah ada, create TT, close ticket, kelola SLA dasar, tambah isolir aktif, dan restorasi isolir sudah ada | SLA penuh dan dismantle flow belum ada | Sangat Tinggi |
+| Support shell: TT, isolir, dismantle, SLA | PARSIAL | TT open review sudah ada, create TT, close ticket, kelola SLA dasar, tambah isolir aktif, restorasi isolir, dan dismantle flow dasar sudah ada | SLA penuh dan otomasi workflow support lanjutan belum ada | Sangat Tinggi |
 | Inventory shell: item, stock movement, ODP, device assignment | BELUM | Baru shell domain dan summary | Review section dan write action belum ada | Tinggi |
 | HR shell: employee, attendance, salary, loan | BELUM | Baru shell domain dan summary | Review section dan write action belum ada | Tinggi |
-| Billing shell: invoice, payment, collection, overdue | PARSIAL | Collection action dan review invoice sudah ada | Payment entry dan lifecycle invoice belum lengkap | Sangat Tinggi |
+| Billing shell: invoice, payment, collection, overdue | PARSIAL | Collection action, payment entry, review invoice, dan review payment terbaru sudah ada | Lifecycle invoice penuh dan otomasi billing lanjutan belum lengkap | Sangat Tinggi |
 | Settings access dan permission | PARSIAL | Permission matrix dan access summary sudah ada | Permission master dinamis dan audit perubahan belum ada | Tinggi |
 | Settings users internal | SUDAH | Direktori user, create user, edit profil, reset password, deactivate/reactivate, dan panel audit perubahan sudah ada | Audit masih terfokus pada user internal, belum lintas seluruh modul write action | Tinggi |
 | Audit log dasar | PARSIAL | Audit perubahan user internal sudah tercatat di `auth_user_audit_logs` dan tampil di web | Belum menjadi audit terpusat lintas import, sales, support, billing, dan modul lain | Tinggi |

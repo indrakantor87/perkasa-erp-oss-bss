@@ -1,7 +1,10 @@
 import Link from 'next/link'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
+import { BillingPaymentForm } from '@/components/billing-payment-form'
 import { CustomerCreateForm } from '@/components/customer-create-form'
 import { SalesLeadCreateForm } from '@/components/sales-lead-create-form'
+import { SalesOrderCreateForm } from '@/components/sales-order-create-form'
+import { SupportDismantleForm } from '@/components/support-dismantle-form'
 import { SupportIsolationForm } from '@/components/support-isolation-form'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
 import { SupportTicketCloseForm } from '@/components/support-ticket-close-form'
@@ -41,6 +44,16 @@ export function DomainShell({
               ),
           ),
         )
+      : []
+  const salesLeadSuggestions =
+    content.key === 'sales'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('LEAD'))
+          .flatMap((section) => section.rows)
+          .map((row) => {
+            const marketing = row.meta.find((item) => item.startsWith('Marketing: '))?.replace('Marketing: ', '').trim() || '-'
+            return `${row.id.replace(/^LEAD-/, '')} | ${row.primary} | ${marketing}`
+          })
       : []
   const supportTypeSuggestions =
     content.key === 'support'
@@ -184,19 +197,34 @@ export function DomainShell({
       </section>
 
       {content.key === 'billing' ? (
-        <BillingCollectionActionForm
-          canCreate={canCreate}
-          reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-          invoiceSuggestions={billingInvoiceSuggestions}
-        />
+        <section className="grid gap-6 xl:grid-cols-2">
+          <BillingCollectionActionForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            invoiceSuggestions={billingInvoiceSuggestions}
+          />
+          <BillingPaymentForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            invoiceSuggestions={billingInvoiceSuggestions}
+          />
+        </section>
       ) : null}
 
       {content.key === 'sales' ? (
-        <SalesLeadCreateForm
-          canCreate={canCreate}
-          reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-          marketingSuggestions={salesMarketingSuggestions}
-        />
+        <section className="grid gap-6 xl:grid-cols-2">
+          <SalesLeadCreateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            marketingSuggestions={salesMarketingSuggestions}
+          />
+          <SalesOrderCreateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            leadSuggestions={salesLeadSuggestions}
+            marketingSuggestions={salesMarketingSuggestions}
+          />
+        </section>
       ) : null}
 
       {content.key === 'customers' ? (
@@ -231,6 +259,11 @@ export function DomainShell({
           />
           <SupportIsolationRestoreForm
             canUpdate={canUpdate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            isolationSuggestions={supportIsolationSuggestions}
+          />
+          <SupportDismantleForm
+            canApprove={canApprove}
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
             isolationSuggestions={supportIsolationSuggestions}
           />
