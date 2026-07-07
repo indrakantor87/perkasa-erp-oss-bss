@@ -716,6 +716,28 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
         ],
       },
       {
+        title: 'Invoice Dibatalkan Terbaru',
+        description: 'Sampel invoice batal terbaru untuk menegaskan pembatalan hanya dilakukan pada invoice unpaid.',
+        rows: [
+          {
+            id: 'INV-202607-0003',
+            primary: 'INV-202607-0003',
+            secondary: 'CV Karya Net',
+            status: 'CANCELLED',
+            detail: '[Status Update] Admin Billing (admin.billing) -> CANCELLED - Duplikasi invoice recurring periode 07/2026.',
+            meta: ['Total: Rp450.000', 'Updated: 07 Jul 2026 15:20'],
+          },
+          {
+            id: 'INV-202607-0004',
+            primary: 'INV-202607-0004',
+            secondary: 'Rina Maharani',
+            status: 'CANCELLED',
+            detail: '[Status Update] Admin Billing (admin.billing) -> CANCELLED - Salah periode penagihan sebelum generate ulang.',
+            meta: ['Total: Rp275.000', 'Updated: 07 Jul 2026 14:10'],
+          },
+        ],
+      },
+      {
         title: 'Collection Action Terbaru',
         description: 'Sampel aktivitas collection terbaru untuk menyiapkan histori reminder, promise to pay, dan suspend.',
         rows: [

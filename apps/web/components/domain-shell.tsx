@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
 import { BillingInvoiceGenerateForm } from '@/components/billing-invoice-generate-form'
+import { BillingInvoiceStatusForm } from '@/components/billing-invoice-status-form'
 import { BillingPaymentForm } from '@/components/billing-payment-form'
 import { CustomerCreateForm } from '@/components/customer-create-form'
 import { HrAttendanceForm } from '@/components/hr-attendance-form'
@@ -44,9 +45,15 @@ export function DomainShell({
   const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
   const billingInvoiceSuggestions =
     content.key === 'billing'
-      ? (content.reviewSections ?? [])
-          .find((section) => section.title.toUpperCase().includes('INVOICE PERLU'))
-          ?.rows.map((row) => row.primary) ?? []
+      ? Array.from(
+          new Set(
+            (content.reviewSections ?? [])
+              .filter((section) => section.title.toUpperCase().includes('INVOICE'))
+              .flatMap((section) => section.rows)
+              .map((row) => row.primary)
+              .filter(Boolean),
+          ),
+        )
       : []
   const billingSubscriptionSuggestions =
     content.key === 'billing'
@@ -275,6 +282,11 @@ export function DomainShell({
             canCreate={canCreate}
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
             subscriptionSuggestions={billingSubscriptionSuggestions}
+          />
+          <BillingInvoiceStatusForm
+            canUpdate={canUpdate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            invoiceSuggestions={billingInvoiceSuggestions}
           />
           <BillingCollectionActionForm
             canCreate={canCreate}

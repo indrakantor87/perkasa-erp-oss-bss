@@ -10,6 +10,23 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.58.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/billing-invoice-status-form.tsx` dan route `POST /api/billing/invoices/status` untuk membatalkan invoice unpaid langsung dari domain `billing`
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan write action billing untuk pembatalan invoice selain generate invoice, collection action, dan payment entry
+- `apps/web/lib/services/domain-service.ts` menambah review section billing: `Invoice Dibatalkan Terbaru`
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone pembatalan invoice tercermin pada fallback mock, test, dan dokumentasi
+
+### Notes
+
+- versi `0.58.0` melengkapi lifecycle billing dengan pembatalan invoice yang aman tanpa penghapusan data
+- pembatalan invoice tetap defensif: hanya role dengan izin update yang boleh menjalankan aksi, invoice yang sudah memiliki pembayaran ditolak untuk dibatalkan, dan status cancel otomatis menutup collection serta menonaktifkan suspend candidate
+
 ## [0.57.0] - 2026-07-07
 
 ### Added

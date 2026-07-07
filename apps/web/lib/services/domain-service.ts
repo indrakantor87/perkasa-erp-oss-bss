@@ -132,6 +132,14 @@ type ReviewDbBillingLatestInvoiceRow = {
   customerName: string
 }
 
+type ReviewDbBillingCancelledInvoiceRow = {
+  invoiceNo: string
+  customerName: string
+  totalAmount: number
+  updatedAt: string | Date
+  notes: string | null
+}
+
 type ReviewDbCollectionActionRow = {
   actionType: string
   actionStatus: string
@@ -713,6 +721,23 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const cancelledInvoices = await runReviewDbQuery<ReviewDbBillingCancelledInvoiceRow>(`
+    SELECT
+      bi.invoice_no AS invoiceNo,
+      c.full_name AS customerName,
+      bi.total_amount AS totalAmount,
+      bi.updated_at AS updatedAt,
+      bi.notes
+    FROM billing_invoices bi
+    JOIN service_subscriptions ss
+      ON ss.id = bi.subscription_id
+    JOIN crm_customers c
+      ON c.id = ss.customer_id
+    WHERE bi.invoice_status = 'CANCELLED'
+    ORDER BY bi.updated_at DESC, bi.id DESC
+    LIMIT 5
+  `)
+
   const actions = await runReviewDbQuery<ReviewDbCollectionActionRow>(`
     SELECT
       bca.action_type AS actionType,
@@ -806,6 +831,22 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
           item.billingMonth && item.billingYear
             ? `Periode: ${String(item.billingMonth).padStart(2, '0')}/${item.billingYear}`
             : 'Periode: -',
+        ],
+      })),
+    },
+    {
+      title: 'Invoice Dibatalkan Terbaru',
+      description:
+        'Invoice yang dibatalkan terbaru untuk memastikan pembatalan invoice unpaid tetap tercatat dan terlihat di halaman billing.',
+      rows: cancelledInvoices.map((item) => ({
+        id: item.invoiceNo,
+        primary: item.invoiceNo,
+        secondary: item.customerName,
+        status: 'CANCELLED',
+        detail: item.notes?.trim() || 'Invoice dibatalkan tanpa catatan tambahan.',
+        meta: [
+          `Total: ${formatCurrency(item.totalAmount)}`,
+          `Updated: ${formatDateTime(item.updatedAt)}`,
         ],
       })),
     },
