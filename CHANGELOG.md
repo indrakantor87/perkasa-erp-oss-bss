@@ -10,6 +10,12 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.60.0] - 2026-07-07
+
+### Added
+
+- filter interaktif pada detail batch import (status, domain, dan pencarian cepat) untuk mempercepat review row bermasalah sesuai PRD
+
 ## [0.59.0] - 2026-07-07
 
 ### Changed
