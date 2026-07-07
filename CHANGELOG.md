@@ -10,6 +10,25 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.55.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/inventory-odp-create-form.tsx` dan route `POST /api/inventory/odps` untuk membuat master ODP beserta generate port otomatis
+- komponen `apps/web/components/inventory-odp-port-assign-form.tsx` dan route `POST /api/inventory/odp-ports/assign` untuk assign port ODP ke subscription/customer
+- komponen `apps/web/components/inventory-device-assignment-form.tsx` dan route `POST /api/inventory/device-assignments` untuk menautkan perangkat inventory ke subscription/work order/customer dan mencatat stok keluar
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` menambah write action inventory untuk ODP, assign port, dan device assignment
+- `apps/web/lib/services/domain-service.ts` menambah review section inventory: `ODP Terbaru`, `Port Terpakai`, dan `Device Assignment Terbaru`
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui untuk mencerminkan flow ODP dan assignment inventory
+
+### Notes
+
+- versi `0.55.0` menutup gap inventory: dari item master + stock movement menjadi siap untuk pemetaan jaringan (ODP/port) dan assignment perangkat ke layanan
+- flow baru tetap defensif: ODP code unik, port hanya bisa dipakai bila status AVAILABLE/RESERVED, movement stok keluar ditolak bila stok tidak cukup
+
 ## [0.54.0] - 2026-07-07
 
 ### Added

@@ -209,6 +209,37 @@ type ReviewDbInventoryMovementRow = {
   notes: string | null
 }
 
+type ReviewDbInventoryOdpRow = {
+  odpId: number
+  odpCode: string
+  odpName: string
+  totalPorts: number
+  activePorts: number
+  locationText: string | null
+}
+
+type ReviewDbInventoryOdpPortRow = {
+  portId: number
+  odpCode: string
+  portNo: number
+  portStatus: string
+  serviceNo: string | null
+  customerCode: string | null
+  installedAt: string | Date | null
+}
+
+type ReviewDbInventoryDeviceAssignmentRow = {
+  assignmentId: number
+  itemCode: string
+  itemName: string
+  assignmentStatus: string
+  assignedAt: string | Date
+  serviceNo: string | null
+  workOrderNo: string | null
+  customerName: string | null
+  serialNumber: string | null
+}
+
 type ReviewDbHrEmployeeRow = {
   employeeId: number
   employeeCode: string
@@ -930,6 +961,64 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const odps = await runReviewDbQuery<ReviewDbInventoryOdpRow>(`
+    SELECT
+      id AS odpId,
+      code AS odpCode,
+      name AS odpName,
+      total_ports AS totalPorts,
+      active_ports AS activePorts,
+      location_text AS locationText
+    FROM network_odp
+    ORDER BY updated_at DESC, id DESC
+    LIMIT 5
+  `)
+
+  const usedPorts = await runReviewDbQuery<ReviewDbInventoryOdpPortRow>(`
+    SELECT
+      nop.id AS portId,
+      no.code AS odpCode,
+      nop.port_no AS portNo,
+      nop.port_status AS portStatus,
+      ss.service_no AS serviceNo,
+      c.customer_code AS customerCode,
+      nop.installed_at AS installedAt
+    FROM network_odp_ports nop
+    JOIN network_odp no
+      ON no.id = nop.odp_id
+    LEFT JOIN service_subscriptions ss
+      ON ss.id = nop.subscription_id
+    LEFT JOIN crm_customers c
+      ON c.id = nop.customer_id
+    WHERE nop.port_status = 'USED'
+    ORDER BY COALESCE(nop.installed_at, nop.created_at) DESC, nop.id DESC
+    LIMIT 5
+  `)
+
+  const assignments = await runReviewDbQuery<ReviewDbInventoryDeviceAssignmentRow>(`
+    SELECT
+      sda.id AS assignmentId,
+      ii.item_code AS itemCode,
+      ii.item_name AS itemName,
+      sda.assignment_status AS assignmentStatus,
+      sda.assigned_at AS assignedAt,
+      ss.service_no AS serviceNo,
+      swo.work_order_no AS workOrderNo,
+      c.full_name AS customerName,
+      sda.serial_number AS serialNumber
+    FROM service_device_assignments sda
+    JOIN inventory_items ii
+      ON ii.id = sda.inventory_item_id
+    LEFT JOIN service_subscriptions ss
+      ON ss.id = sda.subscription_id
+    LEFT JOIN service_work_orders swo
+      ON swo.id = sda.work_order_id
+    LEFT JOIN crm_customers c
+      ON c.id = sda.customer_id
+    ORDER BY sda.assigned_at DESC, sda.id DESC
+    LIMIT 5
+  `)
+
   return [
     {
       title: 'Item Inventory Terbaru',
@@ -961,6 +1050,53 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
           `Qty: ${formatNumber(item.qty)}`,
           `Harga: ${formatCurrency(item.unitPrice)}`,
           `At: ${formatDateTime(item.movementAt)}`,
+        ],
+      })),
+    },
+    {
+      title: 'ODP Terbaru',
+      description: 'ODP terbaru dari review DB untuk memulai pemetaan port dan assignment jaringan.',
+      rows: odps.map((item) => ({
+        id: `ODP-${item.odpId}`,
+        primary: item.odpCode,
+        secondary: item.odpName,
+        status: `${formatNumber(item.activePorts)}/${formatNumber(item.totalPorts)}`,
+        detail: item.locationText?.trim() || 'Lokasi ODP belum diisi.',
+        meta: [
+          `Total Ports: ${formatNumber(item.totalPorts)}`,
+          `Active Ports: ${formatNumber(item.activePorts)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Port Terpakai',
+      description: 'Port ODP yang sudah digunakan untuk layanan aktif agar mapping port lebih mudah diaudit dari inventory.',
+      rows: usedPorts.map((item) => ({
+        id: `PORT-${item.portId}`,
+        primary: `${item.odpCode} #${item.portNo}`,
+        secondary: item.serviceNo || item.customerCode || '-',
+        status: item.portStatus,
+        detail: `Installed ${formatDateTime(item.installedAt)}.`,
+        meta: [
+          `Service: ${item.serviceNo || '-'}`,
+          `Customer: ${item.customerCode || '-'}`,
+          `Installed: ${formatDateTime(item.installedAt)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Device Assignment Terbaru',
+      description: 'Assignment perangkat terbaru dari review DB untuk menautkan stok keluar dengan subscription/work order.',
+      rows: assignments.map((item) => ({
+        id: `ASSIGN-${item.assignmentId}`,
+        primary: `${item.itemCode} | ${item.itemName}`,
+        secondary: item.customerName || item.serviceNo || '-',
+        status: item.assignmentStatus,
+        detail: `Assigned ${formatDateTime(item.assignedAt)} untuk ${item.serviceNo || item.workOrderNo || '-'}.`,
+        meta: [
+          `Service: ${item.serviceNo || '-'}`,
+          `Work Order: ${item.workOrderNo || '-'}`,
+          `Serial: ${item.serialNumber || '-'}`,
         ],
       })),
     },

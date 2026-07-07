@@ -433,6 +433,56 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
           },
         ],
       },
+      {
+        title: 'ODP Terbaru',
+        description: 'Sampel ODP terbaru untuk memulai pemetaan port dan assignment jaringan.',
+        rows: [
+          {
+            id: 'ODP-77',
+            primary: 'ODP-PTI-001',
+            secondary: 'ODP Pati Kidul Blok A',
+            status: '2/8',
+            detail: 'ODP depan minimarket, dekat tiang PLN nomor 12.',
+            meta: ['Total Ports: 8', 'Active Ports: 2'],
+          },
+          {
+            id: 'ODP-76',
+            primary: 'ODP-PTI-002',
+            secondary: 'ODP Margorejo Industri',
+            status: '1/16',
+            detail: 'ODP dekat pos security kawasan industri.',
+            meta: ['Total Ports: 16', 'Active Ports: 1'],
+          },
+        ],
+      },
+      {
+        title: 'Port Terpakai',
+        description: 'Sampel port ODP yang sudah digunakan untuk layanan aktif.',
+        rows: [
+          {
+            id: 'PORT-901',
+            primary: 'ODP-PTI-001 #2',
+            secondary: 'SVC-000501',
+            status: 'USED',
+            detail: 'Installed 08 Jul 2026 11:20.',
+            meta: ['Service: SVC-000501', 'Customer: CUST-001023', 'Installed: 08 Jul 2026 11:20'],
+          },
+        ],
+      },
+      {
+        title: 'Device Assignment Terbaru',
+        description: 'Sampel assignment perangkat terbaru untuk menautkan stok keluar dengan subscription/work order.',
+        rows: [
+          {
+            id: 'ASSIGN-55',
+            primary: 'INV-202607-0001 | ONU ZTE F660',
+            secondary: 'PT Maju Lancar Abadi',
+            status: 'ASSIGNED',
+            detail: 'Assigned 08 Jul 2026 11:30 untuk SVC-000501.',
+            meta: ['Service: SVC-000501', 'Work Order: WO-202607-0021', 'Serial: F660-ABC-0001'],
+          },
+        ],
+      },
     ],
   },
   hr: {

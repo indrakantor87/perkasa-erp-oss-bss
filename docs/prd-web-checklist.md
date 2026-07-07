@@ -23,7 +23,7 @@ Status dipakai dengan arti:
 | Customers | PARSIAL | Customer master sudah bisa create, lifecycle belum lengkap |
 | Support | PARSIAL | TT review sudah bisa create, close, kelola SLA dasar, tambah isolir aktif, restorasi isolir, dan dismantle history |
 | Billing | PARSIAL | Collection action dan payment entry sudah bisa create, invoice lifecycle penuh belum |
-| Inventory | PARSIAL | Review section operasional dan item master awal sudah bisa create |
+| Inventory | PARSIAL | Review section operasional, item master, movement, ODP, port, dan device assignment awal sudah bisa create |
 | HR | PARSIAL | Review section operasional, employee master, attendance, loan, dan payroll awal sudah bisa create |
 | Settings access | PARSIAL | Matrix akses ada, permission master dinamis belum |
 | Settings users | SUDAH | List, create, edit, reset password, deactivate/reactivate, dan audit perubahan user sudah ada |
@@ -44,7 +44,7 @@ Status dipakai dengan arti:
 | Sales shell: lead, coverage, survey, order | PARSIAL | Lead review, coverage create, survey create, sales order create, work order create, aktivasi subscription, dan review coverage/survey/order/work order/subscription sudah ada | Workflow corporate lanjut, quotation/contract, dan otomasi pasca-aktivasi belum hidup | Sangat Tinggi |
 | Customer shell: master, address, subscription, histori | PARSIAL | Create customer + primary address sudah ada | Subscription lifecycle dan histori layanan belum lengkap | Tinggi |
 | Support shell: TT, isolir, dismantle, SLA | PARSIAL | TT open review sudah ada, create TT, close ticket, kelola SLA dasar, tambah isolir aktif, restorasi isolir, dan dismantle flow dasar sudah ada | SLA penuh dan otomasi workflow support lanjutan belum ada | Sangat Tinggi |
-| Inventory shell: item, stock movement, ODP, device assignment | PARSIAL | Review item inventory, review stock movement, create item master awal, dan stock movement create sudah ada | ODP dan device assignment belum hidup | Tinggi |
+| Inventory shell: item, stock movement, ODP, device assignment | PARSIAL | Review item inventory, review stock movement, review ODP/port, review device assignment, create item master, create stock movement, create ODP, assign port, dan device assignment sudah ada | Device return flow, port reserve/faulty, dan integrasi assignment ke work order masih perlu diperdalam | Tinggi |
 | HR shell: employee, attendance, salary, loan | PARSIAL | Review employee, attendance, loan, salary slip, create employee master, create attendance, create loan, dan create payroll awal sudah ada | Payroll release lanjutan dan perhitungan otomatis lebih detail belum hidup | Tinggi |
 | Billing shell: invoice, payment, collection, overdue | PARSIAL | Collection action, payment entry, review invoice, dan review payment terbaru sudah ada | Lifecycle invoice penuh dan otomasi billing lanjutan belum lengkap | Sangat Tinggi |
 | Settings access dan permission | PARSIAL | Permission matrix dan access summary sudah ada | Permission master dinamis dan audit perubahan belum ada | Tinggi |

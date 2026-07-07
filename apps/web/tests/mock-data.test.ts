@@ -135,9 +135,12 @@ async function main() {
 
   const inventoryDomain = await getDomainPageData('inventory', 'SUPER_ADMIN')
   assert.equal(inventoryDomain?.content.resource, 'inventory')
-  assert.equal((inventoryDomain?.content.reviewSections?.length ?? 0) >= 2, true)
+  assert.equal((inventoryDomain?.content.reviewSections?.length ?? 0) >= 5, true)
   assert.equal(inventoryDomain?.content.reviewSections?.[0]?.title, 'Item Inventory Terbaru')
   assert.equal(inventoryDomain?.content.reviewSections?.[1]?.title, 'Stock Movement Terbaru')
+  assert.equal(inventoryDomain?.content.reviewSections?.[2]?.title, 'ODP Terbaru')
+  assert.equal(inventoryDomain?.content.reviewSections?.[3]?.title, 'Port Terpakai')
+  assert.equal(inventoryDomain?.content.reviewSections?.[4]?.title, 'Device Assignment Terbaru')
 
   const hrDomain = await getDomainPageData('hr', 'SUPER_ADMIN')
   assert.equal(hrDomain?.content.resource, 'hr')

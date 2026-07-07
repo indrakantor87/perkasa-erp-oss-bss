@@ -57,6 +57,9 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 - domain `sales` sekarang juga memiliki aktivasi subscription dari sales order yang valid dengan `service_no` otomatis serta pembentukan customer master bila diperlukan
 - domain `inventory` sekarang juga memiliki write action awal untuk membuat item master baru ke `inventory_items` dengan `item_code` otomatis
 - domain `inventory` sekarang juga memiliki write action stock movement untuk mencatat IN/OUT/ADJUSTMENT dan menyelaraskan `current_stock`
+- domain `inventory` sekarang juga memiliki write action ODP untuk membuat master `network_odp` dan generate port awal pada `network_odp_ports`
+- domain `inventory` sekarang juga memiliki write action assign port ODP agar `port_status` dan `active_ports` terselaraskan dengan layanan yang terpasang
+- domain `inventory` sekarang juga memiliki write action device assignment untuk menautkan `inventory_items` ke subscription/work order/customer dan mencatat stok keluar
 - domain `hr` sekarang juga memiliki write action awal untuk membuat employee master baru ke `hr_employees` dengan `employee_code` otomatis
 - domain `hr` sekarang juga memiliki write action attendance harian untuk employee valid pada `hr_attendance`
 - domain `hr` sekarang juga memiliki write action loan atau kasbon awal untuk employee valid pada `hr_loans`

@@ -6,7 +6,10 @@ import { HrAttendanceForm } from '@/components/hr-attendance-form'
 import { HrEmployeeCreateForm } from '@/components/hr-employee-create-form'
 import { HrLoanCreateForm } from '@/components/hr-loan-create-form'
 import { HrSalarySlipForm } from '@/components/hr-salary-slip-form'
+import { InventoryDeviceAssignmentForm } from '@/components/inventory-device-assignment-form'
 import { InventoryItemCreateForm } from '@/components/inventory-item-create-form'
+import { InventoryOdpCreateForm } from '@/components/inventory-odp-create-form'
+import { InventoryOdpPortAssignForm } from '@/components/inventory-odp-port-assign-form'
 import { InventoryStockMovementForm } from '@/components/inventory-stock-movement-form'
 import { SalesCoverageCreateForm } from '@/components/sales-coverage-create-form'
 import { SalesLeadCreateForm } from '@/components/sales-lead-create-form'
@@ -44,6 +47,13 @@ export function DomainShell({
     content.key === 'inventory'
       ? (content.reviewSections ?? [])
           .filter((section) => section.title.toUpperCase().includes('ITEM'))
+          .flatMap((section) => section.rows)
+          .map((row) => `${row.primary} | ${row.secondary}`)
+      : []
+  const inventoryOdpSuggestions =
+    content.key === 'inventory'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('ODP'))
           .flatMap((section) => section.rows)
           .map((row) => `${row.primary} | ${row.secondary}`)
       : []
@@ -296,6 +306,20 @@ export function DomainShell({
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
           />
           <InventoryStockMovementForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            itemSuggestions={inventoryItemSuggestions}
+          />
+          <InventoryOdpCreateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+          />
+          <InventoryOdpPortAssignForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            odpSuggestions={inventoryOdpSuggestions}
+          />
+          <InventoryDeviceAssignmentForm
             canCreate={canCreate}
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
             itemSuggestions={inventoryItemSuggestions}
