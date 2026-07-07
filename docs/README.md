@@ -2,6 +2,9 @@
 
 ## Dokumen Utama
 
+- `xampp-setup.md`  
+  Langkah setup MySQL XAMPP sebagai review DB agar web bisa langsung membaca data nyata.
+
 - `blueprint.md`  
   Arah besar modul, domain, dan workflow sistem baru.
 
