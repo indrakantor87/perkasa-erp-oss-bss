@@ -108,6 +108,18 @@ export type ImportBatchAction = {
   happenedAt: string
 }
 
+export type ImportBatchTransformRun = {
+  id: string
+  stage: TransformStage['stage']
+  status: 'RUNNING' | 'SUCCESS' | 'FAILED'
+  actor: string
+  startedAt: string
+  finishedAt: string
+  durationMs: number
+  executedStatements: number
+  error: string
+}
+
 export type BatchDetail = {
   id: string
   title: string
@@ -116,6 +128,7 @@ export type BatchDetail = {
   status: ImportBatch['status']
   summary: string
   actions: ImportBatchAction[]
+  transformRuns: ImportBatchTransformRun[]
   rows: BatchRow[]
 }
 

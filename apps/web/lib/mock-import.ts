@@ -112,6 +112,19 @@ const batchRows: Record<string, BatchDetail> = {
         happenedAt: '2026-07-06 08:15',
       },
     ],
+    transformRuns: [
+      {
+        id: 'sample-webpsb-user-001-run-02',
+        stage: '02',
+        status: 'SUCCESS',
+        actor: 'System Review',
+        startedAt: '2026-07-06 08:40',
+        finishedAt: '2026-07-06 08:42',
+        durationMs: 120000,
+        executedStatements: 24,
+        error: '',
+      },
+    ],
     rows: [
       {
         id: '1',
@@ -156,6 +169,7 @@ const batchRows: Record<string, BatchDetail> = {
         happenedAt: '2026-07-06 08:20',
       },
     ],
+    transformRuns: [],
     rows: [
       {
         id: '1',
@@ -192,6 +206,7 @@ const batchRows: Record<string, BatchDetail> = {
         happenedAt: '2026-07-06 08:30',
       },
     ],
+    transformRuns: [],
     rows: [
       {
         id: '1',
@@ -218,6 +233,19 @@ const batchRows: Record<string, BatchDetail> = {
         actor: 'System Review',
         detail: 'Transform tahap 1 berhasil memindahkan sample HR ke tabel final.',
         happenedAt: '2026-07-06 08:45',
+      },
+    ],
+    transformRuns: [
+      {
+        id: 'sample-finance-hr-001-run-01',
+        stage: '01',
+        status: 'SUCCESS',
+        actor: 'System Review',
+        startedAt: '2026-07-06 08:44',
+        finishedAt: '2026-07-06 08:45',
+        durationMs: 60000,
+        executedStatements: 18,
+        error: '',
       },
     ],
     rows: [

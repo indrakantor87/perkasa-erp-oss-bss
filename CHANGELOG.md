@@ -10,6 +10,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.59.0] - 2026-07-07
+
+### Changed
+
+- pipeline transform import tahap 1-4 sekarang ter-scope per batch dengan variabel `@batch_id` (mencegah transform lintas batch saat tombol transform dipicu dari web)
+- `apps/web/lib/services/import-write-service.ts` sekarang mengeset `@batch_id` sebelum eksekusi SQL stage
+
+### Added
+
+- histori eksekusi transform per batch melalui tabel `staging_import_batch_transform_runs` (RUNNING/SUCCESS/FAILED, durasi, jumlah statement) dan ditampilkan pada detail batch import
+
 ## [0.58.1] - 2026-07-07
 
 ### Fixed

@@ -15,10 +15,12 @@ JOIN staging_legacy_order_records so
     so.legacy_id = bi.legacy_subscription_ref
     OR so.legacy_customer_id = bi.legacy_customer_id
   )
+  AND so.batch_id = bi.batch_id
   AND so.target_subscription_id IS NOT NULL
 SET bi.target_subscription_id = so.target_subscription_id,
     bi.updated_at = CURRENT_TIMESTAMP
-WHERE bi.target_subscription_id IS NULL;
+WHERE bi.target_subscription_id IS NULL
+  AND bi.batch_id = @batch_id;
 
 -- 2) Transform invoice ke billing_invoices
 INSERT INTO billing_invoices (
@@ -81,6 +83,7 @@ SELECT
   bi.notes
 FROM staging_legacy_billing_invoice_records bi
 WHERE bi.import_status IN ('MAPPED', 'VALID')
+  AND bi.batch_id = @batch_id
   AND bi.target_invoice_id IS NULL
   AND bi.target_subscription_id IS NOT NULL
   AND NOT EXISTS (
@@ -97,6 +100,7 @@ SET bi.target_invoice_id = i.id,
     bi.imported_at = COALESCE(bi.imported_at, CURRENT_TIMESTAMP),
     bi.updated_at = CURRENT_TIMESTAMP
 WHERE bi.import_status IN ('MAPPED', 'VALID')
+  AND bi.batch_id = @batch_id
   AND bi.target_invoice_id IS NULL;
 
 -- 3) Samakan target invoice pada staging item, payment, dan collection
@@ -107,6 +111,7 @@ JOIN staging_legacy_billing_invoice_records bi
 SET ii.target_invoice_id = bi.target_invoice_id,
     ii.updated_at = CURRENT_TIMESTAMP
 WHERE ii.target_invoice_id IS NULL
+  AND ii.batch_id = @batch_id
   AND bi.target_invoice_id IS NOT NULL;
 
 UPDATE staging_legacy_billing_payment_records bp
@@ -116,6 +121,7 @@ JOIN staging_legacy_billing_invoice_records bi
 SET bp.target_invoice_id = bi.target_invoice_id,
     bp.updated_at = CURRENT_TIMESTAMP
 WHERE bp.target_invoice_id IS NULL
+  AND bp.batch_id = @batch_id
   AND bi.target_invoice_id IS NOT NULL;
 
 UPDATE staging_legacy_billing_collection_records bc
@@ -125,6 +131,7 @@ JOIN staging_legacy_billing_invoice_records bi
 SET bc.target_invoice_id = bi.target_invoice_id,
     bc.updated_at = CURRENT_TIMESTAMP
 WHERE bc.target_invoice_id IS NULL
+  AND bc.batch_id = @batch_id
   AND bi.target_invoice_id IS NOT NULL;
 
 -- 4) Transform invoice items
@@ -152,6 +159,7 @@ SELECT
   COALESCE(ii.line_total, COALESCE(ii.qty, 1) * COALESCE(ii.unit_price, 0))
 FROM staging_legacy_billing_item_records ii
 WHERE ii.import_status IN ('MAPPED', 'VALID')
+  AND ii.batch_id = @batch_id
   AND ii.target_item_id IS NULL
   AND ii.target_invoice_id IS NOT NULL
   AND NOT EXISTS (
@@ -172,6 +180,7 @@ SET ii.target_item_id = it.id,
     ii.imported_at = COALESCE(ii.imported_at, CURRENT_TIMESTAMP),
     ii.updated_at = CURRENT_TIMESTAMP
 WHERE ii.import_status IN ('MAPPED', 'VALID')
+  AND ii.batch_id = @batch_id
   AND ii.target_item_id IS NULL;
 
 -- 5) Transform payments
@@ -207,6 +216,7 @@ LEFT JOIN staging_legacy_user_records su
 LEFT JOIN auth_users au
   ON au.id = su.target_user_id
 WHERE bp.import_status IN ('MAPPED', 'VALID')
+  AND bp.batch_id = @batch_id
   AND bp.target_payment_id IS NULL
   AND bp.target_invoice_id IS NOT NULL
   AND NOT EXISTS (
@@ -227,6 +237,7 @@ SET bp.target_payment_id = p.id,
     bp.imported_at = COALESCE(bp.imported_at, CURRENT_TIMESTAMP),
     bp.updated_at = CURRENT_TIMESTAMP
 WHERE bp.import_status IN ('MAPPED', 'VALID')
+  AND bp.batch_id = @batch_id
   AND bp.target_payment_id IS NULL;
 
 -- 6) Transform collection actions
@@ -266,6 +277,7 @@ LEFT JOIN staging_legacy_user_records su
 LEFT JOIN auth_users au
   ON au.id = su.target_user_id
 WHERE bc.import_status IN ('MAPPED', 'VALID')
+  AND bc.batch_id = @batch_id
   AND bc.target_collection_action_id IS NULL
   AND bc.target_invoice_id IS NOT NULL
   AND NOT EXISTS (
@@ -302,4 +314,5 @@ SET bc.target_collection_action_id = ca.id,
     bc.imported_at = COALESCE(bc.imported_at, CURRENT_TIMESTAMP),
     bc.updated_at = CURRENT_TIMESTAMP
 WHERE bc.import_status IN ('MAPPED', 'VALID')
+  AND bc.batch_id = @batch_id
   AND bc.target_collection_action_id IS NULL;

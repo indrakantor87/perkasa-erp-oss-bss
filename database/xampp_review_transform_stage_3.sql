@@ -44,6 +44,7 @@ SELECT
   so.notes
 FROM staging_legacy_order_records so
 WHERE so.import_status = 'IMPORTED'
+  AND so.batch_id = @batch_id
   AND so.target_order_id IS NOT NULL
   AND so.target_work_order_id IS NULL
   AND NOT EXISTS (
@@ -58,6 +59,7 @@ JOIN service_work_orders wo
 SET so.target_work_order_id = wo.id,
     so.updated_at = CURRENT_TIMESTAMP
 WHERE so.import_status = 'IMPORTED'
+  AND so.batch_id = @batch_id
   AND so.target_work_order_id IS NULL;
 
 -- 2) Samakan target subscription pada staging support berdasarkan legacy customer
@@ -65,10 +67,12 @@ UPDATE staging_legacy_support_records ss
 JOIN staging_legacy_order_records so
   ON so.source_system = ss.source_system
   AND so.legacy_customer_id = ss.legacy_customer_id
+  AND so.batch_id = ss.batch_id
   AND so.target_subscription_id IS NOT NULL
 SET ss.target_subscription_id = so.target_subscription_id,
     ss.updated_at = CURRENT_TIMESTAMP
 WHERE ss.target_subscription_id IS NULL
+  AND ss.batch_id = @batch_id
   AND ss.support_type IN ('TROUBLE_TICKET', 'ISOLATION')
   AND (
     ss.opened_at IS NULL
@@ -114,6 +118,7 @@ SELECT
   END
 FROM staging_legacy_support_records ss
 WHERE ss.support_type = 'TROUBLE_TICKET'
+  AND ss.batch_id = @batch_id
   AND ss.import_status IN ('MAPPED', 'VALID')
   AND ss.target_trouble_ticket_id IS NULL
   AND NOT EXISTS (
@@ -130,6 +135,7 @@ SET ss.target_trouble_ticket_id = tt.id,
     ss.imported_at = COALESCE(ss.imported_at, CURRENT_TIMESTAMP),
     ss.updated_at = CURRENT_TIMESTAMP
 WHERE ss.support_type = 'TROUBLE_TICKET'
+  AND ss.batch_id = @batch_id
   AND ss.import_status IN ('MAPPED', 'VALID')
   AND ss.target_trouble_ticket_id IS NULL;
 
@@ -149,6 +155,7 @@ JOIN JSON_TABLE(
   )
 ) jt
 WHERE ss.support_type = 'TROUBLE_TICKET'
+  AND ss.batch_id = @batch_id
   AND ss.target_trouble_ticket_id IS NOT NULL
   AND jt.photo_path IS NOT NULL
   AND jt.photo_path <> ''
@@ -201,7 +208,9 @@ FROM staging_legacy_support_records ss
 LEFT JOIN staging_legacy_customer_records sc
   ON sc.source_system = ss.source_system
   AND sc.legacy_id = ss.legacy_customer_id
+  AND sc.batch_id = ss.batch_id
 WHERE ss.support_type = 'ISOLATION'
+  AND ss.batch_id = @batch_id
   AND ss.import_status IN ('MAPPED', 'VALID')
   AND ss.target_isolation_id IS NULL
   AND NOT EXISTS (
@@ -220,6 +229,7 @@ SET ss.target_isolation_id = si.id,
     ss.imported_at = COALESCE(ss.imported_at, CURRENT_TIMESTAMP),
     ss.updated_at = CURRENT_TIMESTAMP
 WHERE ss.support_type = 'ISOLATION'
+  AND ss.batch_id = @batch_id
   AND ss.import_status IN ('MAPPED', 'VALID')
   AND ss.target_isolation_id IS NULL;
 
@@ -247,6 +257,7 @@ FROM staging_legacy_support_records ss
 LEFT JOIN staging_legacy_customer_records sc
   ON sc.source_system = ss.source_system
   AND sc.legacy_id = ss.legacy_customer_id
+  AND sc.batch_id = ss.batch_id
 LEFT JOIN support_isolations iso
   ON iso.customer_name = COALESCE(NULLIF(TRIM(ss.customer_name), ''), 'Legacy Customer')
   AND (
@@ -254,6 +265,7 @@ LEFT JOIN support_isolations iso
     OR iso.isolation_date = ss.opened_at
   )
 WHERE ss.support_type = 'DISMANTLE_HISTORY'
+  AND ss.batch_id = @batch_id
   AND ss.import_status IN ('MAPPED', 'VALID')
   AND ss.target_dismantle_history_id IS NULL
   AND NOT EXISTS (
@@ -272,5 +284,6 @@ SET ss.target_dismantle_history_id = dh.id,
     ss.imported_at = COALESCE(ss.imported_at, CURRENT_TIMESTAMP),
     ss.updated_at = CURRENT_TIMESTAMP
 WHERE ss.support_type = 'DISMANTLE_HISTORY'
+  AND ss.batch_id = @batch_id
   AND ss.import_status IN ('MAPPED', 'VALID')
   AND ss.target_dismantle_history_id IS NULL;

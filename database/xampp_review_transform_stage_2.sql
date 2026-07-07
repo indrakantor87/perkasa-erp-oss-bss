@@ -33,6 +33,7 @@ FROM staging_legacy_customer_records s
 LEFT JOIN org_branches ob
   ON ob.code = s.branch_code
 WHERE s.import_status IN ('MAPPED', 'VALID')
+  AND s.batch_id = @batch_id
   AND s.target_customer_id IS NULL
   AND NOT EXISTS (
     SELECT 1
@@ -48,6 +49,7 @@ SET s.target_customer_id = c.id,
     s.imported_at = COALESCE(s.imported_at, CURRENT_TIMESTAMP),
     s.updated_at = CURRENT_TIMESTAMP
 WHERE s.import_status IN ('MAPPED', 'VALID')
+  AND s.batch_id = @batch_id
   AND s.target_customer_id IS NULL;
 
 -- 2) Transform customer address dari staging ke crm_customer_addresses
@@ -70,6 +72,7 @@ SELECT
   1
 FROM staging_legacy_customer_records s
 WHERE s.import_status = 'IMPORTED'
+  AND s.batch_id = @batch_id
   AND s.target_customer_id IS NOT NULL
   AND s.target_address_id IS NULL
   AND NOT EXISTS (
@@ -86,6 +89,7 @@ JOIN crm_customer_addresses a
 SET s.target_address_id = a.id,
     s.updated_at = CURRENT_TIMESTAMP
 WHERE s.import_status = 'IMPORTED'
+  AND s.batch_id = @batch_id
   AND s.target_customer_id IS NOT NULL
   AND s.target_address_id IS NULL;
 
@@ -94,9 +98,11 @@ UPDATE staging_legacy_order_records so
 JOIN staging_legacy_customer_records sc
   ON sc.source_system = so.source_system
   AND sc.legacy_id = so.legacy_customer_id
+  AND sc.batch_id = so.batch_id
 SET so.target_customer_id = sc.target_customer_id,
     so.updated_at = CURRENT_TIMESTAMP
 WHERE so.target_customer_id IS NULL
+  AND so.batch_id = @batch_id
   AND sc.target_customer_id IS NOT NULL;
 
 -- 4) Transform sales order dari staging ke sales_orders
@@ -135,6 +141,7 @@ FROM staging_legacy_order_records so
 LEFT JOIN sales_packages sp
   ON sp.code = so.mapped_package_code
 WHERE so.import_status IN ('MAPPED', 'VALID')
+  AND so.batch_id = @batch_id
   AND so.target_order_id IS NULL
   AND so.target_customer_id IS NOT NULL
   AND sp.id IS NOT NULL
@@ -152,6 +159,7 @@ SET so.target_order_id = o.id,
     so.imported_at = COALESCE(so.imported_at, CURRENT_TIMESTAMP),
     so.updated_at = CURRENT_TIMESTAMP
 WHERE so.import_status IN ('MAPPED', 'VALID')
+  AND so.batch_id = @batch_id
   AND so.target_order_id IS NULL;
 
 -- 5) Transform subscription dari staging order ke service_subscriptions
@@ -189,6 +197,7 @@ FROM staging_legacy_order_records so
 LEFT JOIN sales_packages sp
   ON sp.code = so.mapped_package_code
 WHERE so.import_status = 'IMPORTED'
+  AND so.batch_id = @batch_id
   AND so.target_subscription_id IS NULL
   AND so.target_customer_id IS NOT NULL
   AND so.target_order_id IS NOT NULL
@@ -205,4 +214,5 @@ JOIN service_subscriptions ss
 SET so.target_subscription_id = ss.id,
     so.updated_at = CURRENT_TIMESTAMP
 WHERE so.import_status = 'IMPORTED'
+  AND so.batch_id = @batch_id
   AND so.target_subscription_id IS NULL;

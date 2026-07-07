@@ -47,6 +47,7 @@ LEFT JOIN mapping_legacy_status_values msv
   AND msv.legacy_status_value = s.status_text
   AND msv.is_active = 1
 WHERE s.import_status IN ('MAPPED', 'VALID')
+  AND s.batch_id = @batch_id
   AND s.target_item_id IS NULL
   AND NOT EXISTS (
     SELECT 1
@@ -62,6 +63,7 @@ SET s.target_item_id = i.id,
     s.imported_at = COALESCE(s.imported_at, CURRENT_TIMESTAMP),
     s.updated_at = CURRENT_TIMESTAMP
 WHERE s.import_status IN ('MAPPED', 'VALID')
+  AND s.batch_id = @batch_id
   AND s.target_item_id IS NULL;
 
 -- 2) Transform inventory movement dari staging ke inventory_stock_movements
@@ -92,7 +94,9 @@ FROM staging_legacy_inventory_movement_records sm
 LEFT JOIN staging_legacy_inventory_item_records si
   ON si.source_system = sm.source_system
   AND si.legacy_id = sm.legacy_item_id
+  AND si.batch_id = sm.batch_id
 WHERE sm.import_status IN ('MAPPED', 'VALID')
+  AND sm.batch_id = @batch_id
   AND sm.target_movement_id IS NULL
   AND COALESCE(sm.target_item_id, si.target_item_id) IS NOT NULL
   AND NOT EXISTS (
@@ -112,6 +116,7 @@ UPDATE staging_legacy_inventory_movement_records sm
 LEFT JOIN staging_legacy_inventory_item_records si
   ON si.source_system = sm.source_system
   AND si.legacy_id = sm.legacy_item_id
+  AND si.batch_id = sm.batch_id
 JOIN inventory_stock_movements ism
   ON ism.item_id = COALESCE(sm.target_item_id, si.target_item_id)
   AND COALESCE(ism.reference_no, '') = COALESCE(NULLIF(TRIM(sm.reference_no), ''), '')
@@ -127,6 +132,7 @@ SET sm.target_item_id = COALESCE(sm.target_item_id, si.target_item_id),
     sm.imported_at = COALESCE(sm.imported_at, CURRENT_TIMESTAMP),
     sm.updated_at = CURRENT_TIMESTAMP
 WHERE sm.import_status IN ('MAPPED', 'VALID')
+  AND sm.batch_id = @batch_id
   AND sm.target_movement_id IS NULL;
 
 -- 3) Transform employee dari staging ke hr_employees
@@ -159,6 +165,7 @@ LEFT JOIN org_divisions od
 LEFT JOIN org_branches ob
   ON ob.code = 'PATI'
 WHERE se.import_status IN ('MAPPED', 'VALID')
+  AND se.batch_id = @batch_id
   AND se.target_employee_id IS NULL
   AND NOT EXISTS (
     SELECT 1
@@ -174,6 +181,7 @@ SET se.target_employee_id = he.id,
     se.imported_at = COALESCE(se.imported_at, CURRENT_TIMESTAMP),
     se.updated_at = CURRENT_TIMESTAMP
 WHERE se.import_status IN ('MAPPED', 'VALID')
+  AND se.batch_id = @batch_id
   AND se.target_employee_id IS NULL;
 
 -- 4) Transform attendance dari staging ke hr_attendance
@@ -203,12 +211,14 @@ FROM staging_legacy_attendance_records sa
 LEFT JOIN staging_legacy_employee_records se
   ON se.source_system = sa.source_system
   AND se.legacy_id = sa.legacy_employee_id
+  AND se.batch_id = sa.batch_id
 LEFT JOIN mapping_legacy_status_values msv
   ON msv.source_system = sa.source_system
   AND msv.domain_name = 'ATTENDANCE'
   AND msv.legacy_status_value = sa.attendance_status
   AND msv.is_active = 1
 WHERE sa.import_status IN ('MAPPED', 'VALID')
+  AND sa.batch_id = @batch_id
   AND sa.target_attendance_id IS NULL
   AND COALESCE(sa.target_employee_id, se.target_employee_id) IS NOT NULL
   AND sa.attendance_date IS NOT NULL
@@ -223,6 +233,7 @@ UPDATE staging_legacy_attendance_records sa
 LEFT JOIN staging_legacy_employee_records se
   ON se.source_system = sa.source_system
   AND se.legacy_id = sa.legacy_employee_id
+  AND se.batch_id = sa.batch_id
 JOIN hr_attendance ha
   ON ha.employee_id = COALESCE(sa.target_employee_id, se.target_employee_id)
   AND ha.attendance_date = sa.attendance_date
@@ -232,6 +243,7 @@ SET sa.target_employee_id = COALESCE(sa.target_employee_id, se.target_employee_i
     sa.imported_at = COALESCE(sa.imported_at, CURRENT_TIMESTAMP),
     sa.updated_at = CURRENT_TIMESTAMP
 WHERE sa.import_status IN ('MAPPED', 'VALID')
+  AND sa.batch_id = @batch_id
   AND sa.target_attendance_id IS NULL;
 
 -- 5) Transform salary dari staging ke hr_salary_slips
@@ -268,7 +280,9 @@ FROM staging_legacy_salary_records ss
 LEFT JOIN staging_legacy_employee_records se
   ON se.source_system = ss.source_system
   AND se.legacy_id = ss.legacy_employee_id
+  AND se.batch_id = ss.batch_id
 WHERE ss.import_status IN ('MAPPED', 'VALID')
+  AND ss.batch_id = @batch_id
   AND ss.target_salary_slip_id IS NULL
   AND COALESCE(ss.target_employee_id, se.target_employee_id) IS NOT NULL
   AND ss.payroll_month IS NOT NULL
@@ -285,6 +299,7 @@ UPDATE staging_legacy_salary_records ss
 LEFT JOIN staging_legacy_employee_records se
   ON se.source_system = ss.source_system
   AND se.legacy_id = ss.legacy_employee_id
+  AND se.batch_id = ss.batch_id
 JOIN hr_salary_slips hs
   ON hs.employee_id = COALESCE(ss.target_employee_id, se.target_employee_id)
   AND hs.payroll_month = ss.payroll_month
@@ -295,6 +310,7 @@ SET ss.target_employee_id = COALESCE(ss.target_employee_id, se.target_employee_i
     ss.imported_at = COALESCE(ss.imported_at, CURRENT_TIMESTAMP),
     ss.updated_at = CURRENT_TIMESTAMP
 WHERE ss.import_status IN ('MAPPED', 'VALID')
+  AND ss.batch_id = @batch_id
   AND ss.target_salary_slip_id IS NULL;
 
 -- 6) Transform loan dari staging ke hr_loans
@@ -324,7 +340,9 @@ FROM staging_legacy_loan_records sl
 LEFT JOIN staging_legacy_employee_records se
   ON se.source_system = sl.source_system
   AND se.legacy_id = sl.legacy_employee_id
+  AND se.batch_id = sl.batch_id
 WHERE sl.import_status IN ('MAPPED', 'VALID')
+  AND sl.batch_id = @batch_id
   AND sl.target_loan_id IS NULL
   AND COALESCE(sl.target_employee_id, se.target_employee_id) IS NOT NULL
   AND NOT EXISTS (
@@ -340,6 +358,7 @@ UPDATE staging_legacy_loan_records sl
 LEFT JOIN staging_legacy_employee_records se
   ON se.source_system = sl.source_system
   AND se.legacy_id = sl.legacy_employee_id
+  AND se.batch_id = sl.batch_id
 JOIN hr_loans hl
   ON hl.employee_id = COALESCE(sl.target_employee_id, se.target_employee_id)
   AND hl.loan_date = COALESCE(sl.loan_date, CURRENT_DATE)
@@ -351,4 +370,5 @@ SET sl.target_employee_id = COALESCE(sl.target_employee_id, se.target_employee_i
     sl.imported_at = COALESCE(sl.imported_at, CURRENT_TIMESTAMP),
     sl.updated_at = CURRENT_TIMESTAMP
 WHERE sl.import_status IN ('MAPPED', 'VALID')
+  AND sl.batch_id = @batch_id
   AND sl.target_loan_id IS NULL;

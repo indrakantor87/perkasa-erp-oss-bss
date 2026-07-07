@@ -1,7 +1,7 @@
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { getBatchDetail, getImportBatch, importBatches, transformStages } from '@/lib/mock-import'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
-import { getImportBatchActions } from '@/lib/services/import-write-service'
+import { getImportBatchActions, getImportBatchTransformRuns } from '@/lib/services/import-write-service'
 import type { BatchDetail, BatchRow, ImportBatch } from '@/lib/types'
 
 type ImportBatchRow = {
@@ -463,6 +463,9 @@ export async function getImportBatchDetail(batchId: string) {
     const actions = batchPk
       ? await getImportBatchActions(batchPk).catch(() => [])
       : []
+    const transformRuns = batchPk
+      ? await getImportBatchTransformRuns(batchPk).catch(() => [])
+      : []
 
     const detail: BatchDetail = {
       id: batch.id,
@@ -472,6 +475,7 @@ export async function getImportBatchDetail(batchId: string) {
       status: batch.status,
       summary: batch.note,
       actions,
+      transformRuns,
       rows,
     }
 

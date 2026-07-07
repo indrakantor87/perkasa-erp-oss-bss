@@ -18,6 +18,12 @@ const actionTone: Record<BatchDetail['actions'][number]['status'], string> = {
   INFO: 'bg-blue-50 text-blue-700',
 }
 
+const runTone: Record<BatchDetail['transformRuns'][number]['status'], string> = {
+  RUNNING: 'bg-blue-50 text-blue-700',
+  SUCCESS: 'bg-emerald-50 text-emerald-700',
+  FAILED: 'bg-rose-50 text-rose-700',
+}
+
 export function ImportBatchDetailView({
   batch,
   detail,
@@ -126,6 +132,49 @@ export function ImportBatchDetailView({
           ) : (
             <article className="rounded-2xl border border-dashed border-line bg-slate-50 p-5 text-sm text-mute">
               Histori aksi batch belum tersedia. Jalankan create, upload, validasi, atau transform untuk mulai membangun timeline.
+            </article>
+          )}
+        </div>
+      </section>
+
+      <section className="panel overflow-hidden">
+        <div className="border-b border-line px-6 py-5">
+          <p className="section-title">Histori transform</p>
+          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+            Eksekusi tahap 1-4 per batch
+          </h3>
+        </div>
+
+        <div className="space-y-4 p-4 md:p-6">
+          {detail.transformRuns.length > 0 ? (
+            detail.transformRuns.map((run) => (
+              <article key={run.id} className="rounded-2xl border border-line bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-slate-950">Stage {run.stage}</span>
+                      <span className={`badge border-transparent ${runTone[run.status]}`}>{run.status}</span>
+                      <span className="badge border-transparent bg-white text-slate-700">
+                        {run.executedStatements} stmt
+                      </span>
+                      <span className="badge border-transparent bg-white text-slate-700">
+                        {Math.round(run.durationMs / 1000)}s
+                      </span>
+                    </div>
+                    {run.error ? <p className="text-sm leading-6 text-rose-700">{run.error}</p> : null}
+                    <p className="text-sm leading-6 text-slate-700">
+                      Start: {run.startedAt} • Finish: {run.finishedAt}
+                    </p>
+                  </div>
+                  <div className="text-sm text-mute md:text-right">
+                    <p className="font-semibold text-slate-950">{run.actor}</p>
+                  </div>
+                </div>
+              </article>
+            ))
+          ) : (
+            <article className="rounded-2xl border border-dashed border-line bg-slate-50 p-5 text-sm text-mute">
+              Histori transform belum tersedia. Jalankan transform tahap 1-4 untuk membangun log eksekusi per batch.
             </article>
           )}
         </div>

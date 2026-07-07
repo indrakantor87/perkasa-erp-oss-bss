@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
-import type { ImportBatchAction } from '@/lib/types'
+import type { ImportBatchAction, ImportBatchTransformRun } from '@/lib/types'
 
 type BatchLookup = {
   id: number
@@ -25,6 +25,18 @@ type ImportBatchActionRow = {
   actorName: string | null
   detailText: string | null
   createdAt: string
+}
+
+type ImportBatchTransformRunRow = {
+  id: number
+  stage: string
+  runStatus: string
+  actorName: string | null
+  startedAt: string
+  finishedAt: string | null
+  durationMs: number | null
+  executedStatements: number | null
+  errorText: string | null
 }
 
 type BatchSummary = {
@@ -168,6 +180,7 @@ const transformStageFiles: Record<TransformStage, string> = {
 }
 
 let importBatchActionTableEnsured = false
+let importBatchTransformRunTableEnsured = false
 
 function formatActionTime() {
   return new Date().toLocaleString('id-ID', {
@@ -197,6 +210,116 @@ export async function ensureImportBatchActionTable() {
   `)
 
   importBatchActionTableEnsured = true
+}
+
+export async function ensureImportBatchTransformRunTable() {
+  if (importBatchTransformRunTableEnsured) {
+    return
+  }
+
+  await runReviewDbExecute<ExecuteResult>(`
+    CREATE TABLE IF NOT EXISTS staging_import_batch_transform_runs (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      batch_id BIGINT UNSIGNED NOT NULL,
+      stage ENUM('01','02','03','04') NOT NULL,
+      run_status ENUM('RUNNING','SUCCESS','FAILED') NOT NULL DEFAULT 'RUNNING',
+      actor_name VARCHAR(150) NULL,
+      started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      finished_at DATETIME NULL,
+      duration_ms INT NULL,
+      executed_statements INT NULL,
+      error_text TEXT NULL,
+      PRIMARY KEY (id),
+      KEY idx_staging_import_batch_transform_runs_batch (batch_id),
+      CONSTRAINT fk_staging_import_batch_transform_runs_batch FOREIGN KEY (batch_id) REFERENCES staging_import_batches(id)
+    )
+  `)
+
+  importBatchTransformRunTableEnsured = true
+}
+
+async function startImportBatchTransformRun(params: { batchId: number; stage: TransformStage; actor: string }) {
+  await ensureImportBatchTransformRunTable()
+  const result = await runReviewDbExecute<{ insertId?: number }>(
+    `
+      INSERT INTO staging_import_batch_transform_runs (
+        batch_id,
+        stage,
+        run_status,
+        actor_name
+      )
+      VALUES (?, ?, 'RUNNING', ?)
+    `,
+    [params.batchId, params.stage, params.actor],
+  )
+
+  return Number(result.insertId ?? 0)
+}
+
+async function finishImportBatchTransformRun(params: {
+  runId: number
+  status: 'SUCCESS' | 'FAILED'
+  durationMs: number
+  executedStatements: number
+  errorText: string
+}) {
+  await ensureImportBatchTransformRunTable()
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      UPDATE staging_import_batch_transform_runs
+      SET run_status = ?,
+          finished_at = CURRENT_TIMESTAMP,
+          duration_ms = ?,
+          executed_statements = ?,
+          error_text = ?
+      WHERE id = ?
+    `,
+    [params.status, params.durationMs, params.executedStatements, params.errorText || null, params.runId],
+  )
+}
+
+function normalizeRunStatus(value: string): ImportBatchTransformRun['status'] {
+  const normalized = value.trim().toUpperCase()
+  if (normalized === 'SUCCESS' || normalized === 'FAILED') {
+    return normalized
+  }
+  return 'RUNNING'
+}
+
+export async function getImportBatchTransformRuns(batchId: number): Promise<ImportBatchTransformRun[]> {
+  await ensureImportBatchTransformRunTable()
+
+  const rows = await runReviewDbQuery<ImportBatchTransformRunRow>(
+    `
+      SELECT
+        id,
+        stage,
+        run_status AS runStatus,
+        actor_name AS actorName,
+        started_at AS startedAt,
+        finished_at AS finishedAt,
+        duration_ms AS durationMs,
+        executed_statements AS executedStatements,
+        error_text AS errorText
+      FROM staging_import_batch_transform_runs
+      WHERE batch_id = ?
+      ORDER BY started_at DESC, id DESC
+      LIMIT 20
+    `,
+    [batchId],
+  )
+
+  return rows.map((row) => ({
+    id: `run-${row.id}`,
+    stage: (row.stage?.trim() as TransformStage) || '01',
+    status: normalizeRunStatus(row.runStatus),
+    actor: row.actorName?.trim() || 'System Review',
+    startedAt: String(row.startedAt),
+    finishedAt: row.finishedAt ? String(row.finishedAt) : '-',
+    durationMs: Number(row.durationMs ?? 0),
+    executedStatements: Number(row.executedStatements ?? 0),
+    error: row.errorText?.trim() || '',
+  }))
 }
 
 export async function recordImportBatchAction(params: {
@@ -458,12 +581,14 @@ function parseSqlStatements(content: string) {
     .filter((statement) => statement && !/^USE\s+/i.test(statement))
 }
 
-async function executeTransformSqlUpTo(stage: TransformStage) {
+async function executeTransformSqlUpTo(batchPk: number, stage: TransformStage) {
   const stageOrder = (['01', '02', '03', '04'] as TransformStage[]).slice(
     0,
     ['01', '02', '03', '04'].indexOf(stage) + 1
   )
   let executedStatements = 0
+
+  await runReviewDbExecute<ExecuteResult>('SET @batch_id = ?', [batchPk])
 
   for (const currentStage of stageOrder) {
     const filePath = path.join(
@@ -503,59 +628,102 @@ export async function transformImportBatch(
     throw new Error('Batch harus divalidasi dulu sebelum transform dijalankan.')
   }
 
-  const executedStatements = await executeTransformSqlUpTo(stage)
-  const afterSummary = await getImportBatchSummary(batch.id)
-  const nextStatus =
-    afterSummary.importedRows > 0 &&
-    afterSummary.importedRows + afterSummary.invalidRows + afterSummary.skippedRows >= afterSummary.totalRows
-      ? 'IMPORTED'
-      : 'VALIDATED'
+  const startTimestamp = Date.now()
+  const runId = await startImportBatchTransformRun({ batchId: batch.id, stage, actor })
+  let executedStatements = 0
 
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      UPDATE staging_import_batches
-      SET total_rows = ?,
-          valid_rows = ?,
-          invalid_rows = ?,
-          duplicate_rows = ?,
-          import_status = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `,
-    [
-      afterSummary.totalRows,
-      afterSummary.validRows,
-      afterSummary.invalidRows,
-      afterSummary.duplicateRows,
-      nextStatus,
-      batch.id,
-    ]
-  )
-
-  await appendBatchNote(
-    batch.id,
-    batch.note,
-    `[${formatActionTime()}] Transform tahap ${stage} dipicu dari web oleh ${actor}. SQL baseline review dijalankan dan batch kini memiliki ${afterSummary.importedRows} row imported.`
-  )
   try {
-    await recordImportBatchAction({
-      batchId: batch.id,
-      actionType: 'TRANSFORM',
-      status: 'SUCCESS',
-      actor,
-      detail: `Transform tahap ${stage} dijalankan. ${executedStatements} statement SQL diproses dan ${afterSummary.importedRows} row kini berstatus imported.`,
-    })
-  } catch {
-    // Histori aksi tidak boleh memblokir transform utama.
-  }
+    executedStatements = await executeTransformSqlUpTo(batch.id, stage)
+    const afterSummary = await getImportBatchSummary(batch.id)
+    const nextStatus =
+      afterSummary.importedRows > 0 &&
+      afterSummary.importedRows + afterSummary.invalidRows + afterSummary.skippedRows >= afterSummary.totalRows
+        ? 'IMPORTED'
+        : 'VALIDATED'
 
-  return {
-    batchId: batch.id,
-    batchCode: batch.batchCode,
-    stage,
-    executedStatements,
-    status: nextStatus,
-    ...afterSummary,
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        UPDATE staging_import_batches
+        SET total_rows = ?,
+            valid_rows = ?,
+            invalid_rows = ?,
+            duplicate_rows = ?,
+            import_status = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [
+        afterSummary.totalRows,
+        afterSummary.validRows,
+        afterSummary.invalidRows,
+        afterSummary.duplicateRows,
+        nextStatus,
+        batch.id,
+      ]
+    )
+
+    await appendBatchNote(
+      batch.id,
+      batch.note,
+      `[${formatActionTime()}] Transform tahap ${stage} dipicu dari web oleh ${actor}. SQL transform berjalan untuk batch ini dan batch kini memiliki ${afterSummary.importedRows} row imported.`
+    )
+
+    const durationMs = Date.now() - startTimestamp
+    if (runId > 0) {
+      await finishImportBatchTransformRun({
+        runId,
+        status: 'SUCCESS',
+        durationMs,
+        executedStatements,
+        errorText: '',
+      })
+    }
+
+    try {
+      await recordImportBatchAction({
+        batchId: batch.id,
+        actionType: 'TRANSFORM',
+        status: 'SUCCESS',
+        actor,
+        detail: `Transform tahap ${stage} dijalankan. ${executedStatements} statement SQL diproses dan ${afterSummary.importedRows} row kini berstatus imported.`,
+      })
+    } catch {
+      // Histori aksi tidak boleh memblokir transform utama.
+    }
+
+    return {
+      batchId: batch.id,
+      batchCode: batch.batchCode,
+      stage,
+      executedStatements,
+      status: nextStatus,
+      ...afterSummary,
+    }
+  } catch (error) {
+    const durationMs = Date.now() - startTimestamp
+    if (runId > 0) {
+      await finishImportBatchTransformRun({
+        runId,
+        status: 'FAILED',
+        durationMs,
+        executedStatements,
+        errorText: getImportWriteErrorMessage(error),
+      }).catch(() => null)
+    }
+
+    try {
+      await recordImportBatchAction({
+        batchId: batch.id,
+        actionType: 'TRANSFORM',
+        status: 'FAILED',
+        actor,
+        detail: `Transform tahap ${stage} gagal: ${getImportWriteErrorMessage(error)}`,
+      })
+    } catch {
+      // Histori aksi tidak boleh memblokir transform utama.
+    }
+
+    throw error
   }
 }
 
