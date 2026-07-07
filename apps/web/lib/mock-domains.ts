@@ -642,32 +642,76 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
     ],
     reviewSections: [
       {
+        title: 'Subscription Billing-Ready',
+        description: 'Sampel subscription aktif yang belum punya invoice recurring periode bulan berjalan.',
+        rows: [
+          {
+            id: 'SVC-000501',
+            primary: 'SVC-000501',
+            secondary: 'Ahmad Fauzi',
+            status: 'READY',
+            detail: 'Layanan aktif dengan harga bulanan Rp350.000 siap dibuat invoice recurring bulan berjalan.',
+            meta: ['Subscription ID: 501', 'Paket: Home 20Mbps', 'Activated: 08 Jul 2026 11:20', 'Periode: 07/2026'],
+          },
+          {
+            id: 'SVC-000812',
+            primary: 'SVC-000812',
+            secondary: 'PT Delta Pangan Nusantara',
+            status: 'READY',
+            detail: 'Layanan corporate aktif dengan harga bulanan Rp1.750.000 siap dibuat invoice recurring bulan berjalan.',
+            meta: ['Subscription ID: 812', 'Paket: Corporate 50Mbps', 'Activated: 02 Jul 2026 09:30', 'Periode: 07/2026'],
+          },
+        ],
+      },
+      {
         title: 'Invoice Perlu Tindak Lanjut',
         description: 'Sampel invoice overdue atau partial untuk menyiapkan review kontrol penagihan dari database terpadu.',
         rows: [
           {
-            id: 'INV-2026-0701',
-            primary: 'INV-2026-0701',
+            id: 'INV-202607-0001',
+            primary: 'INV-202607-0001',
             secondary: 'Ahmad Fauzi',
             status: 'OVERDUE',
             detail: 'Tagihan bulan berjalan belum lunas dan sudah melewati jatuh tempo, perlu reminder lanjutan.',
             meta: ['Total: Rp350.000', 'Terbayar: Rp0', 'Jatuh Tempo: 05 Jul 2026'],
           },
           {
-            id: 'INV-2026-0698',
-            primary: 'INV-2026-0698',
+            id: 'INV-202607-0002',
+            primary: 'INV-202607-0002',
             secondary: 'PT Delta Pangan Nusantara',
             status: 'PARTIAL',
             detail: 'Invoice corporate baru terbayar sebagian dan menunggu konfirmasi pelunasan sisa tagihan.',
             meta: ['Total: Rp1.750.000', 'Terbayar: Rp1.000.000', 'Jatuh Tempo: 03 Jul 2026'],
           },
           {
-            id: 'INV-2026-0687',
-            primary: 'INV-2026-0687',
+            id: 'INV-202606-0011',
+            primary: 'INV-202606-0011',
             secondary: 'Rina Maharani',
             status: 'OVERDUE',
             detail: 'Invoice retail masuk daftar suspend candidate bila belum ada pembayaran lanjutan.',
             meta: ['Total: Rp275.000', 'Terbayar: Rp0', 'Jatuh Tempo: 30 Jun 2026'],
+          },
+        ],
+      },
+      {
+        title: 'Invoice Terbaru',
+        description: 'Sampel invoice terbaru yang termasuk hasil generate invoice dari subscription aktif.',
+        rows: [
+          {
+            id: 'INV-202607-0005',
+            primary: 'INV-202607-0005',
+            secondary: 'Ahmad Fauzi',
+            status: 'ISSUED',
+            detail: 'Invoice RECURRING untuk layanan SVC-000501 dengan total Rp350.000.',
+            meta: ['Service: SVC-000501', 'Issue: 07 Jul 2026', 'Due: 14 Jul 2026', 'Paid: Rp0', 'Periode: 07/2026'],
+          },
+          {
+            id: 'INV-202607-0002',
+            primary: 'INV-202607-0002',
+            secondary: 'PT Delta Pangan Nusantara',
+            status: 'PARTIAL',
+            detail: 'Invoice RECURRING untuk layanan SVC-000812 dengan total Rp1.750.000.',
+            meta: ['Service: SVC-000812', 'Issue: 05 Jul 2026', 'Due: 03 Jul 2026', 'Paid: Rp1.000.000', 'Periode: 07/2026'],
           },
         ],
       },
@@ -678,7 +722,7 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
           {
             id: 'COL-2026-0104',
             primary: 'REMINDER',
-            secondary: 'INV-2026-0701',
+            secondary: 'INV-202607-0001',
             status: 'OPEN',
             detail: 'Reminder pertama sudah dijadwalkan dan masih menunggu follow up tim collection.',
             meta: ['Customer: Ahmad Fauzi', 'At: 06 Jul 2026 09:00', 'Follow Up: 07 Jul 2026 09:00'],
@@ -686,7 +730,7 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
           {
             id: 'COL-2026-0103',
             primary: 'PROMISE_TO_PAY',
-            secondary: 'INV-2026-0698',
+            secondary: 'INV-202607-0002',
             status: 'DONE',
             detail: 'Pelanggan corporate memberi komitmen pembayaran sisa tagihan pada jadwal yang disepakati.',
             meta: ['Customer: PT Delta Pangan Nusantara', 'At: 05 Jul 2026 15:30', 'Follow Up: 08 Jul 2026 10:00'],
@@ -694,7 +738,7 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
           {
             id: 'COL-2026-0099',
             primary: 'SUSPEND',
-            secondary: 'INV-2026-0687',
+            secondary: 'INV-202606-0011',
             status: 'OPEN',
             detail: 'Aksi suspend masih terbuka sambil menunggu validasi akhir dari billing control.',
             meta: ['Customer: Rina Maharani', 'At: 05 Jul 2026 11:15', 'Follow Up: 06 Jul 2026 16:00'],
@@ -708,7 +752,7 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
           {
             id: 'PAY-202607-0004',
             primary: 'PAY-202607-0004',
-            secondary: 'INV-2026-0698',
+            secondary: 'INV-202607-0002',
             status: 'TRANSFER',
             detail: 'Pembayaran termin pertama corporate sudah diterima dan menunggu pelunasan sisa tagihan.',
             meta: ['Customer: PT Delta Pangan Nusantara', 'Amount: Rp1.000.000', 'Paid At: 06 Jul 2026 10:15', 'Reference: TRF-88721'],
@@ -716,7 +760,7 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
           {
             id: 'PAY-202607-0003',
             primary: 'PAY-202607-0003',
-            secondary: 'INV-2026-0679',
+            secondary: 'INV-202606-0029',
             status: 'VA',
             detail: 'Pembayaran retail masuk via virtual account dan invoice berubah ke status paid.',
             meta: ['Customer: Nabila Putri', 'Amount: Rp315.000', 'Paid At: 05 Jul 2026 18:05', 'Reference: VA-20260705'],
@@ -724,7 +768,7 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
           {
             id: 'PAY-202607-0002',
             primary: 'PAY-202607-0002',
-            secondary: 'INV-2026-0668',
+            secondary: 'INV-202606-0018',
             status: 'CASH',
             detail: 'Penerimaan kas langsung dicatat oleh collection saat kunjungan lapangan.',
             meta: ['Customer: Toko Sumber Rejeki', 'Amount: Rp200.000', 'Paid At: 05 Jul 2026 11:40', 'Reference: CASH-1140'],

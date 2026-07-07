@@ -52,6 +52,7 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 - domain `support` sekarang juga memiliki write action restorasi isolir untuk menutup data isolir aktif melalui `restoration_date` dan `close_note`
 - domain `support` sekarang juga memiliki flow dismantle yang memindahkan data ke `support_dismantle_history` dan mengarsipkan sumber isolir
 - domain `billing` sekarang juga memiliki payment entry yang menulis ke `billing_payments` dan menyelaraskan `paid_amount` serta `invoice_status`
+- domain `billing` sekarang juga memiliki generate invoice dari subscription `ACTIVE` yang menulis ke `billing_invoices` dan `billing_invoice_items` dengan proteksi duplikasi recurring per periode
 - domain `sales` sekarang juga memiliki sales order create dari lead yang valid dengan `order_no` otomatis
 - domain `sales` sekarang juga memiliki work order create dari sales order aktif dengan `work_order_no` otomatis
 - domain `sales` sekarang juga memiliki aktivasi subscription dari sales order yang valid dengan `service_no` otomatis serta pembentukan customer master bila diperlukan
@@ -72,6 +73,7 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 - halaman `settings/users` sekarang menampilkan direktori user internal dari `auth_users` atau fallback mock agar fondasi manajemen user mulai terlihat di UI
 - halaman `settings/users` sekarang juga memiliki write action awal untuk membuat user baru langsung ke `auth_users` saat mode `review-db` aktif
 - shell domain `billing` sudah menampilkan review operasional awal berupa daftar `invoice perlu tindak lanjut` dan `collection action terbaru` dari review DB, lalu fallback ke sampel mock saat koneksi tidak siap
+- shell domain `billing` sekarang juga menampilkan `subscription billing-ready` dan `invoice terbaru` agar proses generate invoice bisa dipantau langsung dari halaman billing
 - domain `billing` sudah memiliki write action awal berupa form `collection action` yang menulis histori reminder / promise to pay / suspend ke review DB saat mode `review-db` aktif
 - shell domain `customers` sudah menampilkan review operasional awal berupa daftar `customer terbaru` dan `subscription aktif` dari review DB, lalu fallback ke sampel mock saat koneksi tidak siap
 - shell domain `support` sudah menampilkan review operasional awal berupa daftar `TT open` dan `isolir aktif` dari review DB, lalu fallback ke sampel mock saat koneksi tidak siap

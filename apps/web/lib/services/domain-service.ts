@@ -108,6 +108,30 @@ type ReviewDbBillingInvoiceRow = {
   dueDate: string | Date
 }
 
+type ReviewDbBillingReadySubscriptionRow = {
+  subscriptionId: number
+  serviceNo: string
+  customerName: string
+  packageName: string | null
+  speedLabel: string | null
+  monthlyPrice: number
+  activatedAt: string | Date | null
+}
+
+type ReviewDbBillingLatestInvoiceRow = {
+  invoiceNo: string
+  invoiceType: string
+  invoiceStatus: string
+  totalAmount: number
+  paidAmount: number
+  issueDate: string | Date
+  dueDate: string | Date
+  billingMonth: number | null
+  billingYear: number | null
+  serviceNo: string
+  customerName: string
+}
+
 type ReviewDbCollectionActionRow = {
   actionType: string
   actionStatus: string
@@ -615,6 +639,35 @@ async function getReviewDbCustomerSections(): Promise<DomainReviewSection[]> {
 }
 
 async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
+  const subscriptionsReady = await runReviewDbQuery<ReviewDbBillingReadySubscriptionRow>(`
+    SELECT
+      ss.id AS subscriptionId,
+      ss.service_no AS serviceNo,
+      c.full_name AS customerName,
+      sp.name AS packageName,
+      sp.speed_label AS speedLabel,
+      ss.monthly_price AS monthlyPrice,
+      ss.activated_at AS activatedAt
+    FROM service_subscriptions ss
+    JOIN crm_customers c
+      ON c.id = ss.customer_id
+    LEFT JOIN sales_packages sp
+      ON sp.id = ss.package_id
+    WHERE ss.status = 'ACTIVE'
+      AND COALESCE(ss.monthly_price, 0) > 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM billing_invoices bi
+        WHERE bi.subscription_id = ss.id
+          AND bi.invoice_type = 'RECURRING'
+          AND bi.billing_year = YEAR(CURRENT_DATE)
+          AND bi.billing_month = MONTH(CURRENT_DATE)
+          AND bi.invoice_status NOT IN ('CANCELLED')
+      )
+    ORDER BY COALESCE(ss.activated_at, ss.created_at) DESC, ss.id DESC
+    LIMIT 5
+  `)
+
   const invoices = await runReviewDbQuery<ReviewDbBillingInvoiceRow>(`
     SELECT
       bi.invoice_no AS invoiceNo,
@@ -635,6 +688,28 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
          AND bi.invoice_status NOT IN ('PAID', 'CANCELLED')
        )
     ORDER BY bi.due_date ASC, bi.id DESC
+    LIMIT 5
+  `)
+
+  const latestInvoices = await runReviewDbQuery<ReviewDbBillingLatestInvoiceRow>(`
+    SELECT
+      bi.invoice_no AS invoiceNo,
+      bi.invoice_type AS invoiceType,
+      bi.invoice_status AS invoiceStatus,
+      bi.total_amount AS totalAmount,
+      bi.paid_amount AS paidAmount,
+      bi.issue_date AS issueDate,
+      bi.due_date AS dueDate,
+      bi.billing_month AS billingMonth,
+      bi.billing_year AS billingYear,
+      ss.service_no AS serviceNo,
+      c.full_name AS customerName
+    FROM billing_invoices bi
+    JOIN service_subscriptions ss
+      ON ss.id = bi.subscription_id
+    JOIN crm_customers c
+      ON c.id = ss.customer_id
+    ORDER BY bi.issue_date DESC, bi.id DESC
     LIMIT 5
   `)
 
@@ -681,6 +756,24 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
 
   return [
     {
+      title: 'Subscription Billing-Ready',
+      description:
+        'Subscription ACTIVE yang belum memiliki invoice recurring periode bulan berjalan, siap digenerate dari halaman billing.',
+      rows: subscriptionsReady.map((item) => ({
+        id: item.serviceNo,
+        primary: item.serviceNo,
+        secondary: item.customerName,
+        status: 'READY',
+        detail: `Harga bulanan ${formatCurrency(item.monthlyPrice)} untuk layanan aktif yang siap dibuat invoice recurring.`,
+        meta: [
+          `Subscription ID: ${item.subscriptionId}`,
+          `Paket: ${item.packageName ? `${item.packageName}${item.speedLabel ? ` • ${item.speedLabel}` : ''}` : '-'}`,
+          `Activated: ${formatDateTime(item.activatedAt)}`,
+          `Periode: ${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`,
+        ],
+      })),
+    },
+    {
       title: 'Invoice Perlu Tindak Lanjut',
       description: 'Invoice overdue atau partial terbaru dari review DB untuk memantau prioritas penagihan.',
       rows: invoices.map((item) => ({
@@ -693,6 +786,26 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
           `Total: ${formatCurrency(item.totalAmount)}`,
           `Terbayar: ${formatCurrency(item.paidAmount)}`,
           `Jatuh Tempo: ${formatDateTime(item.dueDate)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Invoice Terbaru',
+      description: 'Invoice terbaru dari review DB untuk memastikan output generate invoice langsung terlihat pada halaman billing.',
+      rows: latestInvoices.map((item) => ({
+        id: item.invoiceNo,
+        primary: item.invoiceNo,
+        secondary: item.customerName,
+        status: item.invoiceStatus,
+        detail: `Invoice ${item.invoiceType} untuk layanan ${item.serviceNo} dengan total ${formatCurrency(item.totalAmount)}.`,
+        meta: [
+          `Service: ${item.serviceNo}`,
+          `Issue: ${formatDateTime(item.issueDate)}`,
+          `Due: ${formatDateTime(item.dueDate)}`,
+          `Paid: ${formatCurrency(item.paidAmount)}`,
+          item.billingMonth && item.billingYear
+            ? `Periode: ${String(item.billingMonth).padStart(2, '0')}/${item.billingYear}`
+            : 'Periode: -',
         ],
       })),
     },

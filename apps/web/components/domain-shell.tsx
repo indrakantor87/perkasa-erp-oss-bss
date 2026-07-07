@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
+import { BillingInvoiceGenerateForm } from '@/components/billing-invoice-generate-form'
 import { BillingPaymentForm } from '@/components/billing-payment-form'
 import { CustomerCreateForm } from '@/components/customer-create-form'
 import { HrAttendanceForm } from '@/components/hr-attendance-form'
@@ -43,7 +44,21 @@ export function DomainShell({
   const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
   const billingInvoiceSuggestions =
     content.key === 'billing'
-      ? (content.reviewSections?.[0]?.rows ?? []).map((row) => row.primary)
+      ? (content.reviewSections ?? [])
+          .find((section) => section.title.toUpperCase().includes('INVOICE PERLU'))
+          ?.rows.map((row) => row.primary) ?? []
+      : []
+  const billingSubscriptionSuggestions =
+    content.key === 'billing'
+      ? Array.from(
+          new Set(
+            (content.reviewSections ?? [])
+              .filter((section) => section.title.toUpperCase().includes('SUBSCRIPTION BILLING-READY'))
+              .flatMap((section) => section.rows)
+              .map((row) => row.primary)
+              .filter(Boolean),
+          ),
+        )
       : []
   const inventoryItemSuggestions =
     content.key === 'inventory'
@@ -256,6 +271,11 @@ export function DomainShell({
 
       {content.key === 'billing' ? (
         <section className="grid gap-6 xl:grid-cols-2">
+          <BillingInvoiceGenerateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            subscriptionSuggestions={billingSubscriptionSuggestions}
+          />
           <BillingCollectionActionForm
             canCreate={canCreate}
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}

@@ -10,6 +10,23 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.57.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/billing-invoice-generate-form.tsx` dan route `POST /api/billing/invoices/generate` untuk membuat invoice dari subscription `ACTIVE` langsung dari domain `billing`
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan tiga write action billing: generate invoice, collection action, dan payment entry
+- `apps/web/lib/services/domain-service.ts` menambah review section billing: `Subscription Billing-Ready` dan `Invoice Terbaru`
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone generate invoice tercermin pada fallback mock, test, dan dokumentasi
+
+### Notes
+
+- versi `0.57.0` melengkapi fondasi invoice lifecycle billing: subscription aktif tanpa invoice recurring bulan berjalan sekarang bisa langsung digenerate dari web
+- flow generate invoice tetap defensif: hanya untuk subscription `ACTIVE`, menolak duplikasi recurring per periode, membuat `invoice_no` otomatis, dan selalu menambah `billing_invoice_items` tipe `SUBSCRIPTION`
+
 ## [0.56.0] - 2026-07-07
 
 ### Added

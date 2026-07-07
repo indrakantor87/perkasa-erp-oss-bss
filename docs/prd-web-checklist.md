@@ -22,7 +22,7 @@ Status dipakai dengan arti:
 | Sales | PARSIAL | Lead review, coverage, sales survey, sales order, work order, dan aktivasi subscription awal sudah bisa create, workflow belum lengkap |
 | Customers | PARSIAL | Customer master sudah bisa create, lifecycle belum lengkap |
 | Support | PARSIAL | TT review sudah bisa create, close, kelola SLA dasar, tambah isolir aktif, restorasi isolir, dan dismantle history |
-| Billing | PARSIAL | Collection action dan payment entry sudah bisa create, invoice lifecycle penuh belum |
+| Billing | PARSIAL | Generate invoice recurring, collection action, dan payment entry sudah bisa create, invoice lifecycle penuh belum |
 | Inventory | PARSIAL | Review section operasional, item master, movement, ODP, port, device assignment, return perangkat, dan update status port awal sudah bisa create |
 | HR | PARSIAL | Review section operasional, employee master, attendance, loan, dan payroll awal sudah bisa create |
 | Settings access | PARSIAL | Matrix akses ada, permission master dinamis belum |
@@ -46,7 +46,7 @@ Status dipakai dengan arti:
 | Support shell: TT, isolir, dismantle, SLA | PARSIAL | TT open review sudah ada, create TT, close ticket, kelola SLA dasar, tambah isolir aktif, restorasi isolir, dan dismantle flow dasar sudah ada | SLA penuh dan otomasi workflow support lanjutan belum ada | Sangat Tinggi |
 | Inventory shell: item, stock movement, ODP, device assignment | PARSIAL | Review item inventory, review stock movement, review ODP/port, review device assignment, review port bermasalah, review device return, create item master, create stock movement, create ODP, assign port, update status port, device assignment, dan return perangkat sudah ada | Device return lanjutan (return sebagian/serial per perangkat), port reserve per order, dan integrasi assignment penuh ke work order masih perlu diperdalam | Tinggi |
 | HR shell: employee, attendance, salary, loan | PARSIAL | Review employee, attendance, loan, salary slip, create employee master, create attendance, create loan, dan create payroll awal sudah ada | Payroll release lanjutan dan perhitungan otomatis lebih detail belum hidup | Tinggi |
-| Billing shell: invoice, payment, collection, overdue | PARSIAL | Collection action, payment entry, review invoice, dan review payment terbaru sudah ada | Lifecycle invoice penuh dan otomasi billing lanjutan belum lengkap | Sangat Tinggi |
+| Billing shell: invoice, payment, collection, overdue | PARSIAL | Generate invoice recurring dari subscription aktif, collection action, payment entry, review invoice, subscription billing-ready, dan review payment terbaru sudah ada | Lifecycle invoice penuh, penyesuaian non-recurring yang lebih kaya, dan otomasi billing lanjutan belum lengkap | Sangat Tinggi |
 | Settings access dan permission | PARSIAL | Permission matrix dan access summary sudah ada | Permission master dinamis dan audit perubahan belum ada | Tinggi |
 | Settings users internal | SUDAH | Direktori user, create user, edit profil, reset password, deactivate/reactivate, dan panel audit perubahan sudah ada | Audit masih terfokus pada user internal, belum lintas seluruh modul write action | Tinggi |
 | Audit log dasar | PARSIAL | Audit perubahan user internal sudah tercatat di `auth_user_audit_logs` dan tampil di web | Belum menjadi audit terpusat lintas import, sales, support, billing, dan modul lain | Tinggi |
