@@ -2,7 +2,9 @@ import Link from 'next/link'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
 import { BillingPaymentForm } from '@/components/billing-payment-form'
 import { CustomerCreateForm } from '@/components/customer-create-form'
+import { HrAttendanceForm } from '@/components/hr-attendance-form'
 import { HrEmployeeCreateForm } from '@/components/hr-employee-create-form'
+import { HrLoanCreateForm } from '@/components/hr-loan-create-form'
 import { InventoryItemCreateForm } from '@/components/inventory-item-create-form'
 import { InventoryStockMovementForm } from '@/components/inventory-stock-movement-form'
 import { SalesCoverageCreateForm } from '@/components/sales-coverage-create-form'
@@ -41,6 +43,13 @@ export function DomainShell({
     content.key === 'inventory'
       ? (content.reviewSections ?? [])
           .filter((section) => section.title.toUpperCase().includes('ITEM'))
+          .flatMap((section) => section.rows)
+          .map((row) => `${row.primary} | ${row.secondary}`)
+      : []
+  const hrEmployeeSuggestions =
+    content.key === 'hr'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('EMPLOYEE'))
           .flatMap((section) => section.rows)
           .map((row) => `${row.primary} | ${row.secondary}`)
       : []
@@ -294,10 +303,22 @@ export function DomainShell({
       ) : null}
 
       {content.key === 'hr' ? (
-        <HrEmployeeCreateForm
-          canCreate={canCreate}
-          reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-        />
+        <section className="grid gap-6 xl:grid-cols-2">
+          <HrEmployeeCreateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+          />
+          <HrAttendanceForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            employeeSuggestions={hrEmployeeSuggestions}
+          />
+          <HrLoanCreateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            employeeSuggestions={hrEmployeeSuggestions}
+          />
+        </section>
       ) : null}
 
       {content.key === 'support' ? (

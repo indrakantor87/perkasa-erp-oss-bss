@@ -10,6 +10,24 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.53.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/hr-attendance-form.tsx` dan route `POST /api/hr/attendance` untuk mencatat attendance harian employee langsung dari domain `hr`
+- komponen `apps/web/components/hr-loan-create-form.tsx` dan route `POST /api/hr/loans` untuk mencatat loan atau kasbon employee langsung dari domain `hr`
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan tiga write action pada domain `hr`: employee master, attendance, dan loan
+- suggestion employee untuk form attendance dan loan diambil dari review section employee yang aktif pada halaman HR
+- `apps/web/README.md` dan `docs/prd-web-checklist.md` diperbarui agar milestone attendance dan loan awal tercermin pada dokumentasi
+
+### Notes
+
+- versi `0.53.0` melengkapi fondasi HR agar employee yang sudah dibuat bisa langsung memiliki attendance dan loan dari web
+- flow baru tetap defensif: attendance menolak duplikasi employee pada tanggal yang sama, validasi check-in/check-out dijaga, dan loan hanya bisa dibuat untuk employee yang valid dengan nominal yang masuk akal
+
 ## [0.52.0] - 2026-07-07
 
 ### Added
