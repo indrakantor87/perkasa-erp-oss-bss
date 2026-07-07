@@ -238,6 +238,17 @@ type ReviewDbHrLoanRow = {
   status: string
 }
 
+type ReviewDbHrSalarySlipRow = {
+  salarySlipId: number
+  employeeName: string
+  payrollMonth: number
+  payrollYear: number
+  totalIncome: number
+  totalDeduction: number
+  netSalary: number
+  releasedAt: string | Date | null
+}
+
 function buildCapabilities(role: AppRole, domain: DomainKey): DomainCapability[] {
   const content = domainPages[domain]
 
@@ -1008,6 +1019,23 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const salarySlips = await runReviewDbQuery<ReviewDbHrSalarySlipRow>(`
+    SELECT
+      hss.id AS salarySlipId,
+      he.full_name AS employeeName,
+      hss.payroll_month AS payrollMonth,
+      hss.payroll_year AS payrollYear,
+      hss.total_income AS totalIncome,
+      hss.total_deduction AS totalDeduction,
+      hss.net_salary AS netSalary,
+      hss.released_at AS releasedAt
+    FROM hr_salary_slips hss
+    JOIN hr_employees he
+      ON he.id = hss.employee_id
+    ORDER BY hss.payroll_year DESC, hss.payroll_month DESC, hss.id DESC
+    LIMIT 5
+  `)
+
   return [
     {
       title: 'Employee Terbaru',
@@ -1054,6 +1082,22 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
           `Loan Type: ${item.loanType}`,
           `Amount: ${formatCurrency(item.amount)}`,
           `Installment: ${formatCurrency(item.monthlyInstallment)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Slip Gaji Terbaru',
+      description: 'Slip gaji terbaru dari review DB untuk menutup loop HR dari employee, attendance, loan, sampai payroll.',
+      rows: salarySlips.map((item) => ({
+        id: `PAYROLL-${item.salarySlipId}`,
+        primary: item.employeeName,
+        secondary: `${String(item.payrollMonth).padStart(2, '0')}/${item.payrollYear}`,
+        status: item.releasedAt ? 'RELEASED' : 'DRAFT',
+        detail: `Net salary ${formatCurrency(item.netSalary)} dari total income ${formatCurrency(item.totalIncome)} dan deduction ${formatCurrency(item.totalDeduction)}.`,
+        meta: [
+          `Income: ${formatCurrency(item.totalIncome)}`,
+          `Deduction: ${formatCurrency(item.totalDeduction)}`,
+          `Released: ${formatDateTime(item.releasedAt)}`,
         ],
       })),
     },

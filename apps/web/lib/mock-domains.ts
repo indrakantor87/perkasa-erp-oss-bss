@@ -512,6 +512,28 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
           },
         ],
       },
+      {
+        title: 'Slip Gaji Terbaru',
+        description: 'Sampel slip gaji terbaru untuk menutup loop HR dari employee, attendance, loan, sampai payroll.',
+        rows: [
+          {
+            id: 'PAYROLL-31',
+            primary: 'Arif Nugroho',
+            secondary: '07/2026',
+            status: 'RELEASED',
+            detail: 'Net salary Rp4.250.000 dari total income Rp4.500.000 dan deduction Rp250.000.',
+            meta: ['Income: Rp4.500.000', 'Deduction: Rp250.000', 'Released: 07 Jul 2026 17:00'],
+          },
+          {
+            id: 'PAYROLL-30',
+            primary: 'Nabila Putri',
+            secondary: '07/2026',
+            status: 'DRAFT',
+            detail: 'Net salary Rp3.100.000 dari total income Rp3.100.000 dan deduction Rp0.',
+            meta: ['Income: Rp3.100.000', 'Deduction: Rp0', 'Released: -'],
+          },
+        ],
+      },
     ],
   },
   billing: {

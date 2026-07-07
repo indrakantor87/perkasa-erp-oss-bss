@@ -10,6 +10,23 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.54.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/hr-salary-slip-form.tsx` dan route `POST /api/hr/salary-slips` untuk membuat slip gaji bulanan employee langsung dari domain `hr`
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan empat write action pada domain `hr`: employee, attendance, loan, dan salary slip
+- `apps/web/lib/services/domain-service.ts` sekarang memuat review section baru `Slip Gaji Terbaru` dari review DB untuk menutup loop payroll awal
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone payroll awal tercermin pada fallback mock, pengujian, dan dokumentasi
+
+### Notes
+
+- versi `0.54.0` melengkapi fondasi HR agar employee yang sudah memiliki attendance dan loan bisa langsung dibuatkan slip gaji dari web
+- payroll tetap defensif: slip gaji menolak duplikasi employee per bulan/tahun, `loan_deduction` bisa otomatis mengambil cicilan loan aktif, dan `net_salary` tidak boleh negatif
+
 ## [0.53.0] - 2026-07-07
 
 ### Added

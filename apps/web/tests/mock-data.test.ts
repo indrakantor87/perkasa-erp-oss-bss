@@ -141,10 +141,11 @@ async function main() {
 
   const hrDomain = await getDomainPageData('hr', 'SUPER_ADMIN')
   assert.equal(hrDomain?.content.resource, 'hr')
-  assert.equal((hrDomain?.content.reviewSections?.length ?? 0) >= 3, true)
+  assert.equal((hrDomain?.content.reviewSections?.length ?? 0) >= 4, true)
   assert.equal(hrDomain?.content.reviewSections?.[0]?.title, 'Employee Terbaru')
   assert.equal(hrDomain?.content.reviewSections?.[1]?.title, 'Attendance Hari Ini')
   assert.equal(hrDomain?.content.reviewSections?.[2]?.title, 'Loan Aktif')
+  assert.equal(hrDomain?.content.reviewSections?.[3]?.title, 'Slip Gaji Terbaru')
 
   console.log('mock-data.test.ts passed')
 }

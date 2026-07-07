@@ -60,6 +60,7 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 - domain `hr` sekarang juga memiliki write action awal untuk membuat employee master baru ke `hr_employees` dengan `employee_code` otomatis
 - domain `hr` sekarang juga memiliki write action attendance harian untuk employee valid pada `hr_attendance`
 - domain `hr` sekarang juga memiliki write action loan atau kasbon awal untuk employee valid pada `hr_loans`
+- domain `hr` sekarang juga memiliki write action slip gaji bulanan untuk employee valid pada `hr_salary_slips`
 - domain `customers` sudah memiliki write action awal berupa form `customer review` yang menulis customer master baru beserta alamat utama ke `crm_customers` dan `crm_customer_addresses`
 - auth login sekarang memakai mode hybrid: memprioritaskan `auth_users/auth_roles` dari review DB saat tersedia, lalu fallback ke akun bootstrap mock bila user review belum siap
 - seed review DB untuk akun internal sekarang disiapkan di `database/xampp_review_auth_seed.sql` agar mode hybrid bisa diuji tanpa menunggu import user legacy
