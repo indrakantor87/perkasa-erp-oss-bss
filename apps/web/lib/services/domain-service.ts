@@ -140,7 +140,20 @@ type ReviewDbSalesLeadRow = {
   notes: string | null
 }
 
+type ReviewDbSalesCoverageRow = {
+  coverageId: number
+  areaCode: string
+  areaName: string
+  village: string | null
+  district: string | null
+  city: string | null
+  province: string | null
+  coverageStatus: string
+  notes: string | null
+}
+
 type ReviewDbSalesFlowRow = {
+  sourceId: number | null
   flowCode: string
   customerName: string
   flowKind: string
@@ -148,6 +161,52 @@ type ReviewDbSalesFlowRow = {
   detailLine: string | null
   detailDate: string | Date | null
   marketingName: string | null
+}
+
+type ReviewDbSalesWorkOrderRow = {
+  workOrderId: number
+  workOrderNo: string
+  customerName: string
+  status: string
+  workType: string
+  scheduledAt: string | Date | null
+  technicianName: string | null
+  orderNo: string | null
+}
+
+type ReviewDbSalesActivationRow = {
+  subscriptionId: number
+  serviceNo: string
+  customerName: string
+  status: string
+  packageName: string | null
+  speedLabel: string | null
+  monthlyPrice: number
+  activatedAt: string | Date | null
+  orderNo: string | null
+}
+
+type ReviewDbInventoryItemRow = {
+  itemId: number
+  itemCode: string
+  itemName: string
+  categoryCode: string | null
+  unitCode: string | null
+  currentStock: number
+  minimumStock: number
+  status: string
+}
+
+type ReviewDbInventoryMovementRow = {
+  movementId: number
+  movementType: string
+  referenceNo: string | null
+  qty: number
+  unitPrice: number
+  movementAt: string | Date
+  itemName: string
+  itemCode: string
+  notes: string | null
 }
 
 function buildCapabilities(role: AppRole, domain: DomainKey): DomainCapability[] {
@@ -606,8 +665,25 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const coverages = await runReviewDbQuery<ReviewDbSalesCoverageRow>(`
+    SELECT
+      id AS coverageId,
+      area_code AS areaCode,
+      area_name AS areaName,
+      village,
+      district,
+      city,
+      province,
+      coverage_status AS coverageStatus,
+      notes
+    FROM sales_covered_areas
+    ORDER BY updated_at DESC, id DESC
+    LIMIT 5
+  `)
+
   const flows = await runReviewDbQuery<ReviewDbSalesFlowRow>(`
     SELECT
+      ss.id AS sourceId,
       survey_no AS flowCode,
       COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
       'SURVEY' AS flowKind,
@@ -623,6 +699,7 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
     WHERE survey_status IN ('REQUESTED', 'SCHEDULED', 'ON_PROGRESS')
     UNION ALL
     SELECT
+      so.id AS sourceId,
       so.order_no AS flowCode,
       COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
       'ORDER' AS flowKind,
@@ -637,6 +714,51 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
       ON c.id = so.customer_id
     WHERE COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')
     ORDER BY detailDate DESC, flowCode DESC
+    LIMIT 5
+  `)
+
+  const workOrders = await runReviewDbQuery<ReviewDbSalesWorkOrderRow>(`
+    SELECT
+      swo.id AS workOrderId,
+      swo.work_order_no AS workOrderNo,
+      COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+      swo.status,
+      swo.work_type AS workType,
+      swo.scheduled_at AS scheduledAt,
+      swo.technician_name AS technicianName,
+      so.order_no AS orderNo
+    FROM service_work_orders swo
+    LEFT JOIN sales_orders so
+      ON so.id = swo.sales_order_id
+    LEFT JOIN sales_leads sl
+      ON sl.id = so.lead_id
+    LEFT JOIN crm_customers c
+      ON c.id = so.customer_id
+    WHERE COALESCE(UPPER(TRIM(swo.status)), 'OPEN') NOT IN ('COMPLETED', 'CLOSED', 'CANCELLED')
+    ORDER BY COALESCE(swo.scheduled_at, swo.created_at) DESC, swo.id DESC
+    LIMIT 5
+  `)
+
+  const activations = await runReviewDbQuery<ReviewDbSalesActivationRow>(`
+    SELECT
+      ss.id AS subscriptionId,
+      ss.service_no AS serviceNo,
+      c.full_name AS customerName,
+      ss.status,
+      sp.name AS packageName,
+      sp.speed_label AS speedLabel,
+      ss.monthly_price AS monthlyPrice,
+      ss.activated_at AS activatedAt,
+      so.order_no AS orderNo
+    FROM service_subscriptions ss
+    JOIN crm_customers c
+      ON c.id = ss.customer_id
+    LEFT JOIN sales_orders so
+      ON so.id = ss.order_id
+    LEFT JOIN sales_packages sp
+      ON sp.id = ss.package_id
+    WHERE ss.status IN ('PENDING', 'ACTIVE')
+    ORDER BY COALESCE(ss.activated_at, ss.created_at) DESC, ss.id DESC
     LIMIT 5
   `)
 
@@ -658,10 +780,27 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
       })),
     },
     {
+      title: 'Coverage Terbaru',
+      description: 'Master coverage area terbaru dari review DB untuk menghubungkan lead dengan kesiapan area layanan.',
+      rows: coverages.map((item) => ({
+        id: `COV-${item.coverageId}`,
+        primary: item.areaCode,
+        secondary: item.areaName,
+        status: item.coverageStatus,
+        detail: item.notes?.trim() || 'Belum ada catatan coverage tambahan pada area ini.',
+        meta: [
+          `Village: ${item.village || '-'}`,
+          `District: ${item.district || '-'}`,
+          `City: ${item.city || '-'}`,
+          `Province: ${item.province || '-'}`,
+        ],
+      })),
+    },
+    {
       title: 'Survey Dan Order Berjalan',
       description: 'Daftar survey pending dan order aktif terbaru dari review DB untuk memantau delivery awal.',
       rows: flows.map((item) => ({
-        id: `${item.flowKind}-${item.flowCode}`,
+        id: item.flowKind === 'ORDER' ? `ORDER-${item.sourceId ?? item.flowCode}` : `${item.flowKind}-${item.flowCode}`,
         primary: item.flowCode,
         secondary: item.customerName,
         status: item.status,
@@ -671,8 +810,117 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
             : `Order ${item.detailLine || '-'} dengan jadwal instalasi ${formatDateTime(item.detailDate)}.`,
         meta: [
           `Flow: ${item.flowKind}`,
+          ...(item.flowKind === 'ORDER' ? [`Order ID: ${item.sourceId ?? '-'}`] : []),
           `Marketing: ${item.marketingName || '-'}`,
           `At: ${formatDateTime(item.detailDate)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Work Order Aktif',
+      description: 'Work order delivery terbaru dari review DB untuk memantau order yang sudah bergerak ke tahap lapangan.',
+      rows: workOrders.map((item) => ({
+        id: `WO-${item.workOrderId}`,
+        primary: item.workOrderNo,
+        secondary: item.customerName,
+        status: item.status,
+        detail: `Work order ${item.workType} ditautkan ke order ${item.orderNo || '-'} dengan jadwal ${formatDateTime(item.scheduledAt)}.`,
+        meta: [
+          `Type: ${item.workType}`,
+          `Order: ${item.orderNo || '-'}`,
+          `Technician: ${item.technicianName || '-'}`,
+          `Scheduled: ${formatDateTime(item.scheduledAt)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Subscription Aktivasi Terbaru',
+      description: 'Subscription terbaru dari aktivasi order untuk memastikan alur delivery sudah benar-benar masuk ke layanan aktif.',
+      rows: activations.map((item) => ({
+        id: `SUB-${item.subscriptionId}`,
+        primary: item.serviceNo,
+        secondary: item.customerName,
+        status: item.status,
+        detail: `Layanan ${item.packageName || '-'} ${item.speedLabel ? `(${item.speedLabel})` : ''} berasal dari order ${item.orderNo || '-'}.`,
+        meta: [
+          `Order: ${item.orderNo || '-'}`,
+          `Harga: ${formatCurrency(item.monthlyPrice)}`,
+          `Aktivasi: ${formatDateTime(item.activatedAt)}`,
+        ],
+      })),
+    },
+  ].filter((section) => section.rows.length > 0)
+}
+
+async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
+  const items = await runReviewDbQuery<ReviewDbInventoryItemRow>(`
+    SELECT
+      ii.id AS itemId,
+      ii.item_code AS itemCode,
+      ii.item_name AS itemName,
+      ic.code AS categoryCode,
+      iu.code AS unitCode,
+      ii.current_stock AS currentStock,
+      ii.minimum_stock AS minimumStock,
+      ii.status
+    FROM inventory_items ii
+    LEFT JOIN inventory_categories ic
+      ON ic.id = ii.category_id
+    LEFT JOIN inventory_units iu
+      ON iu.id = ii.unit_id
+    ORDER BY ii.updated_at DESC, ii.id DESC
+    LIMIT 5
+  `)
+
+  const movements = await runReviewDbQuery<ReviewDbInventoryMovementRow>(`
+    SELECT
+      ism.id AS movementId,
+      ism.movement_type AS movementType,
+      ism.reference_no AS referenceNo,
+      ism.qty,
+      ism.unit_price AS unitPrice,
+      ism.movement_at AS movementAt,
+      ii.item_name AS itemName,
+      ii.item_code AS itemCode,
+      ism.notes
+    FROM inventory_stock_movements ism
+    JOIN inventory_items ii
+      ON ii.id = ism.item_id
+    ORDER BY ism.movement_at DESC, ism.id DESC
+    LIMIT 5
+  `)
+
+  return [
+    {
+      title: 'Item Inventory Terbaru',
+      description: 'Item master terbaru dari review DB untuk memulai kontrol stok, kategori, dan satuan barang.',
+      rows: items.map((item) => ({
+        id: `ITEM-${item.itemId}`,
+        primary: item.itemCode,
+        secondary: item.itemName,
+        status: item.status,
+        detail: `Stok saat ini ${formatNumber(item.currentStock)} ${item.unitCode || 'unit'} dengan minimum ${formatNumber(item.minimumStock)}.`,
+        meta: [
+          `Category: ${item.categoryCode || '-'}`,
+          `Unit: ${item.unitCode || '-'}`,
+          `Current Stock: ${formatNumber(item.currentStock)}`,
+          `Minimum: ${formatNumber(item.minimumStock)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Stock Movement Terbaru',
+      description: 'Pergerakan stok terbaru dari review DB untuk menautkan item inventory dengan aktivitas operasional lapangan.',
+      rows: movements.map((item) => ({
+        id: `MOV-${item.movementId}`,
+        primary: item.movementType,
+        secondary: `${item.itemCode} | ${item.itemName}`,
+        status: item.referenceNo || 'NO-REF',
+        detail: item.notes?.trim() || `Pergerakan ${item.movementType} sebanyak ${formatNumber(item.qty)} item.`,
+        meta: [
+          `Qty: ${formatNumber(item.qty)}`,
+          `Harga: ${formatCurrency(item.unitPrice)}`,
+          `At: ${formatDateTime(item.movementAt)}`,
         ],
       })),
     },
@@ -784,6 +1032,17 @@ function applyReviewDbSalesSections(content: DomainPageContent, reviewSections: 
   }
 }
 
+function applyReviewDbInventorySections(content: DomainPageContent, reviewSections: DomainReviewSection[]) {
+  if (content.key !== 'inventory' || reviewSections.length === 0) {
+    return content
+  }
+
+  return {
+    ...content,
+    reviewSections,
+  }
+}
+
 export async function getDomainPageData(domain: DomainKey, role: AppRole) {
   const source = getDataSourceSnapshot()
   const content = domainPages[domain]
@@ -806,18 +1065,22 @@ export async function getDomainPageData(domain: DomainKey, role: AppRole) {
     const supportSections = domain === 'support' ? await getReviewDbSupportSections() : []
     const customerSections = domain === 'customers' ? await getReviewDbCustomerSections() : []
     const billingSections = domain === 'billing' ? await getReviewDbBillingSections() : []
+    const inventorySections = domain === 'inventory' ? await getReviewDbInventorySections() : []
 
     return {
       source,
-      content: applyReviewDbSalesSections(
-        applyReviewDbBillingSections(
-          applyReviewDbCustomerSections(
-            applyReviewDbSupportSections(applyReviewDbSummaries(content, stats), supportSections),
-            customerSections,
+      content: applyReviewDbInventorySections(
+        applyReviewDbSalesSections(
+          applyReviewDbBillingSections(
+            applyReviewDbCustomerSections(
+              applyReviewDbSupportSections(applyReviewDbSummaries(content, stats), supportSections),
+              customerSections,
+            ),
+            billingSections,
           ),
-          billingSections,
+          salesSections,
         ),
-        salesSections,
+        inventorySections,
       ),
       capabilities: buildCapabilities(role, domain),
     }

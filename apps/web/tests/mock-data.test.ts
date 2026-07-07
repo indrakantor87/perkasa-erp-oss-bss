@@ -114,8 +114,11 @@ async function main() {
 
   const salesDomain = await getDomainPageData('sales', 'ADMIN_DIVISI')
   assert.equal(salesDomain?.content.resource, 'sales')
-  assert.equal((salesDomain?.content.reviewSections?.length ?? 0) > 0, true)
-  assert.equal(salesDomain?.content.reviewSections?.[1]?.rows.length, 3)
+  assert.equal((salesDomain?.content.reviewSections?.length ?? 0) >= 5, true)
+  assert.equal(salesDomain?.content.reviewSections?.[1]?.title, 'Coverage Terbaru')
+  assert.equal(salesDomain?.content.reviewSections?.[2]?.rows.length, 3)
+  assert.equal(salesDomain?.content.reviewSections?.[3]?.title, 'Work Order Aktif')
+  assert.equal(salesDomain?.content.reviewSections?.[4]?.title, 'Subscription Aktivasi Terbaru')
 
   const customerDomain = await getDomainPageData('customers', 'ADMIN_DIVISI')
   assert.equal(customerDomain?.content.resource, 'customers')
@@ -129,6 +132,12 @@ async function main() {
   assert.equal((billingDomain?.content.reviewSections?.length ?? 0) >= 3, true)
   assert.equal(billingDomain?.content.reviewSections?.[0]?.rows.length, 3)
   assert.equal(billingDomain?.content.reviewSections?.[2]?.title, 'Payment Terbaru')
+
+  const inventoryDomain = await getDomainPageData('inventory', 'SUPER_ADMIN')
+  assert.equal(inventoryDomain?.content.resource, 'inventory')
+  assert.equal((inventoryDomain?.content.reviewSections?.length ?? 0) >= 2, true)
+  assert.equal(inventoryDomain?.content.reviewSections?.[0]?.title, 'Item Inventory Terbaru')
+  assert.equal(inventoryDomain?.content.reviewSections?.[1]?.title, 'Stock Movement Terbaru')
 
   console.log('mock-data.test.ts passed')
 }

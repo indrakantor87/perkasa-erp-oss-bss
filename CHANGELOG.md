@@ -10,6 +10,95 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.51.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/inventory-item-create-form.tsx` untuk membuat item master inventory langsung dari halaman domain `inventory`
+- route `POST /api/inventory/items` di `apps/web/app/api/inventory/items/route.ts` untuk menyimpan item baru ke tabel `inventory_items` dengan `item_code` otomatis
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan write action awal pada domain `inventory` untuk menambah item master langsung dari web
+- `apps/web/lib/services/domain-service.ts` sekarang memuat review section `Item Inventory Terbaru` dan `Stock Movement Terbaru` dari review DB
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone inventory awal tercermin pada fallback mock, pengujian, dan dokumentasi
+
+### Notes
+
+- versi `0.51.0` membuka write action pertama pada domain inventory agar item master dan review movement tidak lagi hanya berupa shell summary
+- item inventory saat ini tetap defensif: kategori dan satuan wajib ada di master review DB, `item_code` dibuat otomatis, dan angka stok divalidasi sebelum insert
+
+## [0.50.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/sales-subscription-activate-form.tsx` untuk mengaktifkan subscription langsung dari sales order pada halaman domain `sales`
+- route `POST /api/sales/subscriptions` di `apps/web/app/api/sales/subscriptions/route.ts` untuk membuat `service_subscriptions`, melengkapi customer master bila belum ada, dan menautkan hasil aktivasi ke order/work order
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan enam write action pada domain `sales`: create lead, create coverage, create survey, create sales order, create work order, dan aktivasi subscription
+- `apps/web/lib/services/domain-service.ts` sekarang memuat review section baru `Subscription Aktivasi Terbaru` dari review DB untuk menutup loop sales ke layanan aktif
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone aktivasi subscription tercermin pada fallback mock, pengujian, dan dokumentasi
+
+### Notes
+
+- versi `0.50.0` menutup gap awal aktivasi subscription sehingga alur sales kini sudah bisa bergerak dari lead sampai layanan aktif
+- aktivasi saat ini tetap defensif: order sumber wajib valid, paket wajib aktif, `service_no` dibuat otomatis, customer master dibentuk otomatis bila belum ada, dan work order instalasi terakhir ikut diselesaikan bila tersedia
+
+## [0.49.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/sales-coverage-create-form.tsx` untuk membuat coverage area awal dari lead langsung pada halaman domain `sales`
+- route `POST /api/sales/covered-areas` di `apps/web/app/api/sales/covered-areas/route.ts` untuk menyimpan coverage area ke tabel `sales_covered_areas` dengan `area_code` otomatis
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan lima write action pada domain `sales`: create lead, create coverage, create survey, create sales order, dan create work order
+- `apps/web/lib/services/domain-service.ts` sekarang memuat review section baru `Coverage Terbaru` dari review DB untuk memperlihatkan kesiapan area layanan
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone coverage flow tercermin pada fallback mock, pengujian, dan dokumentasi
+
+### Notes
+
+- versi `0.49.0` menutup gap awal coverage flow sehingga validasi area layanan bisa dicatat sebelum survey dan order dilanjutkan
+- coverage saat ini tetap defensif: sumber wajib dari lead valid, `area_code` dibuat otomatis, dan lead sumber diselaraskan ke `QUALIFIED` atau `COVERAGE_CHECK` sesuai status coverage
+
+## [0.48.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/sales-survey-create-form.tsx` untuk membuat survey awal langsung dari lead pada halaman domain `sales`
+- route `POST /api/sales/surveys` di `apps/web/app/api/sales/surveys/route.ts` untuk menyimpan survey ke tabel `sales_surveys` dengan `survey_no` otomatis
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan empat write action pada domain `sales`: create lead, create survey, create sales order, dan create work order
+- `apps/web/README.md` dan `docs/prd-web-checklist.md` diperbarui agar milestone sales survey flow tercermin pada dokumentasi implementasi web
+
+### Notes
+
+- versi `0.48.0` menutup gap awal write action survey sehingga proses coverage dan feasibility bisa mulai dicatat tanpa menunggu workflow sales lengkap
+- survey saat ini tetap defensif: sumber wajib dari lead valid, `survey_no` dibuat otomatis, dan lead sumber didorong ke status `SURVEY_REQUEST` setelah survey dibuat
+
+## [0.47.0] - 2026-07-06
+
+### Added
+
+- komponen `apps/web/components/sales-work-order-create-form.tsx` untuk membuat work order delivery dari sales order aktif langsung dari halaman domain `sales`
+- route `POST /api/sales/work-orders` di `apps/web/app/api/sales/work-orders/route.ts` untuk menyimpan work order ke tabel `service_work_orders` dengan `work_order_no` otomatis
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan tiga write action pada domain `sales`: create lead, create sales order, dan create work order
+- `apps/web/lib/services/domain-service.ts` sekarang menambahkan `Order ID` pada review queue order dan memuat review section baru `Work Order Aktif` dari review DB
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone work order flow tercermin pada fallback mock, pengujian, dan dokumentasi
+
+### Notes
+
+- versi `0.47.0` menutup gap awal transisi order ke delivery lapangan tanpa menunggu aktivasi subscription penuh
+- work order saat ini tetap defensif: sumber wajib dari sales order valid, nomor work order dibuat otomatis, dan order sumber didorong ke status `READY_INSTALL` atau `ON_PROCESS` sesuai status awal work order
+
 ## [0.46.0] - 2026-07-06
 
 ### Added

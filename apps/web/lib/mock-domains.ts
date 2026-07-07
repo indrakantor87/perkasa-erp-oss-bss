@@ -51,6 +51,28 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
         ],
       },
       {
+        title: 'Coverage Terbaru',
+        description: 'Sampel coverage area terbaru untuk menghubungkan lead dengan kesiapan wilayah layanan.',
+        rows: [
+          {
+            id: 'COV-241',
+            primary: 'COV-202607-0001',
+            secondary: 'Perumahan Griya Pati Indah',
+            status: 'AVAILABLE',
+            detail: 'Coverage area tersedia dengan port ODP aktif dan jalur instalasi relatif siap.',
+            meta: ['Village: Pati Kidul', 'District: Pati', 'City: Pati', 'Province: Jawa Tengah'],
+          },
+          {
+            id: 'COV-240',
+            primary: 'COV-202607-0002',
+            secondary: 'Kawasan Industri Margorejo',
+            status: 'LIMITED',
+            detail: 'Coverage corporate tersedia terbatas dan memerlukan pengecekan kapasitas sebelum survey final.',
+            meta: ['Village: Sokoharjo', 'District: Margorejo', 'City: Pati', 'Province: Jawa Tengah'],
+          },
+        ],
+      },
+      {
         title: 'Survey Dan Order Berjalan',
         description: 'Sampel alur survey dan order aktif untuk menghubungkan lead, feasibility, dan delivery ke domain lain.',
         rows: [
@@ -63,12 +85,12 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
             meta: ['Feasibility: PENDING', 'Scheduled: 07 Jul 2026 09:00', 'Marketing: Dhimas'],
           },
           {
-            id: 'ORD-2026-0177',
+            id: 'ORDER-177',
             primary: 'ORD-2026-0177',
             secondary: 'PT Maju Lancar Abadi',
             status: 'REGISTERED',
             detail: 'Order corporate sudah teregistrasi dan menunggu finalisasi paket serta jadwal instalasi.',
-            meta: ['Type: NEW_INSTALL', 'Package: Dedicated 50 Mbps', 'Marketing: Chalis'],
+            meta: ['Flow: ORDER', 'Order ID: 177', 'Marketing: Chalis', 'At: 07 Jul 2026 11:00'],
           },
           {
             id: 'SVY-2026-0047',
@@ -77,6 +99,50 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
             status: 'ON_PROGRESS',
             detail: 'Survey lapangan sedang berjalan untuk validasi tiang, kabel, dan estimasi instalasi.',
             meta: ['Feasibility: NEED_REVIEW', 'Scheduled: 06 Jul 2026 14:00', 'Marketing: Kantor'],
+          },
+        ],
+      },
+      {
+        title: 'Work Order Aktif',
+        description: 'Sampel work order delivery terbaru untuk menghubungkan order aktif dengan eksekusi lapangan.',
+        rows: [
+          {
+            id: 'WO-321',
+            primary: 'WO-202607-0021',
+            secondary: 'PT Maju Lancar Abadi',
+            status: 'SCHEDULED',
+            detail: 'Work order INSTALLATION ditautkan ke order ORD-2026-0177 dengan jadwal 08 Jul 2026 09:00.',
+            meta: ['Type: INSTALLATION', 'Order: ORD-2026-0177', 'Technician: Tim Fiber 2', 'Scheduled: 08 Jul 2026 09:00'],
+          },
+          {
+            id: 'WO-320',
+            primary: 'WO-202607-0020',
+            secondary: 'Ahmad Hidayat',
+            status: 'ON_PROGRESS',
+            detail: 'Work order INSTALLATION sedang berjalan untuk order ORD-2026-0176 dengan pengecekan port ODP dan penarikan kabel.',
+            meta: ['Type: INSTALLATION', 'Order: ORD-2026-0176', 'Technician: Arif Nugroho', 'Scheduled: 07 Jul 2026 13:30'],
+          },
+        ],
+      },
+      {
+        title: 'Subscription Aktivasi Terbaru',
+        description: 'Sampel subscription terbaru untuk memastikan order yang selesai instalasi masuk ke layanan aktif.',
+        rows: [
+          {
+            id: 'SUB-501',
+            primary: 'SVC-000501',
+            secondary: 'PT Maju Lancar Abadi',
+            status: 'ACTIVE',
+            detail: 'Layanan Dedicated 1:1 (Custom) berasal dari order ORD-2026-0177.',
+            meta: ['Order: ORD-2026-0177', 'Harga: Rp1.750.000', 'Aktivasi: 08 Jul 2026 11:20'],
+          },
+          {
+            id: 'SUB-500',
+            primary: 'SVC-000500',
+            secondary: 'Ahmad Hidayat',
+            status: 'ACTIVE',
+            detail: 'Layanan Home 20 Mbps (20 Mbps) berasal dari order ORD-2026-0176.',
+            meta: ['Order: ORD-2026-0176', 'Harga: Rp275.000', 'Aktivasi: 07 Jul 2026 16:10'],
           },
         ],
       },
@@ -321,6 +387,52 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
     highlights: [
       { title: 'Stock ke Work Order', detail: 'Pergerakan stok nantinya harus bisa ditautkan ke delivery dan support lapangan.' },
       { title: 'ODP Port Detail', detail: 'Port dan device assignment menjadi penghubung antara inventory dan layanan aktif.' },
+    ],
+    reviewSections: [
+      {
+        title: 'Item Inventory Terbaru',
+        description: 'Sampel item master terbaru untuk memulai review stok, kategori, dan satuan inventory.',
+        rows: [
+          {
+            id: 'ITEM-501',
+            primary: 'INV-202607-0001',
+            secondary: 'ONU ZTE F660',
+            status: 'ACTIVE',
+            detail: 'Stok saat ini 18 PCS dengan minimum 5.',
+            meta: ['Category: ONU', 'Unit: PCS', 'Current Stock: 18', 'Minimum: 5'],
+          },
+          {
+            id: 'ITEM-500',
+            primary: 'INV-202607-0002',
+            secondary: 'Kabel Dropcore 1C',
+            status: 'ACTIVE',
+            detail: 'Stok saat ini 240 METER dengan minimum 100.',
+            meta: ['Category: KABEL', 'Unit: METER', 'Current Stock: 240', 'Minimum: 100'],
+          },
+        ],
+      },
+      {
+        title: 'Stock Movement Terbaru',
+        description: 'Sampel pergerakan stok terbaru untuk menghubungkan inventory dengan aktivitas lapangan.',
+        rows: [
+          {
+            id: 'MOV-120',
+            primary: 'OUT',
+            secondary: 'INV-202607-0001 | ONU ZTE F660',
+            status: 'WO-202607-0021',
+            detail: 'Pergerakan OUT sebanyak 1 item untuk instalasi lapangan.',
+            meta: ['Qty: 1', 'Harga: Rp350.000', 'At: 08 Jul 2026 10:30'],
+          },
+          {
+            id: 'MOV-119',
+            primary: 'IN',
+            secondary: 'INV-202607-0002 | Kabel Dropcore 1C',
+            status: 'PO-202607-0004',
+            detail: 'Barang masuk hasil penerimaan vendor untuk kebutuhan stok minggu berjalan.',
+            meta: ['Qty: 50', 'Harga: Rp7.500', 'At: 07 Jul 2026 15:20'],
+          },
+        ],
+      },
     ],
   },
   hr: {

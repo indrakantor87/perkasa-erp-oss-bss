@@ -19,11 +19,11 @@ Status dipakai dengan arti:
 | Navigasi shell | SUDAH | Sidebar, topbar, RBAC menu sudah aktif |
 | Import center | PARSIAL | Read-side kuat, action pipeline belum penuh |
 | Detail batch | SUDAH | Row review dan summary batch sudah ada |
-| Sales | PARSIAL | Lead review dan sales order sudah bisa create, workflow belum lengkap |
+| Sales | PARSIAL | Lead review, coverage, sales survey, sales order, work order, dan aktivasi subscription awal sudah bisa create, workflow belum lengkap |
 | Customers | PARSIAL | Customer master sudah bisa create, lifecycle belum lengkap |
 | Support | PARSIAL | TT review sudah bisa create, close, kelola SLA dasar, tambah isolir aktif, restorasi isolir, dan dismantle history |
 | Billing | PARSIAL | Collection action dan payment entry sudah bisa create, invoice lifecycle penuh belum |
-| Inventory | BELUM | Masih shell + summary |
+| Inventory | PARSIAL | Review section operasional dan item master awal sudah bisa create |
 | HR | BELUM | Masih shell + summary |
 | Settings access | PARSIAL | Matrix akses ada, permission master dinamis belum |
 | Settings users | SUDAH | List, create, edit, reset password, deactivate/reactivate, dan audit perubahan user sudah ada |
@@ -41,10 +41,10 @@ Status dipakai dengan arti:
 | Pusat import sebagai modul kelas satu | PARSIAL | Halaman daftar batch, detail batch, create batch, upload file sumber, parser ke row staging, validasi, trigger transform, dan histori aksi batch sudah hidup | Parser format bebas per domain dan eksekusi transform per batch yang benar-benar terisolasi belum aktif penuh | Sangat Tinggi |
 | Pipeline transform tahap 1-4 | PARSIAL | Tombol eksekusi transform tahap 1-4 dari web sudah ada | Eksekusi masih mengikuti baseline SQL review global, belum punya histori eksekusi terstruktur per batch | Sangat Tinggi |
 | Filter review batch dan row bermasalah | PARSIAL | Detail row sudah ada | Filter interaktif per status/domain/source belum penuh | Sedang |
-| Sales shell: lead, coverage, survey, order | PARSIAL | Lead review, sales order create, dan review survey/order sudah ada | Coverage, survey write action, dan work order belum hidup | Sangat Tinggi |
+| Sales shell: lead, coverage, survey, order | PARSIAL | Lead review, coverage create, survey create, sales order create, work order create, aktivasi subscription, dan review coverage/survey/order/work order/subscription sudah ada | Workflow corporate lanjut, quotation/contract, dan otomasi pasca-aktivasi belum hidup | Sangat Tinggi |
 | Customer shell: master, address, subscription, histori | PARSIAL | Create customer + primary address sudah ada | Subscription lifecycle dan histori layanan belum lengkap | Tinggi |
 | Support shell: TT, isolir, dismantle, SLA | PARSIAL | TT open review sudah ada, create TT, close ticket, kelola SLA dasar, tambah isolir aktif, restorasi isolir, dan dismantle flow dasar sudah ada | SLA penuh dan otomasi workflow support lanjutan belum ada | Sangat Tinggi |
-| Inventory shell: item, stock movement, ODP, device assignment | BELUM | Baru shell domain dan summary | Review section dan write action belum ada | Tinggi |
+| Inventory shell: item, stock movement, ODP, device assignment | PARSIAL | Review item inventory, review stock movement, dan create item master awal sudah ada | ODP, stock movement write action, dan device assignment belum hidup | Tinggi |
 | HR shell: employee, attendance, salary, loan | BELUM | Baru shell domain dan summary | Review section dan write action belum ada | Tinggi |
 | Billing shell: invoice, payment, collection, overdue | PARSIAL | Collection action, payment entry, review invoice, dan review payment terbaru sudah ada | Lifecycle invoice penuh dan otomasi billing lanjutan belum lengkap | Sangat Tinggi |
 | Settings access dan permission | PARSIAL | Permission matrix dan access summary sudah ada | Permission master dinamis dan audit perubahan belum ada | Tinggi |
@@ -96,15 +96,13 @@ Status dipakai dengan arti:
 
 ## Prioritas Implementasi Berikutnya
 
-1. Lengkapi workflow domain inti:
-   sales order, work order, payment, dan support close flow.
-2. Hidupkan inventory dan HR:
+1. Hidupkan inventory dan HR:
    review section operasional + write action awal.
-3. Rapikan mobile behavior:
+2. Rapikan mobile behavior:
    pola card/stacked row untuk tabel sempit dan form panjang.
-4. Perluas audit perubahan lintas modul:
+3. Perluas audit perubahan lintas modul:
    bawa pola audit formal dari `settings/users` ke import, sales, support, dan billing.
-5. Perluas parser legacy per domain:
+4. Perluas parser legacy per domain:
    dukung format input yang lebih longgar di luar JSON/XLSX terstruktur.
 
 ## Catatan

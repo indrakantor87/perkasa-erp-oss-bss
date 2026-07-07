@@ -43,6 +43,8 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 - `settings/users` sekarang juga menampilkan audit perubahan user internal dan mencatat event create, update, serta reset password ke `auth_user_audit_logs`
 - shell domain `sales` sudah menampilkan review operasional awal berupa daftar `lead terbaru` dan `survey/order berjalan` dari review DB, lalu fallback ke sampel mock saat koneksi tidak siap
 - domain `sales` sudah memiliki write action awal berupa form `lead review` yang menulis prospek baru ke `sales_leads` saat mode `review-db` aktif
+- domain `sales` sekarang juga memiliki write action coverage area awal dari lead yang valid ke tabel `sales_covered_areas` dengan `area_code` otomatis
+- domain `sales` sekarang juga memiliki write action survey awal dari lead yang valid ke tabel `sales_surveys` dengan `survey_no` otomatis
 - domain `support` sudah memiliki write action awal berupa form `trouble ticket review` yang menulis ticket open baru ke `support_trouble_tickets` saat mode `review-db` aktif
 - domain `support` sekarang juga memiliki close flow awal untuk menutup trouble ticket aktif langsung ke `support_trouble_tickets` saat mode `review-db` aktif
 - domain `support` sekarang juga memiliki pengaturan SLA dasar per tipe ticket melalui tabel `support_trouble_ticket_sla` untuk role yang memiliki izin approve
@@ -51,6 +53,9 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 - domain `support` sekarang juga memiliki flow dismantle yang memindahkan data ke `support_dismantle_history` dan mengarsipkan sumber isolir
 - domain `billing` sekarang juga memiliki payment entry yang menulis ke `billing_payments` dan menyelaraskan `paid_amount` serta `invoice_status`
 - domain `sales` sekarang juga memiliki sales order create dari lead yang valid dengan `order_no` otomatis
+- domain `sales` sekarang juga memiliki work order create dari sales order aktif dengan `work_order_no` otomatis
+- domain `sales` sekarang juga memiliki aktivasi subscription dari sales order yang valid dengan `service_no` otomatis serta pembentukan customer master bila diperlukan
+- domain `inventory` sekarang juga memiliki write action awal untuk membuat item master baru ke `inventory_items` dengan `item_code` otomatis
 - domain `customers` sudah memiliki write action awal berupa form `customer review` yang menulis customer master baru beserta alamat utama ke `crm_customers` dan `crm_customer_addresses`
 - auth login sekarang memakai mode hybrid: memprioritaskan `auth_users/auth_roles` dari review DB saat tersedia, lalu fallback ke akun bootstrap mock bila user review belum siap
 - seed review DB untuk akun internal sekarang disiapkan di `database/xampp_review_auth_seed.sql` agar mode hybrid bisa diuji tanpa menunggu import user legacy

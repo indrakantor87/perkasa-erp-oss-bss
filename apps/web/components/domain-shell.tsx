@@ -2,8 +2,13 @@ import Link from 'next/link'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
 import { BillingPaymentForm } from '@/components/billing-payment-form'
 import { CustomerCreateForm } from '@/components/customer-create-form'
+import { InventoryItemCreateForm } from '@/components/inventory-item-create-form'
+import { SalesCoverageCreateForm } from '@/components/sales-coverage-create-form'
 import { SalesLeadCreateForm } from '@/components/sales-lead-create-form'
 import { SalesOrderCreateForm } from '@/components/sales-order-create-form'
+import { SalesSubscriptionActivateForm } from '@/components/sales-subscription-activate-form'
+import { SalesSurveyCreateForm } from '@/components/sales-survey-create-form'
+import { SalesWorkOrderCreateForm } from '@/components/sales-work-order-create-form'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
 import { SupportIsolationForm } from '@/components/support-isolation-form'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
@@ -54,6 +59,17 @@ export function DomainShell({
             const marketing = row.meta.find((item) => item.startsWith('Marketing: '))?.replace('Marketing: ', '').trim() || '-'
             return `${row.id.replace(/^LEAD-/, '')} | ${row.primary} | ${marketing}`
           })
+      : []
+  const salesOrderSuggestions =
+    content.key === 'sales'
+      ? (content.reviewSections ?? [])
+          .flatMap((section) => section.rows)
+          .filter((row) => row.meta.includes('Flow: ORDER'))
+          .map((row) => {
+            const orderId = row.meta.find((item) => item.startsWith('Order ID: '))?.replace('Order ID: ', '').trim() || ''
+            return orderId ? `${orderId} | ${row.primary} | ${row.secondary}` : ''
+          })
+          .filter(Boolean)
       : []
   const supportTypeSuggestions =
     content.key === 'support'
@@ -218,17 +234,44 @@ export function DomainShell({
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
             marketingSuggestions={salesMarketingSuggestions}
           />
+          <SalesCoverageCreateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            leadSuggestions={salesLeadSuggestions}
+          />
+          <SalesSurveyCreateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            leadSuggestions={salesLeadSuggestions}
+          />
           <SalesOrderCreateForm
             canCreate={canCreate}
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
             leadSuggestions={salesLeadSuggestions}
             marketingSuggestions={salesMarketingSuggestions}
           />
+          <SalesWorkOrderCreateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            orderSuggestions={salesOrderSuggestions}
+          />
+          <SalesSubscriptionActivateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            orderSuggestions={salesOrderSuggestions}
+          />
         </section>
       ) : null}
 
       {content.key === 'customers' ? (
         <CustomerCreateForm
+          canCreate={canCreate}
+          reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+        />
+      ) : null}
+
+      {content.key === 'inventory' ? (
+        <InventoryItemCreateForm
           canCreate={canCreate}
           reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
         />
