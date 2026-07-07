@@ -31,3 +31,4 @@ export default async function DomainPage({
 
   return <DomainShell content={payload.content} source={payload.source} capabilities={payload.capabilities} />
 }
+

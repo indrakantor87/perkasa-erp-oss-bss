@@ -1,11 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { PermissionMatrix } from '@/components/access/permission-matrix'
-import {
-  canAccessPath,
-  getPermissionMatrix,
-  getPermissionSummary,
-} from '@/lib/access-control'
+import { canAccessPath, getPermissionMatrix, getPermissionSummary } from '@/lib/access-control'
 import { requireSession } from '@/lib/auth'
 
 export default async function AccessSettingsPage() {
@@ -90,3 +86,4 @@ export default async function AccessSettingsPage() {
     </div>
   )
 }
+

@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans, Sora } from 'next/font/google'
 import type { ReactNode } from 'react'
-import { ShellBoundary } from '@/components/layout/shell-boundary'
-import { getSession } from '@/lib/auth'
 import './globals.css'
 
 const bodyFont = Plus_Jakarta_Sans({
@@ -25,14 +23,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: ReactNode
 }>) {
-  const session = await getSession()
-
   return (
     <html lang="id">
       <body
         className={`${bodyFont.variable} ${headingFont.variable} font-[family-name:var(--font-body)] antialiased`}
       >
-        <ShellBoundary session={session}>{children}</ShellBoundary>
+        {children}
       </body>
     </html>
   )

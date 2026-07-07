@@ -10,6 +10,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.58.1] - 2026-07-07
+
+### Fixed
+
+- merapikan struktur layout Next.js App Router dengan route group:
+  - `(auth)` untuk `/login` tanpa `AppShell`
+  - `(app)` untuk halaman aplikasi (dashboard/import/domain/settings) dengan `AppShell`
+- menghapus `ShellBoundary` berbasis `usePathname()` yang berpotensi memicu hydration mismatch saat SSR/hydration
+
 ## [0.58.0] - 2026-07-07
 
 ### Added
