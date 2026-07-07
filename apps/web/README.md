@@ -11,8 +11,8 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 - shell domain `sales`, `customers`, `support`, `inventory`, `hr`, `billing`
 - halaman `settings/access`
 - auth mock dengan cookie session, guard halaman, dan logout
-- role-based access awal untuk sidebar, dashboard shortcut, route halaman, dan API import
-- permission matrix per role untuk resource dan aksi domain di halaman akses
+- role-based access untuk sidebar, shortcut, guard route halaman, dan guard API yang bisa mengikuti permission master dinamis saat review DB aktif
+- permission matrix + permission master dinamis + audit perubahan permission di halaman akses (`settings/access`)
 - service layer untuk `dashboard`, `import`, dan shell domain dengan adapter MySQL review dan fallback eksplisit ke mock
 - route handler mock:
   - `/api/auth/login`

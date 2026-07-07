@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { AppShell } from '@/components/layout/app-shell'
+import { getAllowedPrefixes } from '@/lib/access-control-server'
 import { getSession } from '@/lib/auth'
 
 export default async function AppLayout({
@@ -8,6 +9,10 @@ export default async function AppLayout({
   children: ReactNode
 }>) {
   const session = await getSession()
-  return <AppShell session={session}>{children}</AppShell>
+  const allowedPrefixes = getAllowedPrefixes(session?.role ?? 'OPERATOR')
+  return (
+    <AppShell session={session} allowedPrefixes={allowedPrefixes}>
+      {children}
+    </AppShell>
+  )
 }
-

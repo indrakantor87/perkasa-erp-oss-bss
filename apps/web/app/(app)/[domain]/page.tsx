@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
-import { canAccessPath } from '@/lib/access-control'
+import { canAccessPath } from '@/lib/access-control-server'
 import { DomainShell } from '@/components/domain-shell'
 import { requireSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
@@ -31,4 +31,3 @@ export default async function DomainPage({
 
   return <DomainShell content={payload.content} source={payload.source} capabilities={payload.capabilities} />
 }
-

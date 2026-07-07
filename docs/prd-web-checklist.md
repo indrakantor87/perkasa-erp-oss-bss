@@ -25,7 +25,7 @@ Status dipakai dengan arti:
 | Billing | PARSIAL | Generate invoice recurring, pembatalan invoice unpaid, collection action, dan payment entry sudah bisa create, invoice lifecycle penuh belum |
 | Inventory | PARSIAL | Review section operasional, item master, movement, ODP, port, device assignment, return perangkat, dan update status port awal sudah bisa create |
 | HR | PARSIAL | Review section operasional, employee master, attendance, loan, dan payroll awal sudah bisa create |
-| Settings access | PARSIAL | Matrix akses ada, permission master dinamis belum |
+| Settings access | SUDAH | Permission master dinamis, role-permissions, dan audit perubahan permission sudah hidup di review DB |
 | Settings users | SUDAH | List, create, edit, reset password, deactivate/reactivate, dan audit perubahan user sudah ada |
 | Mobile readiness | PARSIAL | Shell adaptif, mode detail mobile belum merata |
 | Prisma target | BELUM | Saat ini masih memakai `mysql2` langsung |
@@ -35,7 +35,7 @@ Status dipakai dengan arti:
 | Requirement PRD | Status | Implementasi Saat Ini | Gap Utama | Prioritas |
 |---|---|---|---|---|
 | Login username/password tunggal | SUDAH | Halaman login, session cookie, logout, redirect per role | Belum ada reset password dan full auth admin | Tinggi |
-| Role user `SUPER_ADMIN`, `ADMIN_DIVISI`, `OPERATOR` | SUDAH | RBAC route, sidebar, shortcut, action matrix | Permission masih statis, belum per data instance | Tinggi |
+| Role user `SUPER_ADMIN`, `ADMIN_DIVISI`, `OPERATOR` | SUDAH | RBAC route, sidebar, shortcut, action matrix | Permission sudah bisa dikelola via settings/access saat review DB aktif, namun audit lintas seluruh write action belum terpusat | Tinggi |
 | Dashboard KPI lintas domain | SUDAH | KPI customer, order, TT, isolir, inventory, employee, overdue invoice | KPI per proses detail belum lengkap | Tinggi |
 | Sidebar domain + topbar context | SUDAH | Shell aplikasi dan active state sudah ada | Quick search modul belum nyata | Sedang |
 | Pusat import sebagai modul kelas satu | PARSIAL | Halaman daftar batch, detail batch, create batch, upload file sumber, parser ke row staging, validasi, trigger transform, dan histori aksi batch sudah hidup | Parser format bebas per domain dan eksekusi transform per batch yang benar-benar terisolasi belum aktif penuh | Sangat Tinggi |
@@ -47,7 +47,7 @@ Status dipakai dengan arti:
 | Inventory shell: item, stock movement, ODP, device assignment | PARSIAL | Review item inventory, review stock movement, review ODP/port, review device assignment, review port bermasalah, review device return, create item master, create stock movement, create ODP, assign port, update status port, device assignment, dan return perangkat sudah ada | Device return lanjutan (return sebagian/serial per perangkat), port reserve per order, dan integrasi assignment penuh ke work order masih perlu diperdalam | Tinggi |
 | HR shell: employee, attendance, salary, loan | PARSIAL | Review employee, attendance, loan, salary slip, create employee master, create attendance, create loan, dan create payroll awal sudah ada | Payroll release lanjutan dan perhitungan otomatis lebih detail belum hidup | Tinggi |
 | Billing shell: invoice, payment, collection, overdue | PARSIAL | Generate invoice recurring dari subscription aktif, pembatalan invoice unpaid, collection action, payment entry, review invoice, subscription billing-ready, review invoice dibatalkan, dan review payment terbaru sudah ada | Lifecycle invoice penuh, penyesuaian non-recurring yang lebih kaya, dan otomasi billing lanjutan belum lengkap | Sangat Tinggi |
-| Settings access dan permission | PARSIAL | Permission matrix dan access summary sudah ada | Permission master dinamis dan audit perubahan belum ada | Tinggi |
+| Settings access dan permission | SUDAH | Permission master dinamis + audit permission + set role-permissions sudah tersedia di `settings/access` | - | Tinggi |
 | Settings users internal | SUDAH | Direktori user, create user, edit profil, reset password, deactivate/reactivate, dan panel audit perubahan sudah ada | Audit masih terfokus pada user internal, belum lintas seluruh modul write action | Tinggi |
 | Audit log dasar | PARSIAL | Audit perubahan user internal sudah tercatat di `auth_user_audit_logs` dan tampil di web | Belum menjadi audit terpusat lintas import, sales, support, billing, dan modul lain | Tinggi |
 | Kompatibilitas mobile web | PARSIAL | Shell dan login cukup aman di layar kecil | Tabel review/detail belum punya pola card/stacked merata | Tinggi |
@@ -58,7 +58,7 @@ Status dipakai dengan arti:
 
 ### Auth
 
-- `apps/web/app/login/page.tsx`
+- `apps/web/app/(auth)/login/page.tsx`
 - `apps/web/app/api/auth/login/route.ts`
 - `apps/web/app/api/auth/logout/route.ts`
 - `apps/web/lib/auth.ts`
@@ -67,7 +67,7 @@ Status dipakai dengan arti:
 
 ### Dashboard
 
-- `apps/web/app/dashboard/page.tsx`
+- `apps/web/app/(app)/dashboard/page.tsx`
 - `apps/web/lib/services/dashboard-service.ts`
 - `apps/web/components/data-source-status.tsx`
 

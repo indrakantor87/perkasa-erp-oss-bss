@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getDefaultLandingPath } from '@/lib/access-control'
+import { getDefaultLandingPath } from '@/lib/access-control-server'
 import { applySessionCookie } from '@/lib/auth'
 import { authenticateUser } from '@/lib/auth-session'
 

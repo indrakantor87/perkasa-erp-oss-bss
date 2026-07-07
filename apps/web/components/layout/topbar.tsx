@@ -2,18 +2,23 @@
 
 import Link from 'next/link'
 import { Bell, Search } from 'lucide-react'
-import { canAccessPath } from '@/lib/access-control'
 import { findNavigationItem } from '@/lib/navigation'
 import type { AppSession } from '@/lib/auth-session'
 
 type TopbarProps = {
   pathname: string
   session: AppSession | null
+  allowedPrefixes: string[]
 }
 
-export function Topbar({ pathname, session }: TopbarProps) {
+function matchesPrefix(pathname: string, prefix: string) {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`)
+}
+
+export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
   const activeItem = findNavigationItem(pathname)
-  const canReviewImport = session ? canAccessPath(session.role, '/import') : false
+  const canReviewImport =
+    session ? allowedPrefixes.some((prefix) => matchesPrefix('/import', prefix)) : false
 
   return (
     <header className="flex flex-col gap-4 border-b border-line pb-6 lg:flex-row lg:items-end lg:justify-between">

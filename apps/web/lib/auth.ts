@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createSessionToken, parseSessionToken, type AppSession } from '@/lib/auth-session'
+import { primeAccessControlCache } from '@/lib/access-control-server'
 
 export const AUTH_COOKIE_NAME = 'perkasa_session'
 
@@ -15,6 +16,7 @@ function getCookieOptions(maxAge = 60 * 60 * 12) {
 }
 
 export async function getSession() {
+  await primeAccessControlCache()
   const cookieStore = await cookies()
   return parseSessionToken(cookieStore.get(AUTH_COOKIE_NAME)?.value)
 }

@@ -1,6 +1,16 @@
 import type { AccessAction, AppRole, PermissionMatrixEntry } from '@/lib/types'
 
-const roleAllowedPrefixes: Record<AppRole, string[]> = {
+type DbPermissionSets = Partial<Record<AppRole, Set<string>>>
+
+function getDbPermissionSets() {
+  if (typeof window !== 'undefined') {
+    return null
+  }
+  const container = globalThis as unknown as { __perkasaAccessPermissionSets?: DbPermissionSets }
+  return container.__perkasaAccessPermissionSets ?? null
+}
+
+const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
   SUPER_ADMIN: [
     '/dashboard',
     '/import',
@@ -17,7 +27,7 @@ const roleAllowedPrefixes: Record<AppRole, string[]> = {
   OPERATOR: ['/dashboard', '/customers', '/support'],
 }
 
-const rolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
+const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
   SUPER_ADMIN: [
     { resource: 'dashboard', label: 'Dashboard Global', actions: ['view', 'export', 'manage'] },
     { resource: 'import_center', label: 'Import Center', actions: ['view', 'create', 'approve', 'export'] },
@@ -46,38 +56,92 @@ const rolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
   ],
 }
 
+export function buildRoutePrefixPermissionCode(prefix: string) {
+  return `route_prefix:${prefix}`
+}
+
+export function buildResourceActionPermissionCode(
+  resource: PermissionMatrixEntry['resource'],
+  action: AccessAction
+) {
+  return `res:${resource}:${action}`
+}
+
 function matchesPrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`)
 }
 
 export function canAccessPath(role: AppRole, pathname: string) {
-  return roleAllowedPrefixes[role].some((prefix) => matchesPrefix(pathname, prefix))
+  return getAllowedPrefixes(role).some((prefix) => matchesPrefix(pathname, prefix))
 }
 
 export function getAllowedPrefixes(role: AppRole) {
-  return roleAllowedPrefixes[role]
+  const sets = getDbPermissionSets()
+  const codes = sets?.[role]
+  if (codes && codes.size > 0) {
+    const prefixes = Array.from(codes)
+      .filter((code) => code.startsWith('route_prefix:'))
+      .map((code) => code.replace(/^route_prefix:/, ''))
+      .filter(Boolean)
+
+    if (prefixes.length > 0) {
+      return prefixes
+    }
+  }
+
+  return baselineRoleAllowedPrefixes[role]
 }
 
 export function getDefaultLandingPath(role: AppRole) {
-  return roleAllowedPrefixes[role][0] ?? '/dashboard'
+  return getAllowedPrefixes(role)[0] ?? '/dashboard'
 }
 
 export function getPermissionMatrix(role: AppRole) {
-  return rolePermissionMatrix[role]
+  const sets = getDbPermissionSets()
+  const codes = sets?.[role]
+  if (!codes || codes.size === 0) {
+    return baselineRolePermissionMatrix[role]
+  }
+
+  const hasResourcePermission = Array.from(codes).some((code) => code.startsWith('res:'))
+  if (!hasResourcePermission) {
+    return baselineRolePermissionMatrix[role]
+  }
+
+  return baselineRolePermissionMatrix[role].map((entry) => ({
+    ...entry,
+    actions: entry.actions.filter((action) => codes.has(buildResourceActionPermissionCode(entry.resource, action))),
+  }))
 }
 
 export function canPerformAction(role: AppRole, resource: PermissionMatrixEntry['resource'], action: AccessAction) {
-  return rolePermissionMatrix[role].some(
-    (entry) => entry.resource === resource && entry.actions.includes(action)
-  )
+  const sets = getDbPermissionSets()
+  const codes = sets?.[role]
+  if (codes && codes.size > 0) {
+    const code = buildResourceActionPermissionCode(resource, action)
+    const hasResourcePermission = Array.from(codes).some((item) => item.startsWith('res:'))
+    if (hasResourcePermission) {
+      return codes.has(code)
+    }
+  }
+
+  return baselineRolePermissionMatrix[role].some((entry) => entry.resource === resource && entry.actions.includes(action))
 }
 
 export function getPermissionSummary(role: AppRole) {
-  const entries = rolePermissionMatrix[role]
+  const entries = getPermissionMatrix(role)
 
   return {
     resourceCount: entries.length,
     approvalCount: entries.filter((entry) => entry.actions.includes('approve')).length,
     manageCount: entries.filter((entry) => entry.actions.includes('manage')).length,
   }
+}
+
+export function getBaselineAllowedPrefixes(role: AppRole) {
+  return baselineRoleAllowedPrefixes[role]
+}
+
+export function getBaselinePermissionMatrix(role: AppRole) {
+  return baselineRolePermissionMatrix[role]
 }

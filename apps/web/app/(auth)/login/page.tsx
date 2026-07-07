@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getDefaultLandingPath } from '@/lib/access-control'
+import { getDefaultLandingPath } from '@/lib/access-control-server'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { mockAuthUsers } from '@/lib/auth-session'
@@ -145,4 +145,3 @@ export default async function LoginPage({
     </main>
   )
 }
-

@@ -3,12 +3,23 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { AppSession } from '@/lib/auth-session'
-import { getAccessibleNavigationItems } from '@/lib/ui-access'
+import { navigationItems } from '@/lib/navigation'
 
-export function Sidebar({ session }: { session: AppSession | null }) {
+function matchesPrefix(pathname: string, prefix: string) {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`)
+}
+
+export function Sidebar({
+  session,
+  allowedPrefixes,
+}: {
+  session: AppSession | null
+  allowedPrefixes: string[]
+}) {
   const pathname = usePathname()
-  const role = session?.role ?? 'OPERATOR'
-  const items = getAccessibleNavigationItems(role)
+  const items = navigationItems.filter((item) =>
+    allowedPrefixes.some((prefix) => matchesPrefix(item.href, prefix))
+  )
 
   return (
     <>

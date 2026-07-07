@@ -10,6 +10,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.61.0] - 2026-07-07
+
+### Added
+
+- cache RBAC server kini ikut disegarkan setiap kali role-permissions diubah agar menu, guard halaman, dan guard API bisa segera mengikuti permission master dinamis
+
+### Changed
+
+- `apps/web/lib/access-control.ts` kini bersifat hybrid: tetap aman untuk client components, namun akan memakai snapshot permission DB bila tersedia di runtime server
+- `apps/web/lib/services/access-permission-service.ts` memanggil invalidasi cache RBAC server setelah bootstrap/upsert/assign permission
+
 ## [0.60.0] - 2026-07-07
 
 ### Added

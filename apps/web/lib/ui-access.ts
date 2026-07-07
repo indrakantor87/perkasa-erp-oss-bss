@@ -1,5 +1,7 @@
+import 'server-only'
+
 import type { AppRole } from '@/lib/types'
-import { canAccessPath } from '@/lib/access-control'
+import { canAccessPath } from '@/lib/access-control-server'
 import { moduleCards } from '@/lib/mock-dashboard'
 import { navigationItems } from '@/lib/navigation'
 

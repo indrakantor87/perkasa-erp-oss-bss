@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { PermissionAdmin } from '@/components/access/permission-admin'
 import { PermissionMatrix } from '@/components/access/permission-matrix'
-import { canAccessPath, getPermissionMatrix, getPermissionSummary } from '@/lib/access-control'
+import { canAccessPath, canPerformAction, getPermissionMatrix, getPermissionSummary } from '@/lib/access-control'
 import { requireSession } from '@/lib/auth'
+import { getDataSourceSnapshot } from '@/lib/data-source'
 
 export default async function AccessSettingsPage() {
   const session = await requireSession()
@@ -12,6 +14,9 @@ export default async function AccessSettingsPage() {
 
   const matrix = getPermissionMatrix(session.role)
   const summary = getPermissionSummary(session.role)
+  const source = getDataSourceSnapshot()
+  const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
+  const canManage = canPerformAction(session.role, 'access_settings', 'manage')
 
   return (
     <div className="space-y-6">
@@ -62,6 +67,7 @@ export default async function AccessSettingsPage() {
       </section>
 
       <PermissionMatrix role={session.role} entries={matrix} />
+      <PermissionAdmin canManage={canManage} reviewDbReady={reviewDbReady} />
 
       <section className="panel p-6">
         <p className="section-title">Catatan</p>
@@ -86,4 +92,3 @@ export default async function AccessSettingsPage() {
     </div>
   )
 }
-

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getDefaultLandingPath } from '@/lib/access-control'
+import { getDefaultLandingPath } from '@/lib/access-control-server'
 import { getSession } from '@/lib/auth'
 
 export default async function HomePage() {
