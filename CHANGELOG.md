@@ -10,6 +10,24 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.56.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/inventory-device-return-form.tsx` dan route `POST /api/inventory/device-assignments/status` untuk menyelesaikan assignment perangkat (RETURNED/DAMAGED/LOST) dengan pemulihan stok otomatis saat RETURNED
+- komponen `apps/web/components/inventory-odp-port-status-form.tsx` dan route `POST /api/inventory/odp-ports/status` untuk mengubah status port (AVAILABLE/RESERVED/FAULTY/DISABLED) dan opsi mengosongkan mapping subscription/customer
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` menambah write action inventory untuk update status port ODP dan return perangkat
+- `apps/web/lib/services/domain-service.ts` menambah review section inventory: `Port Bermasalah` dan `Device Return Terbaru`
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar flow return perangkat dan status port tercermin pada fallback mock, test, dan dokumentasi
+
+### Notes
+
+- versi `0.56.0` melengkapi loop inventory jaringan: port ODP bisa di-reserve/faulty/disable, dan perangkat bisa direturn untuk memulihkan stok
+- return perangkat bersifat defensif: hanya assignment dengan status ASSIGNED yang boleh ditutup, dan stok hanya bertambah saat status RETURNED
+
 ## [0.55.0] - 2026-07-07
 
 ### Added

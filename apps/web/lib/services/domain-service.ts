@@ -240,6 +240,18 @@ type ReviewDbInventoryDeviceAssignmentRow = {
   serialNumber: string | null
 }
 
+type ReviewDbInventoryDeviceReturnRow = {
+  assignmentId: number
+  itemCode: string
+  itemName: string
+  assignmentStatus: string
+  returnedAt: string | Date
+  serviceNo: string | null
+  workOrderNo: string | null
+  customerName: string | null
+  serialNumber: string | null
+}
+
 type ReviewDbHrEmployeeRow = {
   employeeId: number
   employeeCode: string
@@ -1019,6 +1031,53 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const portIssues = await runReviewDbQuery<ReviewDbInventoryOdpPortRow>(`
+    SELECT
+      nop.id AS portId,
+      no.code AS odpCode,
+      nop.port_no AS portNo,
+      nop.port_status AS portStatus,
+      ss.service_no AS serviceNo,
+      c.customer_code AS customerCode,
+      nop.installed_at AS installedAt
+    FROM network_odp_ports nop
+    JOIN network_odp no
+      ON no.id = nop.odp_id
+    LEFT JOIN service_subscriptions ss
+      ON ss.id = nop.subscription_id
+    LEFT JOIN crm_customers c
+      ON c.id = nop.customer_id
+    WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
+    ORDER BY nop.updated_at DESC, nop.id DESC
+    LIMIT 5
+  `)
+
+  const returns = await runReviewDbQuery<ReviewDbInventoryDeviceReturnRow>(`
+    SELECT
+      sda.id AS assignmentId,
+      ii.item_code AS itemCode,
+      ii.item_name AS itemName,
+      sda.assignment_status AS assignmentStatus,
+      sda.returned_at AS returnedAt,
+      ss.service_no AS serviceNo,
+      swo.work_order_no AS workOrderNo,
+      c.full_name AS customerName,
+      sda.serial_number AS serialNumber
+    FROM service_device_assignments sda
+    JOIN inventory_items ii
+      ON ii.id = sda.inventory_item_id
+    LEFT JOIN service_subscriptions ss
+      ON ss.id = sda.subscription_id
+    LEFT JOIN service_work_orders swo
+      ON swo.id = sda.work_order_id
+    LEFT JOIN crm_customers c
+      ON c.id = sda.customer_id
+    WHERE sda.assignment_status IN ('RETURNED', 'DAMAGED', 'LOST')
+      AND sda.returned_at IS NOT NULL
+    ORDER BY sda.returned_at DESC, sda.id DESC
+    LIMIT 5
+  `)
+
   return [
     {
       title: 'Item Inventory Terbaru',
@@ -1093,6 +1152,38 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
         secondary: item.customerName || item.serviceNo || '-',
         status: item.assignmentStatus,
         detail: `Assigned ${formatDateTime(item.assignedAt)} untuk ${item.serviceNo || item.workOrderNo || '-'}.`,
+        meta: [
+          `Service: ${item.serviceNo || '-'}`,
+          `Work Order: ${item.workOrderNo || '-'}`,
+          `Serial: ${item.serialNumber || '-'}`,
+        ],
+      })),
+    },
+    {
+      title: 'Port Bermasalah',
+      description: 'Port yang sedang reserved, faulty, atau disabled agar tim jaringan cepat melihat kendala ketersediaan port.',
+      rows: portIssues.map((item) => ({
+        id: `PORT-ISSUE-${item.portId}`,
+        primary: `${item.odpCode} #${item.portNo}`,
+        secondary: item.serviceNo || item.customerCode || '-',
+        status: item.portStatus,
+        detail: item.portStatus === 'RESERVED' ? 'Port sedang dicadangkan.' : 'Port membutuhkan penanganan jaringan.',
+        meta: [
+          `Service: ${item.serviceNo || '-'}`,
+          `Customer: ${item.customerCode || '-'}`,
+          `Installed: ${formatDateTime(item.installedAt)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Device Return Terbaru',
+      description: 'Histori return perangkat terbaru untuk memulihkan stok dan audit perangkat yang rusak/hilang.',
+      rows: returns.map((item) => ({
+        id: `RETURN-${item.assignmentId}`,
+        primary: `${item.itemCode} | ${item.itemName}`,
+        secondary: item.customerName || item.serviceNo || '-',
+        status: item.assignmentStatus,
+        detail: `Return ${formatDateTime(item.returnedAt)} untuk ${item.serviceNo || item.workOrderNo || '-'}.`,
         meta: [
           `Service: ${item.serviceNo || '-'}`,
           `Work Order: ${item.workOrderNo || '-'}`,

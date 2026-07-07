@@ -483,6 +483,42 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
           },
         ],
       },
+      {
+        title: 'Port Bermasalah',
+        description: 'Sampel port yang reserved atau faulty untuk membantu tim jaringan menjaga ketersediaan port.',
+        rows: [
+          {
+            id: 'PORT-ISSUE-941',
+            primary: 'ODP-PTI-002 #7',
+            secondary: '-',
+            status: 'FAULTY',
+            detail: 'Port membutuhkan penanganan jaringan.',
+            meta: ['Service: -', 'Customer: -', 'Installed: -'],
+          },
+          {
+            id: 'PORT-ISSUE-940',
+            primary: 'ODP-PTI-001 #6',
+            secondary: '-',
+            status: 'RESERVED',
+            detail: 'Port sedang dicadangkan.',
+            meta: ['Service: -', 'Customer: -', 'Installed: -'],
+          },
+        ],
+      },
+      {
+        title: 'Device Return Terbaru',
+        description: 'Sampel return perangkat terbaru untuk memulihkan stok dan audit perangkat rusak/hilang.',
+        rows: [
+          {
+            id: 'RETURN-55',
+            primary: 'INV-202607-0001 | ONU ZTE F660',
+            secondary: 'PT Maju Lancar Abadi',
+            status: 'RETURNED',
+            detail: 'Return 09 Jul 2026 16:10 untuk SVC-000501.',
+            meta: ['Service: SVC-000501', 'Work Order: WO-202607-0021', 'Serial: F660-ABC-0001'],
+          },
+        ],
+      },
     ],
   },
   hr: {
