@@ -2,7 +2,9 @@ import Link from 'next/link'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
 import { BillingPaymentForm } from '@/components/billing-payment-form'
 import { CustomerCreateForm } from '@/components/customer-create-form'
+import { HrEmployeeCreateForm } from '@/components/hr-employee-create-form'
 import { InventoryItemCreateForm } from '@/components/inventory-item-create-form'
+import { InventoryStockMovementForm } from '@/components/inventory-stock-movement-form'
 import { SalesCoverageCreateForm } from '@/components/sales-coverage-create-form'
 import { SalesLeadCreateForm } from '@/components/sales-lead-create-form'
 import { SalesOrderCreateForm } from '@/components/sales-order-create-form'
@@ -34,6 +36,13 @@ export function DomainShell({
   const billingInvoiceSuggestions =
     content.key === 'billing'
       ? (content.reviewSections?.[0]?.rows ?? []).map((row) => row.primary)
+      : []
+  const inventoryItemSuggestions =
+    content.key === 'inventory'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('ITEM'))
+          .flatMap((section) => section.rows)
+          .map((row) => `${row.primary} | ${row.secondary}`)
       : []
   const salesMarketingSuggestions =
     content.key === 'sales'
@@ -271,7 +280,21 @@ export function DomainShell({
       ) : null}
 
       {content.key === 'inventory' ? (
-        <InventoryItemCreateForm
+        <section className="grid gap-6 xl:grid-cols-2">
+          <InventoryItemCreateForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+          />
+          <InventoryStockMovementForm
+            canCreate={canCreate}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            itemSuggestions={inventoryItemSuggestions}
+          />
+        </section>
+      ) : null}
+
+      {content.key === 'hr' ? (
+        <HrEmployeeCreateForm
           canCreate={canCreate}
           reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
         />

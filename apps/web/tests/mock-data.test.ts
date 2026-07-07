@@ -139,6 +139,13 @@ async function main() {
   assert.equal(inventoryDomain?.content.reviewSections?.[0]?.title, 'Item Inventory Terbaru')
   assert.equal(inventoryDomain?.content.reviewSections?.[1]?.title, 'Stock Movement Terbaru')
 
+  const hrDomain = await getDomainPageData('hr', 'SUPER_ADMIN')
+  assert.equal(hrDomain?.content.resource, 'hr')
+  assert.equal((hrDomain?.content.reviewSections?.length ?? 0) >= 3, true)
+  assert.equal(hrDomain?.content.reviewSections?.[0]?.title, 'Employee Terbaru')
+  assert.equal(hrDomain?.content.reviewSections?.[1]?.title, 'Attendance Hari Ini')
+  assert.equal(hrDomain?.content.reviewSections?.[2]?.title, 'Loan Aktif')
+
   console.log('mock-data.test.ts passed')
 }
 

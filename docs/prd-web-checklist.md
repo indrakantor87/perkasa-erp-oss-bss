@@ -24,7 +24,7 @@ Status dipakai dengan arti:
 | Support | PARSIAL | TT review sudah bisa create, close, kelola SLA dasar, tambah isolir aktif, restorasi isolir, dan dismantle history |
 | Billing | PARSIAL | Collection action dan payment entry sudah bisa create, invoice lifecycle penuh belum |
 | Inventory | PARSIAL | Review section operasional dan item master awal sudah bisa create |
-| HR | BELUM | Masih shell + summary |
+| HR | PARSIAL | Review section operasional dan employee master awal sudah bisa create |
 | Settings access | PARSIAL | Matrix akses ada, permission master dinamis belum |
 | Settings users | SUDAH | List, create, edit, reset password, deactivate/reactivate, dan audit perubahan user sudah ada |
 | Mobile readiness | PARSIAL | Shell adaptif, mode detail mobile belum merata |
@@ -44,8 +44,8 @@ Status dipakai dengan arti:
 | Sales shell: lead, coverage, survey, order | PARSIAL | Lead review, coverage create, survey create, sales order create, work order create, aktivasi subscription, dan review coverage/survey/order/work order/subscription sudah ada | Workflow corporate lanjut, quotation/contract, dan otomasi pasca-aktivasi belum hidup | Sangat Tinggi |
 | Customer shell: master, address, subscription, histori | PARSIAL | Create customer + primary address sudah ada | Subscription lifecycle dan histori layanan belum lengkap | Tinggi |
 | Support shell: TT, isolir, dismantle, SLA | PARSIAL | TT open review sudah ada, create TT, close ticket, kelola SLA dasar, tambah isolir aktif, restorasi isolir, dan dismantle flow dasar sudah ada | SLA penuh dan otomasi workflow support lanjutan belum ada | Sangat Tinggi |
-| Inventory shell: item, stock movement, ODP, device assignment | PARSIAL | Review item inventory, review stock movement, dan create item master awal sudah ada | ODP, stock movement write action, dan device assignment belum hidup | Tinggi |
-| HR shell: employee, attendance, salary, loan | BELUM | Baru shell domain dan summary | Review section dan write action belum ada | Tinggi |
+| Inventory shell: item, stock movement, ODP, device assignment | PARSIAL | Review item inventory, review stock movement, create item master awal, dan stock movement create sudah ada | ODP dan device assignment belum hidup | Tinggi |
+| HR shell: employee, attendance, salary, loan | PARSIAL | Review employee, attendance, loan, dan create employee master awal sudah ada | Attendance write action, payroll, dan loan write action belum hidup | Tinggi |
 | Billing shell: invoice, payment, collection, overdue | PARSIAL | Collection action, payment entry, review invoice, dan review payment terbaru sudah ada | Lifecycle invoice penuh dan otomasi billing lanjutan belum lengkap | Sangat Tinggi |
 | Settings access dan permission | PARSIAL | Permission matrix dan access summary sudah ada | Permission master dinamis dan audit perubahan belum ada | Tinggi |
 | Settings users internal | SUDAH | Direktori user, create user, edit profil, reset password, deactivate/reactivate, dan panel audit perubahan sudah ada | Audit masih terfokus pada user internal, belum lintas seluruh modul write action | Tinggi |

@@ -453,6 +453,66 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
       { title: 'Payroll Dasar', detail: 'Slip gaji dan loan diposisikan sebagai core, bukan add-on terpisah.' },
       { title: 'Shared Access', detail: 'Data HR tetap masuk satu website, tetapi permission dibatasi secara tegas.' },
     ],
+    reviewSections: [
+      {
+        title: 'Employee Terbaru',
+        description: 'Sampel employee terbaru untuk memulai fondasi absensi, payroll, dan kontrol HR.',
+        rows: [
+          {
+            id: 'EMP-401',
+            primary: 'EMP-202607-0001',
+            secondary: 'Arif Nugroho',
+            status: 'KARYAWAN',
+            detail: 'Teknisi Lapangan pada divisi Support dan cabang Pati.',
+            meta: ['Join: 01 Jul 2026', 'Phone: 081234567890', 'Division: Support', 'Branch: Pati'],
+          },
+          {
+            id: 'EMP-400',
+            primary: 'EMP-202607-0002',
+            secondary: 'Nabila Putri',
+            status: 'KONTRAK',
+            detail: 'Admin Billing pada divisi Finance dan cabang Pati.',
+            meta: ['Join: 15 Jun 2026', 'Phone: 081255577799', 'Division: Finance', 'Branch: Pati'],
+          },
+        ],
+      },
+      {
+        title: 'Attendance Hari Ini',
+        description: 'Sampel attendance terbaru untuk memastikan kehadiran employee mulai terlihat di domain HR.',
+        rows: [
+          {
+            id: 'ATT-91',
+            primary: 'Arif Nugroho',
+            secondary: 'PRESENT',
+            status: 'PRESENT',
+            detail: 'Check-in 07 Jul 2026 08:03 dengan overtime 1.50 jam.',
+            meta: ['Check In: 07 Jul 2026 08:03', 'Overtime: 1.50 jam'],
+          },
+          {
+            id: 'ATT-90',
+            primary: 'Nabila Putri',
+            secondary: 'PRESENT',
+            status: 'PRESENT',
+            detail: 'Check-in 07 Jul 2026 08:11 dengan overtime 0.00 jam.',
+            meta: ['Check In: 07 Jul 2026 08:11', 'Overtime: 0.00 jam'],
+          },
+        ],
+      },
+      {
+        title: 'Loan Aktif',
+        description: 'Sampel kasbon aktif untuk menjaga histori loan tetap terlihat dari domain HR.',
+        rows: [
+          {
+            id: 'LOAN-12',
+            primary: 'Arif Nugroho',
+            secondary: 'KASBON',
+            status: 'ACTIVE',
+            detail: 'Pinjaman Rp1.500.000 dengan cicilan Rp250.000 per bulan.',
+            meta: ['Loan Type: KASBON', 'Amount: Rp1.500.000', 'Installment: Rp250.000'],
+          },
+        ],
+      },
+    ],
   },
   billing: {
     key: 'billing',

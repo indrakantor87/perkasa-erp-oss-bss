@@ -10,6 +10,24 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.52.0] - 2026-07-07
+
+### Added
+
+- komponen `apps/web/components/inventory-stock-movement-form.tsx` dan route `POST /api/inventory/stock-movements` untuk mencatat histori pergerakan stok dari item inventory yang sudah ada
+- komponen `apps/web/components/hr-employee-create-form.tsx` dan route `POST /api/hr/employees` untuk membuat employee master awal pada domain `hr`
+
+### Changed
+
+- `apps/web/components/domain-shell.tsx` sekarang menampilkan dua write action pada domain `inventory` dan satu write action awal pada domain `hr`
+- `apps/web/lib/services/domain-service.ts` sekarang memuat review section HR (`Employee Terbaru`, `Attendance Hari Ini`, `Loan Aktif`) dan memperkaya inventory dengan movement terbaru yang berasal dari review DB
+- `apps/web/lib/mock-domains.ts`, `apps/web/tests/mock-data.test.ts`, `apps/web/README.md`, dan `docs/prd-web-checklist.md` diperbarui agar milestone inventory movement dan HR awal tercermin pada fallback mock, pengujian, dan dokumentasi
+
+### Notes
+
+- versi `0.52.0` membuka fondasi write action awal untuk domain HR dan melengkapi inventory agar item master bisa langsung mempunyai histori movement
+- flow baru tetap defensif: movement OUT menolak stok minus, employee code dibuat otomatis, dan cabang/divisi HR hanya ditautkan jika kode master valid
+
 ## [0.51.0] - 2026-07-07
 
 ### Added

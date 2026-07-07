@@ -209,6 +209,35 @@ type ReviewDbInventoryMovementRow = {
   notes: string | null
 }
 
+type ReviewDbHrEmployeeRow = {
+  employeeId: number
+  employeeCode: string
+  fullName: string
+  positionName: string | null
+  employmentStatus: string
+  joinDate: string | Date | null
+  phone: string | null
+  divisionName: string | null
+  branchName: string | null
+}
+
+type ReviewDbHrAttendanceRow = {
+  attendanceId: number
+  employeeName: string
+  status: string
+  checkIn: string | Date | null
+  overtimeHours: number
+}
+
+type ReviewDbHrLoanRow = {
+  loanId: number
+  employeeName: string
+  loanType: string
+  amount: number
+  monthlyInstallment: number
+  status: string
+}
+
 function buildCapabilities(role: AppRole, domain: DomainKey): DomainCapability[] {
   const content = domainPages[domain]
 
@@ -927,6 +956,110 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
   ].filter((section) => section.rows.length > 0)
 }
 
+async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
+  const employees = await runReviewDbQuery<ReviewDbHrEmployeeRow>(`
+    SELECT
+      he.id AS employeeId,
+      he.employee_code AS employeeCode,
+      he.full_name AS fullName,
+      he.position_name AS positionName,
+      he.employment_status AS employmentStatus,
+      he.join_date AS joinDate,
+      he.phone,
+      od.name AS divisionName,
+      ob.name AS branchName
+    FROM hr_employees he
+    LEFT JOIN org_divisions od
+      ON od.id = he.division_id
+    LEFT JOIN org_branches ob
+      ON ob.id = he.branch_id
+    ORDER BY COALESCE(he.join_date, DATE(he.created_at)) DESC, he.id DESC
+    LIMIT 5
+  `)
+
+  const attendances = await runReviewDbQuery<ReviewDbHrAttendanceRow>(`
+    SELECT
+      ha.id AS attendanceId,
+      he.full_name AS employeeName,
+      ha.status,
+      ha.check_in AS checkIn,
+      ha.overtime_hours AS overtimeHours
+    FROM hr_attendance ha
+    JOIN hr_employees he
+      ON he.id = ha.employee_id
+    WHERE ha.attendance_date = CURRENT_DATE
+    ORDER BY COALESCE(ha.check_in, ha.created_at) DESC, ha.id DESC
+    LIMIT 5
+  `)
+
+  const loans = await runReviewDbQuery<ReviewDbHrLoanRow>(`
+    SELECT
+      hl.id AS loanId,
+      he.full_name AS employeeName,
+      hl.loan_type AS loanType,
+      hl.amount,
+      hl.monthly_installment AS monthlyInstallment,
+      hl.status
+    FROM hr_loans hl
+    JOIN hr_employees he
+      ON he.id = hl.employee_id
+    WHERE hl.status IN ('PENDING', 'ACTIVE')
+    ORDER BY hl.loan_date DESC, hl.id DESC
+    LIMIT 5
+  `)
+
+  return [
+    {
+      title: 'Employee Terbaru',
+      description: 'Employee master terbaru dari review DB untuk memulai fondasi absensi, payroll, dan kontrol HR.',
+      rows: employees.map((item) => ({
+        id: `EMP-${item.employeeId}`,
+        primary: item.employeeCode,
+        secondary: item.fullName,
+        status: item.employmentStatus,
+        detail: `${item.positionName || 'Jabatan belum diisi'} pada divisi ${item.divisionName || '-'} dan cabang ${item.branchName || '-'}.`,
+        meta: [
+          `Join: ${formatDateTime(item.joinDate)}`,
+          `Phone: ${item.phone || '-'}`,
+          `Division: ${item.divisionName || '-'}`,
+          `Branch: ${item.branchName || '-'}`,
+        ],
+      })),
+    },
+    {
+      title: 'Attendance Hari Ini',
+      description: 'Kehadiran terbaru hari ini dari review DB untuk memastikan employee yang aktif mulai tercatat di HR.',
+      rows: attendances.map((item) => ({
+        id: `ATT-${item.attendanceId}`,
+        primary: item.employeeName,
+        secondary: item.status,
+        status: item.status,
+        detail: `Check-in ${formatDateTime(item.checkIn)} dengan overtime ${item.overtimeHours.toFixed(2)} jam.`,
+        meta: [
+          `Check In: ${formatDateTime(item.checkIn)}`,
+          `Overtime: ${item.overtimeHours.toFixed(2)} jam`,
+        ],
+      })),
+    },
+    {
+      title: 'Loan Aktif',
+      description: 'Kasbon atau pinjaman aktif terbaru dari review DB untuk menjaga histori HR tetap terlihat dari domain yang sama.',
+      rows: loans.map((item) => ({
+        id: `LOAN-${item.loanId}`,
+        primary: item.employeeName,
+        secondary: item.loanType,
+        status: item.status,
+        detail: `Pinjaman ${formatCurrency(item.amount)} dengan cicilan ${formatCurrency(item.monthlyInstallment)} per bulan.`,
+        meta: [
+          `Loan Type: ${item.loanType}`,
+          `Amount: ${formatCurrency(item.amount)}`,
+          `Installment: ${formatCurrency(item.monthlyInstallment)}`,
+        ],
+      })),
+    },
+  ].filter((section) => section.rows.length > 0)
+}
+
 function applyReviewDbSummaries(content: DomainPageContent, stats: DomainStatsRow): DomainPageContent {
   switch (content.key) {
     case 'sales':
@@ -1043,6 +1176,17 @@ function applyReviewDbInventorySections(content: DomainPageContent, reviewSectio
   }
 }
 
+function applyReviewDbHrSections(content: DomainPageContent, reviewSections: DomainReviewSection[]) {
+  if (content.key !== 'hr' || reviewSections.length === 0) {
+    return content
+  }
+
+  return {
+    ...content,
+    reviewSections,
+  }
+}
+
 export async function getDomainPageData(domain: DomainKey, role: AppRole) {
   const source = getDataSourceSnapshot()
   const content = domainPages[domain]
@@ -1066,21 +1210,25 @@ export async function getDomainPageData(domain: DomainKey, role: AppRole) {
     const customerSections = domain === 'customers' ? await getReviewDbCustomerSections() : []
     const billingSections = domain === 'billing' ? await getReviewDbBillingSections() : []
     const inventorySections = domain === 'inventory' ? await getReviewDbInventorySections() : []
+    const hrSections = domain === 'hr' ? await getReviewDbHrSections() : []
 
     return {
       source,
-      content: applyReviewDbInventorySections(
-        applyReviewDbSalesSections(
-          applyReviewDbBillingSections(
-            applyReviewDbCustomerSections(
-              applyReviewDbSupportSections(applyReviewDbSummaries(content, stats), supportSections),
-              customerSections,
+      content: applyReviewDbHrSections(
+        applyReviewDbInventorySections(
+          applyReviewDbSalesSections(
+            applyReviewDbBillingSections(
+              applyReviewDbCustomerSections(
+                applyReviewDbSupportSections(applyReviewDbSummaries(content, stats), supportSections),
+                customerSections,
+              ),
+              billingSections,
             ),
-            billingSections,
+            salesSections,
           ),
-          salesSections,
+          inventorySections,
         ),
-        inventorySections,
+        hrSections,
       ),
       capabilities: buildCapabilities(role, domain),
     }
