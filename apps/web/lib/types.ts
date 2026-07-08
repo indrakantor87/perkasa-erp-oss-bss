@@ -70,6 +70,25 @@ export type DashboardMetric = {
   note: string
 }
 
+export type DashboardQueueItem = {
+  title: string
+  href: string
+  count: string
+  description: string
+  accent: string
+}
+
+export type DashboardWorkItem = {
+  id: string
+  domain: string
+  title: string
+  subtitle: string
+  status: string
+  priority: 'tinggi' | 'sedang' | 'rendah'
+  detail: string
+  href: string
+}
+
 export type ModuleCard = {
   title: string
   href: string

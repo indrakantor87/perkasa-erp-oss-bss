@@ -10,6 +10,25 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.63.0] - 2026-07-08
+
+### Added
+
+- panel queue per role pada dashboard melalui [role-queue-grid.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/role-queue-grid.tsx) agar setiap role baru langsung melihat prioritas kerja utamanya
+- panel list kerja terpadu melalui [worklist-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/worklist-board.tsx) sebagai baseline pengalaman `list` lintas domain
+- metadata item queue dan worklist baru di [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+
+### Changed
+
+- [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts) sekarang menghasilkan `roleQueues` dan `worklist` berdasarkan role aktif, memakai review DB bila tersedia atau fallback mock bila belum ada data
+- [mock-dashboard.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/mock-dashboard.ts) diperluas dengan template queue dan baseline worklist per role target
+- [dashboard page](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx) kini menampilkan perspektif role aktif, queue prioritas, dan list kerja terpadu
+- [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts) diperbarui untuk memverifikasi data dashboard role-aware
+
+### Notes
+
+- versi `0.63.0` menandai pergeseran dashboard dari shell generik ke shell yang mulai role-aware, terutama untuk parity `CS`, `MARKETING`, `NOC`, `TEKNISI`, dan `DISMANTLE`
+
 ## [0.62.9] - 2026-07-08
 
 ### Changed
