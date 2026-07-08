@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Bell, Search } from 'lucide-react'
 import { findNavigationItem } from '@/lib/navigation'
 import type { AppSession } from '@/lib/auth-session'
+import { getRoleMeta } from '@/lib/role-meta'
 
 type TopbarProps = {
   pathname: string
@@ -19,6 +20,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
   const activeItem = findNavigationItem(pathname)
   const canReviewImport =
     session ? allowedPrefixes.some((prefix) => matchesPrefix('/import', prefix)) : false
+  const roleMeta = session ? getRoleMeta(session.role) : null
 
   return (
     <header className="flex flex-col gap-4 border-b border-line pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -53,7 +55,8 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-900">{session.displayName}</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-mute">{session.role}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-mute">{roleMeta?.label}</p>
+                <p className="mt-1 truncate text-xs text-slate-500">{roleMeta?.scope}</p>
               </div>
             </div>
           ) : null}

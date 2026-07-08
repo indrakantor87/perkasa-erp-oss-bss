@@ -9,7 +9,7 @@ export default async function AppLayout({
   children: ReactNode
 }>) {
   const session = await getSession()
-  const allowedPrefixes = getAllowedPrefixes(session?.role ?? 'OPERATOR')
+  const allowedPrefixes = getAllowedPrefixes(session?.role ?? 'TT_OPERATOR')
   return (
     <AppShell session={session} allowedPrefixes={allowedPrefixes}>
       {children}

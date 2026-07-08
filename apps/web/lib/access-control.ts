@@ -23,8 +23,14 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
     '/settings/access',
     '/settings/users',
   ],
-  ADMIN_DIVISI: ['/dashboard', '/import', '/sales', '/customers', '/support', '/inventory', '/billing'],
-  OPERATOR: ['/dashboard', '/customers', '/support'],
+  SALES_MARKETING: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
+  CS_OPERATOR: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
+  CS_ADMIN: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
+  NOC_OPERATOR: ['/dashboard', '/support', '/inventory'],
+  FIELD_TECHNICIAN: ['/dashboard', '/support', '/inventory'],
+  TT_OPERATOR: ['/dashboard', '/support'],
+  DIGITAL_CREATOR: ['/dashboard', '/sales'],
+  DISMANTLE_OPERATOR: ['/dashboard', '/support'],
 }
 
 const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
@@ -40,19 +46,48 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
     { resource: 'access_settings', label: 'Akses & Permission', actions: ['view', 'manage'] },
     { resource: 'user_settings', label: 'Manajemen User Internal', actions: ['view', 'manage'] },
   ],
-  ADMIN_DIVISI: [
-    { resource: 'dashboard', label: 'Dashboard Divisi', actions: ['view', 'export'] },
-    { resource: 'import_center', label: 'Import Center', actions: ['view', 'create', 'approve'] },
-    { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update', 'approve'] },
-    { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'create', 'update', 'export'] },
-    { resource: 'support', label: 'Support', actions: ['view', 'create', 'update', 'approve', 'export'] },
-    { resource: 'inventory', label: 'Inventory', actions: ['view', 'create', 'update', 'export'] },
-    { resource: 'billing', label: 'Billing', actions: ['view', 'create', 'update', 'export'] },
+  SALES_MARKETING: [
+    { resource: 'dashboard', label: 'Dashboard Marketing', actions: ['view'] },
+    { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update', 'export'] },
+    { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'create', 'update'] },
+    { resource: 'support', label: 'Support', actions: ['view'] },
+    { resource: 'inventory', label: 'Inventory', actions: ['view'] },
   ],
-  OPERATOR: [
-    { resource: 'dashboard', label: 'Dashboard Operasional', actions: ['view'] },
+  CS_OPERATOR: [
+    { resource: 'dashboard', label: 'Dashboard CS', actions: ['view'] },
+    { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update'] },
     { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'update'] },
     { resource: 'support', label: 'Support', actions: ['view', 'create', 'update'] },
+    { resource: 'inventory', label: 'Inventory', actions: ['view', 'update'] },
+  ],
+  CS_ADMIN: [
+    { resource: 'dashboard', label: 'Dashboard Admin CS', actions: ['view', 'export'] },
+    { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'support', label: 'Support', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'inventory', label: 'Inventory', actions: ['view', 'update', 'approve', 'export'] },
+  ],
+  NOC_OPERATOR: [
+    { resource: 'dashboard', label: 'Dashboard NOC', actions: ['view'] },
+    { resource: 'support', label: 'Support', actions: ['view', 'create', 'update', 'export'] },
+    { resource: 'inventory', label: 'Inventory', actions: ['view', 'update', 'export'] },
+  ],
+  FIELD_TECHNICIAN: [
+    { resource: 'dashboard', label: 'Dashboard Teknisi', actions: ['view'] },
+    { resource: 'support', label: 'Support', actions: ['view', 'update'] },
+    { resource: 'inventory', label: 'Inventory', actions: ['view', 'update'] },
+  ],
+  TT_OPERATOR: [
+    { resource: 'dashboard', label: 'Dashboard Trouble Ticket', actions: ['view'] },
+    { resource: 'support', label: 'Support', actions: ['view', 'create', 'update'] },
+  ],
+  DIGITAL_CREATOR: [
+    { resource: 'dashboard', label: 'Dashboard Creator Digital', actions: ['view'] },
+    { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update', 'export'] },
+  ],
+  DISMANTLE_OPERATOR: [
+    { resource: 'dashboard', label: 'Dashboard Dismantle', actions: ['view'] },
+    { resource: 'support', label: 'Support', actions: ['view', 'update'] },
   ],
 }
 

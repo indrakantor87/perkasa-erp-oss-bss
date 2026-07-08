@@ -36,6 +36,14 @@ Target sistem:
 - `docs/prd-web-checklist.md`
 - `docs/import-file-format.md`
 - `docs/versioning.md`
+- `docs/web-psb-integration-week-1.md`
+- `docs/web-psb-field-matrix-week-1.md`
+- `docs/web-psb-parity-matrix.md`
+- `docs/web-psb-role-action-parity.md`
+- `docs/web-psb-target-role-design.md`
+- `docs/web-psb-flow-checklist.md`
+- `docs/web-psb-target-permission-matrix.md`
+- `docs/web-psb-module-gap-plan.md`
 - `VERSION`
 - `CHANGELOG.md`
 - `database/xampp_review_schema.sql`
@@ -78,6 +86,7 @@ Target sistem:
 11. bootstrap aplikasi web baru
 12. hubungkan shell web ke auth, Prisma, dan API domain nyata
 13. seed `auth_users` review agar login internal bisa diuji tanpa fallback mock
+14. jalankan playbook integrasi 1 minggu yang non-intrusive terhadap `web-psb-perkasa`
 
 ## Versioning
 

@@ -38,13 +38,13 @@ export const mockAuthUsers: MockAuthUser[] = [
     username: 'cs.review',
     password: 'CsReview123!',
     displayName: 'Admin CS Review',
-    role: 'ADMIN_DIVISI',
+    role: 'CS_ADMIN',
   },
   {
     username: 'support.ops',
     password: 'SupportOps123!',
-    displayName: 'Operator Support',
-    role: 'OPERATOR',
+    displayName: 'Operator NOC Support',
+    role: 'NOC_OPERATOR',
   },
 ]
 
@@ -59,8 +59,17 @@ function signPayload(payload: string) {
 function mapReviewRoleToAppRole(roleCode: string): AppRole {
   const normalized = roleCode.trim().toUpperCase()
   if (normalized === 'SUPER_ADMIN') return 'SUPER_ADMIN'
-  if (['OPERATOR', 'SUPPORT_OPS', 'SUPPORT_OPERATOR'].includes(normalized)) return 'OPERATOR'
-  return 'ADMIN_DIVISI'
+  if (normalized === 'ADMIN') return 'SUPER_ADMIN'
+  if (normalized === 'MARKETING') return 'SALES_MARKETING'
+  if (normalized === 'CS') return 'CS_OPERATOR'
+  if (normalized === 'ADMIN_CS') return 'CS_ADMIN'
+  if (normalized === 'NOC') return 'NOC_OPERATOR'
+  if (normalized === 'TEKNISI') return 'FIELD_TECHNICIAN'
+  if (normalized === 'TROUBLESHOOTS') return 'TT_OPERATOR'
+  if (normalized === 'CREATOR_DIGITAL') return 'DIGITAL_CREATOR'
+  if (normalized === 'DISMANTLE') return 'DISMANTLE_OPERATOR'
+  if (['OPERATOR', 'SUPPORT_OPS', 'SUPPORT_OPERATOR'].includes(normalized)) return 'NOC_OPERATOR'
+  return 'CS_ADMIN'
 }
 
 function comparePassword(candidate: string, storedHash: string) {

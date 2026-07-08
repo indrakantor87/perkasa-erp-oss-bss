@@ -6,6 +6,7 @@ import { AuthUserManagementTable } from '@/components/auth-user-management-table
 import { DataSourceStatus } from '@/components/data-source-status'
 import { canAccessPath, canPerformAction } from '@/lib/access-control'
 import { requireSession } from '@/lib/auth'
+import { getRoleMeta } from '@/lib/role-meta'
 import { getAuthUsersPageData } from '@/lib/services/auth-user-service'
 
 export default async function UserSettingsPage() {
@@ -17,6 +18,7 @@ export default async function UserSettingsPage() {
   const { source, users, summary, auditItems, roleOptions, divisionOptions, branchOptions } =
     await getAuthUsersPageData()
   const canManage = canPerformAction(session.role, 'user_settings', 'manage')
+  const roleMeta = getRoleMeta(session.role)
 
   return (
     <div className="space-y-6">
@@ -37,7 +39,7 @@ export default async function UserSettingsPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <span className="badge border-transparent bg-slate-950 text-white">{session.role}</span>
+            <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.label}</span>
             <Link
               href="/settings/access"
               className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700"
@@ -117,4 +119,3 @@ export default async function UserSettingsPage() {
     </div>
   )
 }
-

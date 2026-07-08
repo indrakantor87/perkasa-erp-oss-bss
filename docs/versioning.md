@@ -116,5 +116,5 @@ Setiap kali ada perubahan berarti:
 
 ## Baseline Saat Ini
 
-- versi aktif: `0.11.0`
-- status: blueprint, roadmap, data mapping, ERD phase 1, schema gap review, patch schema phase 1.1, staging import review, master mapping, core master seed, seed awal mapping, sample import lintas tiga source legacy, transform tahap 1 untuk inventory serta HR, transform tahap 2 untuk customer sampai subscription, transform tahap 3 untuk work order serta support, dan transform tahap 4 untuk billing
+- versi aktif: `0.62.9`
+- status: fondasi review database, transform tahap 1-4, bootstrap web utama, write-side domain utama, penguatan RBAC server, playbook integrasi 1 minggu non-intrusive, matriks field operasional minggu pertama, keputusan formal bahwa `web-psb-perkasa` menjadi baseline bisnis-operasional, target end-state satu web di ERP dengan cutover bertahap, requirement parity penuh sebelum web lama bisa ditinggalkan, baseline matriks parity role-menu-aksi-flow-logic, detail parity operasional per role-menu-aksi, desain role ERP target, checklist flow parity per role, permission matrix target, gap implementasi per modul, dan baseline implementasi kode untuk 9 role ERP target

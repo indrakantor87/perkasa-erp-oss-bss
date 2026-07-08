@@ -1,6 +1,6 @@
 import 'server-only'
 
-import type { AccessAction, AppRole, PermissionMatrixEntry } from '@/lib/types'
+import { isAppRole, type AccessAction, type AppRole, type PermissionMatrixEntry } from '@/lib/types'
 import {
   buildResourceActionPermissionCode,
   buildRoutePrefixPermissionCode,
@@ -52,7 +52,7 @@ async function loadAccessControlFromDb() {
   const nextSets: Partial<Record<AppRole, Set<string>>> = {}
   for (const row of rows) {
     const roleCode = String(row.roleCode || '').trim().toUpperCase()
-    if (roleCode !== 'SUPER_ADMIN' && roleCode !== 'ADMIN_DIVISI' && roleCode !== 'OPERATOR') {
+    if (!isAppRole(roleCode)) {
       continue
     }
     const permissionCode = String(row.permissionCode || '').trim()
@@ -60,10 +60,9 @@ async function loadAccessControlFromDb() {
       continue
     }
 
-    const role = roleCode as AppRole
-    const set = nextSets[role] ?? new Set<string>()
+    const set = nextSets[roleCode] ?? new Set<string>()
     set.add(permissionCode)
-    nextSets[role] = set
+    nextSets[roleCode] = set
   }
 
   dbPermissionSets = nextSets

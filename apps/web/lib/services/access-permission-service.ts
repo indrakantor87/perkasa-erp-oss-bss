@@ -150,8 +150,14 @@ export async function setRolePermissionCodes(params: {
 function buildBaselinePermissionSeeds() {
   const roles: { code: AppRole; name: string }[] = [
     { code: 'SUPER_ADMIN', name: 'Super Admin' },
-    { code: 'ADMIN_DIVISI', name: 'Admin Divisi' },
-    { code: 'OPERATOR', name: 'Operator' },
+    { code: 'SALES_MARKETING', name: 'Sales Marketing' },
+    { code: 'CS_OPERATOR', name: 'CS Operator' },
+    { code: 'CS_ADMIN', name: 'CS Admin' },
+    { code: 'NOC_OPERATOR', name: 'NOC Operator' },
+    { code: 'FIELD_TECHNICIAN', name: 'Field Technician' },
+    { code: 'TT_OPERATOR', name: 'Trouble Ticket Operator' },
+    { code: 'DIGITAL_CREATOR', name: 'Digital Creator' },
+    { code: 'DISMANTLE_OPERATOR', name: 'Dismantle Operator' },
   ]
 
   const permissionSet = new Map<string, string>()
@@ -241,11 +247,14 @@ export async function bootstrapAccessPermissions(actor: string) {
       )
     }
 
-    const roleRows = await runReviewDbQuery<{ id: number; code: string }>(`
-      SELECT id, code
-      FROM auth_roles
-      WHERE code IN ('SUPER_ADMIN','ADMIN_DIVISI','OPERATOR')
-    `)
+    const roleRows = await runReviewDbQuery<{ id: number; code: string }>(
+      `
+        SELECT id, code
+        FROM auth_roles
+        WHERE code IN (${seeds.roles.map(() => '?').join(',')})
+      `,
+      seeds.roles.map((role) => role.code)
+    )
 
     const permissionRows = await runReviewDbQuery<{ id: number; code: string }>(`
       SELECT id, code

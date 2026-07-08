@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { AppSession } from '@/lib/auth-session'
 import { navigationItems } from '@/lib/navigation'
+import { getRoleMeta } from '@/lib/role-meta'
 
 function matchesPrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -17,6 +18,7 @@ export function Sidebar({
   allowedPrefixes: string[]
 }) {
   const pathname = usePathname()
+  const roleMeta = session ? getRoleMeta(session.role) : null
   const items = navigationItems.filter((item) =>
     allowedPrefixes.some((prefix) => matchesPrefix(item.href, prefix))
   )
@@ -67,12 +69,19 @@ export function Sidebar({
 
         <div className="mt-auto rounded-2xl border border-slate-800 bg-slate-900 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Review DB
+            {session ? 'Role Aktif' : 'Review DB'}
           </p>
-          <p className="mt-3 text-sm leading-6 text-slate-300">
-            Bootstrap ini disiapkan untuk membaca schema review MySQL XAMPP terlebih dulu, lalu
-            dipindah ke production setelah struktur valid.
-          </p>
+          {session && roleMeta ? (
+            <div className="mt-3 space-y-3">
+              <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.label}</span>
+              <p className="text-sm leading-6 text-slate-300">{roleMeta.scope}</p>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Bootstrap ini disiapkan untuk membaca schema review MySQL XAMPP terlebih dulu, lalu
+              dipindah ke production setelah struktur valid.
+            </p>
+          )}
         </div>
       </aside>
 

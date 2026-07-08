@@ -65,6 +65,30 @@
 - `versioning.md`  
   Aturan versioning, changelog, dan pola release project.
 
+- `web-psb-integration-week-1.md`  
+  Playbook integrasi 1 minggu untuk menarik domain aman dari `web-psb-perkasa` ke ERP tanpa mengganggu sistem lama.
+
+- `web-psb-field-matrix-week-1.md`  
+  Matriks field-by-field untuk `Ticket`, `Isolation`, `TroubleTicket`, dan `ODP` sebagai dasar staging, validasi, dan rekonsiliasi minggu pertama.
+
+- `web-psb-parity-matrix.md`  
+  Matriks parity role, menu, aksi, flow, dan logic antara `web-psb-perkasa` dan ERP baru sebagai syarat sebelum cutover penuh.
+
+- `web-psb-role-action-parity.md`  
+  Matriks detail parity per role, menu, dan aksi untuk mengukur kesiapan operasional ERP baru menggantikan web lama.
+
+- `web-psb-target-role-design.md`  
+  Desain role ERP target untuk menggantikan role generik bootstrap dan menyamai struktur kerja operasional `web-psb-perkasa`.
+
+- `web-psb-flow-checklist.md`  
+  Checklist flow parity per role untuk validasi go/no-go cutover dari web lama ke ERP baru.
+
+- `web-psb-target-permission-matrix.md`  
+  Permission matrix target untuk role ERP baru sebagai dasar perubahan akses, guard, dan menu ERP.
+
+- `web-psb-module-gap-plan.md`  
+  Gap implementasi per modul untuk menentukan prioritas pengerjaan parity setelah role dan permission matrix target dikunci.
+
 ## Dokumen Aplikasi Web
 
 - `.trae/documents/prd-aplikasi-web-utama.md`  

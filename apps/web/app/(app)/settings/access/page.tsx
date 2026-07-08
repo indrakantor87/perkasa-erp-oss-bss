@@ -5,6 +5,7 @@ import { PermissionMatrix } from '@/components/access/permission-matrix'
 import { canAccessPath, canPerformAction, getPermissionMatrix, getPermissionSummary } from '@/lib/access-control'
 import { requireSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
+import { getRoleMeta } from '@/lib/role-meta'
 
 export default async function AccessSettingsPage() {
   const session = await requireSession()
@@ -17,6 +18,7 @@ export default async function AccessSettingsPage() {
   const source = getDataSourceSnapshot()
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
   const canManage = canPerformAction(session.role, 'access_settings', 'manage')
+  const roleMeta = getRoleMeta(session.role)
 
   return (
     <div className="space-y-6">
@@ -34,7 +36,7 @@ export default async function AccessSettingsPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <span className="badge border-transparent bg-slate-950 text-white">{session.role}</span>
+            <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.label}</span>
             <Link
               href="/dashboard"
               className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700"

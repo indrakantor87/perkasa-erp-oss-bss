@@ -2,6 +2,19 @@
 
 Dokumen ini berfungsi sebagai panduan praktis untuk menyiapkan **MySQL XAMPP** sebagai **review database** untuk proyek `perkasa-erp-oss-bss`, supaya aplikasi web bisa dijalankan dengan data nyata (bukan fallback mock).
 
+## Penting
+
+Pada proyek ini, **XAMPP dipakai untuk MySQL**, bukan untuk menjalankan aplikasi web `Next.js`.
+
+Artinya:
+
+1. start MySQL dari XAMPP
+2. siapkan database review di MySQL XAMPP
+3. jalankan web dari folder `apps/web` memakai `npm run dev`
+4. buka web di browser melalui `http://localhost:3000`
+
+Jadi jangan menaruh project `apps/web` ke `htdocs` dan jangan berharap route `Next.js` dijalankan langsung oleh Apache PHP bawaan XAMPP.
+
 ## Prasyarat
 
 - XAMPP (MySQL berjalan).
@@ -47,6 +60,14 @@ DATABASE_URL=mysql://root:@127.0.0.1:3306/perkasa_review
 REVIEW_DB_CONNECT_TIMEOUT_MS=1500
 ```
 
+Jika database review lokal Anda memakai nama lain, sesuaikan nilainya. Contoh yang juga valid:
+
+```ini
+APP_DATA_MODE=review-db
+DATABASE_URL=mysql://root:@127.0.0.1:3306/erp_isp_review
+REVIEW_DB_CONNECT_TIMEOUT_MS=1500
+```
+
 Jika root punya password:
 
 ```ini
@@ -64,6 +85,35 @@ npm run dev
 ```
 
 Lalu buka `http://localhost:3000`.
+
+## Quick Start Paling Cepat
+
+Jika Anda hanya ingin menampilkan web lokal secepat mungkin:
+
+1. buka XAMPP lalu start `MySQL`
+2. pastikan `apps/web/.env` berisi:
+
+```ini
+APP_DATA_MODE=review-db
+DATABASE_URL=mysql://root:@127.0.0.1:3306/erp_isp_review
+REVIEW_DB_CONNECT_TIMEOUT_MS=1500
+```
+
+3. buka terminal di `d:\trae_projects\perkasa-erp-oss-bss\apps\web`
+4. jalankan:
+
+```bash
+npm install
+npm run dev
+```
+
+5. buka:
+
+```text
+http://localhost:3000
+```
+
+Jika MySQL XAMPP belum siap atau database belum terimport, web tetap bisa terbuka tetapi sebagian halaman bisa fallback atau belum menampilkan data review yang diharapkan.
 
 Checklist verifikasi:
 
@@ -103,4 +153,3 @@ Langkah cek:
 - Buka `/import`
 - Buka salah satu batch sample
 - Jalankan validate / transform untuk memastikan pipeline bekerja di review DB
-

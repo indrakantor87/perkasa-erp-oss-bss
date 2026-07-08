@@ -10,6 +10,147 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.62.9] - 2026-07-08
+
+### Changed
+
+- fondasi role ERP di `apps/web` diperluas dari 3 role bootstrap menjadi 9 role target: `SUPER_ADMIN`, `SALES_MARKETING`, `CS_OPERATOR`, `CS_ADMIN`, `NOC_OPERATOR`, `FIELD_TECHNICIAN`, `TT_OPERATOR`, `DIGITAL_CREATOR`, dan `DISMANTLE_OPERATOR`
+- baseline route prefix dan permission matrix di [access-control.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control.ts) disesuaikan ke role baru agar guard akses dan capability domain mengikuti desain parity terbaru
+- mapping auth di [auth-session.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/auth-session.ts) kini mengenali role legacy dan memetakkannya ke role ERP target baru
+- layanan user dan bootstrap permission di [auth-user-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/auth-user-service.ts) serta [access-permission-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/access-permission-service.ts) diperbarui agar label, seed role, dan baseline permission konsisten dengan model role baru
+- smoke test di [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts) diperbarui untuk memverifikasi fondasi role baru
+
+### Notes
+
+- versi `0.62.9` adalah baseline implementasi kode pertama untuk parity role ERP, sehingga langkah berikutnya bisa fokus ke queue per role, list kerja terpadu, dan flow mikro per modul
+
+## [0.62.8] - 2026-07-08
+
+### Added
+
+- dokumen `docs/web-psb-target-permission-matrix.md` untuk menerjemahkan role ERP target ke permission matrix yang lebih implementatif
+- dokumen `docs/web-psb-module-gap-plan.md` untuk memetakan gap implementasi per modul setelah role dan permission matrix target dikunci
+
+### Changed
+
+- `docs/README.md` dan `README.md` root diperbarui agar dokumen permission matrix target dan gap modul masuk ke indeks resmi project
+- `VERSION` dinaikkan ke `0.62.8`
+
+### Notes
+
+- versi `0.62.8` menandai perpindahan dari desain role dan flow parity ke baseline akses yang lebih siap diimplementasikan, sekaligus menetapkan prioritas modul yang harus dibenahi lebih dulu
+
+## [0.62.7] - 2026-07-08
+
+### Added
+
+- dokumen `docs/web-psb-target-role-design.md` untuk mendefinisikan role ERP target yang memetakan sembilan role operasional `web-psb-perkasa` ke struktur role ERP baru
+- dokumen `docs/web-psb-flow-checklist.md` untuk menilai flow parity per role dengan status go/no-go sebelum cutover
+
+### Changed
+
+- `docs/README.md` dan `README.md` root diperbarui agar artefak desain role target dan checklist flow parity masuk ke indeks resmi project
+- `VERSION` dinaikkan ke `0.62.7`
+
+### Notes
+
+- versi `0.62.7` menandai pergeseran dari parity konseptual ke parity operasional yang bisa diuji per role setelah login review DB lokal berhasil digunakan
+
+## [0.62.6] - 2026-07-08
+
+### Added
+
+- dokumen `docs/web-psb-role-action-parity.md` untuk memetakan parity detail per role, menu, dan aksi antara `web-psb-perkasa` dan ERP baru
+
+### Changed
+
+- `docs/xampp-setup.md` kini menegaskan bahwa XAMPP dipakai untuk MySQL review DB, sedangkan web `Next.js` dijalankan lewat `apps/web` dengan `npm run dev`
+- `docs/README.md` dan `README.md` root diperbarui agar dokumen parity detail masuk ke indeks resmi project
+- `VERSION` dinaikkan ke `0.62.6`
+
+### Notes
+
+- versi `0.62.6` menambahkan baseline parity operasional yang lebih detail dan memperjelas quick start lokal untuk menjalankan web ERP dengan MySQL XAMPP
+
+## [0.62.5] - 2026-07-08
+
+### Added
+
+- dokumen `docs/web-psb-parity-matrix.md` sebagai baseline matriks parity role, menu, aksi, flow, dan logic antara `web-psb-perkasa` dan `perkasa-erp-oss-bss`
+
+### Changed
+
+- `docs/README.md` dan `README.md` root diperbarui agar dokumen matriks parity masuk ke indeks resmi project
+- `VERSION` dinaikkan ke `0.62.5` untuk menandai bahwa kesiapan cutover kini diukur dengan parity operasional, bukan hanya migrasi data
+
+### Notes
+
+- versi `0.62.5` menegaskan bahwa gap terbesar saat ini ada pada role parity, menu parity, action parity, flow parity, dan logic parity; ERP baru belum boleh menggantikan `web-psb-perkasa` sebelum gap tersebut ditutup
+
+## [0.62.4] - 2026-07-08
+
+### Changed
+
+- `docs/web-psb-integration-week-1.md` kini menambahkan syarat parity sebelum cutover penuh: role parity, logic parity, flow parity, checklist parity wajib, dan definisi sukses migrasi dari `web-psb-perkasa` ke ERP baru
+- `VERSION` dinaikkan ke `0.62.4` untuk mengunci requirement bahwa ERP baru harus mampu menjalankan seluruh role, logika, dan alur penting dari web lama sebelum pindah penuh
+
+### Notes
+
+- versi `0.62.4` memastikan arah migrasi tidak sekadar memindahkan data; ERP baru harus benar-benar bisa dipakai oleh seluruh role operasional dengan perilaku yang setara atau lebih baik dari `web-psb-perkasa`
+
+## [0.62.3] - 2026-07-08
+
+### Changed
+
+- `docs/web-psb-integration-week-1.md` kini menegaskan target end-state bahwa web utama nantinya dikonsolidasikan ke `perkasa-erp-oss-bss`, sekaligus menambahkan kriteria cutover dan syarat kapan `web-psb-perkasa` baru boleh dipensiunkan
+- `VERSION` dinaikkan ke `0.62.3` untuk mengunci keputusan transisi end-state secara formal
+
+### Notes
+
+- versi `0.62.3` memperjelas bahwa `web-psb-perkasa` tidak ditinggalkan sekarang; aplikasi itu tetap aktif sampai domain inti lolos mapping, staging, rekonsiliasi, kesiapan UI, hak akses, rollback, dan masa paralel operasional
+
+## [0.62.2] - 2026-07-08
+
+### Changed
+
+- `docs/web-psb-integration-week-1.md` kini menegaskan keputusan arsitektur bahwa `web-psb-perkasa` menjadi baseline bisnis-operasional, sedangkan `perkasa-erp-oss-bss` menjadi baseline integrasi target
+- `VERSION` dinaikkan ke `0.62.2` untuk mengunci keputusan baseline secara formal di artefak project
+
+### Notes
+
+- versi `0.62.2` menghilangkan ambiguitas arah integrasi: web lama tetap menjadi acuan proses harian, sementara ERP berkembang bertahap melalui mapping, staging, audit, dan transform per domain
+
+## [0.62.1] - 2026-07-08
+
+### Added
+
+- dokumen `docs/web-psb-field-matrix-week-1.md` sebagai matriks field-by-field untuk `Ticket`, `Isolation`, `TroubleTicket`, dan `ODP`
+
+### Changed
+
+- `docs/README.md` dan `README.md` root diperbarui agar dokumen matriks field minggu pertama masuk ke indeks resmi project
+- `VERSION` dinaikkan ke `0.62.1` untuk menandai sinkronisasi dokumen operasional setelah baseline playbook `0.62.0`
+
+### Notes
+
+- versi `0.62.1` memperinci playbook integrasi minggu pertama ke level field, rule transform, dan rule review manual agar tim bisa langsung menyiapkan staging, validasi, dan rekonsiliasi tanpa menyentuh sistem lama
+
+## [0.62.0] - 2026-07-08
+
+### Added
+
+- dokumen `docs/web-psb-integration-week-1.md` sebagai playbook integrasi 1 minggu yang memetakan modul `web-psb-perkasa` ke domain ERP dengan pola non-intrusive
+
+### Changed
+
+- `docs/README.md` dan `README.md` root diperbarui agar playbook integrasi 1 minggu masuk ke indeks dokumentasi resmi project
+- `VERSION` dinaikkan ke `0.62.0` sebagai baseline formal untuk paket integrasi minggu pertama
+
+### Notes
+
+- versi `0.62.0` mengunci pendekatan integrasi yang aman: `web-psb-perkasa` tetap menjadi sistem operasional utama, sedangkan ERP bergerak melalui read-only, staging, dan transform batch
+- fokus minggu pertama dibatasi pada domain risiko rendah seperti `ODP`, `Isolation`, dan `Trouble Ticket summary`, serta menahan auth, billing live, dan write-back ke sistem lama
+
 ## [0.61.0] - 2026-07-07
 
 ### Added

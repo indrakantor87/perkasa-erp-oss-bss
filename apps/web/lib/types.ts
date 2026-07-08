@@ -1,4 +1,20 @@
-export type AppRole = 'SUPER_ADMIN' | 'ADMIN_DIVISI' | 'OPERATOR'
+export const APP_ROLES = [
+  'SUPER_ADMIN',
+  'SALES_MARKETING',
+  'CS_OPERATOR',
+  'CS_ADMIN',
+  'NOC_OPERATOR',
+  'FIELD_TECHNICIAN',
+  'TT_OPERATOR',
+  'DIGITAL_CREATOR',
+  'DISMANTLE_OPERATOR',
+] as const
+
+export type AppRole = (typeof APP_ROLES)[number]
+
+export function isAppRole(value: string): value is AppRole {
+  return APP_ROLES.includes(value as AppRole)
+}
 
 export type AccessResource =
   | 'dashboard'

@@ -1,10 +1,5 @@
 import type { AppRole, PermissionMatrixEntry } from '@/lib/types'
-
-const roleTone: Record<AppRole, string> = {
-  SUPER_ADMIN: 'bg-slate-950 text-white',
-  ADMIN_DIVISI: 'bg-blue-600 text-white',
-  OPERATOR: 'bg-emerald-600 text-white',
-}
+import { getRoleMeta } from '@/lib/role-meta'
 
 export function PermissionMatrix({
   role,
@@ -13,6 +8,7 @@ export function PermissionMatrix({
   role: AppRole
   entries: PermissionMatrixEntry[]
 }) {
+  const roleMeta = getRoleMeta(role)
   return (
     <section className="panel overflow-hidden">
       <div className="border-b border-line px-6 py-5">
@@ -23,7 +19,7 @@ export function PermissionMatrix({
               Cakupan izin per role
             </h2>
           </div>
-          <span className={`badge border-transparent ${roleTone[role]}`}>{role}</span>
+          <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.label}</span>
         </div>
       </div>
 

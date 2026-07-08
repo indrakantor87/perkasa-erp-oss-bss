@@ -3,6 +3,7 @@ import { getDefaultLandingPath } from '@/lib/access-control-server'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { mockAuthUsers } from '@/lib/auth-session'
+import { getRoleMeta } from '@/lib/role-meta'
 
 function getLoginErrorMessage(error: string | undefined) {
   switch (error) {
@@ -128,14 +129,20 @@ export default async function LoginPage({
               </p>
               <div className="mt-4 space-y-3">
                 {mockAuthUsers.map((user) => (
+                  (() => {
+                    const roleMeta = getRoleMeta(user.role)
+                    return (
                   <div
                     key={user.username}
                     className="flex flex-col gap-1 rounded-2xl border border-line bg-white px-4 py-3 text-sm text-slate-700"
                   >
                     <span className="font-semibold text-slate-950">{user.displayName}</span>
+                    <span className={`badge w-fit border-transparent ${roleMeta.tone}`}>{roleMeta.label}</span>
                     <span>Username: {user.username}</span>
                     <span>Password: {user.password}</span>
                   </div>
+                    )
+                  })()
                 ))}
               </div>
             </div>
