@@ -2,13 +2,17 @@ import { canPerformAction } from '@/lib/access-control'
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { domainPages } from '@/lib/mock-domains'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { buildSupportLaneSnapshots, getPreferredSupportLane, getSupportLaneSections } from '@/lib/support-lanes'
 import type {
   AccessAction,
   AppRole,
+  DomainPageData,
   DomainCapability,
   DomainKey,
   DomainPageContent,
   DomainReviewSection,
+  DomainSupportFocus,
+  SupportLaneKey,
 } from '@/lib/types'
 
 const capabilityLabels: Record<AccessAction, string> = {
@@ -1612,9 +1616,34 @@ function applyReviewDbHrSections(content: DomainPageContent, reviewSections: Dom
   }
 }
 
-export async function getDomainPageData(domain: DomainKey, role: AppRole) {
+function buildSupportFocus(
+  content: DomainPageContent,
+  role: AppRole,
+  selectedLane: SupportLaneKey | null,
+): DomainSupportFocus | undefined {
+  if (content.key !== 'support') {
+    return undefined
+  }
+
+  const sections = content.reviewSections ?? []
+  const defaultLane = getPreferredSupportLane(role)
+
+  return {
+    defaultLane,
+    selectedLane,
+    lanes: buildSupportLaneSnapshots(role, sections),
+    visibleSections: selectedLane ? getSupportLaneSections(sections, selectedLane) : sections,
+  }
+}
+
+export async function getDomainPageData(
+  domain: DomainKey,
+  role: AppRole,
+  options?: { supportLane?: SupportLaneKey | null },
+): Promise<DomainPageData | null> {
   const source = getDataSourceSnapshot()
   const content = domainPages[domain]
+  const selectedSupportLane = domain === 'support' ? options?.supportLane ?? null : null
 
   if (!content) {
     return null
@@ -1625,6 +1654,7 @@ export async function getDomainPageData(domain: DomainKey, role: AppRole) {
       source,
       content,
       capabilities: buildCapabilities(role, domain),
+      supportFocus: buildSupportFocus(content, role, selectedSupportLane),
     }
   }
 
@@ -1637,31 +1667,35 @@ export async function getDomainPageData(domain: DomainKey, role: AppRole) {
     const inventorySections = domain === 'inventory' ? await getReviewDbInventorySections() : []
     const hrSections = domain === 'hr' ? await getReviewDbHrSections() : []
 
+    const nextContent = applyReviewDbHrSections(
+      applyReviewDbInventorySections(
+        applyReviewDbSalesSections(
+          applyReviewDbBillingSections(
+            applyReviewDbCustomerSections(
+              applyReviewDbSupportSections(applyReviewDbSummaries(content, stats), supportSections),
+              customerSections,
+            ),
+            billingSections,
+          ),
+          salesSections,
+        ),
+        inventorySections,
+      ),
+      hrSections,
+    )
+
     return {
       source,
-      content: applyReviewDbHrSections(
-        applyReviewDbInventorySections(
-          applyReviewDbSalesSections(
-            applyReviewDbBillingSections(
-              applyReviewDbCustomerSections(
-                applyReviewDbSupportSections(applyReviewDbSummaries(content, stats), supportSections),
-                customerSections,
-              ),
-              billingSections,
-            ),
-            salesSections,
-          ),
-          inventorySections,
-        ),
-        hrSections,
-      ),
+      content: nextContent,
       capabilities: buildCapabilities(role, domain),
+      supportFocus: buildSupportFocus(nextContent, role, selectedSupportLane),
     }
   } catch (error) {
     return {
       source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
       content,
       capabilities: buildCapabilities(role, domain),
+      supportFocus: buildSupportFocus(content, role, selectedSupportLane),
     }
   }
 }

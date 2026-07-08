@@ -10,6 +10,26 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.63.3] - 2026-07-08
+
+### Added
+
+- payload `DomainPageData` sekarang mendukung `supportFocus` agar konteks lane support bisa dipakai ulang oleh page server, API, dan wrapper berikutnya
+
+### Changed
+
+- [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts) menambahkan tipe `SupportLaneKey`, `SupportLaneSnapshot`, dan `DomainSupportFocus` sebagai kontrak lane support lintas layer
+- [support-lanes.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/support-lanes.ts) diperluas dengan builder snapshot lane agar service dan UI memakai metadata lane yang sama
+- [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts) sekarang menerima opsi `supportLane` dan menghasilkan `supportFocus` untuk domain `support`
+- [domain API route](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/domains/[domain]/route.ts) membaca query `lane` lalu meneruskannya ke service, sehingga mode fokus support tersedia juga di payload API
+- [domain page](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx) dan [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) kini membaca `supportFocus` dari service sebagai sumber tunggal lane aktif dan section yang terlihat
+- [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts) diperluas untuk memverifikasi default lane, selected lane, dan visible sections pada payload support
+- `VERSION` dinaikkan ke `0.63.3`
+
+### Notes
+
+- versi `0.63.3` mendorong parity support dari fokus UI ke kontrak data/service, sehingga lane `TT`, `isolir`, `dismantle`, dan `SLA` lebih siap dipakai ulang pada API dan mobile wrapper
+
 ## [0.63.2] - 2026-07-08
 
 ### Added

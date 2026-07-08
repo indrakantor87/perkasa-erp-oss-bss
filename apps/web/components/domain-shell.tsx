@@ -30,8 +30,7 @@ import { SupportRoleQueueBoard } from '@/components/support-role-queue-board'
 import { SupportSlaForm } from '@/components/support-sla-form'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { getRoleMeta } from '@/lib/role-meta'
-import { getSupportLaneMeta, getSupportLaneOrder, getSupportLaneSections, type SupportLaneKey } from '@/lib/support-lanes'
-import type { AppRole, DomainCapability, DomainPageContent, DataSourceSnapshot } from '@/lib/types'
+import type { AppRole, DomainCapability, DomainPageContent, DataSourceSnapshot, DomainSupportFocus, SupportLaneKey } from '@/lib/types'
 
 function getSupportLaneFocusCopy(lane: SupportLaneKey) {
   switch (lane) {
@@ -71,13 +70,13 @@ export function DomainShell({
   source,
   capabilities,
   role,
-  selectedSupportLane,
+  supportFocus,
 }: {
   content: DomainPageContent
   source: DataSourceSnapshot
   capabilities: DomainCapability[]
   role: AppRole
-  selectedSupportLane?: SupportLaneKey | null
+  supportFocus?: DomainSupportFocus
 }) {
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
@@ -232,16 +231,15 @@ export function DomainShell({
           .flatMap((section) => section.rows)
           .map((row) => `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`)
       : []
+  const selectedSupportLane = supportFocus?.selectedLane ?? null
+  const selectedSupportLaneMeta =
+    selectedSupportLane ? supportFocus?.lanes.find((lane) => lane.key === selectedSupportLane) ?? null : null
   const supportFocusCopy =
     content.key === 'support' && selectedSupportLane ? getSupportLaneFocusCopy(selectedSupportLane) : null
-  const supportLaneMeta =
-    content.key === 'support' && selectedSupportLane ? getSupportLaneMeta(selectedSupportLane) : null
   const supportRoleMeta =
     content.key === 'support' && selectedSupportLane ? getRoleMeta(role) : null
   const visibleReviewSections =
-    content.key === 'support' && selectedSupportLane
-      ? getSupportLaneSections(content.reviewSections ?? [], selectedSupportLane)
-      : (content.reviewSections ?? [])
+    content.key === 'support' ? supportFocus?.visibleSections ?? (content.reviewSections ?? []) : (content.reviewSections ?? [])
   const supportForms =
     content.key === 'support'
       ? [
@@ -539,7 +537,7 @@ export function DomainShell({
       {content.key === 'support' ? (
         <>
           <SupportRoleQueueBoard role={role} sections={content.reviewSections ?? []} selectedLane={selectedSupportLane} />
-          {supportFocusCopy && supportLaneMeta && supportRoleMeta ? (
+          {supportFocusCopy && selectedSupportLaneMeta && supportRoleMeta ? (
             <section className="panel p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
@@ -550,7 +548,7 @@ export function DomainShell({
                   <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{supportFocusCopy.description}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <span className={`badge ${supportLaneMeta.accent}`}>{supportLaneMeta.shortLabel}</span>
+                  <span className={`badge ${selectedSupportLaneMeta.accent}`}>{selectedSupportLaneMeta.shortLabel}</span>
                   <span className={`badge border-transparent ${supportRoleMeta.tone}`}>{supportRoleMeta.shortLabel}</span>
                 </div>
               </div>
@@ -558,19 +556,18 @@ export function DomainShell({
                 <Link href="/support" className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700">
                   Semua lane
                 </Link>
-                {getSupportLaneOrder(role).map((lane) => {
-                  const laneMeta = getSupportLaneMeta(lane)
+                {(supportFocus?.lanes ?? []).map((lane) => {
                   return (
                     <Link
-                      key={lane}
-                      href={`/support?lane=${lane}`}
+                      key={lane.key}
+                      href={`/support?lane=${lane.key}`}
                       className={`rounded-full px-4 py-2 text-sm font-medium ${
-                        lane === selectedSupportLane
+                        lane.key === selectedSupportLane
                           ? 'bg-slate-950 text-white'
                           : 'border border-line bg-white text-slate-700'
                       }`}
                     >
-                      {laneMeta.shortLabel}
+                      {lane.shortLabel}
                     </Link>
                   )
                 })}

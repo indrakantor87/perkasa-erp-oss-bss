@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server'
 import { canAccessPath } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
+import { normalizeSupportLane } from '@/lib/support-lanes'
 import type { DomainKey } from '@/lib/types'
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ domain: string }> }
 ) {
   const session = await getSession()
@@ -18,7 +19,10 @@ export async function GET(
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   }
 
-  const payload = await getDomainPageData(domain as DomainKey, session.role)
+  const url = new URL(request.url)
+  const payload = await getDomainPageData(domain as DomainKey, session.role, {
+    supportLane: normalizeSupportLane(url.searchParams.get('lane') ?? undefined),
+  })
   if (!payload) {
     return NextResponse.json({ message: 'Domain tidak ditemukan.' }, { status: 404 })
   }

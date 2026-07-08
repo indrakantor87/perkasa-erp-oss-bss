@@ -1,8 +1,6 @@
-import type { AppRole, DomainReviewSection } from '@/lib/types'
+import type { AppRole, DomainReviewSection, SupportLaneKey, SupportLaneSnapshot } from '@/lib/types'
 
-export const SUPPORT_LANE_KEYS = ['tt', 'isolations', 'dismantle', 'sla'] as const
-
-export type SupportLaneKey = (typeof SUPPORT_LANE_KEYS)[number]
+export const SUPPORT_LANE_KEYS: SupportLaneKey[] = ['tt', 'isolations', 'dismantle', 'sla']
 
 type SupportLaneMeta = {
   title: string
@@ -84,4 +82,22 @@ export function getSupportLaneSections(sections: DomainReviewSection[], lane: Su
   return sections.filter((section) =>
     keywords.some((keyword) => section.title.toUpperCase().includes(keyword)),
   )
+}
+
+export function buildSupportLaneSnapshots(
+  role: AppRole,
+  sections: DomainReviewSection[],
+): SupportLaneSnapshot[] {
+  return getSupportLaneOrder(role).map((lane) => {
+    const laneMeta = getSupportLaneMeta(lane)
+    const laneSections = getSupportLaneSections(sections, lane)
+    return {
+      key: lane,
+      title: laneMeta.title,
+      shortLabel: laneMeta.shortLabel,
+      accent: laneMeta.accent,
+      count: laneSections.reduce((total, section) => total + section.rows.length, 0),
+      sectionTitles: laneSections.map((section) => section.title),
+    }
+  })
 }

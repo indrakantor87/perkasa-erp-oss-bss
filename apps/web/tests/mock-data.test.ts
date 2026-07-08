@@ -117,11 +117,21 @@ async function main() {
   assert.equal(supportDomain?.content.reviewSections?.[0]?.rows.length, 3)
   assert.equal(supportDomain?.content.reviewSections?.[2]?.title, 'SLA Trouble Ticket')
   assert.equal(supportDomain?.content.reviewSections?.[3]?.title, 'Histori Dismantle')
+  assert.equal(supportDomain?.supportFocus?.defaultLane, 'tt')
+  assert.equal(supportDomain?.supportFocus?.selectedLane, null)
+  assert.equal((supportDomain?.supportFocus?.visibleSections.length ?? 0) >= 4, true)
   assert.equal(normalizeSupportLane('TT'), 'tt')
   assert.equal(normalizeSupportLane('invalid'), null)
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'tt')[0]?.title, 'Trouble Ticket Open')
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'isolations')[0]?.title, 'Isolir Aktif')
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'dismantle')[0]?.title, 'Histori Dismantle')
+  const focusedSupportDomain = await getDomainPageData('support', 'DISMANTLE_OPERATOR', {
+    supportLane: 'dismantle',
+  })
+  assert.equal(focusedSupportDomain?.supportFocus?.defaultLane, 'dismantle')
+  assert.equal(focusedSupportDomain?.supportFocus?.selectedLane, 'dismantle')
+  assert.equal(focusedSupportDomain?.supportFocus?.visibleSections[0]?.title, 'Histori Dismantle')
+  assert.equal(focusedSupportDomain?.supportFocus?.lanes[0]?.key, 'dismantle')
 
   const salesDomain = await getDomainPageData('sales', 'SALES_MARKETING')
   assert.equal(salesDomain?.content.resource, 'sales')

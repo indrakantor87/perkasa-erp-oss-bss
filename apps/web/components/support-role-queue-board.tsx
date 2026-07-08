@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { getPreferredSupportLane, getSupportLaneMeta, getSupportLaneOrder, getSupportLaneSections, type SupportLaneKey } from '@/lib/support-lanes'
+import { buildSupportLaneSnapshots, getPreferredSupportLane } from '@/lib/support-lanes'
 import { getRoleMeta } from '@/lib/role-meta'
-import type { AppRole, DomainReviewSection } from '@/lib/types'
+import type { AppRole, DomainReviewSection, SupportLaneKey } from '@/lib/types'
 
 type SupportLane = {
   key: SupportLaneKey
@@ -13,6 +13,7 @@ type SupportLane = {
 }
 
 function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): SupportLane[] {
+  const snapshots = buildSupportLaneSnapshots(role, sections)
   const lanes: SupportLane[] = [
     {
       key: 'tt',
@@ -21,9 +22,11 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
         role === 'TT_OPERATOR' || role === 'NOC_OPERATOR'
           ? 'Queue utama untuk ticket teknis yang perlu analisis, tindak lanjut, atau close loop.'
           : 'Ticket terbuka yang perlu dipantau dari perspektif operasional support.',
-      count: getSupportLaneSections(sections, 'tt')[0]?.rows.length ?? 0,
-      accent: getSupportLaneMeta('tt').accent,
-      topItems: (getSupportLaneSections(sections, 'tt')[0]?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
+      count: snapshots.find((item) => item.key === 'tt')?.count ?? 0,
+      accent: snapshots.find((item) => item.key === 'tt')?.accent ?? 'bg-orange-50 text-orange-700',
+      topItems: (sections.find((section) => section.title.toUpperCase().includes('TROUBLE'))?.rows ?? [])
+        .slice(0, 2)
+        .map((row) => `${row.primary} - ${row.secondary}`),
     },
     {
       key: 'isolations',
@@ -32,9 +35,11 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
         role === 'CS_OPERATOR' || role === 'CS_ADMIN'
           ? 'Pelanggan suspend yang perlu tindak lanjut administrasi, ticket, atau transfer proses.'
           : 'Data isolir aktif untuk monitoring dan tindak lanjut lintas tim support.',
-      count: getSupportLaneSections(sections, 'isolations')[0]?.rows.length ?? 0,
-      accent: getSupportLaneMeta('isolations').accent,
-      topItems: (getSupportLaneSections(sections, 'isolations')[0]?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
+      count: snapshots.find((item) => item.key === 'isolations')?.count ?? 0,
+      accent: snapshots.find((item) => item.key === 'isolations')?.accent ?? 'bg-amber-50 text-amber-700',
+      topItems: (sections.find((section) => section.title.toUpperCase().includes('ISOLIR'))?.rows ?? [])
+        .slice(0, 2)
+        .map((row) => `${row.primary} - ${row.secondary}`),
     },
     {
       key: 'dismantle',
@@ -43,9 +48,11 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
         role === 'DISMANTLE_OPERATOR'
           ? 'Jejak pelanggan yang sudah diproses atau siap ditindaklanjuti pada flow dismantle.'
           : 'Histori dan tindak lanjut terminasi agar jejak support tidak hilang.',
-      count: getSupportLaneSections(sections, 'dismantle')[0]?.rows.length ?? 0,
-      accent: getSupportLaneMeta('dismantle').accent,
-      topItems: (getSupportLaneSections(sections, 'dismantle')[0]?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
+      count: snapshots.find((item) => item.key === 'dismantle')?.count ?? 0,
+      accent: snapshots.find((item) => item.key === 'dismantle')?.accent ?? 'bg-rose-50 text-rose-700',
+      topItems: (sections.find((section) => section.title.toUpperCase().includes('DISMANTLE'))?.rows ?? [])
+        .slice(0, 2)
+        .map((row) => `${row.primary} - ${row.secondary}`),
     },
     {
       key: 'sla',
@@ -54,14 +61,15 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
         role === 'FIELD_TECHNICIAN'
           ? 'Ringkasan SLA untuk membantu prioritas pekerjaan yang berpotensi overdue di lapangan.'
           : 'Target durasi penanganan per tipe ticket agar prioritas support tetap terukur.',
-      count: getSupportLaneSections(sections, 'sla')[0]?.rows.length ?? 0,
-      accent: getSupportLaneMeta('sla').accent,
-      topItems: (getSupportLaneSections(sections, 'sla')[0]?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
+      count: snapshots.find((item) => item.key === 'sla')?.count ?? 0,
+      accent: snapshots.find((item) => item.key === 'sla')?.accent ?? 'bg-sky-50 text-sky-700',
+      topItems: (sections.find((section) => section.title.toUpperCase().includes('SLA'))?.rows ?? [])
+        .slice(0, 2)
+        .map((row) => `${row.primary} - ${row.secondary}`),
     },
   ]
 
-  const order = getSupportLaneOrder(role)
-  return order.map((key) => lanes.find((lane) => lane.key === key)).filter((lane): lane is SupportLane => Boolean(lane))
+  return lanes
 }
 
 export function SupportRoleQueueBoard({

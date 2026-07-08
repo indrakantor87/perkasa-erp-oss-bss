@@ -217,6 +217,24 @@ export type DomainReviewSection = {
   rows: DomainReviewRow[]
 }
 
+export type SupportLaneKey = 'tt' | 'isolations' | 'dismantle' | 'sla'
+
+export type SupportLaneSnapshot = {
+  key: SupportLaneKey
+  title: string
+  shortLabel: string
+  accent: string
+  count: number
+  sectionTitles: string[]
+}
+
+export type DomainSupportFocus = {
+  defaultLane: SupportLaneKey
+  selectedLane: SupportLaneKey | null
+  lanes: SupportLaneSnapshot[]
+  visibleSections: DomainReviewSection[]
+}
+
 export type DomainCapability = {
   action: AccessAction
   label: string
@@ -240,4 +258,5 @@ export type DomainPageData = {
   source: DataSourceSnapshot
   content: DomainPageContent
   capabilities: DomainCapability[]
+  supportFocus?: DomainSupportFocus
 }

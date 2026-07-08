@@ -27,14 +27,13 @@ export default async function DomainPage({
     redirect('/dashboard')
   }
 
-  const payload = await getDomainPageData(domain as DomainKey, session.role)
+  const payload = await getDomainPageData(domain as DomainKey, session.role, {
+    supportLane: normalizeSupportLane(resolvedSearchParams.lane),
+  })
 
   if (!payload) {
     notFound()
   }
-
-  const selectedSupportLane =
-    payload.content.key === 'support' ? normalizeSupportLane(resolvedSearchParams.lane) : null
 
   return (
     <DomainShell
@@ -42,7 +41,7 @@ export default async function DomainPage({
       source={payload.source}
       capabilities={payload.capabilities}
       role={session.role}
-      selectedSupportLane={selectedSupportLane}
+      supportFocus={payload.supportFocus}
     />
   )
 }
