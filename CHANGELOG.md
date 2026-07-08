@@ -10,6 +10,22 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.63.1] - 2026-07-08
+
+### Added
+
+- panel `Micro Queue Support` di [support-role-queue-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-role-queue-board.tsx) untuk memecah jalur kerja support menjadi lane `TT`, `isolir`, `dismantle`, dan `SLA`
+
+### Changed
+
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) sekarang menerima role aktif dan menampilkan queue mikro khusus saat membuka domain `Support`
+- [domain page](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx) meneruskan role session ke shell agar UI support bisa diurutkan sesuai role login
+- `VERSION` dinaikkan ke `0.63.1`
+
+### Notes
+
+- versi `0.63.1` mendorong parity support dari level dashboard umum ke level domain kerja, khususnya untuk `NOC`, `TT`, `CS`, `FIELD_TECHNICIAN`, dan `DISMANTLE`
+
 ## [0.63.0] - 2026-07-08
 
 ### Added

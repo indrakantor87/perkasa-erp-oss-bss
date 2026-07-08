@@ -29,5 +29,5 @@ export default async function DomainPage({
     notFound()
   }
 
-  return <DomainShell content={payload.content} source={payload.source} capabilities={payload.capabilities} />
+  return <DomainShell content={payload.content} source={payload.source} capabilities={payload.capabilities} role={session.role} />
 }

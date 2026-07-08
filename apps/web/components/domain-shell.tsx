@@ -26,18 +26,21 @@ import { SupportIsolationForm } from '@/components/support-isolation-form'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
 import { SupportTicketCloseForm } from '@/components/support-ticket-close-form'
 import { SupportTicketCreateForm } from '@/components/support-ticket-create-form'
+import { SupportRoleQueueBoard } from '@/components/support-role-queue-board'
 import { SupportSlaForm } from '@/components/support-sla-form'
 import { DataSourceStatus } from '@/components/data-source-status'
-import type { DomainCapability, DomainPageContent, DataSourceSnapshot } from '@/lib/types'
+import type { AppRole, DomainCapability, DomainPageContent, DataSourceSnapshot } from '@/lib/types'
 
 export function DomainShell({
   content,
   source,
   capabilities,
+  role,
 }: {
   content: DomainPageContent
   source: DataSourceSnapshot
   capabilities: DomainCapability[]
+  role: AppRole
 }) {
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
@@ -407,39 +410,42 @@ export function DomainShell({
       ) : null}
 
       {content.key === 'support' ? (
-        <section className="grid gap-6 xl:grid-cols-2">
-          <SupportTicketCreateForm
-            canCreate={canCreate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            typeSuggestions={supportTypeSuggestions}
-          />
-          <SupportTicketCloseForm
-            canUpdate={canUpdate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            ticketSuggestions={supportTicketSuggestions}
-          />
-          <SupportSlaForm
-            canApprove={canApprove}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            typeSuggestions={supportTypeSuggestions}
-          />
-          <SupportIsolationForm
-            canCreate={canCreate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            radboxSuggestions={supportRadboxSuggestions}
-            marketingSuggestions={supportMarketingSuggestions}
-          />
-          <SupportIsolationRestoreForm
-            canUpdate={canUpdate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            isolationSuggestions={supportIsolationSuggestions}
-          />
-          <SupportDismantleForm
-            canApprove={canApprove}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            isolationSuggestions={supportIsolationSuggestions}
-          />
-        </section>
+        <>
+          <SupportRoleQueueBoard role={role} sections={content.reviewSections ?? []} />
+          <section className="grid gap-6 xl:grid-cols-2">
+            <SupportTicketCreateForm
+              canCreate={canCreate}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              typeSuggestions={supportTypeSuggestions}
+            />
+            <SupportTicketCloseForm
+              canUpdate={canUpdate}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              ticketSuggestions={supportTicketSuggestions}
+            />
+            <SupportSlaForm
+              canApprove={canApprove}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              typeSuggestions={supportTypeSuggestions}
+            />
+            <SupportIsolationForm
+              canCreate={canCreate}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              radboxSuggestions={supportRadboxSuggestions}
+              marketingSuggestions={supportMarketingSuggestions}
+            />
+            <SupportIsolationRestoreForm
+              canUpdate={canUpdate}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              isolationSuggestions={supportIsolationSuggestions}
+            />
+            <SupportDismantleForm
+              canApprove={canApprove}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              isolationSuggestions={supportIsolationSuggestions}
+            />
+          </section>
+        </>
       ) : null}
 
       {content.reviewSections && content.reviewSections.length > 0 ? (
