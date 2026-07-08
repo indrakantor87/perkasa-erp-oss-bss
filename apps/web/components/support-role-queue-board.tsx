@@ -1,8 +1,10 @@
-import type { AppRole, DomainReviewSection } from '@/lib/types'
+import Link from 'next/link'
+import { getPreferredSupportLane, getSupportLaneMeta, getSupportLaneOrder, getSupportLaneSections, type SupportLaneKey } from '@/lib/support-lanes'
 import { getRoleMeta } from '@/lib/role-meta'
+import type { AppRole, DomainReviewSection } from '@/lib/types'
 
 type SupportLane = {
-  key: string
+  key: SupportLaneKey
   title: string
   description: string
   count: number
@@ -10,16 +12,7 @@ type SupportLane = {
   topItems: string[]
 }
 
-function findSection(sections: DomainReviewSection[], keyword: string) {
-  return sections.find((section) => section.title.toUpperCase().includes(keyword))
-}
-
 function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): SupportLane[] {
-  const ttSection = findSection(sections, 'TROUBLE')
-  const isolationSection = findSection(sections, 'ISOLIR')
-  const slaSection = findSection(sections, 'SLA')
-  const dismantleSection = findSection(sections, 'DISMANTLE')
-
   const lanes: SupportLane[] = [
     {
       key: 'tt',
@@ -28,9 +21,9 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
         role === 'TT_OPERATOR' || role === 'NOC_OPERATOR'
           ? 'Queue utama untuk ticket teknis yang perlu analisis, tindak lanjut, atau close loop.'
           : 'Ticket terbuka yang perlu dipantau dari perspektif operasional support.',
-      count: ttSection?.rows.length ?? 0,
-      accent: 'bg-orange-50 text-orange-700',
-      topItems: (ttSection?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
+      count: getSupportLaneSections(sections, 'tt')[0]?.rows.length ?? 0,
+      accent: getSupportLaneMeta('tt').accent,
+      topItems: (getSupportLaneSections(sections, 'tt')[0]?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
     },
     {
       key: 'isolations',
@@ -39,9 +32,9 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
         role === 'CS_OPERATOR' || role === 'CS_ADMIN'
           ? 'Pelanggan suspend yang perlu tindak lanjut administrasi, ticket, atau transfer proses.'
           : 'Data isolir aktif untuk monitoring dan tindak lanjut lintas tim support.',
-      count: isolationSection?.rows.length ?? 0,
-      accent: 'bg-amber-50 text-amber-700',
-      topItems: (isolationSection?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
+      count: getSupportLaneSections(sections, 'isolations')[0]?.rows.length ?? 0,
+      accent: getSupportLaneMeta('isolations').accent,
+      topItems: (getSupportLaneSections(sections, 'isolations')[0]?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
     },
     {
       key: 'dismantle',
@@ -50,9 +43,9 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
         role === 'DISMANTLE_OPERATOR'
           ? 'Jejak pelanggan yang sudah diproses atau siap ditindaklanjuti pada flow dismantle.'
           : 'Histori dan tindak lanjut terminasi agar jejak support tidak hilang.',
-      count: dismantleSection?.rows.length ?? 0,
-      accent: 'bg-rose-50 text-rose-700',
-      topItems: (dismantleSection?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
+      count: getSupportLaneSections(sections, 'dismantle')[0]?.rows.length ?? 0,
+      accent: getSupportLaneMeta('dismantle').accent,
+      topItems: (getSupportLaneSections(sections, 'dismantle')[0]?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
     },
     {
       key: 'sla',
@@ -61,37 +54,28 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
         role === 'FIELD_TECHNICIAN'
           ? 'Ringkasan SLA untuk membantu prioritas pekerjaan yang berpotensi overdue di lapangan.'
           : 'Target durasi penanganan per tipe ticket agar prioritas support tetap terukur.',
-      count: slaSection?.rows.length ?? 0,
-      accent: 'bg-sky-50 text-sky-700',
-      topItems: (slaSection?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
+      count: getSupportLaneSections(sections, 'sla')[0]?.rows.length ?? 0,
+      accent: getSupportLaneMeta('sla').accent,
+      topItems: (getSupportLaneSections(sections, 'sla')[0]?.rows ?? []).slice(0, 2).map((row) => `${row.primary} - ${row.secondary}`),
     },
   ]
 
-  const preferredOrder: Record<AppRole, string[]> = {
-    SUPER_ADMIN: ['tt', 'isolations', 'dismantle', 'sla'],
-    SALES_MARKETING: ['isolations', 'tt', 'dismantle', 'sla'],
-    CS_OPERATOR: ['isolations', 'tt', 'dismantle', 'sla'],
-    CS_ADMIN: ['isolations', 'tt', 'dismantle', 'sla'],
-    NOC_OPERATOR: ['tt', 'sla', 'isolations', 'dismantle'],
-    FIELD_TECHNICIAN: ['tt', 'sla', 'isolations', 'dismantle'],
-    TT_OPERATOR: ['tt', 'sla', 'isolations', 'dismantle'],
-    DIGITAL_CREATOR: ['tt', 'isolations', 'dismantle', 'sla'],
-    DISMANTLE_OPERATOR: ['dismantle', 'isolations', 'tt', 'sla'],
-  }
-
-  const order = preferredOrder[role]
+  const order = getSupportLaneOrder(role)
   return order.map((key) => lanes.find((lane) => lane.key === key)).filter((lane): lane is SupportLane => Boolean(lane))
 }
 
 export function SupportRoleQueueBoard({
   role,
   sections,
+  selectedLane,
 }: {
   role: AppRole
   sections: DomainReviewSection[]
+  selectedLane?: SupportLaneKey | null
 }) {
   const lanes = buildSupportLanes(role, sections)
   const roleMeta = getRoleMeta(role)
+  const recommendedLane = getPreferredSupportLane(role)
 
   if (!lanes.some((lane) => lane.count > 0)) {
     return null
@@ -114,9 +98,23 @@ export function SupportRoleQueueBoard({
 
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
         {lanes.map((lane) => (
-          <article key={lane.key} className="rounded-2xl border border-line bg-slate-50 p-5">
+          <Link
+            key={lane.key}
+            href={`/support?lane=${lane.key}`}
+            className={`rounded-2xl border p-5 transition hover:border-slate-300 hover:bg-white ${
+              selectedLane === lane.key ? 'border-slate-950 bg-white shadow-sm' : 'border-line bg-slate-50'
+            }`}
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className={`badge ${lane.accent}`}>{lane.count} item</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`badge ${lane.accent}`}>{lane.count} item</span>
+                {recommendedLane === lane.key && selectedLane !== lane.key ? (
+                  <span className="badge border-slate-200 bg-white text-slate-600">default role</span>
+                ) : null}
+                {selectedLane === lane.key ? (
+                  <span className="badge border-transparent bg-slate-950 text-white">focus aktif</span>
+                ) : null}
+              </div>
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">{lane.key}</span>
             </div>
             <h4 className="mt-4 text-lg font-semibold text-slate-950">{lane.title}</h4>
@@ -132,7 +130,8 @@ export function SupportRoleQueueBoard({
             ) : (
               <p className="mt-4 text-sm text-slate-500">Belum ada item review pada lane ini.</p>
             )}
-          </article>
+            <p className="mt-4 text-sm font-medium text-slate-700">Buka mode fokus lane</p>
+          </Link>
         ))}
       </div>
     </section>

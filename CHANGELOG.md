@@ -10,6 +10,24 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.63.2] - 2026-07-08
+
+### Added
+
+- helper [support-lanes.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/support-lanes.ts) untuk menormalkan query `lane`, metadata lane support, dan pemetaan section review per jalur kerja
+
+### Changed
+
+- [support-role-queue-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-role-queue-board.tsx) sekarang menjadikan setiap kartu lane sebagai entry point ke mode fokus `support?lane=...`, lengkap dengan penanda lane default per role dan lane aktif
+- [domain page](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx) membaca query `lane` untuk domain `support` lalu meneruskannya ke shell halaman
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) kini memprioritaskan form dan review section berdasarkan lane support aktif agar flow `TT`, `isolir`, `dismantle`, dan `SLA` tidak lagi tampil campur aduk
+- [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts) diperluas untuk memverifikasi helper lane support baru
+- `VERSION` dinaikkan ke `0.63.2`
+
+### Notes
+
+- versi `0.63.2` mendorong parity support dari sekadar micro queue visual menjadi mode kerja yang bisa difokuskan per lane tanpa mengganggu shell domain support yang sudah ada
+
 ## [0.63.1] - 2026-07-08
 
 ### Added

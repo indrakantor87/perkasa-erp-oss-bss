@@ -17,6 +17,7 @@ import {
 import { dashboardSummary } from '@/lib/mock-dashboard'
 import { domainPages } from '@/lib/mock-domains'
 import { getBatchDetail, getImportBatch, importBatches, transformStages } from '@/lib/mock-import'
+import { getSupportLaneSections, normalizeSupportLane } from '@/lib/support-lanes'
 import { getDashboardPageData, getDashboardSummary } from '@/lib/services/dashboard-service'
 import { getAuthUsersPageData } from '@/lib/services/auth-user-service'
 import { getDomainPageData } from '@/lib/services/domain-service'
@@ -116,6 +117,11 @@ async function main() {
   assert.equal(supportDomain?.content.reviewSections?.[0]?.rows.length, 3)
   assert.equal(supportDomain?.content.reviewSections?.[2]?.title, 'SLA Trouble Ticket')
   assert.equal(supportDomain?.content.reviewSections?.[3]?.title, 'Histori Dismantle')
+  assert.equal(normalizeSupportLane('TT'), 'tt')
+  assert.equal(normalizeSupportLane('invalid'), null)
+  assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'tt')[0]?.title, 'Trouble Ticket Open')
+  assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'isolations')[0]?.title, 'Isolir Aktif')
+  assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'dismantle')[0]?.title, 'Histori Dismantle')
 
   const salesDomain = await getDomainPageData('sales', 'SALES_MARKETING')
   assert.equal(salesDomain?.content.resource, 'sales')

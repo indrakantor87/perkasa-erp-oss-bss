@@ -29,18 +29,55 @@ import { SupportTicketCreateForm } from '@/components/support-ticket-create-form
 import { SupportRoleQueueBoard } from '@/components/support-role-queue-board'
 import { SupportSlaForm } from '@/components/support-sla-form'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { getRoleMeta } from '@/lib/role-meta'
+import { getSupportLaneMeta, getSupportLaneOrder, getSupportLaneSections, type SupportLaneKey } from '@/lib/support-lanes'
 import type { AppRole, DomainCapability, DomainPageContent, DataSourceSnapshot } from '@/lib/types'
+
+function getSupportLaneFocusCopy(lane: SupportLaneKey) {
+  switch (lane) {
+    case 'tt':
+      return {
+        eyebrow: 'Lane fokus TT',
+        title: 'Trouble ticket diprioritaskan untuk analisis, update status, dan close loop.',
+        description:
+          'Gunakan mode ini saat operator support perlu fokus pada ticket terbuka, kontrol SLA, dan tindak lanjut teknis yang masih aktif.',
+      }
+    case 'isolations':
+      return {
+        eyebrow: 'Lane fokus isolir',
+        title: 'Queue isolir diprioritaskan untuk suspend aktif dan recovery pelanggan.',
+        description:
+          'Mode ini menonjolkan form suspend, restore, dan kaitannya dengan proses dismantle agar follow up administrasi tidak tercampur dengan ticket lain.',
+      }
+    case 'dismantle':
+      return {
+        eyebrow: 'Lane fokus dismantle',
+        title: 'Queue dismantle diprioritaskan untuk terminasi, approval, dan jejak penutupan layanan.',
+        description:
+          'Gunakan lane ini saat tim perlu mengecek data isolir yang siap diterminasi serta histori dismantle yang sudah selesai.',
+      }
+    case 'sla':
+      return {
+        eyebrow: 'Lane fokus SLA',
+        title: 'Kontrol SLA diprioritaskan untuk menjaga ticket tidak melewati target waktu.',
+        description:
+          'Mode ini membantu NOC, TT, dan teknisi lapangan melihat aturan SLA lebih cepat sebelum memproses ticket support yang kritis.',
+      }
+  }
+}
 
 export function DomainShell({
   content,
   source,
   capabilities,
   role,
+  selectedSupportLane,
 }: {
   content: DomainPageContent
   source: DataSourceSnapshot
   capabilities: DomainCapability[]
   role: AppRole
+  selectedSupportLane?: SupportLaneKey | null
 }) {
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
@@ -194,6 +231,96 @@ export function DomainShell({
           .filter((section) => section.title.toUpperCase().includes('ISOLIR'))
           .flatMap((section) => section.rows)
           .map((row) => `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`)
+      : []
+  const supportFocusCopy =
+    content.key === 'support' && selectedSupportLane ? getSupportLaneFocusCopy(selectedSupportLane) : null
+  const supportLaneMeta =
+    content.key === 'support' && selectedSupportLane ? getSupportLaneMeta(selectedSupportLane) : null
+  const supportRoleMeta =
+    content.key === 'support' && selectedSupportLane ? getRoleMeta(role) : null
+  const visibleReviewSections =
+    content.key === 'support' && selectedSupportLane
+      ? getSupportLaneSections(content.reviewSections ?? [], selectedSupportLane)
+      : (content.reviewSections ?? [])
+  const supportForms =
+    content.key === 'support'
+      ? [
+          {
+            key: 'ticket-create',
+            lanes: ['tt'] as SupportLaneKey[],
+            element: (
+              <SupportTicketCreateForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                typeSuggestions={supportTypeSuggestions}
+              />
+            ),
+          },
+          {
+            key: 'ticket-close',
+            lanes: ['tt'] as SupportLaneKey[],
+            element: (
+              <SupportTicketCloseForm
+                canUpdate={canUpdate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                ticketSuggestions={supportTicketSuggestions}
+              />
+            ),
+          },
+          {
+            key: 'sla-manage',
+            lanes: ['tt', 'sla'] as SupportLaneKey[],
+            element: (
+              <SupportSlaForm
+                canApprove={canApprove}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                typeSuggestions={supportTypeSuggestions}
+              />
+            ),
+          },
+          {
+            key: 'isolation-create',
+            lanes: ['isolations'] as SupportLaneKey[],
+            element: (
+              <SupportIsolationForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                radboxSuggestions={supportRadboxSuggestions}
+                marketingSuggestions={supportMarketingSuggestions}
+              />
+            ),
+          },
+          {
+            key: 'isolation-restore',
+            lanes: ['isolations'] as SupportLaneKey[],
+            element: (
+              <SupportIsolationRestoreForm
+                canUpdate={canUpdate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                isolationSuggestions={supportIsolationSuggestions}
+              />
+            ),
+          },
+          {
+            key: 'dismantle-approve',
+            lanes: ['isolations', 'dismantle'] as SupportLaneKey[],
+            element: (
+              <SupportDismantleForm
+                canApprove={canApprove}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                isolationSuggestions={supportIsolationSuggestions}
+              />
+            ),
+          },
+        ]
+      : []
+  const primarySupportForms =
+    selectedSupportLane && content.key === 'support'
+      ? supportForms.filter((item) => item.lanes.includes(selectedSupportLane))
+      : supportForms
+  const secondarySupportForms =
+    selectedSupportLane && content.key === 'support'
+      ? supportForms.filter((item) => !item.lanes.includes(selectedSupportLane))
       : []
 
   return (
@@ -411,46 +538,83 @@ export function DomainShell({
 
       {content.key === 'support' ? (
         <>
-          <SupportRoleQueueBoard role={role} sections={content.reviewSections ?? []} />
-          <section className="grid gap-6 xl:grid-cols-2">
-            <SupportTicketCreateForm
-              canCreate={canCreate}
-              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-              typeSuggestions={supportTypeSuggestions}
-            />
-            <SupportTicketCloseForm
-              canUpdate={canUpdate}
-              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-              ticketSuggestions={supportTicketSuggestions}
-            />
-            <SupportSlaForm
-              canApprove={canApprove}
-              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-              typeSuggestions={supportTypeSuggestions}
-            />
-            <SupportIsolationForm
-              canCreate={canCreate}
-              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-              radboxSuggestions={supportRadboxSuggestions}
-              marketingSuggestions={supportMarketingSuggestions}
-            />
-            <SupportIsolationRestoreForm
-              canUpdate={canUpdate}
-              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-              isolationSuggestions={supportIsolationSuggestions}
-            />
-            <SupportDismantleForm
-              canApprove={canApprove}
-              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-              isolationSuggestions={supportIsolationSuggestions}
-            />
-          </section>
+          <SupportRoleQueueBoard role={role} sections={content.reviewSections ?? []} selectedLane={selectedSupportLane} />
+          {supportFocusCopy && supportLaneMeta && supportRoleMeta ? (
+            <section className="panel p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="section-title">{supportFocusCopy.eyebrow}</p>
+                  <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+                    {supportFocusCopy.title}
+                  </h3>
+                  <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{supportFocusCopy.description}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className={`badge ${supportLaneMeta.accent}`}>{supportLaneMeta.shortLabel}</span>
+                  <span className={`badge border-transparent ${supportRoleMeta.tone}`}>{supportRoleMeta.shortLabel}</span>
+                </div>
+              </div>
+              <div className="mt-6 flex flex-wrap gap-2">
+                <Link href="/support" className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700">
+                  Semua lane
+                </Link>
+                {getSupportLaneOrder(role).map((lane) => {
+                  const laneMeta = getSupportLaneMeta(lane)
+                  return (
+                    <Link
+                      key={lane}
+                      href={`/support?lane=${lane}`}
+                      className={`rounded-full px-4 py-2 text-sm font-medium ${
+                        lane === selectedSupportLane
+                          ? 'bg-slate-950 text-white'
+                          : 'border border-line bg-white text-slate-700'
+                      }`}
+                    >
+                      {laneMeta.shortLabel}
+                    </Link>
+                  )
+                })}
+              </div>
+            </section>
+          ) : null}
+          {primarySupportForms.length ? (
+            <section className="space-y-4">
+              {selectedSupportLane ? (
+                <div>
+                  <p className="section-title">Aksi utama lane</p>
+                  <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+                    Form operasional yang diprioritaskan untuk lane ini
+                  </h3>
+                </div>
+              ) : null}
+              <div className="grid gap-6 xl:grid-cols-2">
+                {primarySupportForms.map((item) => (
+                  <div key={item.key}>{item.element}</div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+          {secondarySupportForms.length ? (
+            <section className="space-y-4">
+              <div>
+                <p className="section-title">Aksi pendukung</p>
+                <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+                  Form support lain tetap tersedia untuk lintas proses
+                </h3>
+              </div>
+              <div className="grid gap-6 xl:grid-cols-2">
+                {secondarySupportForms.map((item) => (
+                  <div key={item.key}>{item.element}</div>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </>
       ) : null}
 
-      {content.reviewSections && content.reviewSections.length > 0 ? (
+      {visibleReviewSections.length > 0 ? (
         <section className="grid gap-6 xl:grid-cols-2">
-          {content.reviewSections.map((section) => (
+          {visibleReviewSections.map((section) => (
             <div key={section.title} className="panel p-6">
               <p className="section-title">{section.title}</p>
               <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
