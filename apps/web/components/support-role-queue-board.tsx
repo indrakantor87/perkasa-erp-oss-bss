@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { buildSupportLaneSnapshots, getPreferredSupportLane } from '@/lib/support-lanes'
+import { buildSupportLaneSnapshots, getPreferredSupportLane, getSupportLanePath } from '@/lib/support-lanes'
 import { getRoleMeta } from '@/lib/role-meta'
 import type { AppRole, DomainReviewSection, SupportLaneKey } from '@/lib/types'
 
@@ -108,7 +108,7 @@ export function SupportRoleQueueBoard({
         {lanes.map((lane) => (
           <Link
             key={lane.key}
-            href={`/support?lane=${lane.key}`}
+            href={getSupportLanePath(lane.key)}
             className={`rounded-2xl border p-5 transition hover:border-slate-300 hover:bg-white ${
               selectedLane === lane.key ? 'border-slate-950 bg-white shadow-sm' : 'border-line bg-slate-50'
             }`}
@@ -138,7 +138,7 @@ export function SupportRoleQueueBoard({
             ) : (
               <p className="mt-4 text-sm text-slate-500">Belum ada item review pada lane ini.</p>
             )}
-            <p className="mt-4 text-sm font-medium text-slate-700">Buka mode fokus lane</p>
+            <p className="mt-4 text-sm font-medium text-slate-700">Buka halaman lane</p>
           </Link>
         ))}
       </div>

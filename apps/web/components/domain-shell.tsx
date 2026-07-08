@@ -32,6 +32,7 @@ import { SupportRoleQueueBoard } from '@/components/support-role-queue-board'
 import { SupportSlaForm } from '@/components/support-sla-form'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { getRoleMeta } from '@/lib/role-meta'
+import { getSupportLanePath } from '@/lib/support-lanes'
 import type {
   AppRole,
   DomainCapability,
@@ -589,7 +590,7 @@ export function DomainShell({
                   return (
                     <Link
                       key={lane.key}
-                      href={`/support?lane=${lane.key}`}
+                      href={getSupportLanePath(lane.key)}
                       className={`rounded-full px-4 py-2 text-sm font-medium ${
                         lane.key === activeSupportLane
                           ? 'bg-slate-950 text-white'

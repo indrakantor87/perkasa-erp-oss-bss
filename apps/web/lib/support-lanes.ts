@@ -69,6 +69,10 @@ export function normalizeSupportLane(value: string | string[] | undefined): Supp
   return normalized as SupportLaneKey
 }
 
+export function getSupportLanePath(lane: SupportLaneKey) {
+  return `/support/${lane}`
+}
+
 export function getSupportLaneOrder(role: AppRole) {
   return supportLaneOrder[role]
 }

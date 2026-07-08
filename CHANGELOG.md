@@ -10,6 +10,24 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.63.5] - 2026-07-08
+
+### Added
+
+- route dedicated [support/[lane]/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/[lane]/page.tsx) untuk screen kerja lane support seperti `/support/tt`, `/support/isolations`, `/support/dismantle`, dan `/support/sla`
+
+### Changed
+
+- [support-lanes.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/support-lanes.ts) kini menyediakan helper `getSupportLanePath()` agar semua tautan lane support memakai path dedicated yang konsisten
+- [support-role-queue-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-role-queue-board.tsx) sekarang mengarahkan kartu lane ke halaman dedicated, bukan query string fokus
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) mengganti chip navigasi lane ke path dedicated agar operator bisa berpindah antar workspace support lewat subpage yang stabil
+- [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts) diperluas untuk memverifikasi helper path lane dan akses subroute `/support/tt`
+- `VERSION` dinaikkan ke `0.63.5`
+
+### Notes
+
+- versi `0.63.5` memindahkan lane support dari sekadar mode fokus di halaman tunggal menjadi screen kerja dedicated yang lebih siap dipakai sebagai fondasi navigasi operasional
+
 ## [0.63.4] - 2026-07-08
 
 ### Added

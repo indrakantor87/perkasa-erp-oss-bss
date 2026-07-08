@@ -17,7 +17,7 @@ import {
 import { dashboardSummary } from '@/lib/mock-dashboard'
 import { domainPages } from '@/lib/mock-domains'
 import { getBatchDetail, getImportBatch, importBatches, transformStages } from '@/lib/mock-import'
-import { getSupportLaneSections, normalizeSupportLane } from '@/lib/support-lanes'
+import { getSupportLanePath, getSupportLaneSections, normalizeSupportLane } from '@/lib/support-lanes'
 import { getDashboardPageData, getDashboardSummary } from '@/lib/services/dashboard-service'
 import { getAuthUsersPageData } from '@/lib/services/auth-user-service'
 import { getDomainPageData } from '@/lib/services/domain-service'
@@ -53,6 +53,7 @@ async function main() {
   assert.equal(canAccessPath('SUPER_ADMIN', '/settings/users'), true)
   assert.equal(canAccessPath('CS_ADMIN', '/settings/users'), false)
   assert.equal(canAccessPath('NOC_OPERATOR', '/support'), true)
+  assert.equal(canAccessPath('NOC_OPERATOR', '/support/tt'), true)
   assert.equal(canAccessPath('NOC_OPERATOR', '/import'), false)
   assert.equal(canAccessPath('CS_ADMIN', '/billing'), false)
   assert.equal(canAccessPath('SALES_MARKETING', '/sales'), true)
@@ -125,6 +126,7 @@ async function main() {
   assert.equal((supportDomain?.supportFocus?.visibleSections.length ?? 0) >= 4, true)
   assert.equal(normalizeSupportLane('TT'), 'tt')
   assert.equal(normalizeSupportLane('invalid'), null)
+  assert.equal(getSupportLanePath('tt'), '/support/tt')
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'tt')[0]?.title, 'Trouble Ticket Open')
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'isolations')[0]?.title, 'Isolir Aktif')
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'dismantle')[0]?.title, 'Histori Dismantle')
