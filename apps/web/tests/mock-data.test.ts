@@ -119,6 +119,9 @@ async function main() {
   assert.equal(supportDomain?.content.reviewSections?.[3]?.title, 'Histori Dismantle')
   assert.equal(supportDomain?.supportFocus?.defaultLane, 'tt')
   assert.equal(supportDomain?.supportFocus?.selectedLane, null)
+  assert.equal(supportDomain?.supportFocus?.activeLane, 'tt')
+  assert.equal(supportDomain?.supportFocus?.activeWorkspace.lane, 'tt')
+  assert.equal((supportDomain?.supportFocus?.activeWorkspace.actionKeys.length ?? 0) > 0, true)
   assert.equal((supportDomain?.supportFocus?.visibleSections.length ?? 0) >= 4, true)
   assert.equal(normalizeSupportLane('TT'), 'tt')
   assert.equal(normalizeSupportLane('invalid'), null)
@@ -130,6 +133,8 @@ async function main() {
   })
   assert.equal(focusedSupportDomain?.supportFocus?.defaultLane, 'dismantle')
   assert.equal(focusedSupportDomain?.supportFocus?.selectedLane, 'dismantle')
+  assert.equal(focusedSupportDomain?.supportFocus?.activeLane, 'dismantle')
+  assert.equal(focusedSupportDomain?.supportFocus?.activeWorkspace.lane, 'dismantle')
   assert.equal(focusedSupportDomain?.supportFocus?.visibleSections[0]?.title, 'Histori Dismantle')
   assert.equal(focusedSupportDomain?.supportFocus?.lanes[0]?.key, 'dismantle')
 

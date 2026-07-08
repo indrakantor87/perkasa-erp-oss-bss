@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { ReactNode } from 'react'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
 import { BillingInvoiceGenerateForm } from '@/components/billing-invoice-generate-form'
 import { BillingInvoiceStatusForm } from '@/components/billing-invoice-status-form'
@@ -26,11 +27,20 @@ import { SupportIsolationForm } from '@/components/support-isolation-form'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
 import { SupportTicketCloseForm } from '@/components/support-ticket-close-form'
 import { SupportTicketCreateForm } from '@/components/support-ticket-create-form'
+import { SupportLaneWorkspacePanel } from '@/components/support-lane-workspace-panel'
 import { SupportRoleQueueBoard } from '@/components/support-role-queue-board'
 import { SupportSlaForm } from '@/components/support-sla-form'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { getRoleMeta } from '@/lib/role-meta'
-import type { AppRole, DomainCapability, DomainPageContent, DataSourceSnapshot, DomainSupportFocus, SupportLaneKey } from '@/lib/types'
+import type {
+  AppRole,
+  DomainCapability,
+  DomainPageContent,
+  DataSourceSnapshot,
+  DomainSupportFocus,
+  SupportLaneActionKey,
+  SupportLaneKey,
+} from '@/lib/types'
 
 function getSupportLaneFocusCopy(lane: SupportLaneKey) {
   switch (lane) {
@@ -232,17 +242,18 @@ export function DomainShell({
           .map((row) => `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`)
       : []
   const selectedSupportLane = supportFocus?.selectedLane ?? null
-  const selectedSupportLaneMeta =
-    selectedSupportLane ? supportFocus?.lanes.find((lane) => lane.key === selectedSupportLane) ?? null : null
+  const activeSupportLane = supportFocus?.activeLane ?? null
+  const activeSupportLaneMeta =
+    activeSupportLane ? supportFocus?.lanes.find((lane) => lane.key === activeSupportLane) ?? null : null
+  const activeSupportWorkspace = supportFocus?.activeWorkspace
   const supportFocusCopy =
-    content.key === 'support' && selectedSupportLane ? getSupportLaneFocusCopy(selectedSupportLane) : null
-  const supportRoleMeta =
-    content.key === 'support' && selectedSupportLane ? getRoleMeta(role) : null
+    content.key === 'support' && activeSupportLane ? getSupportLaneFocusCopy(activeSupportLane) : null
+  const supportRoleMeta = content.key === 'support' ? getRoleMeta(role) : null
   const visibleReviewSections =
     content.key === 'support' ? supportFocus?.visibleSections ?? (content.reviewSections ?? []) : (content.reviewSections ?? [])
   const supportForms =
     content.key === 'support'
-      ? [
+      ? ([
           {
             key: 'ticket-create',
             lanes: ['tt'] as SupportLaneKey[],
@@ -310,15 +321,19 @@ export function DomainShell({
               />
             ),
           },
-        ]
+        ] satisfies {
+          key: SupportLaneActionKey
+          lanes: SupportLaneKey[]
+          element: ReactNode
+        }[])
       : []
   const primarySupportForms =
-    selectedSupportLane && content.key === 'support'
-      ? supportForms.filter((item) => item.lanes.includes(selectedSupportLane))
+    activeSupportWorkspace && content.key === 'support'
+      ? supportForms.filter((item) => activeSupportWorkspace.actionKeys.includes(item.key))
       : supportForms
   const secondarySupportForms =
-    selectedSupportLane && content.key === 'support'
-      ? supportForms.filter((item) => !item.lanes.includes(selectedSupportLane))
+    activeSupportWorkspace && content.key === 'support'
+      ? supportForms.filter((item) => !activeSupportWorkspace.actionKeys.includes(item.key))
       : []
 
   return (
@@ -537,19 +552,33 @@ export function DomainShell({
       {content.key === 'support' ? (
         <>
           <SupportRoleQueueBoard role={role} sections={content.reviewSections ?? []} selectedLane={selectedSupportLane} />
-          {supportFocusCopy && selectedSupportLaneMeta && supportRoleMeta ? (
+          {supportFocusCopy && activeSupportLaneMeta && supportRoleMeta && activeSupportWorkspace ? (
+            <SupportLaneWorkspacePanel
+              workspace={activeSupportWorkspace}
+              laneTone={activeSupportLaneMeta.accent}
+              roleTone={supportRoleMeta.tone}
+              roleLabel={supportRoleMeta.shortLabel}
+              isExplicitFocus={Boolean(selectedSupportLane)}
+            />
+          ) : null}
+          {supportFocusCopy && activeSupportLaneMeta && supportRoleMeta ? (
             <section className="panel p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="section-title">{supportFocusCopy.eyebrow}</p>
+                  <p className="section-title">
+                    {selectedSupportLane ? supportFocusCopy.eyebrow : `Default role: ${supportFocusCopy.eyebrow}`}
+                  </p>
                   <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
                     {supportFocusCopy.title}
                   </h3>
                   <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{supportFocusCopy.description}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <span className={`badge ${selectedSupportLaneMeta.accent}`}>{selectedSupportLaneMeta.shortLabel}</span>
+                  <span className={`badge ${activeSupportLaneMeta.accent}`}>{activeSupportLaneMeta.shortLabel}</span>
                   <span className={`badge border-transparent ${supportRoleMeta.tone}`}>{supportRoleMeta.shortLabel}</span>
+                  {!selectedSupportLane ? (
+                    <span className="badge border-slate-200 bg-white text-slate-600">workspace default</span>
+                  ) : null}
                 </div>
               </div>
               <div className="mt-6 flex flex-wrap gap-2">
@@ -562,7 +591,7 @@ export function DomainShell({
                       key={lane.key}
                       href={`/support?lane=${lane.key}`}
                       className={`rounded-full px-4 py-2 text-sm font-medium ${
-                        lane.key === selectedSupportLane
+                        lane.key === activeSupportLane
                           ? 'bg-slate-950 text-white'
                           : 'border border-line bg-white text-slate-700'
                       }`}
@@ -576,11 +605,11 @@ export function DomainShell({
           ) : null}
           {primarySupportForms.length ? (
             <section className="space-y-4">
-              {selectedSupportLane ? (
+              {activeSupportLane ? (
                 <div>
                   <p className="section-title">Aksi utama lane</p>
                   <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-                    Form operasional yang diprioritaskan untuk lane ini
+                    Form operasional yang diprioritaskan untuk lane aktif
                   </h3>
                 </div>
               ) : null}

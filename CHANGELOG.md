@@ -10,6 +10,25 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.63.4] - 2026-07-08
+
+### Added
+
+- panel baru [support-lane-workspace-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-lane-workspace-panel.tsx) untuk menampilkan checklist, area review, dan catatan eskalasi lane support aktif
+
+### Changed
+
+- [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts) kini menambahkan `SupportLaneWorkspace`, `SupportLaneActionKey`, `activeLane`, dan `activeWorkspace` agar lane support punya struktur workspace yang lebih operasional
+- [support-lanes.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/support-lanes.ts) diperluas dengan builder workspace per lane sehingga `TT`, `isolir`, `dismantle`, dan `SLA` punya checklist dan peta aksi yang konsisten
+- [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts) sekarang menghitung `activeLane` dan `activeWorkspace` di payload `supportFocus`
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) kini memprioritaskan form berdasarkan `actionKeys` workspace lane aktif, termasuk default role ketika user belum memilih lane manual
+- [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts) diperluas untuk memverifikasi `activeLane` dan `activeWorkspace`
+- `VERSION` dinaikkan ke `0.63.4`
+
+### Notes
+
+- versi `0.63.4` mendorong parity support dari kontrak data ke pengalaman kerja yang lebih operasional, karena lane aktif sekarang punya checklist dan peta aksi yang siap dipakai tim support
+
 ## [0.63.3] - 2026-07-08
 
 ### Added

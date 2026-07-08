@@ -228,10 +228,31 @@ export type SupportLaneSnapshot = {
   sectionTitles: string[]
 }
 
+export type SupportLaneActionKey =
+  | 'ticket-create'
+  | 'ticket-close'
+  | 'sla-manage'
+  | 'isolation-create'
+  | 'isolation-restore'
+  | 'dismantle-approve'
+
+export type SupportLaneWorkspace = {
+  lane: SupportLaneKey
+  title: string
+  summary: string
+  checklist: string[]
+  actionKeys: SupportLaneActionKey[]
+  sectionTitles: string[]
+  count: number
+  escalationNote: string
+}
+
 export type DomainSupportFocus = {
   defaultLane: SupportLaneKey
   selectedLane: SupportLaneKey | null
+  activeLane: SupportLaneKey
   lanes: SupportLaneSnapshot[]
+  activeWorkspace: SupportLaneWorkspace
   visibleSections: DomainReviewSection[]
 }
 

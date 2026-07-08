@@ -2,7 +2,13 @@ import { canPerformAction } from '@/lib/access-control'
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { domainPages } from '@/lib/mock-domains'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
-import { buildSupportLaneSnapshots, getPreferredSupportLane, getSupportLaneSections } from '@/lib/support-lanes'
+import {
+  buildSupportLaneSnapshots,
+  buildSupportLaneWorkspace,
+  getActiveSupportLane,
+  getPreferredSupportLane,
+  getSupportLaneSections,
+} from '@/lib/support-lanes'
 import type {
   AccessAction,
   AppRole,
@@ -1627,11 +1633,15 @@ function buildSupportFocus(
 
   const sections = content.reviewSections ?? []
   const defaultLane = getPreferredSupportLane(role)
+  const activeLane = getActiveSupportLane(role, selectedLane)
+  const lanes = buildSupportLaneSnapshots(role, sections)
 
   return {
     defaultLane,
     selectedLane,
-    lanes: buildSupportLaneSnapshots(role, sections),
+    activeLane,
+    lanes,
+    activeWorkspace: buildSupportLaneWorkspace(role, activeLane, lanes),
     visibleSections: selectedLane ? getSupportLaneSections(sections, selectedLane) : sections,
   }
 }
