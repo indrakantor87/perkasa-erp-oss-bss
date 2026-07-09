@@ -24,6 +24,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) merapikan layout halaman `/support/{lane}` dengan header lane-specific dan menyembunyikan aksi pendukung agar fokus kerja lebih dedicated
 - `VERSION` dinaikkan ke `0.63.7`
 
+## [0.63.8] - 2026-07-09
+
+### Added
+
+- panel operasional [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx) untuk menampilkan queue Trouble Ticket di halaman `/support/tt` dengan ringkasan status dan detail meta yang lebih actionable
+
+### Changed
+
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) menampilkan panel TT khusus saat membuka lane `tt`
+- `VERSION` dinaikkan ke `0.63.8`
+
 ## [0.63.5] - 2026-07-08
 
 ### Added

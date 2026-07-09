@@ -31,6 +31,7 @@ import { SupportTicketCreateForm } from '@/components/support-ticket-create-form
 import { SupportLaneWorkspacePanel } from '@/components/support-lane-workspace-panel'
 import { SupportRoleQueueBoard } from '@/components/support-role-queue-board'
 import { SupportSlaForm } from '@/components/support-sla-form'
+import { SupportTroubleTicketQueuePanel } from '@/components/support-tt-queue-panel'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { getRoleMeta } from '@/lib/role-meta'
 import { getSupportLanePath } from '@/lib/support-lanes'
@@ -578,6 +579,9 @@ export function DomainShell({
           ) : null}
           {supportPageMode === 'lane' && supportFocus ? (
             <SupportLaneDetailPanel supportFocus={supportFocus} />
+          ) : null}
+          {supportPageMode === 'lane' && activeSupportLane === 'tt' ? (
+            <SupportTroubleTicketQueuePanel sections={visibleReviewSections} />
           ) : null}
           {supportFocusCopy && activeSupportLaneMeta && supportRoleMeta && activeSupportWorkspace ? (
             <SupportLaneWorkspacePanel
