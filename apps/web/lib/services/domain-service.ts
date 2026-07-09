@@ -4,6 +4,7 @@ import { domainPages } from '@/lib/mock-domains'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
 import {
   buildSupportLaneSnapshots,
+  buildSupportLaneReviewSummary,
   buildSupportLaneWorkspace,
   getActiveSupportLane,
   getPreferredSupportLane,
@@ -1635,6 +1636,7 @@ function buildSupportFocus(
   const defaultLane = getPreferredSupportLane(role)
   const activeLane = getActiveSupportLane(role, selectedLane)
   const lanes = buildSupportLaneSnapshots(role, sections)
+  const visibleSections = selectedLane ? getSupportLaneSections(sections, selectedLane) : sections
 
   return {
     defaultLane,
@@ -1642,7 +1644,8 @@ function buildSupportFocus(
     activeLane,
     lanes,
     activeWorkspace: buildSupportLaneWorkspace(role, activeLane, lanes),
-    visibleSections: selectedLane ? getSupportLaneSections(sections, selectedLane) : sections,
+    visibleSections,
+    reviewSummary: buildSupportLaneReviewSummary(visibleSections),
   }
 }
 

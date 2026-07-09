@@ -52,6 +52,7 @@ export default async function SupportLanePage({
       capabilities={payload.capabilities}
       role={session.role}
       supportFocus={payload.supportFocus}
+      supportPageMode="lane"
     />
   )
 }

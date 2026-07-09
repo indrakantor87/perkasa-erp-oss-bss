@@ -23,6 +23,7 @@ import { SalesSubscriptionActivateForm } from '@/components/sales-subscription-a
 import { SalesSurveyCreateForm } from '@/components/sales-survey-create-form'
 import { SalesWorkOrderCreateForm } from '@/components/sales-work-order-create-form'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
+import { SupportLaneDetailPanel } from '@/components/support-lane-detail-panel'
 import { SupportIsolationForm } from '@/components/support-isolation-form'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
 import { SupportTicketCloseForm } from '@/components/support-ticket-close-form'
@@ -82,12 +83,14 @@ export function DomainShell({
   capabilities,
   role,
   supportFocus,
+  supportPageMode = 'domain',
 }: {
   content: DomainPageContent
   source: DataSourceSnapshot
   capabilities: DomainCapability[]
   role: AppRole
   supportFocus?: DomainSupportFocus
+  supportPageMode?: 'domain' | 'lane'
 }) {
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
@@ -552,7 +555,12 @@ export function DomainShell({
 
       {content.key === 'support' ? (
         <>
-          <SupportRoleQueueBoard role={role} sections={content.reviewSections ?? []} selectedLane={selectedSupportLane} />
+          {supportPageMode === 'domain' ? (
+            <SupportRoleQueueBoard role={role} sections={content.reviewSections ?? []} selectedLane={selectedSupportLane} />
+          ) : null}
+          {supportPageMode === 'lane' && supportFocus ? (
+            <SupportLaneDetailPanel supportFocus={supportFocus} />
+          ) : null}
           {supportFocusCopy && activeSupportLaneMeta && supportRoleMeta && activeSupportWorkspace ? (
             <SupportLaneWorkspacePanel
               workspace={activeSupportWorkspace}
@@ -567,7 +575,11 @@ export function DomainShell({
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className="section-title">
-                    {selectedSupportLane ? supportFocusCopy.eyebrow : `Default role: ${supportFocusCopy.eyebrow}`}
+                    {supportPageMode === 'lane'
+                      ? `Workspace dedicated: ${supportFocusCopy.eyebrow}`
+                      : selectedSupportLane
+                        ? supportFocusCopy.eyebrow
+                        : `Default role: ${supportFocusCopy.eyebrow}`}
                   </p>
                   <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
                     {supportFocusCopy.title}
@@ -577,15 +589,21 @@ export function DomainShell({
                 <div className="flex flex-wrap gap-2">
                   <span className={`badge ${activeSupportLaneMeta.accent}`}>{activeSupportLaneMeta.shortLabel}</span>
                   <span className={`badge border-transparent ${supportRoleMeta.tone}`}>{supportRoleMeta.shortLabel}</span>
-                  {!selectedSupportLane ? (
+                  {!selectedSupportLane && supportPageMode === 'domain' ? (
                     <span className="badge border-slate-200 bg-white text-slate-600">workspace default</span>
                   ) : null}
                 </div>
               </div>
               <div className="mt-6 flex flex-wrap gap-2">
-                <Link href="/support" className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700">
-                  Semua lane
-                </Link>
+                {supportPageMode === 'lane' ? (
+                  <Link href="/support" className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700">
+                    Kembali ke support
+                  </Link>
+                ) : (
+                  <Link href="/support" className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700">
+                    Semua lane
+                  </Link>
+                )}
                 {(supportFocus?.lanes ?? []).map((lane) => {
                   return (
                     <Link

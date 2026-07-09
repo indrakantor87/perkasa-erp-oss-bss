@@ -4,6 +4,7 @@ import type {
   SupportLaneActionKey,
   SupportLaneKey,
   SupportLaneSnapshot,
+  SupportLaneReviewSummary,
   SupportLaneWorkspace,
 } from '@/lib/types'
 
@@ -205,5 +206,37 @@ export function buildSupportLaneWorkspace(
     sectionTitles: snapshot.sectionTitles,
     count: snapshot.count,
     escalationNote: workspace.escalationNote,
+  }
+}
+
+export function buildSupportLaneReviewSummary(
+  sections: DomainReviewSection[],
+): SupportLaneReviewSummary {
+  const rows = sections.flatMap((section) => section.rows)
+  const statusCounts = new Map<string, number>()
+
+  for (const row of rows) {
+    const status = row.status || 'UNKNOWN'
+    statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1)
+  }
+
+  const dominantStatus =
+    Array.from(statusCounts.entries()).sort((left, right) => right[1] - left[1])[0]?.[0] ?? '-'
+
+  const metaHighlights = Array.from(
+    new Set(
+      rows
+        .flatMap((row) => row.meta)
+        .filter(Boolean)
+        .slice(0, 12),
+    ),
+  ).slice(0, 4)
+
+  return {
+    totalRows: rows.length,
+    sectionCount: sections.length,
+    dominantStatus,
+    topItems: rows.slice(0, 3).map((row) => `${row.primary} - ${row.secondary}`),
+    metaHighlights,
   }
 }

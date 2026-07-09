@@ -13,3 +13,4 @@ apps/web/coverage
 apps/web/*.log
 apps/web/storage
 *.tsbuildinfo
+erp_isp_review.sql

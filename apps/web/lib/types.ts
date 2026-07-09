@@ -247,6 +247,14 @@ export type SupportLaneWorkspace = {
   escalationNote: string
 }
 
+export type SupportLaneReviewSummary = {
+  totalRows: number
+  sectionCount: number
+  dominantStatus: string
+  topItems: string[]
+  metaHighlights: string[]
+}
+
 export type DomainSupportFocus = {
   defaultLane: SupportLaneKey
   selectedLane: SupportLaneKey | null
@@ -254,6 +262,7 @@ export type DomainSupportFocus = {
   lanes: SupportLaneSnapshot[]
   activeWorkspace: SupportLaneWorkspace
   visibleSections: DomainReviewSection[]
+  reviewSummary: SupportLaneReviewSummary
 }
 
 export type DomainCapability = {

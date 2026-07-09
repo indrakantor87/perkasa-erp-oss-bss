@@ -17,7 +17,7 @@ import {
 import { dashboardSummary } from '@/lib/mock-dashboard'
 import { domainPages } from '@/lib/mock-domains'
 import { getBatchDetail, getImportBatch, importBatches, transformStages } from '@/lib/mock-import'
-import { getSupportLanePath, getSupportLaneSections, normalizeSupportLane } from '@/lib/support-lanes'
+import { buildSupportLaneReviewSummary, getSupportLanePath, getSupportLaneSections, normalizeSupportLane } from '@/lib/support-lanes'
 import { getDashboardPageData, getDashboardSummary } from '@/lib/services/dashboard-service'
 import { getAuthUsersPageData } from '@/lib/services/auth-user-service'
 import { getDomainPageData } from '@/lib/services/domain-service'
@@ -123,6 +123,8 @@ async function main() {
   assert.equal(supportDomain?.supportFocus?.activeLane, 'tt')
   assert.equal(supportDomain?.supportFocus?.activeWorkspace.lane, 'tt')
   assert.equal((supportDomain?.supportFocus?.activeWorkspace.actionKeys.length ?? 0) > 0, true)
+  assert.equal((supportDomain?.supportFocus?.reviewSummary.totalRows ?? 0) > 0, true)
+  assert.equal((supportDomain?.supportFocus?.reviewSummary.topItems.length ?? 0) > 0, true)
   assert.equal((supportDomain?.supportFocus?.visibleSections.length ?? 0) >= 4, true)
   assert.equal(normalizeSupportLane('TT'), 'tt')
   assert.equal(normalizeSupportLane('invalid'), null)
@@ -130,6 +132,7 @@ async function main() {
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'tt')[0]?.title, 'Trouble Ticket Open')
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'isolations')[0]?.title, 'Isolir Aktif')
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'dismantle')[0]?.title, 'Histori Dismantle')
+  assert.equal(buildSupportLaneReviewSummary(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'tt')).dominantStatus.length > 0, true)
   const focusedSupportDomain = await getDomainPageData('support', 'DISMANTLE_OPERATOR', {
     supportLane: 'dismantle',
   })

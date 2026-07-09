@@ -15,6 +15,7 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 ### Added
 
 - route dedicated [support/[lane]/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/[lane]/page.tsx) untuk screen kerja lane support seperti `/support/tt`, `/support/isolations`, `/support/dismantle`, dan `/support/sla`
+- panel ringkasan lane [support-lane-detail-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-lane-detail-panel.tsx) untuk menampilkan highlight operasional (item/section/status dominan) di halaman dedicated lane support
 
 ### Changed
 
