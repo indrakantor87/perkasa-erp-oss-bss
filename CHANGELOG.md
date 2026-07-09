@@ -10,6 +10,13 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.63.6] - 2026-07-09
+
+### Changed
+
+- [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts) mengoptimalkan query support review DB sehingga `/support/{lane}` hanya mengambil section yang relevan untuk lane tersebut
+- `VERSION` dinaikkan ke `0.63.6`
+
 ## [0.63.5] - 2026-07-08
 
 ### Added

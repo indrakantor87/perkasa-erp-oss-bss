@@ -460,8 +460,14 @@ async function getReviewDbDomainStats() {
   return row
 }
 
-async function getReviewDbSupportSections(): Promise<DomainReviewSection[]> {
-  const tickets = await runReviewDbQuery<ReviewDbSupportTicketRow>(`
+async function getReviewDbSupportSections(lane?: SupportLaneKey | null): Promise<DomainReviewSection[]> {
+  const wantTickets = !lane || lane === 'tt'
+  const wantIsolations = !lane || lane === 'isolations'
+  const wantSla = !lane || lane === 'sla'
+  const wantDismantle = !lane || lane === 'dismantle'
+
+  const tickets = wantTickets
+    ? await runReviewDbQuery<ReviewDbSupportTicketRow>(`
     SELECT
       ticket_code AS ticketCode,
       customer_name AS customerName,
@@ -476,8 +482,10 @@ async function getReviewDbSupportSections(): Promise<DomainReviewSection[]> {
     ORDER BY opened_at DESC, id DESC
     LIMIT 5
   `)
+    : []
 
-  const isolations = await runReviewDbQuery<ReviewDbSupportIsolationRow>(`
+  const isolations = wantIsolations
+    ? await runReviewDbQuery<ReviewDbSupportIsolationRow>(`
     SELECT
       id AS isolationId,
       customer_name AS customerName,
@@ -493,8 +501,10 @@ async function getReviewDbSupportSections(): Promise<DomainReviewSection[]> {
     ORDER BY isolation_date DESC, id DESC
     LIMIT 5
   `)
+    : []
 
-  const slaRows = await runReviewDbQuery<ReviewDbSupportSlaRow>(`
+  const slaRows = wantSla
+    ? await runReviewDbQuery<ReviewDbSupportSlaRow>(`
     SELECT
       trouble_type AS troubleType,
       duration_days AS durationDays,
@@ -503,8 +513,10 @@ async function getReviewDbSupportSections(): Promise<DomainReviewSection[]> {
     ORDER BY updated_at DESC, trouble_type ASC
     LIMIT 5
   `)
+    : []
 
-  const dismantles = await runReviewDbQuery<ReviewDbSupportDismantleRow>(`
+  const dismantles = wantDismantle
+    ? await runReviewDbQuery<ReviewDbSupportDismantleRow>(`
     SELECT
       id AS dismantleId,
       customer_name AS customerName,
@@ -517,6 +529,7 @@ async function getReviewDbSupportSections(): Promise<DomainReviewSection[]> {
     ORDER BY closed_at DESC, id DESC
     LIMIT 5
   `)
+    : []
 
   return [
     {
@@ -1674,7 +1687,7 @@ export async function getDomainPageData(
   try {
     const stats = await getReviewDbDomainStats()
     const salesSections = domain === 'sales' ? await getReviewDbSalesSections() : []
-    const supportSections = domain === 'support' ? await getReviewDbSupportSections() : []
+    const supportSections = domain === 'support' ? await getReviewDbSupportSections(selectedSupportLane) : []
     const customerSections = domain === 'customers' ? await getReviewDbCustomerSections() : []
     const billingSections = domain === 'billing' ? await getReviewDbBillingSections() : []
     const inventorySections = domain === 'inventory' ? await getReviewDbInventorySections() : []
