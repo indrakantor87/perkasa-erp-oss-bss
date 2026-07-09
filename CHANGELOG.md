@@ -46,6 +46,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) menampilkan panel isolir khusus saat membuka lane `isolations`
 - `VERSION` dinaikkan ke `0.63.9`
 
+## [0.63.10] - 2026-07-09
+
+### Added
+
+- panel operasional [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx) untuk menampilkan histori dismantle dan meta penutupan layanan di halaman `/support/dismantle`
+- panel operasional [support-sla-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-queue-panel.tsx) untuk menampilkan aturan SLA trouble ticket di halaman `/support/sla`
+
+### Changed
+
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) menampilkan panel operasional yang spesifik untuk lane `dismantle` dan `sla`
+- `VERSION` dinaikkan ke `0.63.10`
+
 ## [0.63.5] - 2026-07-08
 
 ### Added
