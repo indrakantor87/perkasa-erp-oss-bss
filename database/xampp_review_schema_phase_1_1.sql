@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS billing_invoice_items (
   line_total DECIMAL(15,2) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_billing_invoice_items_bk (invoice_id, description, line_total),
   CONSTRAINT fk_billing_invoice_items_invoice FOREIGN KEY (invoice_id) REFERENCES billing_invoices(id)
 );
 
@@ -112,6 +113,8 @@ CREATE TABLE IF NOT EXISTS billing_payments (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   invoice_id BIGINT UNSIGNED NOT NULL,
   payment_no VARCHAR(50) NULL,
+  payment_no_norm VARCHAR(50)
+    GENERATED ALWAYS AS (IFNULL(payment_no,'')) STORED,
   payment_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   amount DECIMAL(15,2) NOT NULL DEFAULT 0,
   payment_method ENUM('CASH','TRANSFER','EWALLET','VA','OTHER') NOT NULL DEFAULT 'TRANSFER',
@@ -121,6 +124,7 @@ CREATE TABLE IF NOT EXISTS billing_payments (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_billing_payments_no (payment_no),
+  UNIQUE KEY uq_billing_payments_bk (invoice_id, payment_no_norm, amount),
   CONSTRAINT fk_billing_payments_invoice FOREIGN KEY (invoice_id) REFERENCES billing_invoices(id),
   CONSTRAINT fk_billing_payments_received_by FOREIGN KEY (received_by_user_id) REFERENCES auth_users(id)
 );
@@ -136,6 +140,7 @@ CREATE TABLE IF NOT EXISTS billing_collection_actions (
   notes TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_billing_collection_actions_bk (invoice_id, action_at, action_type),
   CONSTRAINT fk_billing_collection_actions_invoice FOREIGN KEY (invoice_id) REFERENCES billing_invoices(id),
   CONSTRAINT fk_billing_collection_actions_handled_by FOREIGN KEY (handled_by_user_id) REFERENCES auth_users(id)
 );

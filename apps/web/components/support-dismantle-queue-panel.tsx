@@ -1,4 +1,5 @@
-import type { DomainReviewSection, DomainReviewRow } from '@/lib/types'
+import { SupportActionQuickLinks } from '@/components/support-action-quick-links'
+import type { DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
   return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? '-'
@@ -38,8 +39,10 @@ function buildDismantleSummary(rows: DomainReviewRow[]) {
 
 export function SupportDismantleQueuePanel({
   sections,
+  actionLinks = [],
 }: {
   sections: DomainReviewSection[]
+  actionLinks?: SupportActionLink[]
 }) {
   const dismantleSection =
     sections.find((section) => section.title.toUpperCase().includes('DISMANTLE')) ?? null
@@ -82,6 +85,11 @@ export function SupportDismantleQueuePanel({
         </div>
       ) : null}
 
+      <SupportActionQuickLinks
+        links={actionLinks}
+        description="Tim dismantle bisa langsung melompat ke form approval atau restore tanpa keluar dari workspace terminasi."
+      />
+
       {dismantleSection.rows.length ? (
         <div className="mt-6 space-y-3">
           {dismantleSection.rows.map((row) => {
@@ -114,4 +122,3 @@ export function SupportDismantleQueuePanel({
     </section>
   )
 }
-

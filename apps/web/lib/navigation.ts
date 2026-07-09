@@ -21,6 +21,13 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
     icon: LayoutDashboard,
   },
   {
+    title: 'Daily Activity',
+    href: '/dashboard/daily-activity',
+    description: 'Plan pagi dan closing sore aktivitas harian',
+    tone: 'bg-cyan-600 text-white',
+    icon: ClipboardList,
+  },
+  {
     title: 'Import Center',
     href: '/import',
     description: 'Batch staging, review, dan transform',
@@ -87,7 +94,9 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
 
 export function findNavigationItem(pathname: string) {
   return (
-    navigationItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) ??
+    navigationItems
+      .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+      .sort((left, right) => right.href.length - left.href.length)[0] ??
     navigationItems[0]
   )
 }

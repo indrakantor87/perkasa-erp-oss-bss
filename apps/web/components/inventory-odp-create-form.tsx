@@ -1,8 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { buildGoogleMapsHref } from '@/lib/map-links'
 
 type InventoryOdpCreateFormProps = {
   canCreate: boolean
@@ -22,6 +24,11 @@ export function InventoryOdpCreateForm({ canCreate, reviewDbReady }: InventoryOd
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+  const mapsHref = buildGoogleMapsHref({
+    latitude,
+    longitude,
+    query: locationText,
+  })
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -144,6 +151,32 @@ export function InventoryOdpCreateForm({ canCreate, reviewDbReady }: InventoryOd
             disabled={isDisabled}
           />
         </label>
+
+        <div className="rounded-2xl border border-line bg-slate-50 p-4 text-sm text-slate-700 lg:col-span-2">
+          <p className="font-semibold text-slate-950">Preview maps dan parity legacy</p>
+          <p className="mt-2 leading-6 text-mute">
+            ERP ini mulai menyiapkan parity ODP dari legacy dengan koordinat yang bisa dibuka ke
+            maps, lalu menjadi dasar untuk port ODP dan accessories/device assignment.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {mapsHref ? (
+              <Link
+                href={mapsHref}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700"
+              >
+                Preview di Google Maps
+              </Link>
+            ) : (
+              <span className="badge border-slate-200 bg-white text-slate-500">
+                Isi koordinat atau lokasi untuk preview maps
+              </span>
+            )}
+            <span className="badge border-slate-200 bg-white text-slate-600">Port ODP siap digenerate</span>
+            <span className="badge border-slate-200 bg-white text-slate-600">Accessories via device assignment</span>
+          </div>
+        </div>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Total Port</span>

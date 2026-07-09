@@ -18,6 +18,19 @@ Urutan eksekusi review:
 2. jalankan `database/xampp_review_schema_phase_1_1.sql`
 3. jalankan `database/xampp_review_staging_import.sql`
 
+Urutan patch aman untuk database existing (jika schema sudah pernah dipakai dan sudah ada data):
+
+1. jalankan `database/xampp_review_schema_precheck_0_63_34.sql` (cek duplikat ringkas)
+2. jika perlu, jalankan `database/xampp_review_schema_precheck_detail_0_63_36.sql` (cek duplikat + daftar id)
+3. jalankan `database/xampp_review_schema_autofix_dry_run_0_63_37.sql` untuk melihat kandidat row yang akan diubah/dihapus
+4. jika aman untuk dibersihkan otomatis, jalankan `database/xampp_review_schema_autofix_guarded_0_63_37.sql` dan set `@confirm_apply = 1` setelah review
+5. jalankan `database/xampp_review_schema_patch_0_63_33.sql` untuk menambah UNIQUE business key transform
+
+Catatan tambahan untuk inventory stock movement:
+
+- jika precheck menemukan duplikat pada `inventory_stock_movements`, jalankan laporan per `reference_no` agar cleanup bisa ditentukan per batch kerja: `database/xampp_review_schema_precheck_inventory_movements_by_ref_0_63_38.sql`
+- jika butuh memastikan duplikat berasal dari re-run transform atau input manual, jalankan laporan korelasi movement ↔ staging (lihat batch/legacy/import_status per movement id): `database/xampp_review_schema_precheck_inventory_movements_correlate_0_63_39.sql`
+
 ## Kenapa Perlu Staging
 
 Import langsung ke tabel final terlalu berisiko karena:

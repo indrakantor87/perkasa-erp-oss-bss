@@ -8,6 +8,10 @@ import type { DomainKey } from '@/lib/types'
 
 const enabledDomains: DomainKey[] = ['sales', 'customers', 'support', 'inventory', 'hr', 'billing']
 
+function resolveSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
 export function generateStaticParams() {
   return enabledDomains.map((domain) => ({ domain }))
 }
@@ -17,7 +21,12 @@ export default async function DomainPage({
   searchParams,
 }: {
   params: Promise<{ domain: string }>
-  searchParams: Promise<{ lane?: string | string[] }>
+  searchParams: Promise<{
+    lane?: string | string[]
+    ticket?: string | string[]
+    isolation?: string | string[]
+    type?: string | string[]
+  }>
 }) {
   const session = await requireSession()
 
@@ -42,6 +51,11 @@ export default async function DomainPage({
       capabilities={payload.capabilities}
       role={session.role}
       supportFocus={payload.supportFocus}
+      supportPrefill={{
+        ticket: resolveSearchParam(resolvedSearchParams.ticket),
+        isolation: resolveSearchParam(resolvedSearchParams.isolation),
+        type: resolveSearchParam(resolvedSearchParams.type),
+      }}
     />
   )
 }

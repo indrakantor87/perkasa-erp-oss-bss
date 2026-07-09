@@ -10,11 +10,20 @@ import { HrEmployeeCreateForm } from '@/components/hr-employee-create-form'
 import { HrLoanCreateForm } from '@/components/hr-loan-create-form'
 import { HrSalarySlipForm } from '@/components/hr-salary-slip-form'
 import { InventoryDeviceAssignmentForm } from '@/components/inventory-device-assignment-form'
+import { InventoryNetworkOpsPanel } from '@/components/inventory-network-ops-panel'
 import { InventoryDeviceReturnForm } from '@/components/inventory-device-return-form'
+import { InventoryItemRequestForm } from '@/components/inventory-item-request-form'
 import { InventoryItemCreateForm } from '@/components/inventory-item-create-form'
+import { InventoryItemLoanForm } from '@/components/inventory-item-loan-form'
+import { InventoryLoanOpsPanel } from '@/components/inventory-loan-ops-panel'
+import { InventoryLoanReturnForm } from '@/components/inventory-loan-return-form'
 import { InventoryOdpCreateForm } from '@/components/inventory-odp-create-form'
 import { InventoryOdpPortAssignForm } from '@/components/inventory-odp-port-assign-form'
 import { InventoryOdpPortStatusForm } from '@/components/inventory-odp-port-status-form'
+import { InventoryRequestOpsPanel } from '@/components/inventory-request-ops-panel'
+import { InventoryRequestStatusForm } from '@/components/inventory-request-status-form'
+import { InventoryStockReceiptForm } from '@/components/inventory-stock-receipt-form'
+import { InventoryStockReceiptPanel } from '@/components/inventory-stock-receipt-panel'
 import { InventoryStockMovementForm } from '@/components/inventory-stock-movement-form'
 import { SalesCoverageCreateForm } from '@/components/sales-coverage-create-form'
 import { SalesLeadCreateForm } from '@/components/sales-lead-create-form'
@@ -37,12 +46,15 @@ import { SupportSlaQueuePanel } from '@/components/support-sla-queue-panel'
 import { SupportTroubleTicketQueuePanel } from '@/components/support-tt-queue-panel'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { getRoleMeta } from '@/lib/role-meta'
+import { getSupportActionAnchorId } from '@/lib/support-action-links'
 import { getSupportLanePath } from '@/lib/support-lanes'
 import type {
   AppRole,
   DomainCapability,
   DomainPageContent,
   DataSourceSnapshot,
+  SupportActionLink,
+  SupportFormPrefill,
   DomainSupportFocus,
   SupportLaneActionKey,
   SupportLaneKey,
@@ -81,6 +93,39 @@ function getSupportLaneFocusCopy(lane: SupportLaneKey) {
   }
 }
 
+const supportActionCopyMap: Record<
+  SupportLaneActionKey,
+  {
+    label: string
+    description: string
+  }
+> = {
+  'ticket-create': {
+    label: 'Buat Trouble Ticket',
+    description: 'Catat ticket baru begitu gangguan tervalidasi agar antrian TT langsung terbentuk.',
+  },
+  'ticket-close': {
+    label: 'Update atau Close Ticket',
+    description: 'Selesaikan tindak lanjut ticket aktif tanpa berpindah lane atau membuka screen lain.',
+  },
+  'sla-manage': {
+    label: 'Kelola Aturan SLA',
+    description: 'Samakan prioritas penanganan dengan target waktu yang berlaku untuk ticket aktif.',
+  },
+  'isolation-create': {
+    label: 'Buat Suspend Isolir',
+    description: 'Input suspend baru setelah identitas pelanggan, radbox, dan alasan isolir tervalidasi.',
+  },
+  'isolation-restore': {
+    label: 'Proses Restore',
+    description: 'Pulihkan pelanggan yang sudah siap recover langsung dari workspace isolir atau dismantle.',
+  },
+  'dismantle-approve': {
+    label: 'Approve Dismantle',
+    description: 'Finalisasi terminasi pelanggan yang memang sudah siap dipindahkan ke proses dismantle.',
+  },
+}
+
 export function DomainShell({
   content,
   source,
@@ -88,6 +133,7 @@ export function DomainShell({
   role,
   supportFocus,
   supportPageMode = 'domain',
+  supportPrefill,
 }: {
   content: DomainPageContent
   source: DataSourceSnapshot
@@ -95,11 +141,16 @@ export function DomainShell({
   role: AppRole
   supportFocus?: DomainSupportFocus
   supportPageMode?: 'domain' | 'lane'
+  supportPrefill?: SupportFormPrefill
 }) {
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
   const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
+  const canRequestInventory = content.key === 'inventory' ? role === 'FIELD_TECHNICIAN' || canCreate : false
+  const canProcessInventoryRequest =
+    content.key === 'inventory' ? role !== 'FIELD_TECHNICIAN' && (canApprove || canUpdate || canCreate) : false
+  const isFieldTechnicianInventory = content.key === 'inventory' && role === 'FIELD_TECHNICIAN'
   const billingInvoiceSuggestions =
     content.key === 'billing'
       ? Array.from(
@@ -146,6 +197,33 @@ export function DomainShell({
           .map((row) => {
             const assignmentId = row.id.replace(/^ASSIGN-/, '').trim()
             return assignmentId ? `${assignmentId} | ${row.primary} | ${row.secondary}` : ''
+          })
+          .filter(Boolean)
+      : []
+  const inventoryRequestSuggestions =
+    content.key === 'inventory'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('REQUEST INVENTORY'))
+          .flatMap((section) => section.rows)
+          .map((row) => {
+            const requestId = row.id.replace(/^REQ-/, '').trim()
+            const subdivision =
+              row.meta.find((item) => item.startsWith('Sub-divisi: '))?.replace('Sub-divisi: ', '').trim() || '-'
+            return requestId ? `${requestId} | ${row.primary} | ${subdivision} | ${row.status}` : ''
+          })
+          .filter(Boolean)
+      : []
+  const inventoryLoanSuggestions =
+    content.key === 'inventory'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('PINJAMAN INVENTORY'))
+          .flatMap((section) => section.rows)
+          .filter((row) => !row.status.toUpperCase().includes('RETURNED') && !row.status.toUpperCase().includes('DIKEMBALIKAN'))
+          .map((row) => {
+            const loanId = row.id.replace(/^LOAN-/, '').trim()
+            const remaining =
+              row.meta.find((item) => item.startsWith('Sisa Pinjam: '))?.replace('Sisa Pinjam: ', '').trim() || '-'
+            return loanId ? `${loanId} | ${row.primary} | ${row.status} | Sisa ${remaining}` : ''
           })
           .filter(Boolean)
       : []
@@ -293,6 +371,7 @@ export function DomainShell({
                 canUpdate={canUpdate}
                 reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
                 ticketSuggestions={supportTicketSuggestions}
+                initialTicketCode={supportPrefill?.ticket}
               />
             ),
           },
@@ -304,6 +383,7 @@ export function DomainShell({
                 canApprove={canApprove}
                 reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
                 typeSuggestions={supportTypeSuggestions}
+                initialTroubleType={supportPrefill?.type}
               />
             ),
           },
@@ -327,6 +407,7 @@ export function DomainShell({
                 canUpdate={canUpdate}
                 reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
                 isolationSuggestions={supportIsolationSuggestions}
+                initialIsolationValue={supportPrefill?.isolation}
               />
             ),
           },
@@ -338,6 +419,7 @@ export function DomainShell({
                 canApprove={canApprove}
                 reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
                 isolationSuggestions={supportIsolationSuggestions}
+                initialIsolationValue={supportPrefill?.isolation}
               />
             ),
           },
@@ -354,6 +436,14 @@ export function DomainShell({
   const secondarySupportForms =
     activeSupportWorkspace && content.key === 'support' && supportPageMode === 'domain'
       ? supportForms.filter((item) => !activeSupportWorkspace.actionKeys.includes(item.key))
+      : []
+  const laneActionLinks: SupportActionLink[] =
+    content.key === 'support' && activeSupportWorkspace
+      ? activeSupportWorkspace.actionKeys.map((key) => ({
+          key,
+          ...supportActionCopyMap[key],
+          href: `#${getSupportActionAnchorId(key)}`,
+        }))
       : []
 
   return (
@@ -514,41 +604,94 @@ export function DomainShell({
       ) : null}
 
       {content.key === 'inventory' ? (
-        <section className="grid gap-6 xl:grid-cols-2">
-          <InventoryItemCreateForm
-            canCreate={canCreate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-          />
-          <InventoryStockMovementForm
-            canCreate={canCreate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            itemSuggestions={inventoryItemSuggestions}
-          />
-          <InventoryOdpCreateForm
-            canCreate={canCreate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-          />
-          <InventoryOdpPortAssignForm
-            canCreate={canCreate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            odpSuggestions={inventoryOdpSuggestions}
-          />
-          <InventoryOdpPortStatusForm
-            canCreate={canCreate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            odpSuggestions={inventoryOdpSuggestions}
-          />
-          <InventoryDeviceAssignmentForm
-            canCreate={canCreate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            itemSuggestions={inventoryItemSuggestions}
-          />
-          <InventoryDeviceReturnForm
-            canCreate={canCreate}
-            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-            assignmentSuggestions={inventoryAssignmentSuggestions}
-          />
-        </section>
+        <>
+          <InventoryNetworkOpsPanel sections={visibleReviewSections} />
+          <InventoryRequestOpsPanel sections={visibleReviewSections} />
+          <InventoryLoanOpsPanel sections={visibleReviewSections} />
+          <InventoryStockReceiptPanel sections={visibleReviewSections} />
+          <section className="grid gap-6 xl:grid-cols-2">
+            <InventoryItemRequestForm
+              canCreate={canRequestInventory}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              itemSuggestions={inventoryItemSuggestions}
+            />
+            {canProcessInventoryRequest ? (
+              <InventoryRequestStatusForm
+                canCreate={canProcessInventoryRequest}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                requestSuggestions={inventoryRequestSuggestions}
+              />
+            ) : null}
+            {!isFieldTechnicianInventory ? (
+              <InventoryStockReceiptForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                itemSuggestions={inventoryItemSuggestions}
+              />
+            ) : null}
+            {!isFieldTechnicianInventory ? (
+              <InventoryItemLoanForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                itemSuggestions={inventoryItemSuggestions}
+              />
+            ) : null}
+            {!isFieldTechnicianInventory ? (
+              <InventoryLoanReturnForm
+                canUpdate={canUpdate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                loanSuggestions={inventoryLoanSuggestions}
+              />
+            ) : null}
+            {!isFieldTechnicianInventory ? (
+              <InventoryItemCreateForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              />
+            ) : null}
+            {!isFieldTechnicianInventory ? (
+              <InventoryStockMovementForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                itemSuggestions={inventoryItemSuggestions}
+              />
+            ) : null}
+            {!isFieldTechnicianInventory ? (
+              <InventoryOdpCreateForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              />
+            ) : null}
+            {!isFieldTechnicianInventory ? (
+              <InventoryOdpPortAssignForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                odpSuggestions={inventoryOdpSuggestions}
+              />
+            ) : null}
+            {!isFieldTechnicianInventory ? (
+              <InventoryOdpPortStatusForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                odpSuggestions={inventoryOdpSuggestions}
+              />
+            ) : null}
+            {!isFieldTechnicianInventory ? (
+              <InventoryDeviceAssignmentForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                itemSuggestions={inventoryItemSuggestions}
+              />
+            ) : null}
+            {!isFieldTechnicianInventory ? (
+              <InventoryDeviceReturnForm
+                canCreate={canCreate}
+                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                assignmentSuggestions={inventoryAssignmentSuggestions}
+              />
+            ) : null}
+          </section>
+        </>
       ) : null}
 
       {content.key === 'hr' ? (
@@ -584,16 +727,16 @@ export function DomainShell({
             <SupportLaneDetailPanel supportFocus={supportFocus} />
           ) : null}
           {supportPageMode === 'lane' && activeSupportLane === 'tt' ? (
-            <SupportTroubleTicketQueuePanel sections={visibleReviewSections} />
+            <SupportTroubleTicketQueuePanel sections={visibleReviewSections} actionLinks={laneActionLinks} />
           ) : null}
           {supportPageMode === 'lane' && activeSupportLane === 'isolations' ? (
-            <SupportIsolationQueuePanel sections={visibleReviewSections} />
+            <SupportIsolationQueuePanel sections={visibleReviewSections} actionLinks={laneActionLinks} />
           ) : null}
           {supportPageMode === 'lane' && activeSupportLane === 'dismantle' ? (
-            <SupportDismantleQueuePanel sections={visibleReviewSections} />
+            <SupportDismantleQueuePanel sections={visibleReviewSections} actionLinks={laneActionLinks} />
           ) : null}
           {supportPageMode === 'lane' && activeSupportLane === 'sla' ? (
-            <SupportSlaQueuePanel sections={visibleReviewSections} />
+            <SupportSlaQueuePanel sections={visibleReviewSections} actionLinks={laneActionLinks} />
           ) : null}
           {supportFocusCopy && activeSupportLaneMeta && supportRoleMeta && activeSupportWorkspace ? (
             <SupportLaneWorkspacePanel
@@ -656,7 +799,9 @@ export function DomainShell({
               ) : null}
               <div className="grid gap-6 xl:grid-cols-2">
                 {primarySupportForms.map((item) => (
-                  <div key={item.key}>{item.element}</div>
+                  <div key={item.key} id={getSupportActionAnchorId(item.key)} className="scroll-mt-24">
+                    {item.element}
+                  </div>
                 ))}
               </div>
             </section>
@@ -671,7 +816,9 @@ export function DomainShell({
               </div>
               <div className="grid gap-6 xl:grid-cols-2">
                 {secondarySupportForms.map((item) => (
-                  <div key={item.key}>{item.element}</div>
+                  <div key={item.key} id={getSupportActionAnchorId(item.key)} className="scroll-mt-24">
+                    {item.element}
+                  </div>
                 ))}
               </div>
             </section>

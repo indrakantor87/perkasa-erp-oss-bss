@@ -21,6 +21,7 @@ Referensi role ERP saat ini:
 1. [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
 2. [access-control.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control.ts)
 3. [access-control-server.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control-server.ts)
+4. [org-division-baseline.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/org-division-baseline.md)
 
 ## Kondisi Saat Ini
 
@@ -41,6 +42,35 @@ Role target harus mengikuti prinsip berikut:
 3. role per divisi boleh melihat domain tertentu, tetapi aksi harus tetap dibatasi
 4. role mikro seperti `DISMANTLE` dan `TROUBLESHOOTS` harus tetap bisa dibuat sempit
 5. `SUPER_ADMIN` tetap ada sebagai role override global
+
+## Baseline Divisi Organisasi
+
+Struktur organisasi yang menjadi acuan ERP saat ini:
+
+1. `Pemasaran & Pelayanan`
+   - `Penjualan`
+   - `CS`
+   - `Admin CS`
+   - `NOC`
+   - `Troubleshoots`
+   - `Digital Creator`
+2. `Teknisi`
+   - `Teknisi PSB`
+   - `Teknisi Jalur dan Expan`
+   - `Teknisi Jointer`
+3. `General Affair`
+   - `Inventory`
+   - `Legal`
+4. `Finance & HR`
+5. `Operasional`
+   - `Kantor`
+   - `Toko`
+
+Catatan:
+
+1. baseline detail ada di [org-division-baseline.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/org-division-baseline.md)
+2. role ERP aktif saat ini baru menutup sebagian struktur organisasi ini
+3. `FIELD_TECHNICIAN` saat ini masih agregat untuk tiga sub-divisi teknisi
 
 ## Role ERP Target
 
@@ -69,6 +99,20 @@ Role target yang disarankan:
 | `TROUBLESHOOTS` | `TT_OPERATOR` | langsung |
 | `CREATOR_DIGITAL` | `DIGITAL_CREATOR` | langsung |
 | `DISMANTLE` | `DISMANTLE_OPERATOR` | langsung |
+
+## Mapping Role ERP Ke Divisi
+
+| Role ERP target | Divisi | Sub-divisi | Catatan |
+|---|---|---|---|
+| `SUPER_ADMIN` | Lintas Divisi | Kontrol Global | override semua area |
+| `SALES_MARKETING` | Pemasaran & Pelayanan | Penjualan | sudah sejajar |
+| `CS_OPERATOR` | Pemasaran & Pelayanan | CS | sudah sejajar |
+| `CS_ADMIN` | Pemasaran & Pelayanan | Admin CS | sudah sejajar |
+| `NOC_OPERATOR` | Pemasaran & Pelayanan | NOC | sudah sejajar |
+| `TT_OPERATOR` | Pemasaran & Pelayanan | Troubleshoots | sudah sejajar |
+| `DIGITAL_CREATOR` | Pemasaran & Pelayanan | Digital Creator | sudah sejajar |
+| `FIELD_TECHNICIAN` | Teknisi | PSB / Jalur dan Expan / Jointer | masih payung gabungan |
+| `DISMANTLE_OPERATOR` | Pemasaran & Pelayanan | Dismantle Operasional | sementara dipertahankan sebagai role mikro support yang belum tercantum eksplisit pada catatan divisi terbaru |
 
 ## Definisi Per Role
 
@@ -159,6 +203,7 @@ Hak minimum:
 1. akses queue lapangan, TT teknis, ODP, work order yang relevan
 2. update hasil lapangan, status pengerjaan, status port/perangkat yang relevan
 3. tidak punya hak persetujuan admin
+4. boleh submit request barang teknisi ke inventory, tetapi tidak memproses status akhir request
 
 Catatan:
 

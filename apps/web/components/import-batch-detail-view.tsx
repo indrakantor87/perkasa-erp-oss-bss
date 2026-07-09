@@ -16,6 +16,44 @@ const runTone: Record<BatchDetail['transformRuns'][number]['status'], string> = 
   FAILED: 'bg-rose-50 text-rose-700',
 }
 
+function buildRowStatusSummary(rows: BatchDetail['rows']) {
+  const summary = {
+    imported: 0,
+    valid: 0,
+    invalid: 0,
+    mapped: 0,
+    pending: 0,
+    skipped: 0,
+  }
+
+  for (const row of rows) {
+    if (row.status === 'IMPORTED') summary.imported += 1
+    else if (row.status === 'VALID') summary.valid += 1
+    else if (row.status === 'INVALID') summary.invalid += 1
+    else if (row.status === 'MAPPED') summary.mapped += 1
+    else if (row.status === 'PENDING') summary.pending += 1
+    else if (row.status === 'SKIPPED') summary.skipped += 1
+  }
+
+  return summary
+}
+
+function buildTargetBreakdown(rows: BatchDetail['rows']) {
+  const map = new Map<string, number>()
+
+  for (const row of rows) {
+    const target = row.targetId.trim()
+    if (!target) continue
+    const targetTable = target.split(':')[0]?.trim() || 'target_lain'
+    map.set(targetTable, (map.get(targetTable) ?? 0) + 1)
+  }
+
+  return Array.from(map.entries())
+    .map(([targetTable, total]) => ({ targetTable, total }))
+    .sort((left, right) => right.total - left.total || left.targetTable.localeCompare(right.targetTable))
+    .slice(0, 6)
+}
+
 export function ImportBatchDetailView({
   batch,
   detail,
@@ -29,6 +67,12 @@ export function ImportBatchDetailView({
   canApprove: boolean
   reviewDbReady: boolean
 }) {
+  const rowSummary = buildRowStatusSummary(detail.rows)
+  const unresolvedRows = rowSummary.valid + rowSummary.mapped + rowSummary.pending
+  const finalizedRows = rowSummary.imported + rowSummary.invalid + rowSummary.skipped
+  const targetBreakdown = buildTargetBreakdown(detail.rows)
+  const completionRate = batch.totalRows > 0 ? Math.round((finalizedRows / batch.totalRows) * 100) : 0
+
   return (
     <div className="space-y-6">
       <section className="panel p-6">
@@ -66,6 +110,127 @@ export function ImportBatchDetailView({
           </article>
         </div>
 
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-2xl border border-line bg-slate-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Row Final</p>
+            <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              {rowSummary.imported.toLocaleString('id-ID')}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-mute">
+              Imported ke target final dari total {batch.totalRows.toLocaleString('id-ID')} row staging.
+            </p>
+          </article>
+          <article className="rounded-2xl border border-line bg-slate-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Butuh Tindak Lanjut</p>
+            <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              {unresolvedRows.toLocaleString('id-ID')}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-mute">
+              Row berstatus `VALID`, `MAPPED`, atau `PENDING` yang belum final.
+            </p>
+          </article>
+          <article className="rounded-2xl border border-line bg-slate-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Invalid / Skipped</p>
+            <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              {(rowSummary.invalid + rowSummary.skipped).toLocaleString('id-ID')}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-mute">
+              {rowSummary.invalid.toLocaleString('id-ID')} invalid dan {rowSummary.skipped.toLocaleString('id-ID')} skipped.
+            </p>
+          </article>
+          <article className="rounded-2xl border border-line bg-slate-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Finalisasi Batch</p>
+            <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">{completionRate}%</p>
+            <p className="mt-2 text-sm leading-6 text-mute">
+              {finalizedRows.toLocaleString('id-ID')} row sudah final (`IMPORTED`, `INVALID`, atau `SKIPPED`).
+            </p>
+          </article>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+          <article className="rounded-2xl border border-line bg-slate-50 p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Kesehatan Batch</p>
+                <h3 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                  Ringkasan progres transform per row
+                </h3>
+              </div>
+              <span className="badge border-transparent bg-white text-slate-700">
+                {detail.rows.length.toLocaleString('id-ID')} row
+              </span>
+            </div>
+            <div className="mt-5 space-y-4 text-sm">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-semibold text-slate-950">Imported</span>
+                  <span className="text-mute">{rowSummary.imported.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="h-2 rounded-full bg-white">
+                  <div
+                    className="h-2 rounded-full bg-violet-500"
+                    style={{ width: `${batch.totalRows > 0 ? (rowSummary.imported / batch.totalRows) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-semibold text-slate-950">Masih valid, belum final</span>
+                  <span className="text-mute">{rowSummary.valid.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="h-2 rounded-full bg-white">
+                  <div
+                    className="h-2 rounded-full bg-emerald-500"
+                    style={{ width: `${batch.totalRows > 0 ? (rowSummary.valid / batch.totalRows) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-semibold text-slate-950">Masih mapped / pending</span>
+                  <span className="text-mute">
+                    {(rowSummary.mapped + rowSummary.pending).toLocaleString('id-ID')}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-white">
+                  <div
+                    className="h-2 rounded-full bg-blue-500"
+                    style={{
+                      width: `${batch.totalRows > 0 ? ((rowSummary.mapped + rowSummary.pending) / batch.totalRows) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-line bg-slate-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Target Final Terbentuk</p>
+            <h3 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+              Breakdown tabel tujuan yang sudah terisi
+            </h3>
+            <div className="mt-5 space-y-3">
+              {targetBreakdown.length > 0 ? (
+                targetBreakdown.map((item) => (
+                  <div
+                    key={item.targetTable}
+                    className="flex items-center justify-between gap-4 rounded-2xl border border-white bg-white px-4 py-3"
+                  >
+                    <span className="text-sm font-semibold text-slate-950">{item.targetTable}</span>
+                    <span className="badge border-transparent bg-slate-100 text-slate-700">
+                      {item.total.toLocaleString('id-ID')} row
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-line bg-white px-4 py-4 text-sm text-mute">
+                  Belum ada target final yang terbentuk. Jalankan validasi dan transform dulu untuk mulai mengisi tabel tujuan.
+                </div>
+              )}
+            </div>
+          </article>
+        </div>
+
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <article className="rounded-2xl border border-line bg-slate-50 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">File sumber</p>
@@ -87,6 +252,7 @@ export function ImportBatchDetailView({
         <ImportBatchActionPanel
           batchId={batch.id}
           batch={batch}
+          rows={detail.rows}
           canApprove={canApprove}
           reviewDbReady={reviewDbReady}
         />

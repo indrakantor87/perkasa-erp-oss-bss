@@ -1,5 +1,14 @@
 type ReviewDbPool = {
   query: (sql: string, values?: unknown[]) => Promise<[unknown[], unknown]>
+  getConnection: () => Promise<ReviewDbConnection>
+}
+
+type ReviewDbConnection = {
+  query: (sql: string, values?: unknown[]) => Promise<[unknown[], unknown]>
+  beginTransaction: () => Promise<void>
+  commit: () => Promise<void>
+  rollback: () => Promise<void>
+  release: () => void
 }
 
 declare global {
@@ -33,7 +42,7 @@ async function createPool(): Promise<ReviewDbPool> {
     connectionLimit: 4,
     queueLimit: 0,
     connectTimeout: Number(process.env.REVIEW_DB_CONNECT_TIMEOUT_MS ?? 1500),
-  })
+  }) as unknown as ReviewDbPool
 }
 
 async function getPool() {
@@ -51,6 +60,22 @@ export async function runReviewDbExecute<T>(sql: string, values: unknown[] = [])
   const pool = await getPool()
   const [result] = await pool.query(sql, values)
   return result as T
+}
+
+export async function runReviewDbTransaction<T>(handler: (connection: ReviewDbConnection) => Promise<T>) {
+  const pool = await getPool()
+  const connection = await pool.getConnection()
+  try {
+    await connection.beginTransaction()
+    const result = await handler(connection)
+    await connection.commit()
+    return result
+  } catch (error) {
+    await connection.rollback().catch(() => null)
+    throw error
+  } finally {
+    connection.release()
+  }
 }
 
 export function getReviewDbErrorDetail(error: unknown) {

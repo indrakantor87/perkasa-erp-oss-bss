@@ -1,28 +1,36 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type SupportTicketCloseFormProps = {
   canUpdate: boolean
   reviewDbReady: boolean
   ticketSuggestions: string[]
+  initialTicketCode?: string
 }
 
 export function SupportTicketCloseForm({
   canUpdate,
   reviewDbReady,
   ticketSuggestions,
+  initialTicketCode,
 }: SupportTicketCloseFormProps) {
   const router = useRouter()
-  const [ticketCode, setTicketCode] = useState(ticketSuggestions[0] ?? '')
+  const [ticketCode, setTicketCode] = useState(initialTicketCode?.trim() || ticketSuggestions[0] || '')
   const [resolutionAction, setResolutionAction] = useState('')
   const [closeNotes, setCloseNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canUpdate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialTicketCode?.trim()) {
+      setTicketCode(initialTicketCode.trim())
+    }
+  }, [initialTicketCode])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

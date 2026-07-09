@@ -1,4 +1,7 @@
-import type { DomainReviewSection, DomainReviewRow } from '@/lib/types'
+import Link from 'next/link'
+import { SupportActionQuickLinks } from '@/components/support-action-quick-links'
+import { buildSupportActionHref } from '@/lib/support-action-links'
+import type { DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
   return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? '-'
@@ -47,8 +50,10 @@ function buildIsolationSummary(rows: DomainReviewRow[]) {
 
 export function SupportIsolationQueuePanel({
   sections,
+  actionLinks = [],
 }: {
   sections: DomainReviewSection[]
+  actionLinks?: SupportActionLink[]
 }) {
   const isolationSection =
     sections.find((section) => section.title.toUpperCase().includes('ISOLIR')) ?? null
@@ -58,6 +63,10 @@ export function SupportIsolationQueuePanel({
   }
 
   const summary = buildIsolationSummary(isolationSection.rows)
+
+  function buildIsolationPrefillValue(row: DomainReviewRow) {
+    return `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`
+  }
 
   return (
     <section className="panel p-6">
@@ -93,12 +102,18 @@ export function SupportIsolationQueuePanel({
         </div>
       ) : null}
 
+      <SupportActionQuickLinks
+        links={actionLinks}
+        description="Buka form suspend, restore, atau approval dismantle langsung dari lane isolir agar follow up lebih cepat."
+      />
+
       {isolationSection.rows.length ? (
         <div className="mt-6 space-y-3">
           {isolationSection.rows.map((row) => {
             const phone = pickMeta(row.meta, 'Phone: ')
             const marketing = pickMeta(row.meta, 'Marketing: ')
             const isolasiAt = pickMeta(row.meta, 'Isolasi: ')
+            const isolationPrefillValue = buildIsolationPrefillValue(row)
 
             return (
               <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-5">
@@ -115,6 +130,24 @@ export function SupportIsolationQueuePanel({
                   <span className="badge border-slate-200 bg-white text-slate-600">Marketing: {marketing}</span>
                   <span className="badge border-slate-200 bg-white text-slate-600">Isolasi: {isolasiAt}</span>
                 </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    href={buildSupportActionHref('isolation-restore', {
+                      isolation: isolationPrefillValue,
+                    })}
+                    className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700"
+                  >
+                    Proses Restore
+                  </Link>
+                  <Link
+                    href={buildSupportActionHref('dismantle-approve', {
+                      isolation: isolationPrefillValue,
+                    })}
+                    className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700"
+                  >
+                    Ke Dismantle
+                  </Link>
+                </div>
               </article>
             )
           })}
@@ -125,4 +158,3 @@ export function SupportIsolationQueuePanel({
     </section>
   )
 }
-

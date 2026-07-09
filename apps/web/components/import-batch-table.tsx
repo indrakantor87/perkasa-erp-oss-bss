@@ -50,7 +50,12 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
                 </td>
                 <td className="px-6 py-5 text-slate-700">{item.totalRows.toLocaleString('id-ID')}</td>
                 <td className="px-6 py-5 text-slate-700">
-                  {item.validRows.toLocaleString('id-ID')} / {item.invalidRows.toLocaleString('id-ID')} invalid
+                  <div className="space-y-1">
+                    <p>
+                      {item.validRows.toLocaleString('id-ID')} valid / {item.invalidRows.toLocaleString('id-ID')} invalid
+                    </p>
+                    <p className="text-xs text-mute">{item.duplicateRows.toLocaleString('id-ID')} duplikat terdeteksi</p>
+                  </div>
                 </td>
                 <td className="px-6 py-5">
                   <Link href={`/import/${item.id}`} className="text-sm font-semibold text-blue-700">
@@ -76,7 +81,10 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
             </div>
             <p className="mt-4 text-sm leading-6 text-mute">{item.note}</p>
             <div className="mt-4 flex items-center justify-between text-xs font-medium text-slate-600">
-              <span>{item.totalRows.toLocaleString('id-ID')} row</span>
+              <span>
+                {item.totalRows.toLocaleString('id-ID')} row • {item.validRows.toLocaleString('id-ID')} valid •{' '}
+                {item.duplicateRows.toLocaleString('id-ID')} duplikat
+              </span>
               <Link href={`/import/${item.id}`} className="font-semibold text-blue-700">
                 Detail
               </Link>

@@ -140,30 +140,55 @@ WHERE ss.support_type = 'TROUBLE_TICKET'
   AND ss.target_trouble_ticket_id IS NULL;
 
 -- 4) Transform photo ticket dari JSON array sederhana ["a","b"] di photo_list_text
+-- Hindari JSON_TABLE agar tetap kompatibel dengan MariaDB lokal.
 INSERT INTO support_trouble_ticket_photos (
   trouble_ticket_id,
   photo_path
 )
 SELECT
   ss.target_trouble_ticket_id,
-  jt.photo_path
+  JSON_UNQUOTE(
+    JSON_EXTRACT(
+      COALESCE(NULLIF(ss.photo_list_text, ''), '[]'),
+      CONCAT('$[', idx.seq, ']')
+    )
+  ) AS photo_path
 FROM staging_legacy_support_records ss
-JOIN JSON_TABLE(
-  COALESCE(NULLIF(ss.photo_list_text, ''), '[]'),
-  '$[*]' COLUMNS (
-    photo_path VARCHAR(255) PATH '$'
-  )
-) jt
+JOIN (
+  SELECT 0 AS seq
+  UNION ALL SELECT 1
+  UNION ALL SELECT 2
+  UNION ALL SELECT 3
+  UNION ALL SELECT 4
+  UNION ALL SELECT 5
+  UNION ALL SELECT 6
+  UNION ALL SELECT 7
+  UNION ALL SELECT 8
+  UNION ALL SELECT 9
+) idx
 WHERE ss.support_type = 'TROUBLE_TICKET'
   AND ss.batch_id = @batch_id
   AND ss.target_trouble_ticket_id IS NOT NULL
-  AND jt.photo_path IS NOT NULL
-  AND jt.photo_path <> ''
+  AND JSON_EXTRACT(
+    COALESCE(NULLIF(ss.photo_list_text, ''), '[]'),
+    CONCAT('$[', idx.seq, ']')
+  ) IS NOT NULL
+  AND JSON_UNQUOTE(
+    JSON_EXTRACT(
+      COALESCE(NULLIF(ss.photo_list_text, ''), '[]'),
+      CONCAT('$[', idx.seq, ']')
+    )
+  ) <> ''
   AND NOT EXISTS (
     SELECT 1
     FROM support_trouble_ticket_photos p
     WHERE p.trouble_ticket_id = ss.target_trouble_ticket_id
-      AND p.photo_path = jt.photo_path
+      AND p.photo_path = JSON_UNQUOTE(
+        JSON_EXTRACT(
+          COALESCE(NULLIF(ss.photo_list_text, ''), '[]'),
+          CONCAT('$[', idx.seq, ']')
+        )
+      )
   );
 
 -- 5) Transform isolation ke support_isolations

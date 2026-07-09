@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type SupportDismantleFormProps = {
   canApprove: boolean
   reviewDbReady: boolean
   isolationSuggestions: string[]
+  initialIsolationValue?: string
 }
 
 function extractIsolationId(value: string) {
@@ -19,14 +20,23 @@ export function SupportDismantleForm({
   canApprove,
   reviewDbReady,
   isolationSuggestions,
+  initialIsolationValue,
 }: SupportDismantleFormProps) {
   const router = useRouter()
-  const [isolationValue, setIsolationValue] = useState(isolationSuggestions[0] ?? '')
+  const [isolationValue, setIsolationValue] = useState(
+    initialIsolationValue?.trim() || isolationSuggestions[0] || '',
+  )
   const [closeNote, setCloseNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canApprove || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialIsolationValue?.trim()) {
+      setIsolationValue(initialIsolationValue.trim())
+    }
+  }, [initialIsolationValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

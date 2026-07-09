@@ -103,6 +103,23 @@ export function HrAttendanceForm({
             : 'Form ini mencatat attendance harian dari employee yang sudah ada agar kehadiran mulai langsung bisa direview di domain HR.'}
       </p>
 
+      <div className="mt-6 rounded-2xl border border-line bg-slate-50 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Roadmap Attendance</p>
+        <h4 className="mt-2 text-base font-semibold text-slate-950">
+          Tahap berikutnya: kamera wajah dan radius lokasi
+        </h4>
+        <p className="mt-3 text-sm leading-6 text-mute">
+          Fondasi form saat ini masih attendance manual. Requirement ERP berikutnya akan
+          menambahkan verifikasi kamera dengan pengenalan wajah dan validasi radius check-in sesuai
+          titik kerja yang ditetapkan perusahaan.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="badge border-slate-200 bg-white text-slate-600">Face recognition: planned</span>
+          <span className="badge border-slate-200 bg-white text-slate-600">Radius attendance: planned</span>
+          <span className="badge border-slate-200 bg-white text-slate-600">Geofence titik kerja: planned</span>
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Employee</span>

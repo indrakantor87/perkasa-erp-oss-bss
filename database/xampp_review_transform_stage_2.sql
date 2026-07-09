@@ -7,7 +7,86 @@
 
 USE erp_isp_review;
 
--- 1) Transform customer dari staging ke crm_customers
+-- 1) Transform user staging ke auth_users
+INSERT INTO auth_users (
+  branch_id,
+  division_id,
+  role_id,
+  full_name,
+  username,
+  email,
+  password_hash,
+  phone,
+  status
+)
+SELECT
+  NULL,
+  od.id,
+  ar.id,
+  COALESCE(NULLIF(TRIM(s.full_name), ''), CONCAT('Legacy User ', s.id)),
+  LOWER(TRIM(s.username)),
+  NULLIF(LOWER(TRIM(s.email)), ''),
+  CONCAT('sha256:', SHA2(CONCAT('legacy-import|', LOWER(TRIM(s.username))), 256)),
+  NULLIF(TRIM(s.phone), ''),
+  'ACTIVE'
+FROM staging_legacy_user_records s
+JOIN auth_roles ar
+  ON ar.code = s.mapped_role_code
+LEFT JOIN org_divisions od
+  ON od.code = s.mapped_division_code
+WHERE s.import_status IN ('MAPPED', 'VALID')
+  AND s.batch_id = @batch_id
+  AND s.target_user_id IS NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM auth_users au
+    WHERE LOWER(au.username) = LOWER(TRIM(s.username))
+  );
+
+UPDATE staging_legacy_user_records s
+JOIN auth_users au
+  ON LOWER(au.username) = LOWER(TRIM(s.username))
+SET s.target_user_id = au.id,
+    s.import_status = 'IMPORTED',
+    s.imported_at = COALESCE(s.imported_at, CURRENT_TIMESTAMP),
+    s.updated_at = CURRENT_TIMESTAMP
+WHERE s.import_status IN ('MAPPED', 'VALID')
+  AND s.batch_id = @batch_id
+  AND s.target_user_id IS NULL;
+
+INSERT INTO auth_user_audit_logs (
+  auth_user_id,
+  action_type,
+  actor_name,
+  target_username,
+  detail_text
+)
+SELECT
+  s.target_user_id,
+  'CREATE',
+  'Import Pipeline',
+  au.username,
+  CONCAT('Legacy staging user ', COALESCE(NULLIF(TRIM(s.legacy_id), ''), CONCAT('#', s.id)), ' berhasil dihubungkan ke auth master.')
+FROM staging_legacy_user_records s
+JOIN auth_users au
+  ON au.id = s.target_user_id
+WHERE s.import_status = 'IMPORTED'
+  AND s.batch_id = @batch_id
+  AND s.target_user_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM auth_user_audit_logs log
+    WHERE log.auth_user_id = s.target_user_id
+      AND log.action_type = 'CREATE'
+      AND log.target_username = au.username
+      AND log.detail_text = CONCAT(
+        'Legacy staging user ',
+        COALESCE(NULLIF(TRIM(s.legacy_id), ''), CONCAT('#', s.id)),
+        ' berhasil dihubungkan ke auth master.'
+      )
+  );
+
+-- 2) Transform customer dari staging ke crm_customers
 INSERT INTO crm_customers (
   customer_code,
   customer_type,
@@ -52,7 +131,7 @@ WHERE s.import_status IN ('MAPPED', 'VALID')
   AND s.batch_id = @batch_id
   AND s.target_customer_id IS NULL;
 
--- 2) Transform customer address dari staging ke crm_customer_addresses
+-- 3) Transform customer address dari staging ke crm_customer_addresses
 INSERT INTO crm_customer_addresses (
   customer_id,
   label,
@@ -93,7 +172,7 @@ WHERE s.import_status = 'IMPORTED'
   AND s.target_customer_id IS NOT NULL
   AND s.target_address_id IS NULL;
 
--- 3) Samakan target_customer_id pada staging order berdasarkan legacy customer
+-- 4) Samakan target_customer_id pada staging order berdasarkan legacy customer
 UPDATE staging_legacy_order_records so
 JOIN staging_legacy_customer_records sc
   ON sc.source_system = so.source_system
@@ -105,7 +184,7 @@ WHERE so.target_customer_id IS NULL
   AND so.batch_id = @batch_id
   AND sc.target_customer_id IS NOT NULL;
 
--- 4) Transform sales order dari staging ke sales_orders
+-- 5) Transform sales order dari staging ke sales_orders
 INSERT INTO sales_orders (
   lead_id,
   customer_id,
@@ -162,7 +241,7 @@ WHERE so.import_status IN ('MAPPED', 'VALID')
   AND so.batch_id = @batch_id
   AND so.target_order_id IS NULL;
 
--- 5) Transform subscription dari staging order ke service_subscriptions
+-- 6) Transform subscription dari staging order ke service_subscriptions
 INSERT INTO service_subscriptions (
   customer_id,
   order_id,

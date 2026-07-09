@@ -1,4 +1,5 @@
-import type { DomainReviewSection, DomainReviewRow } from '@/lib/types'
+import { SupportActionQuickLinks } from '@/components/support-action-quick-links'
+import type { DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
   return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? '-'
@@ -32,8 +33,10 @@ function buildSlaSummary(rows: DomainReviewRow[]) {
 
 export function SupportSlaQueuePanel({
   sections,
+  actionLinks = [],
 }: {
   sections: DomainReviewSection[]
+  actionLinks?: SupportActionLink[]
 }) {
   const slaSection = sections.find((section) => section.title.toUpperCase().includes('SLA')) ?? null
 
@@ -75,6 +78,11 @@ export function SupportSlaQueuePanel({
         </div>
       ) : null}
 
+      <SupportActionQuickLinks
+        links={actionLinks}
+        description="Lane SLA sekarang punya shortcut langsung ke pengelolaan aturan SLA dan penyelesaian ticket prioritas."
+      />
+
       {slaSection.rows.length ? (
         <div className="mt-6 space-y-3">
           {slaSection.rows.map((row) => {
@@ -105,4 +113,3 @@ export function SupportSlaQueuePanel({
     </section>
   )
 }
-

@@ -47,6 +47,13 @@ export const dashboardMetrics: DashboardMetric[] = [
 
 export const moduleCards: ModuleCard[] = [
   {
+    title: 'Daily Activity',
+    href: '/dashboard/daily-activity',
+    description: 'Plan aktivitas pagi dan closing sore dengan status selesai atau pending.',
+    status: 'Siap dipakai untuk kontrol kerja harian',
+    accent: 'bg-cyan-50 text-cyan-700',
+  },
+  {
     title: 'Import Center',
     href: '/import',
     description: 'Review batch staging, mapping, validasi, dan trigger transform tahap 1-4.',

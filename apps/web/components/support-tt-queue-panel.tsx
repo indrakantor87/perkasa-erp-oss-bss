@@ -1,4 +1,7 @@
-import type { DomainReviewSection, DomainReviewRow } from '@/lib/types'
+import Link from 'next/link'
+import { SupportActionQuickLinks } from '@/components/support-action-quick-links'
+import { buildSupportActionHref } from '@/lib/support-action-links'
+import type { DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
   return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? '-'
@@ -38,8 +41,10 @@ function buildTicketSummary(rows: DomainReviewRow[]) {
 
 export function SupportTroubleTicketQueuePanel({
   sections,
+  actionLinks = [],
 }: {
   sections: DomainReviewSection[]
+  actionLinks?: SupportActionLink[]
 }) {
   const ttSection =
     sections.find((section) => section.title.toUpperCase().includes('TROUBLE')) ?? null
@@ -73,6 +78,11 @@ export function SupportTroubleTicketQueuePanel({
         </div>
       </div>
 
+      <SupportActionQuickLinks
+        links={actionLinks}
+        description="Lompat ke form create, update, atau kontrol SLA yang memang diprioritaskan untuk lane Trouble Ticket."
+      />
+
       {ttSection.rows.length ? (
         <div className="mt-6 space-y-3">
           {ttSection.rows.map((row) => {
@@ -95,6 +105,26 @@ export function SupportTroubleTicketQueuePanel({
                   <span className="badge border-slate-200 bg-white text-slate-600">Opened: {opened}</span>
                   <span className="badge border-slate-200 bg-white text-slate-600">User: {customerUser}</span>
                 </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    href={buildSupportActionHref('ticket-close', {
+                      ticket: row.primary,
+                    })}
+                    className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700"
+                  >
+                    Tutup Ticket
+                  </Link>
+                  {type !== '-' ? (
+                    <Link
+                      href={buildSupportActionHref('sla-manage', {
+                        type,
+                      })}
+                      className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700"
+                    >
+                      Atur SLA
+                    </Link>
+                  ) : null}
+                </div>
               </article>
             )
           })}
@@ -105,4 +135,3 @@ export function SupportTroubleTicketQueuePanel({
     </section>
   )
 }
-

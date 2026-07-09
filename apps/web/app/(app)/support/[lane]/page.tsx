@@ -10,6 +10,10 @@ type SupportLaneParams = {
   lane: string
 }
 
+function resolveSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
 export function generateStaticParams(): SupportLaneParams[] {
   return [
     { lane: 'tt' },
@@ -21,11 +25,14 @@ export function generateStaticParams(): SupportLaneParams[] {
 
 export default async function SupportLanePage({
   params,
+  searchParams,
 }: {
   params: Promise<SupportLaneParams>
+  searchParams: Promise<{ ticket?: string | string[]; isolation?: string | string[]; type?: string | string[] }>
 }) {
   const session = await requireSession()
   const { lane } = await params
+  const resolvedSearchParams = await searchParams
 
   const normalizedLane = normalizeSupportLane(lane)
   if (!normalizedLane) {
@@ -53,6 +60,11 @@ export default async function SupportLanePage({
       role={session.role}
       supportFocus={payload.supportFocus}
       supportPageMode="lane"
+      supportPrefill={{
+        ticket: resolveSearchParam(resolvedSearchParams.ticket),
+        isolation: resolveSearchParam(resolvedSearchParams.isolation),
+        type: resolveSearchParam(resolvedSearchParams.type),
+      }}
     />
   )
 }

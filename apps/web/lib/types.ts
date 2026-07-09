@@ -18,6 +18,7 @@ export function isAppRole(value: string): value is AppRole {
 
 export type AccessResource =
   | 'dashboard'
+  | 'daily_activity'
   | 'import_center'
   | 'sales'
   | 'customers'
@@ -76,6 +77,30 @@ export type DashboardQueueItem = {
   count: string
   description: string
   accent: string
+}
+
+export type DashboardDailyActivityApprovalQueueItem = {
+  divisionName: string
+  subdivisionName: string
+  pendingCount: number
+}
+
+export type DashboardDailyActivityPendingApprovalItem = {
+  activityId: number
+  activityCode: string
+  activityDate: string
+  taskTitle: string
+  plannedBy: string
+  divisionName: string
+  subdivisionName: string
+  executionStatus: string
+}
+
+export type DashboardDailyActivityApprovalQueue = {
+  totalPending: number
+  items: DashboardDailyActivityApprovalQueueItem[]
+  pendingItems: DashboardDailyActivityPendingApprovalItem[]
+  href: string
 }
 
 export type DashboardWorkItem = {
@@ -235,6 +260,19 @@ export type SupportLaneActionKey =
   | 'isolation-create'
   | 'isolation-restore'
   | 'dismantle-approve'
+
+export type SupportActionLink = {
+  key: SupportLaneActionKey
+  label: string
+  description: string
+  href: string
+}
+
+export type SupportFormPrefill = {
+  ticket?: string
+  isolation?: string
+  type?: string
+}
 
 export type SupportLaneWorkspace = {
   lane: SupportLaneKey

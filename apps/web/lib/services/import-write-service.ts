@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 import type { ImportBatchAction, ImportBatchTransformRun } from '@/lib/types'
 
 type BatchLookup = {
@@ -581,14 +581,20 @@ function parseSqlStatements(content: string) {
     .filter((statement) => statement && !/^USE\s+/i.test(statement))
 }
 
-async function executeTransformSqlUpTo(batchPk: number, stage: TransformStage) {
+function bindBatchIdToStatement(statement: string, batchPk: number) {
+  return statement.replace(/@batch_id\b/g, String(batchPk))
+}
+
+async function executeTransformSqlUpTo(
+  connection: { query: (sql: string, values?: unknown[]) => Promise<[unknown[], unknown]> },
+  batchPk: number,
+  stage: TransformStage,
+) {
   const stageOrder = (['01', '02', '03', '04'] as TransformStage[]).slice(
     0,
     ['01', '02', '03', '04'].indexOf(stage) + 1
   )
   let executedStatements = 0
-
-  await runReviewDbExecute<ExecuteResult>('SET @batch_id = ?', [batchPk])
 
   for (const currentStage of stageOrder) {
     const filePath = path.join(
@@ -602,7 +608,7 @@ async function executeTransformSqlUpTo(batchPk: number, stage: TransformStage) {
     const statements = parseSqlStatements(content)
 
     for (const statement of statements) {
-      await runReviewDbExecute<ExecuteResult>(statement)
+      await connection.query(bindBatchIdToStatement(statement, batchPk))
       executedStatements += 1
     }
   }
@@ -633,7 +639,36 @@ export async function transformImportBatch(
   let executedStatements = 0
 
   try {
-    executedStatements = await executeTransformSqlUpTo(batch.id, stage)
+    executedStatements = await runReviewDbTransaction(async (connection) => {
+      await ensureImportBatchTransformRunTable()
+      await connection.query(
+        `
+          SELECT id
+          FROM staging_import_batches
+          WHERE id = ?
+          FOR UPDATE
+        `,
+        [batch.id],
+      )
+
+      const [runningRows] = await connection.query(
+        `
+          SELECT COUNT(*) AS total
+          FROM staging_import_batch_transform_runs
+          WHERE batch_id = ?
+            AND run_status = 'RUNNING'
+            AND id <> ?
+          LIMIT 1
+        `,
+        [batch.id, runId],
+      )
+      const runningCount = Number((runningRows as { total?: number }[] | undefined)?.[0]?.total ?? 0)
+      if (runningCount > 0) {
+        throw new Error('Transform batch sedang berjalan. Tunggu proses sebelumnya selesai.')
+      }
+
+      return executeTransformSqlUpTo(connection, batch.id, stage)
+    })
     const afterSummary = await getImportBatchSummary(batch.id)
     const nextStatus =
       afterSummary.importedRows > 0 &&

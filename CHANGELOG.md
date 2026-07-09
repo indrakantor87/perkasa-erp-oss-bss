@@ -10,6 +10,398 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+### Fixed
+
+- transform tahap 3 tidak lagi memakai `JSON_TABLE` pada parsing `photo_list_text`, sehingga tetap kompatibel dengan MariaDB lokal saat tahap 4 mengeksekusi stage 1-4 berurutan: [xampp_review_transform_stage_3.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_3.sql)
+- transform tahap 4 kini bisa resolve `target_subscription_id` dari staging order lintas batch (tidak mengunci `batch_id`), sehingga batch billing terpisah tetap bisa diimport setelah batch user/order selesai: [xampp_review_transform_stage_4.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_4.sql)
+- eksekusi transform import kini me-render `@batch_id` langsung ke setiap statement sebelum dikirim ke MariaDB, sehingga transform sample tidak lagi berakhir `SUCCESS` tapi `0 imported` akibat session variable tidak terbaca: [import-write-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/import-write-service.ts)
+
+### Improved
+
+- halaman detail batch import sekarang menampilkan ringkasan operasional per row (`imported`, `valid`, `mapped/pending`, `invalid/skipped`), progres finalisasi batch, dan breakdown tabel target final yang sudah terbentuk agar operator lebih cepat membaca hasil transform: [import-batch-detail-view.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-detail-view.tsx)
+- daftar batch import kini menampilkan informasi duplikat secara lebih eksplisit di tabel dan kartu mobile agar review awal operator lebih cepat: [import-batch-table.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-table.tsx)
+- transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
+- panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
+
+## [0.63.47] - 2026-07-09
+
+### Fixed
+
+- formatter waktu activity feed dashboard kini aman menerima nilai tanggal dari review DB yang tidak selalu berbentuk string, sehingga dashboard tidak lagi jatuh ke `Mock Fallback` dengan error `value.includes is not a function`: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.47`
+
+## [0.63.46] - 2026-07-09
+
+### Improved
+
+- feed dashboard kini membaca jejak aksi nyata secara terpusat untuk `SUPER_ADMIN` dengan menggabungkan audit Import Center, Settings Users, permission master, dan role-permission, sambil tetap menjaga fallback aman untuk role lain: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- panel aktivitas dashboard diperjelas sebagai feed audit hidup agar operator admin lebih mudah mengenali konteks jejak aksi terbaru: [activity-feed.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/activity-feed.tsx)
+- checklist PRD audit diperbarui agar status implementasi mencerminkan audit terpusat lintas import dan settings yang kini sudah tampil di dashboard: [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.46`
+
+## [0.63.39] - 2026-07-09
+
+### Added
+
+- laporan korelasi duplikasi `inventory_stock_movements` ke staging inventory movement (batch/source/legacy/status) untuk memastikan sumber duplikasi sebelum cleanup: [xampp_review_schema_precheck_inventory_movements_correlate_0_63_39.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema_precheck_inventory_movements_correlate_0_63_39.sql)
+
+### Changed
+
+- dokumentasi staging import menambahkan referensi laporan korelasi movement↔staging: [staging-import.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/staging-import.md)
+- `VERSION` dinaikkan ke `0.63.39`
+
+## [0.63.38] - 2026-07-09
+
+### Added
+
+- laporan precheck khusus duplikasi `inventory_stock_movements` per `reference_no` agar penanganan cleanup bisa lebih aman dan terarah: [xampp_review_schema_precheck_inventory_movements_by_ref_0_63_38.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema_precheck_inventory_movements_by_ref_0_63_38.sql)
+
+### Changed
+
+- dokumentasi staging import menambahkan catatan investigasi duplikat movement per reference: [staging-import.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/staging-import.md)
+- `VERSION` dinaikkan ke `0.63.38`
+
+## [0.63.37] - 2026-07-09
+
+### Added
+
+- script dry-run untuk menampilkan kandidat row yang akan dibersihkan (tanpa mengubah data) sebelum autofix dan patch UNIQUE: [xampp_review_schema_autofix_dry_run_0_63_37.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema_autofix_dry_run_0_63_37.sql)
+- script autofix guarded (rollback default) untuk memastikan cleanup hanya terjadi jika `@confirm_apply = 1`: [xampp_review_schema_autofix_guarded_0_63_37.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema_autofix_guarded_0_63_37.sql)
+
+### Changed
+
+- dokumentasi staging import diperbarui agar alur cleanup bersifat aman (precheck → dry-run → guarded apply → patch UNIQUE): [staging-import.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/staging-import.md)
+- `VERSION` dinaikkan ke `0.63.37`
+
+## [0.63.36] - 2026-07-09
+
+### Added
+
+- script precheck detail yang menampilkan daftar `id` untuk setiap grup duplikat, agar cleanup sebelum UNIQUE lebih terarah: [xampp_review_schema_precheck_detail_0_63_36.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema_precheck_detail_0_63_36.sql)
+
+### Changed
+
+- dokumentasi staging import kini menuliskan urutan patch aman (precheck → autofix → patch UNIQUE): [staging-import.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/staging-import.md)
+- `VERSION` dinaikkan ke `0.63.36`
+
+## [0.63.35] - 2026-07-09
+
+### Added
+
+- script autofix terkontrol untuk membersihkan duplikasi paling aman sebelum penerapan UNIQUE business key transform (primary address ganda, duplikasi persis photos/invoice items/payments/collection actions): [xampp_review_schema_autofix_0_63_35.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema_autofix_0_63_35.sql)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.35`
+
+## [0.63.34] - 2026-07-09
+
+### Added
+
+- script precheck untuk mendeteksi duplikasi data existing sebelum menerapkan UNIQUE business key transform (menghindari kegagalan ALTER TABLE saat patch diterapkan ke DB yang sudah berisi data): [xampp_review_schema_precheck_0_63_34.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema_precheck_0_63_34.sql)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.34`
+
+## [0.63.33] - 2026-07-09
+
+### Changed
+
+- schema review DB ditambah UNIQUE index minimal untuk business key yang dipakai pipeline transform tahap 1-4 agar idempotent terhadap race dan aman saat re-run: [xampp_review_schema.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema.sql), [xampp_review_schema_phase_1_1.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema_phase_1_1.sql)
+- disediakan patch schema yang bisa dijalankan aman berulang (cek `information_schema`) untuk installasi existing: [xampp_review_schema_patch_0_63_33.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema_patch_0_63_33.sql)
+- `VERSION` dinaikkan ke `0.63.33`
+
+## [0.63.32] - 2026-07-09
+
+### Changed
+
+- eksekusi transaksi review DB kini memakai koneksi yang konsisten lewat helper `runReviewDbTransaction` agar transaksi benar-benar atomic: [review-db.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/review-db.ts)
+- pipeline transform import tahap 1-4 kini berjalan dalam transaksi + lock batch untuk mencegah state setengah jalan dan double-run paralel: [import-write-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/import-write-service.ts)
+- perbaikan pemakaian transaksi pada bulk approval Daily Activity, inventory loans/returns, inventory request status, dan bootstrap permission agar konsisten: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/approval/bulk/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/loans/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/loans/return/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/requests/status/route.ts), [access-permission-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/access-permission-service.ts)
+- `VERSION` dinaikkan ke `0.63.32`
+
+## [0.63.31] - 2026-07-09
+
+### Changed
+
+- form Plan Daily Activity kini auto-fill `planningLevel` dari profile user dan mengunci field org untuk non-superadmin: [daily-activity-plan-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-plan-form.tsx)
+- endpoint create & approval daily activity kini menegakkan scope org dari profile user (server-side), bukan dari input form: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/approval/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/approval/bulk/route.ts)
+- approval queue dashboard kini menghitung scope berdasarkan session/profile (supaya konsisten dengan Daily Activity profile per username): [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `VERSION` dinaikkan ke `0.63.31`
+
+## [0.63.30] - 2026-07-09
+
+### Added
+
+- bulk approve/reject pada halaman Daily Activity (Approval Manager) menggunakan endpoint bulk: [daily-activity-manager-approval-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-manager-approval-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.30`
+
+## [0.63.29] - 2026-07-09
+
+### Added
+
+- endpoint bulk approval daily activity (maks 20 item per batch) untuk mempercepat proses manager/SPV: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/approval/bulk/route.ts)
+- bulk approve/reject dari dashboard Approval Queue dengan checkbox: [daily-activity-approval-queue.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/daily-activity-approval-queue.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.29`
+
+## [0.63.28] - 2026-07-09
+
+### Added
+
+- quick action approve/reject daily activity langsung dari panel Approval Queue dashboard: [daily-activity-approval-queue.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/daily-activity-approval-queue.tsx)
+
+### Changed
+
+- [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts) kini memuat daftar pending approval terbaru (maks 6) untuk diproses langsung dari dashboard
+- `VERSION` dinaikkan ke `0.63.28`
+
+## [0.63.27] - 2026-07-09
+
+### Added
+
+- panel `Approval Queue` daily activity di dashboard utama untuk role yang punya izin approve, dengan ringkasan pending approval dan shortcut ke halaman daily activity: [daily-activity-approval-queue.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/daily-activity-approval-queue.tsx)
+
+### Changed
+
+- [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts) kini memuat data pending approval daily activity (per divisi/sub-divisi) untuk dashboard
+- [dashboard/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx) kini menampilkan panel approval queue secara kondisional berdasarkan RBAC `daily_activity:approve`
+- `VERSION` dinaikkan ke `0.63.27`
+
+## [0.63.26] - 2026-07-09
+
+### Added
+
+- filter tambahan `Approval Status` (ALL/PENDING/APPROVED/REJECTED/NONE) pada [daily-activity-filter-bar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-filter-bar.tsx) agar manager bisa fokus ke item yang menunggu approval
+
+### Changed
+
+- [daily-activity-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/daily-activity-service.ts) kini menerapkan filter approval status ke kalender/performa/riwayat sesuai pilihan user
+- `VERSION` dinaikkan ke `0.63.26`
+
+## [0.63.25] - 2026-07-09
+
+### Added
+
+- filter tampilan Daily Activity (divisi/sub-divisi/level) via query param pada [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/daily-activity/page.tsx) dan UI selector [daily-activity-filter-bar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-filter-bar.tsx)
+
+### Changed
+
+- [daily-activity-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/daily-activity-service.ts) kini menghitung kalender/performa/riwayat berdasarkan filter divisi/sub-divisi/level yang dipilih
+- navigasi kalender `prev/next month` kini menjaga filter agar tidak reset saat pindah bulan di [daily-activity-summary-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-summary-panel.tsx)
+- `VERSION` dinaikkan ke `0.63.25`
+
+## [0.63.24] - 2026-07-09
+
+### Added
+
+- navigasi kalender plan `prev/next month` lewat query `?month=YYYY-MM` pada [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/daily-activity/page.tsx) dan [daily-activity-summary-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-summary-panel.tsx)
+
+### Changed
+
+- [daily-activity-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/daily-activity-service.ts) kini menghitung rekap bulanan dan kalender berdasarkan bulan yang dipilih, serta memperluas window pembacaan data menjadi 370 hari
+- `VERSION` dinaikkan ke `0.63.24`
+
+## [0.63.23] - 2026-07-09
+
+### Added
+
+- permission resource `daily_activity` pada [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts) dan baseline permission matrix di [access-control.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control.ts) untuk mendukung aksi `approve` dan `export`
+- endpoint approval manager [approval/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/approval/route.ts) untuk approve/reject closing sore per divisi/sub-divisi
+- endpoint export CSV [export/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/export/route.ts) untuk rekap daily activity berdasarkan rentang tanggal
+- komponen [daily-activity-manager-approval-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-manager-approval-form.tsx) dan [daily-activity-export-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-export-form.tsx) pada halaman daily activity
+
+### Changed
+
+- [daily-activity-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/daily-activity-service.ts) menambah kolom `approval_status/approved_by/approved_at` dan performa dihitung dari aktivitas yang sudah `APPROVED`
+- [status/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/status/route.ts) kini mengubah closing menjadi `PENDING` approval dan mengizinkan resubmit bila sebelumnya `REJECTED`
+- [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/daily-activity/page.tsx) kini mengikuti RBAC `daily_activity` untuk create/update/approve/export
+- [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md) diperbarui untuk mencatat approval manager dan export CSV daily activity sebagai capability aktif
+- `VERSION` dinaikkan ke `0.63.23`
+
+## [0.63.22] - 2026-07-09
+
+### Added
+
+- helper baru [daily-activity-org.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/daily-activity-org.ts) untuk baseline divisi, sub-divisi, dan level plan `Manager`, `SPV`, `Leader` pada daily activity
+- perhitungan performa otomatis harian, mingguan, dan bulanan di [daily-activity-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/daily-activity-service.ts) beserta breakdown divisi/sub-divisi dan level plan
+- kalender plan bulanan di [daily-activity-summary-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-summary-panel.tsx) untuk memantau sebaran aktivitas per tanggal
+
+### Changed
+
+- [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/route.ts) sekarang mewajibkan pengisian level plan, divisi, dan sub-divisi sesuai baseline organisasi sebelum plan disimpan
+- [daily-activity-plan-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-plan-form.tsx) kini mendukung input plan per divisi/sub-divisi dan level `Manager`, `SPV`, `Leader`
+- [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/daily-activity/page.tsx) dan [daily-activity-summary-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-summary-panel.tsx) kini menampilkan performa otomatis lintas periode dan kalender plan
+- [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md) diperbarui agar daily activity tingkat divisi/sub-divisi beserta performa periode dan kalender plan tercatat sebagai capability aktif
+- `VERSION` dinaikkan ke `0.63.22`
+
+## [0.63.21] - 2026-07-09
+
+### Added
+
+- menu baru [navigation.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/navigation.ts) untuk `Daily Activity` di path `/dashboard/daily-activity` agar user punya jalur khusus plan pagi dan closing sore
+- halaman [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/daily-activity/page.tsx), service [daily-activity-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/daily-activity-service.ts), dan endpoint [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/route.ts) serta [status/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/daily-activities/status/route.ts) untuk workflow daily activity berbasis review DB
+- komponen [daily-activity-plan-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-plan-form.tsx), [daily-activity-close-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-close-form.tsx), dan [daily-activity-summary-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/daily-activity-summary-panel.tsx) untuk input plan pagi, closing sore, dan transparansi progres harian
+
+### Changed
+
+- [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx) dan [navigation.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/navigation.ts) kini memakai active item paling spesifik agar menu `Daily Activity` tidak bentrok dengan `Dashboard`
+- [mock-dashboard.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/mock-dashboard.ts) kini menampilkan shortcut `Daily Activity` di dashboard module cards
+- [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md) diperbarui untuk mencatat menu daily activity sebagai capability web yang sudah hidup
+- `VERSION` dinaikkan ke `0.63.21`
+
+## [0.63.20] - 2026-07-09
+
+### Added
+
+- endpoint baru [receipts/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/receipts/route.ts) untuk jalur `barang masuk` yang langsung menambah stok tanpa operator memilih tipe movement manual
+- form [inventory-stock-receipt-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-stock-receipt-form.tsx) untuk pencatatan penerimaan barang yang lebih mudah dipakai gudang
+- panel [inventory-stock-receipt-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-stock-receipt-panel.tsx) untuk merangkum transaksi barang masuk terbaru
+
+### Changed
+
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) kini menampilkan panel dan form khusus barang masuk selain form stock movement umum
+- [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md) diperbarui agar alur inbound gudang yang lebih mudah tercatat sebagai capability inventory aktif
+- `VERSION` dinaikkan ke `0.63.20`
+
+## [0.63.19] - 2026-07-09
+
+### Added
+
+- service baru [inventory-loan-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/inventory-loan-service.ts) untuk bootstrap tabel pinjaman inventory dan generate kode pinjaman otomatis
+- endpoint [loans/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/loans/route.ts) dan [loans/return/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/loans/return/route.ts) untuk alur barang dipinjam lalu dikembalikan
+- komponen [inventory-item-loan-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-item-loan-form.tsx), [inventory-loan-return-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-loan-return-form.tsx), dan [inventory-loan-ops-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-loan-ops-panel.tsx) untuk flow pinjam-kembali di domain Inventory
+
+### Changed
+
+- [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts) kini memuat section `Pinjaman Inventory` dengan status `BORROWED`, `PARTIAL_RETURN`, `RETURNED`, dan indikator `OVERDUE`
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) sekarang menampilkan panel operasional pinjaman inventory serta form pinjam dan pengembalian barang
+- alur pinjam otomatis membuat movement `OUT` dan mengurangi stok, sedangkan alur pengembalian membuat movement `IN` dan menambah stok kembali
+- [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md) diperbarui agar flow barang pinjam-kembali tercatat sebagai capability inventory aktif
+- `VERSION` dinaikkan ke `0.63.19`
+
+## [0.63.18] - 2026-07-09
+
+### Added
+
+- panel baru [inventory-request-ops-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-request-ops-panel.tsx) untuk merangkum antrean request inventory per sub-divisi teknisi dan per status proses
+
+### Changed
+
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) kini menampilkan panel operasional request inventory dan memperkaya suggestion form proses status dengan konteks sub-divisi dan status
+- [inventory-request-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-request-status-form.tsx) diperjelas agar petugas inventory langsung melihat konteks sub-divisi teknisi saat memproses request
+- [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md) diperbarui untuk mencatat antrean request inventory per sub-divisi/status sebagai capability aktif
+- `VERSION` dinaikkan ke `0.63.18`
+
+## [0.63.17] - 2026-07-09
+
+### Added
+
+- helper baru [inventory-request-org.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/inventory-request-org.ts) untuk mengunci divisi `Teknisi` dan pilihan sub-divisi request inventory (`Teknisi PSB`, `Teknisi Jalur dan Expan`, `Teknisi Jointer`)
+
+### Changed
+
+- [inventory-request-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/inventory-request-service.ts) kini memastikan tabel `inventory_item_requests` memiliki kolom `requested_division` dan `requested_subdivision`
+- [requests/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/requests/route.ts) sekarang mewajibkan sub-divisi teknisi saat membuat request barang
+- [inventory-item-request-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-item-request-form.tsx) kini menampilkan input divisi/sub-divisi teknisi agar request inventory lebih presisi sejak awal
+- [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts) menampilkan metadata divisi dan sub-divisi pada section `Request Inventory Teknisi`
+- [org-division-baseline.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/org-division-baseline.md) dan [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md) diperbarui agar tagging sub-divisi teknisi tercatat sebagai capability inventory aktif
+- `VERSION` dinaikkan ke `0.63.17`
+
+## [0.63.16] - 2026-07-09
+
+### Added
+
+- dokumen baru [org-division-baseline.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/org-division-baseline.md) untuk mengunci struktur divisi dan sub-divisi organisasi sebagai baseline pengembangan ERP
+
+### Changed
+
+- [role-meta.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/role-meta.ts) sekarang menyimpan metadata divisi dan sub-divisi untuk seluruh role aktif ERP
+- [topbar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/topbar.tsx), [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx), dan [dashboard/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx) kini menampilkan konteks divisi/sub-divisi role aktif agar perspektif organisasi lebih jelas di UI
+- [web-psb-target-role-design.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-psb-target-role-design.md) dan [web-psb-target-permission-matrix.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-psb-target-permission-matrix.md) diperbarui agar mapping role ERP selalu mengacu pada baseline divisi terbaru
+- `VERSION` dinaikkan ke `0.63.16`
+
+## [0.63.15] - 2026-07-09
+
+### Changed
+
+- [requests/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/requests/route.ts) sekarang mengizinkan `FIELD_TECHNICIAN` membuat request barang meskipun role tersebut tidak memiliki `create` umum pada domain Inventory
+- [requests/status/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/requests/status/route.ts) membatasi proses status request agar tidak bisa dijalankan oleh `FIELD_TECHNICIAN`, sehingga penyelesaian stok tetap dikendalikan tim inventory/operasional
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) kini menampilkan screen Inventory yang lebih sesuai role: teknisi fokus ke form request barang, sedangkan form admin inventory tidak lagi ditampilkan untuk teknisi
+- `VERSION` dinaikkan ke `0.63.15`
+
+## [0.63.14] - 2026-07-09
+
+### Added
+
+- helper baru [inventory-request-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/inventory-request-service.ts) untuk bootstrap tabel request inventory teknisi dan generate kode request otomatis
+- endpoint [requests/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/requests/route.ts) dan [requests/status/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/requests/status/route.ts) untuk alur request barang harian teknisi dengan status `Request`, `On Progress`, `Pending`, dan `Selesai`
+- komponen [inventory-item-request-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-item-request-form.tsx) dan [inventory-request-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-request-status-form.tsx) untuk mensimulasikan pola marketplace internal di domain Inventory
+
+### Changed
+
+- [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts) kini memuat section baru `Request Inventory Teknisi` agar request teknisi terbaca langsung di read-side inventory
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) sekarang menampilkan form request barang teknisi dan form update status request di domain Inventory
+- penyelesaian request inventory otomatis mencatat stock movement `OUT` dan mengurangi stok item secara transaksional di [requests/status/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/requests/status/route.ts)
+- [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md) diperbarui untuk memasukkan workflow request barang teknisi sebagai capability inventory yang sudah mulai hidup
+- `VERSION` dinaikkan ke `0.63.14`
+
+## [0.63.13] - 2026-07-09
+
+### Added
+
+- helper baru [map-links.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/map-links.ts) untuk membangun tautan Google Maps dari koordinat atau teks lokasi secara konsisten
+- panel baru [inventory-network-ops-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-network-ops-panel.tsx) untuk merangkum ODP, port aktif/bermasalah, device assignment, dan indikasi accessories di domain Inventory
+
+### Changed
+
+- [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts) kini membawa metadata koordinat ODP dan kategori item assignment agar konteks maps dan accessories bisa dipakai di read-side inventory
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) sekarang menampilkan panel operasional inventory sebelum form write action
+- [inventory-odp-create-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-odp-create-form.tsx) kini menampilkan preview maps dan penegasan parity ODP/port/accessories dari legacy
+- [hr-attendance-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-form.tsx) sekarang menampilkan roadmap resmi untuk face recognition, radius attendance, dan geofence titik kerja
+- [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md) diperbarui agar gap Inventory dan HR secara eksplisit mencakup maps ODP, accessories detail, face recognition attendance, dan radius attendance
+- `VERSION` dinaikkan ke `0.63.13`
+
+## [0.63.12] - 2026-07-09
+
+### Added
+
+- helper baru [support-action-links.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/support-action-links.ts) untuk menghasilkan anchor dan query link aksi support yang konsisten lintas lane
+- panel [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx) dan [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx) sekarang memiliki tombol aksi per row agar operator bisa langsung menindak item yang sedang direview
+
+### Changed
+
+- [support/[lane]/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/[lane]/page.tsx) dan [[domain]/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx) meneruskan `searchParams` prefill ke `DomainShell` sehingga flow aksi tetap kompatibel dengan versi Next yang dipakai repo ini
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) kini menyalurkan `supportPrefill` ke form close ticket, restore isolir, dismantle, dan SLA
+- [support-ticket-close-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-close-form.tsx), [support-isolation-restore-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-restore-form.tsx), [support-dismantle-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-form.tsx), dan [support-sla-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-form.tsx) sekarang mendukung nilai awal dari query prefill agar operator tidak perlu mengetik ulang item yang sudah dipilih di lane panel
+- [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts) menambahkan tipe `SupportFormPrefill` untuk menjaga kontrak prefill form support tetap rapi
+- `VERSION` dinaikkan ke `0.63.12`
+
+## [0.63.11] - 2026-07-09
+
+### Added
+
+- komponen baru [support-action-quick-links.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-action-quick-links.tsx) untuk menyediakan shortcut aksi ringan dari lane support ke form yang relevan tanpa menambah fetch data baru
+
+### Changed
+
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) kini memberi anchor stabil pada form support lane sehingga panel `/support/{lane}` dapat melompat langsung ke aksi utama yang diprioritaskan
+- [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx), [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx), dan [support-sla-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-queue-panel.tsx) sekarang menampilkan quick action link sesuai lane aktif agar operator lebih cepat masuk ke form kerja
+- [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts) menambahkan tipe `SupportActionLink` untuk menjaga kontrak shortcut action tetap konsisten lintas panel support
+- `VERSION` dinaikkan ke `0.63.11`
+
 ## [0.63.6] - 2026-07-09
 
 ### Changed

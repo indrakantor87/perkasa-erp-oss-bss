@@ -36,6 +36,7 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
 const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
   SUPER_ADMIN: [
     { resource: 'dashboard', label: 'Dashboard Global', actions: ['view', 'export', 'manage'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'import_center', label: 'Import Center', actions: ['view', 'create', 'approve', 'export'] },
     { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'create', 'update', 'approve', 'export'] },
@@ -48,6 +49,7 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
   ],
   SALES_MARKETING: [
     { resource: 'dashboard', label: 'Dashboard Marketing', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update'] },
     { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update', 'export'] },
     { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'create', 'update'] },
     { resource: 'support', label: 'Support', actions: ['view'] },
@@ -55,6 +57,7 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
   ],
   CS_OPERATOR: [
     { resource: 'dashboard', label: 'Dashboard CS', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update'] },
     { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update'] },
     { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'update'] },
     { resource: 'support', label: 'Support', actions: ['view', 'create', 'update'] },
@@ -62,6 +65,7 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
   ],
   CS_ADMIN: [
     { resource: 'dashboard', label: 'Dashboard Admin CS', actions: ['view', 'export'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'support', label: 'Support', actions: ['view', 'create', 'update', 'approve', 'export'] },
@@ -69,24 +73,29 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
   ],
   NOC_OPERATOR: [
     { resource: 'dashboard', label: 'Dashboard NOC', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update'] },
     { resource: 'support', label: 'Support', actions: ['view', 'create', 'update', 'export'] },
     { resource: 'inventory', label: 'Inventory', actions: ['view', 'update', 'export'] },
   ],
   FIELD_TECHNICIAN: [
     { resource: 'dashboard', label: 'Dashboard Teknisi', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update'] },
     { resource: 'support', label: 'Support', actions: ['view', 'update'] },
     { resource: 'inventory', label: 'Inventory', actions: ['view', 'update'] },
   ],
   TT_OPERATOR: [
     { resource: 'dashboard', label: 'Dashboard Trouble Ticket', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update'] },
     { resource: 'support', label: 'Support', actions: ['view', 'create', 'update'] },
   ],
   DIGITAL_CREATOR: [
     { resource: 'dashboard', label: 'Dashboard Creator Digital', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update'] },
     { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update', 'export'] },
   ],
   DISMANTLE_OPERATOR: [
     { resource: 'dashboard', label: 'Dashboard Dismantle', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update'] },
     { resource: 'support', label: 'Support', actions: ['view', 'update'] },
   ],
 }

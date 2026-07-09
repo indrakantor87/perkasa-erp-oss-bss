@@ -2,6 +2,7 @@ import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data
 import { mockAuthUsers } from '@/lib/auth-session'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
 import { getRecentAuthUserAudits } from '@/lib/services/auth-user-audit-service'
+import { getDailyActivityUserProfiles } from '@/lib/services/daily-activity-user-profile-service'
 import type { AuthUserAuditItem } from '@/lib/types'
 
 type ReviewAuthUserRow = {
@@ -264,21 +265,24 @@ export async function getAuthUsersPageData() {
       users,
       summary: buildSummary(users),
       auditItems: mapMockAudits(),
+      dailyActivityProfiles: [],
       ...lookupOptions,
     }
   }
 
   try {
-    const [users, lookupOptions, auditItems] = await Promise.all([
+    const [users, lookupOptions, auditItems, dailyActivityProfiles] = await Promise.all([
       getReviewDbUsers(),
       getReviewDbLookupOptions(),
       getRecentAuthUserAudits().catch(() => []),
+      getDailyActivityUserProfiles(),
     ])
     return {
       source,
       users,
       summary: buildSummary(users),
       auditItems,
+      dailyActivityProfiles,
       ...lookupOptions,
     }
   } catch (error) {
@@ -289,6 +293,7 @@ export async function getAuthUsersPageData() {
       users,
       summary: buildSummary(users),
       auditItems: mapMockAudits(),
+      dailyActivityProfiles: [],
       ...lookupOptions,
     }
   }

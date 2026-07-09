@@ -1,9 +1,11 @@
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
+import { DailyActivityApprovalQueue } from '@/components/dashboard/daily-activity-approval-queue'
 import { KpiGrid } from '@/components/dashboard/kpi-grid'
 import { ModuleGrid } from '@/components/dashboard/module-grid'
 import { RoleQueueGrid } from '@/components/dashboard/role-queue-grid'
 import { WorklistBoard } from '@/components/dashboard/worklist-board'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { canPerformAction } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { getRoleMeta } from '@/lib/role-meta'
 import { getDashboardPageData } from '@/lib/services/dashboard-service'
@@ -11,8 +13,11 @@ import { getVisibleModuleCards } from '@/lib/ui-access'
 
 export default async function DashboardPage() {
   const session = await requireSession()
-  const { source, metrics, roleQueues, worklist, activities } = await getDashboardPageData(session.role)
+  const { source, metrics, roleQueues, worklist, activities, dailyActivityApprovalQueue } = await getDashboardPageData(
+    session,
+  )
   const roleMeta = getRoleMeta(session.role)
+  const canApproveDailyActivity = canPerformAction(session.role, 'daily_activity', 'approve')
 
   return (
     <div className="space-y-6">
@@ -24,6 +29,9 @@ export default async function DashboardPage() {
             <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
               Dashboard kerja untuk {roleMeta.label}
             </h2>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              {roleMeta.division} / {roleMeta.subdivision}
+            </p>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{roleMeta.scope}</p>
           </div>
           <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.shortLabel}</span>
@@ -31,6 +39,7 @@ export default async function DashboardPage() {
       </section>
       <KpiGrid items={metrics} />
       <RoleQueueGrid items={roleQueues} />
+      {canApproveDailyActivity ? <DailyActivityApprovalQueue queue={dailyActivityApprovalQueue} /> : null}
       <WorklistBoard items={worklist} />
       <ModuleGrid items={getVisibleModuleCards(session.role)} />
       <ActivityFeed items={activities} />

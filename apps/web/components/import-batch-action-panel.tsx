@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { ImportBatch } from '@/lib/types'
+import type { BatchDetail, ImportBatch } from '@/lib/types'
 
 type ImportBatchActionPanelProps = {
   batchId: string
   batch: ImportBatch
+  rows: BatchDetail['rows']
   canApprove: boolean
   reviewDbReady: boolean
 }
@@ -34,9 +35,128 @@ const transformStages = [
   },
 ] as const
 
+type ActionStage = (typeof transformStages)[number]['stage']
+
+function resolveRowDomain(row: BatchDetail['rows'][number]) {
+  const target = row.targetId.trim().toLowerCase()
+  const rowId = row.id.trim().toLowerCase()
+  const legacyId = row.legacyId.trim().toLowerCase()
+
+  if (target.startsWith('billing_') || rowId.startsWith('billing-') || legacyId.startsWith('inv-') || legacyId.startsWith('pay-') || legacyId.startsWith('col-')) {
+    return 'BILLING'
+  }
+  if (
+    target.startsWith('support_') ||
+    rowId.startsWith('support-') ||
+    legacyId.startsWith('tt-') ||
+    legacyId.startsWith('iso-') ||
+    legacyId.startsWith('dh-')
+  ) {
+    return 'SUPPORT'
+  }
+  if (
+    target.startsWith('auth_users') ||
+    target.startsWith('crm_') ||
+    target.startsWith('sales_orders') ||
+    target.startsWith('service_subscriptions') ||
+    rowId.startsWith('user-') ||
+    rowId.startsWith('customer-') ||
+    rowId.startsWith('order-') ||
+    legacyId.startsWith('usr-') ||
+    legacyId.startsWith('cust-') ||
+    legacyId.startsWith('ord-')
+  ) {
+    return 'COMMERCIAL'
+  }
+  if (
+    target.startsWith('inventory_') ||
+    target.startsWith('network_odp') ||
+    target.startsWith('hr_') ||
+    rowId.startsWith('inventory-') ||
+    rowId.startsWith('employee-') ||
+    rowId.startsWith('attendance-') ||
+    rowId.startsWith('salary-') ||
+    rowId.startsWith('loan-')
+  ) {
+    return 'FOUNDATION'
+  }
+
+  return 'OTHER'
+}
+
+function inferRecommendedStage(batch: ImportBatch, rows: BatchDetail['rows']): ActionStage | null {
+  const unresolvedRows = rows.filter((row) => ['PENDING', 'MAPPED', 'VALID'].includes(row.status))
+  const unresolvedDomains = unresolvedRows.map(resolveRowDomain)
+
+  if (unresolvedDomains.includes('BILLING')) return '04'
+  if (unresolvedDomains.includes('SUPPORT')) return '03'
+  if (unresolvedDomains.includes('COMMERCIAL')) return '02'
+  if (unresolvedDomains.includes('FOUNDATION')) return '01'
+
+  const normalizedScope = `${batch.scope} ${batch.batchCode} ${batch.sourceSystem}`.toUpperCase()
+  if (normalizedScope.includes('BILLING')) return '04'
+  if (normalizedScope.includes('SUPPORT')) return '03'
+  if (normalizedScope.includes('USER') || normalizedScope.includes('ORDER') || normalizedScope.includes('WEB_PSB')) return '02'
+  if (normalizedScope.includes('HR') || normalizedScope.includes('INVENTORY') || normalizedScope.includes('GA') || normalizedScope.includes('FINANCE')) {
+    return '01'
+  }
+
+  return null
+}
+
+function buildNextStepGuidance(batch: ImportBatch, rows: BatchDetail['rows']) {
+  const recommendedStage = inferRecommendedStage(batch, rows)
+  const unresolvedRows = rows.filter((row) => ['PENDING', 'MAPPED', 'VALID'].includes(row.status)).length
+
+  if (batch.status === 'DRAFT' || batch.status === 'UPLOADED' || batch.status === 'MAPPED') {
+    return {
+      tone: 'bg-blue-50 text-blue-800 border-blue-200',
+      title: 'Langkah berikutnya: validasi batch',
+      detail:
+        'Jalankan validasi dulu agar semua row staging diberi status siap-transform atau invalid sebelum eksekusi SQL tahap berikutnya.',
+    }
+  }
+
+  if (batch.status === 'FAILED') {
+    return {
+      tone: 'bg-rose-50 text-rose-800 border-rose-200',
+      title: 'Langkah berikutnya: review error terakhir',
+      detail:
+        'Batch sedang berada di status gagal. Cek histori aksi dan transform run terakhir, lalu ulangi tahap yang relevan setelah penyebab error dibereskan.',
+    }
+  }
+
+  if (batch.status === 'IMPORTED' && unresolvedRows === 0) {
+    return {
+      tone: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      title: 'Batch sudah final',
+      detail:
+        'Semua row batch ini sudah berada pada status final. Operator tinggal review target akhir atau lanjut ke batch berikutnya.',
+    }
+  }
+
+  if (recommendedStage) {
+    const stageLabel = transformStages.find((item) => item.stage === recommendedStage)
+    return {
+      tone: 'bg-amber-50 text-amber-900 border-amber-200',
+      title: `Langkah disarankan: ${stageLabel?.title || `Tahap ${recommendedStage}`}`,
+      detail:
+        `Masih ada ${unresolvedRows.toLocaleString('id-ID')} row yang belum final. Jalankan ${stageLabel?.title || `Tahap ${recommendedStage}`} untuk domain yang tersisa sebelum naik ke tahap yang lebih tinggi.`,
+    }
+  }
+
+  return {
+    tone: 'bg-slate-100 text-slate-800 border-slate-200',
+    title: 'Batch siap direview',
+    detail:
+      'Tidak ada rekomendasi tahap spesifik dari sistem. Operator bisa review row staging dan histori transform sebelum memutuskan aksi berikutnya.',
+  }
+}
+
 export function ImportBatchActionPanel({
   batchId,
   batch,
+  rows,
   canApprove,
   reviewDbReady,
 }: ImportBatchActionPanelProps) {
@@ -52,6 +172,7 @@ export function ImportBatchActionPanel({
     !reviewDbReady ||
     busyAction !== null ||
     (batch.status !== 'VALIDATED' && batch.status !== 'IMPORTED')
+  const guidance = buildNextStepGuidance(batch, rows)
 
   async function runValidate() {
     if (validationDisabled) return
@@ -131,6 +252,11 @@ export function ImportBatchActionPanel({
 
       <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-700">
         Status batch saat ini: <span className="font-semibold text-slate-950">{batch.status}</span>
+      </div>
+
+      <div className={`mt-4 rounded-2xl border px-4 py-4 ${guidance.tone}`}>
+        <p className="text-sm font-semibold">{guidance.title}</p>
+        <p className="mt-2 text-sm leading-6">{guidance.detail}</p>
       </div>
 
       <div className="mt-4">

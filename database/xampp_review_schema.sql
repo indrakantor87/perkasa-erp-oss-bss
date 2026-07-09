@@ -114,9 +114,12 @@ CREATE TABLE IF NOT EXISTS crm_customer_addresses (
   longitude DECIMAL(10,7) NULL,
   maps_url TEXT NULL,
   is_primary TINYINT(1) NOT NULL DEFAULT 1,
+  primary_customer_id BIGINT UNSIGNED
+    GENERATED ALWAYS AS (CASE WHEN is_primary = 1 THEN customer_id ELSE NULL END) STORED,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_crm_customer_addresses_primary (primary_customer_id),
   CONSTRAINT fk_crm_customer_addresses_customer FOREIGN KEY (customer_id) REFERENCES crm_customers(id)
 );
 
@@ -264,6 +267,7 @@ CREATE TABLE IF NOT EXISTS inventory_stock_movements (
   movement_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_inventory_stock_movements_bk (item_id, reference_no, movement_type, qty),
   CONSTRAINT fk_inventory_stock_movements_item FOREIGN KEY (item_id) REFERENCES inventory_items(id),
   CONSTRAINT fk_inventory_stock_movements_work_order FOREIGN KEY (work_order_id) REFERENCES service_work_orders(id)
 );
@@ -311,6 +315,7 @@ CREATE TABLE IF NOT EXISTS support_trouble_ticket_photos (
   photo_path VARCHAR(255) NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_support_trouble_ticket_photos_bk (trouble_ticket_id, photo_path),
   CONSTRAINT fk_support_trouble_ticket_photos_ticket FOREIGN KEY (trouble_ticket_id) REFERENCES support_trouble_tickets(id)
 );
 
@@ -343,6 +348,7 @@ CREATE TABLE IF NOT EXISTS support_isolations (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_support_isolations_bk (customer_name, isolation_date),
   CONSTRAINT fk_support_isolations_subscription FOREIGN KEY (subscription_id) REFERENCES service_subscriptions(id)
 );
 
@@ -358,6 +364,7 @@ CREATE TABLE IF NOT EXISTS support_dismantle_history (
   close_note TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_support_dismantle_history_bk (customer_name, closed_at),
   CONSTRAINT fk_support_dismantle_history_isolation FOREIGN KEY (isolation_id) REFERENCES support_isolations(id)
 );
 
@@ -431,5 +438,6 @@ CREATE TABLE IF NOT EXISTS hr_loans (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_hr_loans_bk (employee_id, loan_date, amount, loan_type),
   CONSTRAINT fk_hr_loans_employee FOREIGN KEY (employee_id) REFERENCES hr_employees(id)
 );

@@ -1,0 +1,82 @@
+import { runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+
+type ExecuteResult = {
+  insertId?: number
+  affectedRows?: number
+}
+
+type RequestCodeRow = {
+  requestCode: string | null
+}
+
+function padSequence(value: number) {
+  return String(value).padStart(4, '0')
+}
+
+export async function ensureInventoryRequestTable() {
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      CREATE TABLE IF NOT EXISTS inventory_item_requests (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        request_code VARCHAR(40) NOT NULL,
+        inventory_item_id BIGINT UNSIGNED NOT NULL,
+        request_qty INT UNSIGNED NOT NULL DEFAULT 1,
+        request_status VARCHAR(30) NOT NULL DEFAULT 'REQUEST',
+        requested_division VARCHAR(120) NULL,
+        requested_subdivision VARCHAR(150) NULL,
+        requested_for VARCHAR(150) NULL,
+        request_notes TEXT NULL,
+        pending_reason TEXT NULL,
+        requested_by VARCHAR(120) NOT NULL,
+        processed_by VARCHAR(120) NULL,
+        requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        processed_at DATETIME NULL,
+        completed_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_inventory_item_requests_code (request_code),
+        KEY idx_inventory_item_requests_status (request_status),
+        KEY idx_inventory_item_requests_item (inventory_item_id),
+        CONSTRAINT fk_inventory_item_requests_item
+          FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id)
+      )
+    `,
+  )
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE inventory_item_requests
+      ADD COLUMN IF NOT EXISTS requested_division VARCHAR(120) NULL AFTER request_status
+    `,
+  )
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE inventory_item_requests
+      ADD COLUMN IF NOT EXISTS requested_subdivision VARCHAR(150) NULL AFTER requested_division
+    `,
+  )
+}
+
+export async function generateInventoryRequestCode() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const likePrefix = `IREQ-${year}${month}-%`
+
+  const rows = await runReviewDbQuery<RequestCodeRow>(
+    `
+      SELECT request_code AS requestCode
+      FROM inventory_item_requests
+      WHERE request_code LIKE ?
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    [likePrefix],
+  )
+
+  const currentCode = rows[0]?.requestCode ?? ''
+  const lastSequence = Number.parseInt(currentCode.split('-').pop() ?? '0', 10)
+  return `IREQ-${year}${month}-${padSequence(Number.isFinite(lastSequence) ? lastSequence + 1 : 1)}`
+}

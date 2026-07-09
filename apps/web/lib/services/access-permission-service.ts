@@ -8,7 +8,7 @@ import {
   getBaselinePermissionMatrix,
 } from '@/lib/access-control'
 import { invalidateAccessControlCache } from '@/lib/access-control-server'
-import { runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { runReviewDbExecute, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 import { recordAuthPermissionAudit } from '@/lib/services/auth-permission-audit-service'
 import { recordAuthRolePermissionAudit } from '@/lib/services/auth-role-permission-audit-service'
 
@@ -225,73 +225,77 @@ export async function bootstrapAccessPermissions(actor: string) {
     `
   )
 
-  await runReviewDbExecute('START TRANSACTION')
-  try {
+  await runReviewDbTransaction(async (connection) => {
     for (const role of seeds.roles) {
-      await runReviewDbExecute<ExecuteResult>(
+      await connection.query(
         `
           INSERT IGNORE INTO auth_roles (code, name)
           VALUES (?, ?)
         `,
-        [role.code, role.name]
+        [role.code, role.name],
       )
     }
 
     for (const perm of seeds.permissions) {
-      await runReviewDbExecute<ExecuteResult>(
+      await connection.query(
         `
           INSERT IGNORE INTO auth_permissions (code, name)
           VALUES (?, ?)
         `,
-        [perm.code, perm.name]
+        [perm.code, perm.name],
       )
     }
 
-    const roleRows = await runReviewDbQuery<{ id: number; code: string }>(
+    const roleCodes = seeds.roles.map((role) => role.code)
+    const [roleRows] = await connection.query(
       `
         SELECT id, code
         FROM auth_roles
-        WHERE code IN (${seeds.roles.map(() => '?').join(',')})
+        WHERE code IN (${roleCodes.map(() => '?').join(',')})
       `,
-      seeds.roles.map((role) => role.code)
+      roleCodes,
     )
 
-    const permissionRows = await runReviewDbQuery<{ id: number; code: string }>(`
+    const [permissionRows] = await connection.query(`
       SELECT id, code
       FROM auth_permissions
     `)
 
-    const permissionByCode = new Map(permissionRows.map((row) => [String(row.code), Number(row.id)]))
+    const roleItems = (roleRows as { id: number; code: string }[]).map((row) => ({
+      id: Number(row.id),
+      code: String(row.code),
+    }))
+    const permissionItems = (permissionRows as { id: number; code: string }[]).map((row) => ({
+      id: Number(row.id),
+      code: String(row.code),
+    }))
+
+    const permissionByCode = new Map(permissionItems.map((row) => [row.code, row.id]))
 
     for (const role of seeds.roles) {
-      const roleId = roleRows.find((item) => String(item.code).toUpperCase() === role.code)?.id
+      const roleId = roleItems.find((item) => item.code.trim().toUpperCase() === role.code)?.id
       if (!roleId) continue
 
       const permissionCodes = [
         ...getBaselineAllowedPrefixes(role.code).map((prefix) => buildRoutePrefixPermissionCode(prefix)),
         ...getBaselinePermissionMatrix(role.code).flatMap((entry) =>
-          entry.actions.map((action) => buildResourceActionPermissionCode(entry.resource, action))
+          entry.actions.map((action) => buildResourceActionPermissionCode(entry.resource, action)),
         ),
       ]
 
       for (const code of permissionCodes) {
         const permissionId = permissionByCode.get(code)
         if (!permissionId) continue
-        await runReviewDbExecute<ExecuteResult>(
+        await connection.query(
           `
             INSERT IGNORE INTO auth_role_permissions (role_id, permission_id)
             VALUES (?, ?)
           `,
-          [roleId, permissionId]
+          [roleId, permissionId],
         )
       }
     }
-
-    await runReviewDbExecute('COMMIT')
-  } catch (error) {
-    await runReviewDbExecute('ROLLBACK').catch(() => null)
-    throw error
-  }
+  })
 
   invalidateAccessControlCache()
   await recordAuthPermissionAudit({

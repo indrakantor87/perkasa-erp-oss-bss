@@ -9,14 +9,38 @@ USE erp_isp_review;
 
 -- 1) Samakan target subscription invoice dari staging order/customer
 UPDATE staging_legacy_billing_invoice_records bi
-JOIN staging_legacy_order_records so
+JOIN (
+  SELECT
+    source_system,
+    legacy_id,
+    MAX(target_subscription_id) AS target_subscription_id
+  FROM staging_legacy_order_records
+  WHERE target_subscription_id IS NOT NULL
+    AND legacy_id IS NOT NULL
+    AND TRIM(legacy_id) <> ''
+  GROUP BY source_system, legacy_id
+) so
   ON so.source_system = bi.source_system
-  AND (
-    so.legacy_id = bi.legacy_subscription_ref
-    OR so.legacy_customer_id = bi.legacy_customer_id
-  )
-  AND so.batch_id = bi.batch_id
-  AND so.target_subscription_id IS NOT NULL
+  AND so.legacy_id = bi.legacy_subscription_ref
+SET bi.target_subscription_id = so.target_subscription_id,
+    bi.updated_at = CURRENT_TIMESTAMP
+WHERE bi.target_subscription_id IS NULL
+  AND bi.batch_id = @batch_id;
+
+UPDATE staging_legacy_billing_invoice_records bi
+JOIN (
+  SELECT
+    source_system,
+    legacy_customer_id,
+    MAX(target_subscription_id) AS target_subscription_id
+  FROM staging_legacy_order_records
+  WHERE target_subscription_id IS NOT NULL
+    AND legacy_customer_id IS NOT NULL
+    AND TRIM(legacy_customer_id) <> ''
+  GROUP BY source_system, legacy_customer_id
+) so
+  ON so.source_system = bi.source_system
+  AND so.legacy_customer_id = bi.legacy_customer_id
 SET bi.target_subscription_id = so.target_subscription_id,
     bi.updated_at = CURRENT_TIMESTAMP
 WHERE bi.target_subscription_id IS NULL

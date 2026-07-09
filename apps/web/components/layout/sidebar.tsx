@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { AppSession } from '@/lib/auth-session'
-import { navigationItems } from '@/lib/navigation'
+import { findNavigationItem, navigationItems } from '@/lib/navigation'
 import { getRoleMeta } from '@/lib/role-meta'
 
 function matchesPrefix(pathname: string, prefix: string) {
@@ -22,6 +22,7 @@ export function Sidebar({
   const items = navigationItems.filter((item) =>
     allowedPrefixes.some((prefix) => matchesPrefix(item.href, prefix))
   )
+  const activeItem = findNavigationItem(pathname)
 
   return (
     <>
@@ -40,7 +41,7 @@ export function Sidebar({
 
         <nav className="mt-10 space-y-2">
           {items.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+            const active = activeItem.href === item.href
             const Icon = item.icon
 
             return (
@@ -74,6 +75,9 @@ export function Sidebar({
           {session && roleMeta ? (
             <div className="mt-3 space-y-3">
               <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.label}</span>
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                {roleMeta.division} / {roleMeta.subdivision}
+              </p>
               <p className="text-sm leading-6 text-slate-300">{roleMeta.scope}</p>
             </div>
           ) : (
@@ -88,7 +92,7 @@ export function Sidebar({
       <nav className="sticky top-0 z-30 border-b border-line bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
         <div className="flex gap-3 overflow-x-auto pb-1">
           {items.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+            const active = activeItem.href === item.href
 
             return (
               <Link

@@ -28,6 +28,7 @@ Referensi implementasi saat ini:
 
 1. [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
 2. [access-control.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control.ts)
+3. [org-division-baseline.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/org-division-baseline.md)
 
 ## Prinsip Matrix Target
 
@@ -38,6 +39,7 @@ Matrix target mengikuti aturan:
 3. role tidak boleh diberi akses lebih luas daripada flow lama
 4. `approve` hanya diberikan jika memang ada kontrol supervisor
 5. `manage` hanya untuk akses sistem, user, dan konfigurasi
+6. matrix harus tetap konsisten dengan struktur divisi dan sub-divisi organisasi yang sedang aktif
 
 ## Resource Target
 
@@ -142,6 +144,7 @@ Catatan:
 
 1. fokus pada TT teknis dan ODP
 2. tidak diberi akses sales/customers/hr/billing
+3. request barang teknisi ke inventory boleh, tetapi bukan `create` umum untuk semua form inventory
 
 ### 6. `FIELD_TECHNICIAN`
 
@@ -156,6 +159,7 @@ Catatan:
 1. aksi terbatas pada hasil lapangan
 2. tidak punya `create` umum di domain support
 3. pembeda dari NOC ada pada queue dan screen, bukan hanya matrix
+4. request barang teknisi ke inventory diizinkan sebagai workflow khusus, tetapi bukan `create` umum untuk seluruh form inventory
 
 ### 7. `TT_OPERATOR`
 
@@ -221,6 +225,7 @@ Matrix ini masih memakai resource tingkat domain besar. Parity mikro akan dicapa
 2. screen khusus per role
 3. filter data berdasarkan role/divisi
 4. validasi action di service layer
+5. ekspansi bertahap role untuk divisi yang belum penuh terwakili seperti `General Affair`, `Finance & HR`, dan `Operasional`
 
 ## Versioning
 

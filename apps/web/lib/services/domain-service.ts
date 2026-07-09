@@ -2,6 +2,8 @@ import { canPerformAction } from '@/lib/access-control'
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { domainPages } from '@/lib/mock-domains'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { ensureInventoryLoanTable } from '@/lib/services/inventory-loan-service'
+import { ensureInventoryRequestTable } from '@/lib/services/inventory-request-service'
 import {
   buildSupportLaneSnapshots,
   buildSupportLaneReviewSummary,
@@ -259,6 +261,8 @@ type ReviewDbInventoryOdpRow = {
   totalPorts: number
   activePorts: number
   locationText: string | null
+  latitude: number | null
+  longitude: number | null
 }
 
 type ReviewDbInventoryOdpPortRow = {
@@ -275,6 +279,7 @@ type ReviewDbInventoryDeviceAssignmentRow = {
   assignmentId: number
   itemCode: string
   itemName: string
+  categoryCode: string | null
   assignmentStatus: string
   assignedAt: string | Date
   serviceNo: string | null
@@ -293,6 +298,43 @@ type ReviewDbInventoryDeviceReturnRow = {
   workOrderNo: string | null
   customerName: string | null
   serialNumber: string | null
+}
+
+type ReviewDbInventoryRequestRow = {
+  requestId: number
+  requestCode: string
+  requestQty: number
+  requestStatus: string
+  requestedDivision: string | null
+  requestedSubdivision: string | null
+  requestedFor: string | null
+  requestNotes: string | null
+  pendingReason: string | null
+  requestedBy: string
+  processedBy: string | null
+  requestedAt: string | Date
+  processedAt: string | Date | null
+  itemCode: string
+  itemName: string
+  currentStock: number
+}
+
+type ReviewDbInventoryLoanRow = {
+  loanId: number
+  loanCode: string
+  loanQty: number
+  returnedQty: number
+  loanStatus: string
+  borrowerName: string
+  borrowerDivision: string | null
+  borrowerSubdivision: string | null
+  loanNotes: string | null
+  returnNotes: string | null
+  borrowedAt: string | Date
+  dueAt: string | Date | null
+  returnedAt: string | Date | null
+  itemCode: string
+  itemName: string
 }
 
 type ReviewDbHrEmployeeRow = {
@@ -1114,6 +1156,9 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
 }
 
 async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
+  await ensureInventoryLoanTable()
+  await ensureInventoryRequestTable()
+
   const items = await runReviewDbQuery<ReviewDbInventoryItemRow>(`
     SELECT
       ii.id AS itemId,
@@ -1158,7 +1203,9 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
       name AS odpName,
       total_ports AS totalPorts,
       active_ports AS activePorts,
-      location_text AS locationText
+      location_text AS locationText,
+      latitude,
+      longitude
     FROM network_odp
     ORDER BY updated_at DESC, id DESC
     LIMIT 5
@@ -1190,6 +1237,7 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
       sda.id AS assignmentId,
       ii.item_code AS itemCode,
       ii.item_name AS itemName,
+      ic.code AS categoryCode,
       sda.assignment_status AS assignmentStatus,
       sda.assigned_at AS assignedAt,
       ss.service_no AS serviceNo,
@@ -1199,6 +1247,8 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
     FROM service_device_assignments sda
     JOIN inventory_items ii
       ON ii.id = sda.inventory_item_id
+    LEFT JOIN inventory_categories ic
+      ON ic.id = ii.category_id
     LEFT JOIN service_subscriptions ss
       ON ss.id = sda.subscription_id
     LEFT JOIN service_work_orders swo
@@ -1256,6 +1306,55 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const requests = await runReviewDbQuery<ReviewDbInventoryRequestRow>(`
+    SELECT
+      iir.id AS requestId,
+      iir.request_code AS requestCode,
+      iir.request_qty AS requestQty,
+      iir.request_status AS requestStatus,
+      iir.requested_division AS requestedDivision,
+      iir.requested_subdivision AS requestedSubdivision,
+      iir.requested_for AS requestedFor,
+      iir.request_notes AS requestNotes,
+      iir.pending_reason AS pendingReason,
+      iir.requested_by AS requestedBy,
+      iir.processed_by AS processedBy,
+      iir.requested_at AS requestedAt,
+      iir.processed_at AS processedAt,
+      ii.item_code AS itemCode,
+      ii.item_name AS itemName,
+      ii.current_stock AS currentStock
+    FROM inventory_item_requests iir
+    JOIN inventory_items ii
+      ON ii.id = iir.inventory_item_id
+    ORDER BY iir.requested_at DESC, iir.id DESC
+    LIMIT 5
+  `)
+
+  const loans = await runReviewDbQuery<ReviewDbInventoryLoanRow>(`
+    SELECT
+      iil.id AS loanId,
+      iil.loan_code AS loanCode,
+      iil.loan_qty AS loanQty,
+      iil.returned_qty AS returnedQty,
+      iil.loan_status AS loanStatus,
+      iil.borrower_name AS borrowerName,
+      iil.borrower_division AS borrowerDivision,
+      iil.borrower_subdivision AS borrowerSubdivision,
+      iil.loan_notes AS loanNotes,
+      iil.return_notes AS returnNotes,
+      iil.borrowed_at AS borrowedAt,
+      iil.due_at AS dueAt,
+      iil.returned_at AS returnedAt,
+      ii.item_code AS itemCode,
+      ii.item_name AS itemName
+    FROM inventory_item_loans iil
+    JOIN inventory_items ii
+      ON ii.id = iil.inventory_item_id
+    ORDER BY iil.borrowed_at DESC, iil.id DESC
+    LIMIT 5
+  `)
+
   return [
     {
       title: 'Item Inventory Terbaru',
@@ -1302,6 +1401,8 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
         meta: [
           `Total Ports: ${formatNumber(item.totalPorts)}`,
           `Active Ports: ${formatNumber(item.activePorts)}`,
+          `Latitude: ${item.latitude ?? '-'}`,
+          `Longitude: ${item.longitude ?? '-'}`,
         ],
       })),
     },
@@ -1331,6 +1432,7 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
         status: item.assignmentStatus,
         detail: `Assigned ${formatDateTime(item.assignedAt)} untuk ${item.serviceNo || item.workOrderNo || '-'}.`,
         meta: [
+          `Category: ${item.categoryCode || '-'}`,
           `Service: ${item.serviceNo || '-'}`,
           `Work Order: ${item.workOrderNo || '-'}`,
           `Serial: ${item.serialNumber || '-'}`,
@@ -1352,6 +1454,74 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
           `Installed: ${formatDateTime(item.installedAt)}`,
         ],
       })),
+    },
+    {
+      title: 'Request Inventory Teknisi',
+      description: 'Request barang harian dari teknisi/internal inventory dengan alur mirip marketplace untuk diproses sampai selesai.',
+      rows: requests.map((item) => ({
+        id: `REQ-${item.requestId}`,
+        primary: item.requestCode,
+        secondary: `${item.itemCode} | ${item.itemName}`,
+        status:
+          item.requestStatus === 'ON_PROGRESS'
+            ? 'ON PROGRESS'
+            : item.requestStatus === 'COMPLETED'
+              ? 'SELESAI'
+              : item.requestStatus,
+        detail:
+          item.requestStatus === 'PENDING'
+            ? item.pendingReason?.trim() || 'Request sedang pending.'
+            : item.requestNotes?.trim() ||
+              `Request ${formatNumber(item.requestQty)} item untuk ${item.requestedFor || item.requestedBy} dari ${item.requestedSubdivision || item.requestedDivision || 'tim teknisi'}.`,
+        meta: [
+          `Qty: ${formatNumber(item.requestQty)}`,
+          `Divisi: ${item.requestedDivision || '-'}`,
+          `Sub-divisi: ${item.requestedSubdivision || '-'}`,
+          `Untuk: ${item.requestedFor || '-'}`,
+          `Requester: ${item.requestedBy}`,
+          `Processor: ${item.processedBy || '-'}`,
+          `Stock Saat Ini: ${formatNumber(item.currentStock)}`,
+          `Requested: ${formatDateTime(item.requestedAt)}`,
+          `Processed: ${formatDateTime(item.processedAt)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Pinjaman Inventory',
+      description: 'Barang inventaris yang dipinjam dan wajib kembali ke gudang agar stok alat kerja tidak tercampur dengan barang habis pakai.',
+      rows: loans.map((item) => {
+        const remainingQty = Math.max(item.loanQty - item.returnedQty, 0)
+        const dueAtDate = item.dueAt ? new Date(item.dueAt) : null
+        const isOverdue =
+          remainingQty > 0 && dueAtDate instanceof Date && !Number.isNaN(dueAtDate.getTime()) && dueAtDate.getTime() < Date.now()
+        const displayStatus = isOverdue ? 'OVERDUE' : item.loanStatus
+        const detailBase =
+          item.returnNotes?.trim() ||
+          item.loanNotes?.trim() ||
+          `Pinjaman ${formatNumber(item.loanQty)} item untuk ${item.borrowerName}.`
+
+        return {
+          id: `LOAN-${item.loanId}`,
+          primary: item.loanCode,
+          secondary: `${item.itemCode} | ${item.itemName}`,
+          status: displayStatus,
+          detail:
+            displayStatus === 'OVERDUE'
+              ? `Pengembalian melewati target. ${detailBase}`
+              : detailBase,
+          meta: [
+            `Peminjam: ${item.borrowerName}`,
+            `Divisi: ${item.borrowerDivision || '-'}`,
+            `Sub-divisi: ${item.borrowerSubdivision || '-'}`,
+            `Qty Pinjam: ${formatNumber(item.loanQty)}`,
+            `Qty Kembali: ${formatNumber(item.returnedQty)}`,
+            `Sisa Pinjam: ${formatNumber(remainingQty)}`,
+            `Dipinjam: ${formatDateTime(item.borrowedAt)}`,
+            `Jatuh Tempo: ${formatDateTime(item.dueAt)}`,
+            `Dikembalikan: ${formatDateTime(item.returnedAt)}`,
+          ],
+        }
+      }),
     },
     {
       title: 'Device Return Terbaru',

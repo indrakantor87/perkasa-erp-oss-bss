@@ -80,7 +80,7 @@ async function main() {
   process.env.DATABASE_URL = 'mysql://root:@127.0.0.1:1/perkasa_review'
   assert.equal(getDataSourceSnapshot().effectiveMode, 'review-db')
 
-  const dashboardData = await getDashboardPageData('SUPER_ADMIN')
+  const dashboardData = await getDashboardPageData(session!)
   assert.equal(dashboardData.summary.customers, 10284)
   assert.equal(dashboardData.source.effectiveMode, 'mock')
   assert.equal(dashboardData.source.isFallback, true)

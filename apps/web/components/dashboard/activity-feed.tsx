@@ -5,12 +5,12 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
     <div className="panel p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="section-title">Aktivitas</p>
+          <p className="section-title">Audit & Aktivitas</p>
           <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-            Update terbaru project
+            Jejak aksi terbaru
           </h2>
         </div>
-        <span className="badge">Review harian</span>
+        <span className="badge">Live review</span>
       </div>
 
       <div className="mt-6 space-y-4">

@@ -1,27 +1,37 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type SupportSlaFormProps = {
   canApprove: boolean
   reviewDbReady: boolean
   typeSuggestions: string[]
+  initialTroubleType?: string
 }
 
 export function SupportSlaForm({
   canApprove,
   reviewDbReady,
   typeSuggestions,
+  initialTroubleType,
 }: SupportSlaFormProps) {
   const router = useRouter()
-  const [troubleType, setTroubleType] = useState(typeSuggestions[0] ?? 'KONEKSI')
+  const [troubleType, setTroubleType] = useState(
+    initialTroubleType?.trim() || typeSuggestions[0] || 'KONEKSI',
+  )
   const [durationDays, setDurationDays] = useState('1')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canApprove || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialTroubleType?.trim()) {
+      setTroubleType(initialTroubleType.trim())
+    }
+  }, [initialTroubleType])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

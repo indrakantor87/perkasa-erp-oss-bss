@@ -56,6 +56,9 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-900">{session.displayName}</p>
                 <p className="text-xs uppercase tracking-[0.18em] text-mute">{roleMeta?.label}</p>
+                <p className="mt-1 truncate text-xs text-slate-500">
+                  {roleMeta ? `${roleMeta.division} / ${roleMeta.subdivision}` : null}
+                </p>
                 <p className="mt-1 truncate text-xs text-slate-500">{roleMeta?.scope}</p>
               </div>
             </div>

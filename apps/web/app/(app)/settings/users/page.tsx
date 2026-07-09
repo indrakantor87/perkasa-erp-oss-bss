@@ -3,9 +3,11 @@ import { redirect } from 'next/navigation'
 import { AuthUserAuditList } from '@/components/auth-user-audit-list'
 import { AuthUserCreateForm } from '@/components/auth-user-create-form'
 import { AuthUserManagementTable } from '@/components/auth-user-management-table'
+import { DailyActivityUserProfilePanel } from '@/components/daily-activity-user-profile-panel'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { canAccessPath, canPerformAction } from '@/lib/access-control'
 import { requireSession } from '@/lib/auth'
+import { getDailyActivityDivisionOptions } from '@/lib/daily-activity-org'
 import { getRoleMeta } from '@/lib/role-meta'
 import { getAuthUsersPageData } from '@/lib/services/auth-user-service'
 
@@ -15,10 +17,11 @@ export default async function UserSettingsPage() {
     redirect('/dashboard')
   }
 
-  const { source, users, summary, auditItems, roleOptions, divisionOptions, branchOptions } =
+  const { source, users, summary, auditItems, roleOptions, divisionOptions, branchOptions, dailyActivityProfiles } =
     await getAuthUsersPageData()
   const canManage = canPerformAction(session.role, 'user_settings', 'manage')
   const roleMeta = getRoleMeta(session.role)
+  const dailyActivityDivisionOptions = getDailyActivityDivisionOptions()
 
   return (
     <div className="space-y-6">
@@ -92,6 +95,14 @@ export default async function UserSettingsPage() {
         roleOptions={roleOptions}
         divisionOptions={divisionOptions}
         branchOptions={branchOptions}
+      />
+
+      <DailyActivityUserProfilePanel
+        canManage={canManage}
+        reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+        users={users}
+        profiles={dailyActivityProfiles}
+        divisionOptions={dailyActivityDivisionOptions}
       />
 
       <AuthUserAuditList items={auditItems} />
