@@ -17,6 +17,13 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts) mengoptimalkan query support review DB sehingga `/support/{lane}` hanya mengambil section yang relevan untuk lane tersebut
 - `VERSION` dinaikkan ke `0.63.6`
 
+## [0.63.7] - 2026-07-09
+
+### Changed
+
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) merapikan layout halaman `/support/{lane}` dengan header lane-specific dan menyembunyikan aksi pendukung agar fokus kerja lebih dedicated
+- `VERSION` dinaikkan ke `0.63.7`
+
 ## [0.63.5] - 2026-07-08
 
 ### Added

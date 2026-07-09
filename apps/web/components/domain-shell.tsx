@@ -253,6 +253,18 @@ export function DomainShell({
   const supportFocusCopy =
     content.key === 'support' && activeSupportLane ? getSupportLaneFocusCopy(activeSupportLane) : null
   const supportRoleMeta = content.key === 'support' ? getRoleMeta(role) : null
+  const headerCopy = supportPageMode === 'lane' && content.key === 'support' ? supportFocusCopy : null
+  const headerEyebrow = headerCopy ? headerCopy.eyebrow : content.eyebrow
+  const headerTitle = headerCopy ? headerCopy.title : content.title
+  const headerDescription = headerCopy ? headerCopy.description : content.description
+  const headerPrimaryAction =
+    supportPageMode === 'lane' && content.key === 'support'
+      ? { label: 'Kembali ke Support', href: '/support' }
+      : content.primaryAction
+  const headerSecondaryAction =
+    supportPageMode === 'lane' && content.key === 'support'
+      ? { label: 'Lihat Dashboard', href: '/dashboard' }
+      : content.secondaryAction
   const visibleReviewSections =
     content.key === 'support' ? supportFocus?.visibleSections ?? (content.reviewSections ?? []) : (content.reviewSections ?? [])
   const supportForms =
@@ -336,7 +348,7 @@ export function DomainShell({
       ? supportForms.filter((item) => activeSupportWorkspace.actionKeys.includes(item.key))
       : supportForms
   const secondarySupportForms =
-    activeSupportWorkspace && content.key === 'support'
+    activeSupportWorkspace && content.key === 'support' && supportPageMode === 'domain'
       ? supportForms.filter((item) => !activeSupportWorkspace.actionKeys.includes(item.key))
       : []
 
@@ -345,21 +357,27 @@ export function DomainShell({
       <DataSourceStatus source={source} />
 
       <section className="panel p-6">
-        <p className="section-title">{content.eyebrow}</p>
+        <p className="section-title">{headerEyebrow}</p>
         <div className="mt-3 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
-              {content.title}
+              {headerTitle}
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{content.description}</p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{headerDescription}</p>
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link href={content.primaryAction.href} className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white">
-              {content.primaryAction.label}
+            <Link
+              href={headerPrimaryAction.href}
+              className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white"
+            >
+              {headerPrimaryAction.label}
             </Link>
-            <Link href={content.secondaryAction.href} className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700">
-              {content.secondaryAction.label}
+            <Link
+              href={headerSecondaryAction.href}
+              className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700"
+            >
+              {headerSecondaryAction.label}
             </Link>
           </div>
         </div>
@@ -570,16 +588,12 @@ export function DomainShell({
               isExplicitFocus={Boolean(selectedSupportLane)}
             />
           ) : null}
-          {supportFocusCopy && activeSupportLaneMeta && supportRoleMeta ? (
+          {supportPageMode === 'domain' && supportFocusCopy && activeSupportLaneMeta && supportRoleMeta ? (
             <section className="panel p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className="section-title">
-                    {supportPageMode === 'lane'
-                      ? `Workspace dedicated: ${supportFocusCopy.eyebrow}`
-                      : selectedSupportLane
-                        ? supportFocusCopy.eyebrow
-                        : `Default role: ${supportFocusCopy.eyebrow}`}
+                    {selectedSupportLane ? supportFocusCopy.eyebrow : `Default role: ${supportFocusCopy.eyebrow}`}
                   </p>
                   <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
                     {supportFocusCopy.title}
@@ -589,21 +603,13 @@ export function DomainShell({
                 <div className="flex flex-wrap gap-2">
                   <span className={`badge ${activeSupportLaneMeta.accent}`}>{activeSupportLaneMeta.shortLabel}</span>
                   <span className={`badge border-transparent ${supportRoleMeta.tone}`}>{supportRoleMeta.shortLabel}</span>
-                  {!selectedSupportLane && supportPageMode === 'domain' ? (
-                    <span className="badge border-slate-200 bg-white text-slate-600">workspace default</span>
-                  ) : null}
+                  {!selectedSupportLane ? <span className="badge border-slate-200 bg-white text-slate-600">workspace default</span> : null}
                 </div>
               </div>
               <div className="mt-6 flex flex-wrap gap-2">
-                {supportPageMode === 'lane' ? (
-                  <Link href="/support" className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700">
-                    Kembali ke support
-                  </Link>
-                ) : (
-                  <Link href="/support" className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700">
-                    Semua lane
-                  </Link>
-                )}
+                <Link href="/support" className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700">
+                  Semua lane
+                </Link>
                 {(supportFocus?.lanes ?? []).map((lane) => {
                   return (
                     <Link
