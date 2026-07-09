@@ -1,21 +1,46 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type BillingPaymentFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   invoiceSuggestions: string[]
+  followUpSuggestions: string[]
 }
 
 const paymentMethodOptions = ['TRANSFER', 'CASH', 'EWALLET', 'VA', 'OTHER'] as const
+
+function parseFollowUpSuggestion(value: string) {
+  const parts = value.split('|').map((item) => item.trim())
+  return {
+    invoiceNo: parts[0] ?? '',
+    customerName: parts[1] ?? '',
+    invoiceStatus: parts[2] ?? '-',
+    total: parts[3] ?? 'Rp0',
+    paid: parts[4] ?? 'Rp0',
+    remaining: parts[5] ?? 'Rp0',
+    invoiceDue: parts[6] ?? '-',
+    followUp: parts[7] ?? '-',
+    followUpState: parts[8] ?? 'UNSET',
+    actionType: parts[9] ?? '-',
+    collectionStatus: parts[10] ?? '-',
+    suspendCandidate: parts[11] ?? 'Tidak',
+    actionNotes: parts.slice(12).join(' | ') || '-',
+  }
+}
+
+function toPlainAmount(value: string) {
+  return value.replace(/[^0-9.,-]/g, '').trim()
+}
 
 export function BillingPaymentForm({
   canCreate,
   reviewDbReady,
   invoiceSuggestions,
+  followUpSuggestions,
 }: BillingPaymentFormProps) {
   const router = useRouter()
   const [invoiceNo, setInvoiceNo] = useState(invoiceSuggestions[0] ?? '')
@@ -28,6 +53,11 @@ export function BillingPaymentForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+  const currentSuggestion =
+    followUpSuggestions
+      .map((item) => parseFollowUpSuggestion(item))
+      .find((item) => item.invoiceNo.trim().toUpperCase() === invoiceNo.trim().toUpperCase()) ?? null
+
   const helperText = useMemo(() => {
     if (!canCreate) {
       return 'Role aktif belum memiliki izin create pada domain Billing.'
@@ -37,6 +67,14 @@ export function BillingPaymentForm({
     }
     return 'Form ini menambah pembayaran ke review DB dan menyelaraskan status invoice secara aman.'
   }, [canCreate, reviewDbReady])
+
+  useEffect(() => {
+    if (!currentSuggestion) {
+      return
+    }
+
+    setAmount((current) => (current.trim() ? current : toPlainAmount(currentSuggestion.remaining)))
+  }, [currentSuggestion])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -172,6 +210,27 @@ export function BillingPaymentForm({
             disabled={isDisabled}
           />
         </label>
+
+        {currentSuggestion ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 lg:col-span-2">
+            <div className="font-semibold text-slate-950">
+              {currentSuggestion.customerName || '-'} • {currentSuggestion.invoiceNo || '-'}
+            </div>
+            <div className="mt-1">
+              Invoice: {currentSuggestion.invoiceStatus || '-'} • Collection: {currentSuggestion.collectionStatus || '-'}
+            </div>
+            <div className="mt-1">
+              Total {currentSuggestion.total || 'Rp0'} • Paid {currentSuggestion.paid || 'Rp0'} • Remaining {currentSuggestion.remaining || 'Rp0'}
+            </div>
+            <div className="mt-1">
+              Due {currentSuggestion.invoiceDue || '-'} • Follow Up {currentSuggestion.followUp || '-'} • {currentSuggestion.followUpState || 'UNSET'}
+            </div>
+            <div className="mt-1">
+              Action terakhir: {currentSuggestion.actionType || '-'} • Suspend Candidate: {currentSuggestion.suspendCandidate || 'Tidak'}
+            </div>
+            <div className="mt-1">Catatan terakhir: {currentSuggestion.actionNotes || '-'}</div>
+          </div>
+        ) : null}
 
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">

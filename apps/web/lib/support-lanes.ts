@@ -148,7 +148,7 @@ export function buildSupportLaneWorkspace(
         'Pastikan tindak lanjut teknis atau eskalasi lapangan sudah dicatat.',
         'Tutup ticket yang sudah selesai agar antrian operasional tetap bersih.',
       ],
-      actionKeys: ['ticket-create', 'ticket-close', 'sla-manage'],
+      actionKeys: ['ticket-create', 'ticket-progress', 'ticket-escalate', 'ticket-close', 'sla-manage'],
       escalationNote:
         'Eskalasi ke lane SLA atau teknisi lapangan jika ticket berpotensi melewati target durasi.',
     },
@@ -190,7 +190,7 @@ export function buildSupportLaneWorkspace(
         'Cocokkan ticket prioritas dengan target durasi yang berlaku.',
         'Eskalasi kasus yang mendekati atau melewati SLA ke operator terkait.',
       ],
-      actionKeys: ['sla-manage', 'ticket-close'],
+      actionKeys: ['sla-manage', 'ticket-progress', 'ticket-escalate', 'ticket-close'],
       escalationNote:
         'Eskalasi ke lane TT jika problem teknis belum memiliki owner yang jelas atau update statusnya tertinggal.',
     },

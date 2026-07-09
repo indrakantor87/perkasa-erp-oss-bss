@@ -2,6 +2,7 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { recordHrAudit } from '@/lib/services/hr-audit-service'
 
 type BranchRow = {
   id: number
@@ -170,6 +171,13 @@ export async function POST(request: Request) {
         whatsapp || null,
       ],
     )
+
+    await recordHrAudit({
+      actionType: 'EMPLOYEE_CREATE',
+      actor: `${session.displayName} (${session.username})`,
+      targetRef: employeeCode,
+      detail: `Employee ${employeeCode} untuk ${fullName} dibuat via web HR.`,
+    })
 
     return Response.json({
       message: `Employee ${employeeCode} untuk ${fullName} berhasil disimpan.`,

@@ -255,6 +255,8 @@ export type SupportLaneSnapshot = {
 
 export type SupportLaneActionKey =
   | 'ticket-create'
+  | 'ticket-progress'
+  | 'ticket-escalate'
   | 'ticket-close'
   | 'sla-manage'
   | 'isolation-create'

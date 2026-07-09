@@ -23,6 +23,438 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.63.81] - 2026-07-09
+
+### Improved
+
+- Support kini memprioritaskan queue TT berdasarkan `follow-up` terdekat atau yang sudah overdue, menampilkan `follow-up state` langsung di panel, dan memberi konteks progress terakhir pada form close agar operator tidak menutup ticket tanpa melihat PIC/follow-up/progress terbaru: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx), [support-ticket-close-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-close-form.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.81`
+
+## [0.63.82] - 2026-07-09
+
+### Improved
+
+- Support kini membawa konteks `SLA Days`, `SLA Due`, dan `SLA State` langsung ke queue TT, prefill form progress, serta form close; ticket yang sudah `OVERDUE` atau paling dekat jatuh tempo juga diprioritaskan lebih dulu agar operator tidak perlu membuka master SLA terpisah saat menentukan aksi: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [support-ticket-progress-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-progress-form.tsx), [support-ticket-close-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-close-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.82`
+
+## [0.63.83] - 2026-07-09
+
+### Improved
+
+- Support kini punya jalur `eskalasi ticket` non-destruktif untuk kasus `SLA overdue` atau prioritas tinggi, lengkap dengan side-car escalation log, append note aman ke ticket, tombol aksi dari queue TT, dan form eskalasi dengan snapshot SLA/progress/eskalasi terakhir agar operator bisa mendorong kasus ke owner berikutnya tanpa keluar dari shell support: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/%5BticketCode%5D/escalate/route.ts), [support-ticket-escalation-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/support-ticket-escalation-service.ts), [support-ticket-escalate-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-escalate-form.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.83`
+
+## [0.63.84] - 2026-07-09
+
+### Improved
+
+- Billing collection kini mendukung mode `single` dan `batch` dari queue invoice tindak lanjut yang sedang tampil, sehingga operator bisa mencatat reminder/call/promise-to-pay/suspend massal secara aman tanpa membuka invoice satu per satu: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/collection-actions/route.ts), [billing-collection-action-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-collection-action-form.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.84`
+
+## [0.63.85] - 2026-07-09
+
+### Improved
+
+- Billing kini punya `Collection Follow Up Queue` berbasis action collection `OPEN` terbaru per invoice, lengkap dengan `remaining`, `follow-up state`, `collection status`, dan `suspend candidate`; context queue ini juga dipakai ulang oleh form collection dan payment untuk prefill aman serta ringkasan tagihan sebelum operator menindak invoice: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [billing-collection-action-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-collection-action-form.tsx), [billing-payment-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-payment-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.85`
+
+## [0.63.86] - 2026-07-09
+
+### Improved
+
+- Billing kini punya jalur `resolve collection follow-up` dari queue aktif, sehingga operator bisa menutup action collection `OPEN` terbaru per invoice sebagai `DONE` atau `CANCELLED` dengan catatan formal tanpa harus membuat action baru: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/collection-actions/resolve/route.ts), [billing-collection-resolve-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-collection-resolve-form.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Payment entry kini otomatis menutup action collection `OPEN` yang terkait invoice tersebut, sehingga lifecycle penagihan lebih rapi setelah pembayaran diterima: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/payments/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.86`
+
+## [0.63.87] - 2026-07-09
+
+### Improved
+
+- Billing status kini mendukung jalur `SUSPENDED` dan `OVERDUE` selain `CANCELLED`, sehingga operator bisa menandai invoice belum lunas sebagai suspend candidate lalu mengaktifkannya kembali ke jalur overdue/reconnect langsung dari web dengan context follow-up yang aman: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/invoices/status/route.ts), [billing-invoice-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-invoice-status-form.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Billing read-side kini menampilkan section `Invoice Suspended` agar antrean reconnect tidak hilang dari layar operator saat invoice sudah masuk jalur suspend: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.87`
+
+## [0.63.88] - 2026-07-09
+
+### Improved
+
+- Billing status kini mendukung mode `batch` untuk jalur `SUSPENDED` dan `OVERDUE`, sehingga operator bisa mengeksekusi suspend massal dari antrean siap suspend dan reconnect massal dari antrean invoice suspended tanpa memproses satu per satu: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/invoices/status/route.ts), [billing-invoice-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-invoice-status-form.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Billing read-side kini menampilkan section `Suspend Ready Queue` dan `Reconnect Ready Queue` agar antrean keputusan suspend/reconnect lebih eksplisit dan tidak bercampur dengan follow-up umum: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.88`
+
+## [0.63.89] - 2026-07-09
+
+### Improved
+
+- Billing read-side kini menampilkan section `Promise To Pay Queue` agar invoice dengan janji bayar aktif terpisah jelas dari antrean siap suspend, sehingga operator collection bisa membedakan invoice yang masih layak ditunggu dari invoice yang harus dinaikkan tindakannya: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Form collection action batch kini otomatis memakai antrean yang paling relevan berdasarkan `action type`, termasuk `promise to pay`, `siap suspend`, dan `siap reconnect`, sehingga batch action tidak lagi menembak antrean yang terlalu umum: [billing-collection-action-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-collection-action-form.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.89`
+
+## [0.63.80] - 2026-07-09
+
+### Improved
+
+- Support kini punya `update progress trouble ticket` non-destruktif dengan side-car progress log untuk PIC, status kerja, follow-up, dan catatan progres terbaru; queue TT dan shell support juga langsung menampilkan snapshot progress terakhir agar operator bisa lanjut dari open ticket tanpa menimpa data inti: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/%5BticketCode%5D/progress/route.ts), [support-ticket-progress-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/support-ticket-progress-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [support-ticket-progress-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-progress-form.tsx), [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.80`
+
+## [0.63.79] - 2026-07-09
+
+### Improved
+
+- Billing kini mendukung `batch recurring invoice generation` dari daftar `Subscription Billing-Ready`, sehingga operator bisa membuat invoice bulanan massal langsung dari shell web sambil tetap memakai guard existing per subscription untuk menghindari duplikasi periode: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/invoices/generate/route.ts), [billing-invoice-generate-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-invoice-generate-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.79`
+
+## [0.63.78] - 2026-07-09
+
+### Improved
+
+- `Import Center` sekarang mengunci upload ulang batch yang sudah punya row staging, sehingga operator tidak lagi bisa menimpa review lama secara destruktif; form upload juga menampilkan guardrail yang mengarahkan operator membuat batch baru untuk file revisi: [import-file-loader.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/import-file-loader.ts), [import-batch-upload-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-upload-form.tsx), [import-batch-detail-view.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-detail-view.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.78`
+
+## [0.63.77] - 2026-07-09
+
+### Improved
+
+- HR sekarang punya section `Face Priority Queue` yang menyatukan capture `RETAKE` pending dan employee dengan baseline `DRIFTING/WATCHLIST`, lengkap dengan `priority score` agar operator bisa menindak item paling kritis lebih cepat tanpa analisis manual tambahan: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.77`
+
+## [0.63.76] - 2026-07-09
+
+### Improved
+
+- HR kini punya deteksi drift baseline wajah per employee agar operasional lebih cepat membaca apakah kualitas referensi masih `STABLE`, masuk `WATCHLIST`, atau sudah `DRIFTING`; alert ini dihitung dari gap skor terbaru terhadap rata-rata dan skor terbaik, lalu ditampilkan langsung di section `Face Reference Trends` dan panel trend pada form baseline employee: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-employee-face-reference-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-employee-face-reference-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.76`
+
+## [0.63.75] - 2026-07-09
+
+### Improved
+
+- baseline wajah HR kini punya history dan scoring trend per employee: setiap perubahan baseline manual maupun reinforce review disimpan ke tabel history side-car, HR shell menampilkan section `Face Reference History` dan `Face Reference Trends`, dan form baseline employee menampilkan ringkasan trend terpilih agar operator tahu kualitas referensi sebelum menimpa baseline aktif: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-employee-face-reference-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-employee-face-reference-form.tsx), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/employees/face-reference/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.75`
+
+## [0.63.74] - 2026-07-09
+
+### Improved
+
+- feedback loop review wajah HR kini non-destruktif dan lebih operasional: reviewer bisa memperkuat baseline employee secara terkontrol saat hasil `VERIFIED + MATCH`, sementara capture yang berakhir `REJECTED + RETAKE` otomatis masuk ke section `Face Retake Queue` untuk follow-up pengambilan ulang, lengkap dengan audit trail baru: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/attendance/face/review/route.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [hr-attendance-face-review-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-face-review-form.tsx), [hr-audit-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-audit-service.ts), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.74`
+
+## [0.63.73] - 2026-07-09
+
+### Improved
+
+- review wajah HR kini mendapat matching recommendation berbasis baseline employee aktif, sehingga antrean review bisa melihat `Baseline Reference`, `Baseline Match Score`, `Baseline Match Outcome`, dan alasan `MATCH / REVIEW_MANUAL / RETAKE` sebelum operator menetapkan keputusan akhir: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-attendance-face-review-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-face-review-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.73`
+
+## [0.63.72] - 2026-07-09
+
+### Improved
+
+- baseline referensi wajah employee sekarang bisa membaca kandidat otomatis dari capture yang sudah `VERIFIED`: shell HR menampilkan section `Verified Face Candidates`, form baseline wajah melakukan prefill aman saat baseline belum ada, dan operator bisa memakai kandidat terbaru dengan satu klik tanpa mengetik ulang `capture ref`: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-employee-face-reference-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-employee-face-reference-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.72`
+
+## [0.63.71] - 2026-07-09
+
+### Improved
+
+- HR kini punya baseline referensi wajah per employee secara non-intrusive melalui tabel side-car, route write khusus, audit trail, section review `Employee Face References`, dan form safety UX yang bisa prefill referensi lama saat operator memilih employee aktif, sehingga fondasi matching engine tidak perlu menempel ke tabel `hr_employees` inti: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/employees/face-reference/route.ts), [hr-employee-face-reference-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-employee-face-reference-form.tsx), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-audit-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-audit-service.ts), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.71`
+
+## [0.63.70] - 2026-07-09
+
+### Improved
+
+- shell HR kini menampilkan analytics outcome verifikasi wajah yang merangkum backlog `PENDING_REVIEW/VERIFIED/REJECTED`, distribusi confidence placeholder, rata-rata score sample terbaru, serta split adopsi `CAMERA_CAPTURE` vs mode manual agar operator bisa membaca kualitas outcome sebelum masuk ke recognition engine penuh: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.70`
+
+## [0.63.69] - 2026-07-09
+
+### Improved
+
+- konfigurasi face attendance HR kini mendukung kebijakan `auto-verify` yang bisa diatur admin, termasuk sakelar aktivasi dan `minimum score` untuk confidence tinggi, sehingga jalur `Auto-Verify Aman` tidak lagi hardcoded dan bisa mengikuti kebijakan operasional tiap divisi: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/attendance/face/route.ts), [hr-attendance-face-config-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-face-config-form.tsx), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.69`
+
+## [0.63.68] - 2026-07-09
+
+### Improved
+
+- review wajah HR kini punya `confidence band` (`HIGH`, `MEDIUM`, `LOW`) dan indikator `auto-review aman`, sehingga operator bisa melihat apakah capture cukup kuat untuk `Auto-Verify Aman` atau tetap perlu review manual mendalam: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-attendance-face-review-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-face-review-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.68`
+
+## [0.63.67] - 2026-07-09
+
+### Improved
+
+- workflow review wajah HR kini dilengkapi scoring placeholder dan rekomendasi keputusan otomatis: shell HR menampilkan `match score`, `recommended decision`, dan alasan rekomendasi, sementara form review bisa langsung memakai saran `VERIFIED`, `PENDING_REVIEW`, atau `REJECTED` sebelum recognition engine otomatis penuh hadir: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-attendance-face-review-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-face-review-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.67`
+
+## [0.63.66] - 2026-07-09
+
+### Improved
+
+- face attendance HR kini punya workflow review operasional: setiap capture wajah masuk ke status `PENDING_REVIEW`, tersedia antrean review terbaru di shell HR, operator bisa mengubah hasil menjadi `VERIFIED` atau `REJECTED`, dan audit review wajah ikut masuk ke dashboard terpusat: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/attendance/face/review/route.ts), [hr-attendance-face-review-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-face-review-form.tsx), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.66`
+
+## [0.63.65] - 2026-07-09
+
+### Improved
+
+- form attendance HR sekarang sudah punya fondasi capture kamera browser langsung di web: operator bisa membuka kamera, mengambil snapshot wajah, melihat preview capture, dan menghasilkan `faceCaptureRef` otomatis untuk jalur verifikasi `CAMERA_CAPTURE` tanpa mengetik referensi manual: [hr-attendance-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.65`
+
+## [0.63.64] - 2026-07-09
+
+### Improved
+
+- fondasi face attendance HR kini hidup secara non-intrusive: ada konfigurasi mode verifikasi wajah terpisah, log referensi face capture/manual review terpisah, form attendance bisa mengirim referensi verifikasi wajah, dan mode wajib/opsional dapat diatur sebelum recognition engine penuh diaktifkan: [hr-attendance-face-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-face-service.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/attendance/face/route.ts), [hr-attendance-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-form.tsx), [hr-attendance-face-config-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-face-config-form.tsx), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/attendance/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.64`
+
+## [0.63.63] - 2026-07-09
+
+### Improved
+
+- fondasi geofence/radius attendance HR kini hidup secara non-intrusive: ada konfigurasi titik kerja + radius terpisah, capture lokasi browser di form attendance, validasi radius opsional/wajib saat check-in, log lokasi attendance terpisah, serta audit `ATTENDANCE_GEOFENCE_CONFIG` untuk perubahan konfigurasi geofence: [hr-attendance-geofence-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-attendance-geofence-service.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/attendance/geofence/route.ts), [hr-attendance-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-form.tsx), [hr-attendance-geofence-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-geofence-form.tsx), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/attendance/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.63`
+
+## [0.63.62] - 2026-07-09
+
+### Improved
+
+- flow payroll HR kini benar-benar lebih rapat: form void menampilkan ringkasan slip terpilih (periode, status, income, deduction) sebelum submit, dan backend release menolak slip yang sudah berstatus void agar operator tidak bisa merilis payroll yang sudah dibatalkan secara non-destruktif: [hr-salary-slip-void-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-salary-slip-void-form.tsx), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/salary-slips/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.62`
+
+## [0.63.61] - 2026-07-09
+
+### Improved
+
+- flow release dan void Payroll HR sekarang menampilkan suggestion yang lebih kaya (periode, status, income, deduction), lalu form release memperlihatkan ringkasan slip terpilih sebelum submit agar operator lebih aman saat merilis payroll: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-salary-slip-release-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-salary-slip-release-form.tsx), [hr-salary-slip-void-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-salary-slip-void-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.61`
+
+## [0.63.60] - 2026-07-09
+
+### Improved
+
+- flow update dan void Loan HR sekarang menampilkan suggestion yang lebih kaya (loan type, amount, installment) serta form update menampilkan status saat ini dan melakukan prefill status tujuan secara aman agar operator tidak salah ubah status: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-loan-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-loan-status-form.tsx), [hr-loan-void-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-loan-void-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.60`
+
+## [0.63.59] - 2026-07-09
+
+### Improved
+
+- correction attendance HR kini lebih aman untuk operator karena suggestion review membawa metadata mentah `check in`, `check out`, `overtime`, dan `lock admin`, lalu form otomatis melakukan prefill saat row attendance dipilih sehingga koreksi tidak mudah mengosongkan nilai lama secara tidak sengaja: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-attendance-update-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-update-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.59`
+
+## [0.63.58] - 2026-07-09
+
+### Improved
+
+- HR kini mendukung reaktivasi employee non-destruktif dari status `ARCHIVED` ke status aktif yang dipilih operator, lengkap dengan validasi status aman di backend dan actor trail `EMPLOYEE_REACTIVATE`: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/employees/reactivate/route.ts), [hr-audit-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-audit-service.ts)
+- halaman HR kini menyediakan form khusus untuk mengaktifkan kembali employee archived langsung dari review suggestion, sehingga siklus archive/reactivate menjadi lengkap tanpa membuat row employee baru: [hr-employee-reactivate-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-employee-reactivate-form.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Changed
+
+- audit dashboard HR kini mengenali action `EMPLOYEE_REACTIVATE`, sehingga timeline `SUPER_ADMIN` menampilkan jejak unarchive/reactivate employee dengan label yang lebih operasional: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `VERSION` dinaikkan ke `0.63.58`
+
+## [0.63.57] - 2026-07-09
+
+### Improved
+
+- Employee HR kini mendukung archive non-destruktif lewat route khusus yang mengubah `employment_status` menjadi `ARCHIVED`, sehingga data pegawai bisa ditutup tanpa menghapus histori attendance, loan, payroll, atau relasi lain yang sudah ada: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/employees/archive/route.ts), [hr-employee-archive-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-employee-archive-form.tsx)
+
+### Changed
+
+- audit dashboard HR kini mengenali action `EMPLOYEE_ARCHIVE`, dan halaman HR menyediakan form archive employee terpisah agar tidak tercampur dengan write-action create
+- `VERSION` dinaikkan ke `0.63.57`
+
+## [0.63.56] - 2026-07-09
+
+### Improved
+
+- Loan HR kini mendukung cancel/void non-destruktif lewat status `CANCELLED`, sehingga pinjaman bisa dibatalkan tanpa menghapus row `hr_loans`, histori tetap muncul di review HR, dan audit actor tercatat sebagai aksi terpisah: [void route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/loans/void/route.ts), [hr-loan-void-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-loan-void-form.tsx)
+
+### Changed
+
+- review section HR untuk loan kini menampilkan histori terbaru termasuk status `CANCELLED`, dan dashboard audit HR mengenali action `LOAN_VOID`
+- `VERSION` dinaikkan ke `0.63.56`
+
+## [0.63.55] - 2026-07-09
+
+### Improved
+
+- Payroll HR kini mendukung `void` non-destruktif lewat tabel flag `hr_salary_slip_voids`, sehingga slip gaji bisa dibatalkan tanpa menghapus row payroll, status `VOIDED` tampil di review HR, dan audit actor tetap tercatat: [hr-salary-slip-void-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-salary-slip-void-service.ts), [void route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/salary-slips/void/route.ts), [hr-salary-slip-void-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-salary-slip-void-form.tsx)
+
+### Changed
+
+- audit dashboard HR kini mengenali action `SALARY_SLIP_VOID` dan review section HR menampilkan status payroll `VOIDED`
+- `VERSION` dinaikkan ke `0.63.55`
+
+## [0.63.54] - 2026-07-09
+
+### Improved
+
+- HR kini mendukung correction attendance langsung dari web dengan audit trail actor untuk perubahan status, jam masuk/keluar, overtime, dan lock admin, sehingga jejak audit HR tidak hanya berhenti di loan update dan payroll release: [attendance route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/attendance/route.ts), [hr-attendance-update-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-update-form.tsx)
+
+### Changed
+
+- label audit HR di dashboard diperluas agar correction attendance tampil lebih natural untuk operator dan admin
+- `VERSION` dinaikkan ke `0.63.54`
+
+## [0.63.53] - 2026-07-09
+
+### Improved
+
+- HR kini tidak hanya mencatat create audit, tetapi juga mendukung update status loan dan release slip gaji langsung dari web dengan actor trail yang tercatat ke `hr_audit_logs`, lengkap dengan dua form operasional baru di domain HR: [hr-audit-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-audit-service.ts), [loans route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/loans/route.ts), [salary-slips route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/salary-slips/route.ts)
+
+### Changed
+
+- dashboard HR audit kini menampilkan label action yang lebih operasional untuk create, update loan, dan release payroll
+- `VERSION` dinaikkan ke `0.63.53`
+
+## [0.63.52] - 2026-07-09
+
+### Improved
+
+- HR kini memiliki actor trail dasar via tabel `hr_audit_logs` untuk create employee, attendance, loan, dan salary slip, lalu feed audit dashboard `SUPER_ADMIN` ikut membaca jejak ini sehingga coverage audit lintas domain utama makin lengkap: [hr-audit-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-audit-service.ts), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Changed
+
+- route write-side HR (`employees`, `attendance`, `loans`, `salary-slips`) kini mencatat snapshot actor setelah insert sukses tanpa mengubah tabel inti `hr_*`, sehingga jalur audit ditambah dengan risiko migrasi yang rendah
+- `VERSION` dinaikkan ke `0.63.52`
+
+## [0.63.51] - 2026-07-09
+
+### Improved
+
+- feed audit dashboard untuk `SUPER_ADMIN` kini juga membaca write-action sales dari lead, survey, sales order, work order, dan aktivasi subscription yang jejak aktornya sudah tersimpan di kolom notes, sehingga audit terpusat kini mencakup hampir seluruh domain operasional utama: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.51`
+
+## [0.63.50] - 2026-07-09
+
+### Improved
+
+- feed audit dashboard untuk `SUPER_ADMIN` kini juga membaca write-action billing dari pembuatan invoice, pembatalan invoice, payment entry, dan collection action, sehingga audit terpusat makin dekat ke operasi penagihan nyata: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.50`
+
+## [0.63.49] - 2026-07-09
+
+### Improved
+
+- feed audit dashboard untuk `SUPER_ADMIN` kini juga membaca write-action inventory dari request barang, update status request, barang masuk, pinjaman, dan pengembalian berdasarkan tabel operasional yang sudah ada, sehingga audit terpusat makin dekat ke alur gudang/teknisi nyata: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.49`
+
+## [0.63.48] - 2026-07-09
+
+### Improved
+
+- feed audit dashboard untuk `SUPER_ADMIN` kini juga membaca write-action domain support dari create ticket, close ticket, create isolir, restore isolir, dan dismantle yang jejak aktornya sudah tersimpan di tabel review, sehingga audit terpusat tidak lagi terbatas pada import dan settings: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.48`
+
 ## [0.63.47] - 2026-07-09
 
 ### Fixed

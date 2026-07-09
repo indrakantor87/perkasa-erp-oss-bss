@@ -11,6 +11,22 @@ type SupportTicketCloseFormProps = {
   initialTicketCode?: string
 }
 
+function parseTicketSuggestion(value: string) {
+  const parts = value.split('|').map((item) => item.trim())
+  return {
+    ticketCode: parts[0] ?? '',
+    customerName: parts[1] ?? '',
+    status: parts[2] ?? '-',
+    ticketType: parts[3] ?? '-',
+    slaDays: parts[4] ?? '-',
+    slaDueAt: parts[5] ?? '-',
+    slaState: parts[6] ?? 'UNSET',
+    ownerName: parts[7] ?? '-',
+    followUpAt: parts[8] ?? '-',
+    latestProgress: parts.slice(9).join(' | ') || '-',
+  }
+}
+
 export function SupportTicketCloseForm({
   canUpdate,
   reviewDbReady,
@@ -18,13 +34,17 @@ export function SupportTicketCloseForm({
   initialTicketCode,
 }: SupportTicketCloseFormProps) {
   const router = useRouter()
-  const [ticketCode, setTicketCode] = useState(initialTicketCode?.trim() || ticketSuggestions[0] || '')
+  const [ticketCode, setTicketCode] = useState(initialTicketCode?.trim() || parseTicketSuggestion(ticketSuggestions[0] ?? '').ticketCode)
   const [resolutionAction, setResolutionAction] = useState('')
   const [closeNotes, setCloseNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canUpdate || !reviewDbReady || submitting
+  const currentSuggestion =
+    ticketSuggestions
+      .map((item) => parseTicketSuggestion(item))
+      .find((item) => item.ticketCode.trim().toUpperCase() === ticketCode.trim().toUpperCase()) ?? null
 
   useEffect(() => {
     if (initialTicketCode?.trim()) {
@@ -65,7 +85,7 @@ export function SupportTicketCloseForm({
         tone: 'success',
         message: payload?.message || 'Trouble ticket berhasil ditutup.',
       })
-      setTicketCode(ticketSuggestions[0] ?? '')
+      setTicketCode(parseTicketSuggestion(ticketSuggestions[0] ?? '').ticketCode)
       setResolutionAction('')
       setCloseNotes('')
       router.refresh()
@@ -101,9 +121,10 @@ export function SupportTicketCloseForm({
             disabled={isDisabled}
           />
           <datalist id="support-ticket-suggestions">
-            {ticketSuggestions.map((item) => (
-              <option key={item} value={item} />
-            ))}
+            {ticketSuggestions.map((item) => {
+              const suggestion = parseTicketSuggestion(item)
+              return <option key={item} value={suggestion.ticketCode} label={`${suggestion.ticketCode} - ${suggestion.customerName}`} />
+            })}
           </datalist>
         </label>
 
@@ -131,9 +152,24 @@ export function SupportTicketCloseForm({
           />
         </label>
 
+        {currentSuggestion ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <div className="font-semibold text-slate-950">
+              {currentSuggestion.customerName || '-'} • {currentSuggestion.ticketType || '-'}
+            </div>
+            <div className="mt-1">Status terakhir: {currentSuggestion.status || '-'}</div>
+            <div className="mt-1">
+              SLA: {currentSuggestion.slaDays || '-'} hari • Due {currentSuggestion.slaDueAt || '-'} • {currentSuggestion.slaState || 'UNSET'}
+            </div>
+            <div className="mt-1">PIC terakhir: {currentSuggestion.ownerName || '-'}</div>
+            <div className="mt-1">Follow-up terakhir: {currentSuggestion.followUpAt || '-'}</div>
+            <div className="mt-1">Ringkasan progress terakhir: {currentSuggestion.latestProgress || '-'}</div>
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Saran kode ticket diambil dari daftar ticket open yang sedang tampil pada halaman ini.
+            Saran ticket diambil dari daftar ticket open yang sedang tampil pada halaman ini, lengkap dengan snapshot progress terakhir agar penutupan tidak salah konteks.
           </div>
           <button
             type="submit"

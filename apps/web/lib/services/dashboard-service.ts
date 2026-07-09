@@ -12,6 +12,7 @@ import { getRecentAuthPermissionAudits } from '@/lib/services/auth-permission-au
 import { getRecentAuthRolePermissionAudits } from '@/lib/services/auth-role-permission-audit-service'
 import { getRecentAuthUserAudits } from '@/lib/services/auth-user-audit-service'
 import { resolveDailyActivityOrgContext } from '@/lib/services/daily-activity-user-profile-service'
+import { getRecentHrAudits } from '@/lib/services/hr-audit-service'
 import { ensureImportBatchActionTable } from '@/lib/services/import-write-service'
 import type {
   AppRole,
@@ -115,6 +116,45 @@ type DailyActivityApprovalPendingRow = {
 type TimelineActivityItem = {
   title: string
   detail: string
+  happenedAt: string
+}
+
+type SupportAuditActivityRow = {
+  actionType: string
+  entityRef: string
+  customerName: string | null
+  detailText: string | null
+  happenedAt: string
+}
+
+type InventoryAuditActivityRow = {
+  actionType: string
+  entityRef: string
+  itemCode: string | null
+  itemName: string | null
+  qty: number | null
+  statusText: string | null
+  actorName: string | null
+  detailText: string | null
+  happenedAt: string
+}
+
+type BillingAuditActivityRow = {
+  actionType: string
+  entityRef: string
+  customerName: string | null
+  amount: number | null
+  statusText: string | null
+  detailText: string | null
+  happenedAt: string
+}
+
+type SalesAuditActivityRow = {
+  actionType: string
+  entityRef: string
+  customerName: string | null
+  statusText: string | null
+  detailText: string | null
   happenedAt: string
 }
 
@@ -583,14 +623,598 @@ async function getReviewDbImportAuditTimeline(limit = 6): Promise<TimelineActivi
   }))
 }
 
+function formatSupportAuditTitle(actionType: string, entityRef: string, customerName: string) {
+  const normalized = actionType.trim().toUpperCase()
+  if (normalized === 'TT_CREATE') {
+    return `Support Ticket Dibuat • ${entityRef}`
+  }
+  if (normalized === 'TT_CLOSE') {
+    return `Support Ticket Ditutup • ${entityRef}`
+  }
+  if (normalized === 'ISOLATION_CREATE') {
+    return `Isolir Dibuat • ${customerName || entityRef}`
+  }
+  if (normalized === 'ISOLATION_RESTORE') {
+    return `Isolir Direstorasi • ${customerName || entityRef}`
+  }
+  if (normalized === 'DISMANTLE') {
+    return `Dismantle Diproses • ${customerName || entityRef}`
+  }
+
+  return `Support Activity • ${customerName || entityRef}`
+}
+
+async function getReviewDbSupportAuditTimeline(limit = 8): Promise<TimelineActivityItem[]> {
+  const rows = await runReviewDbQuery<SupportAuditActivityRow>(
+    `
+      SELECT *
+      FROM (
+        SELECT
+          'TT_CREATE' AS actionType,
+          ticket_code AS entityRef,
+          customer_name AS customerName,
+          notes AS detailText,
+          opened_at AS happenedAt
+        FROM support_trouble_tickets
+        WHERE notes IS NOT NULL
+          AND notes <> ''
+          AND notes LIKE '[Review Ticket]%'
+
+        UNION ALL
+
+        SELECT
+          'TT_CLOSE' AS actionType,
+          ticket_code AS entityRef,
+          customer_name AS customerName,
+          close_notes AS detailText,
+          closed_at AS happenedAt
+        FROM support_trouble_tickets
+        WHERE closed_at IS NOT NULL
+          AND close_notes IS NOT NULL
+          AND close_notes <> ''
+          AND close_notes LIKE '[Closed via web]%'
+
+        UNION ALL
+
+        SELECT
+          'ISOLATION_CREATE' AS actionType,
+          CONCAT('ISOLIR-', id) AS entityRef,
+          customer_name AS customerName,
+          reason AS detailText,
+          isolation_date AS happenedAt
+        FROM support_isolations
+        WHERE reason IS NOT NULL
+          AND reason <> ''
+          AND reason LIKE '[Review Isolir]%'
+
+        UNION ALL
+
+        SELECT
+          'ISOLATION_RESTORE' AS actionType,
+          CONCAT('ISOLIR-', id) AS entityRef,
+          customer_name AS customerName,
+          close_note AS detailText,
+          restoration_date AS happenedAt
+        FROM support_isolations
+        WHERE restoration_date IS NOT NULL
+          AND close_note IS NOT NULL
+          AND close_note <> ''
+          AND close_note LIKE '[Restored via web]%'
+
+        UNION ALL
+
+        SELECT
+          'DISMANTLE' AS actionType,
+          CONCAT('DISMANTLE-', id) AS entityRef,
+          customer_name AS customerName,
+          close_note AS detailText,
+          closed_at AS happenedAt
+        FROM support_dismantle_history
+        WHERE closed_at IS NOT NULL
+          AND close_note IS NOT NULL
+          AND close_note <> ''
+          AND close_note LIKE '[Dismantled via web]%'
+      ) support_audits
+      ORDER BY happenedAt DESC
+      LIMIT ?
+    `,
+    [limit]
+  )
+
+  return rows.map((row) => {
+    const entityRef = String(row.entityRef ?? '').trim() || 'SUPPORT'
+    const customerName = String(row.customerName ?? '').trim()
+    return {
+      title: formatSupportAuditTitle(String(row.actionType ?? ''), entityRef, customerName),
+      detail:
+        row.detailText?.trim() ||
+        `Aktivitas support ${String(row.actionType ?? '').trim().toUpperCase()} tercatat untuk ${customerName || entityRef}.`,
+      happenedAt: String(row.happenedAt),
+    }
+  })
+}
+
+function formatInventoryAuditTitle(actionType: string, entityRef: string, itemCode: string, itemName: string) {
+  const label = itemCode || itemName || entityRef
+  const normalized = actionType.trim().toUpperCase()
+
+  if (normalized === 'REQUEST_CREATE') {
+    return `Inventory Request Dibuat • ${entityRef}`
+  }
+  if (normalized === 'REQUEST_UPDATE') {
+    return `Inventory Request Diproses • ${entityRef}`
+  }
+  if (normalized === 'RECEIPT_IN') {
+    return `Barang Masuk Dicatat • ${label}`
+  }
+  if (normalized === 'LOAN_OUT') {
+    return `Pinjaman Inventory Dibuat • ${entityRef}`
+  }
+  if (normalized === 'LOAN_RETURN') {
+    return `Pengembalian Inventory Diproses • ${entityRef}`
+  }
+
+  return `Inventory Activity • ${label}`
+}
+
+async function getReviewDbInventoryAuditTimeline(limit = 8): Promise<TimelineActivityItem[]> {
+  const rows = await runReviewDbQuery<InventoryAuditActivityRow>(
+    `
+      SELECT *
+      FROM (
+        SELECT
+          'REQUEST_CREATE' AS actionType,
+          iir.request_code AS entityRef,
+          ii.item_code AS itemCode,
+          ii.item_name AS itemName,
+          iir.request_qty AS qty,
+          iir.requested_subdivision AS statusText,
+          iir.requested_by AS actorName,
+          iir.request_notes AS detailText,
+          iir.requested_at AS happenedAt
+        FROM inventory_item_requests iir
+        JOIN inventory_items ii
+          ON ii.id = iir.inventory_item_id
+
+        UNION ALL
+
+        SELECT
+          'REQUEST_UPDATE' AS actionType,
+          iir.request_code AS entityRef,
+          ii.item_code AS itemCode,
+          ii.item_name AS itemName,
+          iir.request_qty AS qty,
+          iir.request_status AS statusText,
+          iir.processed_by AS actorName,
+          iir.request_notes AS detailText,
+          iir.processed_at AS happenedAt
+        FROM inventory_item_requests iir
+        JOIN inventory_items ii
+          ON ii.id = iir.inventory_item_id
+        WHERE iir.processed_at IS NOT NULL
+          AND iir.processed_by IS NOT NULL
+          AND TRIM(iir.processed_by) <> ''
+          AND UPPER(TRIM(iir.request_status)) <> 'REQUEST'
+
+        UNION ALL
+
+        SELECT
+          'RECEIPT_IN' AS actionType,
+          COALESCE(ism.reference_no, CONCAT('MOVE-', ism.id)) AS entityRef,
+          ii.item_code AS itemCode,
+          ii.item_name AS itemName,
+          ism.qty AS qty,
+          ism.movement_type AS statusText,
+          NULL AS actorName,
+          ism.notes AS detailText,
+          ism.movement_at AS happenedAt
+        FROM inventory_stock_movements ism
+        JOIN inventory_items ii
+          ON ii.id = ism.item_id
+        WHERE ism.movement_type = 'IN'
+          AND ism.notes IS NOT NULL
+          AND ism.notes <> ''
+          AND ism.notes LIKE '[BARANG MASUK]%'
+
+        UNION ALL
+
+        SELECT
+          'LOAN_OUT' AS actionType,
+          COALESCE(ism.reference_no, CONCAT('MOVE-', ism.id)) AS entityRef,
+          ii.item_code AS itemCode,
+          ii.item_name AS itemName,
+          ism.qty AS qty,
+          ism.movement_type AS statusText,
+          NULL AS actorName,
+          ism.notes AS detailText,
+          ism.movement_at AS happenedAt
+        FROM inventory_stock_movements ism
+        JOIN inventory_items ii
+          ON ii.id = ism.item_id
+        WHERE ism.movement_type = 'OUT'
+          AND ism.notes IS NOT NULL
+          AND ism.notes <> ''
+          AND ism.notes LIKE '[PINJAM]%'
+
+        UNION ALL
+
+        SELECT
+          'LOAN_RETURN' AS actionType,
+          COALESCE(ism.reference_no, CONCAT('MOVE-', ism.id)) AS entityRef,
+          ii.item_code AS itemCode,
+          ii.item_name AS itemName,
+          ism.qty AS qty,
+          ism.movement_type AS statusText,
+          NULL AS actorName,
+          ism.notes AS detailText,
+          ism.movement_at AS happenedAt
+        FROM inventory_stock_movements ism
+        JOIN inventory_items ii
+          ON ii.id = ism.item_id
+        WHERE ism.movement_type = 'IN'
+          AND ism.notes IS NOT NULL
+          AND ism.notes <> ''
+          AND ism.notes LIKE '[KEMBALI]%'
+      ) inventory_audits
+      ORDER BY happenedAt DESC
+      LIMIT ?
+    `,
+    [limit]
+  )
+
+  return rows.map((row) => {
+    const entityRef = String(row.entityRef ?? '').trim() || 'INVENTORY'
+    const itemCode = String(row.itemCode ?? '').trim()
+    const itemName = String(row.itemName ?? '').trim()
+    const qty = Number(row.qty ?? 0)
+    const statusText = String(row.statusText ?? '').trim()
+    const actorName = String(row.actorName ?? '').trim()
+    const detail =
+      row.detailText?.trim() ||
+      [
+        itemCode || itemName || entityRef,
+        Number.isFinite(qty) && qty > 0 ? `${qty.toLocaleString('id-ID')} unit` : null,
+        statusText || null,
+        actorName ? `oleh ${actorName}` : null,
+      ]
+        .filter(Boolean)
+        .join(' • ')
+
+    return {
+      title: formatInventoryAuditTitle(String(row.actionType ?? ''), entityRef, itemCode, itemName),
+      detail,
+      happenedAt: String(row.happenedAt),
+    }
+  })
+}
+
+function formatBillingAuditTitle(actionType: string, entityRef: string, customerName: string) {
+  const normalized = actionType.trim().toUpperCase()
+  if (normalized === 'INVOICE_CREATE') {
+    return `Invoice Dibuat • ${entityRef}`
+  }
+  if (normalized === 'INVOICE_CANCEL') {
+    return `Invoice Dibatalkan • ${entityRef}`
+  }
+  if (normalized === 'PAYMENT_CREATE') {
+    return `Payment Entry Dicatat • ${entityRef}`
+  }
+  if (normalized === 'COLLECTION_ACTION') {
+    return `Collection Action Dicatat • ${entityRef}`
+  }
+
+  return `Billing Activity • ${customerName || entityRef}`
+}
+
+async function getReviewDbBillingAuditTimeline(limit = 8): Promise<TimelineActivityItem[]> {
+  const rows = await runReviewDbQuery<BillingAuditActivityRow>(
+    `
+      SELECT *
+      FROM (
+        SELECT
+          'INVOICE_CREATE' AS actionType,
+          bi.invoice_no AS entityRef,
+          c.full_name AS customerName,
+          bi.total_amount AS amount,
+          bi.invoice_status AS statusText,
+          bi.notes AS detailText,
+          bi.created_at AS happenedAt
+        FROM billing_invoices bi
+        JOIN service_subscriptions ss
+          ON ss.id = bi.subscription_id
+        JOIN crm_customers c
+          ON c.id = ss.customer_id
+        WHERE bi.notes IS NOT NULL
+          AND bi.notes <> ''
+          AND bi.notes LIKE '[Review Invoice]%'
+
+        UNION ALL
+
+        SELECT
+          'INVOICE_CANCEL' AS actionType,
+          bi.invoice_no AS entityRef,
+          c.full_name AS customerName,
+          bi.total_amount AS amount,
+          bi.invoice_status AS statusText,
+          bi.notes AS detailText,
+          bi.updated_at AS happenedAt
+        FROM billing_invoices bi
+        JOIN service_subscriptions ss
+          ON ss.id = bi.subscription_id
+        JOIN crm_customers c
+          ON c.id = ss.customer_id
+        WHERE bi.notes IS NOT NULL
+          AND bi.notes <> ''
+          AND bi.notes LIKE '%[Status Update]%'
+          AND bi.invoice_status = 'CANCELLED'
+
+        UNION ALL
+
+        SELECT
+          'PAYMENT_CREATE' AS actionType,
+          bp.payment_no AS entityRef,
+          c.full_name AS customerName,
+          bp.amount AS amount,
+          bp.payment_method AS statusText,
+          bp.notes AS detailText,
+          bp.payment_date AS happenedAt
+        FROM billing_payments bp
+        JOIN billing_invoices bi
+          ON bi.id = bp.invoice_id
+        JOIN service_subscriptions ss
+          ON ss.id = bi.subscription_id
+        JOIN crm_customers c
+          ON c.id = ss.customer_id
+        WHERE bp.notes IS NOT NULL
+          AND bp.notes <> ''
+          AND bp.notes LIKE '[Review Payment]%'
+
+        UNION ALL
+
+        SELECT
+          'COLLECTION_ACTION' AS actionType,
+          bi.invoice_no AS entityRef,
+          c.full_name AS customerName,
+          bi.total_amount AS amount,
+          bca.action_type AS statusText,
+          bca.notes AS detailText,
+          bca.action_at AS happenedAt
+        FROM billing_collection_actions bca
+        JOIN billing_invoices bi
+          ON bi.id = bca.invoice_id
+        JOIN service_subscriptions ss
+          ON ss.id = bi.subscription_id
+        JOIN crm_customers c
+          ON c.id = ss.customer_id
+        WHERE bca.notes IS NOT NULL
+          AND bca.notes <> ''
+          AND bca.notes LIKE '[Review Action]%'
+      ) billing_audits
+      ORDER BY happenedAt DESC
+      LIMIT ?
+    `,
+    [limit]
+  )
+
+  return rows.map((row) => {
+    const entityRef = String(row.entityRef ?? '').trim() || 'BILLING'
+    const customerName = String(row.customerName ?? '').trim()
+    const amount = Number(row.amount ?? 0)
+    const statusText = String(row.statusText ?? '').trim()
+
+    return {
+      title: formatBillingAuditTitle(String(row.actionType ?? ''), entityRef, customerName),
+      detail:
+        row.detailText?.trim() ||
+        [
+          customerName || entityRef,
+          Number.isFinite(amount) && amount > 0 ? `Rp ${amount.toLocaleString('id-ID')}` : null,
+          statusText || null,
+        ]
+          .filter(Boolean)
+          .join(' • '),
+      happenedAt: String(row.happenedAt),
+    }
+  })
+}
+
+function formatSalesAuditTitle(actionType: string, entityRef: string, customerName: string) {
+  const normalized = actionType.trim().toUpperCase()
+  if (normalized === 'LEAD_CREATE') {
+    return `Lead Dibuat • ${customerName || entityRef}`
+  }
+  if (normalized === 'SURVEY_CREATE') {
+    return `Survey Dibuat • ${entityRef}`
+  }
+  if (normalized === 'ORDER_CREATE') {
+    return `Sales Order Dibuat • ${entityRef}`
+  }
+  if (normalized === 'WORK_ORDER_CREATE') {
+    return `Work Order Dibuat • ${entityRef}`
+  }
+  if (normalized === 'SUBSCRIPTION_ACTIVATE') {
+    return `Subscription Diaktivasi • ${entityRef}`
+  }
+
+  return `Sales Activity • ${customerName || entityRef}`
+}
+
+function formatHrAuditTitle(actionType: string, targetRef: string) {
+  const normalized = actionType.trim().toUpperCase()
+  if (normalized === 'EMPLOYEE_CREATE') {
+    return `Employee HR Dibuat • ${targetRef}`
+  }
+  if (normalized === 'EMPLOYEE_ARCHIVE') {
+    return `Employee HR Diarsipkan • ${targetRef}`
+  }
+  if (normalized === 'EMPLOYEE_REACTIVATE') {
+    return `Employee HR Diaktifkan Kembali • ${targetRef}`
+  }
+  if (normalized === 'EMPLOYEE_FACE_REFERENCE_UPSERT') {
+    return `Baseline Wajah Employee Disimpan • ${targetRef}`
+  }
+  if (normalized === 'ATTENDANCE_CREATE') {
+    return `Attendance HR Dicatat • ${targetRef}`
+  }
+  if (normalized === 'ATTENDANCE_UPDATE') {
+    return `Attendance HR Dikoreksi • ${targetRef}`
+  }
+  if (normalized === 'ATTENDANCE_GEOFENCE_CONFIG') {
+    return `Geofence Attendance Diperbarui • ${targetRef}`
+  }
+  if (normalized === 'ATTENDANCE_FACE_CONFIG') {
+    return `Face Attendance Diperbarui • ${targetRef}`
+  }
+  if (normalized === 'ATTENDANCE_FACE_REVIEW') {
+    return `Review Face Attendance • ${targetRef}`
+  }
+  if (normalized === 'ATTENDANCE_FACE_RETAKE_QUEUE') {
+    return `Retake Face Attendance • ${targetRef}`
+  }
+  if (normalized === 'LOAN_CREATE') {
+    return `Loan HR Dibuat • ${targetRef}`
+  }
+  if (normalized === 'LOAN_UPDATE') {
+    return `Status Loan HR Diperbarui • ${targetRef}`
+  }
+  if (normalized === 'LOAN_VOID') {
+    return `Loan HR Dibatalkan • ${targetRef}`
+  }
+  if (normalized === 'SALARY_SLIP_CREATE') {
+    return `Slip Gaji Dibuat • ${targetRef}`
+  }
+  if (normalized === 'SALARY_SLIP_RELEASE') {
+    return `Slip Gaji Dirilis • ${targetRef}`
+  }
+  if (normalized === 'SALARY_SLIP_VOID') {
+    return `Slip Gaji Di-void • ${targetRef}`
+  }
+
+  return `HR Activity • ${targetRef}`
+}
+
+async function getReviewDbSalesAuditTimeline(limit = 8): Promise<TimelineActivityItem[]> {
+  const rows = await runReviewDbQuery<SalesAuditActivityRow>(
+    `
+      SELECT *
+      FROM (
+        SELECT
+          'LEAD_CREATE' AS actionType,
+          CONCAT('LEAD-', sl.id) AS entityRef,
+          sl.customer_name AS customerName,
+          sl.status AS statusText,
+          sl.notes AS detailText,
+          sl.created_at AS happenedAt
+        FROM sales_leads sl
+        WHERE sl.notes IS NOT NULL
+          AND sl.notes <> ''
+          AND sl.notes LIKE '[Review Lead]%'
+
+        UNION ALL
+
+        SELECT
+          'SURVEY_CREATE' AS actionType,
+          ss.survey_no AS entityRef,
+          sl.customer_name AS customerName,
+          ss.survey_status AS statusText,
+          ss.technical_notes AS detailText,
+          COALESCE(ss.scheduled_at, ss.created_at) AS happenedAt
+        FROM sales_surveys ss
+        LEFT JOIN sales_leads sl
+          ON sl.id = ss.lead_id
+        WHERE ss.technical_notes IS NOT NULL
+          AND ss.technical_notes <> ''
+          AND ss.technical_notes LIKE '[Review Survey]%'
+
+        UNION ALL
+
+        SELECT
+          'ORDER_CREATE' AS actionType,
+          so.order_no AS entityRef,
+          sl.customer_name AS customerName,
+          so.status AS statusText,
+          so.notes AS detailText,
+          so.request_date AS happenedAt
+        FROM sales_orders so
+        LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id
+        WHERE so.notes IS NOT NULL
+          AND so.notes <> ''
+          AND so.notes LIKE '[Review Sales Order]%'
+
+        UNION ALL
+
+        SELECT
+          'WORK_ORDER_CREATE' AS actionType,
+          swo.work_order_no AS entityRef,
+          COALESCE(sl.customer_name, c.full_name) AS customerName,
+          swo.status AS statusText,
+          swo.notes AS detailText,
+          COALESCE(swo.scheduled_at, swo.created_at) AS happenedAt
+        FROM service_work_orders swo
+        LEFT JOIN sales_orders so
+          ON so.id = swo.sales_order_id
+        LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id
+        LEFT JOIN crm_customers c
+          ON c.id = so.customer_id
+        WHERE swo.notes IS NOT NULL
+          AND swo.notes <> ''
+          AND swo.notes LIKE '[Review Work Order]%'
+
+        UNION ALL
+
+        SELECT
+          'SUBSCRIPTION_ACTIVATE' AS actionType,
+          swo.work_order_no AS entityRef,
+          COALESCE(sl.customer_name, c.full_name) AS customerName,
+          'COMPLETED' AS statusText,
+          swo.notes AS detailText,
+          COALESCE(swo.completed_at, swo.updated_at) AS happenedAt
+        FROM service_work_orders swo
+        LEFT JOIN sales_orders so
+          ON so.id = swo.sales_order_id
+        LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id
+        LEFT JOIN crm_customers c
+          ON c.id = so.customer_id
+        WHERE swo.notes IS NOT NULL
+          AND swo.notes <> ''
+          AND swo.notes LIKE '%[Activation]%'
+      ) sales_audits
+      ORDER BY happenedAt DESC
+      LIMIT ?
+    `,
+    [limit]
+  )
+
+  return rows.map((row) => {
+    const entityRef = String(row.entityRef ?? '').trim() || 'SALES'
+    const customerName = String(row.customerName ?? '').trim()
+    const statusText = String(row.statusText ?? '').trim()
+    return {
+      title: formatSalesAuditTitle(String(row.actionType ?? ''), entityRef, customerName),
+      detail:
+        row.detailText?.trim() ||
+        [customerName || entityRef, statusText || null].filter(Boolean).join(' • '),
+      happenedAt: String(row.happenedAt),
+    }
+  })
+}
+
 async function getReviewDbActivities(role: AppRole) {
   if (role !== 'SUPER_ADMIN') {
     const importActivities = await getReviewDbImportBatchActivities()
     return importActivities.length ? importActivities : dashboardActivities
   }
 
-  const [importAudits, userAudits, permissionAudits, rolePermissionAudits] = await Promise.all([
+  const [importAudits, supportAudits, inventoryAudits, billingAudits, salesAudits, hrAudits, userAudits, permissionAudits, rolePermissionAudits] = await Promise.all([
     getReviewDbImportAuditTimeline(8),
+    getReviewDbSupportAuditTimeline(8),
+    getReviewDbInventoryAuditTimeline(8),
+    getReviewDbBillingAuditTimeline(8),
+    getReviewDbSalesAuditTimeline(8),
+    getRecentHrAudits(8),
     getRecentAuthUserAudits(8),
     getRecentAuthPermissionAudits(8),
     getRecentAuthRolePermissionAudits(8),
@@ -598,6 +1222,15 @@ async function getReviewDbActivities(role: AppRole) {
 
   const timeline: TimelineActivityItem[] = [
     ...importAudits,
+    ...supportAudits,
+    ...inventoryAudits,
+    ...billingAudits,
+    ...salesAudits,
+    ...hrAudits.map((item) => ({
+      title: formatHrAuditTitle(item.actionType, item.targetRef),
+      detail: [`oleh ${item.actor}`, item.detail].filter(Boolean).join(' • '),
+      happenedAt: item.happenedAt,
+    })),
     ...userAudits.map((item) => ({
       title: `Users ${item.actionType} • ${item.targetUser}`,
       detail: [`oleh ${item.actor}`, item.detail].filter(Boolean).join(' • '),

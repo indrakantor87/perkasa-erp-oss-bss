@@ -8,6 +8,7 @@ type ImportBatchUploadFormProps = {
   batchId: string
   batchCode: string
   sourceFileName?: string | null
+  hasExistingRows: boolean
   canUpload: boolean
   reviewDbReady: boolean
 }
@@ -16,6 +17,7 @@ export function ImportBatchUploadForm({
   batchId,
   batchCode,
   sourceFileName,
+  hasExistingRows,
   canUpload,
   reviewDbReady,
 }: ImportBatchUploadFormProps) {
@@ -26,7 +28,7 @@ export function ImportBatchUploadForm({
     null
   )
 
-  const isDisabled = !canUpload || !reviewDbReady || submitting
+  const isDisabled = !canUpload || !reviewDbReady || hasExistingRows || submitting
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null
@@ -82,12 +84,20 @@ export function ImportBatchUploadForm({
           ? 'Role aktif belum memiliki izin upload pada Import Center.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi upload file dinonaktifkan agar tidak menyimpan file ke mode mock.'
+            : hasExistingRows
+              ? `Batch ${batchCode} sudah memiliki row staging. Upload ulang dikunci agar review tetap non-destruktif, jadi gunakan batch baru untuk file revisi.`
             : `File akan disimpan lokal untuk batch ${batchCode}, lalu parser akan mencoba memuat row staging otomatis sesuai scope batch.`}
       </p>
 
       <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-700">
         File sumber saat ini: <span className="font-semibold text-slate-950">{sourceFileName || '-'}</span>
       </div>
+
+        {hasExistingRows ? (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Batch ini sudah berisi staging hasil upload sebelumnya. Untuk menjaga histori review dan transform, file baru harus masuk ke batch baru, bukan menimpa batch lama.
+          </div>
+        ) : null}
 
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
         <div className="rounded-2xl border border-line bg-white px-4 py-3 text-xs leading-5 text-mute">
@@ -113,7 +123,7 @@ export function ImportBatchUploadForm({
             disabled={isDisabled || !selectedFile}
             className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            {submitting ? 'Mengunggah...' : 'Upload File Sumber'}
+            {submitting ? 'Mengunggah...' : hasExistingRows ? 'Batch Sudah Terkunci' : 'Upload File Sumber'}
           </button>
         </div>
       </form>

@@ -28,6 +28,16 @@ type ExecuteResult = {
   affectedRows?: number
 }
 
+type CreateCollectionActionParams = {
+  invoiceNo: string
+  actionType: string
+  actionStatus: string
+  dueFollowUpAt: Date | null
+  notesRaw: string
+  sessionUsername: string
+  sessionDisplayName: string
+}
+
 function mapCollectionStatus(actionType: string) {
   switch (actionType) {
     case 'PROMISE_TO_PAY':
@@ -44,6 +54,66 @@ function mapCollectionStatus(actionType: string) {
     default:
       return 'REMINDER'
   }
+}
+
+async function createCollectionAction(params: CreateCollectionActionParams) {
+  const [invoice] = await runReviewDbQuery<BillingInvoiceRow>(
+    `
+      SELECT id
+      FROM billing_invoices
+      WHERE invoice_no = ?
+      LIMIT 1
+    `,
+    [params.invoiceNo],
+  )
+  if (!invoice) {
+    throw new Error(`Invoice ${params.invoiceNo} tidak ditemukan di review DB.`)
+  }
+
+  const [handledBy] = await runReviewDbQuery<AuthUserRow>(
+    `
+      SELECT id
+      FROM auth_users
+      WHERE username = ?
+      LIMIT 1
+    `,
+    [params.sessionUsername],
+  )
+
+  const userNote = `[Review Action] ${params.sessionDisplayName} (${params.sessionUsername})${
+    params.notesRaw ? ` - ${params.notesRaw}` : ''
+  }`
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      INSERT INTO billing_collection_actions (
+        invoice_id,
+        action_type,
+        action_status,
+        action_at,
+        due_follow_up_at,
+        handled_by_user_id,
+        notes
+      )
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
+    `,
+    [invoice.id, params.actionType, params.actionStatus, params.dueFollowUpAt, handledBy?.id ?? null, userNote],
+  )
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      UPDATE billing_invoices
+      SET collection_status = ?,
+          suspend_candidate = CASE
+            WHEN ? = 'SUSPEND' THEN 1
+            WHEN ? = 'RECONNECT' THEN 0
+            ELSE suspend_candidate
+          END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    [mapCollectionStatus(params.actionType), params.actionType, params.actionType, invoice.id],
+  )
 }
 
 export async function POST(request: Request) {
@@ -66,6 +136,7 @@ export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as {
       invoiceNo?: unknown
+      invoiceNos?: unknown
       actionType?: unknown
       actionStatus?: unknown
       dueFollowUpAt?: unknown
@@ -73,12 +144,16 @@ export async function POST(request: Request) {
     }
 
     const invoiceNo = String(payload.invoiceNo ?? '').trim()
+    const invoiceNos = Array.isArray(payload.invoiceNos)
+      ? payload.invoiceNos.map((item) => String(item ?? '').trim()).filter(Boolean)
+      : []
     const actionType = String(payload.actionType ?? '').trim().toUpperCase()
     const actionStatus = String(payload.actionStatus ?? '').trim().toUpperCase()
     const dueFollowUpAtRaw = String(payload.dueFollowUpAt ?? '').trim()
     const notesRaw = String(payload.notes ?? '').trim()
+    const isBatchMode = invoiceNos.length > 0
 
-    if (!invoiceNo) {
+    if (!invoiceNo && !isBatchMode) {
       return Response.json({ message: 'Nomor invoice wajib diisi.' }, { status: 400 })
     }
     if (!allowedActionTypes.has(actionType)) {
@@ -88,68 +163,54 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Action status tidak valid.' }, { status: 400 })
     }
 
-    const [invoice] = await runReviewDbQuery<BillingInvoiceRow>(
-      `
-        SELECT id
-        FROM billing_invoices
-        WHERE invoice_no = ?
-        LIMIT 1
-      `,
-      [invoiceNo],
-    )
-    if (!invoice) {
-      return Response.json({ message: 'Invoice tidak ditemukan di review DB.' }, { status: 404 })
-    }
-
-    const [handledBy] = await runReviewDbQuery<AuthUserRow>(
-      `
-        SELECT id
-        FROM auth_users
-        WHERE username = ?
-        LIMIT 1
-      `,
-      [session.username],
-    )
-
     const dueFollowUpAt = dueFollowUpAtRaw ? new Date(dueFollowUpAtRaw) : null
     if (dueFollowUpAt && !Number.isFinite(dueFollowUpAt.getTime())) {
       return Response.json({ message: 'Format follow up tidak valid.' }, { status: 400 })
     }
 
-    const userNote = `[Review Action] ${session.displayName} (${session.username})${
-      notesRaw ? ` - ${notesRaw}` : ''
-    }`
+    if (isBatchMode) {
+      const uniqueInvoiceNos = Array.from(new Set(invoiceNos))
+      const successes: string[] = []
+      const failures: Array<{ invoiceNo: string; message: string }> = []
 
-    await runReviewDbExecute<ExecuteResult>(
-      `
-        INSERT INTO billing_collection_actions (
-          invoice_id,
-          action_type,
-          action_status,
-          action_at,
-          due_follow_up_at,
-          handled_by_user_id,
-          notes
-        )
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
-      `,
-      [invoice.id, actionType, actionStatus, dueFollowUpAt ? dueFollowUpAt : null, handledBy?.id ?? null, userNote],
-    )
+      for (const currentInvoiceNo of uniqueInvoiceNos) {
+        try {
+          await createCollectionAction({
+            invoiceNo: currentInvoiceNo,
+            actionType,
+            actionStatus,
+            dueFollowUpAt,
+            notesRaw,
+            sessionUsername: session.username,
+            sessionDisplayName: session.displayName,
+          })
+          successes.push(currentInvoiceNo)
+        } catch (error) {
+          failures.push({
+            invoiceNo: currentInvoiceNo,
+            message: error instanceof Error && error.message.trim() ? error.message.trim() : 'Collection action batch gagal.',
+          })
+        }
+      }
 
-    await runReviewDbExecute<ExecuteResult>(
-      `
-        UPDATE billing_invoices
-        SET collection_status = ?,
-            suspend_candidate = CASE
-              WHEN ? = 'SUSPEND' THEN 1
-              WHEN ? = 'RECONNECT' THEN 0
-              ELSE suspend_candidate
-            END,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `,
-      [mapCollectionStatus(actionType), actionType, actionType, invoice.id],
-    )
+      return Response.json({
+        message: `Batch collection berhasil memproses ${successes.length} invoice.${failures.length ? ` ${failures.length} invoice dilewati.` : ''}`,
+        createdCount: successes.length,
+        failedCount: failures.length,
+        successes,
+        failures,
+      })
+    }
+
+    await createCollectionAction({
+      invoiceNo,
+      actionType,
+      actionStatus,
+      dueFollowUpAt,
+      notesRaw,
+      sessionUsername: session.username,
+      sessionDisplayName: session.displayName,
+    })
 
     return Response.json({
       message: `Collection action untuk invoice ${invoiceNo} berhasil disimpan.`,

@@ -32,6 +32,7 @@ export function BillingInvoiceGenerateForm({
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+  const [mode, setMode] = useState<'single' | 'batch'>('single')
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
   const helperText = useMemo(() => {
@@ -41,8 +42,10 @@ export function BillingInvoiceGenerateForm({
     if (!reviewDbReady) {
       return 'Mode review database belum aktif, jadi generate invoice dinonaktifkan agar tidak menulis ke mock.'
     }
-    return 'Form ini membuat invoice recurring dari subscription ACTIVE (anti-duplikasi periode) dan menambahkan item SUBSCRIPTION otomatis.'
-  }, [canCreate, reviewDbReady])
+    return mode === 'batch'
+      ? 'Mode batch akan membuat invoice recurring dari daftar subscription billing-ready di halaman ini, sambil melewati service yang sudah punya invoice periode sama.'
+      : 'Form ini membuat invoice recurring dari subscription ACTIVE (anti-duplikasi periode) dan menambahkan item SUBSCRIPTION otomatis.'
+  }, [canCreate, reviewDbReady, mode])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -58,7 +61,8 @@ export function BillingInvoiceGenerateForm({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          serviceNo,
+          serviceNo: mode === 'single' ? serviceNo : '',
+          serviceNumbers: mode === 'batch' ? subscriptionSuggestions : [],
           invoiceType,
           billingMonth: billingMonth ? Number(billingMonth) : null,
           billingYear: billingYear ? Number(billingYear) : null,
@@ -79,7 +83,9 @@ export function BillingInvoiceGenerateForm({
 
       setFeedback({
         tone: 'success',
-        message: payload?.message || `Invoice berhasil dibuat (${payload?.invoiceNo ?? '-'})`,
+        message:
+          payload?.message ||
+          (mode === 'batch' ? 'Batch recurring invoice berhasil diproses.' : `Invoice berhasil dibuat (${payload?.invoiceNo ?? '-'})`),
       })
       setNotes('')
       router.refresh()
@@ -98,6 +104,25 @@ export function BillingInvoiceGenerateForm({
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Mode Generate</span>
+          <select
+            value={mode}
+            onChange={(event) => setMode(event.target.value === 'batch' ? 'batch' : 'single')}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            disabled={isDisabled}
+          >
+            <option value="single">Single subscription</option>
+            <option value="batch">Batch billing-ready</option>
+          </select>
+        </label>
+
+        <div className="rounded-2xl border border-dashed border-line bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          {mode === 'batch'
+            ? `Batch akan memakai ${subscriptionSuggestions.length.toLocaleString('id-ID')} subscription billing-ready yang sedang tampil sebagai suggestion.`
+            : 'Gunakan mode single untuk invoice khusus satu service number.'}
+        </div>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Service Number</span>
           <input
             list="billing-subscription-suggestions"
@@ -105,8 +130,8 @@ export function BillingInvoiceGenerateForm({
             onChange={(event) => setServiceNo(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
             placeholder="MS-202607-0001"
-            required
-            disabled={isDisabled}
+            required={mode === 'single'}
+            disabled={isDisabled || mode === 'batch'}
           />
           <datalist id="billing-subscription-suggestions">
             {subscriptionSuggestions.map((item) => (
@@ -121,7 +146,7 @@ export function BillingInvoiceGenerateForm({
             value={invoiceType}
             onChange={(event) => setInvoiceType(event.target.value as (typeof invoiceTypeOptions)[number])}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            disabled={isDisabled}
+            disabled={isDisabled || mode === 'batch'}
           >
             {invoiceTypeOptions.map((item) => (
               <option key={item} value={item}>
@@ -192,16 +217,20 @@ export function BillingInvoiceGenerateForm({
 
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            {subscriptionSuggestions.length > 0
-              ? 'Saran service number diambil dari daftar subscription billing-ready pada halaman ini.'
-              : 'Belum ada saran subscription billing-ready; Anda tetap bisa mengisi manual.'}
+            {mode === 'batch'
+              ? subscriptionSuggestions.length > 0
+                ? 'Mode batch mengambil daftar service number langsung dari subscription billing-ready yang tersedia di halaman ini.'
+                : 'Belum ada subscription billing-ready untuk diproses massal pada halaman ini.'
+              : subscriptionSuggestions.length > 0
+                ? 'Saran service number diambil dari daftar subscription billing-ready pada halaman ini.'
+                : 'Belum ada saran subscription billing-ready; Anda tetap bisa mengisi manual.'}
           </div>
           <button
             type="submit"
-            disabled={isDisabled}
+            disabled={isDisabled || (mode === 'batch' && subscriptionSuggestions.length === 0)}
             className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            {submitting ? 'Membuat Invoice...' : 'Generate Invoice'}
+            {submitting ? 'Memproses Invoice...' : mode === 'batch' ? 'Generate Batch Recurring' : 'Generate Invoice'}
           </button>
         </div>
       </form>
@@ -220,4 +249,3 @@ export function BillingInvoiceGenerateForm({
     </section>
   )
 }
-

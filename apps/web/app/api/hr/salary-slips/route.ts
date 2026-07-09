@@ -2,6 +2,8 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { recordHrAudit } from '@/lib/services/hr-audit-service'
+import { ensureHrSalarySlipVoidTable } from '@/lib/services/hr-salary-slip-void-service'
 
 type EmployeeRow = {
   id: number
@@ -12,6 +14,16 @@ type EmployeeRow = {
 
 type ExistingSalarySlipRow = {
   id: number
+}
+
+type SalarySlipRow = {
+  id: number
+  employeeCode: string
+  fullName: string
+  payrollMonth: number
+  payrollYear: number
+  releasedAt: string | null
+  voidedAt: string | null
 }
 
 type LoanDeductionRow = {
@@ -188,8 +200,111 @@ export async function POST(request: Request) {
       ],
     )
 
+    await recordHrAudit({
+      actionType: 'SALARY_SLIP_CREATE',
+      actor: `${session.displayName} (${session.username})`,
+      targetRef: `${employee.employeeCode}:${payrollMonth}/${payrollYear}`,
+      detail: `Slip gaji ${employee.employeeCode} - ${employee.fullName} periode ${payrollMonth}/${payrollYear} dibuat via web dengan net salary Rp ${netSalary.toLocaleString('id-ID')}.`,
+    })
+
     return Response.json({
       message: `Slip gaji ${employee.employeeCode} - ${employee.fullName} periode ${payrollMonth}/${payrollYear} berhasil disimpan.`,
+    })
+  } catch (error) {
+    return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  const session = await getSession()
+  if (!session) {
+    return Response.json({ message: 'Unauthorized' }, { status: 401 })
+  }
+  if (!canPerformAction(session.role, 'hr', 'update')) {
+    return Response.json({ message: 'Forbidden' }, { status: 403 })
+  }
+
+  const source = getDataSourceSnapshot()
+  if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    return Response.json(
+      { message: 'Release slip gaji hanya aktif saat review DB benar-benar tersedia.' },
+      { status: 503 },
+    )
+  }
+
+  try {
+    const payload = (await request.json()) as {
+      salarySlipId?: unknown
+      releasedAt?: unknown
+      notes?: unknown
+    }
+
+    const salarySlipId = Number.parseInt(String(payload.salarySlipId ?? '').trim(), 10)
+    const releasedAtRaw = String(payload.releasedAt ?? '').trim()
+    const notes = String(payload.notes ?? '').trim()
+
+    if (!Number.isInteger(salarySlipId) || salarySlipId <= 0) {
+      return Response.json({ message: 'Slip gaji HR tidak valid.' }, { status: 400 })
+    }
+
+    await ensureHrSalarySlipVoidTable()
+
+    const releaseTime = releasedAtRaw || new Date().toISOString().slice(0, 19).replace('T', ' ')
+    const releaseDate = new Date(releaseTime.replace(' ', 'T'))
+    if (!Number.isFinite(releaseDate.getTime())) {
+      return Response.json({ message: 'Waktu release slip gaji tidak valid.' }, { status: 400 })
+    }
+
+    const [salarySlip] = await runReviewDbQuery<SalarySlipRow>(
+      `
+        SELECT
+          hss.id,
+          he.employee_code AS employeeCode,
+          he.full_name AS fullName,
+          hss.payroll_month AS payrollMonth,
+          hss.payroll_year AS payrollYear,
+          CAST(hss.released_at AS CHAR) AS releasedAt,
+          CAST(hsv.voided_at AS CHAR) AS voidedAt
+        FROM hr_salary_slips hss
+        JOIN hr_employees he
+          ON he.id = hss.employee_id
+        LEFT JOIN hr_salary_slip_voids hsv
+          ON hsv.salary_slip_id = hss.id
+        WHERE hss.id = ?
+        LIMIT 1
+      `,
+      [salarySlipId],
+    )
+    if (!salarySlip) {
+      return Response.json({ message: 'Slip gaji HR tidak ditemukan di review DB.' }, { status: 404 })
+    }
+    if (salarySlip.releasedAt) {
+      return Response.json({ message: 'Slip gaji ini sudah berstatus released.' }, { status: 409 })
+    }
+    if (salarySlip.voidedAt) {
+      return Response.json({ message: 'Slip gaji yang sudah di-void tidak bisa dirilis kembali.' }, { status: 409 })
+    }
+
+    await runReviewDbExecute<InsertResult>(
+      `
+        UPDATE hr_salary_slips
+        SET
+          released_at = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [releaseTime, salarySlip.id],
+    )
+
+    await recordHrAudit({
+      actionType: 'SALARY_SLIP_RELEASE',
+      actor: `${session.displayName} (${session.username})`,
+      targetRef: `PAYROLL-${salarySlip.id}`,
+      detail: `Slip gaji ${salarySlip.employeeCode} - ${salarySlip.fullName} periode ${String(salarySlip.payrollMonth).padStart(2, '0')}/${salarySlip.payrollYear} dirilis via web${notes ? ` (${notes})` : ''}.`,
+    })
+
+    return Response.json({
+      message: `Slip gaji ${salarySlip.employeeCode} - ${salarySlip.fullName} periode ${salarySlip.payrollMonth}/${salarySlip.payrollYear} berhasil dirilis.`,
     })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })

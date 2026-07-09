@@ -72,6 +72,7 @@ export function ImportBatchDetailView({
   const finalizedRows = rowSummary.imported + rowSummary.invalid + rowSummary.skipped
   const targetBreakdown = buildTargetBreakdown(detail.rows)
   const completionRate = batch.totalRows > 0 ? Math.round((finalizedRows / batch.totalRows) * 100) : 0
+  const hasExistingRows = batch.totalRows > 0 || detail.rows.length > 0 || Boolean(batch.sourceFileName)
 
   return (
     <div className="space-y-6">
@@ -244,6 +245,7 @@ export function ImportBatchDetailView({
             batchId={batch.id}
             batchCode={batch.batchCode}
             sourceFileName={batch.sourceFileName}
+            hasExistingRows={hasExistingRows}
             canUpload={canUpload}
             reviewDbReady={reviewDbReady}
           />

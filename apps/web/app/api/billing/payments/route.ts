@@ -220,6 +220,26 @@ export async function POST(request: Request) {
       [updatedPaidAmount, nextInvoiceStatus, nextInvoiceStatus, nextInvoiceStatus, invoice.id]
     )
 
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        UPDATE billing_collection_actions
+        SET
+          action_status = 'DONE',
+          due_follow_up_at = NULL,
+          notes = CASE
+            WHEN notes IS NULL OR notes = '' THEN ?
+            ELSE CONCAT(notes, '\n', ?)
+          END
+        WHERE invoice_id = ?
+          AND COALESCE(UPPER(TRIM(action_status)), 'OPEN') = 'OPEN'
+      `,
+      [
+        `[Auto Resolved via Payment] ${session.displayName} (${session.username}) - pembayaran ${paymentNo} diterima.`,
+        `[Auto Resolved via Payment] ${session.displayName} (${session.username}) - pembayaran ${paymentNo} diterima.`,
+        invoice.id,
+      ],
+    )
+
     return Response.json({
       message: `Pembayaran ${paymentNo} untuk invoice ${invoice.invoiceNo} berhasil disimpan.`,
     })

@@ -1,5 +1,5 @@
 import type { ImportBatch } from '@/lib/types'
-import { runReviewDbExecute } from '@/lib/review-db'
+import { runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 type ExecuteResult = {
   affectedRows?: number
@@ -932,13 +932,18 @@ function readJsonSections(
   return result
 }
 
-async function deleteExistingBatchRows(batchId: number, definition: ScopeDefinition) {
+async function countExistingBatchRows(batchId: number, definition: ScopeDefinition) {
+  let total = 0
+
   for (const section of definition.sections) {
-    await runReviewDbExecute<ExecuteResult>(
-      `DELETE FROM ${section.clearTable} WHERE batch_id = ?`,
+    const rows = await runReviewDbQuery<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM ${section.clearTable} WHERE batch_id = ?`,
       [batchId]
     )
+    total += Number(rows[0]?.total ?? 0)
   }
+
+  return total
 }
 
 export async function loadImportFileToStaging(
@@ -973,7 +978,12 @@ export async function loadImportFileToStaging(
     )
   }
 
-  await deleteExistingBatchRows(batch.id, definition)
+  const existingRows = await countExistingBatchRows(batch.id, definition)
+  if (existingRows > 0) {
+    throw new Error(
+      `Batch ${batch.batchCode} sudah memiliki ${existingRows} row staging. Upload ulang dikunci agar review tetap non-destruktif. Buat batch baru untuk file revisi.`
+    )
+  }
 
   let insertedRows = 0
   const sectionsLoaded: string[] = []

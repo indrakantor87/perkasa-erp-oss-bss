@@ -21,6 +21,20 @@ function getRowTone(status: string) {
   return 'border-slate-200 bg-white text-slate-700'
 }
 
+function getSlaTone(state: string) {
+  const normalized = state.trim().toUpperCase()
+  if (normalized === 'OVERDUE') {
+    return 'border-rose-200 bg-rose-50 text-rose-800'
+  }
+  if (normalized === 'DUE_TODAY') {
+    return 'border-amber-200 bg-amber-50 text-amber-800'
+  }
+  if (normalized === 'ON_TRACK') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800'
+  }
+  return 'border-slate-200 bg-white text-slate-600'
+}
+
 function buildTicketSummary(rows: DomainReviewRow[]) {
   const byStatus = new Map<string, number>()
   for (const row of rows) {
@@ -88,7 +102,17 @@ export function SupportTroubleTicketQueuePanel({
           {ttSection.rows.map((row) => {
             const type = pickMeta(row.meta, 'Type: ')
             const opened = pickMeta(row.meta, 'Opened: ')
+            const slaDays = pickMeta(row.meta, 'SLA Days: ')
+            const slaDue = pickMeta(row.meta, 'SLA Due: ')
+            const slaState = pickMeta(row.meta, 'SLA State: ')
             const customerUser = pickMeta(row.meta, 'Customer User: ')
+            const owner = pickMeta(row.meta, 'PIC: ')
+            const followUp = pickMeta(row.meta, 'Next Follow Up: ')
+            const followUpState = pickMeta(row.meta, 'Follow Up State: ')
+            const progressUpdated = pickMeta(row.meta, 'Progress Updated: ')
+            const escalationTarget = pickMeta(row.meta, 'Escalation Target: ')
+            const escalationLevel = pickMeta(row.meta, 'Escalation Level: ')
+            const escalatedAt = pickMeta(row.meta, 'Escalated At: ')
 
             return (
               <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-5">
@@ -102,10 +126,36 @@ export function SupportTroubleTicketQueuePanel({
                 <p className="mt-3 text-sm leading-6 text-mute">{row.detail}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <span className="badge border-slate-200 bg-white text-slate-600">Type: {type}</span>
+                  <span className={`badge ${getSlaTone(slaState)}`}>SLA: {slaState}</span>
+                  <span className="badge border-slate-200 bg-white text-slate-600">SLA Days: {slaDays}</span>
+                  <span className="badge border-slate-200 bg-white text-slate-600">SLA Due: {slaDue}</span>
                   <span className="badge border-slate-200 bg-white text-slate-600">Opened: {opened}</span>
                   <span className="badge border-slate-200 bg-white text-slate-600">User: {customerUser}</span>
+                  <span className="badge border-slate-200 bg-white text-slate-600">PIC: {owner}</span>
+                  <span className="badge border-slate-200 bg-white text-slate-600">Follow Up: {followUp}</span>
+                  <span className="badge border-slate-200 bg-white text-slate-600">State: {followUpState}</span>
+                  <span className="badge border-slate-200 bg-white text-slate-600">Progress: {progressUpdated}</span>
+                  <span className="badge border-slate-200 bg-white text-slate-600">Escalation: {escalationTarget}</span>
+                  <span className="badge border-slate-200 bg-white text-slate-600">Esc Level: {escalationLevel}</span>
+                  <span className="badge border-slate-200 bg-white text-slate-600">Esc At: {escalatedAt}</span>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    href={buildSupportActionHref('ticket-progress', {
+                      ticket: row.primary,
+                    })}
+                    className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700"
+                  >
+                    Update Progress
+                  </Link>
+                  <Link
+                    href={buildSupportActionHref('ticket-escalate', {
+                      ticket: row.primary,
+                    })}
+                    className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700"
+                  >
+                    Eskalasi Ticket
+                  </Link>
                   <Link
                     href={buildSupportActionHref('ticket-close', {
                       ticket: row.primary,

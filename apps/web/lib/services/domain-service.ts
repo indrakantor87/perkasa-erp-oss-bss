@@ -2,8 +2,21 @@ import { canPerformAction } from '@/lib/access-control'
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { domainPages } from '@/lib/mock-domains'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { getHrAttendanceFaceConfig } from '@/lib/services/hr-attendance-face-service'
+import { getRecentHrEmployeeFaceReferenceItems } from '@/lib/services/hr-attendance-face-service'
+import { getRecentHrEmployeeFaceReferenceHistoryItems } from '@/lib/services/hr-attendance-face-service'
+import { getRecentHrAttendanceFaceRetakeQueueItems } from '@/lib/services/hr-attendance-face-service'
+import { getHrAttendanceFacePriorityQueueItems } from '@/lib/services/hr-attendance-face-service'
+import { getHrEmployeeFaceReferenceTrendItems } from '@/lib/services/hr-attendance-face-service'
+import { getVerifiedHrEmployeeFaceReferenceCandidates } from '@/lib/services/hr-attendance-face-service'
+import { getHrAttendanceFaceOutcomeAnalytics } from '@/lib/services/hr-attendance-face-service'
+import { getRecentHrAttendanceFaceReviewItems } from '@/lib/services/hr-attendance-face-service'
+import { getHrAttendanceGeofenceConfig } from '@/lib/services/hr-attendance-geofence-service'
 import { ensureInventoryLoanTable } from '@/lib/services/inventory-loan-service'
 import { ensureInventoryRequestTable } from '@/lib/services/inventory-request-service'
+import { ensureHrSalarySlipVoidTable } from '@/lib/services/hr-salary-slip-void-service'
+import { ensureSupportTroubleTicketEscalationTable } from '@/lib/services/support-ticket-escalation-service'
+import { ensureSupportTroubleTicketProgressTable } from '@/lib/services/support-ticket-progress-service'
 import {
   buildSupportLaneSnapshots,
   buildSupportLaneReviewSummary,
@@ -57,6 +70,7 @@ type DomainStatsRow = {
 }
 
 type ReviewDbSupportTicketRow = {
+  ticketId: number
   ticketCode: string
   customerName: string
   customerUser: string | null
@@ -64,6 +78,19 @@ type ReviewDbSupportTicketRow = {
   status: string
   notes: string | null
   openedAt: string | Date
+  slaDurationDays: number | null
+  slaDueAt: string | Date | null
+  progressStatus: string | null
+  ownerName: string | null
+  followUpAt: string | Date | null
+  progressNotes: string | null
+  progressUpdatedBy: string | null
+  progressUpdatedAt: string | Date | null
+  escalationTarget: string | null
+  escalationLevel: string | null
+  escalationReason: string | null
+  escalatedBy: string | null
+  escalatedAt: string | Date | null
 }
 
 type ReviewDbSupportIsolationRow = {
@@ -160,6 +187,22 @@ type ReviewDbCollectionActionRow = {
   dueFollowUpAt: string | Date | null
   customerName: string
   invoiceNo: string
+  notes: string | null
+}
+
+type ReviewDbCollectionFollowUpRow = {
+  invoiceNo: string
+  customerName: string
+  invoiceStatus: string
+  totalAmount: number
+  paidAmount: number
+  dueDate: string | Date
+  collectionStatus: string | null
+  suspendCandidate: number
+  actionType: string
+  actionStatus: string
+  actionAt: string | Date
+  dueFollowUpAt: string | Date | null
   notes: string | null
 }
 
@@ -352,9 +395,12 @@ type ReviewDbHrEmployeeRow = {
 type ReviewDbHrAttendanceRow = {
   attendanceId: number
   employeeName: string
+  attendanceDate: string
   status: string
   checkIn: string | Date | null
+  checkOut: string | Date | null
   overtimeHours: number
+  lockedByAdmin: number
 }
 
 type ReviewDbHrLoanRow = {
@@ -375,6 +421,8 @@ type ReviewDbHrSalarySlipRow = {
   totalDeduction: number
   netSalary: number
   releasedAt: string | Date | null
+  voidedAt: string | Date | null
+  voidReason: string | null
 }
 
 function buildCapabilities(role: AppRole, domain: DomainKey): DomainCapability[] {
@@ -389,6 +437,14 @@ function buildCapabilities(role: AppRole, domain: DomainKey): DomainCapability[]
 
 function formatNumber(value: number) {
   return value.toLocaleString('id-ID')
+}
+
+function formatPercentage(part: number, total: number) {
+  if (total <= 0) {
+    return '0%'
+  }
+
+  return `${Math.round((part / total) * 100)}%`
 }
 
 function formatCurrency(value: number | null | undefined) {
@@ -411,6 +467,61 @@ function formatDateTime(value: string | Date | null | undefined) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date)
+}
+
+function formatDateTimeInputValue(value: string | Date | null | undefined) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return ''
+
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
+
+function getFollowUpState(value: string | Date | null | undefined) {
+  if (!value) return 'UNSET'
+
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return 'UNSET'
+
+  const now = new Date()
+  if (date.getTime() < now.getTime()) {
+    return 'OVERDUE'
+  }
+
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+  const nextDay = new Date(today)
+  nextDay.setDate(nextDay.getDate() + 1)
+
+  if (date.getTime() >= today.getTime() && date.getTime() < nextDay.getTime()) {
+    return 'TODAY'
+  }
+
+  return 'SCHEDULED'
+}
+
+function getSlaState(value: string | Date | null | undefined) {
+  if (!value) return 'UNSET'
+
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return 'UNSET'
+
+  const now = new Date()
+  if (date.getTime() < now.getTime()) {
+    return 'OVERDUE'
+  }
+
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+  const nextDay = new Date(today)
+  nextDay.setDate(nextDay.getDate() + 1)
+
+  if (date.getTime() >= today.getTime() && date.getTime() < nextDay.getTime()) {
+    return 'DUE_TODAY'
+  }
+
+  return 'ON_TRACK'
 }
 
 async function getReviewDbDomainStats() {
@@ -509,21 +620,90 @@ async function getReviewDbSupportSections(lane?: SupportLaneKey | null): Promise
   const wantDismantle = !lane || lane === 'dismantle'
 
   const tickets = wantTickets
-    ? await runReviewDbQuery<ReviewDbSupportTicketRow>(`
+    ? (await ensureSupportTroubleTicketProgressTable(),
+      await ensureSupportTroubleTicketEscalationTable(),
+      await runReviewDbQuery<ReviewDbSupportTicketRow>(`
     SELECT
+      stt.id AS ticketId,
       ticket_code AS ticketCode,
       customer_name AS customerName,
       customer_user AS customerUser,
       type AS ticketType,
-      status,
-      notes,
-      opened_at AS openedAt
-    FROM support_trouble_tickets
-    WHERE closed_at IS NULL
-      AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
-    ORDER BY opened_at DESC, id DESC
+      stt.status AS status,
+      stt.notes AS notes,
+      stt.opened_at AS openedAt,
+      sla.duration_days AS slaDurationDays,
+      CASE
+        WHEN sla.duration_days IS NULL THEN NULL
+        ELSE DATE_ADD(stt.opened_at, INTERVAL sla.duration_days DAY)
+      END AS slaDueAt,
+      latest.progress_status AS progressStatus,
+      latest.owner_name AS ownerName,
+      latest.follow_up_at AS followUpAt,
+      latest.progress_notes AS progressNotes,
+      latest.updated_by AS progressUpdatedBy,
+      latest.updated_at AS progressUpdatedAt,
+      escalations.escalation_target AS escalationTarget,
+      escalations.escalation_level AS escalationLevel,
+      escalations.escalation_reason AS escalationReason,
+      escalations.escalated_by AS escalatedBy,
+      escalations.escalated_at AS escalatedAt
+    FROM support_trouble_tickets stt
+    LEFT JOIN support_trouble_ticket_sla sla
+      ON UPPER(TRIM(sla.trouble_type)) = UPPER(TRIM(stt.type))
+    LEFT JOIN (
+      SELECT
+        progress.trouble_ticket_id,
+        progress.progress_status,
+        progress.owner_name,
+        progress.follow_up_at,
+        progress.progress_notes,
+        progress.updated_by,
+        progress.updated_at
+      FROM support_trouble_ticket_progress_logs progress
+      INNER JOIN (
+        SELECT trouble_ticket_id, MAX(id) AS latestId
+        FROM support_trouble_ticket_progress_logs
+        GROUP BY trouble_ticket_id
+      ) latest_progress
+        ON latest_progress.latestId = progress.id
+    ) latest
+      ON latest.trouble_ticket_id = stt.id
+    LEFT JOIN (
+      SELECT
+        escalation.trouble_ticket_id,
+        escalation.escalation_target,
+        escalation.escalation_level,
+        escalation.escalation_reason,
+        escalation.escalated_by,
+        escalation.escalated_at
+      FROM support_trouble_ticket_escalation_logs escalation
+      INNER JOIN (
+        SELECT trouble_ticket_id, MAX(id) AS latestId
+        FROM support_trouble_ticket_escalation_logs
+        GROUP BY trouble_ticket_id
+      ) latest_escalation
+        ON latest_escalation.latestId = escalation.id
+    ) escalations
+      ON escalations.trouble_ticket_id = stt.id
+    WHERE stt.closed_at IS NULL
+      AND COALESCE(UPPER(TRIM(stt.status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+    ORDER BY
+      CASE
+        WHEN sla.duration_days IS NULL THEN 1
+        WHEN DATE_ADD(stt.opened_at, INTERVAL sla.duration_days DAY) < CURRENT_TIMESTAMP THEN 0
+        ELSE 1
+      END ASC,
+      CASE
+        WHEN sla.duration_days IS NULL THEN NULL
+        ELSE DATE_ADD(stt.opened_at, INTERVAL sla.duration_days DAY)
+      END ASC,
+      CASE WHEN latest.follow_up_at IS NULL THEN 1 ELSE 0 END ASC,
+      latest.follow_up_at ASC,
+      stt.opened_at DESC,
+      stt.id DESC
     LIMIT 5
-  `)
+  `))
     : []
 
   const isolations = wantIsolations
@@ -577,18 +757,40 @@ async function getReviewDbSupportSections(lane?: SupportLaneKey | null): Promise
     {
       title: 'Trouble Ticket Open',
       description: 'Queue operasional terbaru dari tabel support_trouble_tickets pada database review.',
-      rows: tickets.map((item) => ({
-        id: item.ticketCode,
-        primary: item.ticketCode,
-        secondary: item.customerName,
-        status: item.status,
-        detail: item.notes?.trim() || 'Belum ada catatan tambahan pada ticket ini.',
-        meta: [
-          `Type: ${item.ticketType || '-'}`,
-          `Customer User: ${item.customerUser || '-'}`,
-          `Opened: ${formatDateTime(item.openedAt)}`,
-        ],
-      })),
+      rows: tickets.map((item) => {
+        const followUpState = getFollowUpState(item.followUpAt)
+        const slaState = getSlaState(item.slaDueAt)
+        return {
+          id: item.ticketCode,
+          primary: item.ticketCode,
+          secondary: item.customerName,
+          status: item.progressStatus?.trim() || item.status,
+          detail:
+            item.progressNotes?.trim() ||
+            item.notes?.trim() ||
+            'Belum ada catatan tambahan pada ticket ini.',
+          meta: [
+            `Type: ${item.ticketType || '-'}`,
+            `Customer User: ${item.customerUser || '-'}`,
+            `Opened: ${formatDateTime(item.openedAt)}`,
+            `SLA Days: ${item.slaDurationDays ?? '-'}`,
+            `SLA Due: ${formatDateTime(item.slaDueAt)}`,
+            `SLA State: ${slaState}`,
+            `PIC: ${item.ownerName || '-'}`,
+            `Next Follow Up: ${formatDateTime(item.followUpAt)}`,
+            `Follow Up State: ${followUpState}`,
+            `Progress Updated: ${formatDateTime(item.progressUpdatedAt)}`,
+            `Updated By: ${item.progressUpdatedBy || '-'}`,
+            `Latest Progress: ${item.progressNotes?.trim() || '-'}`,
+            `Escalation Target: ${item.escalationTarget || '-'}`,
+            `Escalation Level: ${item.escalationLevel || '-'}`,
+            `Escalated At: ${formatDateTime(item.escalatedAt)}`,
+            `Escalated By: ${item.escalatedBy || '-'}`,
+            `Escalation Reason: ${item.escalationReason?.trim() || '-'}`,
+            `Ticket Notes: ${item.notes?.trim() || '-'}`,
+          ],
+        }
+      }),
     },
     {
       title: 'Isolir Aktif',
@@ -804,6 +1006,26 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const suspendedInvoices = await runReviewDbQuery<ReviewDbBillingInvoiceRow>(`
+    SELECT
+      bi.invoice_no AS invoiceNo,
+      c.full_name AS customerName,
+      bi.invoice_status AS invoiceStatus,
+      bi.total_amount AS totalAmount,
+      bi.paid_amount AS paidAmount,
+      bi.due_date AS dueDate
+    FROM billing_invoices bi
+    JOIN service_subscriptions ss
+      ON ss.id = bi.subscription_id
+    JOIN crm_customers c
+      ON c.id = ss.customer_id
+    WHERE COALESCE(UPPER(TRIM(bi.invoice_status)), '') = 'SUSPENDED'
+       OR COALESCE(UPPER(TRIM(bi.collection_status)), '') = 'SUSPEND'
+       OR COALESCE(bi.suspend_candidate, 0) = 1
+    ORDER BY bi.updated_at DESC, bi.id DESC
+    LIMIT 5
+  `)
+
   const actions = await runReviewDbQuery<ReviewDbCollectionActionRow>(`
     SELECT
       bca.action_type AS actionType,
@@ -821,6 +1043,53 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
     JOIN crm_customers c
       ON c.id = ss.customer_id
     ORDER BY bca.action_at DESC, bca.id DESC
+    LIMIT 5
+  `)
+
+  const collectionFollowUps = await runReviewDbQuery<ReviewDbCollectionFollowUpRow>(`
+    SELECT
+      bi.invoice_no AS invoiceNo,
+      c.full_name AS customerName,
+      bi.invoice_status AS invoiceStatus,
+      bi.total_amount AS totalAmount,
+      bi.paid_amount AS paidAmount,
+      bi.due_date AS dueDate,
+      bi.collection_status AS collectionStatus,
+      bi.suspend_candidate AS suspendCandidate,
+      latest.action_type AS actionType,
+      latest.action_status AS actionStatus,
+      latest.action_at AS actionAt,
+      latest.due_follow_up_at AS dueFollowUpAt,
+      latest.notes
+    FROM billing_invoices bi
+    JOIN service_subscriptions ss
+      ON ss.id = bi.subscription_id
+    JOIN crm_customers c
+      ON c.id = ss.customer_id
+    JOIN (
+      SELECT
+        action_latest.invoice_id,
+        action_latest.action_type,
+        action_latest.action_status,
+        action_latest.action_at,
+        action_latest.due_follow_up_at,
+        action_latest.notes
+      FROM billing_collection_actions action_latest
+      INNER JOIN (
+        SELECT invoice_id, MAX(id) AS latestId
+        FROM billing_collection_actions
+        GROUP BY invoice_id
+      ) latest_ids
+        ON latest_ids.latestId = action_latest.id
+    ) latest
+      ON latest.invoice_id = bi.id
+    WHERE COALESCE(UPPER(TRIM(latest.action_status)), 'OPEN') = 'OPEN'
+      AND COALESCE(UPPER(TRIM(bi.invoice_status)), 'ISSUED') IN ('ISSUED', 'OVERDUE', 'PARTIAL')
+    ORDER BY
+      CASE WHEN latest.due_follow_up_at IS NULL THEN 1 ELSE 0 END ASC,
+      latest.due_follow_up_at ASC,
+      bi.due_date ASC,
+      bi.id DESC
     LIMIT 5
   `)
 
@@ -917,6 +1186,107 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
       })),
     },
     {
+      title: 'Invoice Suspended',
+      description:
+        'Invoice yang sedang berada pada jalur suspend agar operator billing bisa memantau kandidat suspend dan melakukan reconnect bila tindak lanjut sudah siap.',
+      rows: suspendedInvoices.map((item) => ({
+        id: `${item.invoiceNo}-SUSPENDED`,
+        primary: item.invoiceNo,
+        secondary: item.customerName,
+        status: 'SUSPENDED',
+        detail: `Sisa tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} pada invoice yang sudah masuk jalur suspend.`,
+        meta: [
+          `Total: ${formatCurrency(item.totalAmount)}`,
+          `Terbayar: ${formatCurrency(item.paidAmount)}`,
+          `Remaining: ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))}`,
+          `Jatuh Tempo: ${formatDateTime(item.dueDate)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Suspend Ready Queue',
+      description:
+        'Antrean invoice yang sudah masuk sinyal suspend dari collection follow-up agar operator billing bisa mengeksekusi suspend massal tanpa memilah catatan satu per satu.',
+      rows: collectionFollowUps
+        .filter((item) => Number(item.suspendCandidate) > 0 || item.actionType.trim().toUpperCase() === 'SUSPEND')
+        .map((item, index) => {
+          const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
+          const followUpState = getFollowUpState(item.dueFollowUpAt)
+
+          return {
+            id: `${item.invoiceNo}-SUSPEND-READY-${index}`,
+            primary: item.invoiceNo,
+            secondary: item.customerName,
+            status: followUpState,
+            detail: `Invoice siap suspend dengan sisa tagihan ${formatCurrency(remainingAmount)} dan action ${item.actionType}.`,
+            meta: [
+              `Invoice Status: ${item.invoiceStatus}`,
+              `Total: ${formatCurrency(item.totalAmount)}`,
+              `Paid: ${formatCurrency(item.paidAmount)}`,
+              `Remaining: ${formatCurrency(remainingAmount)}`,
+              `Invoice Due: ${formatDateTime(item.dueDate)}`,
+              `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
+              `Follow Up State: ${followUpState}`,
+              `Action Type: ${item.actionType}`,
+              `Collection Status: ${item.collectionStatus || '-'}`,
+              `Suspend Candidate: ${Number(item.suspendCandidate) > 0 ? 'Ya' : 'Tidak'}`,
+              `Action Notes: ${item.notes?.trim() || '-'}`,
+            ],
+          }
+        }),
+    },
+    {
+      title: 'Promise To Pay Queue',
+      description:
+        'Antrean invoice dengan janji bayar aktif agar operator collection bisa memisahkan invoice yang masih layak ditunggu dari invoice yang sudah harus naik ke jalur suspend.',
+      rows: collectionFollowUps
+        .filter((item) => item.actionType.trim().toUpperCase() === 'PROMISE_TO_PAY')
+        .map((item, index) => {
+          const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
+          const followUpState = getFollowUpState(item.dueFollowUpAt)
+
+          return {
+            id: `${item.invoiceNo}-PTP-${index}`,
+            primary: item.invoiceNo,
+            secondary: item.customerName,
+            status: followUpState,
+            detail: `Janji bayar aktif dengan sisa tagihan ${formatCurrency(remainingAmount)} dan follow-up ${formatDateTime(item.dueFollowUpAt)}.`,
+            meta: [
+              `Invoice Status: ${item.invoiceStatus}`,
+              `Total: ${formatCurrency(item.totalAmount)}`,
+              `Paid: ${formatCurrency(item.paidAmount)}`,
+              `Remaining: ${formatCurrency(remainingAmount)}`,
+              `Invoice Due: ${formatDateTime(item.dueDate)}`,
+              `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
+              `Follow Up State: ${followUpState}`,
+              `Action Type: ${item.actionType}`,
+              `Collection Status: ${item.collectionStatus || '-'}`,
+              `Suspend Candidate: ${Number(item.suspendCandidate) > 0 ? 'Ya' : 'Tidak'}`,
+              `Action Notes: ${item.notes?.trim() || '-'}`,
+            ],
+          }
+        }),
+    },
+    {
+      title: 'Reconnect Ready Queue',
+      description:
+        'Antrean invoice yang sudah disuspend dan siap dikembalikan ke jalur overdue/reconnect setelah tindak lanjut lapangan atau negosiasi customer selesai.',
+      rows: suspendedInvoices.map((item) => ({
+        id: `${item.invoiceNo}-RECONNECT`,
+        primary: item.invoiceNo,
+        secondary: item.customerName,
+        status: 'READY',
+        detail: `Invoice suspended dengan sisa tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} siap diaktifkan lagi ke jalur overdue.`,
+        meta: [
+          `Invoice Status: ${item.invoiceStatus}`,
+          `Total: ${formatCurrency(item.totalAmount)}`,
+          `Paid: ${formatCurrency(item.paidAmount)}`,
+          `Remaining: ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))}`,
+          `Invoice Due: ${formatDateTime(item.dueDate)}`,
+        ],
+      })),
+    },
+    {
       title: 'Collection Action Terbaru',
       description: 'Aktivitas collection terbaru untuk memantau reminder, promise to pay, dan suspend candidate.',
       rows: actions.map((item, index) => ({
@@ -931,6 +1301,37 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
           `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
         ],
       })),
+    },
+    {
+      title: 'Collection Follow Up Queue',
+      description:
+        'Antrean follow-up collection aktif berdasarkan action OPEN terbaru per invoice agar operator bisa menindak promise to pay, reminder, dan suspend candidate dari satu layar.',
+      rows: collectionFollowUps.map((item, index) => {
+        const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
+        const followUpState = getFollowUpState(item.dueFollowUpAt)
+
+        return {
+          id: `${item.invoiceNo}-FOLLOW-${index}`,
+          primary: item.invoiceNo,
+          secondary: item.customerName,
+          status: followUpState,
+          detail: `Action ${item.actionType} masih ${item.actionStatus} dengan sisa tagihan ${formatCurrency(remainingAmount)}.`,
+          meta: [
+            `Invoice Status: ${item.invoiceStatus}`,
+            `Total: ${formatCurrency(item.totalAmount)}`,
+            `Paid: ${formatCurrency(item.paidAmount)}`,
+            `Remaining: ${formatCurrency(remainingAmount)}`,
+            `Invoice Due: ${formatDateTime(item.dueDate)}`,
+            `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
+            `Follow Up State: ${followUpState}`,
+            `Action Type: ${item.actionType}`,
+            `Collection Status: ${item.collectionStatus || '-'}`,
+            `Suspend Candidate: ${Number(item.suspendCandidate) > 0 ? 'Ya' : 'Tidak'}`,
+            `Action At: ${formatDateTime(item.actionAt)}`,
+            `Action Notes: ${item.notes?.trim() || '-'}`,
+          ],
+        }
+      }),
     },
     {
       title: 'Payment Terbaru',
@@ -1543,6 +1944,19 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
 }
 
 async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
+  await ensureHrSalarySlipVoidTable()
+  const faceConfig = await getHrAttendanceFaceConfig().catch(() => null)
+  const faceReferenceItems = await getRecentHrEmployeeFaceReferenceItems(5).catch(() => [])
+  const faceReferenceHistoryItems = await getRecentHrEmployeeFaceReferenceHistoryItems(8).catch(() => [])
+  const faceReferenceTrendItems = await getHrEmployeeFaceReferenceTrendItems(5).catch(() => [])
+  const faceRetakeQueueItems = await getRecentHrAttendanceFaceRetakeQueueItems(5).catch(() => [])
+  const facePriorityQueueItems = await getHrAttendanceFacePriorityQueueItems(8).catch(() => [])
+  const verifiedFaceReferenceCandidates = await getVerifiedHrEmployeeFaceReferenceCandidates(5).catch(() => [])
+  const faceReviewItems = await getRecentHrAttendanceFaceReviewItems(5).catch(() => [])
+  const faceOutcomeAnalytics = await getHrAttendanceFaceOutcomeAnalytics().catch(() => null)
+  const geofenceConfig = await getHrAttendanceGeofenceConfig().catch(() => null)
+
+
   const employees = await runReviewDbQuery<ReviewDbHrEmployeeRow>(`
     SELECT
       he.id AS employeeId,
@@ -1567,9 +1981,12 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
     SELECT
       ha.id AS attendanceId,
       he.full_name AS employeeName,
+      DATE_FORMAT(ha.attendance_date, '%Y-%m-%d') AS attendanceDate,
       ha.status,
-      ha.check_in AS checkIn,
-      ha.overtime_hours AS overtimeHours
+      CAST(ha.check_in AS CHAR) AS checkIn,
+      CAST(ha.check_out AS CHAR) AS checkOut,
+      ha.overtime_hours AS overtimeHours,
+      ha.locked_by_admin AS lockedByAdmin
     FROM hr_attendance ha
     JOIN hr_employees he
       ON he.id = ha.employee_id
@@ -1589,7 +2006,6 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
     FROM hr_loans hl
     JOIN hr_employees he
       ON he.id = hl.employee_id
-    WHERE hl.status IN ('PENDING', 'ACTIVE')
     ORDER BY hl.loan_date DESC, hl.id DESC
     LIMIT 5
   `)
@@ -1603,15 +2019,279 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
       hss.total_income AS totalIncome,
       hss.total_deduction AS totalDeduction,
       hss.net_salary AS netSalary,
-      hss.released_at AS releasedAt
+      hss.released_at AS releasedAt,
+      hsv.voided_at AS voidedAt,
+      hsv.reason_text AS voidReason
     FROM hr_salary_slips hss
     JOIN hr_employees he
       ON he.id = hss.employee_id
+    LEFT JOIN hr_salary_slip_voids hsv
+      ON hsv.salary_slip_id = hss.id
     ORDER BY hss.payroll_year DESC, hss.payroll_month DESC, hss.id DESC
     LIMIT 5
   `)
 
   return [
+    {
+      title: 'Face Attendance',
+      description:
+        'Konfigurasi verifikasi wajah attendance untuk menyiapkan jalur capture browser sebelum phase face recognition penuh diaktifkan.',
+      rows: [
+        faceConfig
+          ? {
+              id: 'ATT-FACE-1',
+              primary: faceConfig.verificationMode,
+              secondary: faceConfig.isRequired ? 'Wajib saat check-in' : 'Masih opsional',
+              status: faceConfig.isRequired ? 'REQUIRED' : 'OPTIONAL',
+              detail: `Face attendance aktif dengan mode ${faceConfig.verificationMode}.`,
+              meta: [
+                `Required: ${faceConfig.isRequired ? 'Ya' : 'Tidak'}`,
+                `Mode: ${faceConfig.verificationMode}`,
+                `Auto Verify: ${faceConfig.autoVerifyHighConfidence ? 'Ya' : 'Tidak'}`,
+                `Auto Verify Min Score: ${faceConfig.autoVerifyMinScore}`,
+                `Updated By: ${faceConfig.updatedBy || '-'}`,
+                `Updated At: ${formatDateTime(faceConfig.updatedAt)}`,
+                `Notes: ${faceConfig.notes || '-'}`,
+              ],
+            }
+          : {
+              id: 'ATT-FACE-EMPTY',
+              primary: 'Face attendance belum diatur',
+              secondary: 'Verifikasi wajah belum aktif',
+              status: 'NOT_SET',
+              detail: 'Atur mode verifikasi wajah agar attendance web siap menerima referensi capture browser.',
+              meta: ['Required: Tidak', 'Mode: MANUAL_REVIEW', 'Auto Verify: Tidak', 'Auto Verify Min Score: 85', 'Notes: Belum ada konfigurasi face attendance.'],
+            },
+      ],
+    },
+    {
+      title: 'Face Priority Queue',
+      description:
+        'Daftar kerja prioritas untuk HR yang menggabungkan capture retake pending dan baseline employee yang mulai drifting agar tindak lanjut harian bisa langsung dieksekusi.',
+      rows:
+        facePriorityQueueItems.length > 0
+          ? facePriorityQueueItems.map((item) => ({
+              id: `FACE-PRIORITY-${item.faceLogId > 0 ? item.faceLogId : item.employeeId}`,
+              primary: item.employeeCode,
+              secondary: item.employeeName,
+              status: `${item.queueType} • P${item.priorityScore}`,
+              detail: item.detailReason,
+              meta: [
+                `Queue Type: ${item.queueType}`,
+                `Priority Score: ${item.priorityScore}`,
+                `Attendance ID: ${item.attendanceId > 0 ? item.attendanceId : '-'}`,
+                `Face Log ID: ${item.faceLogId > 0 ? item.faceLogId : '-'}`,
+                `Capture Ref: ${item.captureRef || '-'}`,
+                `Reference Ref: ${item.referenceRef || '-'}`,
+                `Retake Status: ${item.retakeStatus || '-'}`,
+                `Drift Status: ${item.driftStatus}`,
+                `Latest Score: ${formatNumber(item.latestScore)}`,
+                `Average Score: ${item.averageScore.toFixed(1)}`,
+                `Best Score: ${formatNumber(item.bestScore)}`,
+                `Gap From Average: ${item.driftGapFromAverage.toFixed(1)}`,
+                `Gap From Best: ${formatNumber(item.driftGapFromBest)}`,
+                `Updated By: ${item.latestUpdatedBy || '-'}`,
+                `Updated At: ${formatDateTime(item.latestUpdatedAt)}`,
+              ],
+            }))
+          : [
+              {
+                id: 'FACE-PRIORITY-EMPTY',
+                primary: 'Priority queue wajah masih aman',
+                secondary: 'Belum ada retake pending atau baseline drifting',
+                status: 'CLEAR',
+                detail: 'Saat capture retake pending muncul atau baseline employee mulai melemah, item prioritas akan muncul di section ini.',
+                meta: [
+                  'Queue Type: -',
+                  'Priority Score: 0',
+                  'Attendance ID: -',
+                  'Face Log ID: -',
+                  'Capture Ref: -',
+                  'Reference Ref: -',
+                  'Retake Status: -',
+                  'Drift Status: STABLE',
+                ],
+              },
+            ],
+    },
+    {
+      title: 'Review Face Attendance',
+      description:
+        'Antrean review verifikasi wajah terbaru untuk memastikan snapshot capture browser atau manual review bisa diproses operasional sebelum recognition engine penuh aktif.',
+      rows: faceReviewItems.map((item) => ({
+        id: `FACE-${item.faceLogId}`,
+        primary: item.employeeCode,
+        secondary: item.verificationMode,
+        status: item.captureStatus,
+        detail: `Capture ${item.captureRef} untuk attendance ${item.attendanceDate} dengan skor ${item.matchScore} dan hasil baseline ${item.baselineMatchOutcome}.`,
+        meta: [
+          `Attendance ID: ${item.attendanceId}`,
+          `Date: ${item.attendanceDate}`,
+          `Capture Ref: ${item.captureRef}`,
+          `Mode: ${item.verificationMode}`,
+          `Match Score: ${item.matchScore}`,
+          `Confidence Band: ${item.confidenceBand}`,
+          `Baseline Reference Ref: ${item.baselineReferenceRef || '-'}`,
+          `Baseline Reference Mode: ${item.baselineVerificationMode || '-'}`,
+          `Baseline Match Score: ${item.baselineMatchScore}`,
+          `Baseline Match Band: ${item.baselineMatchBand}`,
+          `Baseline Match Outcome: ${item.baselineMatchOutcome}`,
+          `Baseline Match Reason: ${item.baselineMatchReason}`,
+          `Recommendation: ${item.recommendedDecision}`,
+          `Recommendation Reason: ${item.recommendationReason}`,
+          `Auto Review Eligible: ${item.autoReviewEligible ? 'Ya' : 'Tidak'}`,
+          `Reviewed By: ${item.reviewedBy || '-'}`,
+          `Reviewed At: ${formatDateTime(item.reviewedAt)}`,
+          `Review Notes: ${item.reviewNotes || '-'}`,
+          `Created At: ${formatDateTime(item.createdAt)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Face Retake Queue',
+      description:
+        'Antrean capture wajah yang perlu diulang agar operator HR bisa memprioritaskan pengambilan ulang untuk outcome yang terlalu lemah terhadap baseline employee.',
+      rows:
+        faceRetakeQueueItems.length > 0
+          ? faceRetakeQueueItems.map((item) => ({
+              id: `FACE-RETAKE-${item.faceLogId}`,
+              primary: item.employeeCode,
+              secondary: item.captureRef,
+              status: item.queueStatus,
+              detail: `Capture ${item.captureRef} untuk attendance ${item.attendanceId} ${item.queueStatus === 'PENDING' ? 'menunggu retake' : 'sudah ditindaklanjuti'}.`,
+              meta: [
+                `Attendance ID: ${item.attendanceId}`,
+                `Capture Ref: ${item.captureRef}`,
+                `Reason: ${item.reasonText || '-'}`,
+                `Queued By: ${item.queuedBy || '-'}`,
+                `Queued At: ${formatDateTime(item.queuedAt)}`,
+                `Resolved By: ${item.resolvedBy || '-'}`,
+                `Resolved At: ${formatDateTime(item.resolvedAt)}`,
+              ],
+            }))
+          : [
+              {
+                id: 'FACE-RETAKE-EMPTY',
+                primary: 'Antrean retake wajah masih kosong',
+                secondary: 'Belum ada capture yang perlu diulang',
+                status: 'CLEAR',
+                detail: 'Jika review berakhir REJECTED dengan outcome RETAKE, item akan muncul di antrean ini untuk follow-up operasional.',
+                meta: [
+                  'Attendance ID: -',
+                  'Capture Ref: -',
+                  'Reason: -',
+                  'Queued By: -',
+                  'Queued At: -',
+                  'Resolved By: -',
+                  'Resolved At: -',
+                ],
+              },
+            ],
+    },
+    {
+      title: 'Face Attendance Analytics',
+      description:
+        'Ringkasan outcome verifikasi wajah untuk memantau backlog review, kualitas placeholder score, dan adopsi camera capture sebelum recognition engine penuh diaktifkan.',
+      rows:
+        faceOutcomeAnalytics && faceOutcomeAnalytics.totalLogs > 0
+          ? [
+              {
+                id: 'FACE-ANALYTICS-OUTCOME',
+                primary: `${formatNumber(faceOutcomeAnalytics.verifiedCount)} VERIFIED / ${formatNumber(faceOutcomeAnalytics.rejectedCount)} REJECTED`,
+                secondary: `${formatNumber(faceOutcomeAnalytics.pendingCount)} masih pending review`,
+                status: faceOutcomeAnalytics.pendingCount > 0 ? 'ACTION_NEEDED' : 'STABLE',
+                detail: `${formatNumber(faceOutcomeAnalytics.reviewedCount)} dari ${formatNumber(faceOutcomeAnalytics.totalLogs)} capture sudah punya keputusan final.`,
+                meta: [
+                  `Total Capture: ${formatNumber(faceOutcomeAnalytics.totalLogs)}`,
+                  `Reviewed Final: ${formatNumber(faceOutcomeAnalytics.reviewedCount)} (${formatPercentage(faceOutcomeAnalytics.reviewedCount, faceOutcomeAnalytics.totalLogs)})`,
+                  `Pending Review: ${formatNumber(faceOutcomeAnalytics.pendingCount)} (${formatPercentage(faceOutcomeAnalytics.pendingCount, faceOutcomeAnalytics.totalLogs)})`,
+                  `Verified: ${formatNumber(faceOutcomeAnalytics.verifiedCount)}`,
+                  `Rejected: ${formatNumber(faceOutcomeAnalytics.rejectedCount)}`,
+                  `Latest Capture At: ${formatDateTime(faceOutcomeAnalytics.latestCaptureAt)}`,
+                  `Latest Review At: ${formatDateTime(faceOutcomeAnalytics.latestReviewAt)}`,
+                ],
+              },
+              {
+                id: 'FACE-ANALYTICS-CONFIDENCE',
+                primary: `Avg score ${faceOutcomeAnalytics.averageMatchScore.toFixed(1)}`,
+                secondary: `HIGH ${formatNumber(faceOutcomeAnalytics.highConfidenceCount)} | MEDIUM ${formatNumber(faceOutcomeAnalytics.mediumConfidenceCount)} | LOW ${formatNumber(faceOutcomeAnalytics.lowConfidenceCount)}`,
+                status: 'ANALYTICS',
+                detail: `Distribusi confidence placeholder dihitung dari ${formatNumber(faceOutcomeAnalytics.scoreSampleSize)} capture terbaru.`,
+                meta: [
+                  `Score Sample Size: ${formatNumber(faceOutcomeAnalytics.scoreSampleSize)}`,
+                  `High Confidence: ${formatNumber(faceOutcomeAnalytics.highConfidenceCount)}`,
+                  `Medium Confidence: ${formatNumber(faceOutcomeAnalytics.mediumConfidenceCount)}`,
+                  `Low Confidence: ${formatNumber(faceOutcomeAnalytics.lowConfidenceCount)}`,
+                  `Auto Review Eligible: ${formatNumber(faceOutcomeAnalytics.autoReviewEligibleCount)}`,
+                  `Recommended Verified: ${formatNumber(faceOutcomeAnalytics.recommendedVerifiedCount)}`,
+                  `Recommended Pending Review: ${formatNumber(faceOutcomeAnalytics.recommendedPendingReviewCount)}`,
+                  `Recommended Rejected: ${formatNumber(faceOutcomeAnalytics.recommendedRejectedCount)}`,
+                ],
+              },
+              {
+                id: 'FACE-ANALYTICS-MODE',
+                primary: `Camera ${formatNumber(faceOutcomeAnalytics.cameraCaptureCount)} capture`,
+                secondary: `Manual ${formatNumber(faceOutcomeAnalytics.manualReviewCount)} capture`,
+                status: 'MODE_SPLIT',
+                detail: 'Memantau pergeseran operasional dari referensi manual ke snapshot kamera browser.',
+                meta: [
+                  `Camera Capture: ${formatNumber(faceOutcomeAnalytics.cameraCaptureCount)} (${formatPercentage(faceOutcomeAnalytics.cameraCaptureCount, faceOutcomeAnalytics.totalLogs)})`,
+                  `Manual Review Mode: ${formatNumber(faceOutcomeAnalytics.manualReviewCount)} (${formatPercentage(faceOutcomeAnalytics.manualReviewCount, faceOutcomeAnalytics.totalLogs)})`,
+                  `Total Capture: ${formatNumber(faceOutcomeAnalytics.totalLogs)}`,
+                  `Pending Review: ${formatNumber(faceOutcomeAnalytics.pendingCount)}`,
+                  `Auto Review Eligible: ${formatNumber(faceOutcomeAnalytics.autoReviewEligibleCount)}`,
+                ],
+              },
+            ]
+          : [
+              {
+                id: 'FACE-ANALYTICS-EMPTY',
+                primary: 'Analytics verifikasi wajah belum tersedia',
+                secondary: 'Belum ada capture attendance wajah',
+                status: 'NO_DATA',
+                detail: 'Ringkasan outcome akan muncul otomatis setelah attendance mulai menyimpan capture wajah.',
+                meta: [
+                  'Total Capture: 0',
+                  'Pending Review: 0',
+                  'Verified: 0',
+                  'Rejected: 0',
+                  'Score Sample Size: 0',
+                ],
+              },
+            ],
+    },
+    {
+      title: 'Geofence Attendance',
+      description:
+        'Konfigurasi titik kerja attendance untuk fondasi validasi radius check-in sebelum face recognition diaktifkan penuh.',
+      rows: [
+        geofenceConfig
+          ? {
+              id: 'ATT-GEOFENCE-1',
+              primary: geofenceConfig.locationName,
+              secondary: `${geofenceConfig.radiusMeters.toFixed(2)} meter`,
+              status: geofenceConfig.isRequired ? 'REQUIRED' : 'OPTIONAL',
+              detail: `Titik attendance aktif di ${geofenceConfig.locationName} dengan radius ${geofenceConfig.radiusMeters.toFixed(2)} meter.`,
+              meta: [
+                `Latitude: ${geofenceConfig.latitude ?? '-'}`,
+                `Longitude: ${geofenceConfig.longitude ?? '-'}`,
+                `Radius: ${geofenceConfig.radiusMeters.toFixed(2)} meter`,
+                `Required: ${geofenceConfig.isRequired ? 'Ya' : 'Tidak'}`,
+                `Updated By: ${geofenceConfig.updatedBy || '-'}`,
+                `Updated At: ${formatDateTime(geofenceConfig.updatedAt)}`,
+                `Notes: ${geofenceConfig.notes || '-'}`,
+              ],
+            }
+          : {
+              id: 'ATT-GEOFENCE-EMPTY',
+              primary: 'Geofence attendance belum diatur',
+              secondary: 'Radius belum aktif',
+              status: 'NOT_SET',
+              detail: 'Atur titik kerja dan radius attendance agar check-in lokasi bisa divalidasi dari browser.',
+              meta: ['Required: Tidak', 'Notes: Belum ada konfigurasi geofence attendance.'],
+            },
+      ],
+    },
     {
       title: 'Employee Terbaru',
       description: 'Employee master terbaru dari review DB untuk memulai fondasi absensi, payroll, dan kontrol HR.',
@@ -1630,6 +2310,160 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
       })),
     },
     {
+      title: 'Employee Face References',
+      description:
+        'Baseline referensi wajah per employee untuk menyiapkan data acuan sebelum recognition engine penuh diaktifkan pada attendance HR.',
+      rows:
+        faceReferenceItems.length > 0
+          ? faceReferenceItems.map((item) => ({
+              id: `FACE-REF-${item.employeeId}`,
+              primary: item.employeeCode,
+              secondary: item.employeeName,
+              status: item.employmentStatus,
+              detail: `Baseline wajah mode ${item.verificationMode} tersimpan dengan referensi ${item.referenceRef}.`,
+              meta: [
+                `Employee ID: ${item.employeeId}`,
+                `Reference Ref: ${item.referenceRef}`,
+                `Mode: ${item.verificationMode}`,
+                `Notes: ${item.notes || '-'}`,
+                `Updated By: ${item.updatedBy || '-'}`,
+                `Updated At: ${formatDateTime(item.updatedAt)}`,
+              ],
+            }))
+          : [
+              {
+                id: 'FACE-REF-EMPTY',
+                primary: 'Baseline referensi wajah belum tersedia',
+                secondary: 'Belum ada employee yang punya face reference',
+                status: 'NOT_SET',
+                detail: 'Simpan referensi wajah per employee agar fondasi matching nanti tidak dimulai dari nol.',
+                meta: ['Employee ID: -', 'Reference Ref: -', 'Mode: CAMERA_CAPTURE', 'Notes: -'],
+              },
+            ],
+    },
+    {
+      title: 'Face Reference Trends',
+      description:
+        'Ringkasan perkembangan baseline wajah per employee agar HR bisa melihat apakah kualitas referensi membaik, stagnan, atau perlu pengambilan baseline baru.',
+      rows:
+        faceReferenceTrendItems.length > 0
+          ? faceReferenceTrendItems.map((item) => ({
+              id: `FACE-TREND-${item.employeeId}`,
+              primary: item.employeeCode,
+              secondary: item.employeeName,
+              status: item.driftStatus,
+              detail: `Riwayat ${formatNumber(item.historyCount)} baseline dengan skor terbaru ${formatNumber(item.latestScore)} dan skor terbaik ${formatNumber(item.bestScore)}. ${item.driftReason}`,
+              meta: [
+                `History Count: ${formatNumber(item.historyCount)}`,
+                `Average Score: ${item.averageScore.toFixed(1)}`,
+                `Latest Score: ${formatNumber(item.latestScore)}`,
+                `Best Score: ${formatNumber(item.bestScore)}`,
+                `Drift Status: ${item.driftStatus}`,
+                `Gap From Average: ${item.driftGapFromAverage.toFixed(1)}`,
+                `Gap From Best: ${formatNumber(item.driftGapFromBest)}`,
+                `Drift Reason: ${item.driftReason}`,
+                `Latest Mode: ${item.latestVerificationMode}`,
+                `Latest Source: ${item.latestSourceType}`,
+                `Latest Source Ref: ${item.latestSourceRef || '-'}`,
+                `Updated By: ${item.latestUpdatedBy || '-'}`,
+                `Updated At: ${formatDateTime(item.latestCreatedAt)}`,
+              ],
+            }))
+          : [
+              {
+                id: 'FACE-TREND-EMPTY',
+                primary: 'Trend baseline wajah belum tersedia',
+                secondary: 'Belum ada histori penguatan baseline',
+                status: 'NO_DATA',
+                detail: 'Trend akan muncul setelah baseline manual atau reinforce review mulai tercatat lebih dari satu kali.',
+                meta: [
+                  'History Count: 0',
+                  'Average Score: 0.0',
+                  'Latest Score: 0',
+                  'Best Score: 0',
+                  'Drift Status: INSUFFICIENT_DATA',
+                  'Gap From Average: 0.0',
+                  'Gap From Best: 0',
+                  'Drift Reason: Histori baseline belum cukup untuk membaca tren penurunan kualitas.',
+                ],
+              },
+            ],
+    },
+    {
+      title: 'Face Reference History',
+      description:
+        'Jejak perubahan baseline wajah terbaru untuk audit operasional sebelum recognition engine penuh diaktifkan.',
+      rows:
+        faceReferenceHistoryItems.length > 0
+          ? faceReferenceHistoryItems.map((item) => ({
+              id: `FACE-HIST-${item.historyId}`,
+              primary: item.employeeCode,
+              secondary: item.employeeName,
+              status: item.sourceType,
+              detail: `Baseline ${item.referenceRef} dicatat melalui ${item.sourceType} dengan skor snapshot ${formatNumber(item.scoreSnapshot)}.`,
+              meta: [
+                `Employee ID: ${item.employeeId}`,
+                `Reference Ref: ${item.referenceRef}`,
+                `Mode: ${item.verificationMode}`,
+                `Score Snapshot: ${formatNumber(item.scoreSnapshot)}`,
+                `Source Type: ${item.sourceType}`,
+                `Source Ref: ${item.sourceRef || '-'}`,
+                `Updated By: ${item.updatedBy || '-'}`,
+                `Created At: ${formatDateTime(item.createdAt)}`,
+                `Notes: ${item.notes || '-'}`,
+              ],
+            }))
+          : [
+              {
+                id: 'FACE-HIST-EMPTY',
+                primary: 'History baseline wajah belum tersedia',
+                secondary: 'Belum ada baseline yang terekam',
+                status: 'NO_DATA',
+                detail: 'Setelah baseline manual atau reinforce pertama disimpan, jejak history akan muncul di sini.',
+                meta: ['Employee ID: -', 'Reference Ref: -', 'Mode: -', 'Score Snapshot: 0', 'Source Type: -'],
+              },
+            ],
+    },
+    {
+      title: 'Verified Face Candidates',
+      description:
+        'Capture wajah yang sudah VERIFIED dan siap dipertimbangkan sebagai baseline referensi employee untuk mengurangi input manual saat menyiapkan fondasi matching.',
+      rows:
+        verifiedFaceReferenceCandidates.length > 0
+          ? verifiedFaceReferenceCandidates.map((item) => ({
+              id: `FACE-CAND-${item.faceLogId}`,
+              primary: item.employeeCode,
+              secondary: item.employeeName,
+              status: item.employmentStatus,
+              detail: `Capture ${item.captureRef} mode ${item.verificationMode} sudah VERIFIED dan siap dijadikan kandidat baseline wajah.`,
+              meta: [
+                `Employee ID: ${item.employeeId}`,
+                `Capture Ref: ${item.captureRef}`,
+                `Mode: ${item.verificationMode}`,
+                `Reviewed At: ${formatDateTime(item.reviewedAt)}`,
+                `Current Reference Ref: ${item.currentReferenceRef || '-'}`,
+                `Current Reference Mode: ${item.currentReferenceMode || '-'}`,
+              ],
+            }))
+          : [
+              {
+                id: 'FACE-CAND-EMPTY',
+                primary: 'Belum ada kandidat baseline VERIFIED',
+                secondary: 'Capture VERIFIED belum tersedia',
+                status: 'NOT_READY',
+                detail: 'Operator HR perlu memverifikasi capture wajah dulu sebelum sistem bisa memberi kandidat baseline otomatis.',
+                meta: [
+                  'Employee ID: -',
+                  'Capture Ref: -',
+                  'Mode: -',
+                  'Reviewed At: -',
+                  'Current Reference Ref: -',
+                  'Current Reference Mode: -',
+                ],
+              },
+            ],
+    },
+    {
       title: 'Attendance Hari Ini',
       description: 'Kehadiran terbaru hari ini dari review DB untuk memastikan employee yang aktif mulai tercatat di HR.',
       rows: attendances.map((item) => ({
@@ -1639,14 +2473,21 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
         status: item.status,
         detail: `Check-in ${formatDateTime(item.checkIn)} dengan overtime ${item.overtimeHours.toFixed(2)} jam.`,
         meta: [
+          `Date: ${item.attendanceDate}`,
           `Check In: ${formatDateTime(item.checkIn)}`,
+          `Check Out: ${formatDateTime(item.checkOut)}`,
           `Overtime: ${item.overtimeHours.toFixed(2)} jam`,
+          `Lock Admin: ${Number(item.lockedByAdmin ?? 0) === 1 ? 'Ya' : 'Tidak'}`,
+          `Check In Raw: ${formatDateTimeInputValue(item.checkIn) || '-'}`,
+          `Check Out Raw: ${formatDateTimeInputValue(item.checkOut) || '-'}`,
+          `Overtime Raw: ${item.overtimeHours.toFixed(2)}`,
+          `Lock Raw: ${Number(item.lockedByAdmin ?? 0) === 1 ? '1' : '0'}`,
         ],
       })),
     },
     {
-      title: 'Loan Aktif',
-      description: 'Kasbon atau pinjaman aktif terbaru dari review DB untuk menjaga histori HR tetap terlihat dari domain yang sama.',
+      title: 'Loan Terbaru',
+      description: 'Kasbon atau pinjaman terbaru dari review DB untuk menjaga histori HR tetap terlihat, termasuk yang sudah dibatalkan secara non-destruktif.',
       rows: loans.map((item) => ({
         id: `LOAN-${item.loanId}`,
         primary: item.employeeName,
@@ -1667,12 +2508,14 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
         id: `PAYROLL-${item.salarySlipId}`,
         primary: item.employeeName,
         secondary: `${String(item.payrollMonth).padStart(2, '0')}/${item.payrollYear}`,
-        status: item.releasedAt ? 'RELEASED' : 'DRAFT',
+        status: item.voidedAt ? 'VOIDED' : item.releasedAt ? 'RELEASED' : 'DRAFT',
         detail: `Net salary ${formatCurrency(item.netSalary)} dari total income ${formatCurrency(item.totalIncome)} dan deduction ${formatCurrency(item.totalDeduction)}.`,
         meta: [
           `Income: ${formatCurrency(item.totalIncome)}`,
           `Deduction: ${formatCurrency(item.totalDeduction)}`,
           `Released: ${formatDateTime(item.releasedAt)}`,
+          `Voided: ${formatDateTime(item.voidedAt)}`,
+          `Void Reason: ${item.voidReason || '-'}`,
         ],
       })),
     },
