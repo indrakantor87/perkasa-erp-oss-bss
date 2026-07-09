@@ -35,6 +35,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) menampilkan panel TT khusus saat membuka lane `tt`
 - `VERSION` dinaikkan ke `0.63.8`
 
+## [0.63.9] - 2026-07-09
+
+### Added
+
+- panel operasional [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx) untuk menampilkan queue Isolir di halaman `/support/isolations` dengan ringkasan status, marketing, dan meta isolir yang lebih siap diproses
+
+### Changed
+
+- [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx) menampilkan panel isolir khusus saat membuka lane `isolations`
+- `VERSION` dinaikkan ke `0.63.9`
+
 ## [0.63.5] - 2026-07-08
 
 ### Added
