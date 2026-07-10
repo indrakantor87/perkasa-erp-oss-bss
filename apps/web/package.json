@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "node .next/standalone/server.js",
     "check": "tsc --noEmit",
-    "test:smoke": "tsx tests/mock-data.test.ts"
+    "test:smoke": "tsx tests/mock-data.test.ts",
+    "verify:production-env": "node ./scripts/verify-production-env.mjs",
+    "verify:health": "node ./scripts/verify-health.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.540.0",

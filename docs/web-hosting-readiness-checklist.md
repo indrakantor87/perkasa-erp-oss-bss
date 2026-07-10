@@ -59,6 +59,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - [x] Script install, build, start, dan restart service sudah jelas
 - [x] Command start production dikunci ke mode standalone (`node .next/standalone/server.js`)
 - [x] Health check endpoint atau halaman verifikasi pasca-deploy sudah ditentukan (`/api/health`)
+- [x] Validator env production dan script health verification sudah tersedia
 - [x] Rollback plan sudah disiapkan jika deploy gagal
 - [ ] PIC deploy dan PIC validasi bisnis sudah ditentukan
 
@@ -102,6 +103,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - Smoke browser `admin.perkasa` dan `support.ops` berhasil login, masuk dashboard, dan logout tanpa lagi terkena redirect `0.0.0.0`.
 - Scope dashboard KPI untuk role `NOC` sudah kembali sinkron ke `Pemasaran dan Pelayanan / NOC`, tidak jatuh ke default `Penjualan`.
 - Runbook hosting, PM2 config, dan contoh reverse proxy kini tersedia di `docs/web-hosting-runbook.md` dan `apps/web/ecosystem.config.cjs`.
+- Validator `npm run verify:production-env -- .env` dan checker `npm run verify:health -- http://127.0.0.1:3000/api/health` sudah tersedia untuk tahap deploy.
 
 ## Catatan Eksekusi Senin
 

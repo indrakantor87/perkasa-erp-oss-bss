@@ -182,6 +182,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Focus `ATTENDANCE_RATE` pada HR kini menampilkan summary agregat dari seluruh employee aktif dan attendance hari ini, mencakup `Employee Aktif`, `Attendance Hari Ini`, dan `Rasio Kehadiran`, sehingga ringkasan KPI tidak lagi bergantung pada jumlah row preview yang tampil: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
 - `VERSION` dinaikkan ke `0.64.58`
 
+## [0.64.63] - 2026-07-10
+
+### Changed
+
+- Paket deploy Senin diperkuat dengan validator env production dan checker health endpoint yang dapat dijalankan manual saat preflight/pasca-deploy: [package.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/package.json), [verify-production-env.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/verify-production-env.mjs), [verify-health.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/verify-health.mjs)
+- Runbook hosting kini mengarahkan ke command validasi baru dan file reverse proxy siap-tempel, sedangkan checklist hosting mencatat ketersediaan validator deploy: [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [perkasa-erp-web.conf](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/nginx/perkasa-erp-web.conf), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- `VERSION` dinaikkan ke `0.64.63`
+
 ## [0.64.62] - 2026-07-10
 
 ### Changed

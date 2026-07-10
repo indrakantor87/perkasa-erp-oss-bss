@@ -10,6 +10,8 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - Env template local/review: `apps/web/.env.example`
 - Env template production: `apps/web/.env.production.example`
 - PM2 config: `apps/web/ecosystem.config.cjs`
+- Env validator: `apps/web/scripts/verify-production-env.mjs`
+- Health verifier: `apps/web/scripts/verify-health.mjs`
 - Health check: `/api/health`
 - Checklist final: `docs/web-hosting-readiness-checklist.md`
 
@@ -34,13 +36,15 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 1. Masuk ke folder project dan pastikan branch/commit kandidat rilis sudah benar.
 2. Salin env production ke `apps/web/.env`.
 3. Jalankan `npm install` di `apps/web`.
-4. Jalankan `npm run check`.
-5. Jalankan `npm run test:smoke`.
-6. Jalankan `npm run build`.
-7. Jalankan `pm2 start ecosystem.config.cjs`.
-8. Simpan config PM2 dengan `pm2 save`.
-9. Arahkan Nginx ke port app (`3000`).
-10. Verifikasi `http://127.0.0.1:3000/api/health` dan domain final.
+4. Jalankan `npm run verify:production-env -- .env`.
+5. Jalankan `npm run check`.
+6. Jalankan `npm run test:smoke`.
+7. Jalankan `npm run build`.
+8. Jalankan `pm2 start ecosystem.config.cjs`.
+9. Simpan config PM2 dengan `pm2 save`.
+10. Arahkan Nginx ke port app (`3000`) memakai `docs/nginx/perkasa-erp-web.conf`.
+11. Jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`.
+12. Verifikasi domain final.
 
 ## Command Operasional PM2
 
@@ -53,30 +57,22 @@ pm2 logs perkasa-erp-web --lines 200
 pm2 save
 ```
 
+## Command Validasi
+
+```bash
+cd /path/to/perkasa-erp-oss-bss/apps/web
+npm run verify:production-env -- .env
+npm run verify:health -- http://127.0.0.1:3000/api/health
+```
+
 ## Contoh Nginx
 
-```nginx
-server {
-    listen 80;
-    server_name erp.example.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 60s;
-    }
-}
-```
+- File siap-tempel tersedia di `docs/nginx/perkasa-erp-web.conf`.
+- Ganti `server_name` sesuai domain final sebelum dipasang di server.
 
 ## Verifikasi Pasca Deploy
 
-- `curl http://127.0.0.1:3000/api/health`
+- `npm run verify:health -- http://127.0.0.1:3000/api/health`
 - Login `admin.perkasa` berhasil
 - Login `support.ops` berhasil
 - Dashboard terbuka
@@ -90,7 +86,8 @@ server {
 3. Jalankan ulang `npm install` bila lockfile/dependency berubah.
 4. Jalankan `npm run build`.
 5. Jalankan `pm2 restart perkasa-erp-web`.
-6. Ulangi verifikasi `/api/health` dan login admin.
+6. Jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`.
+7. Ulangi login admin.
 
 ## Catatan Penting
 
