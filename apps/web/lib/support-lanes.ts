@@ -49,11 +49,11 @@ const supportLaneOrder: Record<AppRole, SupportLaneKey[]> = {
   SALES_MARKETING: ['isolations', 'tt', 'dismantle', 'sla'],
   CS_OPERATOR: ['isolations', 'tt', 'dismantle', 'sla'],
   CS_ADMIN: ['isolations', 'tt', 'dismantle', 'sla'],
-  NOC_OPERATOR: ['tt', 'sla', 'isolations', 'dismantle'],
-  FIELD_TECHNICIAN: ['tt', 'sla', 'isolations', 'dismantle'],
-  TT_OPERATOR: ['tt', 'sla', 'isolations', 'dismantle'],
+  NOC_OPERATOR: ['tt', 'sla', 'isolations'],
+  FIELD_TECHNICIAN: ['tt', 'sla', 'isolations'],
+  TT_OPERATOR: ['tt', 'sla'],
   DIGITAL_CREATOR: ['tt', 'isolations', 'dismantle', 'sla'],
-  DISMANTLE_OPERATOR: ['dismantle', 'isolations', 'tt', 'sla'],
+  DISMANTLE_OPERATOR: ['dismantle', 'isolations'],
 }
 
 export function normalizeSupportLane(value: string | string[] | undefined): SupportLaneKey | null {
@@ -78,12 +78,19 @@ export function getSupportLaneOrder(role: AppRole) {
   return supportLaneOrder[role]
 }
 
+export function canAccessSupportLane(role: AppRole, lane: SupportLaneKey) {
+  return getSupportLaneOrder(role).includes(lane)
+}
+
 export function getPreferredSupportLane(role: AppRole): SupportLaneKey {
   return supportLaneOrder[role][0] ?? 'tt'
 }
 
 export function getActiveSupportLane(role: AppRole, selectedLane: SupportLaneKey | null): SupportLaneKey {
-  return selectedLane ?? getPreferredSupportLane(role)
+  if (selectedLane && canAccessSupportLane(role, selectedLane)) {
+    return selectedLane
+  }
+  return getPreferredSupportLane(role)
 }
 
 export function getSupportLaneMeta(lane: SupportLaneKey) {
@@ -207,6 +214,39 @@ export function buildSupportLaneWorkspace(
     count: snapshot.count,
     escalationNote: workspace.escalationNote,
   }
+}
+
+export function canUseSupportAction(params: {
+  role: AppRole
+  actionKey: SupportLaneActionKey
+  canCreate: boolean
+  canUpdate: boolean
+  canApprove: boolean
+}) {
+  const { role, actionKey, canCreate, canUpdate, canApprove } = params
+
+  switch (actionKey) {
+    case 'ticket-create':
+      return canCreate
+    case 'ticket-progress':
+    case 'ticket-escalate':
+    case 'ticket-close':
+      return canUpdate
+    case 'sla-manage':
+      return canApprove
+    case 'isolation-create':
+      return canCreate
+    case 'isolation-restore':
+      return canUpdate
+    case 'dismantle-approve':
+      return canApprove || role === 'DISMANTLE_OPERATOR'
+    default:
+      return false
+  }
+}
+
+export function canProcessSupportDismantle(role: AppRole, canApprove: boolean) {
+  return canApprove || role === 'DISMANTLE_OPERATOR'
 }
 
 export function buildSupportLaneReviewSummary(

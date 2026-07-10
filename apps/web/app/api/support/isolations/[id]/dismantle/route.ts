@@ -2,9 +2,10 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { canProcessSupportDismantle } from '@/lib/support-lanes'
 
 type ReviewIsolationRow = {
-  id: number
+  id: string
   customerName: string
   customerAddress: string | null
   customerPhone: string | null
@@ -19,7 +20,7 @@ function normalizeRequiredText(value: unknown) {
   return String(value ?? '').trim()
 }
 
-async function getIsolationById(id: number) {
+async function getIsolationById(id: string) {
   const [row] = await runReviewDbQuery<ReviewIsolationRow>(
     `
       SELECT
@@ -50,7 +51,7 @@ export async function POST(
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
-  if (!canPerformAction(session.role, 'support', 'approve')) {
+  if (!canProcessSupportDismantle(session.role, canPerformAction(session.role, 'support', 'approve'))) {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
 
@@ -64,8 +65,8 @@ export async function POST(
 
   try {
     const resolvedParams = await params
-    const isolationId = Number(resolvedParams.id)
-    if (!Number.isInteger(isolationId) || isolationId <= 0) {
+    const isolationId = String(resolvedParams.id ?? '').trim()
+    if (!isolationId) {
       return Response.json({ message: 'ID isolir tidak valid.' }, { status: 400 })
     }
 

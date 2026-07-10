@@ -12,8 +12,8 @@ type SupportIsolationRestoreFormProps = {
 }
 
 function extractIsolationId(value: string) {
-  const matched = value.trim().match(/^(\d+)/)
-  return matched ? matched[1] : ''
+  const [rawId] = value.split('|')
+  return rawId?.trim() ?? ''
 }
 
 export function SupportIsolationRestoreForm({

@@ -7,7 +7,7 @@ const priorityTone: Record<DashboardWorkItem['priority'], string> = {
   rendah: 'bg-emerald-50 text-emerald-700',
 }
 
-export function WorklistBoard({ items }: { items: DashboardWorkItem[] }) {
+export function WorklistBoard({ items, viewAllHref }: { items: DashboardWorkItem[]; viewAllHref: string }) {
   if (!items.length) {
     return null
   }
@@ -21,7 +21,15 @@ export function WorklistBoard({ items }: { items: DashboardWorkItem[] }) {
             Fokus operasional lintas domain
           </h2>
         </div>
-        <span className="badge">Baseline parity</span>
+        <div className="flex items-center gap-3">
+          <span className="badge">Baseline parity</span>
+          <Link
+            href={viewAllHref}
+            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+          >
+            Lihat semua
+          </Link>
+        </div>
       </div>
 
       <div className="mt-6 space-y-4">

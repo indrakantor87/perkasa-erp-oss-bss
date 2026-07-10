@@ -1,5 +1,9 @@
 import Link from 'next/link'
 import type { DashboardOperationalCard, DashboardOperationalDivisionKey } from '@/lib/types'
+import {
+  DASHBOARD_DIVISION_CLUSTERS,
+  isDivisionMenuItemIntegrated,
+} from '@/lib/dashboard-division-structure'
 
 const monthOptions = [
   { value: 1, label: 'Januari' },
@@ -27,46 +31,6 @@ const divisionOptions: Array<{ value: DashboardOperationalDivisionKey; label: st
   { value: 'BILLING', label: 'Billing' },
   { value: 'HR', label: 'HR' },
   { value: 'INVENTORY', label: 'Inventory' },
-]
-
-type DivisionCluster = {
-  title: string
-  tone: string
-  subdivisions: string[]
-  cardKeys: Array<Exclude<DashboardOperationalDivisionKey, 'ALL'>>
-}
-
-const divisionClusters: DivisionCluster[] = [
-  {
-    title: 'Pemasaran dan Pelayanan',
-    tone: 'border-sky-200 bg-sky-50 text-sky-900',
-    subdivisions: ['Penjualan', 'CS', 'Admin CS', 'NOC', 'Troubleshoots', 'Dismantle', 'Creator Digital'],
-    cardKeys: ['SALES', 'CS', 'NOC', 'TT', 'DISMANTLE', 'DIGITAL'],
-  },
-  {
-    title: 'Teknis dan Expan',
-    tone: 'border-amber-200 bg-amber-50 text-amber-900',
-    subdivisions: ['Teknisi PSB', 'Teknisi Jalur & Expan', 'Teknisi Jointer'],
-    cardKeys: [],
-  },
-  {
-    title: 'Finance dan HR',
-    tone: 'border-violet-200 bg-violet-50 text-violet-900',
-    subdivisions: ['Billing', 'HR'],
-    cardKeys: ['BILLING', 'HR'],
-  },
-  {
-    title: 'General Affair',
-    tone: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-    subdivisions: ['Inventory', 'Legal'],
-    cardKeys: ['INVENTORY'],
-  },
-  {
-    title: 'Operasional',
-    tone: 'border-slate-200 bg-slate-50 text-slate-900',
-    subdivisions: ['Kantor', 'Toko'],
-    cardKeys: [],
-  },
 ]
 
 function appendDrilldownPeriod(href: string | undefined, month: number, year: number) {
@@ -192,11 +156,11 @@ export function OperationalDivisionBoard({
         </div>
 
         <div className="mt-6 space-y-6">
-          {divisionClusters.map((cluster) => {
+          {DASHBOARD_DIVISION_CLUSTERS.map((cluster) => {
             const clusterCards = cluster.cardKeys
               .map((key) => cardByKey.get(key))
               .filter((card): card is DashboardOperationalCard => Boolean(card))
-            const integratedSubdivisions = new Set(clusterCards.map((card) => card.title))
+            const integratedCardKeys = new Set(clusterCards.map((card) => card.key))
 
             return (
               <section key={cluster.title} className="rounded-3xl border border-line bg-slate-50 p-5">
@@ -205,29 +169,28 @@ export function OperationalDivisionBoard({
                     <div className="flex flex-wrap items-center gap-3">
                       <span className={`badge border ${cluster.tone}`}>{cluster.title}</span>
                       <span className="badge border-slate-200 bg-white text-slate-600">
-                        {cluster.subdivisions.length} sub-divisi
+                        {cluster.items.length} menu
                       </span>
                     </div>
                     <p className="mt-3 text-sm leading-6 text-mute">
-                      Dashboard operasional membaca sub-divisi yang sudah aktif di ERP dan menandai area yang masih
-                      menunggu integrasi lanjutan.
+                      Dashboard operasional membaca kelompok menu per divisi dan menandai area yang sudah aktif di ERP.
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {cluster.subdivisions.map((subdivision) => {
-                    const integrated = integratedSubdivisions.has(subdivision)
+                  {cluster.items.map((item) => {
+                    const integrated = isDivisionMenuItemIntegrated(item, integratedCardKeys)
                     return (
                       <span
-                        key={`${cluster.title}-${subdivision}`}
+                        key={`${cluster.title}-${item.label}`}
                         className={`badge ${
                           integrated
                             ? 'border-transparent bg-slate-950 text-white'
                             : 'border-slate-200 bg-white text-slate-600'
                         }`}
                       >
-                        {subdivision}
+                        {item.label}
                       </span>
                     )
                   })}

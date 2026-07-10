@@ -1,8 +1,11 @@
 import {
   DAILY_ACTIVITY_PLANNING_LEVELS,
+  getDailyActivityDivisionOptions,
   isValidDailyActivityDivision,
   isValidDailyActivityPlanningLevel,
   isValidDailyActivitySubdivision,
+  normalizeDailyActivityDivisionName,
+  normalizeDailyActivitySubdivisionName,
   resolveDefaultDailyActivitySubdivision,
 } from '@/lib/daily-activity-org'
 import { getDataSourceSnapshot } from '@/lib/data-source'
@@ -61,8 +64,8 @@ export async function ensureDailyActivityUserProfileTable() {
 }
 
 function mapProfileRow(row: ProfileRow): DailyActivityUserProfile {
-  const divisionName = String(row.divisionName ?? '').trim()
-  const subdivisionName = String(row.subdivisionName ?? '').trim()
+  const divisionName = normalizeDailyActivityDivisionName(String(row.divisionName ?? ''))
+  const subdivisionName = normalizeDailyActivitySubdivisionName(String(row.subdivisionName ?? ''))
   const planningLevel = String(row.planningLevel ?? '').trim().toUpperCase()
   const updatedAt = String(row.updatedAt ?? '').trim()
 
@@ -135,13 +138,18 @@ export async function getDailyActivityUserProfile(username: string) {
 
 export async function resolveDailyActivityOrgContext(session: AppSession) {
   const roleMeta = getRoleMeta(session.role)
-  const divisionOptions = roleMeta.division ? [roleMeta.division] : []
-  const fallbackDivision = divisionOptions[0] ?? 'Teknisi'
-  const fallbackSubdivision = resolveDefaultDailyActivitySubdivision(fallbackDivision, roleMeta.subdivision)
+  const canonicalRoleDivision = normalizeDailyActivityDivisionName(roleMeta.division)
+  const fallbackDivision = isValidDailyActivityDivision(canonicalRoleDivision)
+    ? canonicalRoleDivision
+    : (getDailyActivityDivisionOptions()[0] ?? 'Pemasaran dan Pelayanan')
+  const fallbackSubdivision = resolveDefaultDailyActivitySubdivision(
+    fallbackDivision,
+    normalizeDailyActivitySubdivisionName(roleMeta.subdivision),
+  )
 
   const profile = await getDailyActivityUserProfile(session.username)
-  const rawDivision = String(profile?.divisionName ?? '').trim()
-  const rawSubdivision = String(profile?.subdivisionName ?? '').trim()
+  const rawDivision = normalizeDailyActivityDivisionName(String(profile?.divisionName ?? ''))
+  const rawSubdivision = normalizeDailyActivitySubdivisionName(String(profile?.subdivisionName ?? ''))
   const rawPlanningLevel = String(profile?.planningLevel ?? '').trim().toUpperCase()
 
   const divisionName = isValidDailyActivityDivision(rawDivision) ? rawDivision : fallbackDivision
@@ -169,8 +177,8 @@ export async function upsertDailyActivityUserProfile(params: {
   }
 
   const username = params.username.trim()
-  const divisionName = params.divisionName.trim()
-  const subdivisionName = params.subdivisionName.trim()
+  const divisionName = normalizeDailyActivityDivisionName(params.divisionName)
+  const subdivisionName = normalizeDailyActivitySubdivisionName(params.subdivisionName)
   const planningLevel = params.planningLevel.trim().toUpperCase()
 
   if (!username) {

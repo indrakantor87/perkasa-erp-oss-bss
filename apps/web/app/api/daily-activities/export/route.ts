@@ -1,9 +1,16 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
+import {
+  getDailyActivityDivisionAliases,
+  getDailyActivitySubdivisionAliases,
+  normalizeDailyActivityDivisionName,
+  normalizeDailyActivitySubdivisionName,
+} from '@/lib/daily-activity-org'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getRoleMeta } from '@/lib/role-meta'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
 import { ensureDailyActivityTable } from '@/lib/services/daily-activity-service'
+import { resolveDailyActivityOrgContext } from '@/lib/services/daily-activity-user-profile-service'
 
 type ExportRow = {
   activityDate: string
@@ -64,8 +71,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const from = getIsoDate(url.searchParams.get('from'))
     const to = getIsoDate(url.searchParams.get('to'))
-    const divisionName = String(url.searchParams.get('divisionName') ?? '').trim()
-    const subdivisionName = String(url.searchParams.get('subdivisionName') ?? '').trim()
+    const divisionName = normalizeDailyActivityDivisionName(String(url.searchParams.get('divisionName') ?? ''))
+    const subdivisionName = normalizeDailyActivitySubdivisionName(String(url.searchParams.get('subdivisionName') ?? ''))
 
     if (!from || !to) {
       return new Response('Parameter from/to wajib diisi.', { status: 400 })
@@ -75,17 +82,28 @@ export async function GET(request: Request) {
     }
 
     const roleMeta = getRoleMeta(session.role)
-    const effectiveDivision = session.role === 'SUPER_ADMIN' ? divisionName : roleMeta.division
+    const userOrg = session.role === 'SUPER_ADMIN' ? null : await resolveDailyActivityOrgContext(session)
+    const effectiveDivision = session.role === 'SUPER_ADMIN' ? divisionName : userOrg?.divisionName || roleMeta.division
     const effectiveSubdivision =
-      session.role === 'SUPER_ADMIN' ? (subdivisionName ? subdivisionName : null) : roleMeta.subdivision
+      session.role === 'SUPER_ADMIN'
+        ? (subdivisionName ? subdivisionName : null)
+        : (userOrg?.subdivisionName || roleMeta.subdivision)
 
-    const filterDivision = effectiveDivision ? 'AND COALESCE(division_name, \'\') = ?' : ''
-    const filterSubdivision =
-      typeof effectiveSubdivision === 'string' ? 'AND COALESCE(subdivision_name, \'\') = ?' : ''
+    const divisionAliases = effectiveDivision ? getDailyActivityDivisionAliases(effectiveDivision) : []
+    const subdivisionAliases =
+      effectiveDivision && typeof effectiveSubdivision === 'string' && effectiveSubdivision
+        ? getDailyActivitySubdivisionAliases(effectiveDivision, effectiveSubdivision)
+        : []
+    const filterDivision = divisionAliases.length
+      ? `AND COALESCE(division_name, '') IN (${divisionAliases.map(() => '?').join(',')})`
+      : ''
+    const filterSubdivision = subdivisionAliases.length
+      ? `AND COALESCE(subdivision_name, '') IN (${subdivisionAliases.map(() => '?').join(',')})`
+      : ''
 
     const args = [from, to]
-    if (effectiveDivision) args.push(effectiveDivision)
-    if (typeof effectiveSubdivision === 'string') args.push(effectiveSubdivision)
+    args.push(...divisionAliases)
+    args.push(...subdivisionAliases)
 
     const rows = await runReviewDbQuery<ExportRow>(
       `
@@ -149,8 +167,8 @@ export async function GET(request: Request) {
         row.activityDate,
         row.activityCode,
         row.planningLevel,
-        row.divisionName ?? '',
-        row.subdivisionName ?? '',
+        normalizeDailyActivityDivisionName(row.divisionName ?? ''),
+        normalizeDailyActivitySubdivisionName(row.subdivisionName ?? ''),
         row.taskTitle,
         row.taskDetail ?? '',
         row.successMetric ?? '',

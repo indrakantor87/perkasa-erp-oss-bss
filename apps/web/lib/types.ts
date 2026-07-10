@@ -157,6 +157,17 @@ export type DashboardWorkItem = {
   href: string
 }
 
+export type WorklistItem = DashboardWorkItem & {
+  queue: string
+  actionLabel: string
+  reason?: string
+  dueLabel?: string
+  owner?: string
+  nextAction?: string
+  blockingInfo?: string
+  prefillToken?: string
+}
+
 export type ModuleCard = {
   title: string
   href: string

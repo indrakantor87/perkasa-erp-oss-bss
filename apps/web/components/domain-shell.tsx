@@ -61,7 +61,7 @@ import { SupportTroubleTicketQueuePanel } from '@/components/support-tt-queue-pa
 import { DataSourceStatus } from '@/components/data-source-status'
 import { getRoleMeta } from '@/lib/role-meta'
 import { getSupportActionAnchorId } from '@/lib/support-action-links'
-import { getSupportLanePath } from '@/lib/support-lanes'
+import { canProcessSupportDismantle, canUseSupportAction, getSupportLanePath } from '@/lib/support-lanes'
 import type {
   AppRole,
   DomainCapability,
@@ -982,15 +982,15 @@ const domainOperationalBlueprints: Record<
   billing: {
     focusTitle: 'Invoice, payment, collection, suspend, dan reconnect secara operasional',
     focusDescription:
-      'Menu Billing diarahkan untuk mengendalikan invoice recurring maupun one-time, pembayaran, collection follow-up, serta jalur suspend/reconnect.',
+      'Menu Billing diarahkan untuk mengendalikan invoice recurring maupun one-time, customer aktif, kasus isolir, pembayaran, collection follow-up, serta jalur suspend/reconnect.',
     flows: [
-      { title: 'Generate -> Review Invoice', detail: 'Bentuk invoice recurring atau one-time dari layanan aktif yang valid.' },
-      { title: 'Collection -> Promise', detail: 'Pisahkan follow-up, promise to pay, dan suspend-ready secara jelas.' },
-      { title: 'Payment -> Reconnect', detail: 'Bersihkan action terbuka dan dorong pemulihan layanan saat syarat terpenuhi.' },
+      { title: 'Customer -> Invoice', detail: 'Bentuk invoice recurring atau one-time dari customer dan layanan aktif yang valid.' },
+      { title: 'Isolir -> Suspend', detail: 'Samakan kasus isolir aktif dengan keputusan suspend, collection, dan restore secara jelas.' },
+      { title: 'Payment -> Reconnect', detail: 'Bersihkan action terbuka dan dorong pemulihan layanan saat syarat pembayaran terpenuhi.' },
     ],
     integrations: [
-      { label: 'Customer', href: '/customers', description: 'Invoice dan payment membaca subscription customer yang aktif.' },
-      { label: 'Support', href: '/support', description: 'Suspend, reconnect, dan isolir perlu ritme operasional yang sinkron.' },
+      { label: 'Customer', href: '/customers', description: 'Invoice, payment, dan aging tagihan membaca customer serta subscription yang sama.' },
+      { label: 'Support', href: '/support', description: 'Isolir, suspend, reconnect, dan keputusan restore perlu ritme operasional yang sinkron.' },
       { label: 'Sales', href: '/sales', description: 'Aktivasi subscription baru dan charge one-time berasal dari proses komersial.' },
     ],
   },
@@ -1827,7 +1827,7 @@ export function DomainShell({
   }> = []
 
   if (content.key === 'support') {
-    if (canCreate) {
+    if (canUseSupportAction({ role, actionKey: 'ticket-create', canCreate, canUpdate, canApprove })) {
       supportForms.push({
         key: 'ticket-create',
         lanes: ['tt'],
@@ -1841,7 +1841,7 @@ export function DomainShell({
       })
     }
 
-    if (canUpdate) {
+    if (canUseSupportAction({ role, actionKey: 'ticket-progress', canCreate, canUpdate, canApprove })) {
       supportForms.push(
         {
           key: 'ticket-progress',
@@ -1882,7 +1882,7 @@ export function DomainShell({
       )
     }
 
-    if (canApprove) {
+    if (canUseSupportAction({ role, actionKey: 'sla-manage', canCreate, canUpdate, canApprove })) {
       supportForms.push({
         key: 'sla-manage',
         lanes: ['tt', 'sla'],
@@ -1897,7 +1897,7 @@ export function DomainShell({
       })
     }
 
-    if (canCreate) {
+    if (canUseSupportAction({ role, actionKey: 'isolation-create', canCreate, canUpdate, canApprove })) {
       supportForms.push({
         key: 'isolation-create',
         lanes: ['isolations'],
@@ -1912,7 +1912,7 @@ export function DomainShell({
       })
     }
 
-    if (canUpdate) {
+    if (canUseSupportAction({ role, actionKey: 'isolation-restore', canCreate, canUpdate, canApprove })) {
       supportForms.push({
         key: 'isolation-restore',
         lanes: ['isolations'],
@@ -1927,13 +1927,13 @@ export function DomainShell({
       })
     }
 
-    if (canApprove) {
+    if (canUseSupportAction({ role, actionKey: 'dismantle-approve', canCreate, canUpdate, canApprove })) {
       supportForms.push({
         key: 'dismantle-approve',
         lanes: ['isolations', 'dismantle'],
         element: (
           <SupportDismantleForm
-            canApprove={canApprove}
+            canProcess={canProcessSupportDismantle(role, canApprove)}
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
             isolationSuggestions={supportIsolationSuggestions}
             initialIsolationValue={supportPrefill?.isolation}

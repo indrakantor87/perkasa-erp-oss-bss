@@ -1,5 +1,6 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
+import { normalizeDailyActivityDivisionName, normalizeDailyActivitySubdivisionName } from '@/lib/daily-activity-org'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 import { ensureDailyActivityTable } from '@/lib/services/daily-activity-service'
@@ -111,8 +112,12 @@ export async function PATCH(request: Request) {
       }
 
       if (session.role !== 'SUPER_ADMIN') {
-        const sameDivision = String(item.divisionName ?? '').trim() === userOrg?.divisionName.trim()
-        const sameSubdivision = String(item.subdivisionName ?? '').trim() === userOrg?.subdivisionName.trim()
+        const sameDivision =
+          normalizeDailyActivityDivisionName(String(item.divisionName ?? '')) ===
+          normalizeDailyActivityDivisionName(userOrg?.divisionName ?? '')
+        const sameSubdivision =
+          normalizeDailyActivitySubdivisionName(String(item.subdivisionName ?? '')) ===
+          normalizeDailyActivitySubdivisionName(userOrg?.subdivisionName ?? '')
         if (!sameDivision || !sameSubdivision) {
           return Response.json(
             { message: `Aktivitas ${item.activityCode} di luar divisi/sub-divisi Anda, batch dibatalkan.` },

@@ -35,6 +35,18 @@ export const mockAuthUsers: MockAuthUser[] = [
     role: 'SUPER_ADMIN',
   },
   {
+    username: 'marketing.review',
+    password: 'MarketingReview123!',
+    displayName: 'Marketing Review',
+    role: 'SALES_MARKETING',
+  },
+  {
+    username: 'cs.operator',
+    password: 'CsOperator123!',
+    displayName: 'Operator CS Review',
+    role: 'CS_OPERATOR',
+  },
+  {
     username: 'cs.review',
     password: 'CsReview123!',
     displayName: 'Admin CS Review',
@@ -45,6 +57,30 @@ export const mockAuthUsers: MockAuthUser[] = [
     password: 'SupportOps123!',
     displayName: 'Operator NOC Support',
     role: 'NOC_OPERATOR',
+  },
+  {
+    username: 'tt.review',
+    password: 'TtReview123!',
+    displayName: 'TT Operator Review',
+    role: 'TT_OPERATOR',
+  },
+  {
+    username: 'dismantle.review',
+    password: 'DismantleReview123!',
+    displayName: 'Dismantle Review',
+    role: 'DISMANTLE_OPERATOR',
+  },
+  {
+    username: 'creator.review',
+    password: 'CreatorReview123!',
+    displayName: 'Creator Digital Review',
+    role: 'DIGITAL_CREATOR',
+  },
+  {
+    username: 'field.review',
+    password: 'FieldReview123!',
+    displayName: 'Field Technician Review',
+    role: 'FIELD_TECHNICIAN',
   },
 ]
 

@@ -1,5 +1,6 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
+import { normalizeDailyActivityDivisionName, normalizeDailyActivitySubdivisionName } from '@/lib/daily-activity-org'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { ensureDailyActivityTable } from '@/lib/services/daily-activity-service'
@@ -95,8 +96,12 @@ export async function PATCH(request: Request) {
 
     if (session.role !== 'SUPER_ADMIN') {
       const userOrg = await resolveDailyActivityOrgContext(session)
-      const sameDivision = String(activity.divisionName ?? '').trim() === userOrg.divisionName.trim()
-      const sameSubdivision = String(activity.subdivisionName ?? '').trim() === userOrg.subdivisionName.trim()
+      const sameDivision =
+        normalizeDailyActivityDivisionName(String(activity.divisionName ?? '')) ===
+        normalizeDailyActivityDivisionName(userOrg.divisionName)
+      const sameSubdivision =
+        normalizeDailyActivitySubdivisionName(String(activity.subdivisionName ?? '')) ===
+        normalizeDailyActivitySubdivisionName(userOrg.subdivisionName)
       if (!sameDivision || !sameSubdivision) {
         return Response.json({ message: 'Approval hanya diizinkan untuk divisi/sub-divisi Anda.' }, { status: 403 })
       }

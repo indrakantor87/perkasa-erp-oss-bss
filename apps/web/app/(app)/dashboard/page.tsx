@@ -18,6 +18,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getRoleMeta } from '@/lib/role-meta'
 import { listMergedDashboardKpiDefinitions, resolveDashboardKpiManagerScope } from '@/lib/services/dashboard-kpi-service'
 import { getDashboardPageData } from '@/lib/services/dashboard-service'
+import { buildWorklistHref } from '@/lib/services/worklist-service'
 import type { DashboardOperationalDivisionKey } from '@/lib/types'
 import type { AppRole } from '@/lib/types'
 import { getVisibleModuleCards } from '@/lib/ui-access'
@@ -125,6 +126,7 @@ export default async function DashboardPage({
         subdivisionName: initialKpiSubdivision,
       }).catch(() => [])
     : []
+  const worklistHref = buildWorklistHref(session.role)
 
   return (
     <div className="space-y-6">
@@ -181,7 +183,7 @@ export default async function DashboardPage({
 
       <section className="grid items-start gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-6">
-          <WorklistBoard items={worklist} />
+          <WorklistBoard items={worklist} viewAllHref={worklistHref} />
           <ActivityFeed items={activities} />
         </div>
         <div className="space-y-6">

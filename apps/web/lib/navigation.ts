@@ -21,6 +21,13 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
     icon: LayoutDashboard,
   },
   {
+    title: 'List Kerja',
+    href: '/dashboard/worklist',
+    description: 'Queue lintas domain untuk tindak lanjut harian',
+    tone: 'bg-slate-700 text-white',
+    icon: SquareKanban,
+  },
+  {
     title: 'Daily Activity',
     href: '/dashboard/daily-activity',
     description: 'Plan pagi dan closing sore aktivitas harian',
@@ -44,14 +51,14 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
   {
     title: 'Customer',
     href: '/customers',
-    description: 'Customer master dan subscription',
+    description: 'Master layanan pelanggan untuk Billing dan CS',
     tone: 'bg-indigo-600 text-white',
     icon: Users,
   },
   {
-    title: 'Support',
+    title: 'NOC & Troubleshoots',
     href: '/support',
-    description: 'TT, isolir, dan dismantle',
+    description: 'Payung support teknis untuk NOC, Troubleshoots, ticket, dan kontrol SLA',
     tone: 'bg-amber-500 text-slate-950',
     icon: Wrench,
   },
@@ -72,7 +79,7 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
   {
     title: 'Billing',
     href: '/billing',
-    description: 'Invoice, payment, dan collection',
+    description: 'Invoice, customer, isolir, payment, dan collection',
     tone: 'bg-rose-600 text-white',
     icon: BadgeDollarSign,
   },

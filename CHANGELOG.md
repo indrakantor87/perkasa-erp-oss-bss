@@ -23,6 +23,46 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.64.69] - 2026-07-11
+
+### Changed
+
+- Struktur navigasi ERP kini benar-benar mengikuti pembagian organisasi yang ditetapkan bisnis: `Pusat Kendali` dipaksa berurutan `Dashboard -> Daily Activity -> Import Center -> List Kerja`, sidebar dikelompokkan per divisi besar, dan pembacaan ownership baru ditegaskan sehingga `Customer` dibaca lewat `Billing`, `isolir` dikelola `Finance/Billing`, `dismantle` dikelola `CS & Admin CS`, dan `NOC & Troubleshoots` fokus ke `TT` serta `SLA`: [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx), [navigation.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/navigation.ts), [dashboard-division-structure.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/dashboard-division-structure.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Dashboard dan landing organisasi kini memakai source of truth baru untuk lima kelompok bisnis serta route workspace nyata bagi `CS & Admin CS`, `Legal`, `Teknisi PSB`, `Teknisi Expan`, `Teknisi Jointer`, `Kantor`, dan `Toko`, sehingga struktur organisasi tidak lagi berhenti sebagai placeholder visual: [division-structure-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/division-structure-board.tsx), [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx), [organization-workspace-page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/organization-workspace-page.tsx), [organization-workspaces.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/organization-workspaces.ts), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/customers/cs-admin/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/inventory/legal/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/inventory/kantor/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/inventory/toko/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-psb/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-expan/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-jointer/page.tsx)
+- `List Kerja Terpadu` dan workspace turunan kini diperdalam untuk role prioritas serta menu organisasi baru, mencakup queue supervisor `CS_ADMIN`, paritas `SALES_MARKETING`/`CS_OPERATOR`/`DIGITAL_CREATOR`, serta landing fokus operasional berbeda untuk `Teknisi PSB`, `Teknisi Expan`, `Teknisi Jointer`, `Kantor`, `Toko`, dan `Legal`: [worklist-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/worklist-service.ts), [worklist-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/worklist-board.tsx), [organization-workspaces.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/organization-workspaces.ts), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Paket kesiapan deploy dan cutover ikut dilengkapi dengan template env production final, checklist deploy rehearsal, pembaruan readiness/UAT/go-live, serta dokumentasi hosting agar batch integrasi ERP ini siap diteruskan ke tahap push dan deployment: [.env.production.final.template](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/.env.production.final.template), [web-deploy-rehearsal-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-deploy-rehearsal-checklist.md), [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md), [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md), [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [docs/README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Panel detail `List Kerja` tidak lagi mempertahankan item stale saat hasil filter kosong, lane support tidak lagi membocorkan review mock ketika data live valid tetapi kosong, parser identifier isolir restore/dismantle sudah membaca token penuh sebelum separator, dan item `Customer` tidak lagi tersisa sebagai menu mandiri di sidebar karena ownership-nya kini benar-benar diserap ke `Billing`: [worklist-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/worklist-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [support-isolation-restore-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-restore-form.tsx), [support-dismantle-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-form.tsx), [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx)
+- `VERSION` dinaikkan ke `0.64.69` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.68] - 2026-07-10
+
+### Fixed
+
+- Lane `support` tidak lagi mempertahankan `reviewSections` mock saat query review DB valid tetapi hasilnya kosong, sehingga KPI live dan queue support kini konsisten dan item mock stale seperti `ISO-2026-0042` tidak bocor lagi ke form restore/dismantle: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Panel detail `List Kerja` tidak lagi jatuh ke item dasar saat hasil filter kosong, sehingga queue seperti `Lainnya` atau queue kosong supervisor kini benar-benar menampilkan state kosong tanpa detail stale di sisi kanan: [worklist-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/worklist-service.ts)
+- Parser identifier isolir pada form restore/dismantle kini mengambil token penuh sebelum separator `|`, sehingga prefill kode isolir tidak lagi terpotong hanya ke digit awal: [support-isolation-restore-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-restore-form.tsx), [support-dismantle-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-form.tsx)
+- `VERSION` dinaikkan ke `0.64.68`
+
+## [0.64.67] - 2026-07-10
+
+### Changed
+
+- Fallback auth lokal kini menyediakan akun mock untuk `SALES_MARKETING`, `CS_OPERATOR`, `TT_OPERATOR`, `DISMANTLE_OPERATOR`, `DIGITAL_CREATOR`, dan `FIELD_TECHNICIAN`, sehingga smoke UAT lintas role dapat dijalankan tanpa bergantung pada user review DB: [auth-session.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/auth-session.ts)
+- Sampling browser lokal di `localhost:3000` kini berhasil memverifikasi login, dashboard, `List Kerja`, dan halaman target untuk role mock `SUPER_ADMIN`, `NOC_OPERATOR`, `CS_ADMIN`, `SALES_MARKETING`, `CS_OPERATOR`, `TT_OPERATOR`, `DISMANTLE_OPERATOR`, dan `DIGITAL_CREATOR`; hasilnya dipakai sebagai bukti readiness berbasis UI awal untuk fase UAT berikutnya.
+- `VERSION` dinaikkan ke `0.64.67`
+
+## [0.64.66] - 2026-07-10
+
+### Changed
+
+- Matriks readiness cutover per role diperbarui agar mencerminkan kondisi terbaru `List Kerja`, supervisory flow `CS_ADMIN`, presisi mikro-role `DISMANTLE_OPERATOR`, dan workspace awal `DIGITAL_CREATOR`, sehingga status `PILOT / PARTIAL / NO-GO` tidak lagi memakai baseline lama sebelum batch readiness terbaru: [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md)
+- Checklist UAT `Pemasaran dan Pelayanan` kini memasukkan validasi `List Kerja` untuk `SALES_MARKETING` dan `CS_OPERATOR`, queue supervisor `CS_ADMIN`, serta workspace awal `DIGITAL_CREATOR` agar bukti UAT mengikuti workflow yang benar-benar hidup saat ini: [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md)
+- Checklist go-live Senin diperbarui agar validasi bisnis minimum untuk `SALES_MARKETING`, `CS_OPERATOR`, dan `CS_ADMIN` juga memeriksa workspace `List Kerja` serta queue supervisor, bukan hanya kemampuan membuka domain: [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+- `VERSION` dinaikkan ke `0.64.66`
+
 ## [0.64.39] - 2026-07-10
 
 ### Changed
@@ -181,6 +221,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Focus `ACTIVATION_RATE` pada Sales kini menampilkan summary agregat yang dihitung dari query penuh, mencakup `Order Periode`, `Aktivasi`, dan `Rasio Aktivasi`, lalu ditempelkan pada section order pembanding dan subscription aktivasi agar pembilang-penyebut langsung terbaca bersama row detail: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
 - Focus `ATTENDANCE_RATE` pada HR kini menampilkan summary agregat dari seluruh employee aktif dan attendance hari ini, mencakup `Employee Aktif`, `Attendance Hari Ini`, dan `Rasio Kehadiran`, sehingga ringkasan KPI tidak lagi bergantung pada jumlah row preview yang tampil: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
 - `VERSION` dinaikkan ke `0.64.58`
+
+## [0.64.65] - 2026-07-10
+
+### Changed
+
+- Paket kesiapan deploy production dilengkapi dengan template env final yang siap disalin ke server serta checklist rehearsal deploy untuk latihan pra go-live: [.env.production.final.template](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/.env.production.final.template), [web-deploy-rehearsal-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-deploy-rehearsal-checklist.md)
+- Runbook hosting, indeks dokumentasi, dan checklist readiness diselaraskan agar tim dapat bergerak dari template env final ke rehearsal lalu ke cutover hari-H tanpa improvisasi tambahan: [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [docs/README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- `VERSION` dinaikkan ke `0.64.65`
 
 ## [0.64.64] - 2026-07-10
 

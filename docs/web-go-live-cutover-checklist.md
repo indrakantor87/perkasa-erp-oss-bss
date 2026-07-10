@@ -157,6 +157,7 @@ Semua poin ini harus lulus sebelum validasi bisnis:
 - berhasil login
 - `sales` dan `customers` terbuka
 - dashboard sesuai perspektif role
+- `List Kerja` marketing menampilkan queue lead/customer/coverage/order
 - tidak melihat menu teknis yang tidak relevan
 
 ### 6. `CS_OPERATOR`
@@ -164,6 +165,7 @@ Semua poin ini harus lulus sebelum validasi bisnis:
 - berhasil login
 - `sales`, `customers`, `support`, dan `inventory` terbuka
 - dashboard sesuai perspektif role
+- `List Kerja` operator menampilkan queue lintas input/order/support/ODP
 - perpindahan lintas domain utama tetap lancar
 
 ### 7. `CS_ADMIN`
@@ -171,6 +173,7 @@ Semua poin ini harus lulus sebelum validasi bisnis:
 - berhasil login
 - dashboard supervisor terbuka
 - domain lintas sales/customers/support/inventory bisa dibuka
+- queue `Perlu Approval`, `Perlu Koreksi`, atau `Transfer atau Restore` terbaca dari perspektif supervisor
 - capability admin yang terlihat sesuai role
 
 ## Kriteria Go-Live

@@ -107,6 +107,9 @@
 - `web-go-live-cutover-checklist.md`  
   Checklist hari-H untuk deploy Senin, mencakup timeline cutover, PIC minimum, kriteria `go / pilot / rollback`, dan validasi bisnis minimum per role fondasi.
 
+- `web-deploy-rehearsal-checklist.md`  
+  Checklist latihan deploy sebelum hari-H, termasuk command rehearsal, data durasi yang harus dicatat, dan kriteria rehearsal berhasil.
+
 - `web-list-kerja-terpadu-implementation-spec.md`  
   Spesifikasi implementasi route `/dashboard/worklist` untuk modul `List Kerja Terpadu`, termasuk kontrak data, query param, tab queue, layout, dan integrasi dashboard.
 

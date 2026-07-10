@@ -4,7 +4,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 type ReviewIsolationRow = {
-  id: number
+  id: string
   customerName: string
   status: string
   restorationDate: string | Date | null
@@ -14,7 +14,7 @@ function normalizeRequiredText(value: unknown) {
   return String(value ?? '').trim()
 }
 
-async function getIsolationById(id: number) {
+async function getIsolationById(id: string) {
   const [row] = await runReviewDbQuery<ReviewIsolationRow>(
     `
       SELECT
@@ -54,8 +54,8 @@ export async function POST(
 
   try {
     const resolvedParams = await params
-    const isolationId = Number(resolvedParams.id)
-    if (!Number.isInteger(isolationId) || isolationId <= 0) {
+    const isolationId = String(resolvedParams.id ?? '').trim()
+    if (!isolationId) {
       return Response.json({ message: 'ID isolir tidak valid.' }, { status: 400 })
     }
 

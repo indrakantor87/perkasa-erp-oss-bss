@@ -87,6 +87,7 @@ Semua role pada fase awal wajib lolos:
 |---|---|---|
 | login marketing | berhasil masuk | sesi aktif |
 | lihat dashboard marketing | kartu dan ringkasan sesuai penjualan | dashboard tampil sesuai role |
+| buka list kerja marketing | queue lead, customer, coverage, dan order tampil sesuai role | tab atau panel kerja tampil |
 | create lead | lead baru berhasil dibuat | row lead baru muncul |
 | update lead follow up | status, note, atau tindak lanjut tersimpan | histori lead berubah |
 | lengkapi customer awal | data customer draft dapat dibuat atau diperbarui | data customer tersimpan |
@@ -96,7 +97,7 @@ Semua role pada fase awal wajib lolos:
 ### Kriteria tambahan
 
 1. role ini harus bisa bekerja tanpa kebingungan berpindah menu terlalu banyak
-2. bila `List Kerja Terpadu` belum hidup penuh, status maksimal tetap `partial`
+2. `List Kerja Terpadu` harus menjadi workspace nyata, tetapi status tetap maksimal `partial` bila parity aktivitas marketing harian belum ada
 
 ## 3. `CS_OPERATOR`
 
@@ -116,7 +117,7 @@ Semua role pada fase awal wajib lolos:
 ### Kriteria tambahan
 
 1. jika operator masih harus bolak-balik banyak domain untuk kerja dasar, status tetap `partial`
-2. `List Kerja Terpadu` menjadi bukti utama naiknya readiness role ini
+2. `List Kerja Terpadu` menjadi bukti utama naiknya readiness role ini dan harus diuji sebagai workspace utama, bukan sekadar menu tambahan
 
 ## 4. `CS_ADMIN`
 
@@ -127,14 +128,16 @@ Semua role pada fase awal wajib lolos:
 | login admin CS | berhasil masuk | sesi aktif |
 | seluruh flow `CS_OPERATOR` | semua flow operator lolos di role admin | hasil uji operator tervalidasi |
 | lihat queue tim CS | daftar item tim dapat dibaca dari perspektif supervisor | queue supervisor tampil |
-| approval aksi CS | approve pada form atau queue target berjalan | status approval berubah |
-| koreksi data operasional | edit korektif berhasil dan terekam | histori atau audit berubah |
-| transfer atau restore support | flow transfer atau restore berjalan sesuai policy | perubahan status atau owner tercatat |
+| approval aksi CS | queue `Perlu Approval` dapat dibuka dan approve/reject berjalan | status approval berubah |
+| koreksi data operasional | queue `Perlu Koreksi` dapat dibuka dan catatan revisi terbaca | histori atau audit berubah |
+| transfer atau restore support | queue `Transfer atau Restore` berjalan sesuai policy | perubahan status atau owner tercatat |
+| tangani backlog risiko tinggi | queue `Queue Risiko Tinggi` dapat dibuka dari perspektif supervisor | keputusan eskalasi atau tindak lanjut tercatat |
 
 ### Kriteria tambahan
 
 1. role ini tidak cukup hanya bisa membaca, tetapi harus punya flow supervisi yang nyata
 2. audit action berisiko tinggi wajib terlihat sebelum status role bisa naik
+3. `List Kerja` supervisor harus menjadi bukti utama bahwa admin CS tidak lagi mewarisi ritme operator biasa
 
 ## 5. `NOC_OPERATOR`
 
@@ -197,15 +200,15 @@ Semua role pada fase awal wajib lolos:
 | Flow | Kriteria lulus | Bukti |
 |---|---|---|
 | login creator digital | berhasil masuk | sesi aktif |
-| lihat workspace creator | ada area kerja yang relevan untuk creator | halaman atau section tampil |
+| lihat workspace creator | ada area kerja awal yang relevan untuk creator di dashboard atau `List Kerja` | halaman atau section tampil |
+| lihat digital leads | lead/order/survey digital tampil dengan konteks yang tepat | daftar lead tampil |
+| lihat analytics awal | review funnel channel digital tersedia | dashboard analytics tampil |
 | buat atau ubah campaign | fitur campaign tersedia | data campaign tersimpan |
-| lihat digital leads | lead digital tampil dengan konteks yang tepat | daftar lead tampil |
-| lihat analytics | metrik creator tersedia | dashboard analytics tampil |
 
 ### Keputusan UAT
 
 1. role ini saat ini dipakai untuk mengukur gap, bukan untuk target lulus fase awal
-2. bila sebagian besar flow masih belum ada, status tetap `fail` atau `partial`
+2. workspace awal boleh `pass`, tetapi bila `campaign` dan write-side creator belum ada maka hasil akhir tetap `fail` atau maksimal `partial`
 
 ## Aturan Lulus Per Role
 
@@ -244,8 +247,8 @@ Urutan UAT fase awal:
 Alasan:
 
 1. role teknis di bawah `Pemasaran dan Pelayanan` paling dekat ke pilot
-2. role bisnis masih bergantung pada kematangan `List Kerja Terpadu`
-3. `DIGITAL_CREATOR` tetap diuji terakhir karena masih dominan gap parity
+2. role bisnis kini bergantung pada pembuktian UAT `List Kerja Terpadu` sebagai workspace harian
+3. `DIGITAL_CREATOR` tetap diuji terakhir karena masih dominan gap parity walau sudah punya workspace awal
 
 ## Hubungan Dengan Cutover
 
@@ -259,4 +262,4 @@ Dokumen ini dipakai untuk:
 
 Dokumen ini dirilis pada:
 
-- `0.64.42` untuk checklist UAT yang diselaraskan dengan struktur divisi dashboard terbaru
+- `0.64.66` untuk checklist UAT yang diselaraskan dengan implementasi `List Kerja`, queue supervisor `CS_ADMIN`, dan workspace awal `DIGITAL_CREATOR`

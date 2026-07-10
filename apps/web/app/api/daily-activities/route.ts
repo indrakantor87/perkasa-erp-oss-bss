@@ -4,6 +4,8 @@ import {
   isValidDailyActivityDivision,
   isValidDailyActivityPlanningLevel,
   isValidDailyActivitySubdivision,
+  normalizeDailyActivityDivisionName,
+  normalizeDailyActivitySubdivisionName,
 } from '@/lib/daily-activity-org'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute } from '@/lib/review-db'
@@ -56,8 +58,8 @@ export async function POST(request: Request) {
     let planningLevel = String(payload.planningLevel ?? '')
       .trim()
       .toUpperCase()
-    let divisionName = String(payload.divisionName ?? '').trim()
-    let subdivisionName = String(payload.subdivisionName ?? '').trim()
+    let divisionName = normalizeDailyActivityDivisionName(String(payload.divisionName ?? ''))
+    let subdivisionName = normalizeDailyActivitySubdivisionName(String(payload.subdivisionName ?? ''))
     const taskTitle = String(payload.taskTitle ?? '').trim()
     const taskDetail = String(payload.taskDetail ?? '').trim()
     const successMetric = String(payload.successMetric ?? '').trim()
@@ -70,6 +72,9 @@ export async function POST(request: Request) {
       planningLevel = userOrg.planningLevel
       divisionName = userOrg.divisionName
       subdivisionName = userOrg.subdivisionName
+    } else {
+      divisionName = normalizeDailyActivityDivisionName(divisionName)
+      subdivisionName = normalizeDailyActivitySubdivisionName(subdivisionName)
     }
 
     if (!activityDate || Number.isNaN(new Date(activityDate).getTime())) {

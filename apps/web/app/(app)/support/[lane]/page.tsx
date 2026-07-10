@@ -3,7 +3,7 @@ import { canAccessPath } from '@/lib/access-control-server'
 import { DomainShell } from '@/components/domain-shell'
 import { requireSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
-import { normalizeSupportLane } from '@/lib/support-lanes'
+import { canAccessSupportLane, getPreferredSupportLane, normalizeSupportLane } from '@/lib/support-lanes'
 import type { SupportDrilldownContext, SupportLaneKey } from '@/lib/types'
 
 type SupportLaneParams = {
@@ -109,6 +109,9 @@ export default async function SupportLanePage({
   const pathname = `/support/${normalizedLane}`
   if (!canAccessPath(session.role, pathname)) {
     redirect('/dashboard')
+  }
+  if (!canAccessSupportLane(session.role, normalizedLane)) {
+    redirect(`/support/${getPreferredSupportLane(session.role)}`)
   }
 
   const payload = await getDomainPageData('support', session.role, {

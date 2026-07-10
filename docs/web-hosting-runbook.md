@@ -9,12 +9,14 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - App: `apps/web`
 - Env template local/review: `apps/web/.env.example`
 - Env template production: `apps/web/.env.production.example`
+- Env template final: `apps/web/.env.production.final.template`
 - PM2 config: `apps/web/ecosystem.config.cjs`
 - Env validator: `apps/web/scripts/verify-production-env.mjs`
 - Health verifier: `apps/web/scripts/verify-health.mjs`
 - Health check: `/api/health`
 - Checklist final: `docs/web-hosting-readiness-checklist.md`
 - Checklist hari-H: `docs/web-go-live-cutover-checklist.md`
+- Checklist rehearsal: `docs/web-deploy-rehearsal-checklist.md`
 
 ## Prasyarat Server
 

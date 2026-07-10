@@ -1,4 +1,10 @@
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
+import {
+  getDailyActivityDivisionAliases,
+  getDailyActivitySubdivisionAliases,
+  normalizeDailyActivityDivisionName,
+  normalizeDailyActivitySubdivisionName,
+} from '@/lib/daily-activity-org'
 import { resolveDashboardKpiTemplateDrilldown } from '@/lib/dashboard-kpi-config'
 import {
   dashboardActivities,
@@ -118,6 +124,69 @@ type DashboardLeadRow = {
   source: string | null
 }
 
+type DashboardMarketingCustomerRow = {
+  customerId: number
+  customerCode: string | null
+  customerName: string
+  phone: string | null
+  email: string | null
+  address: string | null
+}
+
+type DashboardCoverageRow = {
+  coverageId: number
+  areaCode: string
+  areaName: string
+  coverageStatus: string
+  village: string | null
+  district: string | null
+}
+
+type DashboardMarketingOrderRow = {
+  orderId: number
+  orderNo: string
+  customerName: string
+  status: string
+  orderType: string | null
+  marketingName: string | null
+  requestDate: string | null
+}
+
+type DashboardOdpPortIssueRow = {
+  portId: number
+  odpCode: string
+  portNo: string
+  portStatus: string
+  customerCode: string | null
+  serviceNo: string | null
+  installedAt: string | null
+}
+
+type DashboardDigitalOrderRow = {
+  orderId: number
+  orderNo: string
+  customerName: string
+  status: string
+  source: string | null
+  orderType: string | null
+  requestDate: string | null
+}
+
+type DashboardDigitalSurveyRow = {
+  surveyId: number
+  surveyNo: string
+  customerName: string
+  status: string
+  source: string | null
+  feasibilityStatus: string | null
+  scheduledAt: string | null
+}
+
+type DashboardDigitalSourceSummaryRow = {
+  source: string | null
+  totalOpen: number
+}
+
 type DashboardSupportRow = {
   ticketCode: string
   customerName: string
@@ -166,6 +235,32 @@ type DailyActivityApprovalPendingRow = {
   divisionName: string | null
   subdivisionName: string | null
   executionStatus: string
+}
+
+type DashboardRejectedActivityRow = {
+  activityId: number
+  activityCode: string
+  activityDate: string
+  taskTitle: string
+  plannedBy: string
+  approvalNotes: string | null
+}
+
+type DashboardIsolationDecisionRow = {
+  isolationId: number
+  customerName: string
+  reason: string | null
+  isolationDate: string
+  agingDays: number
+}
+
+type DashboardHighRiskTicketRow = {
+  ticketCode: string
+  customerName: string
+  status: string
+  ticketType: string
+  openedAt: string
+  agingHours: number
 }
 
 type TimelineActivityItem = {
@@ -220,6 +315,8 @@ type DashboardPageFilters = {
   kpiDivisionName?: string
   kpiSubdivisionName?: string
 }
+
+const DIGITAL_SALES_SOURCES = ['DIGITAL', 'FACEBOOK', 'INSTAGRAM', 'TIKTOK', 'GOOGLE', 'WEBSITE', 'META ADS'] as const
 
 const reviewDbColumnCache = new Map<string, boolean>()
 
@@ -1389,15 +1486,40 @@ function getTodayIsoDate() {
   return local.toISOString().slice(0, 10)
 }
 
+function buildDailyActivityScopedHref(params: {
+  month: string
+  approvalStatus: 'PENDING' | 'REJECTED'
+  divisionName?: string
+  subdivisionName?: string
+}) {
+  const parts = [
+    `month=${encodeURIComponent(params.month)}`,
+    `approvalStatus=${encodeURIComponent(params.approvalStatus)}`,
+    params.divisionName ? `divisionName=${encodeURIComponent(params.divisionName)}` : null,
+    params.subdivisionName ? `subdivisionName=${encodeURIComponent(params.subdivisionName)}` : null,
+  ].filter(Boolean)
+
+  return `/dashboard/daily-activity?${parts.join('&')}`
+}
+
 async function getReviewDbDailyActivityApprovalQueue(session: AppSession): Promise<DashboardDailyActivityApprovalQueue> {
   const role = session.role
   const today = getTodayIsoDate()
   const month = today.slice(0, 7)
 
-  const whereDivision = role === 'SUPER_ADMIN' ? '' : 'AND COALESCE(division_name, \'\') = ?'
-  const whereSubdivision = role === 'SUPER_ADMIN' ? '' : 'AND COALESCE(subdivision_name, \'\') = ?'
   const userOrg = role === 'SUPER_ADMIN' ? null : await resolveDailyActivityOrgContext(session)
-  const args = role === 'SUPER_ADMIN' ? [] : [userOrg?.divisionName ?? '', userOrg?.subdivisionName ?? '']
+  const divisionAliases = role === 'SUPER_ADMIN' ? [] : getDailyActivityDivisionAliases(userOrg?.divisionName ?? '')
+  const subdivisionAliases =
+    role === 'SUPER_ADMIN'
+      ? []
+      : getDailyActivitySubdivisionAliases(userOrg?.divisionName ?? '', userOrg?.subdivisionName ?? '')
+  const whereDivision = divisionAliases.length
+    ? `AND COALESCE(division_name, '') IN (${divisionAliases.map(() => '?').join(',')})`
+    : ''
+  const whereSubdivision = subdivisionAliases.length
+    ? `AND COALESCE(subdivision_name, '') IN (${subdivisionAliases.map(() => '?').join(',')})`
+    : ''
+  const args = role === 'SUPER_ADMIN' ? [] : [...divisionAliases, ...subdivisionAliases]
 
   const pendingRows = await runReviewDbQuery<DailyActivityApprovalPendingRow>(
     `
@@ -1442,8 +1564,8 @@ async function getReviewDbDailyActivityApprovalQueue(session: AppSession): Promi
   )
 
   const items: DashboardDailyActivityApprovalQueueItem[] = rows.map((row) => ({
-    divisionName: String(row.divisionName ?? ''),
-    subdivisionName: String(row.subdivisionName ?? ''),
+    divisionName: normalizeDailyActivityDivisionName(String(row.divisionName ?? '')),
+    subdivisionName: normalizeDailyActivitySubdivisionName(String(row.subdivisionName ?? '')),
     pendingCount: Number(row.pendingCount ?? 0),
   }))
   const totalPending = items.reduce((acc, item) => acc + item.pendingCount, 0)
@@ -1453,8 +1575,8 @@ async function getReviewDbDailyActivityApprovalQueue(session: AppSession): Promi
     activityDate: String(row.activityDate ?? ''),
     taskTitle: String(row.taskTitle ?? ''),
     plannedBy: String(row.plannedBy ?? ''),
-    divisionName: String(row.divisionName ?? ''),
-    subdivisionName: String(row.subdivisionName ?? ''),
+    divisionName: normalizeDailyActivityDivisionName(String(row.divisionName ?? '')),
+    subdivisionName: normalizeDailyActivitySubdivisionName(String(row.subdivisionName ?? '')),
     executionStatus: String(row.executionStatus ?? ''),
   }))
 
@@ -1473,7 +1595,8 @@ async function getReviewDbDailyActivityApprovalQueue(session: AppSession): Promi
   }
 }
 
-async function getReviewDbWorklist(role: AppRole): Promise<DashboardWorkItem[]> {
+async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkItem[]> {
+  const role = session.role
   switch (role) {
     case 'SUPER_ADMIN': {
       const rows = await runReviewDbQuery<ImportActivityRow>(`
@@ -1508,23 +1631,122 @@ async function getReviewDbWorklist(role: AppRole): Promise<DashboardWorkItem[]> 
           marketing_name AS marketingName,
           source
         FROM sales_leads
+        WHERE COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')
         ORDER BY created_at DESC, id DESC
-        LIMIT 4
+        LIMIT 2
+      `)
+      const customers = await runReviewDbQuery<DashboardMarketingCustomerRow>(`
+        SELECT
+          c.id AS customerId,
+          c.customer_code AS customerCode,
+          c.full_name AS customerName,
+          c.phone,
+          c.email,
+          a.address
+        FROM crm_customers c
+        LEFT JOIN crm_customer_addresses a
+          ON a.customer_id = c.id
+          AND a.is_primary = 1
+        WHERE COALESCE(TRIM(c.phone), '') = ''
+          OR COALESCE(TRIM(c.email), '') = ''
+          OR COALESCE(TRIM(a.address), '') = ''
+        ORDER BY c.id DESC
+        LIMIT 1
+      `)
+      const coverages = await runReviewDbQuery<DashboardCoverageRow>(`
+        SELECT
+          id AS coverageId,
+          area_code AS areaCode,
+          area_name AS areaName,
+          coverage_status AS coverageStatus,
+          village,
+          district
+        FROM sales_covered_areas
+        WHERE COALESCE(UPPER(TRIM(coverage_status)), 'OPEN') NOT IN ('READY', 'ACTIVE', 'AVAILABLE')
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+      `)
+      const orders = await runReviewDbQuery<DashboardMarketingOrderRow>(`
+        SELECT
+          so.id AS orderId,
+          so.order_no AS orderNo,
+          COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+          so.status,
+          so.order_type AS orderType,
+          so.marketing_name AS marketingName,
+          CAST(so.request_date AS CHAR) AS requestDate
+        FROM sales_orders so
+        LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id
+        LEFT JOIN crm_customers c
+          ON c.id = so.customer_id
+        WHERE COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')
+        ORDER BY COALESCE(so.request_date, so.created_at) DESC, so.id DESC
+        LIMIT 1
       `)
 
-      return leads.map((item) => ({
-        id: `lead-${item.leadId}`,
-        domain: 'Sales',
-        title: item.customerName,
-        subtitle: item.marketingName || 'Marketing belum terisi',
-        status: item.status,
-        priority: 'tinggi',
-        detail: `Lead dari ${item.source || 'sumber belum terpetakan'} menunggu follow up awal.`,
-        href: '/sales',
-      }))
+      return [
+        ...leads.map((item) => ({
+          id: `lead-${item.leadId}`,
+          domain: 'Sales',
+          title: item.customerName,
+          subtitle: item.marketingName || 'Marketing belum terisi',
+          status: item.status,
+          priority: 'tinggi' as const,
+          detail: `Lead dari ${item.source || 'sumber belum terpetakan'} menunggu follow up awal dan validasi kebutuhan pelanggan.`,
+          href: '/sales',
+        })),
+        ...customers.map((item) => ({
+          id: `customer-${item.customerId}`,
+          domain: 'Customers',
+          title: item.customerName,
+          subtitle: item.customerCode || 'Customer code belum terisi',
+          status: 'REVIEW',
+          priority: 'sedang' as const,
+          detail: `Data customer belum lengkap: phone ${item.phone ? 'siap' : 'kosong'}, email ${item.email ? 'siap' : 'kosong'}, alamat ${item.address ? 'siap' : 'kosong'}.`,
+          href: '/customers',
+        })),
+        ...coverages.map((item) => ({
+          id: `coverage-${item.coverageId}`,
+          domain: 'Sales',
+          title: item.areaCode,
+          subtitle: item.areaName,
+          status: item.coverageStatus,
+          priority: 'sedang' as const,
+          detail: `Coverage ${item.coverageStatus} untuk area ${item.village || '-'} / ${item.district || '-'} masih perlu review survey dan kesiapan layanan.`,
+          href: '/sales',
+        })),
+        ...orders.map((item) => ({
+          id: `order-${item.orderId}`,
+          domain: 'Sales',
+          title: item.orderNo,
+          subtitle: item.customerName,
+          status: item.status,
+          priority: 'tinggi' as const,
+          detail: `Order ${item.orderType || '-'} dari ${item.marketingName || 'marketing belum terisi'} direquest ${formatActivityTime(item.requestDate)} dan siap didorong ke aktivasi.`,
+          href: '/sales',
+        })),
+      ]
     }
-    case 'CS_OPERATOR':
-    case 'CS_ADMIN': {
+    case 'CS_OPERATOR': {
+      const customers = await runReviewDbQuery<DashboardMarketingCustomerRow>(`
+        SELECT
+          c.id AS customerId,
+          c.customer_code AS customerCode,
+          c.full_name AS customerName,
+          c.phone,
+          c.email,
+          a.address
+        FROM crm_customers c
+        LEFT JOIN crm_customer_addresses a
+          ON a.customer_id = c.id
+          AND a.is_primary = 1
+        WHERE COALESCE(TRIM(c.phone), '') = ''
+          OR COALESCE(TRIM(c.email), '') = ''
+          OR COALESCE(TRIM(a.address), '') = ''
+        ORDER BY c.id DESC
+        LIMIT 1
+      `)
       const orders = await runReviewDbQuery<DashboardWorkOrderRow>(`
         SELECT
           swo.id AS workOrderId,
@@ -1543,7 +1765,20 @@ async function getReviewDbWorklist(role: AppRole): Promise<DashboardWorkItem[]> 
           ON c.id = so.customer_id
         WHERE COALESCE(UPPER(TRIM(swo.status)), 'OPEN') NOT IN ('COMPLETED', 'CLOSED', 'CANCELLED')
         ORDER BY COALESCE(swo.scheduled_at, swo.created_at) DESC, swo.id DESC
-        LIMIT 3
+        LIMIT 2
+      `)
+      const tickets = await runReviewDbQuery<DashboardSupportRow>(`
+        SELECT
+          ticket_code AS ticketCode,
+          customer_name AS customerName,
+          status,
+          type AS ticketType,
+          CAST(opened_at AS CHAR) AS openedAt
+        FROM support_trouble_tickets
+        WHERE closed_at IS NULL
+          AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+        ORDER BY opened_at DESC, id DESC
+        LIMIT 1
       `)
       const isolations = await runReviewDbQuery<DashboardIsolationRow>(`
         SELECT
@@ -1556,10 +1791,40 @@ async function getReviewDbWorklist(role: AppRole): Promise<DashboardWorkItem[]> 
         WHERE status = 'OPEN'
           AND is_archived = 0
         ORDER BY isolation_date DESC, id DESC
-        LIMIT 2
+        LIMIT 1
+      `)
+      const portIssues = await runReviewDbQuery<DashboardOdpPortIssueRow>(`
+        SELECT
+          nop.id AS portId,
+          no.code AS odpCode,
+          nop.port_no AS portNo,
+          nop.port_status AS portStatus,
+          c.customer_code AS customerCode,
+          ss.service_no AS serviceNo,
+          CAST(nop.installed_at AS CHAR) AS installedAt
+        FROM network_odp_ports nop
+        JOIN network_odp no
+          ON no.id = nop.odp_id
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = nop.subscription_id
+        LEFT JOIN crm_customers c
+          ON c.id = nop.customer_id
+        WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
+        ORDER BY nop.updated_at DESC, nop.id DESC
+        LIMIT 1
       `)
 
       return [
+        ...customers.map((item) => ({
+          id: `customer-${item.customerId}`,
+          domain: 'Customers',
+          title: item.customerName,
+          subtitle: item.customerCode || 'Customer perlu dirapikan',
+          status: 'REVIEW',
+          priority: 'sedang' as const,
+          detail: `Data customer belum lengkap: phone ${item.phone ? 'siap' : 'kosong'}, email ${item.email ? 'siap' : 'kosong'}, alamat ${item.address ? 'siap' : 'kosong'}.`,
+          href: '/customers',
+        })),
         ...orders.map((item) => ({
           id: `wo-${item.workOrderId}`,
           domain: 'Sales',
@@ -1570,6 +1835,16 @@ async function getReviewDbWorklist(role: AppRole): Promise<DashboardWorkItem[]> 
           detail: `${item.workType} • Teknisi: ${item.technicianName || '-'} • Jadwal: ${item.scheduledAt ? formatActivityTime(item.scheduledAt) : '-'}.`,
           href: '/sales',
         })),
+        ...tickets.map((item) => ({
+          id: `tt-${item.ticketCode}`,
+          domain: 'Support',
+          title: item.ticketCode,
+          subtitle: item.customerName,
+          status: item.status,
+          priority: 'tinggi' as const,
+          detail: `${item.ticketType} • Ticket dasar perlu update awal sejak ${formatActivityTime(item.openedAt)}.`,
+          href: '/support',
+        })),
         ...isolations.map((item) => ({
           id: `iso-${item.isolationId}`,
           domain: 'Support',
@@ -1579,6 +1854,185 @@ async function getReviewDbWorklist(role: AppRole): Promise<DashboardWorkItem[]> 
           priority: 'tinggi' as const,
           detail: `${item.reason?.trim() || 'Belum ada alasan isolir'} • Tanggal: ${formatActivityTime(item.isolationDate)}.`,
           href: '/support',
+        })),
+        ...portIssues.map((item) => ({
+          id: `port-${item.portId}`,
+          domain: 'Inventory',
+          title: `${item.odpCode} / Port ${item.portNo}`,
+          subtitle: item.customerCode || item.serviceNo || 'ODP dan port perlu dicek',
+          status: item.portStatus,
+          priority: 'sedang' as const,
+          detail: `Port berstatus ${item.portStatus} perlu verifikasi kapasitas dan tindak lanjut inventory. Installed ${formatActivityTime(item.installedAt)}.`,
+          href: '/inventory',
+        })),
+      ]
+    }
+    case 'CS_ADMIN': {
+      const today = getTodayIsoDate()
+      const month = today.slice(0, 7)
+      const userOrg = await resolveDailyActivityOrgContext(session)
+      const divisionAliases = getDailyActivityDivisionAliases(userOrg.divisionName)
+      const subdivisionAliases = getDailyActivitySubdivisionAliases(userOrg.divisionName, userOrg.subdivisionName)
+      const whereDivision = divisionAliases.length
+        ? `AND COALESCE(division_name, '') IN (${divisionAliases.map(() => '?').join(',')})`
+        : ''
+      const whereSubdivision = subdivisionAliases.length
+        ? `AND COALESCE(subdivision_name, '') IN (${subdivisionAliases.map(() => '?').join(',')})`
+        : ''
+      const orgArgs = [...divisionAliases, ...subdivisionAliases]
+      const dailyActivityPendingHref = buildDailyActivityScopedHref({
+        month,
+        approvalStatus: 'PENDING',
+        divisionName: userOrg.divisionName,
+        subdivisionName: userOrg.subdivisionName,
+      })
+      const dailyActivityRejectedHref = buildDailyActivityScopedHref({
+        month,
+        approvalStatus: 'REJECTED',
+        divisionName: userOrg.divisionName,
+        subdivisionName: userOrg.subdivisionName,
+      })
+
+      const pendingApprovals = await runReviewDbQuery<DailyActivityApprovalPendingRow>(
+        `
+          SELECT
+            id AS activityId,
+            activity_code AS activityCode,
+            DATE_FORMAT(activity_date, '%Y-%m-%d') AS activityDate,
+            task_title AS taskTitle,
+            planned_by AS plannedBy,
+            division_name AS divisionName,
+            subdivision_name AS subdivisionName,
+            execution_status AS executionStatus
+          FROM daily_activity_items
+          WHERE approval_status = 'PENDING'
+            AND execution_status IN ('DONE', 'PENDING')
+            AND activity_date >= DATE_SUB(CURRENT_DATE, INTERVAL 10 DAY)
+            ${whereDivision}
+            ${whereSubdivision}
+          ORDER BY activity_date DESC, id DESC
+          LIMIT 2
+        `,
+        orgArgs,
+      )
+      const rejectedActivities = await runReviewDbQuery<DashboardRejectedActivityRow>(
+        `
+          SELECT
+            id AS activityId,
+            activity_code AS activityCode,
+            DATE_FORMAT(activity_date, '%Y-%m-%d') AS activityDate,
+            task_title AS taskTitle,
+            planned_by AS plannedBy,
+            approval_notes AS approvalNotes
+          FROM daily_activity_items
+          WHERE approval_status = 'REJECTED'
+            AND activity_date >= DATE_SUB(CURRENT_DATE, INTERVAL 21 DAY)
+            ${whereDivision}
+            ${whereSubdivision}
+          ORDER BY activity_date DESC, id DESC
+          LIMIT 1
+        `,
+        orgArgs,
+      )
+      const restoreCandidates = await runReviewDbQuery<DashboardIsolationDecisionRow>(`
+        SELECT
+          id AS isolationId,
+          customer_name AS customerName,
+          reason,
+          CAST(isolation_date AS CHAR) AS isolationDate,
+          DATEDIFF(CURRENT_DATE, DATE(isolation_date)) AS agingDays
+        FROM support_isolations
+        WHERE status = 'OPEN'
+          AND is_archived = 0
+        ORDER BY isolation_date ASC, id ASC
+        LIMIT 1
+      `)
+      const highRiskTickets = await runReviewDbQuery<DashboardHighRiskTicketRow>(`
+        SELECT
+          ticket_code AS ticketCode,
+          customer_name AS customerName,
+          status,
+          type AS ticketType,
+          CAST(opened_at AS CHAR) AS openedAt,
+          TIMESTAMPDIFF(HOUR, opened_at, CURRENT_TIMESTAMP) AS agingHours
+        FROM support_trouble_tickets
+        WHERE closed_at IS NULL
+          AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+          AND opened_at <= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)
+        ORDER BY agingHours DESC, opened_at ASC
+        LIMIT 1
+      `)
+      const portIssues = await runReviewDbQuery<DashboardOdpPortIssueRow>(`
+        SELECT
+          nop.id AS portId,
+          no.code AS odpCode,
+          nop.port_no AS portNo,
+          nop.port_status AS portStatus,
+          c.customer_code AS customerCode,
+          ss.service_no AS serviceNo,
+          CAST(nop.installed_at AS CHAR) AS installedAt
+        FROM network_odp_ports nop
+        JOIN network_odp no
+          ON no.id = nop.odp_id
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = nop.subscription_id
+        LEFT JOIN crm_customers c
+          ON c.id = nop.customer_id
+        WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
+        ORDER BY nop.updated_at DESC, nop.id DESC
+        LIMIT 1
+      `)
+
+      return [
+        ...pendingApprovals.map((item) => ({
+          id: `daily-pending-${item.activityId}`,
+          domain: 'Daily Activity',
+          title: item.activityCode,
+          subtitle: item.plannedBy || userOrg.subdivisionName,
+          status: 'PENDING',
+          priority: 'tinggi' as const,
+          detail: `${item.executionStatus} • ${item.taskTitle} • Menunggu approval supervisor untuk ${normalizeDailyActivityDivisionName(String(item.divisionName ?? ''))}/${normalizeDailyActivitySubdivisionName(String(item.subdivisionName ?? ''))}.`,
+          href: dailyActivityPendingHref,
+        })),
+        ...rejectedActivities.map((item) => ({
+          id: `daily-rejected-${item.activityId}`,
+          domain: 'Daily Activity',
+          title: item.activityCode,
+          subtitle: item.plannedBy,
+          status: 'REJECTED',
+          priority: 'sedang' as const,
+          detail: `${item.taskTitle} • Koreksi supervisor: ${item.approvalNotes?.trim() || 'Catatan revisi belum ditulis.'}`,
+          href: dailyActivityRejectedHref,
+        })),
+        ...restoreCandidates.map((item) => ({
+          id: `iso-${item.isolationId}`,
+          domain: 'Support',
+          title: item.customerName,
+          subtitle: `Isolir aktif ${formatNumber(Number(item.agingDays ?? 0))} hari`,
+          status: 'OPEN',
+          priority: 'tinggi' as const,
+          detail: `${item.reason?.trim() || 'Belum ada alasan isolir'} • Kandidat keputusan restore atau transfer ke dismantle sejak ${formatActivityTime(item.isolationDate)}.`,
+          href: '/support/isolations',
+        })),
+        ...highRiskTickets.map((item) => ({
+          id: `tt-risk-${item.ticketCode}`,
+          domain: 'Support',
+          title: item.ticketCode,
+          subtitle: item.customerName,
+          status: 'OVERDUE',
+          priority: 'tinggi' as const,
+          detail: `${item.ticketType} • Ticket sudah terbuka ${formatNumber(Number(item.agingHours ?? 0))} jam dan perlu keputusan supervisor.`,
+          href: '/support/sla',
+        })),
+        ...portIssues.map((item) => ({
+          id: `port-${item.portId}`,
+          domain: 'Inventory',
+          title: `${item.odpCode} / Port ${item.portNo}`,
+          subtitle: item.customerCode || item.serviceNo || 'Port perlu koreksi tim',
+          status: item.portStatus,
+          priority: 'sedang' as const,
+          detail: `Port ${item.portStatus} menahan ritme order/restore dan perlu sinkron koreksi inventory sejak ${formatActivityTime(item.installedAt)}.`,
+          href: '/inventory',
         })),
       ]
     }
@@ -1665,8 +2119,129 @@ async function getReviewDbWorklist(role: AppRole): Promise<DashboardWorkItem[]> 
         href: '/support',
       }))
     }
-    case 'DIGITAL_CREATOR':
-      return []
+    case 'DIGITAL_CREATOR': {
+      const digitalSourcePlaceholders = DIGITAL_SALES_SOURCES.map(() => '?').join(', ')
+      const leads = await runReviewDbQuery<DashboardLeadRow>(
+        `
+          SELECT
+            id AS leadId,
+            customer_name AS customerName,
+            status,
+            marketing_name AS marketingName,
+            source
+          FROM sales_leads
+          WHERE UPPER(COALESCE(source, '')) IN (${digitalSourcePlaceholders})
+          ORDER BY created_at DESC, id DESC
+          LIMIT 2
+        `,
+        [...DIGITAL_SALES_SOURCES],
+      )
+      const orders = await runReviewDbQuery<DashboardDigitalOrderRow>(
+        `
+          SELECT
+            so.id AS orderId,
+            so.order_no AS orderNo,
+            COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+            so.status,
+            sl.source AS source,
+            so.order_type AS orderType,
+            CAST(so.request_date AS CHAR) AS requestDate
+          FROM sales_orders so
+          LEFT JOIN sales_leads sl
+            ON sl.id = so.lead_id
+          LEFT JOIN crm_customers c
+            ON c.id = so.customer_id
+          WHERE UPPER(COALESCE(sl.source, '')) IN (${digitalSourcePlaceholders})
+            AND COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')
+          ORDER BY COALESCE(so.request_date, so.created_at) DESC, so.id DESC
+          LIMIT 2
+        `,
+        [...DIGITAL_SALES_SOURCES],
+      )
+      const surveys = await runReviewDbQuery<DashboardDigitalSurveyRow>(
+        `
+          SELECT
+            ss.id AS surveyId,
+            ss.survey_no AS surveyNo,
+            COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+            ss.survey_status AS status,
+            sl.source AS source,
+            ss.feasibility_status AS feasibilityStatus,
+            CAST(COALESCE(ss.scheduled_at, ss.created_at) AS CHAR) AS scheduledAt
+          FROM sales_surveys ss
+          LEFT JOIN sales_leads sl
+            ON sl.id = ss.lead_id
+          LEFT JOIN crm_customers c
+            ON c.id = ss.customer_id
+          WHERE UPPER(COALESCE(sl.source, '')) IN (${digitalSourcePlaceholders})
+          ORDER BY COALESCE(ss.scheduled_at, ss.created_at) DESC, ss.id DESC
+          LIMIT 1
+        `,
+        [...DIGITAL_SALES_SOURCES],
+      )
+      const [topSource] = await runReviewDbQuery<DashboardDigitalSourceSummaryRow>(
+        `
+          SELECT
+            UPPER(COALESCE(source, 'DIGITAL')) AS source,
+            COUNT(*) AS totalOpen
+          FROM sales_leads
+          WHERE UPPER(COALESCE(source, '')) IN (${digitalSourcePlaceholders})
+            AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')
+          GROUP BY UPPER(COALESCE(source, 'DIGITAL'))
+          ORDER BY totalOpen DESC, source ASC
+          LIMIT 1
+        `,
+        [...DIGITAL_SALES_SOURCES],
+      )
+
+      const items: DashboardWorkItem[] = [
+        ...leads.map((item) => ({
+          id: `digital-lead-${item.leadId}`,
+          domain: 'Sales',
+          title: item.customerName,
+          subtitle: item.marketingName || 'Lead digital baru',
+          status: item.status,
+          priority: 'tinggi' as const,
+          detail: `Lead digital dari ${item.source || 'DIGITAL'} menunggu follow up funnel awal.`,
+          href: '/sales?focus=DIGITAL_LEADS',
+        })),
+        ...orders.map((item) => ({
+          id: `digital-order-${item.orderId}`,
+          domain: 'Sales',
+          title: item.orderNo,
+          subtitle: item.customerName,
+          status: item.status,
+          priority: 'sedang' as const,
+          detail: `Order digital ${item.orderType || '-'} dari channel ${item.source || 'DIGITAL'} direquest ${formatActivityTime(item.requestDate)}.`,
+          href: '/sales?focus=DIGITAL_ORDERS',
+        })),
+        ...surveys.map((item) => ({
+          id: `digital-survey-${item.surveyId}`,
+          domain: 'Sales',
+          title: item.surveyNo,
+          subtitle: item.customerName,
+          status: item.status,
+          priority: 'sedang' as const,
+          detail: `Survey digital ${item.feasibilityStatus || 'PENDING'} dari channel ${item.source || 'DIGITAL'} dijadwalkan ${formatActivityTime(item.scheduledAt)}.`,
+          href: '/sales?focus=DIGITAL_SURVEYS',
+        })),
+      ]
+
+      if (topSource) {
+        items.unshift({
+          id: `digital-analytics-${String(topSource.source ?? 'DIGITAL').trim() || 'DIGITAL'}`,
+          domain: 'Dashboard',
+          title: `Review funnel channel ${String(topSource.source ?? 'DIGITAL').trim() || 'DIGITAL'}`,
+          subtitle: `${formatNumber(Number(topSource.totalOpen ?? 0))} lead aktif`,
+          status: 'REVIEW',
+          priority: 'sedang',
+          detail: 'Channel digital dengan lead aktif terbanyak perlu dicek performa copy, konten, dan kualitas lead sebelum diteruskan ke marketing.',
+          href: '/dashboard?division=DIGITAL',
+        })
+      }
+
+      return items.slice(0, 5)
+    }
   }
 }
 
@@ -2471,7 +3046,7 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
   try {
     const summary = await getReviewDbDashboardSummary()
     const activities = await getReviewDbActivities(role)
-    const worklist = await getReviewDbWorklist(role)
+    const worklist = await getReviewDbWorklist(session)
     const operationalCards = await getReviewDbOperationalCards(session, resolvedFilters)
     const dailyActivityApprovalQueue = await getReviewDbDailyActivityApprovalQueue(session)
     const dashboardAlerts = await getReviewDbDashboardAlerts({

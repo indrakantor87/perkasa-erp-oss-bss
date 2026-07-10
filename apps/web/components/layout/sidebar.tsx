@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { AppSession } from '@/lib/auth-session'
-import { findNavigationItem, navigationItems } from '@/lib/navigation'
+import { navigationItems } from '@/lib/navigation'
+import { DASHBOARD_DIVISION_CLUSTERS } from '@/lib/dashboard-division-structure'
 import { getRoleMeta } from '@/lib/role-meta'
 import type { AppRole } from '@/lib/types'
 
@@ -13,21 +14,28 @@ function matchesPrefix(pathname: string, prefix: string) {
 }
 
 const rolePreferredOrder: Partial<Record<AppRole, string[]>> = {
-  SALES_MARKETING: ['/dashboard', '/sales', '/customers', '/support', '/billing', '/dashboard/daily-activity', '/import'],
-  CS_OPERATOR: ['/dashboard', '/support', '/customers', '/inventory', '/billing', '/dashboard/daily-activity'],
-  CS_ADMIN: ['/dashboard', '/support', '/customers', '/billing', '/inventory', '/dashboard/daily-activity'],
-  NOC_OPERATOR: ['/dashboard', '/support', '/inventory', '/dashboard/daily-activity'],
-  TT_OPERATOR: ['/dashboard', '/support', '/dashboard/daily-activity'],
-  DIGITAL_CREATOR: ['/dashboard', '/sales', '/customers', '/dashboard/daily-activity'],
-  FIELD_TECHNICIAN: ['/dashboard', '/inventory', '/support', '/dashboard/daily-activity'],
-  DISMANTLE_OPERATOR: ['/dashboard', '/support', '/dashboard/daily-activity'],
+  SALES_MARKETING: ['/dashboard', '/dashboard/worklist', '/sales', '/customers', '/support', '/billing', '/dashboard/daily-activity', '/import'],
+  CS_OPERATOR: ['/dashboard', '/dashboard/worklist', '/support', '/customers', '/inventory', '/billing', '/dashboard/daily-activity'],
+  CS_ADMIN: ['/dashboard', '/dashboard/worklist', '/support', '/customers', '/billing', '/inventory', '/dashboard/daily-activity'],
+  NOC_OPERATOR: ['/dashboard', '/dashboard/worklist', '/support', '/inventory', '/dashboard/daily-activity'],
+  TT_OPERATOR: ['/dashboard', '/dashboard/worklist', '/support', '/dashboard/daily-activity'],
+  DIGITAL_CREATOR: ['/dashboard', '/dashboard/worklist', '/sales', '/customers', '/dashboard/daily-activity'],
+  FIELD_TECHNICIAN: ['/dashboard', '/dashboard/worklist', '/inventory', '/support', '/dashboard/daily-activity'],
+  DISMANTLE_OPERATOR: ['/dashboard', '/dashboard/worklist', '/support', '/dashboard/daily-activity'],
 }
+
+const controlCenterOrder = ['/dashboard', '/dashboard/daily-activity', '/import', '/dashboard/worklist']
 
 function sortByPreferredOrder(params: { items: typeof navigationItems; role: AppRole | null }) {
   const order = params.role ? rolePreferredOrder[params.role] ?? [] : []
   const getRank = (href: string) => {
+    const controlCenterIndex = controlCenterOrder.indexOf(href)
+    if (controlCenterIndex >= 0) {
+      return controlCenterIndex
+    }
+
     const index = order.indexOf(href)
-    return index >= 0 ? index : order.length + 10
+    return index >= 0 ? controlCenterOrder.length + index : controlCenterOrder.length + order.length + 10
   }
 
   return [...params.items].sort((left, right) => {
@@ -37,16 +45,254 @@ function sortByPreferredOrder(params: { items: typeof navigationItems; role: App
   })
 }
 
+type SidebarGroup = {
+  title: string
+  items?: SidebarNavItem[]
+  hrefs?: string[]
+  emptyHint?: string
+}
+
+type SidebarNavItem = (typeof navigationItems)[number] & {
+  key: string
+  requiredPath: string
+  assignHrefs?: string[]
+  matchPrefixes?: string[]
+  excludePrefixes?: string[]
+  matchFocusPrefix?: string
+  excludeFocusPrefix?: string
+}
+
+function getNavigationItemByHref(href: string) {
+  return navigationItems.find((item) => item.href === href)
+}
+
+function buildSidebarNavItem(
+  href: string,
+  options?: {
+    key?: string
+    href?: string
+    title?: string
+    description?: string
+    requiredPath?: string
+    assignHrefs?: string[]
+    matchPrefixes?: string[]
+    excludePrefixes?: string[]
+    matchFocusPrefix?: string
+    excludeFocusPrefix?: string
+  },
+): SidebarNavItem {
+  const base = getNavigationItemByHref(href)
+  if (!base) {
+    throw new Error(`Navigation item not found for href: ${href}`)
+  }
+
+  return {
+    ...base,
+    key: options?.key ?? href,
+    href: options?.href ?? base.href,
+    title: options?.title ?? base.title,
+    description: options?.description ?? base.description,
+    requiredPath: options?.requiredPath ?? base.href,
+    assignHrefs: options?.assignHrefs,
+    matchPrefixes: options?.matchPrefixes,
+    excludePrefixes: options?.excludePrefixes,
+    matchFocusPrefix: options?.matchFocusPrefix,
+    excludeFocusPrefix: options?.excludeFocusPrefix,
+  }
+}
+
+function mapNavigationItemToSidebarNavItem(item: (typeof navigationItems)[number]): SidebarNavItem {
+  return {
+    ...item,
+    key: item.href,
+    requiredPath: item.href,
+    assignHrefs: [item.href],
+  }
+}
+
+const sidebarCoreGroups: SidebarGroup[] = [
+  {
+    title: 'Pusat Kendali',
+    hrefs: ['/dashboard', '/dashboard/worklist', '/dashboard/daily-activity', '/import'],
+  },
+  {
+    title: 'Pemasaran dan Pelayanan',
+    items: [
+      buildSidebarNavItem('/support', {
+        key: 'support-noc-tt',
+        title: 'NOC & Troubleshoots',
+        description: 'Queue teknis NOC, TT, monitoring ticket, dan kontrol SLA operasional',
+        excludePrefixes: ['/support/isolations', '/support/dismantle'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-main',
+        title: 'Penjualan',
+        description: 'Lead, survey, order, dan aktivasi komersial',
+        excludeFocusPrefix: 'DIGITAL_',
+      }),
+      buildSidebarNavItem('/customers', {
+        key: 'customers-cs-admin',
+        title: 'CS & Admin CS',
+        description: 'Port ODP, approval CS, dan dismantle dibaca dalam satu workspace pelayanan',
+        href: '/customers/cs-admin',
+        matchPrefixes: ['/customers/cs-admin', '/support/dismantle'],
+        assignHrefs: ['/customers/cs-admin', '/support/dismantle'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-digital-creator',
+        title: 'Digital Creator',
+        description: 'Lead digital, survey digital, dan funnel campaign',
+        href: '/sales?focus=DIGITAL_LEADS',
+        matchFocusPrefix: 'DIGITAL_',
+      }),
+    ],
+    emptyHint: DASHBOARD_DIVISION_CLUSTERS[0]?.items.map((item) => item.label).join(', '),
+  },
+  {
+    title: 'Finance dan HR',
+    items: [
+      buildSidebarNavItem('/billing', {
+        key: 'billing-main',
+        title: 'Billing',
+        description: 'Invoice, customer, isolir, payment, dan collection',
+        matchPrefixes: ['/billing', '/customers', '/support/isolations'],
+        assignHrefs: ['/billing', '/customers', '/support/isolations'],
+      }),
+      buildSidebarNavItem('/hr', {
+        key: 'hr-main',
+        title: 'HR',
+        description: 'Employee, attendance, payroll, dan pinjaman karyawan',
+      }),
+    ],
+    emptyHint: DASHBOARD_DIVISION_CLUSTERS[2]?.items.map((item) => item.label).join(', '),
+  },
+  {
+    title: 'General Affair',
+    items: [
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-main',
+        title: 'Inventory',
+        description: 'Stok, ODP, assignment perangkat, dan request gudang',
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-legal',
+        title: 'Legal',
+        description: 'Workspace dokumen, administrasi, dan tindak lanjut legal',
+        href: '/inventory/legal',
+        matchPrefixes: ['/inventory/legal'],
+      }),
+    ],
+    emptyHint: DASHBOARD_DIVISION_CLUSTERS[3]?.items.map((item) => item.label).join(', '),
+  },
+  {
+    title: 'Teknisi & Ekspan',
+    items: [
+      buildSidebarNavItem('/support', {
+        key: 'support-teknisi-psb',
+        title: 'Teknisi PSB',
+        description: 'Instalasi baru, kesiapan material, dan tindak lanjut lapangan PSB',
+        href: '/support/teknisi-psb',
+        matchPrefixes: ['/support/teknisi-psb'],
+      }),
+      buildSidebarNavItem('/support', {
+        key: 'support-teknisi-expan',
+        title: 'Teknisi Expan',
+        description: 'Ekspan jaringan, ODP, port, dan kesiapan jalur lapangan',
+        href: '/support/teknisi-expan',
+        matchPrefixes: ['/support/teknisi-expan'],
+      }),
+      buildSidebarNavItem('/support', {
+        key: 'support-teknisi-jointer',
+        title: 'Teknisi Jointer',
+        description: 'Sambungan jaringan, kualitas joint, dan follow up teknis backbone',
+        href: '/support/teknisi-jointer',
+        matchPrefixes: ['/support/teknisi-jointer'],
+      }),
+    ],
+    emptyHint: DASHBOARD_DIVISION_CLUSTERS[1]?.items.map((item) => item.label).join(', '),
+  },
+  {
+    title: 'Operasional',
+    items: [
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-kantor',
+        title: 'Kantor',
+        description: 'Workspace operasional kantor untuk stok aktif dan ritme kerja harian',
+        href: '/inventory/kantor',
+        matchPrefixes: ['/inventory/kantor'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-toko',
+        title: 'Toko',
+        description: 'Workspace toko untuk stok display, pergerakan barang, dan tindak lanjut',
+        href: '/inventory/toko',
+        matchPrefixes: ['/inventory/toko'],
+      }),
+    ],
+    emptyHint: DASHBOARD_DIVISION_CLUSTERS[4]?.items.map((item) => item.label).join(', '),
+  },
+]
+
+function groupSidebarItems(items: typeof navigationItems, allowedPrefixes: string[]): Array<{
+  title: string
+  items: SidebarNavItem[]
+  emptyHint?: string
+}> {
+  const grouped = sidebarCoreGroups.map((group) => ({
+    ...group,
+    items:
+      group.items?.filter((item) =>
+        allowedPrefixes.some((prefix) => matchesPrefix(item.requiredPath, prefix)),
+      ) ??
+      items.filter((item) => group.hrefs?.includes(item.href)).map(mapNavigationItemToSidebarNavItem),
+  }))
+
+  const assignedBaseHrefs = new Set(
+    grouped.flatMap((group) =>
+      group.items.flatMap((item) => (item.assignHrefs ?? [item.href]).map((href) => href.split('?')[0] ?? href)),
+    ),
+  )
+  const remainingItems = items.filter((item) => !assignedBaseHrefs.has(item.href))
+
+  if (remainingItems.length) {
+    grouped[0]?.items.push(...remainingItems.map(mapNavigationItemToSidebarNavItem))
+  }
+
+  return grouped
+}
+
+function isSidebarItemActive(item: SidebarNavItem, pathname: string, focus: string) {
+  const matchPrefixes = item.matchPrefixes ?? [item.href.split('?')[0] ?? item.href]
+  const matchesPath = matchPrefixes.some((prefix) => matchesPrefix(pathname, prefix))
+  if (!matchesPath) return false
+
+  if (item.excludePrefixes?.some((prefix) => matchesPrefix(pathname, prefix))) {
+    return false
+  }
+
+  if (item.matchFocusPrefix && !focus.startsWith(item.matchFocusPrefix)) {
+    return false
+  }
+
+  if (item.excludeFocusPrefix && focus.startsWith(item.excludeFocusPrefix)) {
+    return false
+  }
+
+  return true
+}
+
 function SidebarSection({
   title,
   items,
-  activeHref,
+  pathname,
+  focus,
   collapsed,
   onNavigate,
 }: {
   title: string
-  items: typeof navigationItems
-  activeHref: string
+  items: SidebarNavItem[]
+  pathname: string
+  focus: string
   collapsed: boolean
   onNavigate?: () => void
 }) {
@@ -56,12 +302,12 @@ function SidebarSection({
     <div className="space-y-2">
       {!collapsed ? <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{title}</p> : null}
       {items.map((item) => {
-        const active = activeHref === item.href
+        const active = isSidebarItemActive(item, pathname, focus)
         const Icon = item.icon
 
         return (
           <Link
-            key={item.href}
+            key={item.key}
             href={item.href}
             onClick={onNavigate}
             title={item.title}
@@ -91,6 +337,49 @@ function SidebarSection({
   )
 }
 
+function SidebarGroupSection({
+  title,
+  items,
+  emptyHint,
+  pathname,
+  focus,
+  collapsed,
+  onNavigate,
+}: {
+  title: string
+  items: SidebarNavItem[]
+  emptyHint?: string
+  pathname: string
+  focus: string
+  collapsed: boolean
+  onNavigate?: () => void
+}) {
+  if (items.length === 0) {
+    if (collapsed) return null
+
+    return (
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{title}</p>
+        <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/70 px-4 py-4">
+          <p className="text-sm font-semibold text-slate-200">Menunggu integrasi menu</p>
+          {emptyHint ? <p className="mt-2 text-xs leading-5 text-slate-400">{emptyHint}</p> : null}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <SidebarSection
+      title={title}
+      items={items}
+      pathname={pathname}
+      focus={focus}
+      collapsed={collapsed}
+      onNavigate={onNavigate}
+    />
+  )
+}
+
 export function Sidebar({
   session,
   allowedPrefixes,
@@ -99,6 +388,12 @@ export function Sidebar({
   allowedPrefixes: string[]
 }) {
   const pathname = usePathname()
+  const focus =
+    typeof window === 'undefined'
+      ? ''
+      : String(new URLSearchParams(window.location.search).get('focus') ?? '')
+          .trim()
+          .toUpperCase()
   const roleMeta = session ? getRoleMeta(session.role) : null
   const allowedItems = navigationItems.filter((item) =>
     allowedPrefixes.some((prefix) => matchesPrefix(item.href, prefix))
@@ -106,7 +401,9 @@ export function Sidebar({
   const sortedItems = sortByPreferredOrder({ items: allowedItems, role: session?.role ?? null })
   const coreItems = sortedItems.filter((item) => !item.href.startsWith('/settings'))
   const settingsItems = sortedItems.filter((item) => item.href.startsWith('/settings'))
-  const activeItem = findNavigationItem(pathname)
+  const groupedCoreItems = groupSidebarItems(coreItems, allowedPrefixes)
+  const settingsSidebarItems = settingsItems.map(mapNavigationItemToSidebarNavItem)
+  const mobileQuickItems = groupedCoreItems.flatMap((group) => group.items)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -177,8 +474,24 @@ export function Sidebar({
         ) : null}
 
         <nav className="mt-10 space-y-6">
-          <SidebarSection title="Menu Utama" items={coreItems} activeHref={activeItem.href} collapsed={collapsed} />
-          <SidebarSection title="Pengaturan" items={settingsItems} activeHref={activeItem.href} collapsed={collapsed} />
+          {groupedCoreItems.map((group) => (
+            <SidebarGroupSection
+              key={group.title}
+              title={group.title}
+              items={group.items}
+              emptyHint={group.emptyHint}
+              pathname={pathname}
+              focus={focus}
+              collapsed={collapsed}
+            />
+          ))}
+          <SidebarSection
+            title="Pengaturan"
+            items={settingsSidebarItems}
+            pathname={pathname}
+            focus={focus}
+            collapsed={collapsed}
+          />
         </nav>
 
         <div className={`mt-auto rounded-2xl border border-slate-800 bg-slate-900 ${collapsed ? 'p-3' : 'p-5'}`}>
@@ -217,12 +530,12 @@ export function Sidebar({
             Menu
           </button>
           <div className="flex gap-3 overflow-x-auto pb-1">
-          {coreItems.map((item) => {
-            const active = activeItem.href === item.href
+          {mobileQuickItems.map((item) => {
+            const active = isSidebarItemActive(item, pathname, focus)
 
             return (
               <Link
-                key={item.href}
+                key={item.key}
                 href={item.href}
                 className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
                   active ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-600'
@@ -268,17 +581,23 @@ export function Sidebar({
             </div>
 
             <nav className="mt-8 space-y-6 overflow-y-auto pr-1">
-              <SidebarSection
-                title="Menu Utama"
-                items={coreItems}
-                activeHref={activeItem.href}
-                collapsed={false}
-                onNavigate={() => setMobileOpen(false)}
-              />
+              {groupedCoreItems.map((group) => (
+                <SidebarGroupSection
+                  key={group.title}
+                  title={group.title}
+                  items={group.items}
+                  emptyHint={group.emptyHint}
+                  pathname={pathname}
+                  focus={focus}
+                  collapsed={false}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              ))}
               <SidebarSection
                 title="Pengaturan"
-                items={settingsItems}
-                activeHref={activeItem.href}
+                items={settingsSidebarItems}
+                pathname={pathname}
+                focus={focus}
                 collapsed={false}
                 onNavigate={() => setMobileOpen(false)}
               />

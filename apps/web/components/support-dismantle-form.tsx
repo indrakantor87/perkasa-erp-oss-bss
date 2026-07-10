@@ -5,19 +5,19 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type SupportDismantleFormProps = {
-  canApprove: boolean
+  canProcess: boolean
   reviewDbReady: boolean
   isolationSuggestions: string[]
   initialIsolationValue?: string
 }
 
 function extractIsolationId(value: string) {
-  const matched = value.trim().match(/^(\d+)/)
-  return matched ? matched[1] : ''
+  const [rawId] = value.split('|')
+  return rawId?.trim() ?? ''
 }
 
 export function SupportDismantleForm({
-  canApprove,
+  canProcess,
   reviewDbReady,
   isolationSuggestions,
   initialIsolationValue,
@@ -30,7 +30,7 @@ export function SupportDismantleForm({
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
-  const isDisabled = !canApprove || !reviewDbReady || submitting
+  const isDisabled = !canProcess || !reviewDbReady || submitting
 
   useEffect(() => {
     if (initialIsolationValue?.trim()) {
@@ -93,8 +93,8 @@ export function SupportDismantleForm({
         Pindahkan ke histori dismantle
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">
-        {!canApprove
-          ? 'Role aktif belum memiliki izin approve pada domain Support, sehingga flow dismantle dikunci.'
+        {!canProcess
+          ? 'Role aktif belum memiliki akses operasional untuk memproses dismantle pada lane ini.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi flow dismantle dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini menyimpan snapshot pelanggan ke histori dismantle lalu mengarsipkan sumber isolir agar jejak operasional tetap aman.'}

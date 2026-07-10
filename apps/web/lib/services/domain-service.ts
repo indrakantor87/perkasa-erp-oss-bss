@@ -21,6 +21,7 @@ import {
   buildSupportLaneSnapshots,
   buildSupportLaneReviewSummary,
   buildSupportLaneWorkspace,
+  canAccessSupportLane,
   getActiveSupportLane,
   getPreferredSupportLane,
   getSupportLaneSections,
@@ -3628,7 +3629,7 @@ function applyReviewDbSummaries(content: DomainPageContent, stats: DomainStatsRo
 }
 
 function applyReviewDbSupportSections(content: DomainPageContent, reviewSections: DomainReviewSection[]) {
-  if (content.key !== 'support' || reviewSections.length === 0) {
+  if (content.key !== 'support') {
     return content
   }
 
@@ -3862,13 +3863,14 @@ function buildSupportFocus(
 
   const sections = content.reviewSections ?? []
   const defaultLane = getPreferredSupportLane(role)
-  const activeLane = getActiveSupportLane(role, selectedLane)
+  const resolvedSelectedLane = selectedLane && canAccessSupportLane(role, selectedLane) ? selectedLane : null
+  const activeLane = getActiveSupportLane(role, resolvedSelectedLane)
   const lanes = buildSupportLaneSnapshots(role, sections)
-  const visibleSections = selectedLane ? getSupportLaneSections(sections, selectedLane) : sections
+  const visibleSections = resolvedSelectedLane ? getSupportLaneSections(sections, activeLane) : sections
 
   return {
     defaultLane,
-    selectedLane,
+    selectedLane: resolvedSelectedLane,
     activeLane,
     lanes,
     activeWorkspace: buildSupportLaneWorkspace(role, activeLane, lanes),
