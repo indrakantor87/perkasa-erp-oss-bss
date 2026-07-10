@@ -38,6 +38,8 @@ type CreateInvoiceParams = {
   dueDate: Date | null
   notesRaw: string
   actorLabel: string
+  customAmount: number | null
+  customDescription: string
 }
 
 type CreatedInvoiceSummary = {
@@ -105,7 +107,7 @@ async function createInvoiceForSubscription(params: CreateInvoiceParams): Promis
   if (subscription.status !== 'ACTIVE') {
     throw new Error(`Subscription ${subscription.serviceNo} belum berstatus ACTIVE.`)
   }
-  if (Number(subscription.monthlyPrice) <= 0) {
+  if (params.invoiceType === 'RECURRING' && Number(subscription.monthlyPrice) <= 0) {
     throw new Error(`Harga bulanan subscription ${subscription.serviceNo} belum diisi (0).`)
   }
 
@@ -142,7 +144,10 @@ async function createInvoiceForSubscription(params: CreateInvoiceParams): Promis
 
   const invoiceNo = await generateInvoiceNo()
   const userNote = `[Review Invoice] ${params.actorLabel}${params.notesRaw ? ` - ${params.notesRaw}` : ''}`
-  const subtotal = Number(subscription.monthlyPrice)
+  const subtotal =
+    params.invoiceType === 'RECURRING'
+      ? Number(subscription.monthlyPrice)
+      : Number(params.customAmount ?? 0)
   const totalAmount = subtotal
 
   const invoiceResult = await runReviewDbExecute<ExecuteResult>(
@@ -196,8 +201,12 @@ async function createInvoiceForSubscription(params: CreateInvoiceParams): Promis
   const periodLabel =
     params.invoiceType === 'RECURRING'
       ? `periode ${String(params.billingMonth).padStart(2, '0')}/${params.billingYear}`
-      : 'periode custom'
-  const itemDescription = `Subscription ${subscription.serviceNo} • ${packageLabel} • ${periodLabel}`
+      : 'one-time charge'
+  const itemType = params.invoiceType === 'RECURRING' ? 'SUBSCRIPTION' : params.invoiceType
+  const itemDescription =
+    params.invoiceType === 'RECURRING'
+      ? `Subscription ${subscription.serviceNo} • ${packageLabel} • ${periodLabel}`
+      : `${params.customDescription} • ${subscription.serviceNo} • ${subscription.customerName}`
 
   await runReviewDbExecute<ExecuteResult>(
     `
@@ -209,9 +218,9 @@ async function createInvoiceForSubscription(params: CreateInvoiceParams): Promis
         unit_price,
         line_total
       )
-      VALUES (?, 'SUBSCRIPTION', ?, 1, ?, ?)
+      VALUES (?, ?, ?, 1, ?, ?)
     `,
-    [invoiceId, itemDescription, subtotal, subtotal],
+    [invoiceId, itemType, itemDescription, subtotal, subtotal],
   )
 
   return {
@@ -248,6 +257,8 @@ export async function POST(request: Request) {
       issueDate?: unknown
       dueDate?: unknown
       notes?: unknown
+      customAmount?: unknown
+      customDescription?: unknown
     }
 
     const serviceNo = String(payload.serviceNo ?? '').trim()
@@ -262,6 +273,8 @@ export async function POST(request: Request) {
     const issueDateRaw = String(payload.issueDate ?? '').trim()
     const dueDateRaw = String(payload.dueDate ?? '').trim()
     const notesRaw = String(payload.notes ?? '').trim()
+    const customAmountRaw = payload.customAmount
+    const customDescription = String(payload.customDescription ?? '').trim()
     const actorLabel = `${session.displayName} (${session.username})`
     const isBatchMode = serviceNumbers.length > 0
 
@@ -287,6 +300,14 @@ export async function POST(request: Request) {
       }
       if (!Number.isInteger(targetYear) || targetYear < 2020 || targetYear > 2100) {
         return Response.json({ message: 'Billing year tidak valid.' }, { status: 400 })
+      }
+    } else {
+      const customAmount = Number(customAmountRaw ?? NaN)
+      if (!Number.isFinite(customAmount) || customAmount <= 0) {
+        return Response.json({ message: 'Nominal invoice one-time wajib diisi dan harus lebih dari 0.' }, { status: 400 })
+      }
+      if (!customDescription) {
+        return Response.json({ message: 'Deskripsi invoice one-time wajib diisi.' }, { status: 400 })
       }
     }
 
@@ -320,6 +341,8 @@ export async function POST(request: Request) {
             dueDate,
             notesRaw,
             actorLabel,
+            customAmount: null,
+            customDescription: '',
           })
           successes.push(result)
         } catch (error) {
@@ -359,6 +382,8 @@ export async function POST(request: Request) {
       dueDate,
       notesRaw,
       actorLabel,
+      customAmount: invoiceType === 'RECURRING' ? null : Number(customAmountRaw ?? 0),
+      customDescription,
     })
 
     return Response.json({

@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type SalesWorkOrderCreateFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   orderSuggestions: string[]
+  initialOrderValue?: string
 }
 
 const workTypeOptions = ['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'] as const
@@ -22,9 +23,10 @@ export function SalesWorkOrderCreateForm({
   canCreate,
   reviewDbReady,
   orderSuggestions,
+  initialOrderValue,
 }: SalesWorkOrderCreateFormProps) {
   const router = useRouter()
-  const [orderValue, setOrderValue] = useState(orderSuggestions[0] ?? '')
+  const [orderValue, setOrderValue] = useState(initialOrderValue?.trim() || orderSuggestions[0] || '')
   const [workType, setWorkType] = useState<(typeof workTypeOptions)[number]>('INSTALLATION')
   const [status, setStatus] = useState<(typeof workStatusOptions)[number]>('SCHEDULED')
   const [scheduledAt, setScheduledAt] = useState('')
@@ -34,6 +36,12 @@ export function SalesWorkOrderCreateForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialOrderValue?.trim()) {
+      setOrderValue(initialOrderValue.trim())
+    }
+  }, [initialOrderValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

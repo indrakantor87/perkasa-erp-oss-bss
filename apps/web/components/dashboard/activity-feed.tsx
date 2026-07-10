@@ -13,7 +13,7 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
         <span className="badge">Live review</span>
       </div>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 max-h-[40rem] space-y-4 overflow-y-auto pr-1">
         {items.map((item) => (
           <article key={`${item.title}-${item.at}`} className="rounded-2xl border border-line bg-slate-50 p-5">
             <div className="flex items-center justify-between gap-4">

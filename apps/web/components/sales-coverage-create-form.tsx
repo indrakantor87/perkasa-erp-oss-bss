@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type SalesCoverageCreateFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   leadSuggestions: string[]
+  initialLeadValue?: string
 }
 
 const coverageStatusOptions = ['PLANNED', 'AVAILABLE', 'LIMITED', 'UNAVAILABLE'] as const
@@ -21,9 +22,10 @@ export function SalesCoverageCreateForm({
   canCreate,
   reviewDbReady,
   leadSuggestions,
+  initialLeadValue,
 }: SalesCoverageCreateFormProps) {
   const router = useRouter()
-  const [leadValue, setLeadValue] = useState(leadSuggestions[0] ?? '')
+  const [leadValue, setLeadValue] = useState(initialLeadValue?.trim() || leadSuggestions[0] || '')
   const [areaName, setAreaName] = useState('')
   const [village, setVillage] = useState('')
   const [district, setDistrict] = useState('')
@@ -35,6 +37,12 @@ export function SalesCoverageCreateForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialLeadValue?.trim()) {
+      setLeadValue(initialLeadValue.trim())
+    }
+  }, [initialLeadValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

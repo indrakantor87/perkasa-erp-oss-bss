@@ -45,6 +45,10 @@ export function SupportTicketCloseForm({
     ticketSuggestions
       .map((item) => parseTicketSuggestion(item))
       .find((item) => item.ticketCode.trim().toUpperCase() === ticketCode.trim().toUpperCase()) ?? null
+  const hasValidProgress =
+    currentSuggestion != null &&
+    currentSuggestion.latestProgress.trim() !== '-' &&
+    ['ON_PROGRESS', 'FOLLOW_UP'].includes(currentSuggestion.status.trim().toUpperCase())
 
   useEffect(() => {
     if (initialTicketCode?.trim()) {
@@ -105,7 +109,7 @@ export function SupportTicketCloseForm({
           ? 'Role aktif belum memiliki izin update pada domain Support.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi close flow support dinonaktifkan agar tidak menulis ke mock.'
-            : 'Form ini menutup trouble ticket yang masih open pada review DB agar alur open sampai close mulai bisa diuji langsung dari web.'}
+            : 'Form ini menutup trouble ticket yang sudah melewati fase progress aktif pada review DB, sehingga alur support tidak lagi lompat dari open langsung ke close.'}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
@@ -164,6 +168,11 @@ export function SupportTicketCloseForm({
             <div className="mt-1">PIC terakhir: {currentSuggestion.ownerName || '-'}</div>
             <div className="mt-1">Follow-up terakhir: {currentSuggestion.followUpAt || '-'}</div>
             <div className="mt-1">Ringkasan progress terakhir: {currentSuggestion.latestProgress || '-'}</div>
+            <div className={`mt-2 font-medium ${hasValidProgress ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {hasValidProgress
+                ? 'Ticket ini sudah punya progress aktif yang valid untuk dilanjutkan ke close.'
+                : 'Ticket ini belum punya progress aktif yang valid. Simpan progress ticket terlebih dahulu sebelum close.'}
+            </div>
           </div>
         ) : null}
 

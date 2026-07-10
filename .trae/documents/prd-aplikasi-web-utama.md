@@ -17,6 +17,36 @@ Aplikasi ini adalah website utama tunggal untuk operasional ISP yang menyatukan 
 | Admin Divisi | Login internal | Mengakses modul operasional sesuai divisi dan dashboard terkait |
 | Operator | Login internal | Menjalankan pekerjaan harian per modul tanpa akses konfigurasi global |
 
+### 2.1.1 Perspektif Role dan Divisi Aktif
+
+Implementasi web saat ini sudah berjalan dengan model role operasional yang lebih rinci daripada 3 role bootstrap PRD awal, yaitu:
+
+1. `SUPER_ADMIN`
+2. `SALES_MARKETING`
+3. `CS_OPERATOR`
+4. `CS_ADMIN`
+5. `NOC_OPERATOR`
+6. `FIELD_TECHNICIAN`
+7. `TT_OPERATOR`
+8. `DIGITAL_CREATOR`
+9. `DISMANTLE_OPERATOR`
+
+Keputusan fase implementasi saat ini:
+
+1. `web-psb-perkasa` dijadikan fondasi Divisi `Pemasaran & Pelayanan`
+2. migrasi tahap awal dipusatkan pada role dan flow di bawah `Pemasaran & Pelayanan`
+3. divisi lain diintegrasikan setelah fondasi ini stabil di ERP
+
+Pemisahan ini membuat web bisa:
+
+1. memfilter sidebar berdasarkan role dan divisi
+2. mengunci dashboard operasional ke divisi default role non-admin
+3. menampilkan form, CTA, dan approval hanya bila role memiliki capability `create`, `update`, atau `approve`
+
+Lampiran inventaris aktual yang memetakan seluruh role, divisi, menu, fitur, dan kolom tampilan web ada di:
+
+- `docs/web-role-division-menu-feature-catalog.md`
+
 ### 2.2 Modul Fitur
 
 1. **Halaman Login**: autentikasi tunggal, branding platform, akses satu pintu
@@ -42,6 +72,39 @@ Aplikasi ini adalah website utama tunggal untuk operasional ISP yang menyatukan 
 | Inventory | Shell modul | Item, stock movement, ODP/port, device assignment |
 | HR | Shell modul | Employee, attendance, salary slip, loan |
 | Billing | Shell modul | Invoice, payment, collection action, overdue status |
+
+### 2.4 Inventaris Menu dan Kolom Operasional
+
+PRD ini memakai dua lapis dokumentasi untuk perspektif web:
+
+1. PRD utama ini menjelaskan tujuan produk, modul inti, dan arah pengalaman pengguna
+2. lampiran `docs/web-role-division-menu-feature-catalog.md` menjadi inventaris aktual menu, fitur, dan kolom layar berdasarkan role/divisi
+
+Lampiran tersebut wajib dijadikan acuan saat:
+
+1. memverifikasi apakah sebuah role benar-benar bisa melihat menu tertentu
+2. mengecek apakah sebuah capability write-side memang harus tampil atau disembunyikan
+3. menulis test case UAT per role dan per domain
+
+Untuk keputusan pilot dan cutover bertahap per role/divisi, gunakan juga:
+
+- `docs/web-role-cutover-readiness.md`
+
+Untuk blocker utama role bisnis lintas domain, gunakan PRD detail:
+
+- `docs/web-list-kerja-terpadu-prd.md`
+
+Untuk validasi fase awal Divisi `Pemasaran & Pelayanan`, gunakan checklist UAT khusus:
+
+- `docs/web-pemasaran-pelayanan-uat-checklist.md`
+
+Untuk spesifikasi implementasi modul pengganti menu legacy `list`, gunakan:
+
+- `docs/web-list-kerja-terpadu-implementation-spec.md`
+
+Untuk pengembangan dashboard configurable per manager divisi, gunakan:
+
+- `docs/dashboard-kpi-customization-prd.md`
 
 ## 3. Proses Inti
 

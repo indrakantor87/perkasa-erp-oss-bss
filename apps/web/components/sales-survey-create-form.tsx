@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type SalesSurveyCreateFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   leadSuggestions: string[]
+  initialLeadValue?: string
 }
 
 const surveyTypeOptions = ['HOME', 'DEDICATED', 'RESELLER'] as const
@@ -23,9 +24,10 @@ export function SalesSurveyCreateForm({
   canCreate,
   reviewDbReady,
   leadSuggestions,
+  initialLeadValue,
 }: SalesSurveyCreateFormProps) {
   const router = useRouter()
-  const [leadValue, setLeadValue] = useState(leadSuggestions[0] ?? '')
+  const [leadValue, setLeadValue] = useState(initialLeadValue?.trim() || leadSuggestions[0] || '')
   const [surveyType, setSurveyType] = useState<(typeof surveyTypeOptions)[number]>('HOME')
   const [surveyStatus, setSurveyStatus] = useState<(typeof surveyStatusOptions)[number]>('REQUESTED')
   const [feasibilityStatus, setFeasibilityStatus] = useState<(typeof feasibilityOptions)[number]>('PENDING')
@@ -37,6 +39,12 @@ export function SalesSurveyCreateForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialLeadValue?.trim()) {
+      setLeadValue(initialLeadValue.trim())
+    }
+  }, [initialLeadValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

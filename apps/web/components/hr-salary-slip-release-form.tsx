@@ -8,6 +8,7 @@ type HrSalarySlipReleaseFormProps = {
   canUpdate: boolean
   reviewDbReady: boolean
   salarySlipSuggestions: string[]
+  initialSalarySlipValue?: string
 }
 
 function extractSalarySlipId(value: string) {
@@ -28,9 +29,10 @@ export function HrSalarySlipReleaseForm({
   canUpdate,
   reviewDbReady,
   salarySlipSuggestions,
+  initialSalarySlipValue,
 }: HrSalarySlipReleaseFormProps) {
   const router = useRouter()
-  const [salarySlipValue, setSalarySlipValue] = useState(salarySlipSuggestions[0] ?? '')
+  const [salarySlipValue, setSalarySlipValue] = useState(initialSalarySlipValue?.trim() || salarySlipSuggestions[0] || '')
   const [releasedAt, setReleasedAt] = useState('')
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
@@ -49,6 +51,12 @@ export function HrSalarySlipReleaseForm({
     setSelectedIncome(parsed.income || '-')
     setSelectedDeduction(parsed.deduction || '-')
   }, [salarySlipValue])
+
+  useEffect(() => {
+    if (initialSalarySlipValue?.trim()) {
+      setSalarySlipValue(initialSalarySlipValue.trim())
+    }
+  }, [initialSalarySlipValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type SalesOrderCreateFormProps = {
@@ -9,6 +9,7 @@ type SalesOrderCreateFormProps = {
   reviewDbReady: boolean
   leadSuggestions: string[]
   marketingSuggestions: string[]
+  initialLeadValue?: string
 }
 
 const orderTypeOptions = ['NEW_INSTALL', 'UPGRADE', 'DOWNGRADE', 'RELOCATION', 'TERMINATION'] as const
@@ -24,9 +25,10 @@ export function SalesOrderCreateForm({
   reviewDbReady,
   leadSuggestions,
   marketingSuggestions,
+  initialLeadValue,
 }: SalesOrderCreateFormProps) {
   const router = useRouter()
-  const [leadValue, setLeadValue] = useState(leadSuggestions[0] ?? '')
+  const [leadValue, setLeadValue] = useState(initialLeadValue?.trim() || leadSuggestions[0] || '')
   const [orderType, setOrderType] = useState<(typeof orderTypeOptions)[number]>('NEW_INSTALL')
   const [status, setStatus] = useState<(typeof orderStatusOptions)[number]>('REGISTERED')
   const [scheduledInstallationAt, setScheduledInstallationAt] = useState('')
@@ -37,6 +39,12 @@ export function SalesOrderCreateForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialLeadValue?.trim()) {
+      setLeadValue(initialLeadValue.trim())
+    }
+  }, [initialLeadValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

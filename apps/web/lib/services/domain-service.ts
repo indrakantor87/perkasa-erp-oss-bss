@@ -142,10 +142,23 @@ type ReviewDbSubscriptionRow = {
 type ReviewDbBillingInvoiceRow = {
   invoiceNo: string
   customerName: string
+  invoiceType: string
   invoiceStatus: string
   totalAmount: number
   paidAmount: number
   dueDate: string | Date
+}
+
+type ReviewDbBillingReconnectRow = {
+  invoiceNo: string
+  customerName: string
+  invoiceType: string
+  invoiceStatus: string
+  totalAmount: number
+  paidAmount: number
+  dueDate: string | Date
+  collectionStatus: string | null
+  updatedAt: string | Date
 }
 
 type ReviewDbBillingReadySubscriptionRow = {
@@ -181,6 +194,7 @@ type ReviewDbBillingCancelledInvoiceRow = {
 }
 
 type ReviewDbCollectionActionRow = {
+  invoiceType: string
   actionType: string
   actionStatus: string
   actionAt: string | Date
@@ -193,6 +207,7 @@ type ReviewDbCollectionActionRow = {
 type ReviewDbCollectionFollowUpRow = {
   invoiceNo: string
   customerName: string
+  invoiceType: string
   invoiceStatus: string
   totalAmount: number
   paidAmount: number
@@ -425,6 +440,8 @@ type ReviewDbHrSalarySlipRow = {
   voidReason: string | null
 }
 
+const DIGITAL_SALES_SOURCES = ['DIGITAL', 'FACEBOOK', 'INSTAGRAM', 'TIKTOK', 'GOOGLE', 'WEBSITE', 'META ADS'] as const
+
 function buildCapabilities(role: AppRole, domain: DomainKey): DomainCapability[] {
   const content = domainPages[domain]
 
@@ -478,6 +495,13 @@ function formatDateTimeInputValue(value: string | Date | null | undefined) {
   return local.toISOString().slice(0, 16)
 }
 
+function toPeriodKey(value: string | Date | null | undefined) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return ''
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
 function getFollowUpState(value: string | Date | null | undefined) {
   if (!value) return 'UNSET'
 
@@ -499,6 +523,161 @@ function getFollowUpState(value: string | Date | null | undefined) {
   }
 
   return 'SCHEDULED'
+}
+
+function getTimeValue(value: string | Date | null | undefined) {
+  if (!value) return null
+
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return null
+
+  return date.getTime()
+}
+
+function hasSupportCloseEligibleProgress(value: string | null | undefined) {
+  const normalized = String(value ?? '').trim().toUpperCase()
+  return normalized === 'ON_PROGRESS' || normalized === 'FOLLOW_UP'
+}
+
+function isSupportTicketReadyToClose(item: ReviewDbSupportTicketRow) {
+  if (!hasSupportCloseEligibleProgress(item.progressStatus)) {
+    return false
+  }
+
+  if (getFollowUpState(item.followUpAt) !== 'UNSET') {
+    return false
+  }
+
+  const escalationAt = getTimeValue(item.escalatedAt)
+  const progressUpdatedAt = getTimeValue(item.progressUpdatedAt)
+
+  if (escalationAt !== null && (progressUpdatedAt === null || escalationAt > progressUpdatedAt)) {
+    return false
+  }
+
+  return true
+}
+
+function getSupportTicketQueueReason(item: ReviewDbSupportTicketRow) {
+  if (isSupportTicketReadyToClose(item)) {
+    return 'READY_CLOSE'
+  }
+
+  const escalationAt = getTimeValue(item.escalatedAt)
+  const progressUpdatedAt = getTimeValue(item.progressUpdatedAt)
+  if (escalationAt !== null && (progressUpdatedAt === null || escalationAt > progressUpdatedAt)) {
+    return 'ESCALATION_PENDING'
+  }
+
+  const followUpState = getFollowUpState(item.followUpAt)
+  if (followUpState === 'OVERDUE') {
+    return 'FOLLOW_UP_OVERDUE'
+  }
+  if (followUpState === 'TODAY') {
+    return 'FOLLOW_UP_TODAY'
+  }
+  if (followUpState === 'SCHEDULED') {
+    return 'FOLLOW_UP_SCHEDULED'
+  }
+
+  const slaState = getSlaState(item.slaDueAt)
+  if (slaState === 'OVERDUE') {
+    return 'SLA_OVERDUE'
+  }
+  if (slaState === 'DUE_TODAY') {
+    return 'SLA_DUE_TODAY'
+  }
+
+  return 'WAITING_PROGRESS'
+}
+
+function getSupportQueuePriorityRank(reason: string) {
+  switch (reason) {
+    case 'ESCALATION_PENDING':
+      return 1
+    case 'FOLLOW_UP_OVERDUE':
+      return 2
+    case 'SLA_OVERDUE':
+      return 3
+    case 'FOLLOW_UP_TODAY':
+      return 4
+    case 'SLA_DUE_TODAY':
+      return 5
+    case 'READY_CLOSE':
+      return 6
+    case 'FOLLOW_UP_SCHEDULED':
+      return 7
+    case 'WAITING_PROGRESS':
+      return 8
+    default:
+      return 9
+  }
+}
+
+function getSupportQueuePriorityLabel(reason: string) {
+  const rank = getSupportQueuePriorityRank(reason)
+  if (rank <= 2) return 'P1'
+  if (rank <= 4) return 'P2'
+  if (rank <= 6) return 'P3'
+  return 'P4'
+}
+
+function isSupportCriticalQueueReason(reason: string) {
+  return getSupportQueuePriorityRank(reason) <= 5
+}
+
+function isSupportPlannedQueueReason(reason: string) {
+  return reason === 'FOLLOW_UP_SCHEDULED'
+}
+
+function isSupportWaitingProgressQueueReason(reason: string) {
+  return reason === 'WAITING_PROGRESS'
+}
+
+function sortSupportTicketsByPriority(left: ReviewDbSupportTicketRow, right: ReviewDbSupportTicketRow) {
+  const leftReason = getSupportTicketQueueReason(left)
+  const rightReason = getSupportTicketQueueReason(right)
+  const rankDiff = getSupportQueuePriorityRank(leftReason) - getSupportQueuePriorityRank(rightReason)
+  if (rankDiff !== 0) {
+    return rankDiff
+  }
+
+  const leftFollowUp = getTimeValue(left.followUpAt)
+  const rightFollowUp = getTimeValue(right.followUpAt)
+  if (leftFollowUp !== null || rightFollowUp !== null) {
+    if (leftFollowUp === null) return 1
+    if (rightFollowUp === null) return -1
+    if (leftFollowUp !== rightFollowUp) return leftFollowUp - rightFollowUp
+  }
+
+  const leftProgress = getTimeValue(left.progressUpdatedAt)
+  const rightProgress = getTimeValue(right.progressUpdatedAt)
+  if (leftProgress !== null || rightProgress !== null) {
+    if (leftProgress === null) return 1
+    if (rightProgress === null) return -1
+    if (leftProgress !== rightProgress) return rightProgress - leftProgress
+  }
+
+  const leftOpened = getTimeValue(left.openedAt)
+  const rightOpened = getTimeValue(right.openedAt)
+  if (leftOpened !== null || rightOpened !== null) {
+    if (leftOpened === null) return 1
+    if (rightOpened === null) return -1
+    if (leftOpened !== rightOpened) return rightOpened - leftOpened
+  }
+
+  return String(right.ticketCode).localeCompare(String(left.ticketCode))
+}
+
+function isRecurringInvoiceType(value: string | null | undefined) {
+  return String(value ?? '').trim().toUpperCase() === 'RECURRING'
+}
+
+function isPromiseToPayOverdue(params: {
+  actionType: string
+  dueFollowUpAt: string | Date | null | undefined
+}) {
+  return params.actionType.trim().toUpperCase() === 'PROMISE_TO_PAY' && getFollowUpState(params.dueFollowUpAt) === 'OVERDUE'
 }
 
 function getSlaState(value: string | Date | null | undefined) {
@@ -613,8 +792,15 @@ async function getReviewDbDomainStats() {
   return row
 }
 
-async function getReviewDbSupportSections(lane?: SupportLaneKey | null): Promise<DomainReviewSection[]> {
-  const wantTickets = !lane || lane === 'tt'
+async function getReviewDbSupportSections(params?: {
+  lane?: SupportLaneKey | null
+  focus?: string
+}): Promise<DomainReviewSection[]> {
+  const lane = params?.lane ?? null
+  const focus = String(params?.focus ?? '')
+    .trim()
+    .toUpperCase()
+  const wantTickets = !lane || lane === 'tt' || lane === 'sla'
   const wantIsolations = !lane || lane === 'isolations'
   const wantSla = !lane || lane === 'sla'
   const wantDismantle = !lane || lane === 'dismantle'
@@ -753,44 +939,162 @@ async function getReviewDbSupportSections(lane?: SupportLaneKey | null): Promise
   `)
     : []
 
+  const readyCloseTickets = tickets
+    .filter((item) => isSupportTicketReadyToClose(item))
+    .sort(sortSupportTicketsByPriority)
+  const activeTickets = tickets
+    .filter((item) => !isSupportTicketReadyToClose(item))
+    .sort(sortSupportTicketsByPriority)
+  const criticalAttentionTickets = activeTickets.filter((item) =>
+    isSupportCriticalQueueReason(getSupportTicketQueueReason(item)),
+  )
+  const plannedFollowUpTickets = activeTickets.filter((item) =>
+    isSupportPlannedQueueReason(getSupportTicketQueueReason(item)),
+  )
+  const waitingProgressTickets = activeTickets.filter((item) =>
+    isSupportWaitingProgressQueueReason(getSupportTicketQueueReason(item)),
+  )
+  const slaOpenTickets = activeTickets.filter((item) => getSlaState(item.slaDueAt) !== 'UNSET')
+  const slaOverdueTickets = activeTickets.filter((item) => getSlaState(item.slaDueAt) === 'OVERDUE')
+  const showSlaTicketSections = lane === 'sla' || focus === 'SLA_OVERDUE' || focus === 'OVERDUE_RATE'
+  const slaRateSummary = [
+    { label: 'Ticket Open SLA', value: formatNumber(slaOpenTickets.length) },
+    { label: 'Ticket Overdue', value: formatNumber(slaOverdueTickets.length) },
+    { label: 'Rasio Overdue', value: formatPercentage(slaOverdueTickets.length, slaOpenTickets.length) },
+  ]
+
+  const buildSupportTicketRow = (
+    item: ReviewDbSupportTicketRow,
+    options: {
+      idSuffix?: string
+      status: string
+      closeCandidate: 'Ya' | 'Tidak'
+      defaultDetail: string
+    },
+  ) => {
+    const followUpState = getFollowUpState(item.followUpAt)
+    const slaState = getSlaState(item.slaDueAt)
+    const queueReason = getSupportTicketQueueReason(item)
+    const queuePriority = getSupportQueuePriorityLabel(queueReason)
+
+    return {
+      id: options.idSuffix ? `${item.ticketCode}-${options.idSuffix}` : item.ticketCode,
+      primary: item.ticketCode,
+      secondary: item.customerName,
+      status: options.status,
+      detail: item.progressNotes?.trim() || item.notes?.trim() || options.defaultDetail,
+      meta: [
+        `Type: ${item.ticketType || '-'}`,
+        `Customer User: ${item.customerUser || '-'}`,
+        `Opened: ${formatDateTime(item.openedAt)}`,
+        `SLA Days: ${item.slaDurationDays ?? '-'}`,
+        `SLA Due: ${formatDateTime(item.slaDueAt)}`,
+        `SLA State: ${slaState}`,
+        `PIC: ${item.ownerName || '-'}`,
+        `Next Follow Up: ${formatDateTime(item.followUpAt)}`,
+        `Follow Up State: ${followUpState}`,
+        `Progress Updated: ${formatDateTime(item.progressUpdatedAt)}`,
+        `Updated By: ${item.progressUpdatedBy || '-'}`,
+        `Latest Progress: ${item.progressNotes?.trim() || '-'}`,
+        `Escalation Target: ${item.escalationTarget || '-'}`,
+        `Escalation Level: ${item.escalationLevel || '-'}`,
+        `Escalated At: ${formatDateTime(item.escalatedAt)}`,
+        `Escalated By: ${item.escalatedBy || '-'}`,
+        `Escalation Reason: ${item.escalationReason?.trim() || '-'}`,
+        `Queue Priority: ${queuePriority}`,
+        `Queue Reason: ${queueReason}`,
+        `Close Candidate: ${options.closeCandidate}`,
+        `Ticket Notes: ${item.notes?.trim() || '-'}`,
+      ],
+    }
+  }
+
   return [
     {
-      title: 'Trouble Ticket Open',
-      description: 'Queue operasional terbaru dari tabel support_trouble_tickets pada database review.',
-      rows: tickets.map((item) => {
-        const followUpState = getFollowUpState(item.followUpAt)
-        const slaState = getSlaState(item.slaDueAt)
-        return {
-          id: item.ticketCode,
-          primary: item.ticketCode,
-          secondary: item.customerName,
+      title: 'Trouble Ticket Ready Close',
+      description:
+        'Antrean ticket yang sudah punya progress valid, tidak punya follow-up aktif, dan tidak sedang menunggu eskalasi yang lebih baru sehingga siap masuk ke jalur close formal.',
+      rows: readyCloseTickets.map((item) =>
+        buildSupportTicketRow(item, {
+          idSuffix: 'READY-CLOSE',
+          status: 'READY_CLOSE',
+          closeCandidate: 'Ya',
+          defaultDetail: 'Ticket ini sudah punya progress valid dan siap ditutup secara formal.',
+        }),
+      ),
+    },
+    {
+      title: 'Trouble Ticket Critical Attention',
+      description:
+        'Ticket dengan urgensi tertinggi seperti eskalasi pending, follow-up overdue, atau SLA yang sudah kritis sehingga perlu tindakan operator lebih dulu.',
+      rows: criticalAttentionTickets.map((item) =>
+        buildSupportTicketRow(item, {
+          idSuffix: 'CRITICAL',
           status: item.progressStatus?.trim() || item.status,
-          detail:
-            item.progressNotes?.trim() ||
-            item.notes?.trim() ||
-            'Belum ada catatan tambahan pada ticket ini.',
-          meta: [
-            `Type: ${item.ticketType || '-'}`,
-            `Customer User: ${item.customerUser || '-'}`,
-            `Opened: ${formatDateTime(item.openedAt)}`,
-            `SLA Days: ${item.slaDurationDays ?? '-'}`,
-            `SLA Due: ${formatDateTime(item.slaDueAt)}`,
-            `SLA State: ${slaState}`,
-            `PIC: ${item.ownerName || '-'}`,
-            `Next Follow Up: ${formatDateTime(item.followUpAt)}`,
-            `Follow Up State: ${followUpState}`,
-            `Progress Updated: ${formatDateTime(item.progressUpdatedAt)}`,
-            `Updated By: ${item.progressUpdatedBy || '-'}`,
-            `Latest Progress: ${item.progressNotes?.trim() || '-'}`,
-            `Escalation Target: ${item.escalationTarget || '-'}`,
-            `Escalation Level: ${item.escalationLevel || '-'}`,
-            `Escalated At: ${formatDateTime(item.escalatedAt)}`,
-            `Escalated By: ${item.escalatedBy || '-'}`,
-            `Escalation Reason: ${item.escalationReason?.trim() || '-'}`,
-            `Ticket Notes: ${item.notes?.trim() || '-'}`,
-          ],
-        }
-      }),
+          closeCandidate: 'Tidak',
+          defaultDetail: 'Ticket ini berada pada lane perhatian kritis dan perlu tindakan cepat operator.',
+        }),
+      ),
+    },
+    {
+      title: 'Trouble Ticket Planned Follow Up',
+      description:
+        'Ticket yang sudah punya jadwal follow-up aktif untuk hari berikutnya sehingga bisa dipantau terpisah dari antrean kritis.',
+      rows: plannedFollowUpTickets.map((item) =>
+        buildSupportTicketRow(item, {
+          idSuffix: 'PLANNED',
+          status: item.progressStatus?.trim() || item.status,
+          closeCandidate: 'Tidak',
+          defaultDetail: 'Ticket ini sudah punya follow-up terjadwal dan tinggal dipantau sesuai jadwal berikutnya.',
+        }),
+      ),
+    },
+    {
+      title: 'Trouble Ticket Waiting Progress',
+      description:
+        'Ticket yang belum punya follow-up aktif maupun kandidat close formal sehingga operator bisa fokus menambahkan progress baru atau menetapkan PIC berikutnya.',
+      rows: waitingProgressTickets.map((item) =>
+        buildSupportTicketRow(item, {
+          idSuffix: 'WAITING',
+          status: item.progressStatus?.trim() || item.status,
+          closeCandidate: 'Tidak',
+          defaultDetail: 'Ticket ini masih menunggu progress operasional berikutnya dari tim support.',
+        }),
+      ),
+    },
+    {
+      title: 'SLA Ticket Open Aktif',
+      description:
+        'Penyebut KPI rasio overdue, berisi ticket aktif yang masih berjalan dan sudah memiliki target SLA sehingga kontrol backlog bisa dibandingkan dengan pembilang overdue.',
+      summary: slaRateSummary,
+      rows:
+        showSlaTicketSections
+          ? slaOpenTickets.map((item) =>
+              buildSupportTicketRow(item, {
+                idSuffix: 'SLA-OPEN',
+                status: item.progressStatus?.trim() || item.status,
+                closeCandidate: 'Tidak',
+                defaultDetail: 'Ticket aktif ini masih berjalan di dalam kontrol SLA dan menjadi pembanding untuk rasio overdue.',
+              }),
+            )
+          : [],
+    },
+    {
+      title: 'SLA Ticket Overdue',
+      description:
+        'Pembilang KPI overdue rate, berisi ticket aktif yang sudah melewati target SLA agar operator bisa memprioritaskan backlog paling kritis.',
+      summary: slaRateSummary,
+      rows:
+        showSlaTicketSections
+          ? slaOverdueTickets.map((item) =>
+              buildSupportTicketRow(item, {
+                idSuffix: 'SLA-OVERDUE',
+                status: 'OVERDUE',
+                closeCandidate: 'Tidak',
+                defaultDetail: 'Ticket ini sudah melewati SLA dan perlu tindakan operasional lebih cepat.',
+              }),
+            )
+          : [],
     },
     {
       title: 'Isolir Aktif',
@@ -914,7 +1218,12 @@ async function getReviewDbCustomerSections(): Promise<DomainReviewSection[]> {
   ].filter((section) => section.rows.length > 0)
 }
 
-async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
+async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
+  const focus = String(filters?.focus ?? '')
+    .trim()
+    .toUpperCase()
+  const period = resolveSqlPeriodRange(filters)
+
   const subscriptionsReady = await runReviewDbQuery<ReviewDbBillingReadySubscriptionRow>(`
     SELECT
       ss.id AS subscriptionId,
@@ -944,28 +1253,78 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
-  const invoices = await runReviewDbQuery<ReviewDbBillingInvoiceRow>(`
-    SELECT
-      bi.invoice_no AS invoiceNo,
-      c.full_name AS customerName,
-      bi.invoice_status AS invoiceStatus,
-      bi.total_amount AS totalAmount,
-      bi.paid_amount AS paidAmount,
-      bi.due_date AS dueDate
-    FROM billing_invoices bi
-    JOIN service_subscriptions ss
-      ON ss.id = bi.subscription_id
-    JOIN crm_customers c
-      ON c.id = ss.customer_id
-    WHERE bi.invoice_status IN ('OVERDUE', 'PARTIAL')
-       OR (
-         bi.due_date < CURRENT_DATE
-         AND COALESCE(bi.paid_amount, 0) < COALESCE(bi.total_amount, 0)
-         AND bi.invoice_status NOT IN ('PAID', 'CANCELLED')
-       )
-    ORDER BY bi.due_date ASC, bi.id DESC
-    LIMIT 5
-  `)
+  const invoiceValues: unknown[] = []
+  const invoicePeriodWhere = period
+    ? ` AND (
+          (bi.billing_year = ? AND bi.billing_month = ?)
+          OR (bi.due_date >= ? AND bi.due_date < ?)
+        ) `
+    : ''
+  if (invoicePeriodWhere && period) {
+    invoiceValues.push(period.year, period.month, period.startDate, period.endDate)
+  }
+
+  const invoiceFocusWhere = (() => {
+    if (focus === 'OVERDUE_INVOICES' || focus === 'BILLING_OVERDUE_AMOUNT') {
+      return `
+        AND (
+          bi.invoice_status = 'OVERDUE'
+          OR (
+            bi.due_date < CURRENT_DATE
+            AND COALESCE(bi.paid_amount, 0) < COALESCE(bi.total_amount, 0)
+            AND bi.invoice_status NOT IN ('PAID', 'CANCELLED')
+          )
+        )
+      `
+    }
+    if (focus === 'PARTIAL_INVOICES' || focus === 'PARTIAL_PAYMENTS') {
+      return `
+        AND bi.invoice_status = 'PARTIAL'
+        AND COALESCE(bi.paid_amount, 0) < COALESCE(bi.total_amount, 0)
+      `
+    }
+    return `
+      AND (
+        bi.invoice_status IN ('OVERDUE', 'PARTIAL')
+        OR (
+          bi.due_date < CURRENT_DATE
+          AND COALESCE(bi.paid_amount, 0) < COALESCE(bi.total_amount, 0)
+          AND bi.invoice_status NOT IN ('PAID', 'CANCELLED')
+        )
+      )
+    `
+  })()
+
+  const invoiceOrderBy =
+    focus === 'BILLING_OVERDUE_AMOUNT'
+      ? `ORDER BY (COALESCE(bi.total_amount, 0) - COALESCE(bi.paid_amount, 0)) DESC, bi.due_date ASC, bi.id DESC`
+      : `ORDER BY bi.due_date ASC, bi.id DESC`
+  const invoiceLimit = focus === 'BILLING_OVERDUE_AMOUNT' ? 10 : 5
+
+  const invoices = await runReviewDbQuery<ReviewDbBillingInvoiceRow>(
+    `
+      SELECT
+        bi.invoice_no AS invoiceNo,
+        c.full_name AS customerName,
+        bi.invoice_type AS invoiceType,
+        bi.invoice_status AS invoiceStatus,
+        bi.total_amount AS totalAmount,
+        bi.paid_amount AS paidAmount,
+        bi.due_date AS dueDate
+      FROM billing_invoices bi
+      JOIN service_subscriptions ss
+        ON ss.id = bi.subscription_id
+      JOIN crm_customers c
+        ON c.id = ss.customer_id
+      WHERE 1 = 1
+        ${invoiceFocusWhere}
+        ${invoicePeriodWhere}
+        AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') NOT IN ('WRITE_OFF', 'CLOSED')
+      ${invoiceOrderBy}
+      LIMIT ${invoiceLimit}
+    `,
+    invoiceValues,
+  )
 
   const latestInvoices = await runReviewDbQuery<ReviewDbBillingLatestInvoiceRow>(`
     SELECT
@@ -1026,8 +1385,31 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
+  const reconnectReadyInvoices = await runReviewDbQuery<ReviewDbBillingReconnectRow>(`
+    SELECT
+      bi.invoice_no AS invoiceNo,
+      c.full_name AS customerName,
+      bi.invoice_type AS invoiceType,
+      bi.invoice_status AS invoiceStatus,
+      bi.total_amount AS totalAmount,
+      bi.paid_amount AS paidAmount,
+      bi.due_date AS dueDate,
+      bi.collection_status AS collectionStatus,
+      bi.updated_at AS updatedAt
+    FROM billing_invoices bi
+    JOIN service_subscriptions ss
+      ON ss.id = bi.subscription_id
+    JOIN crm_customers c
+      ON c.id = ss.customer_id
+    WHERE COALESCE(UPPER(TRIM(bi.collection_status)), '') = 'RECONNECT'
+      AND COALESCE(UPPER(TRIM(bi.invoice_status)), 'ISSUED') IN ('ISSUED', 'OVERDUE', 'PARTIAL')
+    ORDER BY bi.updated_at DESC, bi.id DESC
+    LIMIT 5
+  `)
+
   const actions = await runReviewDbQuery<ReviewDbCollectionActionRow>(`
     SELECT
+      bi.invoice_type AS invoiceType,
       bca.action_type AS actionType,
       bca.action_status AS actionStatus,
       bca.action_at AS actionAt,
@@ -1046,10 +1428,33 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
-  const collectionFollowUps = await runReviewDbQuery<ReviewDbCollectionFollowUpRow>(`
+  const followUpValues: unknown[] = []
+  const followUpPeriodWhere = period ? ` AND bi.due_date >= ? AND bi.due_date < ? ` : ''
+  if (followUpPeriodWhere && period) {
+    followUpValues.push(period.startDate, period.endDate)
+  }
+
+  const followUpFocusWhere =
+    focus === 'SUSPEND_CANDIDATES'
+      ? `
+        AND (
+          COALESCE(bi.suspend_candidate, 0) = 1
+          OR COALESCE(UPPER(TRIM(latest.action_type)), '') = 'SUSPEND'
+          OR (
+            COALESCE(UPPER(TRIM(latest.action_type)), '') = 'PROMISE_TO_PAY'
+            AND latest.due_follow_up_at IS NOT NULL
+            AND latest.due_follow_up_at < CURRENT_TIMESTAMP
+          )
+        )
+      `
+      : ''
+
+  const collectionFollowUps = await runReviewDbQuery<ReviewDbCollectionFollowUpRow>(
+    `
     SELECT
       bi.invoice_no AS invoiceNo,
       c.full_name AS customerName,
+      bi.invoice_type AS invoiceType,
       bi.invoice_status AS invoiceStatus,
       bi.total_amount AS totalAmount,
       bi.paid_amount AS paidAmount,
@@ -1085,13 +1490,96 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
       ON latest.invoice_id = bi.id
     WHERE COALESCE(UPPER(TRIM(latest.action_status)), 'OPEN') = 'OPEN'
       AND COALESCE(UPPER(TRIM(bi.invoice_status)), 'ISSUED') IN ('ISSUED', 'OVERDUE', 'PARTIAL')
+      AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') <> 'CLOSED'
+      ${followUpFocusWhere}
+      ${followUpPeriodWhere}
     ORDER BY
       CASE WHEN latest.due_follow_up_at IS NULL THEN 1 ELSE 0 END ASC,
       latest.due_follow_up_at ASC,
       bi.due_date ASC,
       bi.id DESC
-    LIMIT 5
-  `)
+    LIMIT 10
+  `,
+    followUpValues,
+  )
+
+  const activeCollectionFollowUps = collectionFollowUps.filter(
+    (item) => !['WRITE_OFF', 'CLOSED'].includes(String(item.collectionStatus ?? '').trim().toUpperCase()),
+  )
+  const recurringActiveCollectionFollowUps = activeCollectionFollowUps.filter((item) => isRecurringInvoiceType(item.invoiceType))
+  const oneTimeActiveCollectionFollowUps = activeCollectionFollowUps.filter((item) => !isRecurringInvoiceType(item.invoiceType))
+  const writeOffCollectionFollowUps = collectionFollowUps.filter(
+    (item) => String(item.collectionStatus ?? '').trim().toUpperCase() === 'WRITE_OFF',
+  )
+  const suspendReadyCollectionFollowUps = activeCollectionFollowUps.filter(
+    (item) =>
+      Number(item.suspendCandidate) > 0 ||
+      item.actionType.trim().toUpperCase() === 'SUSPEND' ||
+      isPromiseToPayOverdue({
+        actionType: item.actionType,
+        dueFollowUpAt: item.dueFollowUpAt,
+      }),
+  )
+  const recurringSuspendReadyCollectionFollowUps = suspendReadyCollectionFollowUps.filter((item) =>
+    isRecurringInvoiceType(item.invoiceType),
+  )
+  const oneTimeSuspendReadyCollectionFollowUps = suspendReadyCollectionFollowUps.filter(
+    (item) => !isRecurringInvoiceType(item.invoiceType),
+  )
+  const promiseToPayCollectionFollowUps = activeCollectionFollowUps.filter(
+    (item) =>
+      item.actionType.trim().toUpperCase() === 'PROMISE_TO_PAY' &&
+      !isPromiseToPayOverdue({
+        actionType: item.actionType,
+        dueFollowUpAt: item.dueFollowUpAt,
+      }),
+  )
+  const recurringPromiseToPayCollectionFollowUps = promiseToPayCollectionFollowUps.filter((item) =>
+    isRecurringInvoiceType(item.invoiceType),
+  )
+  const oneTimePromiseToPayCollectionFollowUps = promiseToPayCollectionFollowUps.filter(
+    (item) => !isRecurringInvoiceType(item.invoiceType),
+  )
+  const recurringActions = actions.filter((item) => isRecurringInvoiceType(item.invoiceType))
+  const oneTimeActions = actions.filter((item) => !isRecurringInvoiceType(item.invoiceType))
+  const recurringReconnectReadyInvoices = reconnectReadyInvoices.filter((item) => isRecurringInvoiceType(item.invoiceType))
+  const oneTimeReconnectReadyInvoices = reconnectReadyInvoices.filter((item) => !isRecurringInvoiceType(item.invoiceType))
+  const recurringWriteOffCollectionFollowUps = writeOffCollectionFollowUps.filter((item) =>
+    isRecurringInvoiceType(item.invoiceType),
+  )
+  const oneTimeWriteOffCollectionFollowUps = writeOffCollectionFollowUps.filter(
+    (item) => !isRecurringInvoiceType(item.invoiceType),
+  )
+  const recurringInvoices = invoices.filter((item) => isRecurringInvoiceType(item.invoiceType))
+  const oneTimeInvoices = invoices.filter((item) => !isRecurringInvoiceType(item.invoiceType))
+  const recurringLatestInvoices = latestInvoices.filter((item) => isRecurringInvoiceType(item.invoiceType))
+  const oneTimeLatestInvoices = latestInvoices.filter((item) => !isRecurringInvoiceType(item.invoiceType))
+  const recurringOutstandingAmount = recurringInvoices.reduce(
+    (total, item) => total + Math.max(0, Number(item.totalAmount) - Number(item.paidAmount)),
+    0,
+  )
+  const oneTimeOutstandingAmount = oneTimeInvoices.reduce(
+    (total, item) => total + Math.max(0, Number(item.totalAmount) - Number(item.paidAmount)),
+    0,
+  )
+  const overdueAmountSummary = {
+    recurring: [
+      { label: 'Invoice', value: formatNumber(recurringInvoices.length) },
+      { label: 'Outstanding', value: formatCurrency(recurringOutstandingAmount) },
+      {
+        label: 'Rata-rata',
+        value: formatCurrency(recurringInvoices.length ? recurringOutstandingAmount / recurringInvoices.length : 0),
+      },
+    ],
+    oneTime: [
+      { label: 'Invoice', value: formatNumber(oneTimeInvoices.length) },
+      { label: 'Outstanding', value: formatCurrency(oneTimeOutstandingAmount) },
+      {
+        label: 'Rata-rata',
+        value: formatCurrency(oneTimeInvoices.length ? oneTimeOutstandingAmount / oneTimeInvoices.length : 0),
+      },
+    ],
+  }
 
   const payments = await runReviewDbQuery<ReviewDbPaymentRow>(`
     SELECT
@@ -1134,31 +1622,74 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
       })),
     },
     {
-      title: 'Invoice Perlu Tindak Lanjut',
-      description: 'Invoice overdue atau partial terbaru dari review DB untuk memantau prioritas penagihan.',
-      rows: invoices.map((item) => ({
+      title: focus === 'BILLING_OVERDUE_AMOUNT' ? 'Nominal Overdue Recurring Terbesar' : 'Invoice Recurring Perlu Tindak Lanjut',
+      description:
+        focus === 'BILLING_OVERDUE_AMOUNT'
+          ? 'Invoice recurring dengan sisa tagihan terbesar agar tim billing bisa memprioritaskan nominal overdue paling besar lebih dulu.'
+          : 'Invoice recurring overdue atau partial terbaru untuk memantau prioritas penagihan bulanan yang masih collectible.',
+      summary: focus === 'BILLING_OVERDUE_AMOUNT' ? overdueAmountSummary.recurring : undefined,
+      rows: recurringInvoices.map((item) => ({
         id: item.invoiceNo,
         primary: item.invoiceNo,
         secondary: item.customerName,
         status: item.invoiceStatus,
-        detail: `Total tagihan ${formatCurrency(item.totalAmount)} dengan pembayaran masuk ${formatCurrency(item.paidAmount)}.`,
+        detail:
+          focus === 'BILLING_OVERDUE_AMOUNT'
+            ? `Sisa tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} dari total ${formatCurrency(item.totalAmount)} pada invoice recurring overdue.`
+            : `Total tagihan ${formatCurrency(item.totalAmount)} dengan pembayaran masuk ${formatCurrency(item.paidAmount)}.`,
         meta: [
+          `Invoice Type: ${item.invoiceType}`,
           `Total: ${formatCurrency(item.totalAmount)}`,
           `Terbayar: ${formatCurrency(item.paidAmount)}`,
+          `Remaining: ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))}`,
           `Jatuh Tempo: ${formatDateTime(item.dueDate)}`,
+        ],
+        filterTags: [
+          `PERIOD:${toPeriodKey(item.dueDate)}`,
+          `INVOICE_STATUS:${String(item.invoiceStatus).trim().toUpperCase()}`,
+          `REMAINING_POSITIVE:${Number(item.totalAmount) > Number(item.paidAmount) ? 'YES' : 'NO'}`,
         ],
       })),
     },
     {
-      title: 'Invoice Terbaru',
-      description: 'Invoice terbaru dari review DB untuk memastikan output generate invoice langsung terlihat pada halaman billing.',
-      rows: latestInvoices.map((item) => ({
+      title: focus === 'BILLING_OVERDUE_AMOUNT' ? 'Nominal Overdue One-Time Terbesar' : 'Invoice One-Time Perlu Tindak Lanjut',
+      description:
+        focus === 'BILLING_OVERDUE_AMOUNT'
+          ? 'Invoice one-time dengan sisa tagihan terbesar agar charge instalasi, adjustment, atau terminasi bisa diprioritaskan berdasarkan nominal outstanding.'
+          : 'Invoice one-time overdue atau partial terbaru untuk memisahkan charge instalasi, adjustment, atau terminasi dari tagihan bulanan.',
+      summary: focus === 'BILLING_OVERDUE_AMOUNT' ? overdueAmountSummary.oneTime : undefined,
+      rows: oneTimeInvoices.map((item) => ({
+        id: item.invoiceNo,
+        primary: item.invoiceNo,
+        secondary: item.customerName,
+        status: item.invoiceStatus,
+        detail: `Invoice ${item.invoiceType} masih menyisakan tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} dan perlu follow-up one-time terpisah dari recurring billing.`,
+        meta: [
+          `Invoice Type: ${item.invoiceType}`,
+          `Total: ${formatCurrency(item.totalAmount)}`,
+          `Terbayar: ${formatCurrency(item.paidAmount)}`,
+          `Remaining: ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))}`,
+          `Jatuh Tempo: ${formatDateTime(item.dueDate)}`,
+        ],
+        filterTags: [
+          `PERIOD:${toPeriodKey(item.dueDate)}`,
+          `INVOICE_STATUS:${String(item.invoiceStatus).trim().toUpperCase()}`,
+          `REMAINING_POSITIVE:${Number(item.totalAmount) > Number(item.paidAmount) ? 'YES' : 'NO'}`,
+        ],
+      })),
+    },
+    {
+      title: 'Invoice Recurring Terbaru',
+      description:
+        'Invoice recurring terbaru dari review DB untuk memastikan hasil generate tagihan bulanan langsung terlihat terpisah dari one-time charge.',
+      rows: recurringLatestInvoices.map((item) => ({
         id: item.invoiceNo,
         primary: item.invoiceNo,
         secondary: item.customerName,
         status: item.invoiceStatus,
         detail: `Invoice ${item.invoiceType} untuk layanan ${item.serviceNo} dengan total ${formatCurrency(item.totalAmount)}.`,
         meta: [
+          `Invoice Type: ${item.invoiceType}`,
           `Service: ${item.serviceNo}`,
           `Issue: ${formatDateTime(item.issueDate)}`,
           `Due: ${formatDateTime(item.dueDate)}`,
@@ -1166,6 +1697,40 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
           item.billingMonth && item.billingYear
             ? `Periode: ${String(item.billingMonth).padStart(2, '0')}/${item.billingYear}`
             : 'Periode: -',
+        ],
+        filterTags: [
+          item.billingMonth && item.billingYear
+            ? `PERIOD:${item.billingYear}-${String(item.billingMonth).padStart(2, '0')}`
+            : `PERIOD:${toPeriodKey(item.issueDate)}`,
+          `INVOICE_STATUS:${String(item.invoiceStatus).trim().toUpperCase()}`,
+        ],
+      })),
+    },
+    {
+      title: 'Invoice One-Time Terbaru',
+      description:
+        'Invoice one-time terbaru untuk meninjau charge instalasi, adjustment, atau terminasi secara terpisah dari recurring billing.',
+      rows: oneTimeLatestInvoices.map((item) => ({
+        id: item.invoiceNo,
+        primary: item.invoiceNo,
+        secondary: item.customerName,
+        status: item.invoiceStatus,
+        detail: `Invoice ${item.invoiceType} untuk layanan ${item.serviceNo} dengan total ${formatCurrency(item.totalAmount)}.`,
+        meta: [
+          `Invoice Type: ${item.invoiceType}`,
+          `Service: ${item.serviceNo}`,
+          `Issue: ${formatDateTime(item.issueDate)}`,
+          `Due: ${formatDateTime(item.dueDate)}`,
+          `Paid: ${formatCurrency(item.paidAmount)}`,
+          item.billingMonth && item.billingYear
+            ? `Periode: ${String(item.billingMonth).padStart(2, '0')}/${item.billingYear}`
+            : 'Periode: -',
+        ],
+        filterTags: [
+          item.billingMonth && item.billingYear
+            ? `PERIOD:${item.billingYear}-${String(item.billingMonth).padStart(2, '0')}`
+            : `PERIOD:${toPeriodKey(item.issueDate)}`,
+          `INVOICE_STATUS:${String(item.invoiceStatus).trim().toUpperCase()}`,
         ],
       })),
     },
@@ -1204,22 +1769,27 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
       })),
     },
     {
-      title: 'Suspend Ready Queue',
+      title: 'Suspend Ready Queue • Recurring',
       description:
-        'Antrean invoice yang sudah masuk sinyal suspend dari collection follow-up agar operator billing bisa mengeksekusi suspend massal tanpa memilah catatan satu per satu.',
-      rows: collectionFollowUps
-        .filter((item) => Number(item.suspendCandidate) > 0 || item.actionType.trim().toUpperCase() === 'SUSPEND')
-        .map((item, index) => {
+        'Antrean invoice recurring yang sudah masuk sinyal suspend dari collection follow-up agar operator billing bisa mengeksekusi suspend massal untuk tagihan bulanan tanpa tercampur one-time charge.',
+      rows: recurringSuspendReadyCollectionFollowUps.map((item, index) => {
           const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
           const followUpState = getFollowUpState(item.dueFollowUpAt)
+          const autoEscalatedPromiseToPay = isPromiseToPayOverdue({
+            actionType: item.actionType,
+            dueFollowUpAt: item.dueFollowUpAt,
+          })
 
           return {
             id: `${item.invoiceNo}-SUSPEND-READY-${index}`,
             primary: item.invoiceNo,
             secondary: item.customerName,
             status: followUpState,
-            detail: `Invoice siap suspend dengan sisa tagihan ${formatCurrency(remainingAmount)} dan action ${item.actionType}.`,
+            detail: autoEscalatedPromiseToPay
+              ? `Promise to pay sudah lewat jatuh tempo, sehingga invoice otomatis masuk sinyal suspend dengan sisa tagihan ${formatCurrency(remainingAmount)}.`
+              : `Invoice siap suspend dengan sisa tagihan ${formatCurrency(remainingAmount)} dan action ${item.actionType}.`,
             meta: [
+              `Invoice Type: ${item.invoiceType}`,
               `Invoice Status: ${item.invoiceStatus}`,
               `Total: ${formatCurrency(item.totalAmount)}`,
               `Paid: ${formatCurrency(item.paidAmount)}`,
@@ -1228,20 +1798,69 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
               `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
               `Follow Up State: ${followUpState}`,
               `Action Type: ${item.actionType}`,
+              `Auto Escalated From Promise To Pay: ${autoEscalatedPromiseToPay ? 'Ya' : 'Tidak'}`,
               `Collection Status: ${item.collectionStatus || '-'}`,
               `Suspend Candidate: ${Number(item.suspendCandidate) > 0 ? 'Ya' : 'Tidak'}`,
               `Action Notes: ${item.notes?.trim() || '-'}`,
+            ],
+            filterTags: [
+              `PERIOD:${toPeriodKey(item.dueDate)}`,
+              `INVOICE_STATUS:${String(item.invoiceStatus).trim().toUpperCase()}`,
+              `REMAINING_POSITIVE:${remainingAmount > 0 ? 'YES' : 'NO'}`,
+              `SUSPEND_CANDIDATE:${Number(item.suspendCandidate) > 0 ? 'YES' : 'NO'}`,
             ],
           }
         }),
     },
     {
-      title: 'Promise To Pay Queue',
+      title: 'Suspend Ready Queue • One-Time',
       description:
-        'Antrean invoice dengan janji bayar aktif agar operator collection bisa memisahkan invoice yang masih layak ditunggu dari invoice yang sudah harus naik ke jalur suspend.',
-      rows: collectionFollowUps
-        .filter((item) => item.actionType.trim().toUpperCase() === 'PROMISE_TO_PAY')
-        .map((item, index) => {
+        'Antrean invoice one-time yang sudah masuk sinyal suspend atau eskalasi follow-up agar charge khusus tidak bercampur dengan ritme recurring billing.',
+      rows: oneTimeSuspendReadyCollectionFollowUps.map((item, index) => {
+        const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
+        const followUpState = getFollowUpState(item.dueFollowUpAt)
+        const autoEscalatedPromiseToPay = isPromiseToPayOverdue({
+          actionType: item.actionType,
+          dueFollowUpAt: item.dueFollowUpAt,
+        })
+
+        return {
+          id: `${item.invoiceNo}-SUSPEND-READY-ONE-TIME-${index}`,
+          primary: item.invoiceNo,
+          secondary: item.customerName,
+          status: followUpState,
+          detail: autoEscalatedPromiseToPay
+            ? `Promise to pay one-time sudah lewat jatuh tempo, sehingga invoice otomatis masuk sinyal suspend dengan sisa tagihan ${formatCurrency(remainingAmount)}.`
+            : `Invoice one-time siap suspend dengan sisa tagihan ${formatCurrency(remainingAmount)} dan action ${item.actionType}.`,
+          meta: [
+            `Invoice Type: ${item.invoiceType}`,
+            `Invoice Status: ${item.invoiceStatus}`,
+            `Total: ${formatCurrency(item.totalAmount)}`,
+            `Paid: ${formatCurrency(item.paidAmount)}`,
+            `Remaining: ${formatCurrency(remainingAmount)}`,
+            `Invoice Due: ${formatDateTime(item.dueDate)}`,
+            `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
+            `Follow Up State: ${followUpState}`,
+            `Action Type: ${item.actionType}`,
+            `Auto Escalated From Promise To Pay: ${autoEscalatedPromiseToPay ? 'Ya' : 'Tidak'}`,
+            `Collection Status: ${item.collectionStatus || '-'}`,
+            `Suspend Candidate: ${Number(item.suspendCandidate) > 0 ? 'Ya' : 'Tidak'}`,
+            `Action Notes: ${item.notes?.trim() || '-'}`,
+          ],
+          filterTags: [
+            `PERIOD:${toPeriodKey(item.dueDate)}`,
+            `INVOICE_STATUS:${String(item.invoiceStatus).trim().toUpperCase()}`,
+            `REMAINING_POSITIVE:${remainingAmount > 0 ? 'YES' : 'NO'}`,
+            `SUSPEND_CANDIDATE:${Number(item.suspendCandidate) > 0 ? 'YES' : 'NO'}`,
+          ],
+        }
+      }),
+    },
+    {
+      title: 'Promise To Pay Queue • Recurring',
+      description:
+        'Antrean invoice recurring dengan janji bayar aktif agar operator collection bisa memisahkan tagihan bulanan yang masih layak ditunggu dari yang harus naik ke jalur suspend.',
+      rows: recurringPromiseToPayCollectionFollowUps.map((item, index) => {
           const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
           const followUpState = getFollowUpState(item.dueFollowUpAt)
 
@@ -1252,6 +1871,7 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
             status: followUpState,
             detail: `Janji bayar aktif dengan sisa tagihan ${formatCurrency(remainingAmount)} dan follow-up ${formatDateTime(item.dueFollowUpAt)}.`,
             meta: [
+              `Invoice Type: ${item.invoiceType}`,
               `Invoice Status: ${item.invoiceStatus}`,
               `Total: ${formatCurrency(item.totalAmount)}`,
               `Paid: ${formatCurrency(item.paidAmount)}`,
@@ -1268,28 +1888,147 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
         }),
     },
     {
-      title: 'Reconnect Ready Queue',
+      title: 'Promise To Pay Queue • One-Time',
       description:
-        'Antrean invoice yang sudah disuspend dan siap dikembalikan ke jalur overdue/reconnect setelah tindak lanjut lapangan atau negosiasi customer selesai.',
-      rows: suspendedInvoices.map((item) => ({
-        id: `${item.invoiceNo}-RECONNECT`,
+        'Antrean invoice one-time dengan janji bayar aktif agar negosiasi biaya instalasi, adjustment, atau terminasi tidak bercampur dengan tagihan bulanan.',
+      rows: oneTimePromiseToPayCollectionFollowUps.map((item, index) => {
+        const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
+        const followUpState = getFollowUpState(item.dueFollowUpAt)
+
+        return {
+          id: `${item.invoiceNo}-PTP-ONE-TIME-${index}`,
+          primary: item.invoiceNo,
+          secondary: item.customerName,
+          status: followUpState,
+          detail: `Janji bayar one-time aktif dengan sisa tagihan ${formatCurrency(remainingAmount)} dan follow-up ${formatDateTime(item.dueFollowUpAt)}.`,
+          meta: [
+            `Invoice Type: ${item.invoiceType}`,
+            `Invoice Status: ${item.invoiceStatus}`,
+            `Total: ${formatCurrency(item.totalAmount)}`,
+            `Paid: ${formatCurrency(item.paidAmount)}`,
+            `Remaining: ${formatCurrency(remainingAmount)}`,
+            `Invoice Due: ${formatDateTime(item.dueDate)}`,
+            `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
+            `Follow Up State: ${followUpState}`,
+            `Action Type: ${item.actionType}`,
+            `Collection Status: ${item.collectionStatus || '-'}`,
+            `Suspend Candidate: ${Number(item.suspendCandidate) > 0 ? 'Ya' : 'Tidak'}`,
+            `Action Notes: ${item.notes?.trim() || '-'}`,
+          ],
+        }
+      }),
+    },
+    {
+      title: 'Reconnect Ready Queue • Recurring',
+      description:
+        'Antrean invoice recurring yang sudah disuspend dan siap dikembalikan ke jalur overdue/reconnect setelah tindak lanjut lapangan atau negosiasi customer selesai.',
+      rows: recurringReconnectReadyInvoices.map((item) => ({
+        id: `${item.invoiceNo}-RECONNECT-RECURRING`,
         primary: item.invoiceNo,
         secondary: item.customerName,
-        status: 'READY',
-        detail: `Invoice suspended dengan sisa tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} siap diaktifkan lagi ke jalur overdue.`,
+        status: item.invoiceStatus,
+        detail: `Invoice recurring pada jalur reconnect dengan sisa tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} masih perlu pemulihan layanan atau tindak lanjut billing.`,
         meta: [
+          `Invoice Type: ${item.invoiceType}`,
           `Invoice Status: ${item.invoiceStatus}`,
+          `Collection Status: ${item.collectionStatus || '-'}`,
           `Total: ${formatCurrency(item.totalAmount)}`,
           `Paid: ${formatCurrency(item.paidAmount)}`,
           `Remaining: ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))}`,
           `Invoice Due: ${formatDateTime(item.dueDate)}`,
+          `Updated: ${formatDateTime(item.updatedAt)}`,
         ],
       })),
     },
     {
-      title: 'Collection Action Terbaru',
-      description: 'Aktivitas collection terbaru untuk memantau reminder, promise to pay, dan suspend candidate.',
-      rows: actions.map((item, index) => ({
+      title: 'Reconnect Ready Queue • One-Time',
+      description:
+        'Antrean invoice one-time yang sudah masuk jalur reconnect agar charge instalasi, adjustment, atau terminasi yang masih perlu pemulihan tidak bercampur dengan tagihan bulanan.',
+      rows: oneTimeReconnectReadyInvoices.map((item) => ({
+        id: `${item.invoiceNo}-RECONNECT-ONE-TIME`,
+        primary: item.invoiceNo,
+        secondary: item.customerName,
+        status: item.invoiceStatus,
+        detail: `Invoice one-time pada jalur reconnect dengan sisa tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} masih perlu tindak lanjut billing.`,
+        meta: [
+          `Invoice Type: ${item.invoiceType}`,
+          `Invoice Status: ${item.invoiceStatus}`,
+          `Collection Status: ${item.collectionStatus || '-'}`,
+          `Total: ${formatCurrency(item.totalAmount)}`,
+          `Paid: ${formatCurrency(item.paidAmount)}`,
+          `Remaining: ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))}`,
+          `Invoice Due: ${formatDateTime(item.dueDate)}`,
+          `Updated: ${formatDateTime(item.updatedAt)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Write Off Queue • Recurring',
+      description:
+        'Antrean invoice recurring yang sedang diajukan atau diproses write-off agar operator collection bisa memisahkannya dari follow-up penagihan normal.',
+      rows: recurringWriteOffCollectionFollowUps.map((item, index) => {
+        const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
+        const followUpState = getFollowUpState(item.dueFollowUpAt)
+
+        return {
+          id: `${item.invoiceNo}-WRITE-OFF-RECURRING-${index}`,
+          primary: item.invoiceNo,
+          secondary: item.customerName,
+          status: followUpState,
+          detail: `Invoice berada pada jalur write-off dengan sisa tagihan ${formatCurrency(remainingAmount)} dan perlu keputusan formal sebelum keluar penuh dari lifecycle billing.`,
+          meta: [
+            `Invoice Type: ${item.invoiceType}`,
+            `Invoice Status: ${item.invoiceStatus}`,
+            `Total: ${formatCurrency(item.totalAmount)}`,
+            `Paid: ${formatCurrency(item.paidAmount)}`,
+            `Remaining: ${formatCurrency(remainingAmount)}`,
+            `Invoice Due: ${formatDateTime(item.dueDate)}`,
+            `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
+            `Follow Up State: ${followUpState}`,
+            `Action Type: ${item.actionType}`,
+            `Collection Status: ${item.collectionStatus || '-'}`,
+            `Action At: ${formatDateTime(item.actionAt)}`,
+            `Action Notes: ${item.notes?.trim() || '-'}`,
+          ],
+        }
+      }),
+    },
+    {
+      title: 'Write Off Queue • One-Time',
+      description:
+        'Antrean invoice one-time yang sedang diajukan atau diproses write-off agar charge khusus tidak bercampur dengan invoice recurring non-collectible.',
+      rows: oneTimeWriteOffCollectionFollowUps.map((item, index) => {
+        const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
+        const followUpState = getFollowUpState(item.dueFollowUpAt)
+
+        return {
+          id: `${item.invoiceNo}-WRITE-OFF-ONE-TIME-${index}`,
+          primary: item.invoiceNo,
+          secondary: item.customerName,
+          status: followUpState,
+          detail: `Invoice one-time berada pada jalur write-off dengan sisa tagihan ${formatCurrency(remainingAmount)} dan perlu keputusan formal sebelum keluar penuh dari lifecycle billing.`,
+          meta: [
+            `Invoice Type: ${item.invoiceType}`,
+            `Invoice Status: ${item.invoiceStatus}`,
+            `Total: ${formatCurrency(item.totalAmount)}`,
+            `Paid: ${formatCurrency(item.paidAmount)}`,
+            `Remaining: ${formatCurrency(remainingAmount)}`,
+            `Invoice Due: ${formatDateTime(item.dueDate)}`,
+            `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
+            `Follow Up State: ${followUpState}`,
+            `Action Type: ${item.actionType}`,
+            `Collection Status: ${item.collectionStatus || '-'}`,
+            `Action At: ${formatDateTime(item.actionAt)}`,
+            `Action Notes: ${item.notes?.trim() || '-'}`,
+          ],
+        }
+      }),
+    },
+    {
+      title: 'Collection Action Terbaru • Recurring',
+      description:
+        'Aktivitas collection recurring terbaru untuk memantau reminder, promise to pay, dan suspend candidate pada tagihan bulanan.',
+      rows: recurringActions.map((item, index) => ({
         id: `${item.invoiceNo}-${item.actionType}-${index}`,
         primary: item.actionType,
         secondary: item.invoiceNo,
@@ -1297,26 +2036,78 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
         detail: item.notes?.trim() || 'Belum ada catatan tambahan pada action collection ini.',
         meta: [
           `Customer: ${item.customerName}`,
+          `Invoice Type: ${item.invoiceType}`,
           `At: ${formatDateTime(item.actionAt)}`,
           `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
         ],
       })),
     },
     {
-      title: 'Collection Follow Up Queue',
+      title: 'Collection Action Terbaru • One-Time',
       description:
-        'Antrean follow-up collection aktif berdasarkan action OPEN terbaru per invoice agar operator bisa menindak promise to pay, reminder, dan suspend candidate dari satu layar.',
-      rows: collectionFollowUps.map((item, index) => {
+        'Aktivitas collection one-time terbaru untuk memantau negosiasi charge instalasi, adjustment, atau terminasi secara terpisah dari recurring billing.',
+      rows: oneTimeActions.map((item, index) => ({
+        id: `${item.invoiceNo}-${item.actionType}-ONE-TIME-${index}`,
+        primary: item.actionType,
+        secondary: item.invoiceNo,
+        status: item.actionStatus,
+        detail: item.notes?.trim() || 'Belum ada catatan tambahan pada action collection ini.',
+        meta: [
+          `Customer: ${item.customerName}`,
+          `Invoice Type: ${item.invoiceType}`,
+          `At: ${formatDateTime(item.actionAt)}`,
+          `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
+        ],
+      })),
+    },
+    {
+      title: 'Collection Follow Up Queue • Recurring',
+      description:
+        'Antrean follow-up collection aktif untuk invoice recurring berdasarkan action OPEN terbaru per invoice agar operator billing bisa fokus pada tagihan bulanan yang masih collectible.',
+      rows: recurringActiveCollectionFollowUps.map((item, index) => {
         const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
         const followUpState = getFollowUpState(item.dueFollowUpAt)
 
         return {
-          id: `${item.invoiceNo}-FOLLOW-${index}`,
+          id: `${item.invoiceNo}-FOLLOW-RECURRING-${index}`,
           primary: item.invoiceNo,
           secondary: item.customerName,
           status: followUpState,
           detail: `Action ${item.actionType} masih ${item.actionStatus} dengan sisa tagihan ${formatCurrency(remainingAmount)}.`,
           meta: [
+            `Invoice Type: ${item.invoiceType}`,
+            `Invoice Status: ${item.invoiceStatus}`,
+            `Total: ${formatCurrency(item.totalAmount)}`,
+            `Paid: ${formatCurrency(item.paidAmount)}`,
+            `Remaining: ${formatCurrency(remainingAmount)}`,
+            `Invoice Due: ${formatDateTime(item.dueDate)}`,
+            `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
+            `Follow Up State: ${followUpState}`,
+            `Action Type: ${item.actionType}`,
+            `Collection Status: ${item.collectionStatus || '-'}`,
+            `Suspend Candidate: ${Number(item.suspendCandidate) > 0 ? 'Ya' : 'Tidak'}`,
+            `Action At: ${formatDateTime(item.actionAt)}`,
+            `Action Notes: ${item.notes?.trim() || '-'}`,
+          ],
+        }
+      }),
+    },
+    {
+      title: 'Collection Follow Up Queue • One-Time',
+      description:
+        'Antrean follow-up collection aktif untuk invoice one-time agar charge instalasi, adjustment, atau terminasi tidak bercampur dengan ritme recurring billing.',
+      rows: oneTimeActiveCollectionFollowUps.map((item, index) => {
+        const remainingAmount = Number(item.totalAmount) - Number(item.paidAmount)
+        const followUpState = getFollowUpState(item.dueFollowUpAt)
+
+        return {
+          id: `${item.invoiceNo}-FOLLOW-ONE-TIME-${index}`,
+          primary: item.invoiceNo,
+          secondary: item.customerName,
+          status: followUpState,
+          detail: `Action ${item.actionType} masih ${item.actionStatus} dengan sisa tagihan ${formatCurrency(remainingAmount)}.`,
+          meta: [
+            `Invoice Type: ${item.invoiceType}`,
             `Invoice Status: ${item.invoiceStatus}`,
             `Total: ${formatCurrency(item.totalAmount)}`,
             `Paid: ${formatCurrency(item.paidAmount)}`,
@@ -1353,8 +2144,26 @@ async function getReviewDbBillingSections(): Promise<DomainReviewSection[]> {
   ].filter((section) => section.rows.length > 0)
 }
 
-async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
-  const leads = await runReviewDbQuery<ReviewDbSalesLeadRow>(`
+async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
+  const focus = String(filters?.focus ?? '')
+    .trim()
+    .toUpperCase()
+  const period = resolveSqlPeriodRange(filters)
+  const digitalSourcePlaceholders = DIGITAL_SALES_SOURCES.map(() => '?').join(', ')
+
+  const leadValues: unknown[] = []
+  const leadWhereParts: string[] = []
+  if (focus === 'ACTIVE_LEADS') {
+    leadWhereParts.push(`COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')`)
+  }
+  if (focus === 'DIGITAL_LEADS') {
+    leadWhereParts.push(`UPPER(COALESCE(source, '')) IN (${digitalSourcePlaceholders})`)
+    leadValues.push(...DIGITAL_SALES_SOURCES)
+  }
+  const leadWhere = leadWhereParts.length ? ` WHERE ${leadWhereParts.join(' AND ')} ` : ''
+
+  const leads = await runReviewDbQuery<ReviewDbSalesLeadRow>(
+    `
     SELECT
       id AS leadId,
       customer_name AS customerName,
@@ -1365,9 +2174,12 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
       phone,
       notes
     FROM sales_leads
+    ${leadWhere}
     ORDER BY created_at DESC, id DESC
     LIMIT 5
-  `)
+  `,
+    leadValues,
+  )
 
   const coverages = await runReviewDbQuery<ReviewDbSalesCoverageRow>(`
     SELECT
@@ -1385,41 +2197,141 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
-  const flows = await runReviewDbQuery<ReviewDbSalesFlowRow>(`
-    SELECT
-      ss.id AS sourceId,
-      survey_no AS flowCode,
-      COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
-      'SURVEY' AS flowKind,
-      survey_status AS status,
-      feasibility_status AS detailLine,
-      scheduled_at AS detailDate,
-      sl.marketing_name AS marketingName
-    FROM sales_surveys ss
-    LEFT JOIN sales_leads sl
-      ON sl.id = ss.lead_id
-    LEFT JOIN crm_customers c
-      ON c.id = ss.customer_id
-    WHERE survey_status IN ('REQUESTED', 'SCHEDULED', 'ON_PROGRESS')
-    UNION ALL
-    SELECT
-      so.id AS sourceId,
-      so.order_no AS flowCode,
-      COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
-      'ORDER' AS flowKind,
-      so.status AS status,
-      so.order_type AS detailLine,
-      so.scheduled_installation_at AS detailDate,
-      so.marketing_name AS marketingName
-    FROM sales_orders so
-    LEFT JOIN sales_leads sl
-      ON sl.id = so.lead_id
-    LEFT JOIN crm_customers c
-      ON c.id = so.customer_id
-    WHERE COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')
+  const flowValues: unknown[] = []
+  let flowsQuery = `
+    SELECT *
+    FROM (
+      SELECT
+        ss.id AS sourceId,
+        survey_no AS flowCode,
+        COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+        'SURVEY' AS flowKind,
+        survey_status AS status,
+        feasibility_status AS detailLine,
+        scheduled_at AS detailDate,
+        sl.marketing_name AS marketingName
+      FROM sales_surveys ss
+      LEFT JOIN sales_leads sl
+        ON sl.id = ss.lead_id
+      LEFT JOIN crm_customers c
+        ON c.id = ss.customer_id
+      WHERE survey_status IN ('REQUESTED', 'SCHEDULED', 'ON_PROGRESS')
+      UNION ALL
+      SELECT
+        so.id AS sourceId,
+        so.order_no AS flowCode,
+        COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+        'ORDER' AS flowKind,
+        so.status AS status,
+        so.order_type AS detailLine,
+        so.scheduled_installation_at AS detailDate,
+        so.marketing_name AS marketingName
+      FROM sales_orders so
+      LEFT JOIN sales_leads sl
+        ON sl.id = so.lead_id
+      LEFT JOIN crm_customers c
+        ON c.id = so.customer_id
+      WHERE COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')
+    ) sales_flow
+    WHERE detailDate IS NOT NULL
     ORDER BY detailDate DESC, flowCode DESC
     LIMIT 5
-  `)
+  `
+
+  if (focus === 'MONTHLY_ORDERS' || focus === 'DIGITAL_ORDERS' || focus === 'ACTIVATION_RATE') {
+    const digitalOrderWhere =
+      focus === 'DIGITAL_ORDERS' ? ` AND UPPER(COALESCE(sl.source, '')) IN (${digitalSourcePlaceholders}) ` : ''
+
+    if (focus === 'DIGITAL_ORDERS') {
+      flowValues.push(...DIGITAL_SALES_SOURCES)
+    }
+    if (period) {
+      flowValues.push(period.startDate, period.endDate)
+    }
+
+    flowsQuery = `
+      SELECT
+        so.id AS sourceId,
+        so.order_no AS flowCode,
+        COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+        'ORDER' AS flowKind,
+        so.status AS status,
+        so.order_type AS detailLine,
+        so.request_date AS detailDate,
+        so.marketing_name AS marketingName
+      FROM sales_orders so
+      LEFT JOIN sales_leads sl
+        ON sl.id = so.lead_id
+      LEFT JOIN crm_customers c
+        ON c.id = so.customer_id
+      WHERE 1 = 1
+        ${digitalOrderWhere}
+        ${period ? 'AND so.request_date >= ? AND so.request_date < ?' : ''}
+      ORDER BY so.request_date DESC, so.id DESC
+      LIMIT 5
+    `
+  } else if (focus === 'DIGITAL_SURVEYS') {
+    flowValues.push(...DIGITAL_SALES_SOURCES)
+    if (period) {
+      flowValues.push(period.startDate, period.endDate)
+    }
+
+    flowsQuery = `
+      SELECT
+        ss.id AS sourceId,
+        ss.survey_no AS flowCode,
+        COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+        'SURVEY' AS flowKind,
+        ss.survey_status AS status,
+        ss.feasibility_status AS detailLine,
+        COALESCE(ss.scheduled_at, ss.created_at) AS detailDate,
+        sl.marketing_name AS marketingName
+      FROM sales_surveys ss
+      LEFT JOIN sales_leads sl
+        ON sl.id = ss.lead_id
+      LEFT JOIN crm_customers c
+        ON c.id = ss.customer_id
+      WHERE UPPER(COALESCE(sl.source, '')) IN (${digitalSourcePlaceholders})
+        ${period ? 'AND COALESCE(ss.scheduled_at, ss.created_at) >= ? AND COALESCE(ss.scheduled_at, ss.created_at) < ?' : ''}
+      ORDER BY COALESCE(ss.scheduled_at, ss.created_at) DESC, ss.id DESC
+      LIMIT 5
+    `
+  }
+
+  const flows = await runReviewDbQuery<ReviewDbSalesFlowRow>(flowsQuery, flowValues)
+
+  const activationRateSummary =
+    focus === 'ACTIVATION_RATE'
+      ? await (async () => {
+          const orderAggregate = await runReviewDbQuery<{ total: number }>(
+            `
+              SELECT COUNT(*) AS total
+              FROM sales_orders so
+              WHERE 1 = 1
+                ${period ? 'AND so.request_date >= ? AND so.request_date < ?' : ''}
+            `,
+            period ? [period.startDate, period.endDate] : [],
+          )
+          const activationAggregate = await runReviewDbQuery<{ total: number }>(
+            `
+              SELECT COUNT(*) AS total
+              FROM service_subscriptions ss
+              WHERE ss.activated_at IS NOT NULL
+                ${period ? 'AND ss.activated_at >= ? AND ss.activated_at < ?' : ''}
+            `,
+            period ? [period.startDate, period.endDate] : [],
+          )
+
+          const orderTotal = Number(orderAggregate[0]?.total ?? 0)
+          const activationTotal = Number(activationAggregate[0]?.total ?? 0)
+
+          return [
+            { label: 'Order Periode', value: formatNumber(orderTotal) },
+            { label: 'Aktivasi', value: formatNumber(activationTotal) },
+            { label: 'Rasio Aktivasi', value: formatPercentage(activationTotal, orderTotal) },
+          ]
+        })()
+      : undefined
 
   const workOrders = await runReviewDbQuery<ReviewDbSalesWorkOrderRow>(`
     SELECT
@@ -1443,7 +2355,19 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
-  const activations = await runReviewDbQuery<ReviewDbSalesActivationRow>(`
+  const activationValues: unknown[] = []
+  const activationWhereParts = ["ss.status IN ('PENDING', 'ACTIVE')"]
+  if (focus === 'MONTHLY_ACTIVATIONS' || focus === 'ACTIVATION_RATE') {
+    activationWhereParts.splice(0, activationWhereParts.length, 'ss.activated_at IS NOT NULL')
+    if (period) {
+      activationWhereParts.push('ss.activated_at >= ? AND ss.activated_at < ?')
+      activationValues.push(period.startDate, period.endDate)
+    }
+  }
+  const activationWhere = activationWhereParts.length ? `WHERE ${activationWhereParts.join(' AND ')}` : ''
+
+  const activations = await runReviewDbQuery<ReviewDbSalesActivationRow>(
+    `
     SELECT
       ss.id AS subscriptionId,
       ss.service_no AS serviceNo,
@@ -1461,10 +2385,12 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
       ON so.id = ss.order_id
     LEFT JOIN sales_packages sp
       ON sp.id = ss.package_id
-    WHERE ss.status IN ('PENDING', 'ACTIVE')
+    ${activationWhere}
     ORDER BY COALESCE(ss.activated_at, ss.created_at) DESC, ss.id DESC
     LIMIT 5
-  `)
+  `,
+    activationValues,
+  )
 
   return [
     {
@@ -1501,8 +2427,27 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
       })),
     },
     {
-      title: 'Survey Dan Order Berjalan',
-      description: 'Daftar survey pending dan order aktif terbaru dari review DB untuk memantau delivery awal.',
+      title:
+        focus === 'MONTHLY_ORDERS'
+          ? 'Order Periode Ini'
+          : focus === 'DIGITAL_ORDERS'
+            ? 'Order Digital Periode Ini'
+            : focus === 'DIGITAL_SURVEYS'
+              ? 'Survey Digital Periode Ini'
+              : focus === 'ACTIVATION_RATE'
+                ? 'Order Pembanding Aktivasi'
+              : 'Survey Dan Order Berjalan',
+      description:
+        focus === 'MONTHLY_ORDERS'
+          ? 'Daftar order yang benar-benar tercatat pada periode dashboard agar angka PSB selaras dengan KPI kartu.'
+          : focus === 'DIGITAL_ORDERS'
+            ? 'Daftar order dari source digital pada periode dashboard agar KPI order digital tidak bercampur dengan source lain.'
+            : focus === 'DIGITAL_SURVEYS'
+              ? 'Daftar survey dari source digital pada periode dashboard agar KPI survey digital mengikuti rule yang sama dengan kartu.'
+              : focus === 'ACTIVATION_RATE'
+                ? 'Daftar order pada periode dashboard yang menjadi penyebut rasio aktivasi, agar pembanding terhadap subscription aktif terlihat jelas.'
+              : 'Daftar survey pending dan order aktif terbaru dari review DB untuk memantau delivery awal.',
+      summary: focus === 'ACTIVATION_RATE' ? activationRateSummary : undefined,
       rows: flows.map((item) => ({
         id: item.flowKind === 'ORDER' ? `ORDER-${item.sourceId ?? item.flowCode}` : `${item.flowKind}-${item.flowCode}`,
         primary: item.flowCode,
@@ -1511,13 +2456,16 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
         detail:
           item.flowKind === 'SURVEY'
             ? `Status feasibility ${item.detailLine || 'PENDING'} dengan jadwal survey ${formatDateTime(item.detailDate)}.`
-            : `Order ${item.detailLine || '-'} dengan jadwal instalasi ${formatDateTime(item.detailDate)}.`,
+            : focus === 'MONTHLY_ORDERS' || focus === 'DIGITAL_ORDERS'
+              ? `Order ${item.detailLine || '-'} direquest pada ${formatDateTime(item.detailDate)}.`
+              : `Order ${item.detailLine || '-'} dengan jadwal instalasi ${formatDateTime(item.detailDate)}.`,
         meta: [
           `Flow: ${item.flowKind}`,
           ...(item.flowKind === 'ORDER' ? [`Order ID: ${item.sourceId ?? '-'}`] : []),
           `Marketing: ${item.marketingName || '-'}`,
           `At: ${formatDateTime(item.detailDate)}`,
         ],
+        filterTags: [`PERIOD:${toPeriodKey(item.detailDate)}`, `FLOW:${item.flowKind}`],
       })),
     },
     {
@@ -1538,8 +2486,15 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
       })),
     },
     {
-      title: 'Subscription Aktivasi Terbaru',
-      description: 'Subscription terbaru dari aktivasi order untuk memastikan alur delivery sudah benar-benar masuk ke layanan aktif.',
+      title:
+        focus === 'MONTHLY_ACTIVATIONS' || focus === 'ACTIVATION_RATE'
+          ? 'Subscription Aktivasi Periode Ini'
+          : 'Subscription Aktivasi Terbaru',
+      description:
+        focus === 'MONTHLY_ACTIVATIONS' || focus === 'ACTIVATION_RATE'
+          ? 'Subscription yang benar-benar aktif pada periode dashboard agar drilldown aktivasi 1:1 dengan KPI kartu.'
+          : 'Subscription terbaru dari aktivasi order untuk memastikan alur delivery sudah benar-benar masuk ke layanan aktif.',
+      summary: focus === 'ACTIVATION_RATE' ? activationRateSummary : undefined,
       rows: activations.map((item) => ({
         id: `SUB-${item.subscriptionId}`,
         primary: item.serviceNo,
@@ -1551,12 +2506,18 @@ async function getReviewDbSalesSections(): Promise<DomainReviewSection[]> {
           `Harga: ${formatCurrency(item.monthlyPrice)}`,
           `Aktivasi: ${formatDateTime(item.activatedAt)}`,
         ],
+        filterTags: [`PERIOD:${toPeriodKey(item.activatedAt)}`, 'FLOW:ACTIVATION'],
       })),
     },
   ].filter((section) => section.rows.length > 0)
 }
 
-async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
+async function getReviewDbInventorySections(filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
+  const focus = String(filters?.focus ?? '')
+    .trim()
+    .toUpperCase()
+  const period = resolveSqlPeriodRange(filters)
+
   await ensureInventoryLoanTable()
   await ensureInventoryRequestTable()
 
@@ -1579,7 +2540,14 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
-  const movements = await runReviewDbQuery<ReviewDbInventoryMovementRow>(`
+  const movementValues: unknown[] = []
+  const movementPeriodWhere = focus === 'MONTHLY_MOVEMENTS' && period ? ` WHERE ism.movement_at >= ? AND ism.movement_at < ? ` : ''
+  if (movementPeriodWhere && period) {
+    movementValues.push(period.startDate, period.endDate)
+  }
+
+  const movements = await runReviewDbQuery<ReviewDbInventoryMovementRow>(
+    `
     SELECT
       ism.id AS movementId,
       ism.movement_type AS movementType,
@@ -1593,9 +2561,12 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
     FROM inventory_stock_movements ism
     JOIN inventory_items ii
       ON ii.id = ism.item_id
+    ${movementPeriodWhere}
     ORDER BY ism.movement_at DESC, ism.id DESC
     LIMIT 5
-  `)
+  `,
+    movementValues,
+  )
 
   const odps = await runReviewDbQuery<ReviewDbInventoryOdpRow>(`
     SELECT
@@ -1707,7 +2678,19 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
     LIMIT 5
   `)
 
-  const requests = await runReviewDbQuery<ReviewDbInventoryRequestRow>(`
+  const requestValues: unknown[] = []
+  const requestWhereParts: string[] = []
+  if (focus === 'PENDING_REQUESTS') {
+    requestWhereParts.push(`UPPER(TRIM(iir.request_status)) = 'PENDING'`)
+  }
+  if (period) {
+    requestWhereParts.push(`iir.requested_at >= ? AND iir.requested_at < ?`)
+    requestValues.push(period.startDate, period.endDate)
+  }
+  const requestWhere = requestWhereParts.length ? ` WHERE ${requestWhereParts.join(' AND ')} ` : ''
+
+  const requests = await runReviewDbQuery<ReviewDbInventoryRequestRow>(
+    `
     SELECT
       iir.id AS requestId,
       iir.request_code AS requestCode,
@@ -1728,9 +2711,12 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
     FROM inventory_item_requests iir
     JOIN inventory_items ii
       ON ii.id = iir.inventory_item_id
+    ${requestWhere}
     ORDER BY iir.requested_at DESC, iir.id DESC
     LIMIT 5
-  `)
+  `,
+    requestValues,
+  )
 
   const loans = await runReviewDbQuery<ReviewDbInventoryLoanRow>(`
     SELECT
@@ -1788,6 +2774,7 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
           `Harga: ${formatCurrency(item.unitPrice)}`,
           `At: ${formatDateTime(item.movementAt)}`,
         ],
+        filterTags: [`PERIOD:${toPeriodKey(item.movementAt)}`],
       })),
     },
     {
@@ -1885,6 +2872,10 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
           `Requested: ${formatDateTime(item.requestedAt)}`,
           `Processed: ${formatDateTime(item.processedAt)}`,
         ],
+        filterTags: [
+          `PERIOD:${toPeriodKey(item.requestedAt)}`,
+          `REQUEST_STATUS:${String(item.requestStatus).trim().toUpperCase()}`,
+        ],
       })),
     },
     {
@@ -1943,7 +2934,12 @@ async function getReviewDbInventorySections(): Promise<DomainReviewSection[]> {
   ].filter((section) => section.rows.length > 0)
 }
 
-async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
+async function getReviewDbHrSections(filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
+  const focus = String(filters?.focus ?? '')
+    .trim()
+    .toUpperCase()
+  const period = resolveSqlPeriodRange(filters)
+
   await ensureHrSalarySlipVoidTable()
   const faceConfig = await getHrAttendanceFaceConfig().catch(() => null)
   const faceReferenceItems = await getRecentHrEmployeeFaceReferenceItems(5).catch(() => [])
@@ -1973,11 +2969,18 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
       ON od.id = he.division_id
     LEFT JOIN org_branches ob
       ON ob.id = he.branch_id
+    WHERE COALESCE(UPPER(TRIM(he.employment_status)), 'ACTIVE') <> 'ARCHIVED'
     ORDER BY COALESCE(he.join_date, DATE(he.created_at)) DESC, he.id DESC
     LIMIT 5
   `)
 
-  const attendances = await runReviewDbQuery<ReviewDbHrAttendanceRow>(`
+  const attendanceValues: unknown[] = []
+  const attendanceWhere = (() => {
+    return `ha.attendance_date = CURRENT_DATE`
+  })()
+
+  const attendances = await runReviewDbQuery<ReviewDbHrAttendanceRow>(
+    `
     SELECT
       ha.id AS attendanceId,
       he.full_name AS employeeName,
@@ -1990,10 +2993,41 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
     FROM hr_attendance ha
     JOIN hr_employees he
       ON he.id = ha.employee_id
-    WHERE ha.attendance_date = CURRENT_DATE
+    WHERE ${attendanceWhere}
     ORDER BY COALESCE(ha.check_in, ha.created_at) DESC, ha.id DESC
     LIMIT 5
-  `)
+  `,
+    attendanceValues,
+  )
+
+  const attendanceRateSummary =
+    focus === 'ATTENDANCE_RATE'
+      ? await (async () => {
+          const employeeAggregate = await runReviewDbQuery<{ total: number }>(
+            `
+              SELECT COUNT(*) AS total
+              FROM hr_employees
+              WHERE COALESCE(UPPER(TRIM(employment_status)), 'ACTIVE') <> 'ARCHIVED'
+            `,
+          )
+          const attendanceAggregate = await runReviewDbQuery<{ total: number }>(
+            `
+              SELECT COUNT(*) AS total
+              FROM hr_attendance
+              WHERE attendance_date = CURRENT_DATE
+            `,
+          )
+
+          const employeeTotal = Number(employeeAggregate[0]?.total ?? 0)
+          const attendanceTotal = Number(attendanceAggregate[0]?.total ?? 0)
+
+          return [
+            { label: 'Employee Aktif', value: formatNumber(employeeTotal) },
+            { label: 'Attendance Hari Ini', value: formatNumber(attendanceTotal) },
+            { label: 'Rasio Kehadiran', value: formatPercentage(attendanceTotal, employeeTotal) },
+          ]
+        })()
+      : undefined
 
   const loans = await runReviewDbQuery<ReviewDbHrLoanRow>(`
     SELECT
@@ -2006,6 +3040,7 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
     FROM hr_loans hl
     JOIN hr_employees he
       ON he.id = hl.employee_id
+    ${focus === 'ACTIVE_LOANS' ? `WHERE hl.status = 'ACTIVE'` : ''}
     ORDER BY hl.loan_date DESC, hl.id DESC
     LIMIT 5
   `)
@@ -2295,6 +3330,7 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
     {
       title: 'Employee Terbaru',
       description: 'Employee master terbaru dari review DB untuk memulai fondasi absensi, payroll, dan kontrol HR.',
+      summary: focus === 'ATTENDANCE_RATE' ? attendanceRateSummary : undefined,
       rows: employees.map((item) => ({
         id: `EMP-${item.employeeId}`,
         primary: item.employeeCode,
@@ -2465,7 +3501,11 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
     },
     {
       title: 'Attendance Hari Ini',
-      description: 'Kehadiran terbaru hari ini dari review DB untuk memastikan employee yang aktif mulai tercatat di HR.',
+      description:
+        focus === 'ATTENDANCE_RATE'
+          ? 'Kehadiran hari ini sebagai pembilang rasio attendance, disandingkan dengan employee aktif yang menjadi penyebut KPI.'
+          : 'Kehadiran terbaru hari ini dari review DB untuk memastikan employee yang aktif mulai tercatat di HR.',
+      summary: focus === 'ATTENDANCE_RATE' ? attendanceRateSummary : undefined,
       rows: attendances.map((item) => ({
         id: `ATT-${item.attendanceId}`,
         primary: item.employeeName,
@@ -2483,11 +3523,15 @@ async function getReviewDbHrSections(): Promise<DomainReviewSection[]> {
           `Overtime Raw: ${item.overtimeHours.toFixed(2)}`,
           `Lock Raw: ${Number(item.lockedByAdmin ?? 0) === 1 ? '1' : '0'}`,
         ],
+        filterTags: [`PERIOD:${toPeriodKey(item.attendanceDate)}`],
       })),
     },
     {
-      title: 'Loan Terbaru',
-      description: 'Kasbon atau pinjaman terbaru dari review DB untuk menjaga histori HR tetap terlihat, termasuk yang sudah dibatalkan secara non-destruktif.',
+      title: focus === 'ACTIVE_LOANS' ? 'Loan Aktif' : 'Loan Terbaru',
+      description:
+        focus === 'ACTIVE_LOANS'
+          ? 'Pinjaman dengan status aktif agar antrean HR mengikuti angka KPI pinjaman aktif pada dashboard.'
+          : 'Kasbon atau pinjaman terbaru dari review DB untuk menjaga histori HR tetap terlihat, termasuk yang sudah dibatalkan secara non-destruktif.',
       rows: loans.map((item) => ({
         id: `LOAN-${item.loanId}`,
         primary: item.employeeName,
@@ -2649,6 +3693,164 @@ function applyReviewDbHrSections(content: DomainPageContent, reviewSections: Dom
   }
 }
 
+type DomainReviewDrilldownFilters = {
+  focus?: string
+  month?: number
+  year?: number
+}
+
+function resolveSqlPeriodRange(filters?: DomainReviewDrilldownFilters) {
+  if (!filters?.month || !filters?.year) return null
+  const month = filters.month
+  const year = filters.year
+  if (!Number.isInteger(month) || month < 1 || month > 12) return null
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) return null
+
+  const start = new Date(year, month - 1, 1)
+  const end = new Date(year, month, 1)
+  const toSqlDate = (value: Date) => {
+    const local = new Date(value.getTime() - value.getTimezoneOffset() * 60_000)
+    return local.toISOString().slice(0, 10)
+  }
+
+  return {
+    month,
+    year,
+    startDate: toSqlDate(start),
+    endDate: toSqlDate(end),
+  }
+}
+
+function filterReviewSectionsForDomain(
+  domain: DomainKey,
+  reviewSections: DomainReviewSection[],
+  filters?: DomainReviewDrilldownFilters,
+) {
+  const focus = String(filters?.focus ?? '')
+    .trim()
+    .toUpperCase()
+  const period =
+    filters?.year && filters?.month ? `${filters.year}-${String(filters.month).padStart(2, '0')}` : ''
+
+  if (!focus || !reviewSections.length || domain === 'support' || domain === 'customers') {
+    return reviewSections
+  }
+
+  const hasTag = (tags: string[] | undefined, key: string, value: string) => tags?.includes(`${key}:${value}`) ?? false
+
+  return reviewSections
+    .map((section) => {
+      const title = section.title.trim().toUpperCase()
+
+      if (domain === 'sales') {
+        if (['ACTIVE_LEADS', 'DIGITAL_LEADS'].includes(focus)) {
+          return title.includes('LEAD TERBARU') ? section : null
+        }
+        if (focus === 'MONTHLY_ORDERS') {
+          if (!title.includes('ORDER PERIODE INI')) return null
+          const rows = period ? section.rows.filter((row) => hasTag(row.filterTags, 'PERIOD', period)) : section.rows
+          return rows.length > 0 ? { ...section, rows } : null
+        }
+        if (focus === 'DIGITAL_ORDERS') {
+          if (!title.includes('ORDER DIGITAL PERIODE INI')) return null
+          const rows = period ? section.rows.filter((row) => hasTag(row.filterTags, 'PERIOD', period)) : section.rows
+          return rows.length > 0 ? { ...section, rows } : null
+        }
+        if (focus === 'DIGITAL_SURVEYS') {
+          if (!title.includes('SURVEY DIGITAL PERIODE INI')) return null
+          const rows = period ? section.rows.filter((row) => hasTag(row.filterTags, 'PERIOD', period)) : section.rows
+          return rows.length > 0 ? { ...section, rows } : null
+        }
+        if (focus === 'MONTHLY_ACTIVATIONS') {
+          if (!title.includes('SUBSCRIPTION AKTIVASI')) return null
+          const rows = period ? section.rows.filter((row) => hasTag(row.filterTags, 'PERIOD', period)) : section.rows
+          return rows.length > 0 ? { ...section, rows } : null
+        }
+        if (focus === 'ACTIVATION_RATE') {
+          if (!title.includes('ORDER PEMBANDING AKTIVASI') && !title.includes('SUBSCRIPTION AKTIVASI')) return null
+          const rows = period ? section.rows.filter((row) => hasTag(row.filterTags, 'PERIOD', period)) : section.rows
+          return rows.length > 0 ? { ...section, rows } : null
+        }
+      }
+
+      if (domain === 'billing') {
+        const isOverdueFocus = focus === 'OVERDUE_INVOICES' || focus === 'BILLING_OVERDUE_AMOUNT'
+        const isPartialFocus = focus === 'PARTIAL_INVOICES' || focus === 'PARTIAL_PAYMENTS'
+
+        if (isOverdueFocus || isPartialFocus) {
+          if (
+            !title.includes('PERLU TINDAK LANJUT') &&
+            !(focus === 'BILLING_OVERDUE_AMOUNT' && title.includes('NOMINAL OVERDUE'))
+          ) {
+            return null
+          }
+          const statusNeedle = isOverdueFocus ? 'OVERDUE' : 'PARTIAL'
+          const rows = section.rows.filter((row) => {
+            const periodMatches = period ? hasTag(row.filterTags, 'PERIOD', period) : true
+            return (
+              periodMatches &&
+              hasTag(row.filterTags, 'INVOICE_STATUS', statusNeedle) &&
+              hasTag(row.filterTags, 'REMAINING_POSITIVE', 'YES')
+            )
+          })
+          return rows.length > 0 ? { ...section, rows } : null
+        }
+
+        if (focus === 'SUSPEND_CANDIDATES') {
+          const rows = section.rows.filter((row) => {
+            const periodMatches = period ? hasTag(row.filterTags, 'PERIOD', period) : true
+            return periodMatches && hasTag(row.filterTags, 'SUSPEND_CANDIDATE', 'YES')
+          })
+
+          if (rows.length > 0) {
+            return { ...section, rows }
+          }
+
+          return title.includes('SUSPEND') ? section : null
+        }
+      }
+
+      if (domain === 'hr') {
+        if (focus === 'ACTIVE_EMPLOYEES') {
+          return title.includes('EMPLOYEE TERBARU') ? section : null
+        }
+        if (focus === 'TODAY_ATTENDANCE') {
+          if (!title.includes('ATTENDANCE HARI INI')) return null
+          return section.rows.length > 0 ? section : null
+        }
+        if (focus === 'ATTENDANCE_RATE') {
+          if (!title.includes('EMPLOYEE TERBARU') && !title.includes('ATTENDANCE HARI INI')) return null
+          return section.rows.length > 0 ? section : null
+        }
+        if (focus === 'ACTIVE_LOANS') {
+          return title.includes('LOAN AKTIF') ? section : null
+        }
+      }
+
+      if (domain === 'inventory') {
+        if (focus === 'ACTIVE_ITEMS') {
+          return title.includes('ITEM INVENTORY TERBARU') ? section : null
+        }
+        if (focus === 'MONTHLY_MOVEMENTS') {
+          if (!title.includes('STOCK MOVEMENT TERBARU')) return null
+          const rows = period ? section.rows.filter((row) => hasTag(row.filterTags, 'PERIOD', period)) : section.rows
+          return rows.length > 0 ? { ...section, rows } : null
+        }
+        if (focus === 'PENDING_REQUESTS') {
+          if (!title.includes('REQUEST INVENTORY TEKNISI')) return null
+          const rows = section.rows.filter((row) => {
+            const periodMatches = period ? hasTag(row.filterTags, 'PERIOD', period) : true
+            return periodMatches && hasTag(row.filterTags, 'REQUEST_STATUS', 'PENDING')
+          })
+          return rows.length > 0 ? { ...section, rows } : null
+        }
+      }
+
+      return section
+    })
+    .filter((section): section is DomainReviewSection => Boolean(section))
+}
+
 function buildSupportFocus(
   content: DomainPageContent,
   role: AppRole,
@@ -2678,7 +3880,12 @@ function buildSupportFocus(
 export async function getDomainPageData(
   domain: DomainKey,
   role: AppRole,
-  options?: { supportLane?: SupportLaneKey | null },
+  options?: {
+    supportLane?: SupportLaneKey | null
+    focus?: string
+    month?: number
+    year?: number
+  },
 ): Promise<DomainPageData | null> {
   const source = getDataSourceSnapshot()
   const content = domainPages[domain]
@@ -2699,12 +3906,62 @@ export async function getDomainPageData(
 
   try {
     const stats = await getReviewDbDomainStats()
-    const salesSections = domain === 'sales' ? await getReviewDbSalesSections() : []
-    const supportSections = domain === 'support' ? await getReviewDbSupportSections(selectedSupportLane) : []
+    const salesSections =
+      domain === 'sales'
+        ? filterReviewSectionsForDomain(domain, await getReviewDbSalesSections({
+            focus: options?.focus,
+            month: options?.month,
+            year: options?.year,
+          }), {
+            focus: options?.focus,
+            month: options?.month,
+            year: options?.year,
+          })
+        : []
+    const supportSections =
+      domain === 'support'
+        ? await getReviewDbSupportSections({
+            lane: selectedSupportLane,
+            focus: options?.focus,
+          })
+        : []
     const customerSections = domain === 'customers' ? await getReviewDbCustomerSections() : []
-    const billingSections = domain === 'billing' ? await getReviewDbBillingSections() : []
-    const inventorySections = domain === 'inventory' ? await getReviewDbInventorySections() : []
-    const hrSections = domain === 'hr' ? await getReviewDbHrSections() : []
+    const billingSections =
+      domain === 'billing'
+        ? filterReviewSectionsForDomain(domain, await getReviewDbBillingSections({
+            focus: options?.focus,
+            month: options?.month,
+            year: options?.year,
+          }), {
+            focus: options?.focus,
+            month: options?.month,
+            year: options?.year,
+          })
+        : []
+    const inventorySections =
+      domain === 'inventory'
+        ? filterReviewSectionsForDomain(domain, await getReviewDbInventorySections({
+            focus: options?.focus,
+            month: options?.month,
+            year: options?.year,
+          }), {
+            focus: options?.focus,
+            month: options?.month,
+            year: options?.year,
+          })
+        : []
+    const hrSections =
+      domain === 'hr'
+        ? filterReviewSectionsForDomain(domain, await getReviewDbHrSections({
+            focus: options?.focus,
+            month: options?.month,
+            year: options?.year,
+          }), {
+            focus: options?.focus,
+            month: options?.month,
+            year: options?.year,
+          })
+        : []
 
     const nextContent = applyReviewDbHrSections(
       applyReviewDbInventorySections(

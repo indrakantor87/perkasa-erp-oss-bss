@@ -17,6 +17,15 @@ Dokumen ini melengkapi:
 2. [web-psb-role-action-parity.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-psb-role-action-parity.md)
 3. [web-psb-target-role-design.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-psb-target-role-design.md)
 
+## Catatan Fase Saat Ini
+
+Dokumen ini tetap menjadi baseline parity global lintas role.
+
+Untuk fase implementasi aktif yang berpusat pada Divisi `Pemasaran & Pelayanan`, gunakan dokumen yang lebih
+operasional:
+
+1. [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md)
+
 ## Cara Pakai
 
 Setiap role harus diuji langsung di ERP baru.

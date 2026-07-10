@@ -10,6 +10,17 @@ Dokumen ini tidak mengubah implementasi role yang sedang aktif sekarang. Dokumen
 2. penyusunan permission matrix yang lebih presisi
 3. perencanaan cutover bertahap per role
 
+## Keputusan Fase Awal
+
+Untuk fase implementasi terdekat, `web-psb-perkasa` diperlakukan sebagai fondasi Divisi
+`Pemasaran dan Pelayanan` di ERP.
+
+Artinya:
+
+1. role legacy yang berasal dari `web-psb-perkasa` menjadi prioritas utama migrasi
+2. fokus tahap 1 adalah menyelesaikan flow kerja `Pemasaran dan Pelayanan`
+3. integrasi penuh ke divisi lain dilakukan setelah flow inti legacy stabil di ERP
+
 ## Acuan
 
 Referensi role lama:
@@ -47,21 +58,24 @@ Role target harus mengikuti prinsip berikut:
 
 Struktur organisasi yang menjadi acuan ERP saat ini:
 
-1. `Pemasaran & Pelayanan`
+1. `Pemasaran dan Pelayanan`
    - `Penjualan`
    - `CS`
    - `Admin CS`
    - `NOC`
    - `Troubleshoots`
-   - `Digital Creator`
-2. `Teknisi`
+   - `Creator Digital`
+   - `Dismantle`
+2. `Teknis dan Expan`
    - `Teknisi PSB`
-   - `Teknisi Jalur dan Expan`
+   - `Teknisi Jalur & Expan`
    - `Teknisi Jointer`
 3. `General Affair`
    - `Inventory`
    - `Legal`
-4. `Finance & HR`
+4. `Finance dan HR`
+   - `Billing`
+   - `HR`
 5. `Operasional`
    - `Kantor`
    - `Toko`
@@ -71,6 +85,7 @@ Catatan:
 1. baseline detail ada di [org-division-baseline.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/org-division-baseline.md)
 2. role ERP aktif saat ini baru menutup sebagian struktur organisasi ini
 3. `FIELD_TECHNICIAN` saat ini masih agregat untuk tiga sub-divisi teknisi
+4. untuk fase awal, fokus migrasi tetap pada rumpun `Pemasaran dan Pelayanan`
 
 ## Role ERP Target
 
@@ -81,11 +96,19 @@ Role target yang disarankan:
 3. `CS_OPERATOR`
 4. `CS_ADMIN`
 5. `NOC_OPERATOR`
-6. `FIELD_TECHNICIAN`
-7. `TT_OPERATOR`
-8. `DIGITAL_CREATOR`
+6. `TT_OPERATOR`
+7. `DISMANTLE_OPERATOR`
+
+Catatan:
+
+1. fokus tahap 1 adalah role yang langsung berada di bawah `Pemasaran dan Pelayanan`
+2. `FIELD_TECHNICIAN` tetap valid sebagai target desain ERP, tetapi tidak menjadi pusat fase cutover awal
 9. `DISMANTLE_OPERATOR`
 
+Catatan fase:
+
+1. role `SALES_MARKETING`, `CS_OPERATOR`, `CS_ADMIN`, `NOC_OPERATOR`, `TT_OPERATOR`, `DIGITAL_CREATOR`, dan `DISMANTLE_OPERATOR` adalah inti fase awal
+2. `FIELD_TECHNICIAN` tetap dipertahankan sebagai role target, tetapi integrasi penuhnya diposisikan setelah fondasi `Pemasaran dan Pelayanan` stabil
 ## Mapping Role Lama ke Role ERP Target
 
 | Role `web-psb-perkasa` | Role ERP target | Status |
@@ -105,14 +128,14 @@ Role target yang disarankan:
 | Role ERP target | Divisi | Sub-divisi | Catatan |
 |---|---|---|---|
 | `SUPER_ADMIN` | Lintas Divisi | Kontrol Global | override semua area |
-| `SALES_MARKETING` | Pemasaran & Pelayanan | Penjualan | sudah sejajar |
-| `CS_OPERATOR` | Pemasaran & Pelayanan | CS | sudah sejajar |
-| `CS_ADMIN` | Pemasaran & Pelayanan | Admin CS | sudah sejajar |
-| `NOC_OPERATOR` | Pemasaran & Pelayanan | NOC | sudah sejajar |
-| `TT_OPERATOR` | Pemasaran & Pelayanan | Troubleshoots | sudah sejajar |
-| `DIGITAL_CREATOR` | Pemasaran & Pelayanan | Digital Creator | sudah sejajar |
-| `FIELD_TECHNICIAN` | Teknisi | PSB / Jalur dan Expan / Jointer | masih payung gabungan |
-| `DISMANTLE_OPERATOR` | Pemasaran & Pelayanan | Dismantle Operasional | sementara dipertahankan sebagai role mikro support yang belum tercantum eksplisit pada catatan divisi terbaru |
+| `SALES_MARKETING` | Pemasaran dan Pelayanan | Penjualan | sudah sejajar |
+| `CS_OPERATOR` | Pemasaran dan Pelayanan | CS | sudah sejajar |
+| `CS_ADMIN` | Pemasaran dan Pelayanan | Admin CS | sudah sejajar |
+| `NOC_OPERATOR` | Pemasaran dan Pelayanan | NOC | sudah sejajar |
+| `TT_OPERATOR` | Pemasaran dan Pelayanan | Troubleshoots | sudah sejajar |
+| `DIGITAL_CREATOR` | Pemasaran dan Pelayanan | Creator Digital | sudah sejajar |
+| `FIELD_TECHNICIAN` | Teknis dan Expan | Teknisi PSB / Teknisi Jalur & Expan / Teknisi Jointer | masih payung gabungan |
+| `DISMANTLE_OPERATOR` | Pemasaran dan Pelayanan | Dismantle | role mikro support yang kini sudah masuk struktur divisi aktif |
 
 ## Definisi Per Role
 
@@ -281,6 +304,7 @@ Hak minimum:
 1. tambah `DIGITAL_CREATOR` saat modul parity marketing digital mulai dibangun
 2. sesuaikan permission matrix per resource dan action
 3. tambahkan guard UI per role baru
+4. mulai menyiapkan integrasi lintas divisi setelah fondasi `Pemasaran dan Pelayanan` stabil
 
 ### Tahap 3
 
@@ -312,4 +336,4 @@ Inti keputusannya:
 
 Dokumen ini dirilis pada:
 
-- `0.62.7` untuk baseline desain role ERP target
+- `0.64.42` untuk desain role target yang diselaraskan dengan struktur dashboard divisi terbaru

@@ -8,6 +8,7 @@ type HrAttendanceUpdateFormProps = {
   canUpdate: boolean
   reviewDbReady: boolean
   attendanceSuggestions: string[]
+  initialAttendanceValue?: string
 }
 
 const attendanceStatusOptions = ['PRESENT', 'SICK', 'PERMIT', 'ALPHA'] as const
@@ -31,9 +32,10 @@ export function HrAttendanceUpdateForm({
   canUpdate,
   reviewDbReady,
   attendanceSuggestions,
+  initialAttendanceValue,
 }: HrAttendanceUpdateFormProps) {
   const router = useRouter()
-  const [attendanceValue, setAttendanceValue] = useState(attendanceSuggestions[0] ?? '')
+  const [attendanceValue, setAttendanceValue] = useState(initialAttendanceValue?.trim() || attendanceSuggestions[0] || '')
   const [checkIn, setCheckIn] = useState('')
   const [checkOut, setCheckOut] = useState('')
   const [status, setStatus] = useState<(typeof attendanceStatusOptions)[number]>('PRESENT')
@@ -55,6 +57,12 @@ export function HrAttendanceUpdateForm({
     setOvertimeHours(parsed.overtimeHours)
     setLockByAdmin(parsed.lockByAdmin)
   }, [attendanceValue])
+
+  useEffect(() => {
+    if (initialAttendanceValue?.trim()) {
+      setAttendanceValue(initialAttendanceValue.trim())
+    }
+  }, [initialAttendanceValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

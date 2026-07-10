@@ -94,7 +94,7 @@ async function updateInvoiceStatus(params: {
         invoice_status = ?,
         collection_status = CASE
           WHEN ? = 'SUSPENDED' THEN 'SUSPEND'
-          WHEN ? = 'OVERDUE' THEN 'RECONNECT'
+          WHEN ? = 'OVERDUE' THEN 'REMINDER'
           ELSE 'CLOSED'
         END,
         suspend_candidate = CASE
@@ -107,6 +107,27 @@ async function updateInvoiceStatus(params: {
     `,
     [params.nextStatus, params.nextStatus, params.nextStatus, params.nextStatus, mergedNotes, invoice.id],
   )
+
+  if (params.nextStatus === 'OVERDUE') {
+    const resolutionNote = `[Auto Resolved via Status Update] ${params.actorLabel} mengaktifkan kembali invoice ke OVERDUE.`
+
+    await runReviewDbExecute(
+      `
+        UPDATE billing_collection_actions
+        SET
+          action_status = 'DONE',
+          due_follow_up_at = NULL,
+          notes = CASE
+            WHEN notes IS NULL OR notes = '' THEN ?
+            ELSE CONCAT(notes, '\n', ?)
+          END
+        WHERE invoice_id = ?
+          AND COALESCE(UPPER(TRIM(action_status)), 'OPEN') = 'OPEN'
+          AND COALESCE(UPPER(TRIM(action_type)), '') = 'RECONNECT'
+      `,
+      [resolutionNote, resolutionNote, invoice.id],
+    )
+  }
 
   return invoice
 }

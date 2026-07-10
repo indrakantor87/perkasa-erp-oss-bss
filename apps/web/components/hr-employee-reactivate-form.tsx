@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type HrEmployeeReactivateFormProps = {
   canUpdate: boolean
   reviewDbReady: boolean
   employeeSuggestions: string[]
+  initialEmployeeValue?: string
 }
 
 const employeeStatusOptions = ['KARYAWAN', 'KONTRAK', 'MAGANG', 'ACTIVE'] as const
@@ -20,15 +21,22 @@ export function HrEmployeeReactivateForm({
   canUpdate,
   reviewDbReady,
   employeeSuggestions,
+  initialEmployeeValue,
 }: HrEmployeeReactivateFormProps) {
   const router = useRouter()
-  const [employeeValue, setEmployeeValue] = useState(employeeSuggestions[0] ?? '')
+  const [employeeValue, setEmployeeValue] = useState(initialEmployeeValue?.trim() || employeeSuggestions[0] || '')
   const [nextStatus, setNextStatus] = useState<(typeof employeeStatusOptions)[number]>('KARYAWAN')
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canUpdate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialEmployeeValue?.trim()) {
+      setEmployeeValue(initialEmployeeValue.trim())
+    }
+  }, [initialEmployeeValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

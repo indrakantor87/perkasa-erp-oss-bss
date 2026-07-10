@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type BillingInvoiceStatusFormProps = {
@@ -9,8 +9,10 @@ type BillingInvoiceStatusFormProps = {
   reviewDbReady: boolean
   invoiceSuggestions: string[]
   followUpSuggestions: string[]
+  reconnectSuggestions: string[]
   suspendBatchSuggestions: string[]
   reconnectBatchSuggestions: string[]
+  initialInvoiceNo?: string
 }
 
 const nextStatusOptions = ['CANCELLED', 'SUSPENDED', 'OVERDUE'] as const
@@ -39,12 +41,14 @@ export function BillingInvoiceStatusForm({
   reviewDbReady,
   invoiceSuggestions,
   followUpSuggestions,
+  reconnectSuggestions,
   suspendBatchSuggestions,
   reconnectBatchSuggestions,
+  initialInvoiceNo,
 }: BillingInvoiceStatusFormProps) {
   const router = useRouter()
   const [mode, setMode] = useState<'single' | 'batch'>('single')
-  const [invoiceNo, setInvoiceNo] = useState(invoiceSuggestions[0] ?? '')
+  const [invoiceNo, setInvoiceNo] = useState(initialInvoiceNo?.trim() || invoiceSuggestions[0] || '')
   const [nextStatus, setNextStatus] = useState<(typeof nextStatusOptions)[number]>('CANCELLED')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -52,12 +56,27 @@ export function BillingInvoiceStatusForm({
 
   const isDisabled = !canUpdate || !reviewDbReady || submitting
   const currentSuggestion = useMemo(
-    () =>
-      followUpSuggestions
-        .map((item) => parseFollowUpSuggestion(item))
-        .find((item) => item.invoiceNo.trim().toUpperCase() === invoiceNo.trim().toUpperCase()) ?? null,
-    [followUpSuggestions, invoiceNo],
+    () => {
+      const normalizedInvoiceNo = invoiceNo.trim().toUpperCase()
+      return (
+        followUpSuggestions
+          .map((item) => parseFollowUpSuggestion(item))
+          .find((item) => item.invoiceNo.trim().toUpperCase() === normalizedInvoiceNo) ??
+        reconnectSuggestions
+          .map((item) => parseFollowUpSuggestion(item))
+          .find((item) => item.invoiceNo.trim().toUpperCase() === normalizedInvoiceNo) ??
+        null
+      )
+    },
+    [followUpSuggestions, invoiceNo, reconnectSuggestions],
   )
+
+  useEffect(() => {
+    if (initialInvoiceNo?.trim()) {
+      setMode('single')
+      setInvoiceNo(initialInvoiceNo.trim())
+    }
+  }, [initialInvoiceNo])
 
   const helperText = useMemo(() => {
     if (!canUpdate) {
@@ -250,7 +269,8 @@ export function BillingInvoiceStatusForm({
               Total {currentSuggestion.total || 'Rp0'} • Paid {currentSuggestion.paid || 'Rp0'} • Remaining {currentSuggestion.remaining || 'Rp0'}
             </div>
             <div className="mt-1">
-              Due {currentSuggestion.invoiceDue || '-'} • Follow Up {currentSuggestion.followUp || '-'} • {currentSuggestion.followUpState || 'UNSET'}
+              Due {currentSuggestion.invoiceDue || '-'} • Follow Up {currentSuggestion.followUp || '-'} •{' '}
+              {currentSuggestion.followUpState || 'UNSET'}
             </div>
             <div className="mt-1">
               Action aktif: {currentSuggestion.actionType || '-'} • Suspend Candidate: {currentSuggestion.suspendCandidate || 'Tidak'}

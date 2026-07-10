@@ -1,5 +1,3 @@
-import 'server-only'
-
 import { isAppRole, type AccessAction, type AppRole, type PermissionMatrixEntry } from '@/lib/types'
 import {
   buildResourceActionPermissionCode,

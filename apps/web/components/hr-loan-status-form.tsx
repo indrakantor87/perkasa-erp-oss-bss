@@ -8,6 +8,7 @@ type HrLoanStatusFormProps = {
   canUpdate: boolean
   reviewDbReady: boolean
   loanSuggestions: string[]
+  initialLoanValue?: string
 }
 
 const loanStatusOptions = ['ACTIVE', 'REJECTED', 'PAID'] as const
@@ -27,9 +28,10 @@ export function HrLoanStatusForm({
   canUpdate,
   reviewDbReady,
   loanSuggestions,
+  initialLoanValue,
 }: HrLoanStatusFormProps) {
   const router = useRouter()
-  const [loanValue, setLoanValue] = useState(loanSuggestions[0] ?? '')
+  const [loanValue, setLoanValue] = useState(initialLoanValue?.trim() || loanSuggestions[0] || '')
   const [nextStatus, setNextStatus] = useState<(typeof loanStatusOptions)[number]>('ACTIVE')
   const [currentStatus, setCurrentStatus] = useState('')
   const [notes, setNotes] = useState('')
@@ -50,6 +52,12 @@ export function HrLoanStatusForm({
 
     setNextStatus('ACTIVE')
   }, [loanValue])
+
+  useEffect(() => {
+    if (initialLoanValue?.trim()) {
+      setLoanValue(initialLoanValue.trim())
+    }
+  }, [initialLoanValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

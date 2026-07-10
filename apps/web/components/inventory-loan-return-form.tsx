@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type InventoryLoanReturnFormProps = {
   canUpdate: boolean
   reviewDbReady: boolean
   loanSuggestions: string[]
+  initialLoanValue?: string
 }
 
 function extractLoanId(value: string) {
@@ -18,15 +19,22 @@ export function InventoryLoanReturnForm({
   canUpdate,
   reviewDbReady,
   loanSuggestions,
+  initialLoanValue,
 }: InventoryLoanReturnFormProps) {
   const router = useRouter()
-  const [loanValue, setLoanValue] = useState(loanSuggestions[0] ?? '')
+  const [loanValue, setLoanValue] = useState(initialLoanValue?.trim() || loanSuggestions[0] || '')
   const [returnQty, setReturnQty] = useState('1')
   const [returnNotes, setReturnNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canUpdate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialLoanValue?.trim()) {
+      setLoanValue(initialLoanValue.trim())
+    }
+  }, [initialLoanValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

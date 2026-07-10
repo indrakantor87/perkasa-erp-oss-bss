@@ -71,12 +71,55 @@ export type DashboardMetric = {
   note: string
 }
 
+export type DashboardOperationalDivisionKey =
+  | 'ALL'
+  | 'SALES'
+  | 'CS'
+  | 'NOC'
+  | 'TT'
+  | 'DISMANTLE'
+  | 'DIGITAL'
+  | 'BILLING'
+  | 'HR'
+  | 'INVENTORY'
+
+export type DashboardOperationalCardMetric = {
+  label: string
+  value: string
+  href?: string
+  hint?: string
+  hintBadges?: string[]
+}
+
+export type DashboardOperationalCard = {
+  key: Exclude<DashboardOperationalDivisionKey, 'ALL'>
+  title: string
+  description: string
+  badge: string
+  href: string
+  tone: string
+  metrics: DashboardOperationalCardMetric[]
+}
+
 export type DashboardQueueItem = {
   title: string
   href: string
   count: string
   description: string
   accent: string
+}
+
+export type DashboardAlertItem = {
+  id: string
+  domain: string
+  severity: 'critical' | 'high' | 'medium'
+  title: string
+  detail: string
+  impactSummary: string
+  nextStep: string
+  affectedModules: string[]
+  href: string
+  actionLabel: string
 }
 
 export type DashboardDailyActivityApprovalQueueItem = {
@@ -234,11 +277,16 @@ export type DomainReviewRow = {
   status: string
   detail: string
   meta: string[]
+  filterTags?: string[]
 }
 
 export type DomainReviewSection = {
   title: string
   description: string
+  summary?: Array<{
+    label: string
+    value: string
+  }>
   rows: DomainReviewRow[]
 }
 
@@ -274,6 +322,25 @@ export type SupportFormPrefill = {
   ticket?: string
   isolation?: string
   type?: string
+}
+
+export type DomainFormPrefill = {
+  lead?: string
+  order?: string
+  invoice?: string
+  service?: string
+  request?: string
+  employee?: string
+  attendance?: string
+  loan?: string
+  payroll?: string
+}
+
+export type SupportDrilldownContext = {
+  key: string
+  label: string
+  detail: string
+  clearHref: string
 }
 
 export type SupportLaneWorkspace = {

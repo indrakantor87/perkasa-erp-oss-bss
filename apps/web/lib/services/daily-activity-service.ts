@@ -1,5 +1,3 @@
-import 'server-only'
-
 import {
   DAILY_ACTIVITY_PLANNING_LEVELS,
   dailyActivityPlanningLevelLabels,

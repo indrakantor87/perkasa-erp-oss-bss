@@ -8,12 +8,81 @@ const allowedResolutionStatuses = new Set(['DONE', 'CANCELLED'])
 type BillingInvoiceRow = {
   id: number
   invoiceNo: string
+  invoiceStatus: string
+  collectionStatus: string | null
+  suspendCandidate: number | null
 }
 
 type BillingCollectionActionRow = {
   id: number
   actionType: string
   actionStatus: string
+}
+
+function resolveInvoiceCollectionState(params: {
+  invoiceStatus: string
+  currentCollectionStatus: string
+  suspendCandidate: number
+  actionType: string
+  resolutionStatus: string
+}) {
+  if (params.invoiceStatus === 'PAID' || params.invoiceStatus === 'CANCELLED') {
+    return {
+      collectionStatus: 'CLOSED',
+      suspendCandidate: 0,
+    }
+  }
+
+  switch (params.actionType) {
+    case 'PROMISE_TO_PAY':
+      return {
+        collectionStatus: 'REMINDER',
+        suspendCandidate: 0,
+      }
+    case 'SUSPEND':
+      return params.resolutionStatus === 'CANCELLED'
+        ? {
+            collectionStatus: 'REMINDER',
+            suspendCandidate: 0,
+          }
+        : {
+            collectionStatus: params.currentCollectionStatus === 'SUSPEND' ? 'SUSPEND' : 'REMINDER',
+            suspendCandidate:
+              params.currentCollectionStatus === 'SUSPEND' || params.suspendCandidate > 0 ? 1 : 0,
+          }
+    case 'RECONNECT':
+      return params.invoiceStatus === 'SUSPENDED' || params.currentCollectionStatus === 'RECONNECT'
+        ? {
+            collectionStatus: 'RECONNECT',
+            suspendCandidate: 0,
+          }
+        : {
+            collectionStatus: 'REMINDER',
+            suspendCandidate: 0,
+          }
+    case 'VISIT':
+    case 'CALL':
+    case 'REMINDER':
+      return {
+        collectionStatus: 'REMINDER',
+        suspendCandidate: 0,
+      }
+    case 'WRITE_OFF':
+      return params.resolutionStatus === 'DONE'
+        ? {
+            collectionStatus: 'CLOSED',
+            suspendCandidate: 0,
+          }
+        : {
+            collectionStatus: 'REMINDER',
+            suspendCandidate: 0,
+          }
+    default:
+      return {
+        collectionStatus: 'REMINDER',
+        suspendCandidate: 0,
+      }
+  }
 }
 
 export async function POST(request: Request) {
@@ -56,7 +125,12 @@ export async function POST(request: Request) {
 
     const [invoice] = await runReviewDbQuery<BillingInvoiceRow>(
       `
-        SELECT id, invoice_no AS invoiceNo
+        SELECT
+          id,
+          invoice_no AS invoiceNo,
+          invoice_status AS invoiceStatus,
+          collection_status AS collectionStatus,
+          suspend_candidate AS suspendCandidate
         FROM billing_invoices
         WHERE invoice_no = ?
         LIMIT 1
@@ -86,6 +160,15 @@ export async function POST(request: Request) {
     }
 
     const noteText = `[Resolved via web] ${session.displayName} (${session.username}) - ${resolutionNotes}`
+    const invoiceStatus = String(invoice.invoiceStatus ?? '').trim().toUpperCase()
+    const currentCollectionStatus = String(invoice.collectionStatus ?? '').trim().toUpperCase()
+    const nextCollectionState = resolveInvoiceCollectionState({
+      invoiceStatus,
+      currentCollectionStatus,
+      suspendCandidate: Number(invoice.suspendCandidate ?? 0),
+      actionType: String(openAction.actionType ?? '').trim().toUpperCase(),
+      resolutionStatus,
+    })
 
     await runReviewDbExecute(
       `
@@ -100,6 +183,18 @@ export async function POST(request: Request) {
         WHERE id = ?
       `,
       [resolutionStatus, noteText, noteText, openAction.id],
+    )
+
+    await runReviewDbExecute(
+      `
+        UPDATE billing_invoices
+        SET
+          collection_status = ?,
+          suspend_candidate = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [nextCollectionState.collectionStatus, nextCollectionState.suspendCandidate, invoice.id],
     )
 
     return Response.json({

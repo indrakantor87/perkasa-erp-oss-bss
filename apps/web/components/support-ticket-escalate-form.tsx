@@ -65,6 +65,39 @@ export function SupportTicketEscalateForm({
         .find((item) => item.ticketCode.trim().toUpperCase() === normalizedTicketCode) ?? null
     )
   }, [ticketCode, ticketSuggestions])
+  const allowedEscalationLevels = useMemo(() => {
+    const slaState = (currentSuggestion?.slaState || '').trim().toUpperCase()
+    if (slaState === 'OVERDUE') {
+      return ['OVERDUE', 'MANUAL'] as (typeof escalationLevelOptions)[number][]
+    }
+    if (slaState === 'DUE_TODAY') {
+      return ['DUE_TODAY', 'MANUAL'] as (typeof escalationLevelOptions)[number][]
+    }
+    return ['MANUAL'] as (typeof escalationLevelOptions)[number][]
+  }, [currentSuggestion?.slaState])
+  const helperText = useMemo(() => {
+    if (!canUpdate) {
+      return 'Role aktif belum memiliki izin update pada domain Support.'
+    }
+    if (!reviewDbReady) {
+      return 'Mode review database belum aktif, jadi eskalasi trouble ticket dinonaktifkan agar tidak menulis ke mock.'
+    }
+    if (allowedEscalationLevels.includes('OVERDUE')) {
+      return 'Ticket ini sudah melewati SLA, sehingga level OVERDUE atau MANUAL boleh dipakai untuk jalur eskalasi formal.'
+    }
+    if (allowedEscalationLevels.includes('DUE_TODAY')) {
+      return 'Ticket ini jatuh tempo hari ini, sehingga level DUE_TODAY atau MANUAL boleh dipakai untuk eskalasi preventif.'
+    }
+    return 'Ticket ini belum due menurut SLA, jadi form hanya mengizinkan eskalasi MANUAL agar jalur overdue tidak dipakai sembarang.'
+  }, [allowedEscalationLevels, canUpdate, reviewDbReady])
+  const isSameEscalationPath =
+    currentSuggestion != null &&
+    escalationTarget.trim().toUpperCase() !== '' &&
+    escalationTarget.trim().toUpperCase() === currentSuggestion.escalationTarget.trim().toUpperCase() &&
+    escalationLevel === currentSuggestion.escalationLevel.trim().toUpperCase()
+  const escalationContextHint = isSameEscalationPath
+    ? 'Eskalasi ini memakai target dan level yang sama dengan eskalasi terakhir. Pastikan ada alasan baru atau progress baru sebelum submit ulang.'
+    : 'Gunakan alasan yang spesifik agar jalur eskalasi formal mudah ditelusuri oleh SPV atau owner berikutnya.'
 
   useEffect(() => {
     if (initialTicketCode?.trim()) {
@@ -78,6 +111,12 @@ export function SupportTicketEscalateForm({
     setEscalationLevel(getDefaultEscalationLevel(currentSuggestion.slaState))
     setEscalationReason('')
   }, [currentSuggestion])
+
+  useEffect(() => {
+    if (!allowedEscalationLevels.includes(escalationLevel)) {
+      setEscalationLevel(allowedEscalationLevels[0] ?? 'MANUAL')
+    }
+  }, [allowedEscalationLevels, escalationLevel])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -126,13 +165,7 @@ export function SupportTicketEscalateForm({
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Eskalasi trouble ticket overdue
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
-        {!canUpdate
-          ? 'Role aktif belum memiliki izin update pada domain Support.'
-          : !reviewDbReady
-            ? 'Mode review database belum aktif, jadi eskalasi trouble ticket dinonaktifkan agar tidak menulis ke mock.'
-            : 'Form ini mencatat eskalasi non-destruktif untuk ticket yang mendekati atau melewati SLA agar ada jejak formal ke owner atau tim berikutnya.'}
-      </p>
+      <p className="mt-3 text-sm leading-6 text-mute">{helperText}</p>
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-slate-700">
@@ -175,7 +208,7 @@ export function SupportTicketEscalateForm({
             disabled={isDisabled}
           >
             {escalationLevelOptions.map((item) => (
-              <option key={item} value={item}>
+              <option key={item} value={item} disabled={!allowedEscalationLevels.includes(item)}>
                 {item}
               </option>
             ))}
@@ -192,6 +225,7 @@ export function SupportTicketEscalateForm({
             required
             disabled={isDisabled}
           />
+          <span className={`text-xs ${isSameEscalationPath ? 'text-amber-700' : 'text-mute'}`}>{escalationContextHint}</span>
         </label>
 
         {currentSuggestion ? (

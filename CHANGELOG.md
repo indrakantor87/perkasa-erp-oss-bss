@@ -23,6 +23,452 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.64.39] - 2026-07-10
+
+### Changed
+
+- Fase awal Divisi `Pemasaran & Pelayanan` kini memiliki checklist UAT khusus di `docs/web-pemasaran-pelayanan-uat-checklist.md`, mencakup flow wajib, bukti lulus, aturan `pass/partial/fail`, dan urutan uji untuk `SUPER_ADMIN`, `SALES_MARKETING`, `CS_OPERATOR`, `CS_ADMIN`, `NOC_OPERATOR`, `TT_OPERATOR`, `DISMANTLE_OPERATOR`, dan `DIGITAL_CREATOR`: [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md)
+- PRD utama, checklist PRD, indeks dokumentasi, dan baseline checklist parity kini menautkan checklist UAT tersebut agar pelaksanaan pilot fase awal tidak bercampur dengan scope integrasi divisi lain: [prd-aplikasi-web-utama.md](file:///d:/trae_projects/perkasa-erp-oss-bss/.trae/documents/prd-aplikasi-web-utama.md), [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md), [web-psb-flow-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-psb-flow-checklist.md)
+- `VERSION` dinaikkan ke `0.64.39`
+
+## [0.64.40] - 2026-07-10
+
+### Changed
+
+- PRD web kini memiliki spesifikasi implementasi teknis `List Kerja Terpadu` untuk route `/dashboard/worklist`, termasuk kontrak data `WorklistItem`, query parameter, tab queue per role fase awal `Pemasaran & Pelayanan`, layout tabel + panel detail, integrasi tombol `Lihat semua` dari dashboard, serta rencana implementasi bertahap: [web-list-kerja-terpadu-implementation-spec.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-list-kerja-terpadu-implementation-spec.md)
+- PRD utama, checklist PRD, dan indeks dokumentasi kini menautkan spesifikasi implementasi tersebut agar siap langsung diturunkan ke coding batch `/dashboard/worklist`: [prd-aplikasi-web-utama.md](file:///d:/trae_projects/perkasa-erp-oss-bss/.trae/documents/prd-aplikasi-web-utama.md), [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- `VERSION` dinaikkan ke `0.64.40`
+
+## [0.64.41] - 2026-07-10
+
+### Changed
+
+- Dashboard kini menampilkan panel `Struktur Divisi` yang memisahkan 5 cluster divisi (Pemasaran dan Pelayanan, Teknis dan Expan, Finance dan HR, General Affair, Operasional) beserta sub-divisinya, sehingga konteks organisasi terbaca jelas di landing utama ERP: [division-structure-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/division-structure-board.tsx), [dashboard/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx)
+- Label filter dashboard operasional diselaraskan menjadi `Sub-divisi` agar tidak rancu dengan struktur divisi 5 cluster: [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx)
+- Metadata role diperbarui agar menampilkan penamaan divisi/sub-divisi yang konsisten di dashboard: [role-meta.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/role-meta.ts)
+- `VERSION` dinaikkan ke `0.64.41`
+
+## [0.64.42] - 2026-07-10
+
+### Changed
+
+- Dokumen baseline organisasi, role target, readiness cutover, katalog role/menu, UAT, dan PRD worklist kini diselaraskan dengan struktur divisi dashboard terbaru: `Pemasaran dan Pelayanan`, `Teknis dan Expan`, `Finance dan HR`, `General Affair`, dan `Operasional`, termasuk penamaan sub-divisi `Creator Digital` dan `Dismantle`: [org-division-baseline.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/org-division-baseline.md), [web-psb-target-role-design.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-psb-target-role-design.md), [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md), [web-role-division-menu-feature-catalog.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-division-menu-feature-catalog.md), [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md), [web-list-kerja-terpadu-prd.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-list-kerja-terpadu-prd.md)
+- README, checklist PRD, dan dokumen spesifikasi implementasi juga ikut disinkronkan agar referensi fase awal tidak lagi memakai istilah divisi lama: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md), [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md), [web-list-kerja-terpadu-implementation-spec.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-list-kerja-terpadu-implementation-spec.md)
+- `VERSION` dinaikkan ke `0.64.42`
+
+## [0.64.43] - 2026-07-10
+
+### Changed
+
+- Dashboard operasional kini dikelompokkan per 5 divisi besar dan menandai sub-divisi mana yang sudah memiliki kartu KPI operasional versus mana yang masih menunggu integrasi, sehingga pemisahan organisasi lebih jelas dari tampilan dashboard utama: [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx)
+- Kartu KPI operasional kini menambah cakupan sub-divisi `Troubleshoots` dan `Dismantle`, dan panel `KPI Proses` ikut memahami drilldown untuk kedua sub-divisi tersebut: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [dashboard-process-kpis.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-process-kpis.tsx), [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts), [dashboard/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx)
+- Checklist PRD diperbarui untuk mencatat grouping dashboard operasional per divisi besar dan status integrasi sub-divisi: [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md)
+- `VERSION` dinaikkan ke `0.64.43`
+
+## [0.64.44] - 2026-07-10
+
+### Changed
+
+- Dashboard operasional kini menghidupkan KPI awal untuk `Billing`, `HR`, dan `Inventory`, sehingga cluster `Finance dan HR` serta `General Affair` tidak lagi sepenuhnya placeholder di dashboard utama: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx), [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- Panel `KPI Proses` kini mendukung drilldown untuk `Billing`, `HR`, dan `Inventory`, dan filter sub-divisi dashboard ikut mengenali ketiga area tersebut: [dashboard-process-kpis.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-process-kpis.tsx), [dashboard/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx)
+- Checklist PRD diperbarui agar cakupan KPI aktif dashboard mencatat sub-divisi baru yang sudah hidup: [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md)
+- `VERSION` dinaikkan ke `0.64.44`
+
+## [0.64.45] - 2026-07-10
+
+### Changed
+
+- PRD dashboard kini memiliki spesifikasi fitur kustomisasi KPI agar manager per divisi dapat menambah, mengubah, menghapus, menonaktifkan, dan mengurutkan KPI dashboard secara aman per scope divisi/sub-divisi: [dashboard-kpi-customization-prd.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/dashboard-kpi-customization-prd.md)
+- Fondasi backend awal untuk kustomisasi KPI dashboard ditambahkan melalui service `dashboard-kpi-service`, mencakup pembuatan tabel definisi KPI dan audit, validasi hak `SUPER_ADMIN` dan `MANAGER` berbasis `daily_activity_user_profiles`, serta CRUD dasar definisi KPI custom per divisi/sub-divisi: [dashboard-kpi-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-kpi-service.ts)
+- PRD utama, checklist PRD, dan indeks dokumentasi kini menautkan pengembangan KPI custom manager tersebut agar batch dashboard berikutnya bisa langsung menurunkan UI dan API runtime-nya: [prd-aplikasi-web-utama.md](file:///d:/trae_projects/perkasa-erp-oss-bss/.trae/documents/prd-aplikasi-web-utama.md), [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- `VERSION` dinaikkan ke `0.64.45`
+
+## [0.64.46] - 2026-07-10
+
+### Changed
+
+- Dashboard kini memiliki panel `Kelola KPI` yang tampil langsung di halaman utama untuk manager divisi dan super admin, sehingga definisi KPI custom dapat ditambah, diubah, diaktifkan/nonaktifkan, dan dihapus per scope divisi/sub-divisi: [dashboard-kpi-manager-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-kpi-manager-panel.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx)
+- API CRUD untuk definisi KPI dashboard sekarang hidup di `/api/dashboard/kpi-definitions` dan `/api/dashboard/kpi-definitions/[id]`, lengkap dengan validasi session, review DB, dan pembatasan scope manager: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/dashboard/kpi-definitions/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/dashboard/kpi-definitions/[id]/route.ts)
+- Registry konfigurasi KPI dashboard kini dipusatkan di file terpisah untuk menjaga konsistensi opsi divisi, sub-divisi, dashboard key, metric type, dan template KPI antara service backend dan UI manager: [dashboard-kpi-config.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/dashboard-kpi-config.ts), [dashboard-kpi-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-kpi-service.ts)
+- Checklist PRD diperbarui agar status fitur KPI custom manager mencerminkan bahwa backend, API, dan panel dashboard sudah hidup, sementara merge nilai KPI custom ke runtime kartu operasional masih menjadi batch berikutnya: [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md)
+- `VERSION` dinaikkan ke `0.64.46`
+
+## [0.64.47] - 2026-07-10
+
+### Changed
+
+- Dashboard operasional kini membaca definisi KPI custom aktif untuk scope divisi/sub-divisi user dan merender metrik kartu berdasarkan `template_key` serta urutan yang dikonfigurasi manager, sehingga add/edit/hapus KPI custom langsung memengaruhi angka yang tampil di dashboard: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [dashboard-kpi-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-kpi-service.ts)
+- Metrik KPI custom kini mendukung drilldown per item lewat `drilldown_href` sehingga angka KPI pada kartu dashboard bisa langsung diklik ke target modul yang relevan: [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx), [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- Checklist PRD diperbarui agar status runtime merge KPI custom tercatat sebagai sudah hidup, sementara baseline-override nonaktif KPI default masih menjadi tahap lanjutan: [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md)
+- `VERSION` dinaikkan ke `0.64.47`
+
+## [0.64.48] - 2026-07-10
+
+### Changed
+
+- KPI dashboard kini memiliki baseline sistem (`scope_type=SYSTEM`, `is_default=1`) yang otomatis di-seed, lalu definisi KPI pada scope divisi/sub-divisi di-merge berbasis `metric_key` sehingga manager dapat mengoverride atau menonaktifkan KPI default tanpa menghapus baseline sistem: [dashboard-kpi-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-kpi-service.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/dashboard/kpi-definitions/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/dashboard/kpi-definitions/[id]/route.ts)
+- Dashboard operasional kini merender metrik kartu dari definisi KPI baseline/custom ter-merge (menggunakan `metric_type` untuk formatting) dan template KPI diperluas agar paritas metrik default tetap konsisten: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [dashboard-kpi-config.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/dashboard-kpi-config.ts)
+- SUPER_ADMIN kini dapat memilih scope KPI (divisi/sub-divisi) lewat query parameter `kpiDivisionName` dan `kpiSubdivisionName`, sehingga perubahan KPI scope langsung memengaruhi angka yang tampil pada kartu dashboard operasional: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx), [dashboard-kpi-manager-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-kpi-manager-panel.tsx)
+- Guard `server-only` dihapus dari beberapa helper server agar smoke test `tsx` dapat berjalan tanpa runtime error, sekaligus merapikan typing map kartu operasional yang sebelumnya menabrak union `ALL`: [dashboard-kpi-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-kpi-service.ts), [access-control-server.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control-server.ts), [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx)
+- `VERSION` dinaikkan ke `0.64.48`
+
+## [0.64.49] - 2026-07-10
+
+### Changed
+
+- KPI dashboard kini menambah template berbasis `PERCENTAGE` (rasio aktivasi sales, rasio overdue support, rasio kehadiran HR) dan `SUM` (nominal overdue billing), sehingga manager bisa membuat KPI yang benar-benar berupa rasio/persen maupun total nominal tanpa manual hitung: [dashboard-kpi-config.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/dashboard-kpi-config.ts), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Query dashboard billing kini menyediakan `overdueAmount` untuk mendukung KPI nominal overdue dan menjaga perhitungan tetap konsisten dengan definisi overdue invoice yang sudah dipakai di dashboard: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `VERSION` dinaikkan ke `0.64.49`
+
+## [0.64.50] - 2026-07-10
+
+### Changed
+
+- Drilldown `focus` kini aktif untuk domain non-support (Sales/Billing/HR/Inventory) dengan banner “Reset Fokus” dan penyaringan section review berbasis focus key, sehingga klik KPI dari dashboard langsung membuka modul dengan konteks antrean yang relevan: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Panel `KPI Proses` kini memberi `focus` lebih spesifik untuk kartu Sales dan Creator Digital agar klik metrik tidak lagi selalu jatuh ke root `/sales`: [dashboard-process-kpis.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-process-kpis.tsx)
+- Standarisasi focus Billing untuk invoice parsial menggunakan `PARTIAL_INVOICES` (selaras dengan KPI proses dan drilldown domain), serta seed baseline baru mengikuti key tersebut: [dashboard-kpi-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-kpi-service.ts)
+- `VERSION` dinaikkan ke `0.64.50`
+
+## [0.64.51] - 2026-07-10
+
+### Changed
+
+- Drilldown KPI non-support kini diperdalam ke level baris dengan `filterTags` internal pada review row, sehingga filtering tidak lagi hanya berdasarkan judul section tetapi juga membaca period, status invoice, remaining positive, suspend candidate, request status, dan tanggal aktivitas yang relevan: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Dashboard kini meneruskan `month` dan `year` ke URL drilldown dari panel `KPI Proses` maupun kartu operasional, sehingga fokus seperti order bulanan sales, movement inventory, attendance HR, dan overdue billing mengikuti periode dashboard yang sedang dipilih: [dashboard-process-kpis.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-process-kpis.tsx), [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx), [dashboard/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx)
+- Sidebar kini bisa diminimalkan/ditampilkan kembali pada desktop dan dibuka-tutup sebagai drawer pada mobile, sehingga area navigasi seperti pada screenshot tidak selalu memakan ruang penuh: [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx)
+- `VERSION` dinaikkan ke `0.64.51`
+
+## [0.64.54] - 2026-07-10
+
+### Changed
+
+- Drilldown KPI non-support kini lebih presisi terhadap template KPI: focus `MONTHLY_ORDERS`, `DIGITAL_ORDERS`, `DIGITAL_SURVEYS`, `MONTHLY_ACTIVATIONS`, `ACTIVE_LOANS`, dan `DIGITAL_LEADS` sekarang memakai basis SQL yang mengikuti field/tanggal/source yang sama dengan kartu dashboard, sehingga isi review tidak lagi bercampur dengan antrean generik: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx)
+- KPI HR dan Inventory di dashboard kini lebih selaras dengan definisi operasional: hitungan `Employee Aktif` mengecualikan employee `ARCHIVED`, sedangkan `Request Pending` kini membaca status `PENDING` yang sama dengan focus drilldown inventory: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Layout dashboard diperketat lagi dengan `items-start` pada kedua grid dua kolom utama agar panel kanan tidak ikut meregang tinggi kolom kiri dan tidak menyisakan gap visual di bagian bawah saat tinggi konten berbeda: [dashboard/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx), [activity-feed.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/activity-feed.tsx)
+- `VERSION` dinaikkan ke `0.64.54`
+
+## [0.64.55] - 2026-07-10
+
+### Changed
+
+- Template KPI dashboard kini punya default `drilldownHref` terpusat, termasuk untuk template komposit seperti `SALES_ACTIVATION_RATE`, `SUPPORT_OVERDUE_RATE`, `HR_ATTENDANCE_RATE`, dan `BILLING_OVERDUE_AMOUNT`, sehingga KPI custom baru tetap punya arah drilldown yang konsisten walau manager tidak mengisi URL manual: [dashboard-kpi-config.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/dashboard-kpi-config.ts), [dashboard-kpi-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-kpi-service.ts)
+- Panel `Kelola KPI` kini melakukan prefill aman untuk `drilldown` dan `metric type` berdasarkan template yang dipilih, sehingga manager lebih cepat membuat KPI custom dan risiko salah arah drilldown untuk template standar berkurang: [dashboard-kpi-manager-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-kpi-manager-panel.tsx)
+- Drilldown komposit untuk KPI rasio kini lebih jujur terhadap definisi metrik: `ACTIVATION_RATE` menampilkan pembanding order periode aktif dan subscription aktivasi periode yang sama, `ATTENDANCE_RATE` menampilkan employee aktif dan attendance hari ini, serta focus support `OVERDUE_RATE` memiliki context banner khusus; selain itu `TODAY_ATTENDANCE` kini kembali membaca `CURRENT_DATE` agar tidak melenceng oleh parameter periode dashboard: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx)
+- `VERSION` dinaikkan ke `0.64.55`
+
+## [0.64.56] - 2026-07-10
+
+### Changed
+
+- Lane `support/sla` kini membawa section turunan ticket yang relevan untuk KPI komposit, yaitu `SLA Ticket Open Aktif` sebagai penyebut dan `SLA Ticket Overdue` sebagai pembilang, sehingga focus `OVERDUE_RATE` dan `SLA_OVERDUE` tidak lagi berhenti di master SLA saja: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/[lane]/page.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Drilldown `BILLING_OVERDUE_AMOUNT` kini dipisahkan dari overdue count biasa dengan prioritas urut berdasarkan outstanding terbesar, title/description yang menegaskan nominal overdue, serta detail remaining amount pada row recurring dan one-time: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx)
+- Runtime dashboard kini lebih konsisten terhadap mapping template terbaru: KPI proses mengenali focus rasio/nominal untuk Support, Sales, Billing, dan HR, seed baseline SLA overdue diarahkan ke lane SLA, dan metric default sistem pada kartu operasional memprioritaskan mapping template terbaru agar tidak tersisa link lama dari baseline awal: [dashboard-process-kpis.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-process-kpis.tsx), [dashboard-kpi-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-kpi-service.ts), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `VERSION` dinaikkan ke `0.64.56`
+
+## [0.64.57] - 2026-07-10
+
+### Changed
+
+- `DomainReviewSection` kini mendukung summary agregat per section, dan `DomainShell` menampilkannya sebagai badge ringkas di header section agar pembacaan KPI komposit tidak berhenti di daftar row saja: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Focus komposit `OVERDUE_RATE` pada Support sekarang menampilkan ringkasan `Ticket Open SLA`, `Ticket Overdue`, dan `Rasio Overdue` langsung di section SLA, sehingga pembilang dan penyebut terlihat dalam satu layar bersama row detailnya: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Focus `BILLING_OVERDUE_AMOUNT` kini menampilkan summary agregat outstanding per section recurring dan one-time, termasuk total invoice, total nominal outstanding, dan rata-rata outstanding, sehingga nominal overdue lebih cepat dibaca sebelum masuk ke level invoice: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- `VERSION` dinaikkan ke `0.64.57`
+
+## [0.64.58] - 2026-07-10
+
+### Changed
+
+- Focus `ACTIVATION_RATE` pada Sales kini menampilkan summary agregat yang dihitung dari query penuh, mencakup `Order Periode`, `Aktivasi`, dan `Rasio Aktivasi`, lalu ditempelkan pada section order pembanding dan subscription aktivasi agar pembilang-penyebut langsung terbaca bersama row detail: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Focus `ATTENDANCE_RATE` pada HR kini menampilkan summary agregat dari seluruh employee aktif dan attendance hari ini, mencakup `Employee Aktif`, `Attendance Hari Ini`, dan `Rasio Kehadiran`, sehingga ringkasan KPI tidak lagi bergantung pada jumlah row preview yang tampil: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- `VERSION` dinaikkan ke `0.64.58`
+
+## [0.64.59] - 2026-07-10
+
+### Changed
+
+- Kartu `KPI Proses` di dashboard kini bisa menampilkan hint spesifik per metric, bukan hanya helper teks generik, sehingga KPI komposit bisa dibaca lebih cepat sebelum user masuk ke drilldown: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts), [dashboard-process-kpis.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-process-kpis.tsx)
+- Runtime builder dashboard kini mengirim hint numerator-denominator atau nominal agregat untuk metric komposit utama, termasuk `SALES_MONTHLY_ACTIVATIONS`/`SALES_ACTIVATION_RATE`, `SUPPORT_SLA_OVERDUE`/`SUPPORT_OVERDUE_RATE`, `BILLING_OVERDUE`/`BILLING_OVERDUE_AMOUNT`, dan `HR_TODAY_ATTENDANCE`/`HR_ATTENDANCE_RATE`; hint ini juga berlaku untuk KPI custom berbasis template yang sama: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `VERSION` dinaikkan ke `0.64.59`
+
+## [0.64.60] - 2026-07-10
+
+### Changed
+
+- Panel `Dashboard Operasional` kini ikut menampilkan hint konteks pada metric card, sehingga pembacaan KPI komposit konsisten antara `Dashboard Operasional` dan `KPI Proses`: [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx), [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- Mode fallback/mock dashboard kini juga mengisi hint komposit untuk `Aktivasi`, `Ticket Overdue`, `Invoice Overdue`, dan `Absensi Hari Ini`, sehingga pengalaman baca tetap seragam saat review DB belum aktif: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `VERSION` dinaikkan ke `0.64.60`
+
+## [0.64.61] - 2026-07-10
+
+### Changed
+
+- Hint KPI komposit di dashboard kini dipoles menjadi lebih scanable dengan `hintBadges`, sehingga numerator-denominator atau nominal agregat bisa dibaca cepat sebagai mini badge sebelum membaca teks penjelasan lengkap: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [dashboard-process-kpis.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-process-kpis.tsx), [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx)
+- Ditambahkan dokumen `web-hosting-readiness-checklist.md` sebagai checklist final menuju hosting Senin, mencakup freeze scope, code readiness, environment, database, infra, deploy, validasi fungsional, security, dan post-deploy checks: [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- `VERSION` dinaikkan ke `0.64.61`
+
+## [0.64.53] - 2026-07-10
+
+### Changed
+
+- Drilldown non-support kini makin query-driven: `getReviewDbSalesSections`, `getReviewDbBillingSections`, `getReviewDbInventorySections`, dan `getReviewDbHrSections` menerima filter `focus/month/year` untuk mempersempit query SQL (mis. period filter untuk order/aktivasi sales, movement inventory, attendance HR; dan filter overdue/partial/suspend candidates billing): [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- `getDomainPageData` kini meneruskan filter drilldown tersebut sampai ke fungsi query review section, sehingga hasil yang masuk ke UI sudah lebih presisi sejak query level: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- `VERSION` dinaikkan ke `0.64.53`
+
+## [0.64.52] - 2026-07-10
+
+### Changed
+
+- Filter drilldown non-support kini dipindahkan ke service layer `getDomainPageData`, sehingga section review Sales/Billing/HR/Inventory sudah disaring dari backend berdasarkan `focus`, `month`, dan `year` sebelum dikirim ke UI: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx)
+- `DomainShell` disederhanakan agar fokus pada rendering context/badge/banner drilldown, sementara filter data utama tetap diputuskan di service layer untuk mengurangi duplikasi logika frontend: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- `VERSION` dinaikkan ke `0.64.52`
+
+## [0.64.36] - 2026-07-10
+
+### Changed
+
+- PRD web kini memiliki matriks readiness cutover per role/divisi di `docs/web-role-cutover-readiness.md`, sehingga status `GO`, `PILOT`, `PARTIAL`, dan `NO-GO` untuk role aktif bisa dibaca langsung dari kondisi implementasi web saat ini beserta blocker dan gelombang cutovernya: [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md)
+- PRD utama, checklist PRD, dan indeks dokumentasi kini menautkan dokumen readiness cutover tersebut agar jalur dokumentasi role tidak berhenti pada inventaris menu/kolom, tetapi juga mencakup keputusan readiness operasional: [prd-aplikasi-web-utama.md](file:///d:/trae_projects/perkasa-erp-oss-bss/.trae/documents/prd-aplikasi-web-utama.md), [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- `VERSION` dinaikkan ke `0.64.36`
+
+## [0.64.38] - 2026-07-10
+
+### Changed
+
+- PRD migrasi kini mengunci keputusan bahwa `web-psb-perkasa` menjadi fondasi fase awal Divisi `Pemasaran & Pelayanan`, sedangkan integrasi ke `Teknisi`, `General Affair`, `Finance & HR`, dan `Operasional` dilakukan setelah flow inti legacy stabil di ERP: [org-division-baseline.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/org-division-baseline.md), [web-psb-target-role-design.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-psb-target-role-design.md), [prd-aplikasi-web-utama.md](file:///d:/trae_projects/perkasa-erp-oss-bss/.trae/documents/prd-aplikasi-web-utama.md)
+- Dokumen readiness cutover, katalog role/menu, dan PRD `List Kerja Terpadu` kini diselaraskan dengan scope fase awal tersebut, sehingga gelombang implementasi tidak lagi mengasumsikan seluruh divisi bergerak paralel dari awal: [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md), [web-role-division-menu-feature-catalog.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-division-menu-feature-catalog.md), [web-list-kerja-terpadu-prd.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-list-kerja-terpadu-prd.md), [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- `VERSION` dinaikkan ke `0.64.38`
+
+## [0.64.37] - 2026-07-10
+
+### Changed
+
+- PRD web kini memiliki spesifikasi detail modul `List Kerja Terpadu` di `docs/web-list-kerja-terpadu-prd.md`, mencakup route target `/dashboard/worklist`, target role, filter global, tab queue per role, struktur item kerja, kolom utama, panel detail, CTA contextual prefill, dan tahapan rollout untuk menggantikan menu legacy `list`: [web-list-kerja-terpadu-prd.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-list-kerja-terpadu-prd.md)
+- PRD utama, checklist PRD, dan indeks dokumentasi kini menautkan PRD `List Kerja Terpadu` tersebut agar blocker terbesar role bisnis lintas domain sudah punya spesifikasi implementasi yang eksplisit: [prd-aplikasi-web-utama.md](file:///d:/trae_projects/perkasa-erp-oss-bss/.trae/documents/prd-aplikasi-web-utama.md), [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- `VERSION` dinaikkan ke `0.64.37`
+
+## [0.64.35] - 2026-07-10
+
+### Changed
+
+- PRD web kini memiliki lampiran inventaris aktual role/divisi/menu/fitur/kolom melalui dokumen `docs/web-role-division-menu-feature-catalog.md`, sehingga pembacaan aplikasi dapat dilakukan langsung dari perspektif operasional tiap role aktif: [web-role-division-menu-feature-catalog.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-division-menu-feature-catalog.md)
+- PRD utama, checklist PRD, dan indeks dokumentasi kini menautkan inventaris role/divisi tersebut agar proses review menu, capability, dan kolom layar tetap sinkron dengan implementasi web saat ini: [prd-aplikasi-web-utama.md](file:///d:/trae_projects/perkasa-erp-oss-bss/.trae/documents/prd-aplikasi-web-utama.md), [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- `VERSION` dinaikkan ke `0.64.35`
+
+## [0.64.34] - 2026-07-10
+
+### Changed
+
+- CTA row `Subscription Billing-Ready` di Billing kini membawa `service number` ke form generate invoice, sehingga operator tidak perlu memilih ulang layanan saat menindak item billing-ready tertentu: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [billing-invoice-generate-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-invoice-generate-form.tsx)
+- CTA row HR untuk `archive/reactivate employee` dan `release payroll` kini ikut membawa prefill `employee` atau `payroll` ke form target, dan form payroll create juga bisa dibuka dengan employee yang sudah terseleksi agar tindak lanjut lebih aman: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [hr-employee-archive-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-employee-archive-form.tsx), [hr-employee-reactivate-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-employee-reactivate-form.tsx), [hr-salary-slip-release-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-salary-slip-release-form.tsx), [hr-salary-slip-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-salary-slip-form.tsx)
+- Kontrak query prefill lintas domain kini diperluas dengan `service`, `employee`, dan `payroll` agar safety UX dari review card ke form target tetap type-safe pada Billing dan HR: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx), [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- `VERSION` dinaikkan ke `0.64.34`
+
+## [0.64.33] - 2026-07-10
+
+### Changed
+
+- CTA per-row pada kartu review `Sales`, `Billing`, `Inventory`, dan `HR` kini membentuk tautan `query + anchor`, sehingga klik dari row tidak lagi hanya melompat ke form, tetapi juga membawa context item seperti `lead`, `order`, `invoice`, `request`, `attendance`, atau `loan` ke halaman domain terkait: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx), [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- Form write-side yang menjadi target CTA kini menerima `initial...` prefill agar operator langsung masuk dengan nilai item yang sudah terpilih untuk tindak lanjut invoice, lead, order, request inventory, attendance, dan loan HR: [billing-invoice-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-invoice-status-form.tsx), [billing-collection-action-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-collection-action-form.tsx), [billing-collection-resolve-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-collection-resolve-form.tsx), [billing-payment-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-payment-form.tsx), [sales-order-create-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/sales-order-create-form.tsx), [sales-survey-create-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/sales-survey-create-form.tsx), [sales-work-order-create-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/sales-work-order-create-form.tsx), [sales-subscription-activate-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/sales-subscription-activate-form.tsx), [inventory-request-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-request-status-form.tsx), [inventory-loan-return-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-loan-return-form.tsx), [hr-attendance-update-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-attendance-update-form.tsx), [hr-loan-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-loan-status-form.tsx)
+- `VERSION` dinaikkan ke `0.64.33`
+
+## [0.64.32] - 2026-07-10
+
+### Changed
+
+- Kartu review generik pada `Sales`, `Inventory`, `HR`, dan `Billing` kini juga menampilkan CTA per-row yang membaca kombinasi domain, section, status row, dan meta operasional seperti `collection status`, `follow up state`, atau `suspend candidate`, sehingga tindakan yang muncul lebih spesifik dari sebelumnya: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Mapping CTA review kini turun sampai level row, jadi operator bisa melompat langsung dari item review ke form yang paling relevan tanpa hanya bergantung pada CTA section/header: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- `VERSION` dinaikkan ke `0.64.32`
+
+## [0.64.31] - 2026-07-10
+
+### Changed
+
+- Kartu review generik pada `Sales`, `Inventory`, `HR`, dan `Billing` kini menampilkan CTA per-section langsung di header card bila role aktif punya aksi yang relevan, sehingga operator bisa melompat dari review section ke form terkait tanpa kembali ke panel prioritas: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Mapping CTA review generik kini dipusatkan berdasarkan domain + section title agar perilaku action per role tetap konsisten antara panel prioritas dan kartu review bawah: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- `VERSION` dinaikkan ke `0.64.31`
+
+## [0.64.30] - 2026-07-10
+
+### Changed
+
+- `Sales`, `Inventory`, dan `HR` kini punya panel aksi prioritas yang membaca section review lalu mengarahkan operator ke form paling relevan sesuai role aktif, sehingga review domain tidak lagi pasif dan konsisten dengan pola `Support`/`Billing`: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Form pada `Sales`, `Inventory`, dan `HR` kini juga diberi anchor per aksi agar CTA dari panel prioritas bisa melompat langsung ke form yang sesuai: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- `VERSION` dinaikkan ke `0.64.30`
+
+## [0.64.29] - 2026-07-10
+
+### Changed
+
+- Billing kini punya panel `Aksi Billing Prioritas` yang membaca section review lalu menyiapkan CTA langsung ke form `generate invoice`, `status invoice`, `collection`, `resolve`, atau `payment` sesuai permission role aktif, sehingga antrean review tidak lagi pasif untuk operator: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Form billing juga kini memiliki anchor per aksi agar CTA dari panel prioritas bisa melompat langsung ke form yang relevan untuk role aktif: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- `VERSION` dinaikkan ke `0.64.29`
+
+## [0.64.28] - 2026-07-10
+
+### Changed
+
+- Tampilan Billing kini mengikuti capability role: form write-side (generate invoice, status invoice, payment, collection action/resolve) hanya dirender jika role memiliki permission create/update, dan role read-only melihat banner `Mode baca saja` agar tidak bingung mengapa aksi tidak tersedia: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- `VERSION` dinaikkan ke `0.64.28`
+
+## [0.64.27] - 2026-07-10
+
+### Changed
+
+- Tampilan lane Support kini lebih ketat per role: form aksi (create/progress/escalate/close/SLA/isolir/dismantle) hanya dirender jika role memiliki capability yang sesuai, dan quick links otomatis mengikuti form yang benar-benar tersedia: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Panel Trouble Ticket kini menyembunyikan tombol aksi update/escalate/close/SLA ketika role tidak memiliki permission yang diperlukan, dan menampilkan status `Mode baca saja` agar operator paham lane tersebut bersifat read-only: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.27`
+
+## [0.64.26] - 2026-07-10
+
+### Changed
+
+- Sidebar kini memprioritaskan urutan menu berdasarkan role/divisi, memisahkan `Menu Utama` dan `Pengaturan`, serta menyederhanakan navigasi mobile agar lebih fokus pada menu operasional role aktif: [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx)
+- Dashboard kini otomatis memakai divisi default sesuai role (mis. Sales/CS/NOC/Digital) ketika query `division` belum diberikan, serta mengunci filter divisi untuk non-admin agar tampilan dan kontrol lebih konsisten per divisi: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx), [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx)
+- `VERSION` dinaikkan ke `0.64.26`
+
+## [0.64.25] - 2026-07-10
+
+### Changed
+
+- Panel `KPI Proses` kini membawa drilldown yang lebih spesifik ke lane support menggunakan query `focus`, sehingga metrik seperti `Ticket Overdue`, `Trouble Ticket Open`, `Isolir Aktif`, dan `Dismantle Periode Ini` tidak lagi hanya membuka halaman umum: [dashboard-process-kpis.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-process-kpis.tsx)
+- Halaman support lane dan support domain kini membaca context `focus` untuk menampilkan banner fokus operasional dan menyaring section/row yang relevan, terutama untuk backlog `SLA OVERDUE` dan ticket yang masih aktif terbuka: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/[lane]/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Kontrak UI support kini memuat `SupportDrilldownContext` untuk menjaga context drilldown tetap type-safe dari halaman ke shell domain: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- `VERSION` dinaikkan ke `0.64.25`
+
+## [0.64.24] - 2026-07-10
+
+### Changed
+
+- Dashboard kini menambah panel `KPI Proses` untuk memecah metrik operasional per divisi (Sales/CS/NOC/Digital) menjadi metrik proses yang bisa langsung diklik ke lane atau modul terkait, sehingga gap `KPI per proses detail` di PRD semakin tertutup: [dashboard-process-kpis.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-process-kpis.tsx)
+- Landing `/dashboard` kini menyisipkan `KPI Proses` setelah `Dashboard Operasional` agar urutan monitor -> drilldown proses -> alert -> tindakan berikutnya terasa lebih lengkap: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx)
+- `VERSION` dinaikkan ke `0.64.24`
+
+## [0.64.23] - 2026-07-10
+
+### Changed
+
+- Landing `/dashboard` kini menambah panel `Tindakan Berikutnya` di antara `Alert Silang Domain` dan blok KPI, sehingga alur baca operator menjadi monitor -> identifikasi blocker -> pilih aksi -> masuk ke modul yang tepat tanpa menebak langkah berikutnya: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx)
+- Komponen baru `DashboardNextActions` merangkum alert, list kerja, dan queue role aktif menjadi kartu aksi prioritas dengan CTA langsung seperti `Review Import`, `Kerjakan Sekarang`, dan `Masuk Queue`, agar shortcut tindakan dashboard lebih tajam sesuai PRD: [dashboard-next-actions.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-next-actions.tsx)
+- `VERSION` dinaikkan ke `0.64.23`
+
+## [0.64.22] - 2026-07-10
+
+### Changed
+
+- Panel `Alert Silang Domain` kini menampilkan modul terdampak, ringkasan dampak lintas domain, dan `Langkah berikutnya` pada tiap alert, sehingga operator tidak lagi hanya melihat blocker tetapi juga korelasi operasional dan tindakan paling tepat setelah membuka dashboard: [cross-domain-alerts.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/cross-domain-alerts.tsx)
+- Service dashboard kini memperkaya payload `dashboardAlerts` untuk mode review DB dan fallback dengan `impactSummary`, `nextStep`, dan `affectedModules`, sehingga alert import, billing, support, isolir, dan approval memberi konteks dampak ke modul lain secara lebih eksplisit: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Kontrak `DashboardAlertItem` kini membawa metadata korelasi silang domain yang lebih lengkap untuk menjaga type-safety antara service dashboard dan komponen UI alert: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- `VERSION` dinaikkan ke `0.64.22`
+
+## [0.64.21] - 2026-07-09
+
+### Changed
+
+- Dashboard utama kini memiliki panel `Alert Silang Domain` yang menonjolkan hambatan paling berdampak lintas modul seperti batch import tertahan, invoice overdue, trouble ticket aktif, isolir aktif, dan approval Daily Activity yang masih menunggu agar operator bisa langsung masuk ke tindakan prioritas: [cross-domain-alerts.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/cross-domain-alerts.tsx)
+- Service dashboard kini menghitung `dashboardAlerts` untuk review DB maupun mode fallback, sehingga landing dashboard tidak lagi hanya memberi ringkasan pasif tetapi juga CTA prioritas ke modul yang tepat: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Landing `/dashboard` kini menyisipkan alert silang domain di antara ringkasan operasional dan blok eksekusi agar urutan baca operator menjadi monitor -> identifikasi blocker -> tindak lanjuti: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx)
+- `VERSION` dinaikkan ke `0.64.21`
+
+## [0.64.20] - 2026-07-09
+
+### Changed
+
+- Landing `/dashboard` kini disusun ulang mengikuti konsep PRD sebagai pusat kendali ERP, dengan lapisan `Pusat Kendali ERP`, `Dashboard Operasional`, `Kontrol Lintas Domain`, serta blok `List Kerja`, `Approval`, `Shortcut Modul`, dan `Audit` agar alur monitor -> eksekusi -> audit terasa jelas di satu halaman: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx)
+- Komponen baru `DashboardCommandCenter` menampilkan fokus role aktif, jumlah queue prioritas, list kerja terpadu, shortcut modul, dan approval pending supaya operator langsung memahami konteks kerjanya saat masuk ke dashboard: [dashboard-command-center.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-command-center.tsx)
+- Query kartu operasional NOC kini tahan terhadap variasi schema review DB dengan pengecekan kolom `sla_due_at` terlebih dahulu, sehingga dashboard tidak lagi jatuh ke `Mock Fallback` hanya karena kolom SLA belum tersedia pada database aktif: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Copy dashboard operasional kini mengacu langsung ke PRD dan tidak lagi memakai narasi baseline visual lama: [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx)
+- `VERSION` dinaikkan ke `0.64.20`
+
+## [0.64.19] - 2026-07-09
+
+### Changed
+
+- `DomainShell` kini menjadi landing operasional lintas menu yang lebih selaras dengan PRD, dengan navigasi antardomain langsung di header setiap menu agar operator bisa berpindah antar modul tanpa terasa keluar dari satu ERP terintegrasi: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Setiap menu domain (`Sales`, `Customer`, `Support`, `Inventory`, `HR`, `Billing`) kini memiliki blok `Alur utama menu` yang menjelaskan workflow inti domain berdasarkan fokus PRD, sehingga tampilan tiap halaman tidak lagi hanya berupa shell generik dengan form dan review: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Setiap menu domain kini juga menampilkan panel `Integrasi ERP` yang mengarahkan operator ke modul terkait seperti Sales -> Customer/Billing, Support -> Billing/Inventory, dan HR -> Daily Activity/Settings Users, agar integrasi lintas domain terasa langsung pada UI masing-masing menu: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- `VERSION` dinaikkan ke `0.64.19`
+
+## [0.64.18] - 2026-07-09
+
+### Changed
+
+- Dashboard utama ERP kini memprioritaskan blok `Dashboard Operasional` lintas divisi di bagian atas halaman agar lebih selaras dengan baseline `web-psb-perkasa` dan PRD yang menekankan integrasi operasional semua domain dalam satu landing page: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx)
+- Service dashboard kini menyediakan kartu operasional untuk `Penjualan`, `CS`, `NOC`, dan `Creator Digital` dengan metrik lintas domain yang dibaca dari review DB berdasarkan filter periode aktif, sehingga dashboard ERP tidak lagi hanya bergantung pada ringkasan role-aware: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Dashboard operasional baru kini menyediakan filter `bulan`, `tahun`, dan `divisi`, serta kartu ringkas per divisi yang langsung melompat ke modul relevan agar alur landing dashboard lebih dekat ke ritme operasional legacy tanpa membuang komponen ERP yang sudah ada: [operational-division-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/operational-division-board.tsx)
+- `VERSION` dinaikkan ke `0.64.18`
+
+## [0.64.17] - 2026-07-09
+
+### Changed
+
+- CTA header lane dan tombol aksi per row pada `Queue Trouble Ticket` kini memakai kamus label yang sama berbasis `Queue Reason`, sehingga bahasa aksi utama dan aksi pendukung terasa konsisten dari level lane sampai level ticket: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Header lane TT kini juga memakai urutan aksi yang sama dengan row ticket teratas, sehingga prioritas klik operator tidak lagi berbeda antara panel ringkas dan detail row: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.17`
+
+## [0.64.16] - 2026-07-09
+
+### Changed
+
+- Tiap row `Queue Trouble Ticket` kini menampilkan helper singkat saat aksi memang disederhanakan oleh konteks ticket, sehingga operator memahami kenapa kombinasi tombol pada `READY_CLOSE`, `ESCALATION_PENDING`, `SLA_OVERDUE`, `FOLLOW_UP_SCHEDULED`, dan konteks lain bisa berbeda: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Pesan helper penyederhanaan aksi kini juga menyebut fokus operasional yang diutamakan, misalnya close formal, tindak lanjut eskalasi, pengamanan SLA, atau follow-up terjadwal, agar UI tetap ringkas tetapi tidak terasa “menghilangkan” opsi tanpa penjelasan: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.16`
+
+## [0.64.15] - 2026-07-09
+
+### Changed
+
+- Opsi aksi pendukung pada tiap row `Queue Trouble Ticket` kini disaring berdasarkan `Queue Reason`, sehingga ticket `READY_CLOSE`, `ESCALATION_PENDING`, `SLA_OVERDUE`, `FOLLOW_UP_OVERDUE`, dan reason lain tidak lagi dipenuhi tombol yang kurang relevan: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Ticket kritis kini menampilkan set aksi yang lebih fokus, misalnya `READY_CLOSE` hanya menonjolkan close/progress sementara jalur eskalasi dan SLA hanya muncul saat konteks ticket memang membutuhkannya: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.15`
+
+## [0.64.14] - 2026-07-09
+
+### Changed
+
+- Tombol aksi pada tiap row `Queue Trouble Ticket` kini diurutkan mengikuti `Aksi Disarankan`, sehingga tindakan utama tampil paling depan dan tidak lagi tenggelam di antara aksi pendukung lain: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Aksi utama per row TT kini memakai styling yang lebih menonjol dibanding aksi pendukung, sehingga operator lebih cepat terdorong menekan tombol yang paling relevan sesuai `Queue Reason`: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.14`
+
+## [0.64.13] - 2026-07-09
+
+### Changed
+
+- Setiap row pada panel `Queue Trouble Ticket` kini menampilkan badge `Aksi Disarankan` yang membaca `Queue Reason`, sehingga operator bisa langsung melihat tindakan yang paling tepat untuk ticket tersebut tanpa bergantung pada CTA header lane saja: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Tiap row TT kini juga menampilkan helper `Langkah saat ini` untuk menjelaskan konteks tindakan yang disarankan, misalnya mengejar follow-up overdue, mengamankan SLA, melanjutkan eskalasi, atau menutup ticket yang sudah matang: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.13`
+
+## [0.64.12] - 2026-07-09
+
+### Changed
+
+- CTA rekomendasi pada header lane `Queue Trouble Ticket` kini membaca `Queue Reason` ticket teratas, sehingga label aksi berubah lebih spesifik sesuai konteks nyata seperti `ESCALATION_PENDING`, `FOLLOW_UP_OVERDUE`, `SLA_DUE_TODAY`, `FOLLOW_UP_SCHEDULED`, atau `WAITING_PROGRESS`: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Pesan `fokus cepat` pada header lane TT kini juga menjelaskan niat aksi untuk ticket teratas, bukan hanya menampilkan kode ticket, sehingga operator lebih cepat memahami kenapa lane itu harus ditindak duluan: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.12`
+
+## [0.64.11] - 2026-07-09
+
+### Changed
+
+- Header tiap lane pada panel `Queue Trouble Ticket` kini membawa CTA rekomendasi yang menyesuaikan konteks lane aktif seperti `Critical Attention`, `Planned Follow Up`, `Waiting Progress`, dan `Ready Close`, sehingga operator bisa langsung meloncat ke aksi paling relevan dari ticket teratas di lane tersebut: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Header lane TT kini juga menampilkan penanda `Fokus cepat untuk ticket teratas`, agar CTA section jelas terbaca sebagai dorongan aksi untuk item paling mendesak di lane itu: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.11`
+
+## [0.64.10] - 2026-07-09
+
+### Changed
+
+- Queue support sekarang memecah ticket aktif ke lane `Critical Attention`, `Planned Follow Up`, dan `Waiting Progress`, sehingga operator tidak lagi membaca kasus eskalasi/follow-up kritis bercampur dengan ticket yang masih terjadwal atau baru menunggu progress: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Panel `Queue Trouble Ticket` kini hanya merender lane yang benar-benar berisi ticket, sehingga segmentasi operasional baru tetap ringkas dan tidak dipenuhi section kosong: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.10`
+
+## [0.64.9] - 2026-07-09
+
+### Changed
+
+- Panel `Queue Trouble Ticket` kini mengurutkan section berdasarkan urgensi `Queue Priority`, sehingga lane yang memuat ticket `P1/P2` tampil lebih dulu daripada lane yang lebih aman ditutup seperti `Ready Close`: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Ringkasan header panel TT kini juga menampilkan distribusi `P1`-`P4`, sehingga operator bisa langsung membaca beban ticket paling kritis tanpa membuka setiap section: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.9`
+
 ## [0.63.81] - 2026-07-09
 
 ### Improved
@@ -116,6 +562,234 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 ### Changed
 
 - `VERSION` dinaikkan ke `0.63.89`
+
+## [0.63.90] - 2026-07-09
+
+### Improved
+
+- Billing read-side kini otomatis menaikkan `promise to pay` yang follow-up-nya sudah lewat ke `Suspend Ready Queue`, sehingga operator tidak perlu lagi memilah manual invoice janji bayar yang sudah jatuh tempo sebelum menjalankan batch suspend: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- `Promise To Pay Queue` kini hanya menampilkan janji bayar yang masih sehat untuk ditunggu, sehingga pemisahan antara antrean tunggu bayar dan antrean siap suspend menjadi lebih tegas: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.90`
+
+## [0.63.91] - 2026-07-09
+
+### Improved
+
+- Payment entry billing kini otomatis menarik invoice keluar dari jalur suspend saat pembayaran mulai masuk, sehingga invoice yang tadinya `SUSPENDED` tidak lagi tertinggal di konteks suspend setelah operator menerima pembayaran parsial atau penuh: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/payments/route.ts)
+- Form payment kini memberi konteks jelas saat invoice yang dibayar berasal dari jalur suspend, sehingga operator tahu bahwa pembayaran juga akan membersihkan sinyal suspend secara aman: [billing-payment-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-payment-form.tsx)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.91`
+
+## [0.64.8] - 2026-07-09
+
+### Added
+
+- Queue support sekarang menghitung `Queue Priority` (`P1`-`P4`) dari `Queue Reason`, sehingga ticket trouble ticket otomatis terurut dari yang paling mendesak sampai yang paling bisa ditunda: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- Panel `Queue Trouble Ticket` kini menampilkan badge `Priority` di setiap row, jadi operator bisa langsung membaca urutan urgensi ticket tanpa memilah manual: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.8`
+
+## [0.64.7] - 2026-07-09
+
+### Added
+
+- Queue support sekarang membawa `Queue Reason` dan `Close Candidate` pada trouble ticket, sehingga operator bisa langsung membaca apakah ticket tertahan karena follow-up, SLA, eskalasi, atau memang sudah siap close: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- Panel `Queue Trouble Ticket` kini menampilkan badge alasan antrean (`Reason`) dan indikator `Close Candidate`, sehingga lane `ready close` dan `open` tidak hanya terpisah tetapi juga lebih tegas dibaca operator: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.7`
+
+## [0.64.6] - 2026-07-09
+
+### Added
+
+- Support review sekarang menambahkan lane `Trouble Ticket Ready Close` untuk ticket yang sudah punya progress valid, tidak punya follow-up aktif, dan tidak sedang menunggu eskalasi yang lebih baru, sehingga kandidat close tidak lagi bercampur dengan antrean progress/escalation umum: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- Panel `Queue Trouble Ticket` kini merender lebih dari satu section trouble ticket sekaligus, sehingga lane `Ready Close` dan `Open` bisa dibaca terpisah pada halaman support: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.6`
+
+## [0.64.5] - 2026-07-09
+
+### Added
+
+- Review billing sekarang memisahkan `Reconnect Ready Queue` dan `Write Off Queue` menjadi lane `Recurring` dan `One-Time`, sehingga jalur pemulihan layanan dan non-collectible juga tidak lagi bercampur antara tagihan bulanan dan charge khusus: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.64.5`
+
+## [0.64.4] - 2026-07-09
+
+### Added
+
+- Review billing sekarang memisahkan `Collection Action Terbaru` menjadi lane `Recurring` dan `One-Time`, sehingga histori action operator tidak lagi bercampur antara tagihan bulanan dan charge instalasi/adjustment/termination: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.64.4`
+
+## [0.64.3] - 2026-07-09
+
+### Added
+
+- Review billing sekarang memisahkan `Promise To Pay Queue` dan `Suspend Ready Queue` menjadi lane `Recurring` dan `One-Time`, sehingga operator collection bisa membaca negosiasi janji bayar dan eskalasi suspend sesuai tipe tagihan: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.64.3`
+
+## [0.64.2] - 2026-07-09
+
+### Added
+
+- Review billing sekarang memisahkan `Collection Follow Up Queue` menjadi lane `Recurring` dan `One-Time`, sehingga operator collection bisa membaca tindak lanjut tagihan bulanan terpisah dari charge instalasi, adjustment, atau terminasi: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.64.2`
+
+## [0.64.1] - 2026-07-09
+
+### Added
+
+- Review billing sekarang menampilkan lane terpisah untuk `Invoice Recurring Perlu Tindak Lanjut`, `Invoice One-Time Perlu Tindak Lanjut`, `Invoice Recurring Terbaru`, dan `Invoice One-Time Terbaru`, sehingga operator bisa membedakan tagihan bulanan dari charge instalasi/adjustment/termination tanpa membaca campuran data: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- Meta pada antrean collection billing kini ikut membawa `Invoice Type`, sehingga context follow-up, write-off, dan histori action lebih jelas saat menangani recurring vs one-time invoice: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- `VERSION` dinaikkan ke `0.64.1`
+
+## [0.64.0] - 2026-07-09
+
+### Added
+
+- Review section billing sekarang punya `Write Off Queue` agar invoice yang sedang diajukan atau diproses write-off terpisah dari lane follow-up collection normal: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- Read-side billing sekarang mengeluarkan invoice `WRITE_OFF/CLOSED` dari antrean umum seperti `Invoice Perlu Tindak Lanjut`, `Collection Follow Up Queue`, `Promise To Pay Queue`, dan `Suspend Ready Queue`, sehingga operator hanya melihat invoice yang masih collectible di lane utama: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Resolve collection untuk action `WRITE_OFF` sekarang menutup invoice ke `collection_status = CLOSED` saat selesai, sementara pembatalannya mengembalikan invoice ke lane `REMINDER`: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/collection-actions/resolve/route.ts)
+- `VERSION` dinaikkan ke `0.64.0`
+
+## [0.63.99] - 2026-07-09
+
+### Improved
+
+- Form collection action billing sekarang otomatis membatasi action strategis seperti `PROMISE_TO_PAY`, `SUSPEND`, `RECONNECT`, dan `WRITE_OFF` ke status `OPEN`, serta mengarahkan operator memakai resolve/status invoice untuk penutupan formal jalur tersebut: [billing-collection-action-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-collection-action-form.tsx)
+
+### Fixed
+
+- Backend collection action billing sekarang menolak action baru pada invoice `PAID/CANCELLED`, memvalidasi bahwa `RECONNECT` hanya boleh dipakai pada invoice yang memang sudah berada di jalur suspend/reconnect, dan tidak lagi menggeser `collection_status` aktif saat operator hanya mencatat action non-OPEN: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/collection-actions/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.99`
+
+## [0.63.98] - 2026-07-09
+
+### Improved
+
+- Form generate invoice billing sekarang menyediakan field `Nominal One-Time` dan `Deskripsi One-Time` untuk tipe `INSTALLATION`, `ADJUSTMENT`, dan `TERMINATION`, serta otomatis mengunci mode batch kembali ke `RECURRING` agar operator tidak membawa state yang nanti ditolak backend: [billing-invoice-generate-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-invoice-generate-form.tsx)
+
+### Fixed
+
+- Backend generate invoice billing sekarang membedakan recurring vs non-recurring secara benar: recurring tetap memakai `monthly_price` subscription, sedangkan invoice one-time memakai nominal dan deskripsi custom serta item invoice yang sesuai tipe charge, sehingga `INSTALLATION/ADJUSTMENT/TERMINATION` tidak lagi salah terbentuk sebagai tagihan bulanan biasa: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/invoices/generate/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.98`
+
+## [0.63.97] - 2026-07-09
+
+### Improved
+
+- Form eskalasi support sekarang memberi peringatan saat operator mencoba memakai target dan level yang sama dengan eskalasi terakhir, sehingga kebutuhan context baru terlihat sebelum submit: [support-ticket-escalate-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-escalate-form.tsx)
+
+### Fixed
+
+- Backend eskalasi trouble ticket sekarang menolak eskalasi ulang yang identik bila belum ada progress baru sesudah eskalasi terakhir, sehingga jejak eskalasi tidak terduplikasi tanpa konteks operasional baru: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/%5BticketCode%5D/escalate/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.97`
+
+## [0.63.96] - 2026-07-09
+
+### Improved
+
+- Form eskalasi support sekarang membatasi pilihan level sesuai state SLA ticket dan menjelaskan kapan `OVERDUE`, `DUE_TODAY`, atau `MANUAL` boleh dipakai, sehingga operator tidak lagi menebak level eskalasi yang valid: [support-ticket-escalate-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-escalate-form.tsx)
+
+### Fixed
+
+- Backend eskalasi trouble ticket sekarang memvalidasi kecocokan level `OVERDUE` dan `DUE_TODAY` terhadap `sla_due_at` ticket, sehingga jalur eskalasi SLA tidak bisa dipakai sembarang untuk ticket yang belum benar-benar due: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/%5BticketCode%5D/escalate/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.96`
+
+## [0.63.95] - 2026-07-09
+
+### Improved
+
+- Form `Close Ticket` support sekarang menampilkan indikator apakah ticket sudah memiliki progress aktif yang valid, sehingga operator mendapat peringatan dini sebelum mencoba menutup ticket yang belum melewati fase progress: [support-ticket-close-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-close-form.tsx)
+
+### Fixed
+
+- Backend close trouble ticket sekarang mewajibkan adanya progress aktif `ON_PROGRESS` atau `FOLLOW_UP` sebelum ticket bisa ditutup, sehingga lifecycle support tidak bisa lagi lompat dari `OPEN` langsung ke `CLOSED`: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/%5BticketCode%5D/close/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.95`
+
+## [0.63.94] - 2026-07-09
+
+### Improved
+
+- Form `Resolve Collection` billing sekarang memberi helper yang menyesuaikan action aktif seperti `PROMISE_TO_PAY`, `SUSPEND`, dan `RECONNECT`, sehingga operator lebih paham efek resolve terhadap jalur invoice sebelum menutup follow-up: [billing-collection-resolve-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-collection-resolve-form.tsx)
+
+### Fixed
+
+- Resolve collection billing sekarang ikut menyelaraskan `collection_status` dan `suspend_candidate` invoice secara aman berdasarkan action yang ditutup, sehingga janji bayar yang selesai/batal tidak tertinggal sebagai `PROMISE_TO_PAY`, suspend yang dibatalkan mencabut sinyal suspend, dan reconnect tetap tinggal di lane reconnect sampai invoice benar-benar diaktifkan lagi: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/collection-actions/resolve/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.94`
+
+## [0.63.93] - 2026-07-09
+
+### Improved
+
+- Form `Status Invoice` billing sekarang ikut membaca konteks dari `Reconnect Ready Queue`, sehingga operator tetap melihat ringkasan invoice aktif yang sedang berada di jalur reconnect sebelum mengaktifkan layanan kembali: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [billing-invoice-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-invoice-status-form.tsx)
+
+### Fixed
+
+- Aksi collection `RECONNECT` billing sekarang mempertahankan `collection_status = RECONNECT`, sehingga antrean reconnect tetap merefleksikan invoice yang benar-benar sedang menunggu pemulihan layanan dan tidak langsung hilang saat operator baru mencatat action reconnect: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/collection-actions/route.ts)
+- Aktivasi ulang invoice suspend ke `OVERDUE` sekarang otomatis mengeluarkan invoice dari jalur reconnect kembali ke follow-up normal dan sekaligus menutup action `RECONNECT` yang masih `OPEN`, sehingga invoice yang sudah dipulihkan tidak tertahan di antrean reconnect: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/invoices/status/route.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.93`
+
+## [0.63.92] - 2026-07-09
+
+### Improved
+
+- `Reconnect Ready Queue` billing kini hanya membaca invoice yang benar-benar berada pada jalur `RECONNECT`, sehingga antrean reconnect tidak lagi tercampur dengan histori suspend lama dan lebih jujur terhadap invoice yang masih perlu dipulihkan: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Antrean reconnect sekarang ikut menampilkan `collection status` dan waktu update terakhir agar operator bisa melihat konteks pemulihan layanan tanpa menebak asal perpindahan invoice dari jalur suspend: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+
+### Changed
+
+- `VERSION` dinaikkan ke `0.63.92`
 
 ## [0.63.80] - 2026-07-09
 

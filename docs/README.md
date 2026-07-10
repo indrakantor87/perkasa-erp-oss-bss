@@ -89,6 +89,27 @@
 - `web-psb-module-gap-plan.md`  
   Gap implementasi per modul untuk menentukan prioritas pengerjaan parity setelah role dan permission matrix target dikunci.
 
+- `web-role-division-menu-feature-catalog.md`  
+  Inventaris aktual role aktif, divisi, menu sidebar, fitur domain, dan kolom layar web untuk membaca ERP dari perspektif operasional per role.
+
+- `web-role-cutover-readiness.md`  
+  Matriks keputusan readiness `GO/PILOT/PARTIAL/NO-GO` per role/divisi untuk menentukan gelombang pilot dan cutover berdasarkan implementasi web aktual.
+
+- `web-list-kerja-terpadu-prd.md`  
+  PRD detail modul `List Kerja Terpadu` sebagai pengganti menu legacy `list`, termasuk route, queue per role, kolom, filter, dan CTA lintas domain.
+
+- `org-division-baseline.md`  
+  Baseline struktur divisi ERP, termasuk keputusan bahwa fase awal migrasi berpusat pada Divisi `Pemasaran dan Pelayanan` sebelum integrasi ke divisi lain.
+
+- `web-pemasaran-pelayanan-uat-checklist.md`  
+  Checklist UAT khusus fase awal Divisi `Pemasaran dan Pelayanan`, berisi flow wajib, bukti lulus, dan urutan uji per role inti legacy.
+
+- `web-list-kerja-terpadu-implementation-spec.md`  
+  Spesifikasi implementasi route `/dashboard/worklist` untuk modul `List Kerja Terpadu`, termasuk kontrak data, query param, tab queue, layout, dan integrasi dashboard.
+
+- `dashboard-kpi-customization-prd.md`  
+  PRD kustomisasi KPI dashboard agar manager per divisi dapat menambah, mengubah, menghapus, dan mengurutkan KPI secara aman per scope divisi/sub-divisi.
+
 ## Dokumen Aplikasi Web
 
 - `.trae/documents/prd-aplikasi-web-utama.md`  

@@ -2,6 +2,7 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { ensureSupportTroubleTicketProgressTable } from '@/lib/services/support-ticket-progress-service'
 
 type TroubleTicketRow = {
   id: number
@@ -9,6 +10,10 @@ type TroubleTicketRow = {
   customerName: string
   status: string
   closedAt: string | Date | null
+}
+
+type TroubleTicketProgressRow = {
+  progressStatus: string
 }
 
 function normalizeRequiredText(value: unknown) {
@@ -29,6 +34,22 @@ async function getTroubleTicketByCode(ticketCode: string) {
       LIMIT 1
     `,
     [ticketCode]
+  )
+
+  return row ?? null
+}
+
+async function getLatestProgressByTicketId(ticketId: number) {
+  const [row] = await runReviewDbQuery<TroubleTicketProgressRow>(
+    `
+      SELECT
+        progress_status AS progressStatus
+      FROM support_trouble_ticket_progress_logs
+      WHERE trouble_ticket_id = ?
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    [ticketId],
   )
 
   return row ?? null
@@ -82,6 +103,19 @@ export async function POST(
     }
     if (ticket.closedAt || ['CLOSE', 'CLOSED'].includes(ticket.status.trim().toUpperCase())) {
       return Response.json({ message: `Trouble ticket ${ticket.ticketCode} sudah berstatus closed.` }, { status: 409 })
+    }
+
+    await ensureSupportTroubleTicketProgressTable()
+
+    const latestProgress = await getLatestProgressByTicketId(ticket.id)
+    const latestProgressStatus = String(latestProgress?.progressStatus ?? '').trim().toUpperCase()
+    if (!latestProgress || !['ON_PROGRESS', 'FOLLOW_UP'].includes(latestProgressStatus)) {
+      return Response.json(
+        {
+          message: `Trouble ticket ${ticket.ticketCode} belum memiliki progress aktif yang valid. Update progress ticket terlebih dahulu sebelum close.`,
+        },
+        { status: 409 },
+      )
     }
 
     const closeNoteText = `[Closed via web] ${session.displayName} (${session.username}) - ${closeNotes}`

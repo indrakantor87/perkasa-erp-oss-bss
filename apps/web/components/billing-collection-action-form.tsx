@@ -13,10 +13,13 @@ type BillingCollectionActionFormProps = {
   promiseToPayBatchSuggestions: string[]
   suspendBatchSuggestions: string[]
   reconnectBatchSuggestions: string[]
+  initialInvoiceNo?: string
 }
 
 const actionTypeOptions = ['REMINDER', 'CALL', 'VISIT', 'PROMISE_TO_PAY', 'SUSPEND', 'RECONNECT', 'WRITE_OFF'] as const
 const actionStatusOptions = ['OPEN', 'DONE', 'CANCELLED'] as const
+const openOnlyActionTypes = ['PROMISE_TO_PAY', 'SUSPEND', 'RECONNECT', 'WRITE_OFF'] as const
+const openOnlyActionTypeSet = new Set<string>(openOnlyActionTypes)
 
 function parseFollowUpSuggestion(value: string) {
   const parts = value.split('|').map((item) => item.trim())
@@ -56,10 +59,11 @@ export function BillingCollectionActionForm({
   promiseToPayBatchSuggestions,
   suspendBatchSuggestions,
   reconnectBatchSuggestions,
+  initialInvoiceNo,
 }: BillingCollectionActionFormProps) {
   const router = useRouter()
   const [mode, setMode] = useState<'single' | 'batch'>('single')
-  const [invoiceNo, setInvoiceNo] = useState(invoiceSuggestions[0] ?? '')
+  const [invoiceNo, setInvoiceNo] = useState(initialInvoiceNo?.trim() || invoiceSuggestions[0] || '')
   const [actionType, setActionType] = useState<(typeof actionTypeOptions)[number]>('REMINDER')
   const [actionStatus, setActionStatus] = useState<(typeof actionStatusOptions)[number]>('OPEN')
   const [dueFollowUpAt, setDueFollowUpAt] = useState('')
@@ -73,6 +77,13 @@ export function BillingCollectionActionForm({
       .map((item) => parseFollowUpSuggestion(item))
       .find((item) => item.invoiceNo.trim().toUpperCase() === invoiceNo.trim().toUpperCase()) ?? null
 
+  useEffect(() => {
+    if (initialInvoiceNo?.trim()) {
+      setMode('single')
+      setInvoiceNo(initialInvoiceNo.trim())
+    }
+  }, [initialInvoiceNo])
+
   const helperText = useMemo(() => {
     if (!canCreate) {
       return 'Role aktif belum memiliki izin create pada domain Billing.'
@@ -80,10 +91,15 @@ export function BillingCollectionActionForm({
     if (!reviewDbReady) {
       return 'Mode review database belum aktif, jadi write action sengaja dinonaktifkan agar tidak menulis ke mock.'
     }
+    if (openOnlyActionTypeSet.has(actionType)) {
+      return mode === 'batch'
+        ? `Mode batch membuka action ${actionType} massal dari antrean yang sesuai. Penyelesaian atau pembatalannya harus lewat resolve/status invoice agar jalur billing tetap konsisten.`
+        : `Action ${actionType} hanya dibuat sebagai OPEN. Penyelesaian atau pembatalannya harus lewat resolve/status invoice agar lane billing tidak drift.`
+    }
     return mode === 'batch'
       ? 'Mode batch menambah collection action massal dengan sumber antrean yang disesuaikan menurut jenis aksi, tanpa mengubah invoice secara destruktif.'
       : 'Form ini menambah histori collection action tanpa mengubah data inti invoice secara destruktif.'
-  }, [canCreate, mode, reviewDbReady])
+  }, [actionType, canCreate, mode, reviewDbReady])
 
   const resolvedBatchSuggestions = useMemo(() => {
     if (actionType === 'PROMISE_TO_PAY') {
@@ -111,6 +127,11 @@ export function BillingCollectionActionForm({
     return 'tindak lanjut'
   }, [actionType])
 
+  const allowedActionStatuses = useMemo(
+    () => (openOnlyActionTypeSet.has(actionType) ? (['OPEN'] as (typeof actionStatusOptions)[number][]) : [...actionStatusOptions]),
+    [actionType],
+  )
+
   useEffect(() => {
     if (!currentSuggestion || mode !== 'single') {
       return
@@ -124,6 +145,12 @@ export function BillingCollectionActionForm({
       setDueFollowUpAt(normalizeDateTimeLocalValue(currentSuggestion.followUp))
     }
   }, [currentSuggestion, dueFollowUpAt, mode])
+
+  useEffect(() => {
+    if (!allowedActionStatuses.includes(actionStatus)) {
+      setActionStatus('OPEN')
+    }
+  }, [actionStatus, allowedActionStatuses])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -241,8 +268,8 @@ export function BillingCollectionActionForm({
             disabled={isDisabled}
           >
             {actionStatusOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
+              <option key={item} value={item} disabled={!allowedActionStatuses.includes(item)}>
+                {allowedActionStatuses.includes(item) ? item : `${item} (Gunakan Resolve)`}
               </option>
             ))}
           </select>

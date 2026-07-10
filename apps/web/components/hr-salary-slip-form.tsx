@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type HrSalarySlipFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   employeeSuggestions: string[]
+  initialEmployeeValue?: string
 }
 
 function extractEmployeeCode(value: string) {
@@ -18,10 +19,11 @@ export function HrSalarySlipForm({
   canCreate,
   reviewDbReady,
   employeeSuggestions,
+  initialEmployeeValue,
 }: HrSalarySlipFormProps) {
   const router = useRouter()
   const now = new Date()
-  const [employeeValue, setEmployeeValue] = useState(employeeSuggestions[0] ?? '')
+  const [employeeValue, setEmployeeValue] = useState(initialEmployeeValue?.trim() || employeeSuggestions[0] || '')
   const [payrollMonth, setPayrollMonth] = useState(String(now.getMonth() + 1))
   const [payrollYear, setPayrollYear] = useState(String(now.getFullYear()))
   const [baseSalary, setBaseSalary] = useState('')
@@ -35,6 +37,12 @@ export function HrSalarySlipForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialEmployeeValue?.trim()) {
+      setEmployeeValue(initialEmployeeValue.trim())
+    }
+  }, [initialEmployeeValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

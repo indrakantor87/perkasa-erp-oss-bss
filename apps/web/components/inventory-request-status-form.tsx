@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type InventoryRequestStatusFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   requestSuggestions: string[]
+  initialRequestValue?: string
 }
 
 const statusOptions = [
@@ -24,9 +25,10 @@ export function InventoryRequestStatusForm({
   canCreate,
   reviewDbReady,
   requestSuggestions,
+  initialRequestValue,
 }: InventoryRequestStatusFormProps) {
   const router = useRouter()
-  const [requestValue, setRequestValue] = useState(requestSuggestions[0] ?? '')
+  const [requestValue, setRequestValue] = useState(initialRequestValue?.trim() || requestSuggestions[0] || '')
   const [nextStatus, setNextStatus] = useState<(typeof statusOptions)[number]['value']>('ON_PROGRESS')
   const [pendingReason, setPendingReason] = useState('')
   const [processNotes, setProcessNotes] = useState('')
@@ -34,6 +36,12 @@ export function InventoryRequestStatusForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialRequestValue?.trim()) {
+      setRequestValue(initialRequestValue.trim())
+    }
+  }, [initialRequestValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

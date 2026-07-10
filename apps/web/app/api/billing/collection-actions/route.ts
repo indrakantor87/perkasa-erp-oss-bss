@@ -17,6 +17,10 @@ const allowedActionStatuses = new Set(['OPEN', 'DONE', 'CANCELLED'])
 
 type BillingInvoiceRow = {
   id: number
+  invoiceNo: string
+  invoiceStatus: string
+  collectionStatus: string | null
+  suspendCandidate: number | null
 }
 
 type AuthUserRow = {
@@ -38,15 +42,18 @@ type CreateCollectionActionParams = {
   sessionDisplayName: string
 }
 
+const openOnlyActionTypes = new Set(['PROMISE_TO_PAY', 'SUSPEND', 'RECONNECT', 'WRITE_OFF'])
+
 function mapCollectionStatus(actionType: string) {
   switch (actionType) {
     case 'PROMISE_TO_PAY':
       return 'PROMISE_TO_PAY'
     case 'SUSPEND':
       return 'SUSPEND'
+    case 'RECONNECT':
+      return 'RECONNECT'
     case 'VISIT':
       return 'FIELD_VISIT'
-    case 'RECONNECT':
     case 'WRITE_OFF':
       return 'CLOSED'
     case 'REMINDER':
@@ -59,7 +66,12 @@ function mapCollectionStatus(actionType: string) {
 async function createCollectionAction(params: CreateCollectionActionParams) {
   const [invoice] = await runReviewDbQuery<BillingInvoiceRow>(
     `
-      SELECT id
+      SELECT
+        id,
+        invoice_no AS invoiceNo,
+        invoice_status AS invoiceStatus,
+        collection_status AS collectionStatus,
+        suspend_candidate AS suspendCandidate
       FROM billing_invoices
       WHERE invoice_no = ?
       LIMIT 1
@@ -68,6 +80,26 @@ async function createCollectionAction(params: CreateCollectionActionParams) {
   )
   if (!invoice) {
     throw new Error(`Invoice ${params.invoiceNo} tidak ditemukan di review DB.`)
+  }
+
+  const invoiceStatus = String(invoice.invoiceStatus ?? '').trim().toUpperCase()
+  const currentCollectionStatus = String(invoice.collectionStatus ?? '').trim().toUpperCase()
+  if (invoiceStatus === 'PAID' || invoiceStatus === 'CANCELLED') {
+    throw new Error(`Invoice ${invoice.invoiceNo} sudah berstatus ${invoiceStatus}, jadi tidak layak menerima collection action baru.`)
+  }
+  if (openOnlyActionTypes.has(params.actionType) && params.actionStatus !== 'OPEN') {
+    throw new Error(
+      `Action ${params.actionType} hanya boleh dibuat sebagai OPEN. Gunakan route resolve/status invoice untuk menutup atau membatalkan jalur ini secara formal.`,
+    )
+  }
+  if (
+    params.actionType === 'RECONNECT' &&
+    invoiceStatus !== 'SUSPENDED' &&
+    currentCollectionStatus !== 'RECONNECT' &&
+    currentCollectionStatus !== 'SUSPEND' &&
+    Number(invoice.suspendCandidate ?? 0) <= 0
+  ) {
+    throw new Error(`Invoice ${invoice.invoiceNo} belum berada pada jalur suspend/reconnect, jadi action RECONNECT belum valid.`)
   }
 
   const [handledBy] = await runReviewDbQuery<AuthUserRow>(
@@ -112,7 +144,12 @@ async function createCollectionAction(params: CreateCollectionActionParams) {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `,
-    [mapCollectionStatus(params.actionType), params.actionType, params.actionType, invoice.id],
+    [
+      params.actionStatus === 'OPEN' ? mapCollectionStatus(params.actionType) : currentCollectionStatus || 'REMINDER',
+      params.actionStatus === 'OPEN' ? params.actionType : '',
+      params.actionStatus === 'OPEN' ? params.actionType : '',
+      invoice.id,
+    ],
   )
 }
 

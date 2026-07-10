@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type BillingCollectionResolveFormProps = {
   canUpdate: boolean
   reviewDbReady: boolean
   followUpSuggestions: string[]
+  initialInvoiceNo?: string
 }
 
 const resolutionStatusOptions = ['DONE', 'CANCELLED'] as const
@@ -35,9 +36,10 @@ export function BillingCollectionResolveForm({
   canUpdate,
   reviewDbReady,
   followUpSuggestions,
+  initialInvoiceNo,
 }: BillingCollectionResolveFormProps) {
   const router = useRouter()
-  const [invoiceNo, setInvoiceNo] = useState(parseFollowUpSuggestion(followUpSuggestions[0] ?? '').invoiceNo)
+  const [invoiceNo, setInvoiceNo] = useState(initialInvoiceNo?.trim() || parseFollowUpSuggestion(followUpSuggestions[0] ?? '').invoiceNo)
   const [resolutionStatus, setResolutionStatus] = useState<(typeof resolutionStatusOptions)[number]>('DONE')
   const [resolutionNotes, setResolutionNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -51,6 +53,34 @@ export function BillingCollectionResolveForm({
         .find((item) => item.invoiceNo.trim().toUpperCase() === invoiceNo.trim().toUpperCase()) ?? null,
     [followUpSuggestions, invoiceNo],
   )
+
+  useEffect(() => {
+    if (initialInvoiceNo?.trim()) {
+      setInvoiceNo(initialInvoiceNo.trim())
+    }
+  }, [initialInvoiceNo])
+  const helperText = useMemo(() => {
+    if (!canUpdate) {
+      return 'Role aktif belum memiliki izin update pada domain Billing.'
+    }
+    if (!reviewDbReady) {
+      return 'Mode review database belum aktif, jadi resolve collection dinonaktifkan agar tidak menulis ke mock.'
+    }
+
+    const actionType = (currentSuggestion?.actionType || '').trim().toUpperCase()
+    if (actionType === 'PROMISE_TO_PAY') {
+      return 'Resolve janji bayar akan menutup action aktif dan mengembalikan invoice ke jalur follow-up normal agar operator tidak meninggalkan status janji bayar yang sudah selesai atau batal.'
+    }
+    if (actionType === 'SUSPEND') {
+      return resolutionStatus === 'CANCELLED'
+        ? 'Membatalkan resolve suspend juga akan mencabut sinyal suspend agar invoice kembali ke jalur follow-up normal.'
+        : 'Resolve suspend mempertahankan sinyal suspend yang sudah aktif sampai operator billing benar-benar mengubah status invoice.'
+    }
+    if (actionType === 'RECONNECT') {
+      return 'Resolve reconnect hanya menutup action follow-up aktif; invoice tetap berada di jalur reconnect sampai status invoice benar-benar diaktifkan lagi.'
+    }
+    return 'Form ini menutup follow-up collection OPEN terbaru per invoice secara aman saat reminder, call, atau visit sudah selesai atau dibatalkan.'
+  }, [canUpdate, currentSuggestion?.actionType, resolutionStatus, reviewDbReady])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -99,13 +129,7 @@ export function BillingCollectionResolveForm({
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Selesaikan follow-up collection
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
-        {!canUpdate
-          ? 'Role aktif belum memiliki izin update pada domain Billing.'
-          : !reviewDbReady
-            ? 'Mode review database belum aktif, jadi resolve collection dinonaktifkan agar tidak menulis ke mock.'
-            : 'Form ini menutup follow-up collection OPEN terbaru per invoice secara aman saat reminder sudah selesai atau dibatalkan.'}
-      </p>
+      <p className="mt-3 text-sm leading-6 text-mute">{helperText}</p>
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-slate-700">

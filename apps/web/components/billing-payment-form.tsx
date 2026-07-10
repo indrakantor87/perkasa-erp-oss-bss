@@ -9,6 +9,7 @@ type BillingPaymentFormProps = {
   reviewDbReady: boolean
   invoiceSuggestions: string[]
   followUpSuggestions: string[]
+  initialInvoiceNo?: string
 }
 
 const paymentMethodOptions = ['TRANSFER', 'CASH', 'EWALLET', 'VA', 'OTHER'] as const
@@ -41,9 +42,10 @@ export function BillingPaymentForm({
   reviewDbReady,
   invoiceSuggestions,
   followUpSuggestions,
+  initialInvoiceNo,
 }: BillingPaymentFormProps) {
   const router = useRouter()
-  const [invoiceNo, setInvoiceNo] = useState(invoiceSuggestions[0] ?? '')
+  const [invoiceNo, setInvoiceNo] = useState(initialInvoiceNo?.trim() || invoiceSuggestions[0] || '')
   const [amount, setAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<(typeof paymentMethodOptions)[number]>('TRANSFER')
   const [paymentDate, setPaymentDate] = useState('')
@@ -58,6 +60,12 @@ export function BillingPaymentForm({
       .map((item) => parseFollowUpSuggestion(item))
       .find((item) => item.invoiceNo.trim().toUpperCase() === invoiceNo.trim().toUpperCase()) ?? null
 
+  useEffect(() => {
+    if (initialInvoiceNo?.trim()) {
+      setInvoiceNo(initialInvoiceNo.trim())
+    }
+  }, [initialInvoiceNo])
+
   const helperText = useMemo(() => {
     if (!canCreate) {
       return 'Role aktif belum memiliki izin create pada domain Billing.'
@@ -65,8 +73,15 @@ export function BillingPaymentForm({
     if (!reviewDbReady) {
       return 'Mode review database belum aktif, jadi payment entry dinonaktifkan agar tidak menulis ke mock.'
     }
+    if (
+      currentSuggestion &&
+      ((currentSuggestion.collectionStatus || '').trim().toUpperCase() === 'SUSPEND' ||
+        (currentSuggestion.suspendCandidate || '').trim().toUpperCase() === 'YA')
+    ) {
+      return 'Form ini menambah pembayaran ke review DB, menyelaraskan status invoice, dan otomatis menarik invoice keluar dari jalur suspend bila pembayaran sudah mulai masuk.'
+    }
     return 'Form ini menambah pembayaran ke review DB dan menyelaraskan status invoice secara aman.'
-  }, [canCreate, reviewDbReady])
+  }, [canCreate, currentSuggestion, reviewDbReady])
 
   useEffect(() => {
     if (!currentSuggestion) {

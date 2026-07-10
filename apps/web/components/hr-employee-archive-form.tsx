@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type HrEmployeeArchiveFormProps = {
   canUpdate: boolean
   reviewDbReady: boolean
   employeeSuggestions: string[]
+  initialEmployeeValue?: string
 }
 
 function extractEmployeeId(value: string) {
@@ -18,14 +19,21 @@ export function HrEmployeeArchiveForm({
   canUpdate,
   reviewDbReady,
   employeeSuggestions,
+  initialEmployeeValue,
 }: HrEmployeeArchiveFormProps) {
   const router = useRouter()
-  const [employeeValue, setEmployeeValue] = useState(employeeSuggestions[0] ?? '')
+  const [employeeValue, setEmployeeValue] = useState(initialEmployeeValue?.trim() || employeeSuggestions[0] || '')
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canUpdate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    if (initialEmployeeValue?.trim()) {
+      setEmployeeValue(initialEmployeeValue.trim())
+    }
+  }, [initialEmployeeValue])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

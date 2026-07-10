@@ -12,6 +12,8 @@ type BillingInvoiceRow = {
   paidAmount: number
   dueDate: string | Date
   invoiceStatus: string
+  collectionStatus: string | null
+  suspendCandidate: number | null
 }
 
 type AuthUserRow = {
@@ -129,7 +131,9 @@ export async function POST(request: Request) {
           total_amount AS totalAmount,
           paid_amount AS paidAmount,
           due_date AS dueDate,
-          invoice_status AS invoiceStatus
+          invoice_status AS invoiceStatus,
+          collection_status AS collectionStatus,
+          suspend_candidate AS suspendCandidate
         FROM billing_invoices
         WHERE invoice_no = ?
         LIMIT 1
@@ -199,6 +203,14 @@ export async function POST(request: Request) {
 
     const updatedPaidAmount = Number(invoice.paidAmount) + amount
     const nextInvoiceStatus = resolveInvoiceStatus(Number(invoice.totalAmount), updatedPaidAmount, invoice.dueDate)
+    const currentCollectionStatus = String(invoice.collectionStatus ?? '').trim().toUpperCase()
+    const wasSuspendFlow =
+      currentCollectionStatus === 'SUSPEND' ||
+      String(invoice.invoiceStatus).trim().toUpperCase() === 'SUSPENDED' ||
+      Number(invoice.suspendCandidate) > 0
+    const nextCollectionStatus =
+      nextInvoiceStatus === 'PAID' ? 'CLOSED' : wasSuspendFlow ? 'RECONNECT' : currentCollectionStatus || 'REMINDER'
+    const nextSuspendCandidate = nextInvoiceStatus === 'PAID' || wasSuspendFlow ? 0 : Number(invoice.suspendCandidate ?? 0)
 
     await runReviewDbExecute<ExecuteResult>(
       `
@@ -206,18 +218,12 @@ export async function POST(request: Request) {
         SET
           paid_amount = ?,
           invoice_status = ?,
-          collection_status = CASE
-            WHEN ? = 'PAID' THEN 'CLOSED'
-            ELSE collection_status
-          END,
-          suspend_candidate = CASE
-            WHEN ? = 'PAID' THEN 0
-            ELSE suspend_candidate
-          END,
+          collection_status = ?,
+          suspend_candidate = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `,
-      [updatedPaidAmount, nextInvoiceStatus, nextInvoiceStatus, nextInvoiceStatus, invoice.id]
+      [updatedPaidAmount, nextInvoiceStatus, nextCollectionStatus, nextSuspendCandidate, invoice.id]
     )
 
     await runReviewDbExecute<ExecuteResult>(

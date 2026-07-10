@@ -1,13 +1,14 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type BillingInvoiceGenerateFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   subscriptionSuggestions: string[]
+  initialServiceNo?: string
 }
 
 const invoiceTypeOptions = ['RECURRING', 'INSTALLATION', 'ADJUSTMENT', 'TERMINATION'] as const
@@ -20,21 +21,25 @@ export function BillingInvoiceGenerateForm({
   canCreate,
   reviewDbReady,
   subscriptionSuggestions,
+  initialServiceNo,
 }: BillingInvoiceGenerateFormProps) {
   const router = useRouter()
   const now = useMemo(() => new Date(), [])
-  const [serviceNo, setServiceNo] = useState(subscriptionSuggestions[0] ?? '')
+  const [serviceNo, setServiceNo] = useState(initialServiceNo?.trim() || subscriptionSuggestions[0] || '')
   const [invoiceType, setInvoiceType] = useState<(typeof invoiceTypeOptions)[number]>('RECURRING')
   const [billingMonth, setBillingMonth] = useState(String(now.getMonth() + 1))
   const [billingYear, setBillingYear] = useState(String(now.getFullYear()))
   const [issueDate, setIssueDate] = useState(`${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`)
   const [dueDate, setDueDate] = useState('')
+  const [customAmount, setCustomAmount] = useState('')
+  const [customDescription, setCustomDescription] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const [mode, setMode] = useState<'single' | 'batch'>('single')
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+  const isRecurring = invoiceType === 'RECURRING'
   const helperText = useMemo(() => {
     if (!canCreate) {
       return 'Role aktif belum memiliki izin create pada domain Billing.'
@@ -44,8 +49,30 @@ export function BillingInvoiceGenerateForm({
     }
     return mode === 'batch'
       ? 'Mode batch akan membuat invoice recurring dari daftar subscription billing-ready di halaman ini, sambil melewati service yang sudah punya invoice periode sama.'
-      : 'Form ini membuat invoice recurring dari subscription ACTIVE (anti-duplikasi periode) dan menambahkan item SUBSCRIPTION otomatis.'
-  }, [canCreate, reviewDbReady, mode])
+      : isRecurring
+        ? 'Form ini membuat invoice recurring dari subscription ACTIVE (anti-duplikasi periode) dan menambahkan item SUBSCRIPTION otomatis.'
+        : 'Mode one-time membuat invoice non-recurring dari subscription ACTIVE dengan nominal dan deskripsi custom agar kebutuhan instalasi, penyesuaian, atau terminasi tidak lagi memakai harga bulanan.'
+  }, [canCreate, reviewDbReady, mode, isRecurring])
+
+  useEffect(() => {
+    if (mode === 'batch' && invoiceType !== 'RECURRING') {
+      setInvoiceType('RECURRING')
+    }
+  }, [invoiceType, mode])
+
+  useEffect(() => {
+    if (isRecurring) {
+      setCustomAmount('')
+      setCustomDescription('')
+    }
+  }, [isRecurring])
+
+  useEffect(() => {
+    if (initialServiceNo?.trim()) {
+      setMode('single')
+      setServiceNo(initialServiceNo.trim())
+    }
+  }, [initialServiceNo])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -68,6 +95,8 @@ export function BillingInvoiceGenerateForm({
           billingYear: billingYear ? Number(billingYear) : null,
           issueDate: issueDate || null,
           dueDate: dueDate || null,
+          customAmount: !isRecurring ? Number(customAmount || 0) : null,
+          customDescription: !isRecurring ? customDescription : '',
           notes,
         }),
       })
@@ -87,6 +116,10 @@ export function BillingInvoiceGenerateForm({
           payload?.message ||
           (mode === 'batch' ? 'Batch recurring invoice berhasil diproses.' : `Invoice berhasil dibuat (${payload?.invoiceNo ?? '-'})`),
       })
+      if (!isRecurring) {
+        setCustomAmount('')
+        setCustomDescription('')
+      }
       setNotes('')
       router.refresh()
     } finally {
@@ -165,7 +198,7 @@ export function BillingInvoiceGenerateForm({
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
             min={1}
             max={12}
-            disabled={isDisabled || invoiceType !== 'RECURRING'}
+            disabled={isDisabled || !isRecurring}
           />
         </label>
 
@@ -178,9 +211,39 @@ export function BillingInvoiceGenerateForm({
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
             min={2020}
             max={2100}
-            disabled={isDisabled || invoiceType !== 'RECURRING'}
+            disabled={isDisabled || !isRecurring}
           />
         </label>
+
+        {!isRecurring ? (
+          <>
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Nominal One-Time</span>
+              <input
+                type="number"
+                value={customAmount}
+                onChange={(event) => setCustomAmount(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                min={1}
+                placeholder="250000"
+                required={!isRecurring}
+                disabled={isDisabled}
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Deskripsi One-Time</span>
+              <input
+                value={customDescription}
+                onChange={(event) => setCustomDescription(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                placeholder="Contoh: Biaya instalasi baru / Penyesuaian tagihan / Final charge terminasi"
+                required={!isRecurring}
+                disabled={isDisabled}
+              />
+            </label>
+          </>
+        ) : null}
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Issue Date</span>
