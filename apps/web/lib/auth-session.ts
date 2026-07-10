@@ -49,7 +49,16 @@ export const mockAuthUsers: MockAuthUser[] = [
 ]
 
 function getAuthSecret() {
-  return process.env.AUTH_SESSION_SECRET || DEFAULT_AUTH_SECRET
+  const configuredSecret = process.env.AUTH_SESSION_SECRET?.trim()
+  if (configuredSecret) {
+    return configuredSecret
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('AUTH_SESSION_SECRET wajib diisi pada environment production.')
+  }
+
+  return DEFAULT_AUTH_SECRET
 }
 
 function signPayload(payload: string) {

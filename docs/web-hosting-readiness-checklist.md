@@ -19,11 +19,11 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 
 ## 2. Code Readiness
 
-- [ ] `npm run check` lulus di `apps/web`
-- [ ] `npm run test:smoke` lulus di `apps/web`
+- [x] `npm run check` lulus di `apps/web`
+- [x] `npm run test:smoke` lulus di `apps/web`
 - [ ] `npm run build` lulus di `apps/web`
 - [ ] Tidak ada diagnostics TypeScript/lint blocker pada file inti
-- [ ] Dashboard utama, domain pages, auth, dan KPI custom sudah diverifikasi manual
+- [x] Dashboard utama, domain pages, auth, dan KPI custom sudah diverifikasi manual
 
 ## 3. Environment Readiness
 
@@ -47,8 +47,8 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 
 - [ ] Server hosting sudah ditentukan
 - [ ] Node.js version target sudah sesuai dengan kebutuhan app
-- [ ] Process manager sudah dipilih, misalnya PM2 atau service manager lain
-- [ ] Reverse proxy sudah ditentukan, misalnya Nginx
+- [x] Process manager sudah dipilih, misalnya PM2 atau service manager lain
+- [x] Reverse proxy sudah ditentukan, misalnya Nginx
 - [ ] Domain/subdomain sudah disiapkan
 - [ ] SSL/TLS sudah siap
 - [ ] Folder log dan strategi rotasi log sudah ditentukan
@@ -56,15 +56,16 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 ## 6. Deploy Readiness
 
 - [ ] Strategi deploy sudah dipilih: staging dulu atau langsung production
-- [ ] Script install, build, start, dan restart service sudah jelas
-- [ ] Health check endpoint atau halaman verifikasi pasca-deploy sudah ditentukan
-- [ ] Rollback plan sudah disiapkan jika deploy gagal
+- [x] Script install, build, start, dan restart service sudah jelas
+- [x] Command start production dikunci ke mode standalone (`node .next/standalone/server.js`)
+- [x] Health check endpoint atau halaman verifikasi pasca-deploy sudah ditentukan (`/api/health`)
+- [x] Rollback plan sudah disiapkan jika deploy gagal
 - [ ] PIC deploy dan PIC validasi bisnis sudah ditentukan
 
 ## 7. Functional Validation
 
-- [ ] Login berhasil untuk role utama
-- [ ] Dashboard utama terbuka tanpa error
+- [x] Login berhasil untuk role utama
+- [x] Dashboard utama terbuka tanpa error
 - [ ] `Dashboard Operasional` dan `KPI Proses` menampilkan data serta hint KPI dengan benar
 - [ ] Modul Sales dapat dibuka dan drilldown KPI berjalan
 - [ ] Modul Support dapat dibuka dan focus lane berjalan
@@ -94,6 +95,13 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - [ ] Semua checklist wajib di atas sudah hijau
 - [ ] Risiko yang tersisa sudah dicatat
 - [ ] Keputusan `go / no-go` disepakati sebelum switch penuh
+
+## Catatan Verifikasi Saat Ini
+
+- `npm run start` berhasil menyalakan server standalone lokal dan endpoint `/api/health` merespons normal.
+- Smoke browser `admin.perkasa` dan `support.ops` berhasil login, masuk dashboard, dan logout tanpa lagi terkena redirect `0.0.0.0`.
+- Scope dashboard KPI untuk role `NOC` sudah kembali sinkron ke `Pemasaran dan Pelayanan / NOC`, tidak jatuh ke default `Penjualan`.
+- Runbook hosting, PM2 config, dan contoh reverse proxy kini tersedia di `docs/web-hosting-runbook.md` dan `apps/web/ecosystem.config.cjs`.
 
 ## Catatan Eksekusi Senin
 

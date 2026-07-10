@@ -45,6 +45,20 @@ type Feedback = {
   message: string
 }
 
+function resolveDashboardKeyBySubdivision(subdivisionName: string) {
+  const normalized = subdivisionName.trim().toUpperCase()
+  if (normalized === 'PENJUALAN') return 'SALES'
+  if (normalized === 'CS' || normalized === 'ADMIN CS') return 'CS'
+  if (normalized === 'NOC') return 'NOC'
+  if (normalized === 'TROUBLESHOOTS') return 'TT'
+  if (normalized === 'DISMANTLE') return 'DISMANTLE'
+  if (normalized === 'CREATOR DIGITAL') return 'DIGITAL'
+  if (normalized === 'BILLING') return 'BILLING'
+  if (normalized === 'HR') return 'HR'
+  if (normalized === 'INVENTORY' || normalized === 'LEGAL') return 'INVENTORY'
+  return 'SALES'
+}
+
 function buildMetricKey(dashboardKey: string, templateKey: string, metricLabel: string) {
   const normalizedLabel = metricLabel
     .trim()
@@ -82,7 +96,7 @@ export function DashboardKpiManagerPanel({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [metricLabel, setMetricLabel] = useState('')
   const [metricType, setMetricType] = useState<'COUNT' | 'SUM' | 'PERCENTAGE'>('COUNT')
-  const [dashboardKey, setDashboardKey] = useState<string>('SALES')
+  const [dashboardKey, setDashboardKey] = useState<string>(resolveDashboardKeyBySubdivision(initialSubdivision))
   const [templateKey, setTemplateKey] = useState<string>(DASHBOARD_KPI_TEMPLATE_OPTIONS[0]?.key ?? 'SALES_ACTIVE_LEADS')
   const [displayOrder, setDisplayOrder] = useState('0')
   const [drilldownHref, setDrilldownHref] = useState('')
@@ -105,6 +119,13 @@ export function DashboardKpiManagerPanel({
       setSelectedSubdivision(subdivisionOptions[0] ?? '')
     }
   }, [selectedSubdivision, subdivisionOptions])
+
+  useEffect(() => {
+    setDashboardKey((current) => {
+      if (editingId) return current
+      return resolveDashboardKeyBySubdivision(selectedSubdivision)
+    })
+  }, [editingId, selectedSubdivision])
 
   useEffect(() => {
     const suggestedHref = resolveDashboardKpiTemplateDrilldown(templateKey)
@@ -337,7 +358,7 @@ export function DashboardKpiManagerPanel({
           </select>
         </label>
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-          <p className="font-semibold text-slate-950">Hak akses</p>
+          <p className="font-semibold text-slate-950">Level planning</p>
           <p className="mt-1">{managerScope.planningLevel || 'VIEWER'}</p>
         </div>
         <div className="flex items-end">
@@ -382,7 +403,7 @@ export function DashboardKpiManagerPanel({
           />
         </label>
         <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Sub-divisi KPI</span>
+          <span className="font-semibold text-slate-950">Domain KPI</span>
           <select
             value={dashboardKey}
             onChange={(event) => setDashboardKey(event.target.value)}

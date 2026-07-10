@@ -182,6 +182,16 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Focus `ATTENDANCE_RATE` pada HR kini menampilkan summary agregat dari seluruh employee aktif dan attendance hari ini, mencakup `Employee Aktif`, `Attendance Hari Ini`, dan `Rasio Kehadiran`, sehingga ringkasan KPI tidak lagi bergantung pada jumlah row preview yang tampil: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
 - `VERSION` dinaikkan ke `0.64.58`
 
+## [0.64.62] - 2026-07-10
+
+### Changed
+
+- Hardening hosting web ditingkatkan dengan guard `AUTH_SESSION_SECRET` untuk environment production, endpoint health check `/api/health`, template `.env.production.example`, dan command start production yang diselaraskan ke mode standalone Node server: [auth-session.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/auth-session.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/health/route.ts), [.env.production.example](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/.env.production.example), [package.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/package.json)
+- Flow auth hosting diperkeras agar redirect login/logout mengikuti host request nyata saat standalone atau reverse proxy, sehingga bug redirect ke `0.0.0.0` hilang pada smoke browser: [request-url.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/request-url.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/auth/login/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/auth/logout/route.ts)
+- Panel `Kelola KPI` dashboard kini lebih konsisten untuk role operasional: fallback scope KPI mengikuti role aktif (mis. `NOC` tidak lagi jatuh ke `Penjualan`), label field diperjelas, dan default domain KPI mengikuti sub-divisi aktif: [dashboard-kpi-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-kpi-service.ts), [dashboard-kpi-manager-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-kpi-manager-panel.tsx)
+- Artefak deploy nyata kini disiapkan lewat runbook hosting dan konfigurasi PM2, lalu checklist hosting dan PRD checklist ikut disinkronkan dengan evidence smoke test admin/support: [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [ecosystem.config.cjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/ecosystem.config.cjs), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md), [prd-web-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/prd-web-checklist.md)
+- `VERSION` dinaikkan ke `0.64.62`
+
 ## [0.64.59] - 2026-07-10
 
 ### Changed

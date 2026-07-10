@@ -8,6 +8,7 @@ import {
   resolveDashboardKpiTemplateDrilldown,
 } from '@/lib/dashboard-kpi-config'
 import { getDataSourceSnapshot } from '@/lib/data-source'
+import { getRoleMeta } from '@/lib/role-meta'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { resolveDailyActivityOrgContext } from '@/lib/services/daily-activity-user-profile-service'
 
@@ -498,10 +499,21 @@ export async function resolveDashboardKpiManagerScope(session: AppSession): Prom
     }
   }
 
+  const roleMeta = getRoleMeta(session.role)
+  const fallbackDivision = normalizeDashboardDivisionName(roleMeta.division)
+  const fallbackSubdivision = normalizeDashboardSubdivisionName(roleMeta.subdivision)
   const org = await resolveDailyActivityOrgContext(session)
+  const divisionName = normalizeDashboardDivisionName(org.divisionName)
+  const normalizedSubdivision = normalizeDashboardSubdivisionName(org.subdivisionName)
+
   return {
-    divisionName: normalizeDashboardDivisionName(org.divisionName),
-    subdivisionName: normalizeDashboardSubdivisionName(org.subdivisionName),
+    divisionName: isValidDashboardKpiDivision(divisionName) ? divisionName : fallbackDivision,
+    subdivisionName: isValidDashboardKpiSubdivision(
+      isValidDashboardKpiDivision(divisionName) ? divisionName : fallbackDivision,
+      normalizedSubdivision,
+    )
+      ? normalizedSubdivision
+      : fallbackSubdivision,
     planningLevel: String(org.planningLevel ?? '').trim().toUpperCase(),
     canManage: String(org.planningLevel ?? '').trim().toUpperCase() === 'MANAGER',
   }

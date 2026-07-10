@@ -84,10 +84,18 @@ Folder ini sekarang berisi bootstrap aplikasi web utama berbasis `Next.js`, `Rea
 ## Konfigurasi Data Mode
 
 Gunakan file `.env.local` berdasarkan [`.env.example`](file:///c:/Users/user/Documents/trae_projects/perkasa-erp-oss-bss/apps/web/.env.example).
+Untuk hosting, gunakan template [`.env.production.example`](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/.env.production.example) sebagai baseline agar mode data, secret session, dan koneksi DB production tidak tertinggal.
 
 - `APP_DATA_MODE=mock` akan memakai data bootstrap lokal.
 - `APP_DATA_MODE=review-db` akan menandai service layer untuk mode review database.
 - Jika `APP_DATA_MODE=review-db` tetapi `DATABASE_URL` belum diisi, aplikasi akan fallback ke `mock` dan menampilkan status fallback di UI.
+- `AUTH_SESSION_SECRET` wajib diisi pada environment production agar session cookie tidak memakai secret default development.
+
+## Health Check
+
+- Endpoint readiness dasar tersedia di `/api/health`.
+- Endpoint ini dipakai untuk verifikasi pasca-deploy bahwa proses Next.js hidup, mode data terbaca, dan secret session production sudah terpasang.
+- Untuk hasil build production dengan `output: standalone`, jalankan app memakai `npm run start` yang sekarang mengeksekusi `node .next/standalone/server.js`.
 
 ## Verifikasi Sandbox
 

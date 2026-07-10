@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getDefaultLandingPath } from '@/lib/access-control-server'
 import { applySessionCookie } from '@/lib/auth'
 import { authenticateUser } from '@/lib/auth-session'
+import { buildRequestUrl } from '@/lib/request-url'
 
 export async function POST(request: Request) {
   const formData = await request.formData()
@@ -11,10 +12,10 @@ export async function POST(request: Request) {
   const session = authResult.session
 
   if (!session) {
-    return NextResponse.redirect(new URL('/login?error=invalid_credentials', request.url))
+    return NextResponse.redirect(buildRequestUrl(request, '/login?error=invalid_credentials'))
   }
 
-  const response = NextResponse.redirect(new URL(getDefaultLandingPath(session.role), request.url))
+  const response = NextResponse.redirect(buildRequestUrl(request, getDefaultLandingPath(session.role)))
   applySessionCookie(response, session)
 
   return response
