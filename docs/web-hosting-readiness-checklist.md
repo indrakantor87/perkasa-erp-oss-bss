@@ -104,6 +104,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - Scope dashboard KPI untuk role `NOC` sudah kembali sinkron ke `Pemasaran dan Pelayanan / NOC`, tidak jatuh ke default `Penjualan`.
 - Runbook hosting, PM2 config, dan contoh reverse proxy kini tersedia di `docs/web-hosting-runbook.md` dan `apps/web/ecosystem.config.cjs`.
 - Validator `npm run verify:production-env -- .env` dan checker `npm run verify:health -- http://127.0.0.1:3000/api/health` sudah tersedia untuk tahap deploy.
+- Checklist hari-H untuk keputusan `go / pilot / rollback` kini tersedia di `docs/web-go-live-cutover-checklist.md`.
 
 ## Catatan Eksekusi Senin
 

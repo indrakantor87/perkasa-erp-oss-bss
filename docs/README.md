@@ -104,6 +104,9 @@
 - `web-pemasaran-pelayanan-uat-checklist.md`  
   Checklist UAT khusus fase awal Divisi `Pemasaran dan Pelayanan`, berisi flow wajib, bukti lulus, dan urutan uji per role inti legacy.
 
+- `web-go-live-cutover-checklist.md`  
+  Checklist hari-H untuk deploy Senin, mencakup timeline cutover, PIC minimum, kriteria `go / pilot / rollback`, dan validasi bisnis minimum per role fondasi.
+
 - `web-list-kerja-terpadu-implementation-spec.md`  
   Spesifikasi implementasi route `/dashboard/worklist` untuk modul `List Kerja Terpadu`, termasuk kontrak data, query param, tab queue, layout, dan integrasi dashboard.
 

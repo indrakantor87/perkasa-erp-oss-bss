@@ -14,6 +14,7 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - Health verifier: `apps/web/scripts/verify-health.mjs`
 - Health check: `/api/health`
 - Checklist final: `docs/web-hosting-readiness-checklist.md`
+- Checklist hari-H: `docs/web-go-live-cutover-checklist.md`
 
 ## Prasyarat Server
 

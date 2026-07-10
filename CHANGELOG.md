@@ -182,6 +182,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Focus `ATTENDANCE_RATE` pada HR kini menampilkan summary agregat dari seluruh employee aktif dan attendance hari ini, mencakup `Employee Aktif`, `Attendance Hari Ini`, dan `Rasio Kehadiran`, sehingga ringkasan KPI tidak lagi bergantung pada jumlah row preview yang tampil: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
 - `VERSION` dinaikkan ke `0.64.58`
 
+## [0.64.64] - 2026-07-10
+
+### Changed
+
+- Paket operasional hari-H kini dilengkapi checklist `go-live` khusus Senin yang merangkum timeline deploy, PIC minimum, validasi bisnis minimum per role fondasi, serta trigger `go / pilot / rollback`: [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+- Indeks dokumentasi dan runbook hosting diselaraskan agar jalur eksekusi berpindah rapi dari readiness teknis ke keputusan cutover hari-H: [docs/README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md), [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- `VERSION` dinaikkan ke `0.64.64`
+
 ## [0.64.63] - 2026-07-10
 
 ### Changed
