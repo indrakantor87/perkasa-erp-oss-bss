@@ -53,6 +53,9 @@
 - `hybrid-wave-2-psb-production-mini-batch.md`  
   Rencana mini-batch produksi pertama yang aman dari `Web PSB` setelah sample review `Wave 1A`, `Wave 1B`, dan `Wave 1C`, dengan scope prioritas coverage, marketing activity, ODP header, bootstrap ODP port, dan TT SLA.
 
+- `hybrid-wave-2-psb-production-extraction-pack.md`  
+  Paket query dan langkah read-only untuk menarik data production `CoveredArea`, `MarketingActivity`, `psb_odp`, dan `TroubleTicketSla` dari terminal app `Web PSB` di Coolify ke format JSON yang siap dipakai pada mini-batch produksi pertama.
+
 - `phase-1-erd.md`  
   Ringkasan relasi antar tabel phase 1 berdasarkan schema review XAMPP.
 

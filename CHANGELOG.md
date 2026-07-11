@@ -23,6 +23,19 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.07] - 2026-07-11
+
+### Changed
+
+- Artefak runnable `Wave 1C` yang sebelumnya masih lokal kini dirapikan untuk siap dipush bersama paket extraction production, mencakup patch review DB lama, sample import coverage/marketing activity, transform, bootstrap native ODP ports, review query, dan runner Windows: [xampp_review_patch_wave_1c_existing_review_db.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_patch_wave_1c_existing_review_db.sql), [xampp_review_sample_import_wave_1c_sales.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_sample_import_wave_1c_sales.sql), [xampp_review_transform_wave_1c_sales.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave_1c_sales.sql), [xampp_review_bootstrap_wave_1c_odp_ports.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_bootstrap_wave_1c_odp_ports.sql), [xampp_review_wave_1c_sales_odp_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave_1c_sales_odp_review_queries.sql), [run-review-wave1c-sales-odp.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1c-sales-odp.ps1)
+- Ditambahkan extraction pack production `Wave 2` yang read-only untuk `CoveredArea`, `MarketingActivity`, `psb_odp`, dan `TroubleTicketSla`, sehingga batch produksi pertama kini punya langkah operasional konkret dari terminal Coolify ke file JSON: [postgres_web_psb_wave2_extraction_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/postgres_web_psb_wave2_extraction_queries.sql), [hybrid-wave-2-psb-production-extraction-pack.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-2-psb-production-extraction-pack.md)
+- Docs index diperbarui agar jalur `Wave 2 production extraction` terbaca langsung sesudah dokumen mini-batch: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Transisi dari sample review ke mini-batch production kini tidak lagi berhenti di level rencana, karena query pack extraction sudah tersedia dan sesuai batasan terminal Coolify yang mengandalkan `node + PrismaClient`.
+- `VERSION` dinaikkan ke `0.65.07` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
 ## [0.65.06] - 2026-07-11
 
 ### Changed
