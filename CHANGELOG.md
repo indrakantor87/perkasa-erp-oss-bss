@@ -23,6 +23,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.21] - 2026-07-11
+
+### Added
+
+- Ditambahkan jalur production `User` end-to-end yang mencakup generator JSON ke staging, transform role/division legacy ke auth master ERP, query review, assertion query, runner lokal, dan runbook untuk memuat `users.production.json` ke `auth_users`: [generate-wave1-user-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave1-user-production-loader.mjs), [xampp_review_transform_wave1_user_production.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave1_user_production.sql), [xampp_review_wave1_user_production_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1_user_production_review_queries.sql), [xampp_review_wave1_user_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1_user_production_assertions.sql), [run-review-wave1-user-production.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1-user-production.ps1), [hybrid-wave-1-user-production-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-user-production-runbook.md)
+- Seed master minimum diperluas untuk mengakomodasi role dan division production nyata `Web PSB`, termasuk `CS_ADMIN`, `NOC_TROUBLESHOOTS`, `MARKETING`, `CS`, `TROUBLESHOOTS`, `CREATOR_DIGITAL`, dan `DISMANTLE`: [xampp_review_core_master_seed.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_core_master_seed.sql)
+
+### Changed
+
+- Docs index diperluas agar extraction pack dan runbook `User production` muncul eksplisit pada urutan kerja hybrid migration `Web PSB`: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- Versioning diselaraskan ke `0.65.21` untuk menandai pembukaan jalur production `User`.
+
 ## [0.65.20] - 2026-07-11
 
 ### Added

@@ -56,6 +56,9 @@
 - `hybrid-wave-1-user-production-extraction-pack.md`  
   Paket extraction discovery read-only untuk menarik `User` production sekaligus menghitung distribusi `role` dan `division` sebagai dasar penguncian mapping ke `auth_users`, `auth_roles`, dan `org_divisions`.
 
+- `hybrid-wave-1-user-production-runbook.md`  
+  Runbook lokal untuk memuat `users.production.json` ke review DB, memetakan role/division legacy, lalu mengimpor user ke `auth_users` dengan role auth yang selaras dengan web baru.
+
 - `hybrid-wave-1-psb-wave-1a-execution-checklist.md`  
   Checklist pasca-eksekusi `Wave 1A` untuk menilai hasil batch support extension dan ODP header secara cepat, konsisten, dan terdokumentasi.
 
