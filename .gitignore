@@ -14,3 +14,5 @@ apps/web/*.log
 apps/web/storage
 *.tsbuildinfo
 erp_isp_review.sql
+production-data/
+database/generated/

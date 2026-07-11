@@ -56,6 +56,9 @@
 - `hybrid-wave-2-psb-production-extraction-pack.md`  
   Paket query dan langkah read-only untuk menarik data production `CoveredArea`, `MarketingActivity`, `psb_odp`, dan `TroubleTicketSla` dari terminal app `Web PSB` di Coolify ke format JSON yang siap dipakai pada mini-batch produksi pertama.
 
+- `hybrid-wave-2-psb-local-loader-runbook.md`  
+  Runbook lokal untuk mengubah file JSON production `Wave 2` menjadi SQL staging review DB, menjalankan transform production mini-batch, dan mereview hasil final secara lokal di XAMPP.
+
 - `phase-1-erd.md`  
   Ringkasan relasi antar tabel phase 1 berdasarkan schema review XAMPP.
 

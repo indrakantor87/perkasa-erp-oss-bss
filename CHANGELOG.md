@@ -23,6 +23,43 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.11] - 2026-07-11
+
+### Fixed
+
+- Generator `Wave 2 production mini-batch` sekarang membulatkan latitude/longitude ODP ke 7 digit desimal agar staging review DB tidak lagi memberi warning `Data truncated` untuk koordinat production: [generate-wave2-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave2-production-loader.mjs)
+- Transform ODP production kini melakukan deduplikasi per `odp_code` sebelum insert ke `network_odp`, sehingga batch production nyata yang punya header legacy ganda seperti `TRKL/01 - 01` tetap bisa diimpor ke satu header final tanpa melanggar unique key: [xampp_review_transform_wave2_odp_ttsla.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave2_odp_ttsla.sql)
+- Versioning diselaraskan ke `0.65.11` untuk menandai patch bugfix deduplikasi ODP production ini.
+
+## [0.65.10] - 2026-07-11
+
+### Fixed
+
+- Loader SQL `Wave 2 production mini-batch` tidak lagi memakai session variable `batch_code` yang memicu bentrok collation pada review DB lama; generator sekarang menulis literal `_utf8mb4 ... COLLATE utf8mb4_unicode_ci` agar lookup batch produksi berjalan stabil di lingkungan XAMPP yang collation-nya campuran: [generate-wave2-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave2-production-loader.mjs)
+- Versioning diselaraskan ke `0.65.10` untuk menandai patch bugfix loader production ini.
+
+## [0.65.09] - 2026-07-11
+
+### Fixed
+
+- Generator staging `Wave 2 production mini-batch` sekarang membentuk `legacy_id` ODP dari kombinasi `id + nama_odp`, sehingga sample dan batch production yang memiliki `id` legacy duplikat tetap bisa ditelusuri dengan aman pada staging tanpa ambigu: [generate-wave2-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave2-production-loader.mjs)
+- Runbook lokal `Wave 2` kini mendokumentasikan guardrail anomali `psb_odp` production, termasuk alasan mengapa identitas staging ODP tidak lagi bergantung pada `id` legacy tunggal: [hybrid-wave-2-psb-local-loader-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-2-psb-local-loader-runbook.md)
+- `VERSION` dan versi `apps/web` diselaraskan ke `0.65.09` untuk menandai patch release loader production ini.
+
+## [0.65.08] - 2026-07-11
+
+### Changed
+
+- Ditambahkan generator SQL `Wave 2 production mini-batch` yang membaca file JSON hasil extraction `CoveredArea`, `MarketingActivity`, `psb_odp`, dan `TroubleTicketSla`, lalu menghasilkan loader staging review DB dengan namespace produksi yang tidak bentrok dengan sample review lama: [generate-wave2-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave2-production-loader.mjs)
+- Ditambahkan transform khusus batch production untuk domain sales serta domain ODP/TT SLA, sehingga mini-batch nyata tidak lagi bergantung pada batch code sample `Wave 1A` dan `Wave 1C`: [xampp_review_transform_wave2_sales.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave2_sales.sql), [xampp_review_transform_wave2_odp_ttsla.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave2_odp_ttsla.sql)
+- Ditambahkan runner lokal dan review query untuk `Wave 2 production mini-batch`, sehingga alur `JSON production -> staging -> transform -> review` kini bisa dijalankan end-to-end di XAMPP lokal: [run-review-wave2-production-mini-batch.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave2-production-mini-batch.ps1), [xampp_review_wave2_production_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave2_production_review_queries.sql)
+- Ditambahkan runbook lokal `Wave 2` dan pembaruan docs index agar batch produksi pertama punya panduan operasional konkret setelah extraction dari Coolify: [hybrid-wave-2-psb-local-loader-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-2-psb-local-loader-runbook.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Batch produksi pertama kini tidak lagi berhenti di level extraction JSON, karena loader staging, transform production, dan review query sudah tersedia dalam bentuk artefak runnable lokal.
+- `VERSION` dinaikkan ke `0.65.08` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
 ## [0.65.07] - 2026-07-11
 
 ### Changed
