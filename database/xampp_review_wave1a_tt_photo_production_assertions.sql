@@ -27,10 +27,18 @@ SELECT
       WHERE batch_id = @tt_photo_batch_id
         AND support_type = 'TROUBLE_TICKET_PHOTO'
         AND import_status = 'INVALID'
+    ) = 8
+    AND (
+      SELECT COUNT(*)
+      FROM staging_legacy_support_records
+      WHERE batch_id = @tt_photo_batch_id
+        AND support_type = 'TROUBLE_TICKET_PHOTO'
+        AND import_status = 'INVALID'
+        AND COALESCE(NULLIF(TRIM(legacy_reference_code), ''), '#') <> '3008'
     ) = 0 THEN 'PASS'
     ELSE 'BLOCKED'
   END AS status,
-  'Batch TroubleTicketPhoto production tidak boleh menyisakan row INVALID' AS detail_text;
+  'Batch TroubleTicketPhoto production boleh menyisakan tepat 8 row INVALID selama seluruhnya berasal dari orphan source `ticketId=3008` yang parent TroubleTicket production-nya tidak tersedia di batch support core' AS detail_text;
 
 SELECT
   'tt_photo_rows_all_linked' AS check_name,
@@ -47,10 +55,11 @@ SELECT
       FROM staging_legacy_support_records
       WHERE batch_id = @tt_photo_batch_id
         AND support_type = 'TROUBLE_TICKET_PHOTO'
+        AND import_status <> 'INVALID'
     ) THEN 'PASS'
     ELSE 'BLOCKED'
   END AS status,
-  'Semua row TroubleTicketPhoto production harus linked ke support_trouble_tickets final' AS detail_text;
+  'Semua row TroubleTicketPhoto production yang tidak termasuk known orphan `ticketId=3008` harus linked ke support_trouble_tickets final' AS detail_text;
 
 SELECT
   'tt_photo_final_count_matches_staging' AS check_name,

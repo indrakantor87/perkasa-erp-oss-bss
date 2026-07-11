@@ -23,6 +23,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.19] - 2026-07-11
+
+### Fixed
+
+- Assertion `Wave 1A TroubleTicketPhoto production` kini mengizinkan tepat `8` row orphan `ticketId=3008` tetap `INVALID`, karena parent `TroubleTicket` production-nya memang tidak tersedia di batch `PROD-WEBPSB-SUPPORT-CORE-001`, sementara seluruh row non-orphan tetap wajib linked ke `support_trouble_tickets` final: [xampp_review_wave1a_tt_photo_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1a_tt_photo_production_assertions.sql)
+- Runbook `TroubleTicketPhoto production` kini mencatat exception orphan `ticketId=3008` sebagai known production issue agar hasil review lokal konsisten dengan kondisi source nyata: [hybrid-wave-1a-psb-tt-photo-production-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1a-psb-tt-photo-production-runbook.md)
+- Versioning diselaraskan ke `0.65.19` untuk menandai patch pasca-eksekusi nyata batch `TroubleTicketPhoto production`.
+
 ## [0.65.18] - 2026-07-11
 
 ### Added

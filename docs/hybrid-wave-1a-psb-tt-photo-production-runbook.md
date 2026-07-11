@@ -58,12 +58,13 @@ Runner akan:
 ## Acceptance Minimum
 
 - batch `PROD-WEBPSB-TTPHOTO-001` terbentuk di `staging_import_batches`
-- semua row `TroubleTicketPhoto` production berstatus `IMPORTED`
-- semua row `TroubleTicketPhoto` production punya `target_trouble_ticket_id`
+- semua row `TroubleTicketPhoto` production yang parent-nya tersedia di batch support core harus berstatus `IMPORTED`
+- semua row `TroubleTicketPhoto` production yang bukan orphan harus punya `target_trouble_ticket_id`
 - assertion query tidak menyisakan status `BLOCKED`
 
 ## Catatan Praktis
 
 - batch ini sengaja hanya membuka evidence photo detail dan tidak menyentuh `TroubleTicketSla` karena jalur produksinya sudah ditangani di `Wave 2`
-- jika ada row `INVALID`, penyebab paling mungkin adalah `ticketId` kosong di source atau parent ticket belum tersedia di batch support core production
+- production saat ini diketahui menyisakan tepat `8` row orphan untuk `ticketId=3008`; row tersebut boleh tetap `INVALID` karena parent `TroubleTicket`-nya memang tidak tersedia pada batch `PROD-WEBPSB-SUPPORT-CORE-001`
+- di luar exception `ticketId=3008`, jika ada row `INVALID`, penyebab paling mungkin adalah `ticketId` kosong di source atau parent ticket belum tersedia di batch support core production
 - jangan commit file JSON production mentah maupun file `.sql` hasil generate dari folder lokal
