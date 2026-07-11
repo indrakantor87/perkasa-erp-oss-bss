@@ -20,6 +20,7 @@ Scope runbook ini hanya untuk review DB lokal, bukan import production penuh.
 - sample batch: [xampp_review_sample_import_wave_1b_ticket.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_sample_import_wave_1b_ticket.sql)
 - transform khusus batch ticket: [xampp_review_transform_wave_1b_ticket.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave_1b_ticket.sql)
 - review query: [xampp_review_wave_1b_ticket_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave_1b_ticket_review_queries.sql)
+- assertion query: [xampp_review_wave_1b_ticket_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave_1b_ticket_assertions.sql)
 - runner Windows: [run-review-wave1b-ticket.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1b-ticket.ps1)
 
 ## Prasyarat
@@ -61,6 +62,7 @@ Jika tidak memakai runner, jalankan urutan ini:
 1. `database/xampp_review_sample_import_wave_1b_ticket.sql`
 2. `database/xampp_review_transform_wave_1b_ticket.sql`
 3. `database/xampp_review_wave_1b_ticket_review_queries.sql`
+4. `database/xampp_review_wave_1b_ticket_assertions.sql`
 
 ## Hasil yang Diharapkan
 
@@ -129,6 +131,6 @@ Query ini memeriksa:
 
 Setelah runbook ini lulus, langkah paling natural adalah:
 
-1. siapkan assertion query `Wave 1B Ticket`
+1. jalankan assertion query `Wave 1B Ticket`
 2. siapkan patch schema `Wave 1C` untuk coverage dan marketing activity
 3. siapkan bootstrap native `network_odp_ports`

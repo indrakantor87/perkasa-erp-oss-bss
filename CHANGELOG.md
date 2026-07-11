@@ -23,6 +23,32 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.06] - 2026-07-11
+
+### Changed
+
+- Ditambahkan assertion query `Wave 1B Ticket` dan `Wave 1C Sales + ODP`, sehingga validasi hasil sample review kini bisa diringkas otomatis ke status `PASS / BLOCKED` tanpa membaca seluruh blok review manual: [xampp_review_wave_1b_ticket_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave_1b_ticket_assertions.sql), [xampp_review_wave_1c_sales_odp_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave_1c_sales_odp_assertions.sql)
+- Ditambahkan dokumen `Wave 2 production mini-batch` yang mengunci batch produksi pertama paling aman dari `Web PSB`, dengan prioritas `CoveredArea`, `MarketingActivity`, `psb_odp`, bootstrap native `network_odp_ports`, dan `TroubleTicketSla`: [hybrid-wave-2-psb-production-mini-batch.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-2-psb-production-mini-batch.md)
+- Runbook `Wave 1B` dan `Wave 1C` diperbarui agar memuat assertion query sebagai langkah resmi sesudah review query, dan docs index diselaraskan ke jalur kerja batch berikutnya: [hybrid-wave-1-psb-wave-1b-ticket-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1b-ticket-runbook.md), [hybrid-wave-1-psb-wave-1c-sales-odp-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1c-sales-odp-runbook.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Jalur menuju import production kecil kini tidak lagi bergantung pada interpretasi lisan hasil review, karena threshold batch aman, batch yang ditunda, guardrail, dan acceptance criteria sudah tertulis eksplisit.
+- `VERSION` dinaikkan ke `0.65.06` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.65.05] - 2026-07-11
+
+### Changed
+
+- Ditambahkan patch schema `Wave 1C` untuk domain sales dan network review DB, mencakup staging `CoveredArea`, staging `MarketingActivity`, relasi area activity, tabel final `sales_marketing_activities`, dan tabel final `sales_marketing_activity_areas`: [xampp_review_staging_import.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_staging_import.sql), [xampp_review_schema_phase_1_1.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema_phase_1_1.sql), [xampp_review_patch_wave_1c_existing_review_db.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_patch_wave_1c_existing_review_db.sql)
+- Ditambahkan sample import `Wave 1C`, transform coverage/activity, bootstrap native `network_odp_ports`, review query, dan runner Windows agar jalur schema-new pasca `Wave 1B` bisa diuji end-to-end di review DB lokal: [xampp_review_sample_import_wave_1c_sales.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_sample_import_wave_1c_sales.sql), [xampp_review_transform_wave_1c_sales.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave_1c_sales.sql), [xampp_review_bootstrap_wave_1c_odp_ports.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_bootstrap_wave_1c_odp_ports.sql), [xampp_review_wave_1c_sales_odp_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave_1c_sales_odp_review_queries.sql), [run-review-wave1c-sales-odp.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1c-sales-odp.ps1)
+- Ditambahkan runbook `Wave 1C` dan pembaruan docs index/sample import/staging import agar coverage, marketing activity, dan bootstrap ODP port masuk jalur kerja hybrid migration yang eksplisit: [hybrid-wave-1-psb-wave-1c-sales-odp-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1c-sales-odp-runbook.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md), [sample-import.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/sample-import.md), [staging-import.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/staging-import.md)
+
+### Fixed
+
+- Batas antara data copy-first legacy dan data native ERP kini makin tegas, karena `network_odp_ports` tidak lagi diasumsikan bisa di-copy dari production lama dan sudah punya bootstrap aman berbasis header ODP tervalidasi.
+- `VERSION` dinaikkan ke `0.65.05` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
 ## [0.65.04] - 2026-07-11
 
 ### Changed

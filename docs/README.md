@@ -47,6 +47,12 @@
 - `hybrid-wave-1-psb-wave-1b-ticket-runbook.md`  
   Runbook eksekusi `Wave 1B Ticket split` untuk menguji jalur `Ticket -> staging customer/order -> customer/address/order/subscription/work order` pada review DB lokal.
 
+- `hybrid-wave-1-psb-wave-1c-sales-odp-runbook.md`  
+  Runbook eksekusi `Wave 1C` untuk menguji jalur `CoveredArea` dan `MarketingActivity` ke model sales ERP baru, sekaligus bootstrap native `network_odp_ports` dari header ODP yang sudah tervalidasi.
+
+- `hybrid-wave-2-psb-production-mini-batch.md`  
+  Rencana mini-batch produksi pertama yang aman dari `Web PSB` setelah sample review `Wave 1A`, `Wave 1B`, dan `Wave 1C`, dengan scope prioritas coverage, marketing activity, ODP header, bootstrap ODP port, dan TT SLA.
+
 - `phase-1-erd.md`  
   Ringkasan relasi antar tabel phase 1 berdasarkan schema review XAMPP.
 
