@@ -120,6 +120,15 @@ function normalizeText(value) {
   return String(value).trim();
 }
 
+function cleanUrl(value) {
+  const normalized = normalizeText(value)
+    .replace(/^`+/, '')
+    .replace(/`+$/, '')
+    .trim();
+
+  return normalized || null;
+}
+
 function normalizeKey(parts) {
   return parts
     .map((part) => normalizeText(part))
@@ -179,6 +188,46 @@ function derivePackageCode(packageName) {
     return null;
   }
 
+  if (
+    normalized === 'HOME BASIC' ||
+    normalized === 'HOME-BASIC' ||
+    normalized === 'HOME LITE' ||
+    normalized === 'HOME LITE 1 THN' ||
+    normalized === 'HOME-LITE' ||
+    normalized === 'PROMO HOME LITE' ||
+    normalized === 'HOME LITE ( BUNDLING 4BULAN + FREE 1BULAN)' ||
+    normalized === 'HOME MINI' ||
+    normalized === 'HOME_MINI (PROMO 4+1)' ||
+    normalized === 'HOME-MINI' ||
+    normalized === 'HOME SMALL' ||
+    normalized === 'HOME-SMALL' ||
+    normalized.includes('BASIC') ||
+    normalized.includes('LITE') ||
+    normalized.includes('MINI') ||
+    normalized.includes('SMALL')
+  ) {
+    return 'HOME-10M';
+  }
+
+  if (
+    normalized === 'HOME STREAM' ||
+    normalized === 'HOME-STREAM' ||
+    normalized === 'HOME ENTERTAIN' ||
+    normalized === 'HOME-ENTERTAIN' ||
+    normalized.includes('STREAM') ||
+    normalized.includes('ENTERTAIN')
+  ) {
+    return 'HOME-20M';
+  }
+
+  if (normalized === 'HOME ADVAN' || normalized === 'HOME-ADVAN' || normalized.includes('ADVAN')) {
+    return 'HOME-30M';
+  }
+
+  if (normalized === 'DEDICATED' || normalized.includes('DEDICATED')) {
+    return 'DEDICATED-1-1';
+  }
+
   if (normalized === 'HOME-20M' || normalized.includes('20')) {
     return 'HOME-20M';
   }
@@ -191,7 +240,29 @@ function derivePackageCode(packageName) {
 }
 
 function deriveOrderStatus(row) {
-  return firstNonEmpty(row, ['statusOrder', 'orderStatus', 'status', 'ticketStatus']) ?? 'REGISTERED';
+  const rawOrderStatus = firstNonEmpty(row, ['statusOrder', 'orderStatus']);
+  const rawTicketStatus = firstNonEmpty(row, ['status', 'ticketStatus']);
+  const normalizedOrderStatus = normalizeText(rawOrderStatus).toUpperCase();
+  const normalizedTicketStatus = normalizeText(rawTicketStatus).toUpperCase();
+  const hasInstalledDate = firstNonEmpty(row, ['installedDate']) !== null;
+
+  if ((normalizedTicketStatus === 'CLOSE' || normalizedTicketStatus === 'CLOSED') && hasInstalledDate) {
+    return 'ACTIVE';
+  }
+
+  if (normalizedTicketStatus === 'OPEN' || normalizedTicketStatus === 'ON_PROGRESS') {
+    return 'REGISTERED';
+  }
+
+  if (normalizedOrderStatus === '0' || normalizedOrderStatus === '1') {
+    return 'ACTIVE';
+  }
+
+  if (normalizedOrderStatus === '3') {
+    return hasInstalledDate ? 'ACTIVE' : 'REGISTERED';
+  }
+
+  return rawOrderStatus ?? rawTicketStatus ?? 'REGISTERED';
 }
 
 function deriveTicketStatus(row) {
@@ -210,7 +281,7 @@ function buildCustomerRows(data, options) {
     const email = firstNonEmpty(row, ['email', 'customerEmail']);
     const identityNo = firstNonEmpty(row, ['identityNo', 'nik', 'ktp']);
     const addressText = firstNonEmpty(row, ['addressText', 'address', 'alamat']);
-    const mapsUrl = firstNonEmpty(row, ['locationMap', 'mapsUrl']);
+    const mapsUrl = cleanUrl(firstNonEmpty(row, ['locationMap', 'mapsUrl']));
     const latitude = firstNonEmpty(row, ['latitude']);
     const longitude = firstNonEmpty(row, ['longitude']);
     const marketingName = firstNonEmpty(row, ['marketingName', 'marketing']);

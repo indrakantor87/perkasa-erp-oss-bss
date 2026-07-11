@@ -149,7 +149,8 @@ SELECT
   COALESCE(NULLIF(TRIM(so.order_no), ''), CONCAT('PSB-TICKET-', so.id)),
   'NEW_INSTALL',
   CASE
-    WHEN UPPER(TRIM(so.order_status)) IN ('ACTIVE', 'INSTALLED', 'DONE', 'COMPLETED') THEN 'ACTIVE'
+    WHEN UPPER(TRIM(so.order_status)) IN ('ACTIVE', 'INSTALLED', 'DONE', 'COMPLETED', 'CLOSE', 'CLOSED', '0', '1') THEN 'ACTIVE'
+    WHEN UPPER(TRIM(so.order_status)) = '3' AND so.installed_date IS NOT NULL THEN 'ACTIVE'
     WHEN UPPER(TRIM(so.order_status)) IN ('CANCELLED', 'CANCELED', 'REJECTED') THEN 'CANCELLED'
     ELSE 'REGISTERED'
   END,
@@ -201,6 +202,7 @@ SELECT
   CONCAT('PSB-SVC-', LPAD(so.id, 8, '0')),
   CASE
     WHEN UPPER(TRIM(JSON_UNQUOTE(JSON_EXTRACT(so.raw_payload, '$.status')))) IN ('ACTIVE', 'INSTALLED') THEN 'ACTIVE'
+    WHEN UPPER(TRIM(JSON_UNQUOTE(JSON_EXTRACT(so.raw_payload, '$.status')))) IN ('CLOSE', 'CLOSED') AND so.installed_date IS NOT NULL THEN 'ACTIVE'
     WHEN UPPER(TRIM(JSON_UNQUOTE(JSON_EXTRACT(so.raw_payload, '$.status')))) IN ('SUSPENDED', 'ISOLIR') THEN 'SUSPENDED'
     WHEN UPPER(TRIM(JSON_UNQUOTE(JSON_EXTRACT(so.raw_payload, '$.status')))) IN ('TERMINATED', 'CANCELLED', 'CANCELED') THEN 'TERMINATED'
     WHEN so.installed_date IS NOT NULL THEN 'ACTIVE'

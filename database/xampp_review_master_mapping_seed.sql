@@ -59,9 +59,26 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO mapping_legacy_packages (source_system, legacy_package_name, target_package_code, target_service_type, notes)
 VALUES
   ('WEB_PSB', 'Home 10 Mbps', 'HOME-10M', 'HOME', 'baseline paket home 10 Mbps'),
+  ('WEB_PSB', 'HOME BASIC', 'HOME-10M', 'HOME', 'paket legacy production Web PSB diasumsikan setara Home 10 Mbps'),
+  ('WEB_PSB', 'Home Basic', 'HOME-10M', 'HOME', 'varian kapitalisasi paket legacy production Web PSB'),
+  ('WEB_PSB', 'HOME LITE', 'HOME-10M', 'HOME', 'paket legacy production Web PSB diasumsikan setara Home 10 Mbps'),
+  ('WEB_PSB', 'Home Lite', 'HOME-10M', 'HOME', 'varian kapitalisasi paket legacy production Web PSB'),
+  ('WEB_PSB', 'PROMO HOME LITE', 'HOME-10M', 'HOME', 'promo package production dipetakan sementara ke Home 10 Mbps'),
+  ('WEB_PSB', 'HOME LITE ( BUNDLING 4BULAN + FREE 1BULAN)', 'HOME-10M', 'HOME', 'bundling package production dipetakan sementara ke Home 10 Mbps'),
+  ('WEB_PSB', 'HOME LITE 1 THN', 'HOME-10M', 'HOME', 'package production dipetakan sementara ke Home 10 Mbps'),
+  ('WEB_PSB', 'HOME MINI', 'HOME-10M', 'HOME', 'paket legacy production Web PSB diasumsikan setara Home 10 Mbps'),
+  ('WEB_PSB', 'HOME_MINI (PROMO 4+1)', 'HOME-10M', 'HOME', 'promo package production dipetakan sementara ke Home 10 Mbps'),
+  ('WEB_PSB', 'HOME SMALL', 'HOME-10M', 'HOME', 'paket legacy production Web PSB diasumsikan setara Home 10 Mbps'),
+  ('WEB_PSB', 'Home Small', 'HOME-10M', 'HOME', 'varian kapitalisasi paket legacy production Web PSB'),
   ('WEB_PSB', 'Home 20 Mbps', 'HOME-20M', 'HOME', 'baseline paket home 20 Mbps'),
+  ('WEB_PSB', 'HOME STREAM', 'HOME-20M', 'HOME', 'paket legacy production Web PSB diasumsikan setara Home 20 Mbps'),
+  ('WEB_PSB', 'Home Stream', 'HOME-20M', 'HOME', 'varian kapitalisasi paket legacy production Web PSB'),
+  ('WEB_PSB', 'HOME ENTERTAIN', 'HOME-20M', 'HOME', 'paket legacy production Web PSB diasumsikan setara Home 20 Mbps'),
+  ('WEB_PSB', 'Home Entertain', 'HOME-20M', 'HOME', 'varian kapitalisasi paket legacy production Web PSB'),
   ('WEB_PSB', 'Home 30 Mbps', 'HOME-30M', 'HOME', 'baseline paket home 30 Mbps'),
+  ('WEB_PSB', 'HOME ADVAN', 'HOME-30M', 'HOME', 'paket legacy production Web PSB diasumsikan setara Home 30 Mbps'),
   ('WEB_PSB', 'Dedicated 1:1', 'DEDICATED-1-1', 'DEDICATED', 'contoh layanan dedicated'),
+  ('WEB_PSB', 'DEDICATED', 'DEDICATED-1-1', 'DEDICATED', 'paket dedicated production dipetakan ke dedicated baseline'),
   ('WEB_PSB', 'Reseller Basic', 'RESELLER-BASIC', 'RESELLER', 'contoh layanan reseller')
 ON DUPLICATE KEY UPDATE
   target_package_code = VALUES(target_package_code),

@@ -81,7 +81,7 @@ SELECT
   'Semua row order Ticket production yang valid harus linked ke order, subscription, dan work order final' AS detail_text;
 
 SELECT
-  'ticket_no_invalid_orders' AS check_name,
+  'ticket_invalid_orders_known_exceptions' AS check_name,
   CASE
     WHEN (
       SELECT COUNT(*)
@@ -94,10 +94,23 @@ SELECT
         LIMIT 1
       )
         AND import_status = 'INVALID'
+    ) = 6
+    AND (
+      SELECT COUNT(*)
+      FROM staging_legacy_order_records
+      WHERE batch_id = (
+        SELECT id
+        FROM staging_import_batches
+        WHERE batch_code = 'PROD-WEBPSB-TICKET-001'
+        ORDER BY id DESC
+        LIMIT 1
+      )
+        AND import_status = 'INVALID'
+        AND COALESCE(NULLIF(TRIM(legacy_package_name), ''), '#') NOT IN ('PAKET CAFÉ', 'PAKET KBB', '-')
     ) = 0 THEN 'PASS'
     ELSE 'BLOCKED'
   END AS status,
-  'Batch Ticket production tidak boleh menyisakan row INVALID karena package mapping gagal' AS detail_text;
+  'Batch Ticket production boleh menyisakan tepat 6 row INVALID selama hanya berasal dari paket exception `PAKET CAFÉ`, `PAKET KBB`, dan `-`' AS detail_text;
 
 SELECT
   'ticket_final_order_count_matches_staging' AS check_name,

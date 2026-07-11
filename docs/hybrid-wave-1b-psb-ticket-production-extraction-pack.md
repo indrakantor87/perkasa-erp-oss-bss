@@ -91,6 +91,7 @@ main()
 - jangan tambahkan operasi write
 - bila salah satu kolom opsional tidak ada di production nyata, hapus dari `select` lalu rerun
 - file JSON hasil extraction jangan di-commit ke repository lokal
+- pada sample production yang sudah tervalidasi, `statusOrder` muncul sebagai angka (`1`) dan `status` muncul sebagai `CLOSE`; loader production sudah menormalisasi pola ini ke status order/subscription ERP yang setara
 
 ## Next Step
 

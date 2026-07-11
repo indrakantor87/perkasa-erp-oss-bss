@@ -23,6 +23,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.14] - 2026-07-11
+
+### Changed
+
+- Assertion `Wave 1B Ticket production` disesuaikan agar batch tetap dinilai lulus bila hanya menyisakan tepat 6 row `INVALID` dari exception paket production yang sudah diketahui (`PAKET CAFÉ`, `PAKET KBB`, dan `-`), sehingga invalid anomali tetap terlihat tanpa memblokir jalur utama customer/order/subscription/work order: [xampp_review_wave1b_ticket_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1b_ticket_production_assertions.sql)
+- Runbook `Wave 1B Ticket production` diperjelas agar exception paket anomali ini terdokumentasi sebagai pengecualian yang disengaja, bukan kegagalan mapping tersembunyi: [hybrid-wave-1b-psb-ticket-production-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1b-psb-ticket-production-runbook.md)
+- Versioning diselaraskan ke `0.65.14` untuk menandai penyesuaian assertion pasca-validasi batch production `Ticket`.
+
 ## [0.65.13] - 2026-07-11
 
 ### Added

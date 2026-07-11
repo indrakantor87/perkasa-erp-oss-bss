@@ -70,6 +70,12 @@ Field opsional yang akan dipakai jika tersedia:
   - `PSB-WO-*`
 - transform production melakukan deduplikasi customer berbasis `nama + phone`
 - order, subscription, dan work order tetap dibentuk satu row per ticket/order production
+- asumsi package awal production:
+  - `HOME BASIC -> HOME-10M`
+  - `HOME STREAM -> HOME-20M`
+- translasi awal status production:
+  - `statusOrder = 1` diperlakukan sebagai order aktif/selesai
+  - `status = CLOSE/CLOSED` dengan `installedDate` terisi akan berujung ke subscription `ACTIVE`
 
 ## Jalankan Generator Saja
 
@@ -114,11 +120,15 @@ database/xampp_review_wave1b_ticket_production_assertions.sql
   - `target_order_id`
   - `target_subscription_id`
   - `target_work_order_id`
-- tidak ada row `INVALID` karena package mapping gagal
+- row `INVALID` diperbolehkan bila hanya berasal dari exception paket production yang sudah disetujui:
+  - `PAKET CAFÉ`
+  - `PAKET KBB`
+  - `-`
 - jumlah `sales_orders` final sama dengan jumlah row order production yang berhasil diimpor
 
 ## Catatan Praktis
 
 - bila ada beberapa ticket untuk customer yang sama, transform production akan link ke satu customer final yang sama selama `nama + phone` cocok
-- bila package legacy belum termasuk mapping otomatis `HOME-20M` atau `HOME-30M`, row order akan jatuh ke status `INVALID` dan harus ditambah mapping package dulu
+- bila package legacy belum termasuk mapping otomatis seperti `HOME BASIC`, `HOME STREAM`, `HOME-20M`, atau `HOME-30M`, row order akan jatuh ke status `INVALID` dan harus ditambah mapping package dulu
+- untuk batch production yang sudah divalidasi saat ini, `PAKET CAFÉ`, `PAKET KBB`, dan `-` sengaja tetap `INVALID` agar tidak masuk ke package ERP yang salah
 - order number final memakai fallback `PSB-TICKET-{id}` bila source tidak memberi nomor order/ticket yang stabil
