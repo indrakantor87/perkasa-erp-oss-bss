@@ -41,6 +41,15 @@
 - `hybrid-wave-1a-psb-support-production-runbook.md`  
   Runbook lokal untuk memuat empat file JSON production support inti `Web PSB` ke review DB, menjalankan transform production `Wave 1A`, dan mereview hasil final support.
 
+- `hybrid-wave-1a-psb-support-production-results.md`  
+  Rekap hasil riil eksekusi batch production support inti `Web PSB` di review DB lokal, termasuk angka final, anomali nyata, dan keputusan batch berikutnya.
+
+- `hybrid-wave-1a-psb-tt-photo-production-extraction-pack.md`  
+  Paket extraction read-only untuk menarik source production `TroubleTicketPhoto` dari terminal app `Web PSB` di Coolify ke format JSON yang siap dipakai pada batch evidence photo production.
+
+- `hybrid-wave-1a-psb-tt-photo-production-runbook.md`  
+  Runbook lokal untuk memuat `trouble-ticket-photo.production.json` ke review DB, menjalankan transform production evidence photo, dan memverifikasi linkage ke `support_trouble_tickets` final.
+
 - `hybrid-wave-1-psb-wave-1a-execution-checklist.md`  
   Checklist pasca-eksekusi `Wave 1A` untuk menilai hasil batch support extension dan ODP header secara cepat, konsisten, dan terdokumentasi.
 

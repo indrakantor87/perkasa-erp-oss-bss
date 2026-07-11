@@ -23,6 +23,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.18] - 2026-07-11
+
+### Added
+
+- Ditambahkan dokumen hasil riil batch `Wave 1A support production` agar angka final, anomali nyata, dan keputusan batch berikutnya terdokumentasi sebagai bukti eksekusi review DB lokal: [hybrid-wave-1a-psb-support-production-results.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1a-psb-support-production-results.md)
+- Ditambahkan jalur production khusus `TroubleTicketPhoto` berupa generator loader JSON, transform SQL, review query, assertion query, runner lokal, extraction pack, dan runbook agar evidence photo production bisa dimigrasikan dengan parent resolver dari batch `PROD-WEBPSB-SUPPORT-CORE-001`: [generate-wave1a-tt-photo-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave1a-tt-photo-production-loader.mjs), [xampp_review_transform_wave1a_tt_photo_production.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave1a_tt_photo_production.sql), [xampp_review_wave1a_tt_photo_production_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1a_tt_photo_production_review_queries.sql), [xampp_review_wave1a_tt_photo_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1a_tt_photo_production_assertions.sql), [run-review-wave1a-tt-photo-production.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1a-tt-photo-production.ps1), [hybrid-wave-1a-psb-tt-photo-production-extraction-pack.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1a-psb-tt-photo-production-extraction-pack.md), [hybrid-wave-1a-psb-tt-photo-production-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1a-psb-tt-photo-production-runbook.md)
+
+### Changed
+
+- Docs index diperluas agar hasil riil support production dan jalur `TroubleTicketPhoto production` muncul eksplisit di urutan kerja hybrid migration Web PSB: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- Versioning diselaraskan ke `0.65.18` untuk menandai batch lanjutan pasca-validasi penuh `Wave 1A support production`.
+
 ## [0.65.17] - 2026-07-11
 
 ### Fixed
