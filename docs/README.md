@@ -59,6 +59,9 @@
 - `hybrid-wave-2-psb-local-loader-runbook.md`  
   Runbook lokal untuk mengubah file JSON production `Wave 2` menjadi SQL staging review DB, menjalankan transform production mini-batch, dan mereview hasil final secara lokal di XAMPP.
 
+- `xampp_review_wave2_production_assertions.sql`  
+  Assertion query read-only untuk merangkum status `PASS / BLOCKED` batch production `Wave 2` setelah loader, transform, dan bootstrap ODP port selesai.
+
 - `phase-1-erd.md`  
   Ringkasan relasi antar tabel phase 1 berdasarkan schema review XAMPP.
 

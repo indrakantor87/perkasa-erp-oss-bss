@@ -124,6 +124,22 @@ Area yang harus dicek:
   - `network_odp_ports`
   - `support_trouble_ticket_sla`
 
+## Step 5: Jalankan Assertion Query
+
+File assertion query ada di:
+
+```text
+database/xampp_review_wave2_production_assertions.sql
+```
+
+Query ini merangkum status `PASS / BLOCKED` untuk check utama batch production `Wave 2`, termasuk:
+
+- eksistensi empat batch production
+- total row batch sesuai hasil extraction nyata
+- seluruh row staging sudah `IMPORTED` dan punya target final
+- final count coverage, marketing, relasi area, ODP header dedup, dan ODP ports sesuai hasil run yang sudah tervalidasi
+- tipe TT SLA production utama sudah lengkap
+
 ## Acceptance Minimum
 
 - batch production coverage berstatus `MAPPED` dengan `total_rows = 65`
