@@ -50,6 +50,12 @@
 - `hybrid-wave-1a-psb-tt-photo-production-runbook.md`  
   Runbook lokal untuk memuat `trouble-ticket-photo.production.json` ke review DB, menjalankan transform production evidence photo, dan memverifikasi linkage ke `support_trouble_tickets` final.
 
+- `hybrid-psb-production-readiness-2026-07-11.md`  
+  Rekap readiness hybrid migration `Web PSB` setelah support core dan `TroubleTicketPhoto` production lulus, termasuk keputusan batch berikutnya untuk kesiapan cutover.
+
+- `hybrid-wave-1-user-production-extraction-pack.md`  
+  Paket extraction discovery read-only untuk menarik `User` production sekaligus menghitung distribusi `role` dan `division` sebagai dasar penguncian mapping ke `auth_users`, `auth_roles`, dan `org_divisions`.
+
 - `hybrid-wave-1-psb-wave-1a-execution-checklist.md`  
   Checklist pasca-eksekusi `Wave 1A` untuk menilai hasil batch support extension dan ODP header secara cepat, konsisten, dan terdokumentasi.
 

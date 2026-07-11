@@ -23,6 +23,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.20] - 2026-07-11
+
+### Added
+
+- Ditambahkan rekap readiness hybrid migration `Web PSB` pasca-validasi `support core` dan `TroubleTicketPhoto` production agar status jalur production yang sudah lulus, gap yang tersisa, dan keputusan batch berikutnya terdokumentasi eksplisit: [hybrid-psb-production-readiness-2026-07-11.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-readiness-2026-07-11.md)
+- Ditambahkan paket extraction discovery `User production` untuk menarik source user nyata dari Coolify sekaligus menghitung distribusi `role` dan `division` sebagai dasar penguncian mapping ke `auth_users`, `auth_roles`, dan `org_divisions`: [hybrid-wave-1-user-production-extraction-pack.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-user-production-extraction-pack.md)
+
+### Changed
+
+- Docs index diperluas agar rekap readiness hybrid terbaru dan discovery pack `User production` muncul eksplisit di urutan kerja migrasi `Web PSB`: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- Versioning diselaraskan ke `0.65.20` untuk menandai penguncian keputusan batch berikutnya setelah `TT Photo production` lulus.
+
 ## [0.65.19] - 2026-07-11
 
 ### Fixed
