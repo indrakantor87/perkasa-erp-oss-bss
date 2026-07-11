@@ -155,6 +155,7 @@ SELECT
       CASE
         WHEN JSON_UNQUOTE(JSON_EXTRACT(ss.raw_payload, '$.archivedAt')) IS NOT NULL
           AND JSON_UNQUOTE(JSON_EXTRACT(ss.raw_payload, '$.archivedAt')) <> ''
+          AND LOWER(JSON_UNQUOTE(JSON_EXTRACT(ss.raw_payload, '$.archivedAt'))) <> 'null'
         THEN STR_TO_DATE(
           REPLACE(
             REPLACE(
@@ -353,6 +354,23 @@ SELECT
     ''
   )
 FROM staging_legacy_support_records dh
+JOIN (
+  SELECT
+    batch_id,
+    COALESCE(NULLIF(TRIM(customer_name), ''), 'Legacy Customer') AS dedupe_customer_name,
+    COALESCE(closed_at, opened_at) AS dedupe_closed_at,
+    MIN(id) AS picked_id
+  FROM staging_legacy_support_records
+  WHERE batch_id = @support_batch_id
+    AND support_type = 'DISMANTLE_HISTORY'
+    AND import_status IN ('MAPPED', 'VALID')
+  GROUP BY
+    batch_id,
+    COALESCE(NULLIF(TRIM(customer_name), ''), 'Legacy Customer'),
+    COALESCE(closed_at, opened_at)
+) dh_pick
+  ON dh_pick.batch_id = dh.batch_id
+  AND dh_pick.picked_id = dh.id
 WHERE dh.batch_id = @support_batch_id
   AND dh.support_type = 'DISMANTLE_HISTORY'
   AND dh.import_status IN ('MAPPED', 'VALID')

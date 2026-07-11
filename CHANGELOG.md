@@ -23,6 +23,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.16] - 2026-07-11
+
+### Fixed
+
+- Loader `Wave 1A support production` kini memecah `INSERT` menjadi per-row statement dan mengecilkan `raw_payload` menjadi ringkasan audit field penting, sehingga batch production support tetap bisa dimuat pada XAMPP lokal yang memiliki batas `max_allowed_packet` ketat: [generate-wave1a-support-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave1a-support-production-loader.mjs), [run-review-wave1a-support-production.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1a-support-production.ps1)
+- Transform `Wave 1A support production` kini menahan string tanggal literal `null` dan men-dedupe `DismantleHistory` production berdasarkan pasangan `customer_name + closed_at/opened_at`, sehingga import support inti production bisa selesai tanpa bentrok unique key di `support_dismantle_history`: [xampp_review_transform_wave1a_support_production.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave1a_support_production.sql)
+- Assertion `Wave 1A support production` kini menghitung linkage `DismantleHistory` dari staging ke tabel final alih-alih menghitung `id` final unik, sehingga kasus dedupe production yang valid tetap dinilai `PASS` saat seluruh row staging sudah terhubung: [xampp_review_wave1a_support_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1a_support_production_assertions.sql)
+- Versioning diselaraskan ke `0.65.16` untuk menandai patch pasca-eksekusi nyata batch support production `Web PSB`.
+
 ## [0.65.15] - 2026-07-11
 
 ### Added

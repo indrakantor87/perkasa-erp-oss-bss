@@ -190,14 +190,13 @@ SELECT
   CASE
     WHEN (
       SELECT COUNT(*)
-      FROM support_dismantle_history dh
-      WHERE dh.id IN (
-        SELECT target_dismantle_history_id
-        FROM staging_legacy_support_records
-        WHERE batch_id = @support_batch_id
-          AND support_type = 'DISMANTLE_HISTORY'
-          AND target_dismantle_history_id IS NOT NULL
-      )
+      FROM staging_legacy_support_records ss
+      JOIN support_dismantle_history dh
+        ON dh.id = ss.target_dismantle_history_id
+      WHERE ss.batch_id = @support_batch_id
+        AND ss.support_type = 'DISMANTLE_HISTORY'
+        AND ss.import_status = 'IMPORTED'
+        AND ss.target_dismantle_history_id IS NOT NULL
     ) = (
       SELECT COUNT(*)
       FROM staging_legacy_support_records
@@ -207,4 +206,4 @@ SELECT
     ) THEN 'PASS'
     ELSE 'BLOCKED'
   END AS status,
-  'Jumlah support_dismantle_history final harus sama dengan jumlah row DismantleHistory production yang berhasil diimpor' AS detail_text;
+  'Jumlah linkage final DismantleHistory harus sama dengan jumlah row staging imported, termasuk kasus dedupe production yang berbagi final record yang sama' AS detail_text;

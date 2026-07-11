@@ -186,6 +186,22 @@ function buildInsertStatements(tableName, columns, rows, chunkSize = 250) {
   });
 }
 
+// Support production menyimpan raw payload JSON penuh per row. Chunk kecil menjaga
+// ukuran statement tetap aman untuk max_allowed_packet default review DB lokal.
+const SUPPORT_INSERT_CHUNK_SIZE = 1;
+
+function buildAuditPayload(row, keys) {
+  const payload = {};
+
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(row, key)) {
+      payload[key] = row[key];
+    }
+  }
+
+  return JSON.stringify(payload);
+}
+
 function supportRecordRow(values) {
   return [
     '@support_batch_id',
@@ -222,7 +238,19 @@ function supportRecordRow(values) {
 
 function buildIsolationRows(data) {
   return data.map((row) => {
-    const payload = JSON.stringify(row);
+    const payload = buildAuditPayload(row, [
+      'id',
+      'ticketId',
+      'ticketDismantle',
+      'customerName',
+      'customerPhone',
+      'marketing',
+      'radboox',
+      'status',
+      'isolationDate',
+      'restorationDate',
+      'archivedAt',
+    ]);
     const isolationDate = firstNonEmpty(row, ['isolationDate']);
     const restorationDate = firstNonEmpty(row, ['restorationDate']);
     const archivedAt = firstNonEmpty(row, ['archivedAt']);
@@ -262,7 +290,18 @@ function buildIsolationRows(data) {
 
 function buildDismantleQueueRows(data) {
   return data.map((row) => {
-    const payload = JSON.stringify(row);
+    const payload = buildAuditPayload(row, [
+      'id',
+      'sourceIsolationId',
+      'ticketNumber',
+      'customerName',
+      'customerPhone',
+      'marketing',
+      'radboox',
+      'status',
+      'isolationDate',
+      'fieldNote',
+    ]);
 
     return supportRecordRow({
       supportType: 'DISMANTLE_QUEUE',
@@ -297,7 +336,17 @@ function buildDismantleQueueRows(data) {
 
 function buildDismantleHistoryRows(data) {
   return data.map((row) => {
-    const payload = JSON.stringify(row);
+    const payload = buildAuditPayload(row, [
+      'id',
+      'sourceIsolationId',
+      'ticketDismantle',
+      'ticketId',
+      'customerName',
+      'customerPhone',
+      'closedBy',
+      'closedAt',
+      'closeNote',
+    ]);
 
     return supportRecordRow({
       supportType: 'DISMANTLE_HISTORY',
@@ -332,7 +381,21 @@ function buildDismantleHistoryRows(data) {
 
 function buildTroubleTicketRows(data) {
   return data.map((row) => {
-    const payload = JSON.stringify(row);
+    const payload = buildAuditPayload(row, [
+      'id',
+      'ticketCode',
+      'customerName',
+      'user',
+      'waNumber',
+      'type',
+      'category',
+      'status',
+      'problemCategory',
+      'resolutionAction',
+      'openedAt',
+      'closedAt',
+      'closedBy',
+    ]);
     const closePhotos = Array.isArray(row.closePhotos) ? row.closePhotos : [];
 
     return supportRecordRow({
@@ -479,7 +542,7 @@ function main() {
         'validation_notes',
       ],
       allRows,
-      200,
+      SUPPORT_INSERT_CHUNK_SIZE,
     ),
     '',
     'UPDATE staging_import_batches',

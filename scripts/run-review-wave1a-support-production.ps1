@@ -59,6 +59,7 @@ function Get-MysqlArgs {
     "--port=$DbPort",
     "--user=$DbUser",
     '--default-character-set=utf8mb4',
+    '--max_allowed_packet=64M',
     '--show-warnings',
     $DbName
   )
