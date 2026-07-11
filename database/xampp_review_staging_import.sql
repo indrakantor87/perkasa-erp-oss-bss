@@ -139,18 +139,26 @@ CREATE TABLE IF NOT EXISTS staging_legacy_support_records (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   batch_id BIGINT UNSIGNED NOT NULL,
   source_system ENUM('WEB_PSB') NOT NULL DEFAULT 'WEB_PSB',
-  support_type ENUM('TROUBLE_TICKET','ISOLATION','DISMANTLE_HISTORY') NOT NULL,
+  support_type ENUM('TROUBLE_TICKET','ISOLATION','DISMANTLE_HISTORY','DISMANTLE_QUEUE','TROUBLE_TICKET_PHOTO','TROUBLE_TICKET_SLA','TROUBLE_TICKET_MASTER') NOT NULL,
   legacy_id VARCHAR(100) NULL,
   legacy_customer_id VARCHAR(100) NULL,
+  legacy_parent_id VARCHAR(100) NULL,
+  legacy_reference_code VARCHAR(100) NULL,
   ticket_code VARCHAR(50) NULL,
   customer_name VARCHAR(150) NULL,
+  customer_address TEXT NULL,
+  customer_phone VARCHAR(30) NULL,
   customer_user VARCHAR(150) NULL,
+  marketing_name VARCHAR(120) NULL,
+  radbox_name VARCHAR(120) NULL,
   category VARCHAR(30) NULL,
   trouble_type VARCHAR(100) NULL,
   support_status VARCHAR(50) NULL,
   opened_at DATETIME NULL,
   closed_at DATETIME NULL,
   reason_text TEXT NULL,
+  note_text TEXT NULL,
+  actor_name VARCHAR(150) NULL,
   problem_category VARCHAR(120) NULL,
   resolution_action VARCHAR(120) NULL,
   photo_list_text LONGTEXT NULL,
@@ -160,6 +168,8 @@ CREATE TABLE IF NOT EXISTS staging_legacy_support_records (
   target_trouble_ticket_id BIGINT UNSIGNED NULL,
   target_isolation_id BIGINT UNSIGNED NULL,
   target_dismantle_history_id BIGINT UNSIGNED NULL,
+  target_dismantle_queue_id BIGINT UNSIGNED NULL,
+  target_trouble_ticket_sla_id BIGINT UNSIGNED NULL,
   import_status ENUM('PENDING','MAPPED','VALID','INVALID','IMPORTED','SKIPPED') NOT NULL DEFAULT 'PENDING',
   validation_notes TEXT NULL,
   imported_at DATETIME NULL,
@@ -171,7 +181,9 @@ CREATE TABLE IF NOT EXISTS staging_legacy_support_records (
   CONSTRAINT fk_staging_legacy_support_target_subscription FOREIGN KEY (target_subscription_id) REFERENCES service_subscriptions(id),
   CONSTRAINT fk_staging_legacy_support_target_ticket FOREIGN KEY (target_trouble_ticket_id) REFERENCES support_trouble_tickets(id),
   CONSTRAINT fk_staging_legacy_support_target_isolation FOREIGN KEY (target_isolation_id) REFERENCES support_isolations(id),
-  CONSTRAINT fk_staging_legacy_support_target_dismantle FOREIGN KEY (target_dismantle_history_id) REFERENCES support_dismantle_history(id)
+  CONSTRAINT fk_staging_legacy_support_target_dismantle FOREIGN KEY (target_dismantle_history_id) REFERENCES support_dismantle_history(id),
+  CONSTRAINT fk_staging_legacy_support_target_dismantle_queue FOREIGN KEY (target_dismantle_queue_id) REFERENCES support_dismantle_queue(id),
+  CONSTRAINT fk_staging_legacy_support_target_ticket_sla FOREIGN KEY (target_trouble_ticket_sla_id) REFERENCES support_trouble_ticket_sla(id)
 );
 
 CREATE TABLE IF NOT EXISTS staging_legacy_billing_invoice_records (
@@ -327,6 +339,36 @@ CREATE TABLE IF NOT EXISTS staging_legacy_inventory_item_records (
   KEY idx_staging_legacy_inventory_item_batch (batch_id),
   CONSTRAINT fk_staging_legacy_inventory_item_batch FOREIGN KEY (batch_id) REFERENCES staging_import_batches(id),
   CONSTRAINT fk_staging_legacy_inventory_item_target FOREIGN KEY (target_item_id) REFERENCES inventory_items(id)
+);
+
+CREATE TABLE IF NOT EXISTS staging_legacy_network_odp_records (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  batch_id BIGINT UNSIGNED NOT NULL,
+  source_system ENUM('WEB_PSB') NOT NULL DEFAULT 'WEB_PSB',
+  legacy_id VARCHAR(100) NULL,
+  odp_code VARCHAR(50) NULL,
+  odp_name VARCHAR(150) NULL,
+  region_name VARCHAR(120) NULL,
+  location_text TEXT NULL,
+  latitude DECIMAL(10,7) NULL,
+  longitude DECIMAL(10,7) NULL,
+  total_ports INT NULL,
+  active_ports INT NULL,
+  pole_status VARCHAR(80) NULL,
+  is_active TINYINT(1) NULL,
+  raw_payload LONGTEXT NULL,
+  normalized_key VARCHAR(180) NULL,
+  target_odp_id BIGINT UNSIGNED NULL,
+  import_status ENUM('PENDING','MAPPED','VALID','INVALID','IMPORTED','SKIPPED') NOT NULL DEFAULT 'PENDING',
+  validation_notes TEXT NULL,
+  imported_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_staging_legacy_network_odp_batch (batch_id),
+  KEY idx_staging_legacy_network_odp_target (target_odp_id),
+  CONSTRAINT fk_staging_legacy_network_odp_batch FOREIGN KEY (batch_id) REFERENCES staging_import_batches(id),
+  CONSTRAINT fk_staging_legacy_network_odp_target FOREIGN KEY (target_odp_id) REFERENCES network_odp(id)
 );
 
 CREATE TABLE IF NOT EXISTS staging_legacy_inventory_movement_records (

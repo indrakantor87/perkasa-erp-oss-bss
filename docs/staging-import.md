@@ -104,16 +104,21 @@ Dipakai untuk menampung model campuran dari ticket/order lama sebelum dipecah ke
 
 - `staging_legacy_support_records`
 
-Menyatukan tiga tipe data support lama:
+Menyatukan domain support `Web PSB`, termasuk extension `wave 1A`:
 
 - `TROUBLE_TICKET`
 - `ISOLATION`
 - `DISMANTLE_HISTORY`
+- `DISMANTLE_QUEUE`
+- `TROUBLE_TICKET_PHOTO`
+- `TROUBLE_TICKET_SLA`
+- `TROUBLE_TICKET_MASTER`
 
 Alasannya:
 
 - ketiganya berasal dari domain support yang sama
 - semua butuh review status legacy dan relasi ke subscription/customer
+- queue dismantle, SLA, dan evidence foto tetap bisa masuk ke staging yang sama tanpa memecah review operator ke banyak tabel kecil
 
 ### 5. Billing
 
@@ -141,7 +146,17 @@ Dipakai untuk:
 - barang keluar
 - hubungan ke work order jika nanti sudah ditemukan mapping yang valid
 
-### 7. HR
+### 7. Network
+
+- `staging_legacy_network_odp_records`
+
+Dipakai untuk:
+
+- header ODP dari production `Web PSB`
+- kapasitas dan okupansi awal ODP
+- review mapping ke `network_odp` tanpa mencampur domain ini ke inventory gudang
+
+### 8. HR
 
 - `staging_legacy_employee_records`
 - `staging_legacy_attendance_records`

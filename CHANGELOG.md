@@ -23,6 +23,426 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.04] - 2026-07-11
+
+### Changed
+
+- Ditambahkan sample batch `Wave 1B Ticket split` beserta transform khusus yang tidak lagi bergantung pada `@batch_id` manual, sehingga jalur `Ticket -> staging customer/order -> crm_customers/crm_customer_addresses/sales_orders/service_subscriptions/service_work_orders` kini bisa diuji secara utuh di review DB lokal: [xampp_review_sample_import_wave_1b_ticket.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_sample_import_wave_1b_ticket.sql), [xampp_review_transform_wave_1b_ticket.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave_1b_ticket.sql)
+- Ditambahkan review query dan runner Windows untuk `Wave 1B Ticket`, sehingga eksekusi dan audit hasil batch bisa dilakukan lebih mudah dari lingkungan XAMPP user: [xampp_review_wave_1b_ticket_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave_1b_ticket_review_queries.sql), [run-review-wave1b-ticket.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1b-ticket.ps1)
+- Ditambahkan runbook dan pembaruan docs index/sample import agar `Wave 1B Ticket` langsung masuk ke jalur kerja hybrid migration setelah validasi `Wave 1A`: [hybrid-wave-1-psb-wave-1b-ticket-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1b-ticket-runbook.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md), [sample-import.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/sample-import.md)
+
+### Fixed
+
+- Batch lanjut setelah `Wave 1A` kini tidak lagi berhenti di level desain, karena adapter `Ticket` sudah punya artefak sample, transform, review, dan runner yang siap dipakai.
+- `VERSION` dinaikkan ke `0.65.04` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.65.03] - 2026-07-11
+
+### Changed
+
+- Ditambahkan dokumen desain `Wave 1B` pasca-validasi `Wave 1A` yang mengunci jalur adapter `Ticket` ke `crm_customers`, `crm_customer_addresses`, `sales_orders`, `service_subscriptions`, dan `service_work_orders`, sekaligus membedakan secara tegas domain yang masih `schema-new` seperti `CoveredArea`, `MarketingActivity`, dan `network_odp_ports`: [hybrid-wave-1-psb-wave-1b-adapter-design.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1b-adapter-design.md)
+- Index docs diperbarui agar dokumen `Wave 1B` langsung masuk ke jalur kerja hybrid migration dan bisa dipakai sebagai acuan batch berikutnya: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Arah lanjut setelah `Wave 1A` kini tidak lagi abu-abu karena batas antara batch adapter existing schema dan batch schema ERP baru sudah terdokumentasi dengan jelas.
+- `VERSION` dinaikkan ke `0.65.03` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.65.02] - 2026-07-11
+
+### Fixed
+
+- Transform `Wave 1A` untuk support extension dan ODP header kini mengambil batch sample secara eksplisit berdasarkan `batch_code`, sehingga runner tidak lagi berhenti pada kondisi semu di mana batch sample berhasil masuk ke staging tetapi semua target final tetap `NULL` karena variabel `@batch_id` tidak pernah terisi: [xampp_review_transform_wave_1a_support_extension.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave_1a_support_extension.sql), [xampp_review_transform_wave_1a_network_odp.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave_1a_network_odp.sql)
+- `VERSION` dinaikkan ke `0.65.02` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.65.01] - 2026-07-11
+
+### Changed
+
+- Ditambahkan assertion query `Wave 1A` yang merangkum status `PASS / BLOCKED` untuk batch support extension, link target staging, row final support, batch ODP header, dan row final `network_odp`, sehingga validasi pasca-eksekusi bisa dibaca lebih cepat tanpa menafsirkan seluruh output query mentah: [xampp_review_wave_1a_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave_1a_assertions.sql)
+- Ditambahkan template laporan hasil run `Wave 1A` agar output runner, query review, assertion query, checklist, dan keputusan lanjut bisa ditempel dalam format yang konsisten untuk dianalisis bersama: [hybrid-wave-1-psb-wave-1a-result-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1a-result-template.md)
+- Runbook dan docs index diperbarui untuk menghubungkan runner, review query, assertion query, checklist, dan template hasil menjadi satu paket validasi yang utuh: [hybrid-wave-1-psb-wave-1a-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1a-runbook.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Tahap handoff setelah eksekusi `Wave 1A` kini lebih rapi karena operator bisa langsung mengirim laporan hasil run dalam format standar, dan validasi utama sudah punya assertion SQL yang eksplisit.
+- `VERSION` dinaikkan ke `0.65.01` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.65.00] - 2026-07-11
+
+### Changed
+
+- Ditambahkan file query review `Wave 1A` yang bisa dijalankan read-only setelah sample dan transform selesai, sehingga audit hasil staging/final table support extension dan ODP header tidak perlu merangkai query satu per satu secara manual: [xampp_review_wave_1a_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave_1a_review_queries.sql)
+- Ditambahkan checklist eksekusi `Wave 1A` untuk mencatat status `PASS / FAIL / BLOCKED`, evidence, dan keputusan `GO / PARTIAL / BLOCKED` setelah runner dijalankan: [hybrid-wave-1-psb-wave-1a-execution-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1a-execution-checklist.md)
+- Runbook dan docs index diperbarui agar runner, query review, dan checklist pasca-eksekusi sekarang saling terhubung dalam satu jalur kerja yang utuh: [hybrid-wave-1-psb-wave-1a-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1a-runbook.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Tahap validasi hasil `Wave 1A` kini lebih operasional karena ada artefak khusus untuk memeriksa batch support extension dan network ODP secara konsisten sesudah eksekusi, bukan hanya mengandalkan output runner mentah.
+- `VERSION` dinaikkan ke `0.65.00` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.99] - 2026-07-11
+
+### Changed
+
+- Ditambahkan runner PowerShell `Wave 1A` agar urutan SQL review DB untuk support extension dan ODP header bisa dijalankan otomatis dari Windows, termasuk mode `Full` dan `Wave1AOnly`, pencarian `mysql.exe`, dan query review hasil akhir: [run-review-wave1a.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1a.ps1)
+- Ditambahkan runbook khusus `Wave 1A` yang merangkum prasyarat, urutan SQL manual, contoh command PowerShell, dan query review final table untuk memudahkan eksekusi di mesin XAMPP user: [hybrid-wave-1-psb-wave-1a-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1a-runbook.md)
+- Panduan XAMPP dan index docs diperbarui agar extension `Wave 1A` tidak lagi tersebar di beberapa file terpisah, tetapi punya jalur eksekusi yang eksplisit dari bootstrap sampai review hasil: [xampp-setup.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/xampp-setup.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Jalur lanjut setelah sample dan draft transform `Wave 1A` kini lebih siap dipakai di lingkungan Windows/XAMPP, walau `mysql` belum ada di `PATH`, karena runner mendukung path eksplisit ke binary MySQL.
+- `VERSION` dinaikkan ke `0.64.99` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.98] - 2026-07-11
+
+### Changed
+
+- Ditambahkan file sample `Wave 1A` terpisah untuk `PSB_SUPPORT_EXT` dan `PSB_ODP_HEADER`, sehingga queue dismantle, photo TT detail, SLA, master support config, dan header ODP bisa diuji di staging review tanpa mengganggu sample batch dasar yang sudah ada: [xampp_review_sample_import_wave_1a.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_sample_import_wave_1a.sql)
+- Dokumentasi sample import diperluas agar urutan eksekusi sekarang mencakup sample dan transform `Wave 1A`, lengkap dengan query review staging/final table untuk support extension dan network ODP: [sample-import.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/sample-import.md)
+- Desain `Wave 1A` dan index docs diperbarui untuk menandai bahwa sample batch SQL sudah tersedia dan siap dipakai untuk review DB berikutnya: [hybrid-wave-1-psb-wave-1a-import-design.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1a-import-design.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Draft transform support extension kini dapat mencari parent `Isolation` dan `TroubleTicket` lintas batch source yang sama, sehingga desain batch terpisah `PSB_SUPPORT_EXT` benar-benar bisa dijalankan sesuai rencana `Wave 1A`: [xampp_review_transform_wave_1a_support_extension.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave_1a_support_extension.sql)
+- `VERSION` dinaikkan ke `0.64.98` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.97] - 2026-07-11
+
+### Changed
+
+- Ditambahkan draft transform `wave 1A` untuk support extension agar `DismantleTickets`, `TroubleTicketPhoto`, dan `TroubleTicketSla` dapat dipindahkan dari staging ke tabel final review menggunakan pola yang konsisten dengan transform tahap 3 yang sudah ada: [xampp_review_transform_wave_1a_support_extension.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave_1a_support_extension.sql)
+- Ditambahkan draft transform khusus header ODP production `Web PSB` agar `staging_legacy_network_odp_records` dapat dipindahkan ke `network_odp` tanpa mencampur jalur network dengan inventory gudang: [xampp_review_transform_wave_1a_network_odp.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave_1a_network_odp.sql)
+- Dokumen desain `wave 1A` diperbarui untuk menandai bahwa patch schema minimum dan draft transform SQL sudah tersedia, sehingga langkah berikutnya tinggal menyiapkan batch sample dan review hasil final table: [hybrid-wave-1-psb-wave-1a-import-design.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1a-import-design.md)
+
+### Fixed
+
+- Jalur migrasi `Web PSB` untuk support extension dan ODP header kini tidak lagi berhenti di level desain, karena schema staging dan draft transform SQL sudah saling tersambung pada review DB.
+- `VERSION` dinaikkan ke `0.64.97` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.96] - 2026-07-11
+
+### Changed
+
+- Schema review staging sekarang diperluas untuk `wave 1A Web PSB` dengan menambahkan tipe support `DISMANTLE_QUEUE`, `TROUBLE_TICKET_PHOTO`, `TROUBLE_TICKET_SLA`, dan `TROUBLE_TICKET_MASTER`, beserta kolom linkage/fallback seperti `legacy_parent_id`, `legacy_reference_code`, `note_text`, `actor_name`, `target_dismantle_queue_id`, dan `target_trouble_ticket_sla_id`: [xampp_review_staging_import.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_staging_import.sql)
+- Ditambahkan tabel staging baru `staging_legacy_network_odp_records` agar header ODP production `Web PSB` bisa di-review langsung ke jalur `network_odp` tanpa bercampur dengan staging inventory gudang: [xampp_review_staging_import.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_staging_import.sql)
+- Dokumentasi staging import diperbarui agar mencerminkan extension support `wave 1A` dan penambahan domain network ODP pada layer staging: [staging-import.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/staging-import.md)
+
+### Fixed
+
+- Jalur eksekusi setelah desain `wave 1A` kini benar-benar siap dipakai untuk batch support extension dan ODP header, sehingga `DismantleTickets`, `TroubleTicketPhoto`, `TroubleTicketSla`, dan `psb_odp` tidak lagi menggantung tanpa landing zone staging yang eksplisit.
+- `VERSION` dinaikkan ke `0.64.96` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.95] - 2026-07-11
+
+### Changed
+
+- Ditambahkan desain `wave 1A staging/import` untuk source production `Web PSB`, mencakup batch `Isolation`, `DismantleTickets`, `DismantleHistory`, `TroubleTicket`, `TroubleTicketPhoto`, `TroubleTicketSla`, dan `psb_odp`, beserta patch schema minimum dan urutan eksekusi review DB: [hybrid-wave-1-psb-wave-1a-import-design.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1a-import-design.md)
+- Index docs diperbarui agar desain `wave 1A` masuk ke baseline hybrid migration dan bisa langsung dipakai saat menyiapkan patch staging atau script transform berikutnya: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Jalur lanjut setelah audit production `Web PSB` kini lebih konkret karena domain support dan ODP sudah dipisahkan antara yang bisa memakai schema staging saat ini dan yang wajib mendapat patch minimum lebih dulu.
+- `VERSION` dinaikkan ke `0.64.95` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.94] - 2026-07-11
+
+### Changed
+
+- Ditambahkan mapping final `Web PSB production` ke staging, tabel final ERP, aturan normalisasi, dan keputusan transform berbasis schema, constraint, serta sample data nyata dari Coolify, sehingga wave 1 tidak lagi bergerak dari asumsi schema legacy: [hybrid-wave-1-psb-production-final-mapping.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-production-final-mapping.md)
+- Index docs diperbarui agar hasil audit production final `Web PSB` masuk ke daftar dokumen utama bersama matriks awal, checklist akses DB, dan playbook hybrid migration: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Keputusan migrasi `Isolation`, `DismantleTickets`, `DismantleHistory`, `TroubleTicket`, dan `psb_odp` kini dikunci berdasarkan data production nyata, termasuk fallback untuk relasi longgar dan penegasan bahwa `network_odp_ports` harus dibentuk sebagai schema ERP baru.
+- `VERSION` dinaikkan ke `0.64.94` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.93] - 2026-07-11
+
+### Changed
+
+- Ditambahkan checklist akses database production `Web PSB` di Coolify, termasuk opsi kredensial minimum, query inventaris schema, tabel prioritas audit, dan guardrail read-only agar penarikan DB production bisa dilakukan dengan aman dan terarah: [hybrid-wave-1-psb-production-db-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-production-db-checklist.md)
+- Index docs diperbarui agar checklist akses production `Web PSB` masuk ke dokumen utama dan bisa dipakai langsung saat koneksi Coolify tersedia: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Jalur lanjut dari audit repo lokal ke inventaris DB production kini lebih jelas karena kebutuhan akses Coolify dan langkah inventaris schema sudah terdokumentasi.
+- `VERSION` dinaikkan ke `0.64.93` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.92] - 2026-07-11
+
+### Changed
+
+- Ditambahkan matriks tabel `Web PSB` yang memetakan model/tabel legacy ke staging, tabel final ERP, modul target, dan status kesiapan transform, sehingga penarikan schema/data production berikutnya punya jalur implementasi yang lebih konkret: [hybrid-wave-1-psb-table-matrix.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-table-matrix.md)
+- Index docs diperbarui agar matriks tabel `Web PSB` masuk ke daftar dokumen utama bersama playbook dan inventaris hybrid gelombang 1: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Arah kerja setelah audit repo lokal kini lebih operasional karena sumber `Web PSB` sudah dipetakan sampai level staging/final table/modul ERP, bukan hanya level menu dan file referensi.
+- `VERSION` dinaikkan ke `0.64.92` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.91] - 2026-07-11
+
+### Changed
+
+- Ditambahkan dokumen inventaris gelombang 1 untuk tiga repo legacy lokal (`web-psb-perkasa`, `finance-repo`, `ga-web-app`) agar tim punya daftar sumber yang nyata, menu kerja inti, model/tabel penting, file prioritas untuk copy-first, dan mapping awal ke modul ERP baru: [hybrid-wave-1-inventory.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-inventory.md)
+- Index docs diperbarui agar inventaris hybrid gelombang 1 bisa langsung dipakai sebagai referensi batch porting berikutnya bersama playbook migrasi hybrid: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Keputusan untuk memakai repo lokal sebagai sumber audit tidak lagi hanya implisit, karena inventaris sumber legacy dan prioritas porting awal sekarang terdokumentasi secara eksplisit.
+- `VERSION` dinaikkan ke `0.64.91` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.90] - 2026-07-11
+
+### Changed
+
+- Ditambahkan dokumen kerja baru `hybrid-migration-playbook.md` untuk mengunci keputusan bahwa percepatan parity dilakukan dengan model hybrid: database production dipakai sebagai sumber data nyata, repo legacy dipakai sebagai sumber logic/UI, dan `perkasa-erp-oss-bss` tetap menjadi target akhir `ERP/OSS/BSS` dengan constraint `1 database`, `1 domain`, `1 website`: [hybrid-migration-playbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-migration-playbook.md)
+- Index dokumen proyek diperbarui agar playbook hybrid migration masuk ke daftar dokumen utama dan bisa langsung dipakai sebagai panduan batch berikutnya: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Fixed
+
+- Arah kerja migrasi kini terdokumentasi lebih jelas sehingga keputusan `ambil DB`, `ambil repo`, dan `tetap ERP-first` tidak perlu ditebak ulang pada batch implementasi berikutnya.
+- `VERSION` dinaikkan ke `0.64.90` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.89] - 2026-07-11
+
+### Changed
+
+- Route `/support/isolations` kini memakai workspace khusus `SupportIsolationWorkspace`, sehingga `Monitoring Isolir` tampil sebagai halaman kerja tersendiri dengan header operasional, KPI cepat, tabel isolir, dan blok form restore/transfer yang lebih dekat ke pola `web-psb-perkasa`: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/[lane]/page.tsx), [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx)
+- Workspace isolir baru tetap me-reuse `SupportIsolationQueuePanel`, `SupportIsolationForm`, `SupportIsolationRestoreForm`, dan `SupportDismantleForm`, sehingga parity UI bergerak ke pola legacy tanpa memecah service, API, permission, maupun ownership ERP yang sudah aktif: [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx)
+
+### Fixed
+
+- `Monitoring Isolir` tidak lagi terasa seperti lane support generik karena tabel dan aksi utama sekarang menjadi pusat baca halaman, sementara fokus kasus per customer/service tetap dipertahankan melalui drilldown yang sama.
+- `VERSION` dinaikkan ke `0.64.89` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.88] - 2026-07-11
+
+### Changed
+
+- Halaman `Aktivitas Marketing` sekarang dibaca lebih seperti console operasional legacy dengan empat KPI cepat di atas, info strip mode aktif, dan dua mode yang sama-sama `table-first`, sehingga operator tidak lagi berpindah dari tabel ke tampilan kartu saat membaca performa marketing vs distribusi area: [marketing-activity-manager.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/marketing-activity-manager.tsx)
+- Mode `Analisis Area` diubah dari daftar progress/bar menjadi tabel operasional yang menampilkan `Area`, `Kunjungan`, `Marketing Aktif`, `Persentase`, dan `PIC Area`, namun tetap memakai service aktivitas marketing yang sama agar fondasi ERP/OSS/BSS tidak berubah: [marketing-activity-manager.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/marketing-activity-manager.tsx)
+
+### Fixed
+
+- Ritme halaman Aktivitas Marketing kini lebih dekat ke baseline `web-psb-perkasa` karena pembacaan status cepat dan tabel utama langsung terbaca sebelum operator masuk ke modal tambah/edit aktivitas.
+- `VERSION` dinaikkan ke `0.64.88` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.87] - 2026-07-11
+
+### Changed
+
+- Route `/sales` kini tidak lagi dirender penuh oleh `DomainShell` generik, tetapi memakai workspace khusus `SalesDomainWorkspace` yang memosisikan KPI, tabel pipeline penjualan, dan action form dalam ritme kerja yang lebih dekat ke `web-psb-perkasa`: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx), [sales-domain-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/sales-domain-workspace.tsx)
+- Workspace `Penjualan` baru tetap memakai `getDomainPageData()` dan form/service sales yang sudah ada, sehingga parity UI bergerak ke pola legacy tanpa melepaskan fondasi ERP/OSS/BSS yang sudah terbangun: [sales-domain-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/sales-domain-workspace.tsx)
+
+### Fixed
+
+- Gap ekspektasi pada menu `Penjualan` ditangani dengan memisahkan halaman kerja spesifik dari renderer domain generik, sehingga tabel kerja kini menjadi pusat baca dan CTA per baris lebih langsung seperti baseline operasional lama.
+- `VERSION` dinaikkan ke `0.64.87` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.86] - 2026-07-11
+
+### Changed
+
+- `Tabel kerja utama menu` kini dipindahkan ke bagian atas `DomainShell`, sehingga saat user membuka menu Sales, Customer, Billing, Inventory, HR, dan domain lain, blok tabel langsung terlihat setelah header/drilldown tanpa harus melewati kartu summary, highlight, atau form terlebih dahulu: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Judul section review lintas domain kini dipertegas menjadi `Tabel kerja utama menu` agar hierarki visualnya jelas sebagai pusat kerja, bukan blok review sekunder di bagian bawah halaman: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Fixed
+
+- Keluhan bahwa tabel belum terlihat pada masing-masing menu ditangani dengan mengubah urutan layout halaman, bukan hanya bentuk row, sehingga pola `table-first` sekarang terasa langsung dari awal membuka menu: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- `VERSION` dinaikkan ke `0.64.86` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.85] - 2026-07-11
+
+### Changed
+
+- `Lembar kerja` lintas divisi pada renderer shared kini berubah menjadi `table-first`, sehingga review operasional di Sales, Customer, Billing, Inventory, HR, dan workspace domain lain tidak lagi tampil sebagai kartu per row tetapi sebagai tabel rapat dengan aksi per baris: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Layout section review lintas divisi kini dibuat satu kolom penuh agar tabel kerja lebih lebar dan lebih dekat dengan pola operasional sistem legacy dibanding grid kartu dua kolom sebelumnya: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Lane `SLA` di support juga kini mengikuti pola tabel, sehingga rule SLA tidak lagi card-only dan konsisten dengan panel operasional support lain yang sudah table-first: [support-sla-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-queue-panel.tsx)
+
+### Fixed
+
+- Detail kontekstual Billing seperti correlation summary, decision trail, evidence, health signal, recommended action, dan outcome summary tetap dipertahankan melalui row detail di bawah tabel agar perpindahan dari kartu ke tabel tidak menghilangkan konteks keputusan kasus: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- `VERSION` dinaikkan ke `0.64.85` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.84] - 2026-07-11
+
+### Changed
+
+- `Panel Detail` supervisor kini menampilkan `Action Outcome Summary` setelah `Recommended Next Action`, sehingga operator bisa langsung membaca target hasil, sinyal berhasil, dan fallback pada kasus restore, terminate, serta TT/SLA kritis tanpa membuka lane lain lebih dulu: [worklist-detail-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-detail-panel.tsx), [case-action-outcome-summary.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/case-action-outcome-summary.tsx), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Area review Billing kini ikut menampilkan `Action Outcome Summary`, sehingga hasil yang dituju setelah reconnect, follow-up, suspend, atau terminate langsung terbaca pada level row review dan tidak berhenti di action recommendation saja: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Fixed
+
+- Tipe worklist kini mendukung `actionOutcomeSummary` agar outcome target dan fallback per kasus bisa dibawa konsisten bersama health signal, recommended actions, correlation summary, decision trail, dan evidence panel: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- `VERSION` dinaikkan ke `0.64.84` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.83] - 2026-07-11
+
+### Changed
+
+- `Panel Detail` supervisor kini menampilkan `Recommended Next Action` untuk kasus restore, terminate, dan TT/SLA kritis, sehingga operator langsung melihat matriks 2-3 aksi prioritas yang bisa dijalankan per kasus tanpa menebak lane berikutnya: [worklist-detail-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-detail-panel.tsx), [case-next-action-matrix.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/case-next-action-matrix.tsx), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Area review Billing kini ikut menampilkan `Recommended Next Action` yang menerjemahkan health signal menjadi action primer, lane support terkait, dan audit Billing, sehingga keputusan reconnect/follow-up/terminate lebih operasional pada level customer-service yang sama: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Fixed
+
+- Tipe worklist kini mendukung `recommendedActions` agar matriks rekomendasi bisa dibawa konsisten bersama health signal, correlation summary, decision trail, dan evidence panel dalam satu konteks kasus: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- `VERSION` dinaikkan ke `0.64.83` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.82] - 2026-07-11
+
+### Changed
+
+- `Panel Detail` supervisor kini menampilkan `Case Health Signal` pada kasus restore, terminate, dan ticket kritis, sehingga operator langsung mendapatkan sinyal keputusan cepat seperti `Butuh Follow-Up Billing`, `Siap Terminate`, atau `Masih Tertahan SLA` sebelum membaca detail lebih dalam: [worklist-detail-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-detail-panel.tsx), [case-health-signal.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/case-health-signal.tsx), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Area review Billing kini ikut menampilkan `Case Health Signal`, sehingga operator dapat langsung membaca apakah kasus cenderung aman direstore, masih butuh follow-up Billing, siap terminate, atau masih perlu review supervisor sebelum berpindah lane: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Fixed
+
+- Tipe worklist kini mendukung `healthSignal` agar ringkasan keputusan cepat dapat dibawa konsisten bersama correlation summary, decision trail, dan evidence panel dalam satu konteks kasus: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- `VERSION` dinaikkan ke `0.64.82` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.81] - 2026-07-11
+
+### Changed
+
+- `Panel Detail` supervisor kini menampilkan `Evidence Terakhir` per kasus untuk jalur restore, terminate, dan ticket kritis, sehingga operator dapat membaca alasan isolir, catatan transfer, status ticket aktif, serta scope service yang terakhir terbaca tanpa keluar dari worklist: [worklist-detail-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-detail-panel.tsx), [case-evidence-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/case-evidence-panel.tsx), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Area review Billing kini ikut menampilkan `Evidence Billing / Kasus`, sehingga operator bisa melihat action notes, due atau follow-up terakhir, dan scope service yang relevan sebelum memutuskan handoff ke lane support: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Fixed
+
+- Tipe worklist kini mendukung `evidencePanel` agar supervisor dapat membawa bukti tindakan terakhir lintas Billing, Isolir, TT/SLA, dan Dismantle dalam satu panel yang reusable: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- `VERSION` dinaikkan ke `0.64.81` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.80] - 2026-07-11
+
+### Changed
+
+- `Panel Detail` supervisor sekarang menampilkan `Decision Trail` per kasus untuk jalur restore, terminate, dan ticket kritis, sehingga supervisor dapat membaca fase penting terakhir seperti pembukaan isolir, transfer ke queue dismantle, atau pembukaan TT sebelum memutuskan aksi berikutnya: [worklist-detail-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-detail-panel.tsx), [case-decision-trail.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/case-decision-trail.tsx), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Area review Billing kini ikut menampilkan `Decision Trail Billing / Kasus`, sehingga operator bisa membaca urutan keputusan dari status invoice atau collection, kontrol follow-up aktif, hingga handoff lintas domain sebelum keluar dari Billing: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Fixed
+
+- Query supervisor terminate kini ikut membawa `isolation_date` sehingga jejak keputusan pada kasus dismantle dapat menunjukkan fase isolir sebelum transfer ke queue dismantle secara lebih natural: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `VERSION` dinaikkan ke `0.64.80` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.79] - 2026-07-11
+
+### Changed
+
+- `Panel Detail` supervisor sekarang menampilkan `Ringkasan Korelasi Kasus` yang merangkum Billing, Isolir, TT/SLA, Dismantle, owner aktif, customer, dan service pada item support yang sedang diputuskan, sehingga supervisor tidak perlu lompat lane dulu hanya untuk memahami posisi kasus: [worklist-detail-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-detail-panel.tsx), [case-correlation-summary.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/case-correlation-summary.tsx), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Area review Billing kini menampilkan ringkasan korelasi customer/service langsung pada row yang relevan, sehingga operator bisa membaca posisi operasional kasus sebelum memutuskan tetap di Billing atau lompat ke Isolir, TT/SLA, maupun Dismantle: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Fixed
+
+- Query supervisor untuk restore, terminate, dan ticket risiko tinggi kini ikut membawa `service_no` dari subscription agar ringkasan korelasi lintas domain tidak berhenti di customer name saja: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `VERSION` dinaikkan ke `0.64.79` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.78] - 2026-07-11
+
+### Changed
+
+- Lane support kini bisa dibuka dengan filter `customer/service` langsung dari query string, sehingga handoff dari Billing tidak lagi hanya memindahkan operator ke lane umum tetapi langsung menyusut ke kasus yang paling dekat dengan customer dan layanan yang sama: [support/[lane]/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/[lane]/page.tsx)
+- Review row pada domain Billing sekarang mendukung CTA sekunder ke lane support terkait, sehingga operator bisa tetap menjalankan aksi Billing sebagai tombol utama sambil membuka `Isolir`, `TT/SLA`, atau `Dismantle` yang sudah terfilter customer/service sebagai jalur tindak lanjut kasus: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+
+### Fixed
+
+- Data row Billing kini membawa metadata `Service` pada invoice, collection follow-up, reconnect, write-off, collection action, dan payment terbaru agar pemetaan lintas domain tidak berhenti di invoice atau customer saja: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- `VERSION` dinaikkan ke `0.64.78` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.77] - 2026-07-11
+
+### Changed
+
+- Jalur `Billing decision -> Isolir -> TT/SLA -> Dismantle -> Supervisor CS_ADMIN` kini diperjelas lewat panel handoff lintas divisi yang tampil langsung di form `collection action`, `resolve`, dan `status invoice`, sehingga operator Billing tidak lagi berhenti di keputusan finansial saja tetapi langsung diarahkan ke lane operasional berikutnya: [billing-decision-handoff-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-decision-handoff-panel.tsx), [billing-collection-action-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-collection-action-form.tsx), [billing-collection-resolve-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-collection-resolve-form.tsx), [billing-invoice-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-invoice-status-form.tsx)
+- Panel `Isolir`, `SLA`, dan `Dismantle` kini menampilkan CTA sinkron Billing dan shortcut supervisor yang lebih eksplisit, sehingga operator support dapat membaca keputusan Billing sebagai bagian dari alur layanan, bukan konteks terpisah: [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx), [support-sla-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-queue-panel.tsx), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+
+### Fixed
+
+- Alert dashboard untuk `Billing overdue`, `Ticket`, dan `Isolir` kini lebih tepat mengarahkan operator ke anchor atau queue keputusan yang sesuai, sehingga jalur handoff ke Billing, SLA, dan Supervisor tidak lagi berhenti di halaman umum: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `VERSION` dinaikkan ke `0.64.77` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.76] - 2026-07-11
+
+### Changed
+
+- Workspace `CS_ADMIN` kini memiliki quick access yang lebih eksplisit ke `TT Aktif`, `SLA Kritis`, dan `Billing`, sehingga supervisor bisa berpindah dari bucket kontrol ke lane operasional yang tepat tanpa lewat menu umum lagi: [cs-admin-workspace-dashboard.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/cs-admin-workspace-dashboard.tsx)
+- Item worklist support kini mendukung handoff link sekunder, sehingga panel detail tidak hanya memberi satu CTA utama tetapi juga jalur lintas divisi yang relevan untuk restore, terminate, progress TT, eskalasi, dan kontrol SLA: [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts), [worklist-detail-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-detail-panel.tsx)
+
+### Fixed
+
+- Queue `Transfer atau Restore` dan `Queue Risiko Tinggi` di supervisor kini tidak lagi berhenti di link modul umum, karena kasus isolir, dismantle, dan ticket kritis langsung membuka lane dan action support yang sesuai dengan konteks prefill masing-masing: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [support-action-links.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/support-action-links.ts)
+- Handoff lintas peran antara `Billing`, `CS & Admin CS`, `TT`, dan `SLA` kini lebih natural karena CTA utama dan sekunder pada item supervisor membawa operator ke jalur keputusan yang benar, bukan sekadar ke daftar halaman domain: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `VERSION` dinaikkan ke `0.64.76` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.75] - 2026-07-11
+
+### Changed
+
+- Panel `Trouble Ticket` kini dipadatkan mengikuti ritme console legacy per bucket queue: setiap section tetap mempertahankan kecerdasan prioritas dan aksi yang sudah ada, tetapi tabel desktop sekarang menampilkan ticket, customer, SLA, PIC, follow-up, konteks queue, dan aksi utama per baris secara lebih cepat dipindai; tampilan mobile tetap memakai kartu agar aman di layar kecil: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+
+### Fixed
+
+- Review operasional lane `TT` kini lebih mudah dibaca tanpa tenggelam di kumpulan badge panjang, karena detail SLA, follow-up, escalation, dan rekomendasi aksi dipisahkan ke kolom-kolom yang lebih natural untuk operator NOC/TT: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.75` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.74] - 2026-07-11
+
+### Changed
+
+- Panel `Dismantle` kini dipadatkan mengikuti ritme console legacy: queue open dan histori close ditampilkan dalam tabel operasional yang lebih rapat di desktop, tetap aman sebagai kartu di mobile, dan aksi utama per baris langsung terlihat tanpa harus membuka detail panjang lebih dulu: [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+
+### Fixed
+
+- Ownership dan audit lifecycle pada queue `Dismantle` kini lebih mudah dibaca lintas peran karena tabel open menegaskan jalur `Close Owner: CS & Admin CS` versus `Restore Owner: Billing`, sementara histori close merangkum metadata lapangan, billing disposition, dan aksi reopen dalam format review yang lebih cepat dipindai: [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+- `VERSION` dinaikkan ke `0.64.74` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.73] - 2026-07-11
+
+### Changed
+
+- Metadata close `Dismantle` kini jauh lebih kaya dan mendekati konteks lapangan: form close sekarang menangkap `Field PIC`, `Device Status`, `Pickup Status`, `Close Outcome`, dan `Billing Disposition`, lalu histori dismantle memecah metadata itu menjadi badge yang terbaca jelas saat review terminasi: [support-dismantle-close-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-close-form.tsx), [support-dismantle-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/support-dismantle-service.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle/[id]/close/route.ts), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+- Queue supervisor `Transfer atau Restore` kini membaca lifecycle isolir dan dismantle dengan ownership yang lebih tegas: kasus restore tetap dibaca sebagai jalur `Billing`, sedangkan terminate dan close histori dibaca sebagai jalur `CS & Admin CS`; narasi queue supervisor, item worklist, dan CTA panel support ikut diselaraskan agar handoff lintas peran tidak kabur: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [worklist-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/worklist-service.ts), [cs-admin-workspace-dashboard.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/cs-admin-workspace-dashboard.tsx), [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx), [support-isolation-restore-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-restore-form.tsx), [restore route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/isolations/[id]/restore/route.ts)
+
+### Fixed
+
+- Parser catatan support kini memprioritaskan ringkasan close final pada histori dismantle, sehingga panel histori tidak lagi berhenti pada transfer note lama ketika satu kasus menyimpan jejak transfer dan close sekaligus: [support-dismantle-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/support-dismantle-service.ts)
+- `VERSION` dinaikkan ke `0.64.73` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.72] - 2026-07-11
+
+### Changed
+
+- Flow `Dismantle` sekarang benar-benar bertahap seperti baseline: `Approve Dismantle` hanya mentransfer isolir aktif ke `support_dismantle_queue`, `Close Dismantle` yang memindahkan queue aktif ke histori, dan `Reopen Dismantle` mengembalikan histori ke queue aktif lagi bila terminasi perlu dikoreksi; panel queue, action form, prefill search param, dan lane action workspace ikut diselaraskan agar lifecycle `Isolir -> Queue -> Histori -> Reopen` terbaca jelas: [support-dismantle-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/support-dismantle-service.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/isolations/[id]/dismantle/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle/[id]/close/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle-history/[id]/reopen/route.ts), [support-dismantle-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-form.tsx), [support-dismantle-close-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-close-form.tsx), [support-dismantle-reopen-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-reopen-form.tsx), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/[lane]/page.tsx), [support-lanes.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/support-lanes.ts), [types.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/types.ts)
+- Read-side support dan dashboard kini membaca queue dismantle nyata, sehingga lane `Dismantle`, kartu operasional support, dan worklist `DISMANTLE_OPERATOR` tidak lagi hanya menebak dari jumlah isolir aktif atau histori close: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [xampp_review_schema.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema.sql)
+
+### Fixed
+
+- Queue isolir kini menandai apakah item sudah memiliki ticket dismantle, sehingga operator tidak lagi buta terhadap kasus yang sebenarnya sudah ditransfer ke lane terminasi: [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx), [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- `VERSION` dinaikkan ke `0.64.72` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.71] - 2026-07-11
+
+### Changed
+
+- Lane `Dismantle` kini membaca dua lapisan operasional sekaligus: `Queue Dismantle Open` dari isolir aktif untuk kandidat terminasi yang masih perlu keputusan, dan `Histori Dismantle` untuk jejak close yang sudah final; panel workspace dan narasi lane ikut diselaraskan agar pola kerja lebih dekat ke baseline legacy yang table-first: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx), [support-lanes.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/support-lanes.ts)
+
+### Fixed
+
+- Proses `dismantle` sekarang menulis histori dan mengarsipkan isolir dalam satu transaksi review DB, sehingga tidak lagi berisiko meninggalkan snapshot histori yatim atau row isolir yang setengah tertutup jika salah satu query gagal: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/isolations/[id]/dismantle/route.ts)
+- `VERSION` dinaikkan ke `0.64.71` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
+## [0.64.70] - 2026-07-11
+
+### Changed
+
+- Workspace `CS & Admin CS` kini tidak lagi berhenti sebagai landing organisasi statis; halaman ini berubah menjadi dashboard supervisor hidup yang merangkum bucket `Perlu Approval`, `Perlu Koreksi`, `Transfer atau Restore`, dan `Queue Risiko Tinggi` dalam pola `table-first`, lengkap dengan detail panel dan CTA lintas customer/support/inventory: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/customers/cs-admin/page.tsx), [cs-admin-workspace-dashboard.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/cs-admin-workspace-dashboard.tsx), [worklist-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/worklist-service.ts)
+
+### Fixed
+
+- Write action `assign port` dan `update status port` pada inventory kini membaca permission `inventory:update` agar role operasional seperti `CS_OPERATOR`, `CS_ADMIN`, `NOC_OPERATOR`, dan teknisi yang memang punya hak update tidak lagi tertolak hanya karena gate lama masih memaksa `inventory:create`; CTA domain inventory dan form port ikut diselaraskan ke capability yang benar: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/odp-ports/assign/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/odp-ports/status/route.ts), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx), [inventory-odp-port-assign-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-odp-port-assign-form.tsx), [inventory-odp-port-status-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-odp-port-status-form.tsx)
+- `VERSION` dinaikkan ke `0.64.70` dan versi `apps/web` diselaraskan ke angka rilis yang sama.
+
 ## [0.64.69] - 2026-07-11
 
 ### Changed

@@ -43,6 +43,18 @@ Gunakan urutan ini agar foreign key, master seed, dan contoh staging siap untuk 
 7. `database/xampp_review_master_mapping_seed.sql`
 8. `database/xampp_review_sample_import.sql`
 
+Jika ingin langsung menguji extension `Wave 1A Web PSB` setelah bootstrap dasar:
+
+9. `database/xampp_review_transform_stage_2.sql`
+10. `database/xampp_review_transform_stage_3.sql`
+11. `database/xampp_review_sample_import_wave_1a.sql`
+12. `database/xampp_review_transform_wave_1a_support_extension.sql`
+13. `database/xampp_review_transform_wave_1a_network_odp.sql`
+
+Runbook cepat:
+
+- [hybrid-wave-1-psb-wave-1a-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-psb-wave-1a-runbook.md)
+
 Referensi detail (seed auth): [auth-review-seed.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/auth-review-seed.md)
 
 ### Catatan import

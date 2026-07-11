@@ -14,6 +14,39 @@
 - `data-mapping.md`  
   Mapping field dan entitas dari tiga aplikasi lama ke schema baru.
 
+- `hybrid-migration-playbook.md`  
+  Playbook keputusan kerja untuk migrasi hybrid dari `Web PSB`, `Web Finance`, dan `Web GA`, dengan pembagian jelas antara peran database production, repo legacy, dan target akhir ERP/OSS/BSS.
+
+- `hybrid-wave-1-inventory.md`  
+  Inventaris gelombang 1 repo legacy lokal yang sudah tersedia, termasuk menu kerja inti, tabel/model utama, file prioritas untuk copy-first, dan mapping awal ke modul ERP baru.
+
+- `hybrid-wave-1-psb-table-matrix.md`  
+  Matriks tabel `Web PSB` yang memetakan source table/model legacy ke tabel staging, tabel final ERP, modul target, dan status kesiapan transform.
+
+- `hybrid-wave-1-psb-production-db-checklist.md`  
+  Checklist akses database production `Web PSB` di Coolify, termasuk opsi kredensial yang dibutuhkan, query inventaris minimum, tabel prioritas, dan guardrail read-only sebelum penarikan schema/data nyata.
+
+- `hybrid-wave-1-psb-production-final-mapping.md`  
+  Mapping final `Web PSB production` ke staging, tabel final ERP, aturan normalisasi, dan keputusan mana yang harus tetap copy-first versus dibentuk ulang di ERP berdasarkan hasil audit schema, constraint, dan sample data nyata.
+
+- `hybrid-wave-1-psb-wave-1a-import-design.md`  
+  Desain batch `wave 1A staging/import` untuk `Isolation`, `DismantleTickets`, `DismantleHistory`, `TroubleTicket`, `TroubleTicketPhoto`, `TroubleTicketSla`, dan `psb_odp`, termasuk patch schema minimum serta urutan eksekusi yang direkomendasikan.
+
+- `hybrid-wave-1-psb-wave-1a-runbook.md`  
+  Runbook eksekusi sample dan transform `Wave 1A` `Web PSB`, termasuk runner PowerShell, urutan SQL manual, dan query review hasil final table.
+
+- `hybrid-wave-1-psb-wave-1a-execution-checklist.md`  
+  Checklist pasca-eksekusi `Wave 1A` untuk menilai hasil batch support extension dan ODP header secara cepat, konsisten, dan terdokumentasi.
+
+- `hybrid-wave-1-psb-wave-1a-result-template.md`  
+  Template laporan hasil run `Wave 1A` untuk menempelkan output runner, hasil query review, hasil assertion query, dan keputusan lanjut tanpa perlu merangkum manual.
+
+- `hybrid-wave-1-psb-wave-1b-adapter-design.md`  
+  Desain langkah lanjut setelah `Wave 1A`, dengan fokus pada adapter `Ticket` ke customer/order/subscription/work order, persiapan schema `CoveredArea` dan `MarketingActivity`, serta fondasi native ERP untuk `network_odp_ports`.
+
+- `hybrid-wave-1-psb-wave-1b-ticket-runbook.md`  
+  Runbook eksekusi `Wave 1B Ticket split` untuk menguji jalur `Ticket -> staging customer/order -> customer/address/order/subscription/work order` pada review DB lokal.
+
 - `phase-1-erd.md`  
   Ringkasan relasi antar tabel phase 1 berdasarkan schema review XAMPP.
 
@@ -39,7 +72,7 @@
   Seed awal translasi nilai legacy agar sample import bisa langsung diuji.
 
 - `sample-import.md`  
-  Contoh batch kecil untuk menguji staging dan mapping sebelum import nyata.
+  Contoh batch kecil untuk menguji staging, mapping, dan sample `Wave 1A` support extension/ODP header sebelum import nyata.
 
 - `staging-transform.md`  
   Transform tahap awal dari staging ke tabel final untuk domain inventory dan HR.
