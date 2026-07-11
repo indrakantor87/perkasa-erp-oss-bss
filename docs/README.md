@@ -35,6 +35,12 @@
 - `hybrid-wave-1-psb-wave-1a-runbook.md`  
   Runbook eksekusi sample dan transform `Wave 1A` `Web PSB`, termasuk runner PowerShell, urutan SQL manual, dan query review hasil final table.
 
+- `hybrid-wave-1a-psb-support-production-extraction-pack.md`  
+  Paket extraction read-only untuk menarik JSON production `Isolation`, `DismantleTickets`, `DismantleHistory`, dan `TroubleTicket` dari terminal app `Web PSB` di Coolify.
+
+- `hybrid-wave-1a-psb-support-production-runbook.md`  
+  Runbook lokal untuk memuat empat file JSON production support inti `Web PSB` ke review DB, menjalankan transform production `Wave 1A`, dan mereview hasil final support.
+
 - `hybrid-wave-1-psb-wave-1a-execution-checklist.md`  
   Checklist pasca-eksekusi `Wave 1A` untuk menilai hasil batch support extension dan ODP header secara cepat, konsisten, dan terdokumentasi.
 

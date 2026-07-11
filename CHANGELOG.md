@@ -23,6 +23,19 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.15] - 2026-07-11
+
+### Added
+
+- Ditambahkan generator production `Wave 1A support core` untuk mengubah empat file JSON production (`Isolation`, `DismantleTickets`, `DismantleHistory`, `TroubleTicket`) menjadi staging SQL idempotent dengan batch code `PROD-WEBPSB-SUPPORT-CORE-001`, lengkap dengan penyimpanan raw payload, fallback legacy parent/reference, dan normalized key per lane support: [generate-wave1a-support-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave1a-support-production-loader.mjs)
+- Ditambahkan transform production support inti `Wave 1A` yang memuat `support_isolations`, `support_trouble_tickets`, `support_dismantle_queue`, dan `support_dismantle_history` langsung dari `staging_legacy_support_records`, sambil mempertahankan fallback matching longgar yang memang dibutuhkan data support production nyata: [xampp_review_transform_wave1a_support_production.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave1a_support_production.sql)
+- Ditambahkan review query, assertion query, runner lokal, extraction pack, dan runbook production untuk membuka jalur eksekusi nyata batch support inti setelah `Wave 1B Ticket` dan `Wave 2` tervalidasi: [xampp_review_wave1a_support_production_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1a_support_production_review_queries.sql), [xampp_review_wave1a_support_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1a_support_production_assertions.sql), [run-review-wave1a-support-production.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1a-support-production.ps1), [hybrid-wave-1a-psb-support-production-extraction-pack.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1a-psb-support-production-extraction-pack.md), [hybrid-wave-1a-psb-support-production-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1a-psb-support-production-runbook.md)
+- Docs index diperluas agar jalur production support inti ini muncul berdampingan dengan jalur `Wave 1A`, `Wave 1B Ticket`, dan `Wave 2`, sehingga urutan kerja hybrid migration semakin eksplisit di repo: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Changed
+
+- Versioning diselaraskan ke `0.65.15` untuk menandai batch baru persiapan production path support inti Web PSB.
+
 ## [0.65.14] - 2026-07-11
 
 ### Changed
