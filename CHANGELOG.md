@@ -23,6 +23,13 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.17] - 2026-07-11
+
+### Fixed
+
+- Transform `Wave 1A support production` kini membuat `support_isolation` sintetis minimum untuk row `DismantleTickets` production yang orphan dan tidak punya source `Isolation`, sehingga queue production seperti kasus `FEBRIAN RIZKY` tetap bisa masuk ke `support_dismantle_queue` tanpa menyisakan row `MAPPED`: [xampp_review_transform_wave1a_support_production.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave1a_support_production.sql)
+- Versioning diselaraskan ke `0.65.17` untuk menandai patch final pasca-validasi penuh batch production support inti `Web PSB`.
+
 ## [0.65.16] - 2026-07-11
 
 ### Fixed

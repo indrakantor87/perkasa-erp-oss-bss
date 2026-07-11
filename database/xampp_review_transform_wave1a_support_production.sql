@@ -223,6 +223,65 @@ WHERE dq.batch_id = @support_batch_id
   AND dq.import_status IN ('MAPPED', 'VALID')
   AND dq.target_isolation_id IS NULL;
 
+-- 5b) Bila queue production tidak punya row Isolation asal, buat isolation sintetis minimum
+-- agar queue tetap bisa dimigrasikan tanpa melanggar FK support_dismantle_queue.
+INSERT INTO support_isolations (
+  subscription_id,
+  customer_name,
+  customer_address,
+  customer_phone,
+  marketing_name,
+  radbox_name,
+  package_price,
+  isolation_date,
+  reason,
+  status,
+  restoration_date,
+  close_note,
+  is_archived,
+  archived_at
+)
+SELECT
+  NULL,
+  COALESCE(NULLIF(TRIM(dq.customer_name), ''), 'Legacy Customer'),
+  NULLIF(TRIM(dq.customer_address), ''),
+  NULLIF(TRIM(dq.customer_phone), ''),
+  NULLIF(TRIM(dq.marketing_name), ''),
+  NULLIF(TRIM(dq.radbox_name), ''),
+  NULL,
+  COALESCE(dq.opened_at, CURRENT_TIMESTAMP),
+  COALESCE(NULLIF(TRIM(dq.reason_text), ''), 'Synthetic isolation from production dismantle queue'),
+  CASE
+    WHEN UPPER(TRIM(dq.support_status)) IN ('CLOSE', 'CLOSED') OR dq.closed_at IS NOT NULL THEN 'CLOSED'
+    ELSE 'OPEN'
+  END,
+  dq.closed_at,
+  NULLIF(TRIM(dq.note_text), ''),
+  0,
+  NULL
+FROM staging_legacy_support_records dq
+WHERE dq.batch_id = @support_batch_id
+  AND dq.support_type = 'DISMANTLE_QUEUE'
+  AND dq.import_status IN ('MAPPED', 'VALID')
+  AND dq.target_isolation_id IS NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM support_isolations si
+    WHERE si.customer_name = COALESCE(NULLIF(TRIM(dq.customer_name), ''), 'Legacy Customer')
+      AND si.isolation_date = COALESCE(dq.opened_at, CURRENT_TIMESTAMP)
+  );
+
+UPDATE staging_legacy_support_records dq
+JOIN support_isolations si
+  ON si.customer_name = COALESCE(NULLIF(TRIM(dq.customer_name), ''), 'Legacy Customer')
+  AND si.isolation_date = COALESCE(dq.opened_at, CURRENT_TIMESTAMP)
+SET dq.target_isolation_id = si.id,
+    dq.updated_at = CURRENT_TIMESTAMP
+WHERE dq.batch_id = @support_batch_id
+  AND dq.support_type = 'DISMANTLE_QUEUE'
+  AND dq.import_status IN ('MAPPED', 'VALID')
+  AND dq.target_isolation_id IS NULL;
+
 -- 6) Transform DismantleTickets ke support_dismantle_queue.
 INSERT INTO support_dismantle_queue (
   isolation_id,
