@@ -47,6 +47,12 @@
 - `hybrid-wave-1-psb-wave-1b-ticket-runbook.md`  
   Runbook eksekusi `Wave 1B Ticket split` untuk menguji jalur `Ticket -> staging customer/order -> customer/address/order/subscription/work order` pada review DB lokal.
 
+- `hybrid-wave-1b-psb-ticket-production-extraction-pack.md`  
+  Paket extraction read-only untuk menarik JSON production `Ticket` dari terminal app `Web PSB` di Coolify ke format yang siap dimuat ke review DB lokal.
+
+- `hybrid-wave-1b-psb-ticket-production-runbook.md`  
+  Runbook lokal untuk memuat `ticket.production.json` ke staging review DB, menjalankan transform production `Wave 1B Ticket`, dan mereview hasil final secara lokal di XAMPP.
+
 - `hybrid-wave-1-psb-wave-1c-sales-odp-runbook.md`  
   Runbook eksekusi `Wave 1C` untuk menguji jalur `CoveredArea` dan `MarketingActivity` ke model sales ERP baru, sekaligus bootstrap native `network_odp_ports` dari header ODP yang sudah tervalidasi.
 

@@ -23,6 +23,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.13] - 2026-07-11
+
+### Added
+
+- Ditambahkan generator production `Wave 1B Ticket split` untuk mengubah `ticket.production.json` menjadi staging SQL yang idempotent, termasuk batch code khusus `PROD-WEBPSB-TICKET-001`, fallback nomor order, dan penandaan row `INVALID` bila package mapping otomatis belum tersedia: [generate-wave1b-ticket-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave1b-ticket-production-loader.mjs)
+- Ditambahkan transform production `Wave 1B Ticket` yang melakukan deduplikasi customer berbasis `nama + phone`, lalu membentuk `crm_customers`, `crm_customer_addresses`, `sales_orders`, `service_subscriptions`, dan `service_work_orders` dari staging production: [xampp_review_transform_wave1b_ticket_production.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave1b_ticket_production.sql)
+- Ditambahkan review query, assertion query, runner lokal, extraction pack, dan runbook production untuk menyiapkan jalur eksekusi nyata `Ticket split` setelah sample `Wave 1B` tervalidasi: [xampp_review_wave1b_ticket_production_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1b_ticket_production_review_queries.sql), [xampp_review_wave1b_ticket_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1b_ticket_production_assertions.sql), [run-review-wave1b-ticket-production.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1b-ticket-production.ps1), [hybrid-wave-1b-psb-ticket-production-extraction-pack.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1b-psb-ticket-production-extraction-pack.md), [hybrid-wave-1b-psb-ticket-production-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1b-psb-ticket-production-runbook.md)
+- Versioning diselaraskan ke `0.65.13` untuk menandai paket production path `Wave 1B Ticket` ini.
+
 ## [0.65.12] - 2026-07-11
 
 ### Changed
