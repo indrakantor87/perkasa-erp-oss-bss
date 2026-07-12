@@ -3,6 +3,7 @@ import { canAccessPath } from '@/lib/access-control-server'
 import { DomainShell } from '@/components/domain-shell'
 import { SupportDismantleWorkspace } from '@/components/support-dismantle-workspace'
 import { SupportIsolationWorkspace } from '@/components/support-isolation-workspace'
+import { SupportSlaWorkspace } from '@/components/support-sla-workspace'
 import { SupportTroubleTicketWorkspace } from '@/components/support-tt-workspace'
 import { requireSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
@@ -21,15 +22,25 @@ function normalizeCaseToken(value: string | undefined) {
   return String(value ?? '').trim()
 }
 
-function filterSupportReviewSectionsByCase(
+function normalizeStatusFilter(value: string | undefined) {
+  return String(value ?? '')
+    .trim()
+    .toUpperCase()
+}
+
+function filterSupportReviewSections(
   sections: NonNullable<Awaited<ReturnType<typeof getDomainPageData>>>['content']['reviewSections'],
   customer: string | undefined,
   service: string | undefined,
+  type: string | undefined,
+  status: string | undefined,
 ) {
   const normalizedCustomer = normalizeCaseToken(customer).toUpperCase()
   const normalizedService = normalizeCaseToken(service).toUpperCase()
+  const normalizedType = normalizeCaseToken(type).toUpperCase()
+  const normalizedStatus = normalizeStatusFilter(status)
 
-  if (!normalizedCustomer && !normalizedService) {
+  if (!normalizedCustomer && !normalizedService && !normalizedType && !normalizedStatus) {
     return sections
   }
 
@@ -40,7 +51,15 @@ function filterSupportReviewSectionsByCase(
         const haystack = [row.primary, row.secondary, row.detail, ...row.meta].join(' ').toUpperCase()
         const customerMatched = !normalizedCustomer || haystack.includes(normalizedCustomer)
         const serviceMatched = !normalizedService || haystack.includes(normalizedService)
-        return customerMatched && serviceMatched
+        const rowType = row.meta
+          .find((item) => item.startsWith('Type: '))
+          ?.replace('Type: ', '')
+          .trim()
+          .toUpperCase()
+        const rowStatus = String(row.status ?? '').trim().toUpperCase()
+        const typeMatched = !normalizedType || rowType === normalizedType
+        const statusMatched = !normalizedStatus || rowStatus === normalizedStatus
+        return customerMatched && serviceMatched && typeMatched && statusMatched
       }),
     }))
     .filter((section) => section.rows.length > 0)
@@ -155,6 +174,7 @@ export default async function SupportLanePage({
     dismantle?: string | string[]
     dismantleHistory?: string | string[]
     type?: string | string[]
+    status?: string | string[]
     focus?: string | string[]
     customer?: string | string[]
     service?: string | string[]
@@ -179,6 +199,8 @@ export default async function SupportLanePage({
 
   const customerFilter = resolveSearchParam(resolvedSearchParams.customer)
   const serviceFilter = resolveSearchParam(resolvedSearchParams.service)
+  const typeFilter = resolveSearchParam(resolvedSearchParams.type)
+  const statusFilter = resolveSearchParam(resolvedSearchParams.status)
   const payload = await getDomainPageData('support', session.role, {
     supportLane: normalizedLane as SupportLaneKey,
     focus: resolveSearchParam(resolvedSearchParams.focus),
@@ -188,9 +210,15 @@ export default async function SupportLanePage({
     notFound()
   }
 
-  const filteredReviewSections = filterSupportReviewSectionsByCase(payload.content.reviewSections, customerFilter, serviceFilter)
+  const filteredReviewSections = filterSupportReviewSections(
+    payload.content.reviewSections,
+    customerFilter,
+    serviceFilter,
+    typeFilter,
+    statusFilter,
+  )
   const filteredContent =
-    customerFilter || serviceFilter
+    customerFilter || serviceFilter || typeFilter || statusFilter
       ? {
           ...payload.content,
           reviewSections: filteredReviewSections,
@@ -217,6 +245,10 @@ export default async function SupportLanePage({
           dismantle: resolveSearchParam(resolvedSearchParams.dismantle),
           dismantleHistory: resolveSearchParam(resolvedSearchParams.dismantleHistory),
           type: resolveSearchParam(resolvedSearchParams.type),
+          status: statusFilter,
+          focus: resolveSearchParam(resolvedSearchParams.focus),
+          customer: customerFilter,
+          service: serviceFilter,
         }}
         supportDrilldown={resolvedSupportDrilldown}
       />
@@ -233,6 +265,10 @@ export default async function SupportLanePage({
         supportPrefill={{
           ticket: resolveSearchParam(resolvedSearchParams.ticket),
           type: resolveSearchParam(resolvedSearchParams.type),
+          status: statusFilter,
+          focus: resolveSearchParam(resolvedSearchParams.focus),
+          customer: customerFilter,
+          service: serviceFilter,
         }}
         supportDrilldown={resolvedSupportDrilldown}
       />
@@ -250,6 +286,28 @@ export default async function SupportLanePage({
           isolation: resolveSearchParam(resolvedSearchParams.isolation),
           dismantle: resolveSearchParam(resolvedSearchParams.dismantle),
           dismantleHistory: resolveSearchParam(resolvedSearchParams.dismantleHistory),
+          status: statusFilter,
+          focus: resolveSearchParam(resolvedSearchParams.focus),
+          customer: customerFilter,
+          service: serviceFilter,
+        }}
+        supportDrilldown={resolvedSupportDrilldown}
+      />
+    )
+  }
+
+  if ((normalizedLane as SupportLaneKey) === 'sla') {
+    return (
+      <SupportSlaWorkspace
+        content={filteredContent}
+        source={payload.source}
+        capabilities={payload.capabilities}
+        role={session.role}
+        supportPrefill={{
+          type: resolveSearchParam(resolvedSearchParams.type),
+          focus: resolveSearchParam(resolvedSearchParams.focus),
+          customer: customerFilter,
+          service: serviceFilter,
         }}
         supportDrilldown={resolvedSupportDrilldown}
       />

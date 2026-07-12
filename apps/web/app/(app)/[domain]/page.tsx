@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation'
 import { canAccessPath } from '@/lib/access-control-server'
+import { BillingDomainWorkspace } from '@/components/billing-domain-workspace'
 import { DomainShell } from '@/components/domain-shell'
+import { SalesDomainWorkspace } from '@/components/sales-domain-workspace'
 import { requireSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
 import { normalizeSupportLane } from '@/lib/support-lanes'
@@ -310,6 +312,48 @@ export default async function DomainPage({
     payroll: resolveSearchParam(resolvedSearchParams.payroll),
   }
   const resolvedDomainDrilldown = resolveDomainDrilldown(domain as DomainKey, resolveSearchParam(resolvedSearchParams.focus))
+
+  if ((domain as DomainKey) === 'sales') {
+    return (
+      <SalesDomainWorkspace
+        content={payload.content}
+        source={payload.source}
+        capabilities={payload.capabilities}
+        role={session.role}
+        domainPrefill={domainPrefill}
+        domainDrilldown={
+          resolvedDomainDrilldown
+            ? {
+                ...resolvedDomainDrilldown,
+                month: resolvePositiveIntegerParam(resolvedSearchParams.month),
+                year: resolvePositiveIntegerParam(resolvedSearchParams.year),
+              }
+            : undefined
+        }
+      />
+    )
+  }
+
+  if ((domain as DomainKey) === 'billing') {
+    return (
+      <BillingDomainWorkspace
+        content={payload.content}
+        source={payload.source}
+        capabilities={payload.capabilities}
+        role={session.role}
+        domainPrefill={domainPrefill}
+        domainDrilldown={
+          resolvedDomainDrilldown
+            ? {
+                ...resolvedDomainDrilldown,
+                month: resolvePositiveIntegerParam(resolvedSearchParams.month),
+                year: resolvePositiveIntegerParam(resolvedSearchParams.year),
+              }
+            : undefined
+        }
+      />
+    )
+  }
 
   return (
     <DomainShell

@@ -48,10 +48,10 @@ function countPickupPending(rows: DomainReviewRow[]) {
 
 function getActionButtonClass(isPrimary: boolean) {
   if (isPrimary) {
-    return 'rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800'
+    return 'rounded-md border border-slate-950 bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800'
   }
 
-  return 'rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50'
+  return 'rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50'
 }
 
 export function SupportDismantleQueuePanel({
@@ -84,16 +84,15 @@ export function SupportDismantleQueuePanel({
   }
 
   return (
-    <section className="panel p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="panel p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="section-title">Queue Dismantle</p>
-          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+          <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
             Kandidat terminasi aktif dan histori penutupan layanan
           </h3>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-            Panel ini membantu tim dismantle membaca kandidat terminasi dari isolir aktif, lalu
-            memverifikasi histori penutupan agar keputusan terminate dan recovery tidak tercampur.
+          <p className="mt-1 text-sm leading-5 text-mute">
+            Queue terminate aktif, histori close, dan pickup pending dalam satu panel kerja.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -105,34 +104,30 @@ export function SupportDismantleQueuePanel({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-4">
-        <article className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">Queue Open</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-rose-950">
+      <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
+        <article className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700">Queue Open</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-rose-950">
             {openCount}
           </p>
-          <p className="mt-2 text-sm text-rose-700">Kandidat terminate aktif yang masih perlu diputuskan.</p>
         </article>
-        <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Histori Close</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-emerald-950">
+        <article className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Histori Close</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-emerald-950">
             {historySummary.total}
           </p>
-          <p className="mt-2 text-sm text-emerald-700">Jejak terminasi yang sudah dibukukan ke histori.</p>
         </article>
-        <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Pickup Pending</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-amber-950">
+        <article className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Pickup Pending</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-amber-950">
             {pickupPendingCount}
           </p>
-          <p className="mt-2 text-sm text-amber-700">Histori yang masih menyisakan tindak lanjut perangkat lapangan.</p>
         </article>
-        <article className="rounded-3xl border border-violet-200 bg-violet-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Owner Marketing</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-violet-950">
+        <article className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-700">Owner Marketing</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-violet-950">
             {historySummary.marketingNames.length}
           </p>
-          <p className="mt-2 text-sm text-violet-700">Nama marketing yang masih sering muncul pada histori terminate.</p>
         </article>
       </div>
 
@@ -152,22 +147,22 @@ export function SupportDismantleQueuePanel({
         description="Tim dismantle bisa langsung melompat ke form transfer, close, reopen, atau restore tanpa keluar dari workspace terminasi."
       />
 
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="mt-3 flex flex-wrap gap-2">
         <Link
           href="/billing"
-          className="inline-flex items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:opacity-90"
+          className="inline-flex items-center justify-center rounded-md border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-violet-700 transition hover:opacity-90"
         >
           Sinkron Billing
         </Link>
         <Link
           href={buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' })}
-          className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:opacity-90"
+          className="inline-flex items-center justify-center rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-amber-700 transition hover:opacity-90"
         >
           Kembali ke Isolir
         </Link>
         <Link
           href="/customers/cs-admin?queue=Transfer+atau+Restore"
-          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
+          className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:opacity-90"
         >
           Buka Supervisor CS
         </Link>
@@ -185,11 +180,11 @@ export function SupportDismantleQueuePanel({
 
           {openSection.rows.length ? (
             <>
-              <div className="mt-4 hidden overflow-hidden rounded-3xl border border-line bg-white lg:block">
+              <div className="mt-4 hidden overflow-hidden rounded-xl border border-line bg-white lg:block">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-slate-200 text-sm">
                     <thead className="bg-slate-50/90">
-                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                      <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                         <th className="px-4 py-3">Customer</th>
                         <th className="px-4 py-3">Kontak & Konteks</th>
                         <th className="px-4 py-3">Transfer</th>

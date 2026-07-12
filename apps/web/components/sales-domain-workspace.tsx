@@ -256,83 +256,91 @@ export function SalesDomainWorkspace({
   const consoleStats = buildSalesConsoleStats(reviewSections)
 
   return (
-    <div className="space-y-6">
-      <DataSourceStatus source={source} />
-
-      <section className="panel p-6">
+    <div className="space-y-4">
+      <section className="panel p-4">
         <p className="section-title">{content.eyebrow}</p>
-        <div className="mt-3 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
+            <h2 className="font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
               Ticket PSB / Pipeline Penjualan
             </h2>
-            <p className="mt-3 max-w-4xl text-sm leading-6 text-mute">
-              Workspace ini menerjemahkan ritme halaman PSB legacy ke mode terang ERP: kartu ringkas di atas,
-              filter cepat untuk funnel utama, tabel ticket/pipeline di tengah, lalu form write-side tetap
-              memakai fondasi service ERP yang sekarang.
+            <p className="mt-1 text-sm leading-5 text-mute">
+              Lead, coverage, survey, order, work order, dan aktivasi dalam satu layar kerja yang ringkas.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Link href={content.primaryAction.href} className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white">
+          <div className="flex flex-wrap gap-2">
+            <Link href={content.primaryAction.href} className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
               {content.primaryAction.label}
             </Link>
-            <Link href={content.secondaryAction.href} className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700">
+            <Link href={content.secondaryAction.href} className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700">
               {content.secondaryAction.label}
             </Link>
           </div>
         </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <span className="badge border-slate-200 bg-white text-slate-600">{totalRows.toLocaleString('id-ID')} baris pipeline</span>
+          <span className="badge border-slate-200 bg-white text-slate-600">{openRows.toLocaleString('id-ID')} item aktif</span>
+          <span className="badge border-slate-200 bg-white text-slate-600">{consoleStats.marketingCount} marketing</span>
+        </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-5">
-        <article className="rounded-3xl border border-sky-200 bg-sky-50 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Lead</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-sky-950">
+      <section className="grid grid-cols-2 gap-2 xl:grid-cols-5">
+        <article className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Lead</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-sky-950">
             {consoleStats.leadCount}
           </p>
-          <p className="mt-2 text-sm text-sky-700">Prospek terbaru yang masih mendorong funnel awal.</p>
         </article>
-        <article className="rounded-3xl border border-violet-200 bg-violet-50 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Coverage</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-violet-950">
+        <article className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-700">Coverage</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-violet-950">
             {consoleStats.coverageCount}
           </p>
-          <p className="mt-2 text-sm text-violet-700">Area yang sedang jadi dasar keputusan PSB.</p>
         </article>
-        <article className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Survey / Order</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-amber-950">
+        <article className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Survey / Order</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-amber-950">
             {consoleStats.flowCount}
           </p>
-          <p className="mt-2 text-sm text-amber-700">Ticket PSB aktif yang sedang bergerak ke delivery.</p>
         </article>
-        <article className="rounded-3xl border border-rose-200 bg-rose-50 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">Work Order</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-rose-950">
+        <article className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700">Work Order</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-rose-950">
             {consoleStats.workOrderCount}
           </p>
-          <p className="mt-2 text-sm text-rose-700">Order yang sudah turun ke jalur operasional lapangan.</p>
         </article>
-        <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Aktivasi</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-emerald-950">
+        <article className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Aktivasi</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-emerald-950">
             {consoleStats.activationCount}
-          </p>
-          <p className="mt-2 text-sm text-emerald-700">
-            Layanan yang sudah masuk aktif, dijaga oleh {consoleStats.marketingCount} marketing.
           </p>
         </article>
       </section>
 
+      {content.summaries.length ? (
+        <section className="rounded-xl border border-line bg-white p-3">
+          <div className="flex flex-wrap gap-2">
+            {content.summaries.map((item) => (
+              <span key={item.label} className="badge border-slate-200 bg-white text-slate-600">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <DataSourceStatus source={source} />
+
       {domainDrilldown ? (
-        <section className="panel p-6">
+        <section className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="section-title">{domainDrilldown.label}</p>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{domainDrilldown.detail}</p>
+              <p className="text-sm font-semibold text-sky-900">{domainDrilldown.label}</p>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-800">{domainDrilldown.detail}</p>
             </div>
             <Link
               href={domainDrilldown.clearHref}
-              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              className="rounded-md border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-sky-800 transition hover:border-sky-300 hover:bg-sky-100"
             >
               Reset Fokus
             </Link>
@@ -340,36 +348,34 @@ export function SalesDomainWorkspace({
         </section>
       ) : null}
 
-      <section className="panel p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="rounded-xl border border-line bg-slate-50 p-3">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="section-title">Filter Cepat Ticket PSB</p>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
-              Gunakan shortcut ini untuk membaca funnel utama tanpa harus pindah menu atau mengandalkan dark mode seperti contoh lama.
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Toolbar Ticket PSB</p>
+            <p className="mt-1 text-sm text-mute">Shortcut funnel utama dan jalur kerja marketing.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
               href="/sales?focus=ACTIVE_LEADS"
-              className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:opacity-90"
+              className="rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-sky-700 transition hover:opacity-90"
             >
               Lead Aktif
             </Link>
             <Link
               href="/sales?focus=MONTHLY_ORDERS"
-              className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:opacity-90"
+              className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-amber-700 transition hover:opacity-90"
             >
               Order Periode Ini
             </Link>
             <Link
               href="/sales?focus=MONTHLY_ACTIVATIONS"
-              className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:opacity-90"
+              className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-700 transition hover:opacity-90"
             >
               Aktivasi Periode Ini
             </Link>
             <Link
               href="/sales/marketing-activities"
-              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
+              className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:opacity-90"
             >
               Aktivitas Marketing
             </Link>
@@ -377,50 +383,32 @@ export function SalesDomainWorkspace({
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-4">
-        {content.summaries.map((item) => (
-          <article key={item.label} className="panel p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">{item.label}</p>
-            <p className="mt-4 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
-              {item.value}
-            </p>
-          </article>
-        ))}
-        <article className="panel p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Baris Pipeline</p>
-          <p className="mt-4 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
-            {totalRows.toLocaleString('id-ID')}
-          </p>
-          <p className="mt-3 text-sm leading-6 text-mute">{openRows.toLocaleString('id-ID')} item masih aktif untuk ditindaklanjuti.</p>
-        </article>
-      </section>
-
-      <section className="panel p-6">
+      <section className="panel p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="section-title">Console Ticket PSB</p>
-            <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+            <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
               Tabel pipeline dan aktivitas kerja PSB
             </h3>
-            <p className="mt-3 max-w-4xl text-sm leading-6 text-mute">
-              Pola halaman ini mengikuti semangat `web-psb-perkasa`: kartu status di atas, tabel kerja sebagai pusat baca, lalu form operasional di bawah.
+            <p className="mt-1 max-w-4xl text-sm leading-5 text-mute">
+              Tabel jadi pusat baca. Form aksi dipindah ke panel sekunder agar layar tetap fokus ke pipeline.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <span className="badge border-slate-200 bg-white text-slate-600">{reviewSections.length} section</span>
-            <Link href="/sales/marketing-activities" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950">
+            <Link href="/sales/marketing-activities" className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:text-slate-950">
               Aktivitas Marketing
             </Link>
           </div>
         </div>
 
         {sectionActions.length ? (
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-wrap gap-2">
             {sectionActions.map((item) => (
               <Link
                 key={item.key}
                 href={`#${getSalesActionAnchorId(item.key)}`}
-                className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white hover:text-slate-950"
+                className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-white hover:text-slate-950"
               >
                 {item.label}
               </Link>
@@ -429,8 +417,8 @@ export function SalesDomainWorkspace({
         ) : null}
 
         {reviewSections.map((section) => (
-          <div key={section.title} className="mt-6 rounded-3xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-5 py-4">
+          <div key={section.title} className="mt-4 rounded-xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 px-4 py-3">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-slate-950">{section.title}</p>
@@ -444,7 +432,7 @@ export function SalesDomainWorkspace({
             <div className="overflow-x-auto">
               <table className="min-w-[1080px] w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                     <th className="px-4 py-3">Referensi</th>
                     <th className="px-4 py-3">Customer / Area</th>
                     <th className="px-4 py-3">Status</th>
@@ -485,7 +473,7 @@ export function SalesDomainWorkspace({
                           {action ? (
                             <Link
                               href={action.href}
-                              className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                              className="inline-flex items-center justify-center rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800"
                             >
                               {action.label}
                             </Link>
@@ -507,78 +495,88 @@ export function SalesDomainWorkspace({
         <section className="space-y-4">
           <div>
             <p className="section-title">Aksi Penjualan</p>
-            <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-              Form operasional tetap hidup di fondasi ERP
+            <h3 className="mt-2 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
+              Form operasional
             </h3>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-              UX dibuat lebih mirip halaman legacy, tetapi write-side tetap diarahkan ke form, service, dan route ERP yang sekarang.
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
+              Default layar tetap fokus ke tabel. Buka panel ini hanya saat operator perlu menulis aksi.
             </p>
           </div>
-          <div className="grid gap-6 xl:grid-cols-2">
-            <div id={getSalesActionAnchorId('lead-create')} className="scroll-mt-24">
-              <SalesLeadCreateForm
-                canCreate={canCreate}
-                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                marketingSuggestions={salesMarketingSuggestions}
-              />
+          <details className="group rounded-2xl border border-line bg-white p-4">
+            <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
+              Buka panel aksi penjualan
+            </summary>
+            <p className="mt-2 text-sm text-mute">
+              Berisi `Lead`, `Coverage`, `Survey`, `Order`, `Work Order`, dan `Aktivasi`.
+            </p>
+            <div className="mt-4 grid gap-6 xl:grid-cols-2">
+              <div id={getSalesActionAnchorId('lead-create')} className="scroll-mt-24">
+                <SalesLeadCreateForm
+                  canCreate={canCreate}
+                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                  marketingSuggestions={salesMarketingSuggestions}
+                />
+              </div>
+              <div id={getSalesActionAnchorId('coverage-create')} className="scroll-mt-24">
+                <SalesCoverageCreateForm
+                  canCreate={canCreate}
+                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                  leadSuggestions={salesLeadSuggestions}
+                  initialLeadValue={domainPrefill?.lead}
+                />
+              </div>
+              <div id={getSalesActionAnchorId('survey-create')} className="scroll-mt-24">
+                <SalesSurveyCreateForm
+                  canCreate={canCreate}
+                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                  leadSuggestions={salesLeadSuggestions}
+                  initialLeadValue={domainPrefill?.lead}
+                />
+              </div>
+              <div id={getSalesActionAnchorId('order-create')} className="scroll-mt-24">
+                <SalesOrderCreateForm
+                  canCreate={canCreate}
+                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                  leadSuggestions={salesLeadSuggestions}
+                  marketingSuggestions={salesMarketingSuggestions}
+                  initialLeadValue={domainPrefill?.lead}
+                />
+              </div>
+              <div id={getSalesActionAnchorId('work-order-create')} className="scroll-mt-24">
+                <SalesWorkOrderCreateForm
+                  canCreate={canCreate}
+                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                  orderSuggestions={salesOrderSuggestions}
+                  initialOrderValue={domainPrefill?.order}
+                />
+              </div>
+              <div id={getSalesActionAnchorId('subscription-activate')} className="scroll-mt-24">
+                <SalesSubscriptionActivateForm
+                  canCreate={canCreate}
+                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                  orderSuggestions={salesOrderSuggestions}
+                  initialOrderValue={domainPrefill?.order}
+                />
+              </div>
             </div>
-            <div id={getSalesActionAnchorId('coverage-create')} className="scroll-mt-24">
-              <SalesCoverageCreateForm
-                canCreate={canCreate}
-                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                leadSuggestions={salesLeadSuggestions}
-                initialLeadValue={domainPrefill?.lead}
-              />
-            </div>
-            <div id={getSalesActionAnchorId('survey-create')} className="scroll-mt-24">
-              <SalesSurveyCreateForm
-                canCreate={canCreate}
-                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                leadSuggestions={salesLeadSuggestions}
-                initialLeadValue={domainPrefill?.lead}
-              />
-            </div>
-            <div id={getSalesActionAnchorId('order-create')} className="scroll-mt-24">
-              <SalesOrderCreateForm
-                canCreate={canCreate}
-                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                leadSuggestions={salesLeadSuggestions}
-                marketingSuggestions={salesMarketingSuggestions}
-                initialLeadValue={domainPrefill?.lead}
-              />
-            </div>
-            <div id={getSalesActionAnchorId('work-order-create')} className="scroll-mt-24">
-              <SalesWorkOrderCreateForm
-                canCreate={canCreate}
-                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                orderSuggestions={salesOrderSuggestions}
-                initialOrderValue={domainPrefill?.order}
-              />
-            </div>
-            <div id={getSalesActionAnchorId('subscription-activate')} className="scroll-mt-24">
-              <SalesSubscriptionActivateForm
-                canCreate={canCreate}
-                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                orderSuggestions={salesOrderSuggestions}
-                initialOrderValue={domainPrefill?.order}
-              />
-            </div>
-          </div>
+          </details>
         </section>
       ) : null}
 
       {content.highlights.length ? (
-        <section className="panel p-6">
-          <p className="section-title">Integrasi ERP / OSS / BSS</p>
-          <div className="mt-6 grid gap-4 xl:grid-cols-3">
+        <details className="rounded-2xl border border-line bg-white p-4">
+          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
+            Buka info integrasi ERP / OSS / BSS
+          </summary>
+          <div className="mt-4 grid gap-3 xl:grid-cols-3">
             {content.highlights.map((item) => (
-              <article key={item.title} className="rounded-2xl border border-line bg-slate-50 p-5">
+              <article key={item.title} className="rounded-xl border border-line bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-slate-950">{item.title}</p>
-                <p className="mt-3 text-sm leading-6 text-mute">{item.detail}</p>
+                <p className="mt-2 text-sm leading-6 text-mute">{item.detail}</p>
               </article>
             ))}
           </div>
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             {capabilities.map((item) => (
               <span
                 key={item.action}
@@ -592,10 +590,10 @@ export function SalesDomainWorkspace({
               </span>
             ))}
           </div>
-          <p className="mt-4 text-sm leading-6 text-mute">
-            Role aktif: {role}. Parity halaman mengikuti baseline legacy, tetapi kepemilikan akses dan write-side tetap tunduk pada capability ERP.
+          <p className="mt-3 text-sm leading-6 text-mute">
+            Role aktif: {role}. Write-side tetap tunduk pada capability ERP dan fondasi PRD.
           </p>
-        </section>
+        </details>
       ) : null}
     </div>
   )

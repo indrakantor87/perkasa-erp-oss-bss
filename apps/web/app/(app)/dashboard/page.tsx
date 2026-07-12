@@ -129,7 +129,7 @@ export default async function DashboardPage({
   const worklistHref = buildWorklistHref(session.role)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <DashboardCommandCenter
         roleLabel={roleMeta.label}
         roleShortLabel={roleMeta.shortLabel}
@@ -142,74 +142,83 @@ export default async function DashboardPage({
         moduleCount={visibleModuleCards.length}
         approvalCount={canApproveDailyActivity ? dailyActivityApprovalQueue.totalPending : 0}
       />
-      <DivisionStructureBoard activeDivision={roleMeta.division} activeSubdivision={roleMeta.subdivision} />
-      <DataSourceStatus source={source} />
-      <DashboardKpiManagerPanel
-        reviewDbReady={reviewDbReady}
-        managerScope={managerScope}
-        initialDefinitions={initialKpiDefinitions}
-      />
-      <OperationalDivisionBoard
-        cards={operationalCards}
-        month={month}
-        year={year}
-        division={division}
-        lockDivision={lockDivisionFilter}
-      />
-      <DashboardProcessKpis cards={operationalCards} month={month} year={year} />
-      <CrossDomainAlerts items={dashboardAlerts} />
-      <DashboardNextActions alerts={dashboardAlerts} worklist={worklist} roleQueues={roleQueues} />
-      <section className="grid items-start gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="panel p-6">
+      <section className="grid items-start gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="panel p-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="section-title">Kontrol Lintas Domain</p>
-              <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-                KPI utama untuk membaca kesehatan operasi
+              <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
+                KPI utama kesehatan operasi
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-                Ringkasan ini dipakai untuk memastikan customer, order, support, inventory, HR,
-                dan billing tetap terbaca dari satu halaman yang sama.
+              <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">
+                Customer, order, support, inventory, HR, dan billing dibaca dari satu layar.
               </p>
             </div>
             <span className="badge border-slate-200 bg-white text-slate-600">{metrics.length} KPI</span>
           </div>
-          <div className="mt-6">
+          <div className="mt-4">
             <KpiGrid items={metrics} />
           </div>
         </div>
         <RoleQueueGrid items={roleQueues} />
       </section>
+      <DataSourceStatus source={source} />
 
-      <section className="grid items-start gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-6">
+      <section className="grid items-start gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="space-y-4">
           <WorklistBoard items={worklist} viewAllHref={worklistHref} />
           <ActivityFeed items={activities} />
         </div>
-        <div className="space-y-6">
+        <div className="space-y-4">
           {canApproveDailyActivity ? <DailyActivityApprovalQueue queue={dailyActivityApprovalQueue} /> : null}
-          <section className="panel p-6">
+          <section className="panel p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="section-title">Shortcut Operasional</p>
-                <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-                  Masuk ke modul yang relevan tanpa berpindah konteks
+                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
+                  Masuk ke modul yang relevan
                 </h2>
-                <p className="mt-3 text-sm leading-6 text-mute">
-                  Shortcut ini mengikuti RBAC role aktif agar dashboard tetap menjadi pintu kerja
-                  tunggal lintas domain.
+                <p className="mt-1 text-sm leading-5 text-mute">
+                  Shortcut mengikuti RBAC role aktif agar dashboard tetap jadi pintu kerja tunggal.
                 </p>
               </div>
               <span className="badge border-slate-200 bg-white text-slate-600">
                 {visibleModuleCards.length} modul
               </span>
             </div>
-            <div className="mt-6">
+            <div className="mt-4">
               <ModuleGrid items={visibleModuleCards} />
             </div>
           </section>
         </div>
       </section>
+
+      <details className="rounded-2xl border border-line bg-white p-4">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
+          Buka panel kontrol tambahan dashboard
+        </summary>
+        <p className="mt-2 text-sm text-mute">
+          Berisi struktur divisi, KPI manager, board operasional, alert lintas domain, dan next actions.
+        </p>
+        <div className="mt-4 space-y-4">
+          <DivisionStructureBoard activeDivision={roleMeta.division} activeSubdivision={roleMeta.subdivision} />
+          <DashboardKpiManagerPanel
+            reviewDbReady={reviewDbReady}
+            managerScope={managerScope}
+            initialDefinitions={initialKpiDefinitions}
+          />
+          <OperationalDivisionBoard
+            cards={operationalCards}
+            month={month}
+            year={year}
+            division={division}
+            lockDivision={lockDivisionFilter}
+          />
+          <DashboardProcessKpis cards={operationalCards} month={month} year={year} />
+          <CrossDomainAlerts items={dashboardAlerts} />
+          <DashboardNextActions alerts={dashboardAlerts} worklist={worklist} roleQueues={roleQueues} />
+        </div>
+      </details>
     </div>
   )
 }

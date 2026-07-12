@@ -1,24 +1,48 @@
-'use client'
-
 import Link from 'next/link'
 import { DataSourceStatus } from '@/components/data-source-status'
-import { SupportDismantleCloseForm } from '@/components/support-dismantle-close-form'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
-import { SupportDismantleQueuePanel } from '@/components/support-dismantle-queue-panel'
-import { SupportDismantleReopenForm } from '@/components/support-dismantle-reopen-form'
+import { SupportIsolationForm } from '@/components/support-isolation-form'
+import { SupportIsolationQueuePanel } from '@/components/support-isolation-queue-panel'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
-import { buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
-import { canProcessSupportDismantle, canUseSupportAction } from '@/lib/support-lanes'
-import type {
-  AppRole,
-  DataSourceSnapshot,
-  DomainCapability,
-  DomainPageContent,
-  SupportActionLink,
-  SupportDrilldownContext,
-} from '@/lib/types'
+import { buildSupportActionHref, buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
+import { canProcessSupportDismantle } from '@/lib/support-lanes'
+import type { AppRole, DataSourceSnapshot, DomainCapability, DomainPageContent, DomainReviewRow, SupportActionLink, SupportDrilldownContext } from '@/lib/types'
 
-export function SupportDismantleWorkspace({
+function pickMeta(meta: string[], prefix: string) {
+  return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? ''
+}
+
+function buildIsolationWorkspaceSummary(rows: DomainReviewRow[]) {
+  const statusCounts = new Map<string, number>()
+  const marketing = new Set<string>()
+  let terminateCount = 0
+
+  rows.forEach((row) => {
+    const status = row.status?.trim() || 'UNKNOWN'
+    statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1)
+
+    const marketingName = pickMeta(row.meta, 'Marketing: ')
+    if (marketingName && marketingName !== '-') {
+      marketing.add(marketingName)
+    }
+
+    if (pickMeta(row.meta, 'Ticket Dismantle: ') === 'Sudah') {
+      terminateCount += 1
+    }
+  })
+
+  return {
+    total: rows.length,
+    terminateCount,
+    restoreCount: rows.length - terminateCount,
+    marketingCount: marketing.size,
+    topStatuses: Array.from(statusCounts.entries())
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 3),
+  }
+}
+
+export function SupportIsolationWorkspace({
   content,
   source,
   capabilities,
@@ -31,9 +55,11 @@ export function SupportDismantleWorkspace({
   capabilities: DomainCapability[]
   role: AppRole
   supportPrefill?: {
+    ticket?: string
     isolation?: string
     dismantle?: string
     dismantleHistory?: string
+    type?: string
     status?: string
     focus?: string
     customer?: string
@@ -42,61 +68,58 @@ export function SupportDismantleWorkspace({
   supportDrilldown?: SupportDrilldownContext
 }) {
   const reviewSections = content.reviewSections ?? []
+  const isolationSection =
+    reviewSections.find((section) => section.title.toUpperCase().includes('ISOLIR')) ?? null
+  const isolationRows = isolationSection?.rows ?? []
+  const summary = buildIsolationWorkspaceSummary(isolationRows)
+
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
   const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
-  const canProcess = canProcessSupportDismantle(role, canApprove)
 
-  const supportIsolationSuggestions = reviewSections
-    .filter((section) => section.title.toUpperCase().includes('ISOLIR'))
-    .flatMap((section) => section.rows)
-    .map((row) => `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`)
-  const supportDismantleQueueSuggestions = reviewSections
-    .filter((section) => section.title.toUpperCase().includes('QUEUE DISMANTLE OPEN'))
-    .flatMap((section) => section.rows)
-    .map((row) => `${row.id.replace(/^DISMANTLE-QUEUE-/, '')} | ${row.primary} | ${row.secondary}`)
-  const supportDismantleHistorySuggestions = reviewSections
-    .filter((section) => section.title.toUpperCase().includes('HISTORI DISMANTLE'))
-    .flatMap((section) => section.rows)
-    .map((row) => `${row.id.replace(/^DIS-/, '')} | ${row.primary} | ${row.secondary}`)
+  const supportRadboxSuggestions = Array.from(
+    new Set(
+      isolationRows
+        .map((row) => row.secondary.trim())
+        .filter((item) => item && !item.toLowerCase().includes('belum terpetakan')),
+    ),
+  )
+  const supportMarketingSuggestions = Array.from(
+    new Set(
+      isolationRows
+        .map((row) => pickMeta(row.meta, 'Marketing: '))
+        .filter((item) => item && item !== '-'),
+    ),
+  )
+  const supportIsolationSuggestions = isolationRows.map((row) => `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`)
 
   const actionLinks = [
     {
+      key: 'isolation-create',
+      label: 'Tambah Isolir',
+      description: 'Catat suspend aktif baru ke review DB.',
+      href: `#${getSupportActionAnchorId('isolation-create')}`,
+    },
+    {
       key: 'isolation-restore',
-      label: 'Kembali ke Restore',
-      description: 'Kembalikan kasus ke Billing bila terminate belum final.',
+      label: 'Restore Billing',
+      description: 'Pulihkan pelanggan yang sudah aman di-restore.',
       href: `#${getSupportActionAnchorId('isolation-restore')}`,
     },
     {
       key: 'dismantle-approve',
       label: 'Transfer Dismantle',
-      description: 'Masukkan isolir aktif ke queue dismantle.',
+      description: 'Teruskan terminate ke queue CS & Admin CS.',
       href: `#${getSupportActionAnchorId('dismantle-approve')}`,
-    },
-    {
-      key: 'dismantle-close',
-      label: 'Tutup ke Histori',
-      description: 'Finalisasi terminate ke histori close.',
-      href: `#${getSupportActionAnchorId('dismantle-close')}`,
-    },
-    {
-      key: 'dismantle-reopen',
-      label: 'Reopen Queue',
-      description: 'Buka kembali histori ke queue aktif.',
-      href: `#${getSupportActionAnchorId('dismantle-reopen')}`,
     },
   ] satisfies SupportActionLink[]
 
-  const visibleActionLinks = actionLinks.filter((item) =>
-    canUseSupportAction({
-      role,
-      actionKey: item.key,
-      canCreate,
-      canUpdate,
-      canApprove,
-    }),
-  )
+  const visibleActionLinks = actionLinks.filter((item) => {
+    if (item.key === 'isolation-create') return canCreate
+    if (item.key === 'isolation-restore') return canUpdate
+    return canProcessSupportDismantle(role, canApprove)
+  })
 
   return (
     <div className="space-y-4">
@@ -105,41 +128,66 @@ export function SupportDismantleWorkspace({
           <div>
             <p className="section-title">{content.eyebrow}</p>
             <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-              Dismantle
+              Monitoring Isolir Pelanggan
             </h2>
             <p className="mt-1 text-sm leading-5 text-mute">
-              Queue terminate aktif, histori close, dan reopen bila keputusan berubah.
+              Monitoring backlog isolir, restore, dan transfer ke dismantle.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href={buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' })}
-              className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
-            >
-              Kembali ke Isolir
+            <Link href="/billing" className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+              Buka Billing Decision
             </Link>
             <Link
-              href="/billing"
+              href={buildSupportLaneHref('dismantle')}
               className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
             >
-              Sinkron Billing
+              Queue Dismantle
             </Link>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
-          <span className="badge border-slate-200 bg-white text-slate-600">{supportDismantleQueueSuggestions.length} queue open</span>
-          <span className="badge border-slate-200 bg-white text-slate-600">{supportDismantleHistorySuggestions.length} histori close</span>
-          <span className="badge border-slate-200 bg-white text-slate-600">{supportIsolationSuggestions.length} kandidat transfer</span>
+          <span className="badge border-slate-200 bg-white text-slate-600">{summary.total} isolir</span>
+          <span className="badge border-sky-200 bg-sky-50 text-sky-700">Restore: {summary.restoreCount}</span>
+          <span className="badge border-rose-200 bg-rose-50 text-rose-700">Dismantle: {summary.terminateCount}</span>
+          {summary.marketingCount ? (
+            <span className="badge border-slate-200 bg-white text-slate-600">{summary.marketingCount} marketing terlibat</span>
+          ) : null}
           {!reviewDbReady ? (
             <span className="badge border-amber-200 bg-amber-50 text-amber-700">Review DB belum aktif</span>
           ) : null}
         </div>
       </section>
 
+      {summary.topStatuses.length ? (
+        <section className="rounded-xl border border-line bg-white p-3">
+          <div className="flex flex-wrap gap-2">
+            <span className="badge border-slate-200 bg-white text-slate-600">Status dominan:</span>
+            {summary.topStatuses.map(([status, count]) => (
+              <span key={status} className="badge border-slate-200 bg-white text-slate-600">
+                {status}: {count}
+              </span>
+            ))}
+            <Link
+              href={buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })}
+              className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:opacity-90"
+            >
+              Kontrol SLA Terkait
+            </Link>
+            <Link
+              href="/customers/cs-admin?queue=Transfer+atau+Restore"
+              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
+            >
+              Buka Supervisor CS
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
       <DataSourceStatus source={source} />
 
       <section className="rounded-xl border border-line bg-slate-50 p-3">
-        <form action="/support/dismantle" className="flex flex-col gap-3 xl:flex-row xl:items-end">
+        <form action="/support/isolations" className="flex flex-col gap-3 xl:flex-row xl:items-end">
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
             <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus</span>
             <select
@@ -147,8 +195,8 @@ export function SupportDismantleWorkspace({
               defaultValue={supportPrefill?.focus ?? ''}
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
-              <option value="">Semua Dismantle</option>
-              <option value="DISMANTLE_OPEN">Queue Open</option>
+              <option value="">Semua Isolir</option>
+              <option value="ACTIVE_ISOLATIONS">Isolir Aktif</option>
             </select>
           </label>
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
@@ -156,7 +204,7 @@ export function SupportDismantleWorkspace({
             <input
               name="status"
               defaultValue={supportPrefill?.status ?? ''}
-              placeholder="OPEN / PENDING / CLOSE"
+              placeholder="ACTIVE / PENDING / lainnya"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
@@ -174,7 +222,7 @@ export function SupportDismantleWorkspace({
             <input
               name="service"
               defaultValue={supportPrefill?.service ?? ''}
-              placeholder="Service / pickup / catatan"
+              placeholder="Radbox / service / catatan"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
@@ -183,7 +231,7 @@ export function SupportDismantleWorkspace({
               Terapkan
             </button>
             <Link
-              href="/support/dismantle"
+              href="/support/isolations"
               className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
             >
               Reset
@@ -209,16 +257,16 @@ export function SupportDismantleWorkspace({
         </section>
       ) : null}
 
-      <SupportDismantleQueuePanel sections={reviewSections} actionLinks={visibleActionLinks} />
+      <SupportIsolationQueuePanel sections={reviewSections} actionLinks={visibleActionLinks} />
 
       <section className="space-y-4">
         <div>
-          <p className="section-title">Aksi Dismantle</p>
+          <p className="section-title">Aksi Isolir</p>
           <h3 className="mt-2 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
             Form tindak lanjut
           </h3>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
-            Default layar tetap fokus ke antrean. Buka panel ini hanya saat operator perlu menulis aksi.
+            Default layar tetap fokus ke tabel. Buka panel ini hanya saat operator perlu menulis aksi.
           </p>
           {!reviewDbReady ? (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -228,23 +276,23 @@ export function SupportDismantleWorkspace({
         </div>
         <details className="group rounded-2xl border border-line bg-white p-4">
           <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-            Buka panel aksi dismantle
+            Buka panel aksi isolir
           </summary>
           <p className="mt-2 text-sm text-mute">
-            Berisi `Transfer Dismantle`, `Kembali ke Restore`, `Tutup ke Histori`, dan `Reopen Queue`.
+            Berisi `Tambah Isolir`, `Restore Billing`, dan `Transfer Dismantle`.
           </p>
-          <div className="mt-4 grid gap-6 xl:grid-cols-2">
-            {canUseSupportAction({ role, actionKey: 'dismantle-approve', canCreate, canUpdate, canApprove }) ? (
-              <div id={getSupportActionAnchorId('dismantle-approve')} className="scroll-mt-24">
-                <SupportDismantleForm
-                  canProcess={canProcess}
+          <div className="mt-4 grid gap-6 xl:grid-cols-3">
+            {canCreate ? (
+              <div id={getSupportActionAnchorId('isolation-create')} className="scroll-mt-24">
+                <SupportIsolationForm
+                  canCreate={canCreate}
                   reviewDbReady={reviewDbReady}
-                  isolationSuggestions={supportIsolationSuggestions}
-                  initialIsolationValue={supportPrefill?.isolation}
+                  radboxSuggestions={supportRadboxSuggestions}
+                  marketingSuggestions={supportMarketingSuggestions}
                 />
               </div>
             ) : null}
-            {canUseSupportAction({ role, actionKey: 'isolation-restore', canCreate, canUpdate, canApprove }) ? (
+            {canUpdate ? (
               <div id={getSupportActionAnchorId('isolation-restore')} className="scroll-mt-24">
                 <SupportIsolationRestoreForm
                   canUpdate={canUpdate}
@@ -254,23 +302,13 @@ export function SupportDismantleWorkspace({
                 />
               </div>
             ) : null}
-            {canUseSupportAction({ role, actionKey: 'dismantle-close', canCreate, canUpdate, canApprove }) ? (
-              <div id={getSupportActionAnchorId('dismantle-close')} className="scroll-mt-24">
-                <SupportDismantleCloseForm
-                  canProcess={canProcess}
+            {canProcessSupportDismantle(role, canApprove) ? (
+              <div id={getSupportActionAnchorId('dismantle-approve')} className="scroll-mt-24">
+                <SupportDismantleForm
+                  canProcess={canProcessSupportDismantle(role, canApprove)}
                   reviewDbReady={reviewDbReady}
-                  dismantleSuggestions={supportDismantleQueueSuggestions}
-                  initialDismantleValue={supportPrefill?.dismantle}
-                />
-              </div>
-            ) : null}
-            {canUseSupportAction({ role, actionKey: 'dismantle-reopen', canCreate, canUpdate, canApprove }) ? (
-              <div id={getSupportActionAnchorId('dismantle-reopen')} className="scroll-mt-24">
-                <SupportDismantleReopenForm
-                  canProcess={canProcess}
-                  reviewDbReady={reviewDbReady}
-                  historySuggestions={supportDismantleHistorySuggestions}
-                  initialHistoryValue={supportPrefill?.dismantleHistory}
+                  isolationSuggestions={supportIsolationSuggestions}
+                  initialIsolationValue={supportPrefill?.isolation}
                 />
               </div>
             ) : null}

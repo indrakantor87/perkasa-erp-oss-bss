@@ -63,16 +63,15 @@ export function InventoryNetworkOpsPanel({
   const assignmentRows = assignmentSection?.rows ?? []
 
   return (
-    <section className="panel p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="panel p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="section-title">Operasional ODP</p>
-          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+          <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
             Ringkasan ODP, port aktif, dan device lapangan
           </h3>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-            Panel ini merangkum konteks jaringan yang paling dekat dengan parity legacy:
-            koordinat ODP, kondisi port, dan assignment device/accessories yang dipakai di lapangan.
+          <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">
+            ODP, kapasitas port, issue, dan assignment device dalam satu console kerja yang ringkas.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -104,67 +103,61 @@ export function InventoryNetworkOpsPanel({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-4">
-        <article className="rounded-3xl border border-sky-200 bg-sky-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">ODP Aktif</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-sky-950">
+      <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
+        <article className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">ODP Aktif</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-sky-950">
             {odpRows.length}
           </p>
-          <p className="mt-2 text-sm text-sky-700">Header ODP yang sedang jadi acuan pembacaan port.</p>
         </article>
-        <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Port Terpakai</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-emerald-950">
+        <article className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Port Terpakai</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-emerald-950">
             {usedPortRows.length}
           </p>
-          <p className="mt-2 text-sm text-emerald-700">Port yang sudah tertaut ke service/customer aktif.</p>
         </article>
-        <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Port Issue</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-amber-950">
+        <article className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Port Issue</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-amber-950">
             {issuePortRows.length}
           </p>
-          <p className="mt-2 text-sm text-amber-700">Port reserved, faulty, atau disabled yang perlu ditindak.</p>
         </article>
-        <article className="rounded-3xl border border-violet-200 bg-violet-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Assignment</p>
-          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-violet-950">
+        <article className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-700">Assignment</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-violet-950">
             {assignmentRows.length}
           </p>
-          <p className="mt-2 text-sm text-violet-700">{accessoryAssignments.length} item terbaca sebagai accessories/device lapangan.</p>
         </article>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="mt-3 flex flex-wrap gap-2">
         <Link
           href="/inventory?focus=ACTIVE_ITEMS"
-          className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:opacity-90"
+          className="inline-flex items-center justify-center rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-sky-700 transition hover:opacity-90"
         >
           Fokus ODP Aktif
         </Link>
         <Link
           href="/inventory?focus=PENDING_REQUESTS"
-          className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:opacity-90"
+          className="inline-flex items-center justify-center rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-amber-700 transition hover:opacity-90"
         >
           Cek Request Pending
         </Link>
         <Link
           href="/customers/cs-admin?queue=PORT+ODP"
-          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
+          className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:opacity-90"
         >
           Buka Supervisor CS
         </Link>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-3xl border border-line bg-white">
-        <div className="border-b border-slate-200 px-5 py-4">
+      <div className="mt-4 overflow-hidden rounded-xl border border-line bg-white">
+        <div className="border-b border-slate-200 px-4 py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Console Port ODP</p>
-              <h4 className="mt-2 text-lg font-semibold text-slate-950">Tabel ODP dan kapasitas port</h4>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
-                Fokus utama dibuat table-first seperti console legacy, tetapi tetap memakai row metadata ERP yang tersedia saat ini.
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">Console Port ODP</p>
+              <h4 className="mt-1 text-base font-semibold text-slate-950">Tabel ODP dan kapasitas port</h4>
+              <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">Fokus utama dibuat table-first seperti console legacy.</p>
             </div>
             <span className="badge border-slate-200 bg-slate-50 text-slate-700">{odpRows.length} ODP terbaca</span>
           </div>
@@ -173,7 +166,7 @@ export function InventoryNetworkOpsPanel({
           <div className="overflow-x-auto">
             <table className="min-w-[1080px] w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
-                <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   <th className="px-4 py-3">ODP</th>
                   <th className="px-4 py-3">Lokasi</th>
                   <th className="px-4 py-3">Port</th>
@@ -221,7 +214,7 @@ export function InventoryNetworkOpsPanel({
                               href={mapHref}
                               target="_blank"
                               rel="noreferrer"
-                              className="rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                              className="rounded-md border border-slate-950 bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800"
                             >
                               Buka Maps
                             </Link>
@@ -241,12 +234,12 @@ export function InventoryNetworkOpsPanel({
         )}
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <article className="rounded-2xl border border-line bg-slate-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Port Terpakai & Port Issue</p>
-          <div className="mt-4 space-y-3">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <article className="rounded-xl border border-line bg-slate-50 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">Port Terpakai & Port Issue</p>
+          <div className="mt-3 space-y-3">
             {usedPortRows.slice(0, 4).map((row) => (
-              <div key={row.id} className="rounded-2xl border border-line bg-white p-4">
+              <div key={row.id} className="rounded-xl border border-line bg-white p-3">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
@@ -265,7 +258,7 @@ export function InventoryNetworkOpsPanel({
               </div>
             ))}
             {issuePortRows.slice(0, 3).map((row) => (
-              <div key={row.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div key={row.id} className="rounded-xl border border-amber-200 bg-amber-50 p-3">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-amber-950">{row.primary}</p>
@@ -282,11 +275,11 @@ export function InventoryNetworkOpsPanel({
           </div>
         </article>
 
-        <article className="rounded-2xl border border-line bg-slate-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Device Assignment</p>
-          <div className="mt-4 space-y-3">
+        <article className="rounded-xl border border-line bg-slate-50 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">Device Assignment</p>
+          <div className="mt-3 space-y-3">
             {assignmentRows.slice(0, 6).map((row) => (
-              <div key={row.id} className="rounded-2xl border border-line bg-white p-4">
+              <div key={row.id} className="rounded-xl border border-line bg-white p-3">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
