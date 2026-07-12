@@ -17,6 +17,9 @@
 - `hybrid-migration-playbook.md`  
   Playbook keputusan kerja untuk migrasi hybrid dari `Web PSB`, `Web Finance`, dan `Web GA`, dengan pembagian jelas antara peran database production, repo legacy, dan target akhir ERP/OSS/BSS.
 
+- `ui-copy-first-refactor-plan.md`  
+  Keputusan kerja aktif untuk refactor UI global ERP dengan strategi `copy-first UI, PRD-first backend`, termasuk source of truth tampilan per repo legacy, mapping menu ERP ke baseline lama, dan urutan eksekusi per cluster.
+
 - `hybrid-wave-1-inventory.md`  
   Inventaris gelombang 1 repo legacy lokal yang sudah tersedia, termasuk menu kerja inti, tabel/model utama, file prioritas untuk copy-first, dan mapping awal ke modul ERP baru.
 

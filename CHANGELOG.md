@@ -23,6 +23,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.28] - 2026-07-12
+
+### Added
+
+- Ditambahkan keputusan kerja aktif untuk refactor UI global ERP dengan strategi `copy-first UI, PRD-first backend`, termasuk sumber baseline tampilan dari `web-psb-perkasa`, `finance-repo`, dan `ga-web-app`, aturan anti-pattern `card-heavy`, mapping menu ERP ke baseline legacy, serta urutan eksekusi per cluster: [ui-copy-first-refactor-plan.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/ui-copy-first-refactor-plan.md)
+
+### Changed
+
+- Docs index diperluas agar rencana refactor UI copy-first muncul eksplisit sebagai dokumen kerja aktif di jalur migrasi dan implementasi ERP: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- Versioning diselaraskan ke `0.65.28` untuk menandai penguncian arah baru refactor UI operasional ERP.
+
 ## [0.65.27] - 2026-07-12
 
 ### Added
