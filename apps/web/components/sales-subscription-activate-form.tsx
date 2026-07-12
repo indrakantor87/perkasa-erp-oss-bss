@@ -11,14 +11,6 @@ type SalesSubscriptionActivateFormProps = {
   initialOrderValue?: string
 }
 
-const packageSuggestionOptions = [
-  'HOME-10M | Home 10 Mbps',
-  'HOME-20M | Home 20 Mbps',
-  'HOME-30M | Home 30 Mbps',
-  'DEDICATED-1-1 | Dedicated 1:1',
-  'RESELLER-BASIC | Reseller Basic',
-] as const
-
 function extractOrderId(value: string) {
   const matched = value.trim().match(/^(\d+)/)
   return matched ? matched[1] : ''
@@ -36,7 +28,8 @@ export function SalesSubscriptionActivateForm({
 }: SalesSubscriptionActivateFormProps) {
   const router = useRouter()
   const [orderValue, setOrderValue] = useState(initialOrderValue?.trim() || orderSuggestions[0] || '')
-  const [packageReference, setPackageReference] = useState<string>(packageSuggestionOptions[1])
+  const [packageReference, setPackageReference] = useState('')
+  const [packageSuggestions, setPackageSuggestions] = useState<string[]>([])
   const [activatedAt, setActivatedAt] = useState('')
   const [monthlyPrice, setMonthlyPrice] = useState('')
   const [addressLabel, setAddressLabel] = useState('Alamat Instalasi')
@@ -53,6 +46,36 @@ export function SalesSubscriptionActivateForm({
       setOrderValue(initialOrderValue.trim())
     }
   }, [initialOrderValue])
+
+  useEffect(() => {
+    if (!reviewDbReady) {
+      setPackageSuggestions([])
+      return
+    }
+
+    let cancelled = false
+
+    async function loadPackageSuggestions() {
+      const response = await fetch('/api/sales/subscriptions', {
+        method: 'GET',
+        cache: 'no-store',
+      })
+      const payload = (await response.json().catch(() => null)) as { suggestions?: string[] } | null
+      if (!response.ok || cancelled) {
+        return
+      }
+
+      const nextSuggestions = Array.isArray(payload?.suggestions) ? payload.suggestions.filter(Boolean) : []
+      setPackageSuggestions(nextSuggestions)
+      setPackageReference((currentValue) => currentValue || nextSuggestions[0] || '')
+    }
+
+    void loadPackageSuggestions()
+
+    return () => {
+      cancelled = true
+    }
+  }, [reviewDbReady])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -110,7 +133,7 @@ export function SalesSubscriptionActivateForm({
         tone: 'success',
         message: payload?.message || 'Aktivasi subscription berhasil disimpan.',
       })
-      setPackageReference(packageSuggestionOptions[1])
+      setPackageReference(packageSuggestions[0] || '')
       setActivatedAt('')
       setMonthlyPrice('')
       setAddressLabel('Alamat Instalasi')
@@ -168,7 +191,7 @@ export function SalesSubscriptionActivateForm({
             disabled={isDisabled}
           />
           <datalist id="sales-activation-package-suggestions">
-            {packageSuggestionOptions.map((item) => (
+            {packageSuggestions.map((item) => (
               <option key={item} value={item} />
             ))}
           </datalist>
@@ -242,7 +265,7 @@ export function SalesSubscriptionActivateForm({
 
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Saran order diambil dari review queue sales order aktif. Paket bisa diisi dengan kode atau nama paket.
+            Saran order diambil dari review queue sales order aktif. Paket diambil langsung dari master `sales_packages` aktif pada review DB.
           </div>
           <button
             type="submit"

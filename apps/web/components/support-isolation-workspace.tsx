@@ -92,6 +92,13 @@ export function SupportIsolationWorkspace({
         .filter((item) => item && item !== '-'),
     ),
   )
+  const supportServiceSuggestions = Array.from(
+    new Set(
+      isolationRows
+        .flatMap((row) => [pickMeta(row.meta, 'Service No: '), pickMeta(row.meta, 'Customer Code: ')])
+        .filter((item) => item && item !== '-'),
+    ),
+  )
   const supportIsolationSuggestions = isolationRows.map((row) => `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`)
 
   const actionLinks = [
@@ -289,6 +296,7 @@ export function SupportIsolationWorkspace({
                   reviewDbReady={reviewDbReady}
                   radboxSuggestions={supportRadboxSuggestions}
                   marketingSuggestions={supportMarketingSuggestions}
+                  serviceSuggestions={supportServiceSuggestions}
                 />
               </div>
             ) : null}

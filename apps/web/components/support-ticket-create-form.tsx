@@ -8,6 +8,7 @@ type SupportTicketCreateFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   typeSuggestions: string[]
+  serviceSuggestions: string[]
 }
 
 const categoryOptions = ['TT', 'PV'] as const
@@ -17,8 +18,10 @@ export function SupportTicketCreateForm({
   canCreate,
   reviewDbReady,
   typeSuggestions,
+  serviceSuggestions,
 }: SupportTicketCreateFormProps) {
   const router = useRouter()
+  const [serviceReference, setServiceReference] = useState(serviceSuggestions[0] ?? '')
   const [customerName, setCustomerName] = useState('')
   const [customerUser, setCustomerUser] = useState('')
   const [category, setCategory] = useState<(typeof categoryOptions)[number]>('TT')
@@ -45,6 +48,7 @@ export function SupportTicketCreateForm({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          serviceReference,
           customerName,
           customerUser,
           category,
@@ -68,6 +72,7 @@ export function SupportTicketCreateForm({
         tone: 'success',
         message: payload?.message || 'Trouble ticket review berhasil disimpan.',
       })
+      setServiceReference(serviceSuggestions[0] ?? '')
       setCustomerName('')
       setCustomerUser('')
       setCategory('TT')
@@ -96,6 +101,24 @@ export function SupportTicketCreateForm({
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Service No / Customer Code</span>
+          <input
+            list="support-service-suggestions"
+            value={serviceReference}
+            onChange={(event) => setServiceReference(event.target.value)}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="SVC-000123 / CUST-00045"
+            required
+            disabled={isDisabled}
+          />
+          <datalist id="support-service-suggestions">
+            {serviceSuggestions.map((item) => (
+              <option key={item} value={item} />
+            ))}
+          </datalist>
+        </label>
+
         <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Nama Customer</span>
           <input
@@ -193,7 +216,7 @@ export function SupportTicketCreateForm({
 
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Saran tipe ticket diambil dari queue support yang sedang tampil pada halaman ini.
+            Anchor layanan wajib memakai `Service No` atau `Customer Code`, sedangkan saran type ticket diambil dari queue support yang sedang tampil.
           </div>
           <button
             type="submit"

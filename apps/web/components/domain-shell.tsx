@@ -2176,14 +2176,18 @@ export function DomainShell({
     content.key === 'support'
       ? Array.from(
           new Set(
-            (content.reviewSections ?? [])
-              .flatMap((section) => section.rows)
-              .flatMap((row) =>
+            (content.reviewSections ?? []).flatMap((section) => {
+              if (section.title.toUpperCase().includes('SLA TROUBLE TICKET')) {
+                return section.rows.map((row) => row.primary.trim()).filter(Boolean)
+              }
+
+              return section.rows.flatMap((row) =>
                 row.meta
                   .filter((item) => item.startsWith('Type: '))
                   .map((item) => item.replace('Type: ', '').trim())
                   .filter(Boolean),
-              ),
+              )
+            }),
           ),
         )
       : []
@@ -2289,6 +2293,28 @@ export function DomainShell({
           ),
         )
       : []
+  const supportServiceSuggestions =
+    content.key === 'support'
+      ? Array.from(
+          new Set(
+            (content.reviewSections ?? [])
+              .flatMap((section) => section.rows)
+              .flatMap((row) =>
+                row.meta
+                  .flatMap((item) => {
+                    if (item.startsWith('Service No: ')) {
+                      return [item.replace('Service No: ', '').trim()]
+                    }
+                    if (item.startsWith('Customer Code: ')) {
+                      return [item.replace('Customer Code: ', '').trim()]
+                    }
+                    return []
+                  })
+                  .filter((item) => item && item !== '-'),
+              ),
+          ),
+        )
+      : []
   const supportIsolationSuggestions =
     content.key === 'support'
       ? (content.reviewSections ?? [])
@@ -2385,6 +2411,7 @@ export function DomainShell({
             canCreate={canCreate}
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
             typeSuggestions={supportTypeSuggestions}
+            serviceSuggestions={supportServiceSuggestions}
           />
         ),
       })
@@ -2456,6 +2483,7 @@ export function DomainShell({
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
             radboxSuggestions={supportRadboxSuggestions}
             marketingSuggestions={supportMarketingSuggestions}
+            serviceSuggestions={supportServiceSuggestions}
           />
         ),
       })

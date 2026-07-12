@@ -28,6 +28,61 @@ function normalizeStatusFilter(value: string | undefined) {
     .toUpperCase()
 }
 
+function filterSupportFocusSections(
+  sections: NonNullable<Awaited<ReturnType<typeof getDomainPageData>>>['content']['reviewSections'],
+  lane: SupportLaneKey,
+  focus: string | undefined,
+) {
+  const normalizedFocus = String(focus ?? '')
+    .trim()
+    .toUpperCase()
+
+  if (!normalizedFocus) {
+    return sections
+  }
+
+  return (sections ?? []).filter((section) => {
+    const title = section.title.trim().toUpperCase()
+
+    if (lane === 'tt') {
+      if (normalizedFocus === 'READY_CLOSE') return title.includes('READY CLOSE')
+      if (normalizedFocus === 'OPEN_TICKETS' || normalizedFocus === 'MONTHLY_OPENED') {
+        return title.includes('TROUBLE TICKET') && !title.includes('READY CLOSE')
+      }
+      if (normalizedFocus === 'SLA_OVERDUE') return title.includes('SLA TICKET OVERDUE')
+      if (normalizedFocus === 'OVERDUE_RATE') {
+        return title.includes('SLA TICKET OPEN AKTIF') || title.includes('SLA TICKET OVERDUE')
+      }
+    }
+
+    if (lane === 'sla') {
+      if (normalizedFocus === 'SLA_OVERDUE') return title.includes('SLA TICKET OVERDUE')
+      if (normalizedFocus === 'OVERDUE_RATE') {
+        return title.includes('SLA TICKET OPEN AKTIF') || title.includes('SLA TICKET OVERDUE')
+      }
+    }
+
+    if (lane === 'isolations') {
+      if (normalizedFocus === 'ACTIVE_ISOLATIONS') return title.includes('ISOLIR AKTIF')
+    }
+
+    if (lane === 'dismantle') {
+      if (normalizedFocus === 'OPEN_QUEUE' || normalizedFocus === 'FIELD_FOLLOW_UP' || normalizedFocus === 'DISMANTLE_OPEN') {
+        return title.includes('QUEUE DISMANTLE OPEN')
+      }
+      if (
+        normalizedFocus === 'RECENT_DISMANTLE' ||
+        normalizedFocus === 'CLOSED_THIS_PERIOD' ||
+        normalizedFocus === 'MONTHLY_DISMANTLES'
+      ) {
+        return title.includes('HISTORI DISMANTLE')
+      }
+    }
+
+    return true
+  })
+}
+
 function filterSupportReviewSections(
   sections: NonNullable<Awaited<ReturnType<typeof getDomainPageData>>>['content']['reviewSections'],
   customer: string | undefined,
@@ -133,6 +188,15 @@ function resolveSupportDrilldown(
     }
   }
 
+  if (lane === 'tt' && normalized === 'READY_CLOSE') {
+    return {
+      key: normalized,
+      label: 'Fokus KPI Proses: Ticket Siap Close',
+      detail: 'Lane ini dipersempit ke ticket yang sudah punya progress valid dan siap masuk ke jalur close formal.',
+      clearHref: '/support/tt',
+    }
+  }
+
   if (lane === 'isolations' && normalized === 'ACTIVE_ISOLATIONS') {
     return {
       key: normalized,
@@ -147,6 +211,33 @@ function resolveSupportDrilldown(
       key: normalized,
       label: 'Fokus KPI Proses: Dismantle Periode Ini',
       detail: 'Lane ini dibuka untuk meninjau kebutuhan persetujuan dan penutupan dismantle terbaru pada periode aktif.',
+      clearHref: '/support/dismantle',
+    }
+  }
+
+  if (lane === 'dismantle' && normalized === 'OPEN_QUEUE') {
+    return {
+      key: normalized,
+      label: 'Fokus KPI Proses: Queue Dismantle Open',
+      detail: 'Lane ini dipersempit ke kandidat terminate yang masih aktif di queue dismantle dan belum masuk histori close.',
+      clearHref: '/support/dismantle',
+    }
+  }
+
+  if (lane === 'dismantle' && normalized === 'FIELD_FOLLOW_UP') {
+    return {
+      key: normalized,
+      label: 'Fokus KPI Proses: Follow Up Lapangan',
+      detail: 'Lane ini menyorot antrean dismantle open yang masih menunggu tindak lanjut lapangan sebelum bisa ditutup permanen.',
+      clearHref: '/support/dismantle',
+    }
+  }
+
+  if (lane === 'dismantle' && (normalized === 'CLOSED_THIS_PERIOD' || normalized === 'MONTHLY_DISMANTLES')) {
+    return {
+      key: normalized,
+      label: 'Fokus KPI Proses: Dismantle Close Periode Ini',
+      detail: 'Lane ini dipersempit ke histori dismantle yang benar-benar ditutup pada periode aktif agar sinkron dengan KPI dashboard.',
       clearHref: '/support/dismantle',
     }
   }
@@ -201,17 +292,23 @@ export default async function SupportLanePage({
   const serviceFilter = resolveSearchParam(resolvedSearchParams.service)
   const typeFilter = resolveSearchParam(resolvedSearchParams.type)
   const statusFilter = resolveSearchParam(resolvedSearchParams.status)
+  const focusFilter = resolveSearchParam(resolvedSearchParams.focus)
   const payload = await getDomainPageData('support', session.role, {
     supportLane: normalizedLane as SupportLaneKey,
-    focus: resolveSearchParam(resolvedSearchParams.focus),
+    focus: focusFilter,
   })
 
   if (!payload) {
     notFound()
   }
 
-  const filteredReviewSections = filterSupportReviewSections(
+  const focusFilteredSections = filterSupportFocusSections(
     payload.content.reviewSections,
+    normalizedLane as SupportLaneKey,
+    focusFilter,
+  )
+  const filteredReviewSections = filterSupportReviewSections(
+    focusFilteredSections,
     customerFilter,
     serviceFilter,
     typeFilter,
@@ -227,7 +324,7 @@ export default async function SupportLanePage({
 
   const resolvedSupportDrilldown = resolveSupportDrilldown(
     normalizedLane as SupportLaneKey,
-    resolveSearchParam(resolvedSearchParams.focus),
+    focusFilter,
     customerFilter,
     serviceFilter,
   )

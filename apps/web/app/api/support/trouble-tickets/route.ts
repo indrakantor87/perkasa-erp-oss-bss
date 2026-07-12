@@ -10,6 +10,18 @@ type TicketCodeRow = {
   ticketCode: string
 }
 
+type LinkedSubscriptionRow = {
+  subscriptionId: number
+  customerId: number
+  serviceNo: string | null
+  customerCode: string | null
+  customerName: string
+}
+
+type TroubleTypeRow = {
+  troubleType: string
+}
+
 type ExecuteResult = {
   insertId?: number
   affectedRows?: number
@@ -40,6 +52,37 @@ async function generateTicketCode(category: string) {
   return `${prefix}-${year}${month}-${padSequence(Number.isFinite(lastSequence) ? lastSequence + 1 : 1)}`
 }
 
+async function resolveLinkedSubscription(serviceReference: string) {
+  const [linkedSubscription] = await runReviewDbQuery<LinkedSubscriptionRow>(
+    `
+      SELECT
+        ss.id AS subscriptionId,
+        ss.customer_id AS customerId,
+        ss.service_no AS serviceNo,
+        c.customer_code AS customerCode,
+        c.full_name AS customerName
+      FROM service_subscriptions ss
+      INNER JOIN crm_customers c
+        ON c.id = ss.customer_id
+      WHERE ss.status IN ('ACTIVE', 'PENDING')
+        AND (
+          UPPER(ss.service_no) = UPPER(?)
+          OR UPPER(c.customer_code) = UPPER(?)
+        )
+      ORDER BY
+        CASE
+          WHEN UPPER(ss.service_no) = UPPER(?) THEN 0
+          ELSE 1
+        END ASC,
+        ss.id DESC
+      LIMIT 1
+    `,
+    [serviceReference, serviceReference, serviceReference],
+  )
+
+  return linkedSubscription ?? null
+}
+
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) {
@@ -59,6 +102,7 @@ export async function POST(request: Request) {
 
   try {
     const payload = (await request.json()) as {
+      serviceReference?: unknown
       customerName?: unknown
       customerUser?: unknown
       category?: unknown
@@ -68,6 +112,7 @@ export async function POST(request: Request) {
       notes?: unknown
     }
 
+    const serviceReference = String(payload.serviceReference ?? '').trim()
     const customerName = String(payload.customerName ?? '').trim()
     const customerUser = String(payload.customerUser ?? '').trim()
     const category = String(payload.category ?? '').trim().toUpperCase()
@@ -76,8 +121,8 @@ export async function POST(request: Request) {
     const problemCategory = String(payload.problemCategory ?? '').trim()
     const notesRaw = String(payload.notes ?? '').trim()
 
-    if (!customerName) {
-      return Response.json({ message: 'Nama customer wajib diisi.' }, { status: 400 })
+    if (!serviceReference) {
+      return Response.json({ message: 'Service No atau Customer Code wajib diisi.' }, { status: 400 })
     }
     if (!allowedCategories.has(category)) {
       return Response.json({ message: 'Kategori ticket tidak valid.' }, { status: 400 })
@@ -89,10 +134,36 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Status ticket tidak valid.' }, { status: 400 })
     }
 
+    const linkedSubscription = await resolveLinkedSubscription(serviceReference)
+    if (!linkedSubscription) {
+      return Response.json(
+        { message: 'Service No atau Customer Code tidak ditemukan pada subscription aktif review DB.' },
+        { status: 404 },
+      )
+    }
+
+    const knownTroubleTypes = await runReviewDbQuery<TroubleTypeRow>(
+      `
+        SELECT trouble_type AS troubleType
+        FROM support_trouble_ticket_sla
+        WHERE UPPER(TRIM(trouble_type)) = UPPER(TRIM(?))
+        LIMIT 1
+      `,
+      [type],
+    )
+    if (!knownTroubleTypes.length) {
+      return Response.json(
+        { message: 'Tipe ticket belum terdaftar pada master SLA trouble ticket.' },
+        { status: 400 },
+      )
+    }
+
     const ticketCode = await generateTicketCode(category)
     const notes = `[Review Ticket] ${session.displayName} (${session.username})${
       notesRaw ? ` - ${notesRaw}` : ''
     }`
+    const resolvedCustomerName = customerName || linkedSubscription.customerName
+    const resolvedCustomerUser = customerUser || linkedSubscription.serviceNo || linkedSubscription.customerCode || null
 
     await runReviewDbExecute<ExecuteResult>(
       `
@@ -107,12 +178,13 @@ export async function POST(request: Request) {
           problem_category,
           notes
         )
-        VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
+        linkedSubscription.subscriptionId,
         ticketCode,
-        customerName,
-        customerUser || null,
+        resolvedCustomerName,
+        resolvedCustomerUser,
         category,
         type,
         status,
@@ -122,7 +194,7 @@ export async function POST(request: Request) {
     )
 
     return Response.json({
-      message: `Trouble ticket ${ticketCode} untuk ${customerName} berhasil disimpan.`,
+      message: `Trouble ticket ${ticketCode} untuk ${resolvedCustomerName} berhasil disimpan dan terhubung ke ${linkedSubscription.serviceNo || linkedSubscription.customerCode || serviceReference}.`,
     })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })

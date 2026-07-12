@@ -141,6 +141,7 @@ export function SupportSlaWorkspace({
             >
               <option value="">Semua SLA</option>
               <option value="SLA_OVERDUE">SLA Overdue</option>
+              <option value="OVERDUE_RATE">Rasio Overdue</option>
             </select>
           </label>
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">

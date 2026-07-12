@@ -101,6 +101,46 @@ async function generateCustomerCode(customerType: string) {
   return `${prefix}-${padSequence(Number.isFinite(lastSequence) ? lastSequence + 1 : 1, 5)}`
 }
 
+export async function GET() {
+  const session = await getSession()
+  if (!session) {
+    return Response.json({ message: 'Unauthorized' }, { status: 401 })
+  }
+  if (!canPerformAction(session.role, 'sales', 'view')) {
+    return Response.json({ message: 'Forbidden' }, { status: 403 })
+  }
+
+  const source = getDataSourceSnapshot()
+  if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    return Response.json({ suggestions: [] as string[] })
+  }
+
+  try {
+    const packages = await runReviewDbQuery<ReviewPackageRow>(
+      `
+        SELECT
+          id,
+          code,
+          name,
+          service_type AS serviceType,
+          speed_label AS speedLabel,
+          price
+        FROM sales_packages
+        WHERE status = 'ACTIVE'
+        ORDER BY service_type ASC, price ASC, id DESC
+      `,
+    )
+
+    return Response.json({
+      suggestions: packages.map((item) =>
+        `${item.code} | ${item.name}${item.speedLabel ? ` | ${item.speedLabel}` : ''}`,
+      ),
+    })
+  } catch (error) {
+    return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
+  }
+}
+
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) {

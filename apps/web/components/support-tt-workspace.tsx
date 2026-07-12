@@ -91,13 +91,36 @@ export function SupportTroubleTicketWorkspace({
 
   const supportTypeSuggestions = Array.from(
     new Set(
-      reviewSections
-        .flatMap((section) => section.rows)
-        .flatMap((row) =>
+      reviewSections.flatMap((section) => {
+        if (section.title.toUpperCase().includes('SLA TROUBLE TICKET')) {
+          return section.rows.map((row) => row.primary.trim()).filter(Boolean)
+        }
+
+        return section.rows.flatMap((row) =>
           row.meta
             .filter((item) => item.startsWith('Type: '))
             .map((item) => item.replace('Type: ', '').trim())
             .filter(Boolean),
+        )
+      }),
+    ),
+  )
+  const supportServiceSuggestions = Array.from(
+    new Set(
+      reviewSections
+        .flatMap((section) => section.rows)
+        .flatMap((row) =>
+          row.meta
+            .flatMap((item) => {
+              if (item.startsWith('Service No: ')) {
+                return [item.replace('Service No: ', '').trim()]
+              }
+              if (item.startsWith('Customer Code: ')) {
+                return [item.replace('Customer Code: ', '').trim()]
+              }
+              return []
+            })
+            .filter((item) => item && item !== '-'),
         ),
     ),
   )
@@ -209,6 +232,7 @@ export function SupportTroubleTicketWorkspace({
               <option value="">Semua Ticket</option>
               <option value="OPEN_TICKETS">Open Tickets</option>
               <option value="MONTHLY_OPENED">Periode Ini</option>
+              <option value="READY_CLOSE">Siap Close</option>
             </select>
           </label>
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
@@ -333,6 +357,7 @@ export function SupportTroubleTicketWorkspace({
                   canCreate={canCreate}
                   reviewDbReady={reviewDbReady}
                   typeSuggestions={supportTypeSuggestions}
+                  serviceSuggestions={supportServiceSuggestions}
                 />
               </div>
             </details>

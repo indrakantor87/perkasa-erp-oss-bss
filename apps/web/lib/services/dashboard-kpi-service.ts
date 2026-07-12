@@ -207,7 +207,7 @@ function getDashboardKpiBaselineSeeds(): DashboardKpiBaselineSeed[] {
       metricType: 'COUNT',
       templateKey: 'CS_ACTIVE_WORK_ORDERS',
       displayOrder: 10,
-      drilldownHref: '/support?focus=ACTIVE_WORK_ORDERS',
+      drilldownHref: '/sales?focus=ACTIVE_WORK_ORDERS',
     },
     {
       dashboardKey: 'CS',

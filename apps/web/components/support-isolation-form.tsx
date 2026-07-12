@@ -9,6 +9,7 @@ type SupportIsolationFormProps = {
   reviewDbReady: boolean
   radboxSuggestions: string[]
   marketingSuggestions: string[]
+  serviceSuggestions: string[]
 }
 
 export function SupportIsolationForm({
@@ -16,8 +17,10 @@ export function SupportIsolationForm({
   reviewDbReady,
   radboxSuggestions,
   marketingSuggestions,
+  serviceSuggestions,
 }: SupportIsolationFormProps) {
   const router = useRouter()
+  const [serviceReference, setServiceReference] = useState(serviceSuggestions[0] ?? '')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
@@ -44,6 +47,7 @@ export function SupportIsolationForm({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          serviceReference,
           customerName,
           customerPhone,
           customerAddress,
@@ -67,6 +71,7 @@ export function SupportIsolationForm({
         tone: 'success',
         message: payload?.message || 'Data isolir berhasil disimpan.',
       })
+      setServiceReference(serviceSuggestions[0] ?? '')
       setCustomerName('')
       setCustomerPhone('')
       setCustomerAddress('')
@@ -95,6 +100,24 @@ export function SupportIsolationForm({
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Service No / Customer Code</span>
+          <input
+            list="support-isolation-service-suggestions"
+            value={serviceReference}
+            onChange={(event) => setServiceReference(event.target.value)}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="SVC-000123 / CUST-00045"
+            required
+            disabled={isDisabled}
+          />
+          <datalist id="support-isolation-service-suggestions">
+            {serviceSuggestions.map((item) => (
+              <option key={item} value={item} />
+            ))}
+          </datalist>
+        </label>
+
         <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Nama Customer</span>
           <input
@@ -188,7 +211,7 @@ export function SupportIsolationForm({
 
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Saran radbox dan marketing diambil dari data isolir aktif yang sedang tampil pada halaman ini.
+            Anchor isolir wajib memakai `Service No` atau `Customer Code`; saran radbox dan marketing diambil dari data isolir aktif yang sedang tampil.
           </div>
           <button
             type="submit"

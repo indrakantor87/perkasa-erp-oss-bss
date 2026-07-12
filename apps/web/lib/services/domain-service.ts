@@ -80,6 +80,8 @@ type ReviewDbSupportTicketRow = {
   ticketCode: string
   customerName: string
   customerUser: string | null
+  serviceNo: string | null
+  customerCode: string | null
   ticketType: string
   status: string
   notes: string | null
@@ -102,6 +104,8 @@ type ReviewDbSupportTicketRow = {
 type ReviewDbSupportIsolationRow = {
   isolationId: number
   customerName: string
+  serviceNo: string | null
+  customerCode: string | null
   radboxName: string | null
   customerPhone: string | null
   marketingName: string | null
@@ -115,6 +119,8 @@ type ReviewDbSupportDismantleOpenRow = {
   queueId: number
   isolationId: number
   customerName: string
+  serviceNo: string | null
+  customerCode: string | null
   radboxName: string | null
   customerPhone: string | null
   marketingName: string | null
@@ -133,6 +139,8 @@ type ReviewDbSupportSlaRow = {
 type ReviewDbSupportDismantleRow = {
   dismantleId: number
   customerName: string
+  serviceNo: string | null
+  customerCode: string | null
   radboxName: string | null
   customerPhone: string | null
   marketingName: string | null
@@ -834,6 +842,20 @@ async function getReviewDbSupportSections(params?: {
   const wantIsolations = !lane || lane === 'isolations'
   const wantSla = !lane || lane === 'sla'
   const wantDismantle = !lane || lane === 'dismantle'
+  const ticketMonthFilter =
+    focus === 'MONTHLY_OPENED'
+      ? `
+      AND stt.opened_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01')
+      AND stt.opened_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)
+    `
+      : ''
+  const dismantleClosedMonthFilter =
+    focus === 'CLOSED_THIS_PERIOD' || focus === 'MONTHLY_DISMANTLES'
+      ? `
+      WHERE dh.closed_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01')
+        AND dh.closed_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)
+    `
+      : ''
 
   if (wantIsolations || wantDismantle) {
     await ensureSupportDismantleQueueTable()
@@ -848,6 +870,8 @@ async function getReviewDbSupportSections(params?: {
       ticket_code AS ticketCode,
       customer_name AS customerName,
       customer_user AS customerUser,
+      ss.service_no AS serviceNo,
+      c.customer_code AS customerCode,
       type AS ticketType,
       stt.status AS status,
       stt.notes AS notes,
@@ -906,8 +930,13 @@ async function getReviewDbSupportSections(params?: {
         ON latest_escalation.latestId = escalation.id
     ) escalations
       ON escalations.trouble_ticket_id = stt.id
+    LEFT JOIN service_subscriptions ss
+      ON ss.id = stt.subscription_id
+    LEFT JOIN crm_customers c
+      ON c.id = ss.customer_id
     WHERE stt.closed_at IS NULL
       AND COALESCE(UPPER(TRIM(stt.status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+      ${ticketMonthFilter}
     ORDER BY
       CASE
         WHEN sla.duration_days IS NULL THEN 1
@@ -931,6 +960,8 @@ async function getReviewDbSupportSections(params?: {
     SELECT
       si.id AS isolationId,
       si.customer_name AS customerName,
+      ss.service_no AS serviceNo,
+      c.customer_code AS customerCode,
       si.radbox_name AS radboxName,
       si.customer_phone AS customerPhone,
       si.marketing_name AS marketingName,
@@ -939,6 +970,10 @@ async function getReviewDbSupportSections(params?: {
       si.isolation_date AS isolationDate,
       CASE WHEN dq.id IS NULL THEN 0 ELSE 1 END AS hasDismantleQueue
     FROM support_isolations si
+    LEFT JOIN service_subscriptions ss
+      ON ss.id = si.subscription_id
+    LEFT JOIN crm_customers c
+      ON c.id = ss.customer_id
     LEFT JOIN support_dismantle_queue dq
       ON dq.isolation_id = si.id
     WHERE si.status = 'OPEN'
@@ -966,6 +1001,8 @@ async function getReviewDbSupportSections(params?: {
       dq.id AS queueId,
       si.id AS isolationId,
       si.customer_name AS customerName,
+      ss.service_no AS serviceNo,
+      c.customer_code AS customerCode,
       si.radbox_name AS radboxName,
       si.customer_phone AS customerPhone,
       si.marketing_name AS marketingName,
@@ -976,6 +1013,10 @@ async function getReviewDbSupportSections(params?: {
     FROM support_dismantle_queue dq
     INNER JOIN support_isolations si
       ON si.id = dq.isolation_id
+    LEFT JOIN service_subscriptions ss
+      ON ss.id = si.subscription_id
+    LEFT JOIN crm_customers c
+      ON c.id = ss.customer_id
     ORDER BY dq.transferred_at DESC, dq.id DESC
     LIMIT 8
   `)
@@ -984,15 +1025,22 @@ async function getReviewDbSupportSections(params?: {
   const dismantles = wantDismantle
     ? await runReviewDbQuery<ReviewDbSupportDismantleRow>(`
     SELECT
-      id AS dismantleId,
-      customer_name AS customerName,
-      radbox_name AS radboxName,
-      customer_phone AS customerPhone,
-      marketing_name AS marketingName,
-      close_note AS closeNote,
-      closed_at AS closedAt
-    FROM support_dismantle_history
-    ORDER BY closed_at DESC, id DESC
+      dh.id AS dismantleId,
+      dh.customer_name AS customerName,
+      ss.service_no AS serviceNo,
+      c.customer_code AS customerCode,
+      dh.radbox_name AS radboxName,
+      dh.customer_phone AS customerPhone,
+      dh.marketing_name AS marketingName,
+      dh.close_note AS closeNote,
+      dh.closed_at AS closedAt
+    FROM support_dismantle_history dh
+    LEFT JOIN service_subscriptions ss
+      ON ss.id = dh.subscription_id
+    LEFT JOIN crm_customers c
+      ON c.id = ss.customer_id
+    ${dismantleClosedMonthFilter}
+    ORDER BY dh.closed_at DESC, dh.id DESC
     LIMIT 5
   `)
     : []
@@ -1044,6 +1092,8 @@ async function getReviewDbSupportSections(params?: {
       meta: [
         `Type: ${item.ticketType || '-'}`,
         `Customer User: ${item.customerUser || '-'}`,
+        `Service No: ${item.serviceNo || '-'}`,
+        `Customer Code: ${item.customerCode || '-'}`,
         `Opened: ${formatDateTime(item.openedAt)}`,
         `SLA Days: ${item.slaDurationDays ?? '-'}`,
         `SLA Due: ${formatDateTime(item.slaDueAt)}`,
@@ -1164,6 +1214,8 @@ async function getReviewDbSupportSections(params?: {
         status: item.status,
         detail: item.reason?.trim() || 'Belum ada alasan isolir yang tercatat.',
         meta: [
+          `Service No: ${item.serviceNo || '-'}`,
+          `Customer Code: ${item.customerCode || '-'}`,
           `Phone: ${item.customerPhone || '-'}`,
           `Marketing: ${item.marketingName || '-'}`,
           `Isolasi: ${formatDateTime(item.isolationDate)}`,
@@ -1199,6 +1251,8 @@ async function getReviewDbSupportSections(params?: {
         meta: [
           `Queue ID: ${item.queueId}`,
           `Isolation ID: ${item.isolationId}`,
+          `Service No: ${item.serviceNo || '-'}`,
+          `Customer Code: ${item.customerCode || '-'}`,
           `Phone: ${item.customerPhone || '-'}`,
           `Marketing: ${item.marketingName || '-'}`,
           `Transferred: ${formatDateTime(item.transferredAt)}`,
@@ -1220,6 +1274,8 @@ async function getReviewDbSupportSections(params?: {
           status: 'CLOSED',
           detail: structuredNote.summary || 'Belum ada catatan dismantle yang tercatat.',
           meta: [
+            `Service No: ${item.serviceNo || '-'}`,
+            `Customer Code: ${item.customerCode || '-'}`,
             `Phone: ${item.customerPhone || '-'}`,
             `Marketing: ${item.marketingName || '-'}`,
             `Closed: ${formatDateTime(item.closedAt)}`,
@@ -3874,6 +3930,9 @@ function filterReviewSectionsForDomain(
           if (!title.includes('SURVEY DIGITAL PERIODE INI')) return null
           const rows = period ? section.rows.filter((row) => hasTag(row.filterTags, 'PERIOD', period)) : section.rows
           return rows.length > 0 ? { ...section, rows } : null
+        }
+        if (focus === 'ACTIVE_WORK_ORDERS') {
+          return title.includes('WORK ORDER AKTIF') ? section : null
         }
         if (focus === 'MONTHLY_ACTIVATIONS') {
           if (!title.includes('SUBSCRIPTION AKTIVASI')) return null

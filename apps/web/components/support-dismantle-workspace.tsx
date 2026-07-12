@@ -148,7 +148,9 @@ export function SupportDismantleWorkspace({
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
               <option value="">Semua Dismantle</option>
-              <option value="DISMANTLE_OPEN">Queue Open</option>
+              <option value="OPEN_QUEUE">Queue Open</option>
+              <option value="FIELD_FOLLOW_UP">Follow Up Lapangan</option>
+              <option value="MONTHLY_DISMANTLES">Close Periode Ini</option>
             </select>
           </label>
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
