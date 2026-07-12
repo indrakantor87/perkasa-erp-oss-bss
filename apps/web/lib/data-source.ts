@@ -1,9 +1,13 @@
 import type { AppDataMode, DataSourceSnapshot } from '@/lib/types'
 
-const DEFAULT_DATA_MODE: AppDataMode = 'mock'
+const DEFAULT_DATA_MODE: AppDataMode = 'review-db'
 
 function normalizeMode(value: string | undefined): AppDataMode {
-  return value === 'review-db' ? 'review-db' : DEFAULT_DATA_MODE
+  if (value === 'review-db' || value === 'mock') {
+    return value
+  }
+
+  return DEFAULT_DATA_MODE
 }
 
 export function getConfiguredDataMode(): AppDataMode {
@@ -52,6 +56,6 @@ export function getDataSourceSnapshot(): DataSourceSnapshot {
     effectiveMode: 'mock',
     isFallback: false,
     label: 'Mock Source',
-    detail: 'Data masih dibaca dari mock bootstrap sampai koneksi review database diaktifkan.',
+    detail: 'Mode mock dipakai eksplisit dari konfigurasi aplikasi.',
   }
 }

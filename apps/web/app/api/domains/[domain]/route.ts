@@ -5,6 +5,21 @@ import { getDomainPageData } from '@/lib/services/domain-service'
 import { normalizeSupportLane } from '@/lib/support-lanes'
 import type { DomainKey } from '@/lib/types'
 
+function resolveSearchParam(value: string | null) {
+  const normalized = String(value ?? '').trim()
+  return normalized || undefined
+}
+
+function resolvePositiveIntegerParam(value: string | null) {
+  const normalized = resolveSearchParam(value)
+  if (!normalized) {
+    return undefined
+  }
+
+  const parsed = Number.parseInt(normalized, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ domain: string }> }
@@ -22,6 +37,9 @@ export async function GET(
   const url = new URL(request.url)
   const payload = await getDomainPageData(domain as DomainKey, session.role, {
     supportLane: normalizeSupportLane(url.searchParams.get('lane') ?? undefined),
+    focus: resolveSearchParam(url.searchParams.get('focus')),
+    month: resolvePositiveIntegerParam(url.searchParams.get('month')),
+    year: resolvePositiveIntegerParam(url.searchParams.get('year')),
   })
   if (!payload) {
     return NextResponse.json({ message: 'Domain tidak ditemukan.' }, { status: 404 })

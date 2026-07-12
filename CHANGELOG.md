@@ -23,6 +23,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.32] - 2026-07-12
+
+### Changed
+
+- API `/api/domains/[domain]` kini meneruskan `focus`, `month`, `year`, dan `lane` dengan aturan parsing yang sama seperti halaman SSR, sehingga payload domain dari route dan render halaman tidak lagi bisa berbeda saat dibuka dari KPI atau drilldown periodik: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/domains/[domain]/route.ts), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/[domain]/page.tsx)
+- Data source aplikasi kini memprioritaskan `review-db` sebagai mode default project, tetapi override `APP_DATA_MODE=mock` tetap didukung, sehingga dashboard/worklist/domain tidak lagi diam-diam boot ke mode mock saat integrasi review DB sebenarnya sudah tersedia: [data-source.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/data-source.ts), [.env.example](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/.env.example)
+- Versioning diselaraskan ke `0.65.32` untuk menandai pass integrasi yang menyamakan parity API domain dan mode data default berbasis review DB.
+
 ## [0.65.31] - 2026-07-12
 
 ### Changed
