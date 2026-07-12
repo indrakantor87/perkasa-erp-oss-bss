@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type InventoryOdpPortStatusFormProps = {
-  canCreate: boolean
+  canUpdate: boolean
   reviewDbReady: boolean
   odpSuggestions: string[]
 }
@@ -17,7 +17,7 @@ function extractOdpCode(value: string) {
 }
 
 export function InventoryOdpPortStatusForm({
-  canCreate,
+  canUpdate,
   reviewDbReady,
   odpSuggestions,
 }: InventoryOdpPortStatusFormProps) {
@@ -30,7 +30,7 @@ export function InventoryOdpPortStatusForm({
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
-  const isDisabled = !canCreate || !reviewDbReady || submitting
+  const isDisabled = !canUpdate || !reviewDbReady || submitting
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -93,8 +93,8 @@ export function InventoryOdpPortStatusForm({
         Update status port ODP
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">
-        {!canCreate
-          ? 'Role aktif belum memiliki izin create pada domain Inventory.'
+        {!canUpdate
+          ? 'Role aktif belum memiliki izin update pada domain Inventory.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi write action update port dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini mengubah status port ODP (AVAILABLE/RESERVED/FAULTY/DISABLED). Jika port sebelumnya USED, Anda bisa mengosongkan mapping agar port bisa dipakai ulang.'}
@@ -196,4 +196,3 @@ export function InventoryOdpPortStatusForm({
     </section>
   )
 }
-

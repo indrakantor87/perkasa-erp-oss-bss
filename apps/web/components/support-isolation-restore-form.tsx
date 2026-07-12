@@ -90,14 +90,14 @@ export function SupportIsolationRestoreForm({
     <section className="panel p-6">
       <p className="section-title">Restorasi Isolir</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-        Tutup isolir aktif
+        Tutup isolir aktif melalui jalur Billing
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">
         {!canUpdate
           ? 'Role aktif belum memiliki izin update pada domain Support.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi restorasi isolir dinonaktifkan agar tidak menulis ke mock.'
-            : 'Form ini menutup isolir aktif dengan mengisi tanggal restorasi dan catatan penutupan pada review DB.'}
+            : 'Form ini dipakai untuk keputusan restore milik Billing atau collection, bukan untuk terminate. Kasus terminate dipindahkan ke queue Dismantle milik CS & Admin CS.'}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
@@ -133,7 +133,7 @@ export function SupportIsolationRestoreForm({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Gunakan daftar saran agar sistem mengambil ID isolir aktif yang benar.
+            Gunakan daftar saran agar sistem mengambil ID isolir aktif yang benar sebelum dipulihkan dari sisi Billing.
           </div>
           <button
             type="submit"

@@ -175,13 +175,13 @@ export function buildSupportLaneWorkspace(
     dismantle: {
       title: 'Workspace Dismantle',
       summary:
-        'Gunakan lane ini untuk finalisasi terminasi, validasi histori penutupan layanan, dan menjaga jejak dismantle tetap sinkron.',
+        'Gunakan lane ini untuk membaca kandidat terminasi dari isolir aktif, memfinalkan keputusan dismantle, dan menjaga histori penutupan layanan tetap sinkron.',
       checklist: [
         'Pastikan kandidat dismantle berasal dari isolir atau keputusan terminasi yang valid.',
-        'Verifikasi histori penutupan agar tidak ada pelanggan aktif yang salah terminasi.',
-        'Simpan approval dan catatan terminasi sebagai jejak operasional.',
+        'Verifikasi queue open sebelum pelanggan dipindahkan ke histori dismantle.',
+        'Simpan close note atau reopen note sebagai jejak operasional.',
       ],
-      actionKeys: ['dismantle-approve', 'isolation-restore'],
+      actionKeys: ['dismantle-approve', 'dismantle-close', 'dismantle-reopen', 'isolation-restore'],
       escalationNote:
         'Kembalikan ke lane isolir bila kasus ternyata masih perlu recovery pelanggan, bukan terminasi.',
     },
@@ -239,6 +239,8 @@ export function canUseSupportAction(params: {
     case 'isolation-restore':
       return canUpdate
     case 'dismantle-approve':
+    case 'dismantle-close':
+    case 'dismantle-reopen':
       return canApprove || role === 'DISMANTLE_OPERATOR'
     default:
       return false

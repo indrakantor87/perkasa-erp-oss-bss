@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BillingDecisionHandoffPanel } from '@/components/billing-decision-handoff-panel'
 
 type BillingCollectionResolveFormProps = {
   canUpdate: boolean
@@ -81,6 +82,36 @@ export function BillingCollectionResolveForm({
     }
     return 'Form ini menutup follow-up collection OPEN terbaru per invoice secara aman saat reminder, call, atau visit sudah selesai atau dibatalkan.'
   }, [canUpdate, currentSuggestion?.actionType, resolutionStatus, reviewDbReady])
+
+  const handoffCopy = useMemo(() => {
+    const actionType = (currentSuggestion?.actionType || '').trim().toUpperCase()
+    if (actionType === 'SUSPEND' && resolutionStatus === 'DONE') {
+      return {
+        label: 'Resolve suspend perlu ditutup dengan sinkron Isolir dan Supervisor',
+        detail:
+          'Follow-up suspend yang selesai tetap harus dibaca ulang pada queue Isolir dan Supervisor CS_ADMIN agar keputusan restore, tahan, atau terminate tidak menggantung di domain support.',
+      }
+    }
+    if (actionType === 'RECONNECT' && resolutionStatus === 'DONE') {
+      return {
+        label: 'Resolve reconnect mengembalikan fokus ke recovery layanan',
+        detail:
+          'Setelah resolve reconnect ditutup, Billing perlu mendorong tim melihat kesiapan restore pada Isolir, lalu memastikan TT/SLA tidak masih menahan pemulihan pelanggan.',
+      }
+    }
+    if (resolutionStatus === 'CANCELLED') {
+      return {
+        label: 'Resolve batal butuh monitoring lintas lane',
+        detail:
+          'Pembatalan resolve biasanya berarti kasus masih hidup. Isolir, TT/SLA, Dismantle, dan Supervisor perlu tetap membaca kasus ini sebagai backlog aktif sampai Billing memberi arah baru.',
+      }
+    }
+    return {
+      label: 'Resolve follow-up menutup loop Billing, bukan loop layanan',
+      detail:
+        'Begitu follow-up collection ditutup, operator tetap perlu mengecek apakah layanan pelanggan sudah aman di lane Isolir, TT/SLA, dan Supervisor sebelum kasus dianggap selesai penuh.',
+    }
+  }, [currentSuggestion?.actionType, resolutionStatus])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -199,6 +230,13 @@ export function BillingCollectionResolveForm({
             <div className="mt-1">Catatan aktif: {currentSuggestion.actionNotes || '-'}</div>
           </div>
         ) : null}
+
+        <div className="lg:col-span-2">
+          <BillingDecisionHandoffPanel
+            decisionLabel={handoffCopy.label}
+            detail={handoffCopy.detail}
+          />
+        </div>
 
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">

@@ -37,11 +37,18 @@ const ROLE_QUEUE_DEFAULT: Record<AppRole, string> = {
   DISMANTLE_OPERATOR: 'Siap Dismantle',
 }
 
-type WorklistSummary = {
+export type WorklistSummary = {
   criticalCount: number
   followUpCount: number
   waitingCount: number
   readyCloseCount: number
+}
+
+export type WorklistBucketData = {
+  queue: string
+  items: WorklistItem[]
+  summary: WorklistSummary
+  totalCount: number
 }
 
 function isHighPriority(status: string, priority: WorklistItem['priority']) {
@@ -176,12 +183,20 @@ function getQueueForRole(role: AppRole, item: Pick<WorklistItem, 'id' | 'domain'
 
 function buildReason(queue: string, item: Pick<WorklistItem, 'status' | 'detail'>) {
   const status = String(item.status ?? '').trim().toUpperCase()
+  const detail = String(item.detail ?? '').trim().toLowerCase()
   if (queue === 'Perlu Approval') return 'Supervisor perlu memfinalkan aktivitas harian agar performa tim valid.'
   if (queue === 'Perlu Koreksi') return 'Ada item yang harus direvisi atau disinkronkan sebelum workflow tim lanjut.'
   if (queue === 'Lead Follow Up') return 'Lead baru perlu ditindaklanjuti agar tidak dingin.'
   if (queue === 'Customer Belum Lengkap') return 'Data customer belum lengkap dan berisiko menghambat order.'
   if (queue === 'Order dan Aktivasi' || queue === 'Order Siap Aktivasi') return 'Order aktif perlu sinkronisasi jadwal dan kesiapan teknis.'
-  if (queue === 'Isolir dan Dismantle' || queue === 'Transfer atau Restore') return 'Kasus isolir perlu keputusan lanjut lintas support dan billing.'
+  if (queue === 'Transfer atau Restore' && detail.includes('billing')) {
+    return 'Kasus isolir ini masih berada pada ownership Billing untuk memutuskan restore atau tindak lanjut penagihan.'
+  }
+  if (queue === 'Transfer atau Restore' && (detail.includes('terminate') || detail.includes('dismantle'))) {
+    return 'Kasus ini sudah berada pada ownership CS & Admin CS untuk terminate, close histori, atau reopen.'
+  }
+  if (queue === 'Isolir dan Dismantle' || queue === 'Transfer atau Restore')
+    return 'Kasus isolir perlu keputusan lanjut lintas support dan billing.'
   if (queue === 'TT Teknis' || queue === 'Ticket Baru') return 'Ticket support aktif masih membutuhkan progress operasional.'
   if (queue === 'ODP dan Port') return 'Kapasitas atau ketersediaan titik inventory perlu dicek.'
   if (queue === 'Queue Risiko Tinggi') return 'Ada backlog supervisor yang berisiko menahan SLA atau keputusan tim.'
@@ -195,6 +210,7 @@ function buildNextAction(queue: string, domain: string) {
   if (queue === 'Lead Follow Up') return 'Hubungi lead dan cek coverage'
   if (queue === 'Customer Belum Lengkap') return 'Lengkapi data customer'
   if (queue === 'Order dan Aktivasi' || queue === 'Order Siap Aktivasi') return 'Sinkronkan jadwal aktivasi'
+  if (queue === 'Transfer atau Restore') return 'Pilih apakah Billing memulihkan layanan atau CS/Admin memfinalkan terminate'
   if (queue === 'Isolir dan Dismantle' || queue === 'Siap Dismantle') return 'Tentukan tindak lanjut support'
   if (queue === 'TT Teknis' || queue === 'Ticket Baru') return 'Update progress trouble ticket'
   if (queue === 'Queue Risiko Tinggi') return 'Prioritaskan keputusan supervisor pada backlog paling berisiko'
@@ -347,7 +363,7 @@ export function buildWorklistHref(role: AppRole, params?: Partial<Pick<WorklistP
   return `/dashboard/worklist?${searchParams.toString()}`
 }
 
-export async function getWorklistPageData(session: AppSession, filters: WorklistPageFilters) {
+async function getWorklistBaseData(session: AppSession) {
   const now = new Date()
   const dashboardData = await getDashboardPageData(session, {
     month: now.getMonth() + 1,
@@ -355,25 +371,57 @@ export async function getWorklistPageData(session: AppSession, filters: Worklist
     division: 'ALL',
   })
   const queueOptions = getWorklistQueues(session.role)
-  const requestedQueue = String(filters.queue ?? '').trim()
-  const selectedQueue =
-    requestedQueue && queueOptions.includes(requestedQueue)
-      ? requestedQueue
-      : getDefaultWorklistQueue(session.role)
   const approvalItems = buildDailyActivityApprovalWorklistItems(session.role, dashboardData.dailyActivityApprovalQueue)
-  const upgradedItems = upgradeDashboardItems(session.role, [...dashboardData.worklist, ...approvalItems])
-  const filteredItems = filterItems(session.role, upgradedItems, { ...filters, queue: selectedQueue })
-  const selectedItemId = String(filters.selected ?? '').trim()
-  const selectedItem = filteredItems.find((item) => item.id === selectedItemId) ?? filteredItems[0] ?? null
+  const items = upgradeDashboardItems(session.role, [...dashboardData.worklist, ...approvalItems])
 
   return {
     source: dashboardData.source,
     queueOptions,
+    items,
+  }
+}
+
+export async function getWorklistPageData(session: AppSession, filters: WorklistPageFilters) {
+  const baseData = await getWorklistBaseData(session)
+  const requestedQueue = String(filters.queue ?? '').trim()
+  const selectedQueue =
+    requestedQueue && baseData.queueOptions.includes(requestedQueue)
+      ? requestedQueue
+      : getDefaultWorklistQueue(session.role)
+  const filteredItems = filterItems(session.role, baseData.items, { ...filters, queue: selectedQueue })
+  const selectedItemId = String(filters.selected ?? '').trim()
+  const selectedItem = filteredItems.find((item) => item.id === selectedItemId) ?? filteredItems[0] ?? null
+
+  return {
+    source: baseData.source,
+    queueOptions: baseData.queueOptions,
     selectedQueue,
     items: filteredItems,
     selectedItem,
     summary: getWorklistSummary(filteredItems),
     totalCount: filteredItems.length,
-    baseCount: upgradedItems.length,
+    baseCount: baseData.items.length,
+  }
+}
+
+export async function getWorklistBucketsData(session: AppSession, queues: string[]) {
+  const baseData = await getWorklistBaseData(session)
+  const normalizedQueues = Array.from(new Set(queues.map((queue) => String(queue).trim()).filter(Boolean)))
+
+  const buckets: WorklistBucketData[] = normalizedQueues.map((queue) => {
+    const items = baseData.items.filter((item) => item.queue === queue)
+    return {
+      queue,
+      items,
+      summary: getWorklistSummary(items),
+      totalCount: items.length,
+    }
+  })
+
+  return {
+    source: baseData.source,
+    queueOptions: baseData.queueOptions,
+    baseCount: baseData.items.length,
+    buckets,
   }
 }

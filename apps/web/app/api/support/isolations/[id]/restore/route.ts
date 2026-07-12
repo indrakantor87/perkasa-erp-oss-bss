@@ -73,7 +73,7 @@ export async function POST(
       return Response.json({ message: `Isolir ${isolation.id} sudah ditutup sebelumnya.` }, { status: 409 })
     }
 
-    const normalizedCloseNote = `[Restored via web] ${session.displayName} (${session.username}) - ${closeNote}`
+    const normalizedCloseNote = `[Restored via billing workflow] ${session.displayName} (${session.username}) - ${closeNote}`
 
     await runReviewDbExecute(
       `

@@ -35,6 +35,103 @@ export type OrganizationWorkspaceDefinition = {
   sections: OrganizationWorkspaceSection[]
 }
 
+export const digitalCreatorWorkspace: OrganizationWorkspaceDefinition = {
+  eyebrow: 'Pemasaran dan Pelayanan',
+  title: 'Digital Creator',
+  description:
+    'Workspace ini sekarang menjadi pintu nyata untuk campaign, digital leads, content calendar, dan analytics agar funnel akuisisi digital tidak lagi menumpang sebagai fokus sementara di domain sales.',
+  primaryAction: {
+    label: 'Buka Workspace Digital',
+    href: '/sales/digital-creator',
+    description: 'Masuk ke ringkasan funnel dan jalur kerja utama Creator Digital.',
+  },
+  secondaryAction: {
+    label: 'Buka Lead Digital',
+    href: '/sales/digital-leads',
+    description: 'Masuk langsung ke database leads dari channel digital.',
+  },
+  steps: [
+    {
+      title: 'Campaign Planning',
+      detail: 'Susun objective, budget, status, dan platform campaign agar target funnel tertulis rapi sebelum distribusi konten dimulai.',
+    },
+    {
+      title: 'Lead Capture',
+      detail: 'Catat prospek yang masuk dari channel digital dan sambungkan ke campaign atau lead penjualan saat sudah qualified.',
+    },
+    {
+      title: 'Content Delivery',
+      detail: 'Kelola kalender konten per platform untuk memastikan ritme posting, publish date, dan status produksi tetap terjaga.',
+    },
+    {
+      title: 'Performance Review',
+      detail: 'Baca reach, impressions, engagement, click, dan follower gain agar keputusan optimasi tidak terlepas dari data.',
+    },
+  ],
+  sections: [
+    {
+      title: 'Funnel utama',
+      description: 'Urutan kerja Creator Digital dari perencanaan hingga evaluasi performa.',
+      links: [
+        {
+          label: 'Campaign',
+          href: '/sales/campaigns',
+          description: 'Kelola daftar campaign, objective, budget, dan platform aktif.',
+          badge: 'campaign',
+        },
+        {
+          label: 'Digital Leads',
+          href: '/sales/digital-leads',
+          description: 'Catat lead digital dan pantau status funnel dari NEW sampai CONVERTED.',
+          badge: 'lead',
+        },
+        {
+          label: 'Content Calendar',
+          href: '/sales/content-calendar',
+          description: 'Susun jadwal konten, status publish, tag, dan platform distribusi.',
+          badge: 'konten',
+        },
+        {
+          label: 'Content Analytics',
+          href: '/sales/content-analytics',
+          description: 'Review performa konten dan campaign berbasis metrik harian yang terakumulasi.',
+          badge: 'analytics',
+        },
+      ],
+    },
+    {
+      title: 'Integrasi dengan penjualan',
+      description: 'Jalur yang menghubungkan Creator Digital ke domain sales dan worklist ERP.',
+      links: [
+        {
+          label: 'Sales Funnel Digital',
+          href: '/sales?focus=DIGITAL_LEADS',
+          description: 'Baca KPI digital lead langsung dari domain sales utama.',
+          badge: 'kpi',
+        },
+        {
+          label: 'Order Digital',
+          href: '/sales?focus=DIGITAL_ORDERS',
+          description: 'Tinjau order yang berasal dari sumber digital tanpa bercampur dengan source lain.',
+          badge: 'order',
+        },
+        {
+          label: 'Survey Digital',
+          href: '/sales?focus=DIGITAL_SURVEYS',
+          description: 'Lihat survey yang bersumber dari lead digital untuk mengukur kesiapan closing.',
+          badge: 'survey',
+        },
+        {
+          label: 'Worklist Digital',
+          href: buildWorklistHref({ domain: 'Sales', q: 'digital' }),
+          description: 'Pantau antrean lintas domain yang mengandung kata kunci digital, campaign, atau konten.',
+          badge: 'worklist',
+        },
+      ],
+    },
+  ],
+}
+
 export const csAdminWorkspace: OrganizationWorkspaceDefinition = {
   eyebrow: 'Pemasaran dan Pelayanan',
   title: 'CS & Admin CS',

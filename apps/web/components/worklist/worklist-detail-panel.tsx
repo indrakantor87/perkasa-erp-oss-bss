@@ -1,4 +1,10 @@
 import Link from 'next/link'
+import { CaseActionOutcomeSummaryCard } from '@/components/case-action-outcome-summary'
+import { CaseDecisionTrailPanel } from '@/components/case-decision-trail'
+import { CaseEvidencePanelCard } from '@/components/case-evidence-panel'
+import { CaseHealthSignalCard } from '@/components/case-health-signal'
+import { CaseNextActionMatrixCard } from '@/components/case-next-action-matrix'
+import { CaseCorrelationSummaryPanel } from '@/components/case-correlation-summary'
 import type { WorklistItem } from '@/lib/types'
 
 export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
@@ -47,6 +53,20 @@ export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
             </article>
           </div>
 
+          {item.healthSignal ? <CaseHealthSignalCard signal={item.healthSignal} /> : null}
+
+          {item.recommendedActions ? <CaseNextActionMatrixCard matrix={item.recommendedActions} /> : null}
+
+          {item.actionOutcomeSummary ? <CaseActionOutcomeSummaryCard summary={item.actionOutcomeSummary} /> : null}
+
+          {item.correlationSummary ? (
+            <CaseCorrelationSummaryPanel summary={item.correlationSummary} />
+          ) : null}
+
+          {item.decisionTrail ? <CaseDecisionTrailPanel trail={item.decisionTrail} /> : null}
+
+          {item.evidencePanel ? <CaseEvidencePanelCard evidence={item.evidencePanel} /> : null}
+
           <div className="rounded-3xl border border-slate-200 bg-white p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">CTA</p>
             <div className="mt-4 flex flex-wrap gap-3">
@@ -60,6 +80,19 @@ export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
                 Prefill token: {item.prefillToken || '-'}
               </span>
             </div>
+            {item.handoffLinks?.length ? (
+              <div className="mt-4 flex flex-wrap gap-3">
+                {item.handoffLinks.map((link) => (
+                  <Link
+                    key={`${item.id}-${link.label}`}
+                    href={link.href}
+                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : (

@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import { SupportActionQuickLinks } from '@/components/support-action-quick-links'
+import { buildSupportLaneHref } from '@/lib/support-action-links'
 import type { DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
@@ -47,16 +49,15 @@ export function SupportSlaQueuePanel({
   const summary = buildSlaSummary(slaSection.rows)
 
   return (
-    <section className="panel p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="panel p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="section-title">Kontrol SLA</p>
-          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+          <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
             Aturan durasi penanganan trouble ticket
           </h3>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-            Ringkasan SLA dipakai untuk menjaga prioritas kerja TT/NOC/lapangan tetap terukur dan
-            menghindari ticket overdue.
+          <p className="mt-1 text-sm leading-5 text-mute">
+            Rule SLA untuk menjaga prioritas kerja TT tetap terukur dan menghindari overdue.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -68,7 +69,7 @@ export function SupportSlaQueuePanel({
       </div>
 
       {summary.durationValues.length ? (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <span className="badge border-slate-200 bg-white text-slate-600">Contoh durasi:</span>
           {summary.durationValues.map((value) => (
             <span key={value} className="badge border-slate-200 bg-white text-slate-600">
@@ -83,29 +84,62 @@ export function SupportSlaQueuePanel({
         description="Lane SLA sekarang punya shortcut langsung ke pengelolaan aturan SLA dan penyelesaian ticket prioritas."
       />
 
-      {slaSection.rows.length ? (
-        <div className="mt-6 space-y-3">
-          {slaSection.rows.map((row) => {
-            const duration = pickMeta(row.meta, 'Durasi: ')
-            const updatedAt = pickMeta(row.meta, 'Updated: ')
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          href={buildSupportLaneHref('tt', { focus: 'OPEN_TICKETS' })}
+          className="inline-flex items-center justify-center rounded-md border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-orange-700 transition hover:opacity-90"
+        >
+          Buka TT Aktif
+        </Link>
+        <Link
+          href="/billing"
+          className="inline-flex items-center justify-center rounded-md border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-violet-700 transition hover:opacity-90"
+        >
+          Sinkron Billing Recovery
+        </Link>
+        <Link
+          href="/customers/cs-admin?queue=Queue+Risiko+Tinggi"
+          className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:opacity-90"
+        >
+          Buka Supervisor CS
+        </Link>
+      </div>
 
-            return (
-              <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
-                    <p className="mt-1 text-sm text-mute">{row.secondary}</p>
-                  </div>
-                  <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-mute">{row.detail}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="badge border-slate-200 bg-white text-slate-600">{duration}</span>
-                  <span className="badge border-slate-200 bg-white text-slate-600">Updated: {updatedAt}</span>
-                </div>
-              </article>
-            )
-          })}
+      {slaSection.rows.length ? (
+        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+          <table className="min-w-[980px] w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
+              <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <th className="px-4 py-3">Rule</th>
+                <th className="px-4 py-3">Scope</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Detail</th>
+                <th className="px-4 py-3">Durasi</th>
+                <th className="px-4 py-3">Updated</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white">
+              {slaSection.rows.map((row) => {
+                const duration = pickMeta(row.meta, 'Durasi: ')
+                const updatedAt = pickMeta(row.meta, 'Updated: ')
+
+                return (
+                  <tr key={row.id} className="align-top">
+                    <td className="px-4 py-4">
+                      <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-slate-600">{row.secondary}</td>
+                    <td className="px-4 py-4">
+                      <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
+                    </td>
+                    <td className="px-4 py-4 text-sm leading-6 text-mute">{row.detail}</td>
+                    <td className="px-4 py-4 text-sm text-slate-700">{duration}</td>
+                    <td className="px-4 py-4 text-sm text-slate-700">{updatedAt}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       ) : (
         <p className="mt-6 text-sm text-slate-500">Belum ada aturan SLA yang tersedia untuk direview.</p>

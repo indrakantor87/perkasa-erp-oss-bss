@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
-  if (!canPerformAction(session.role, 'inventory', 'create')) {
+  if (!canPerformAction(session.role, 'inventory', 'update')) {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
 
@@ -145,4 +145,3 @@ export async function POST(request: Request) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
   }
 }
-

@@ -15,6 +15,11 @@ import { getHrAttendanceGeofenceConfig } from '@/lib/services/hr-attendance-geof
 import { ensureInventoryLoanTable } from '@/lib/services/inventory-loan-service'
 import { ensureInventoryRequestTable } from '@/lib/services/inventory-request-service'
 import { ensureHrSalarySlipVoidTable } from '@/lib/services/hr-salary-slip-void-service'
+import {
+  ensureSupportDismantleQueueTable,
+  parseStructuredSupportNote,
+  SUPPORT_DISMANTLE_METADATA_PREFIXES,
+} from '@/lib/services/support-dismantle-service'
 import { ensureSupportTroubleTicketEscalationTable } from '@/lib/services/support-ticket-escalation-service'
 import { ensureSupportTroubleTicketProgressTable } from '@/lib/services/support-ticket-progress-service'
 import {
@@ -103,6 +108,20 @@ type ReviewDbSupportIsolationRow = {
   status: string
   reason: string | null
   isolationDate: string | Date
+  hasDismantleQueue: number
+}
+
+type ReviewDbSupportDismantleOpenRow = {
+  queueId: number
+  isolationId: number
+  customerName: string
+  radboxName: string | null
+  customerPhone: string | null
+  marketingName: string | null
+  status: string
+  transferNote: string | null
+  transferredAt: string | Date
+  ageDays: number | null
 }
 
 type ReviewDbSupportSlaRow = {
@@ -143,6 +162,7 @@ type ReviewDbSubscriptionRow = {
 type ReviewDbBillingInvoiceRow = {
   invoiceNo: string
   customerName: string
+  serviceNo: string
   invoiceType: string
   invoiceStatus: string
   totalAmount: number
@@ -153,6 +173,7 @@ type ReviewDbBillingInvoiceRow = {
 type ReviewDbBillingReconnectRow = {
   invoiceNo: string
   customerName: string
+  serviceNo: string
   invoiceType: string
   invoiceStatus: string
   totalAmount: number
@@ -189,6 +210,7 @@ type ReviewDbBillingLatestInvoiceRow = {
 type ReviewDbBillingCancelledInvoiceRow = {
   invoiceNo: string
   customerName: string
+  serviceNo: string
   totalAmount: number
   updatedAt: string | Date
   notes: string | null
@@ -201,6 +223,7 @@ type ReviewDbCollectionActionRow = {
   actionAt: string | Date
   dueFollowUpAt: string | Date | null
   customerName: string
+  serviceNo: string
   invoiceNo: string
   notes: string | null
 }
@@ -208,6 +231,7 @@ type ReviewDbCollectionActionRow = {
 type ReviewDbCollectionFollowUpRow = {
   invoiceNo: string
   customerName: string
+  serviceNo: string
   invoiceType: string
   invoiceStatus: string
   totalAmount: number
@@ -229,6 +253,7 @@ type ReviewDbPaymentRow = {
   paymentMethod: string
   referenceNo: string | null
   customerName: string
+  serviceNo: string
   invoiceNo: string
   notes: string | null
 }
@@ -485,6 +510,10 @@ function formatDateTime(value: string | Date | null | undefined) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date)
+}
+
+function pickStructuredSupportMetadata(note: string | null | undefined, prefix: string) {
+  return parseStructuredSupportNote(note).metadata.get(prefix) ?? '-'
 }
 
 function formatDateTimeInputValue(value: string | Date | null | undefined) {
@@ -806,6 +835,10 @@ async function getReviewDbSupportSections(params?: {
   const wantSla = !lane || lane === 'sla'
   const wantDismantle = !lane || lane === 'dismantle'
 
+  if (wantIsolations || wantDismantle) {
+    await ensureSupportDismantleQueueTable()
+  }
+
   const tickets = wantTickets
     ? (await ensureSupportTroubleTicketProgressTable(),
       await ensureSupportTroubleTicketEscalationTable(),
@@ -896,18 +929,21 @@ async function getReviewDbSupportSections(params?: {
   const isolations = wantIsolations
     ? await runReviewDbQuery<ReviewDbSupportIsolationRow>(`
     SELECT
-      id AS isolationId,
-      customer_name AS customerName,
-      radbox_name AS radboxName,
-      customer_phone AS customerPhone,
-      marketing_name AS marketingName,
-      status,
-      reason,
-      isolation_date AS isolationDate
-    FROM support_isolations
-    WHERE status = 'OPEN'
-      AND is_archived = 0
-    ORDER BY isolation_date DESC, id DESC
+      si.id AS isolationId,
+      si.customer_name AS customerName,
+      si.radbox_name AS radboxName,
+      si.customer_phone AS customerPhone,
+      si.marketing_name AS marketingName,
+      si.status,
+      si.reason,
+      si.isolation_date AS isolationDate,
+      CASE WHEN dq.id IS NULL THEN 0 ELSE 1 END AS hasDismantleQueue
+    FROM support_isolations si
+    LEFT JOIN support_dismantle_queue dq
+      ON dq.isolation_id = si.id
+    WHERE si.status = 'OPEN'
+      AND si.is_archived = 0
+    ORDER BY si.isolation_date DESC, si.id DESC
     LIMIT 5
   `)
     : []
@@ -921,6 +957,27 @@ async function getReviewDbSupportSections(params?: {
     FROM support_trouble_ticket_sla
     ORDER BY updated_at DESC, trouble_type ASC
     LIMIT 5
+  `)
+    : []
+
+  const dismantleOpenRows = wantDismantle
+    ? await runReviewDbQuery<ReviewDbSupportDismantleOpenRow>(`
+    SELECT
+      dq.id AS queueId,
+      si.id AS isolationId,
+      si.customer_name AS customerName,
+      si.radbox_name AS radboxName,
+      si.customer_phone AS customerPhone,
+      si.marketing_name AS marketingName,
+      si.status,
+      dq.transfer_note AS transferNote,
+      dq.transferred_at AS transferredAt,
+      DATEDIFF(CURRENT_DATE, DATE(dq.transferred_at)) AS ageDays
+    FROM support_dismantle_queue dq
+    INNER JOIN support_isolations si
+      ON si.id = dq.isolation_id
+    ORDER BY dq.transferred_at DESC, dq.id DESC
+    LIMIT 8
   `)
     : []
 
@@ -1110,6 +1167,7 @@ async function getReviewDbSupportSections(params?: {
           `Phone: ${item.customerPhone || '-'}`,
           `Marketing: ${item.marketingName || '-'}`,
           `Isolasi: ${formatDateTime(item.isolationDate)}`,
+          `Ticket Dismantle: ${item.hasDismantleQueue ? 'Sudah' : 'Belum'}`,
         ],
       })),
     },
@@ -1129,20 +1187,51 @@ async function getReviewDbSupportSections(params?: {
       })),
     },
     {
-      title: 'Histori Dismantle',
-      description: 'Riwayat perangkat dan layanan yang sudah ditutup permanen agar jejak operasional tidak hilang.',
-      rows: dismantles.map((item) => ({
-        id: `DIS-${item.dismantleId}`,
+      title: 'Queue Dismantle Open',
+      description:
+        'Kandidat terminasi yang masih aktif di isolir dan perlu divalidasi lebih dulu sebelum dipindahkan ke histori dismantle permanen.',
+      rows: dismantleOpenRows.map((item) => ({
+        id: `DISMANTLE-QUEUE-${item.queueId}`,
         primary: item.customerName,
         secondary: item.radboxName || 'Radbox belum terpetakan',
-        status: 'CLOSED',
-        detail: item.closeNote?.trim() || 'Belum ada catatan dismantle yang tercatat.',
+        status: item.status,
+        detail: item.transferNote?.trim() || 'Belum ada catatan transfer untuk kandidat dismantle ini.',
         meta: [
+          `Queue ID: ${item.queueId}`,
+          `Isolation ID: ${item.isolationId}`,
           `Phone: ${item.customerPhone || '-'}`,
           `Marketing: ${item.marketingName || '-'}`,
-          `Closed: ${formatDateTime(item.closedAt)}`,
+          `Transferred: ${formatDateTime(item.transferredAt)}`,
+          `Aging: ${item.ageDays ?? 0} hari`,
+          'Source: Queue dismantle aktif',
         ],
       })),
+    },
+    {
+      title: 'Histori Dismantle',
+      description: 'Riwayat perangkat dan layanan yang sudah ditutup permanen agar jejak operasional tidak hilang.',
+      rows: dismantles.map((item) => {
+        const structuredNote = parseStructuredSupportNote(item.closeNote)
+
+        return {
+          id: `DIS-${item.dismantleId}`,
+          primary: item.customerName,
+          secondary: item.radboxName || 'Radbox belum terpetakan',
+          status: 'CLOSED',
+          detail: structuredNote.summary || 'Belum ada catatan dismantle yang tercatat.',
+          meta: [
+            `Phone: ${item.customerPhone || '-'}`,
+            `Marketing: ${item.marketingName || '-'}`,
+            `Closed: ${formatDateTime(item.closedAt)}`,
+            `Field PIC: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.fieldPic)}`,
+            `Device Status: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.deviceStatus)}`,
+            `Pickup Status: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.pickupStatus)}`,
+            `Close Outcome: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.closeOutcome)}`,
+            `Billing Disposition: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.billingDisposition)}`,
+            `Closed By: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.actor)}`,
+          ],
+        }
+      }),
     },
   ].filter((section) => section.rows.length > 0)
 }
@@ -1307,8 +1396,10 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
       SELECT
         bi.invoice_no AS invoiceNo,
         c.full_name AS customerName,
+        ss.service_no AS serviceNo,
         bi.invoice_type AS invoiceType,
         bi.invoice_status AS invoiceStatus,
+        bi.total_amount AS totalAmount,
         bi.total_amount AS totalAmount,
         bi.paid_amount AS paidAmount,
         bi.due_date AS dueDate
@@ -1353,6 +1444,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
     SELECT
       bi.invoice_no AS invoiceNo,
       c.full_name AS customerName,
+        ss.service_no AS serviceNo,
       bi.total_amount AS totalAmount,
       bi.updated_at AS updatedAt,
       bi.notes
@@ -1370,6 +1462,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
     SELECT
       bi.invoice_no AS invoiceNo,
       c.full_name AS customerName,
+        ss.service_no AS serviceNo,
       bi.invoice_status AS invoiceStatus,
       bi.total_amount AS totalAmount,
       bi.paid_amount AS paidAmount,
@@ -1416,6 +1509,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
       bca.action_at AS actionAt,
       bca.due_follow_up_at AS dueFollowUpAt,
       c.full_name AS customerName,
+        ss.service_no AS serviceNo,
       bi.invoice_no AS invoiceNo,
       bca.notes
     FROM billing_collection_actions bca
@@ -1455,6 +1549,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
     SELECT
       bi.invoice_no AS invoiceNo,
       c.full_name AS customerName,
+      ss.service_no AS serviceNo,
       bi.invoice_type AS invoiceType,
       bi.invoice_status AS invoiceStatus,
       bi.total_amount AS totalAmount,
@@ -1590,6 +1685,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
       bp.payment_method AS paymentMethod,
       bp.reference_no AS referenceNo,
       c.full_name AS customerName,
+      ss.service_no AS serviceNo,
       bi.invoice_no AS invoiceNo,
       bp.notes
     FROM billing_payments bp
@@ -1639,6 +1735,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
             ? `Sisa tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} dari total ${formatCurrency(item.totalAmount)} pada invoice recurring overdue.`
             : `Total tagihan ${formatCurrency(item.totalAmount)} dengan pembayaran masuk ${formatCurrency(item.paidAmount)}.`,
         meta: [
+          `Service: ${item.serviceNo}`,
           `Invoice Type: ${item.invoiceType}`,
           `Total: ${formatCurrency(item.totalAmount)}`,
           `Terbayar: ${formatCurrency(item.paidAmount)}`,
@@ -1666,6 +1763,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         status: item.invoiceStatus,
         detail: `Invoice ${item.invoiceType} masih menyisakan tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} dan perlu follow-up one-time terpisah dari recurring billing.`,
         meta: [
+          `Service: ${item.serviceNo}`,
           `Invoice Type: ${item.invoiceType}`,
           `Total: ${formatCurrency(item.totalAmount)}`,
           `Terbayar: ${formatCurrency(item.paidAmount)}`,
@@ -1746,6 +1844,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         status: 'CANCELLED',
         detail: item.notes?.trim() || 'Invoice dibatalkan tanpa catatan tambahan.',
         meta: [
+          `Service: ${item.serviceNo}`,
           `Total: ${formatCurrency(item.totalAmount)}`,
           `Updated: ${formatDateTime(item.updatedAt)}`,
         ],
@@ -1762,6 +1861,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         status: 'SUSPENDED',
         detail: `Sisa tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} pada invoice yang sudah masuk jalur suspend.`,
         meta: [
+          `Service: ${item.serviceNo}`,
           `Total: ${formatCurrency(item.totalAmount)}`,
           `Terbayar: ${formatCurrency(item.paidAmount)}`,
           `Remaining: ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))}`,
@@ -1790,6 +1890,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
               ? `Promise to pay sudah lewat jatuh tempo, sehingga invoice otomatis masuk sinyal suspend dengan sisa tagihan ${formatCurrency(remainingAmount)}.`
               : `Invoice siap suspend dengan sisa tagihan ${formatCurrency(remainingAmount)} dan action ${item.actionType}.`,
             meta: [
+              `Service: ${item.serviceNo}`,
               `Invoice Type: ${item.invoiceType}`,
               `Invoice Status: ${item.invoiceStatus}`,
               `Total: ${formatCurrency(item.totalAmount)}`,
@@ -1834,6 +1935,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
             ? `Promise to pay one-time sudah lewat jatuh tempo, sehingga invoice otomatis masuk sinyal suspend dengan sisa tagihan ${formatCurrency(remainingAmount)}.`
             : `Invoice one-time siap suspend dengan sisa tagihan ${formatCurrency(remainingAmount)} dan action ${item.actionType}.`,
           meta: [
+            `Service: ${item.serviceNo}`,
             `Invoice Type: ${item.invoiceType}`,
             `Invoice Status: ${item.invoiceStatus}`,
             `Total: ${formatCurrency(item.totalAmount)}`,
@@ -1872,6 +1974,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
             status: followUpState,
             detail: `Janji bayar aktif dengan sisa tagihan ${formatCurrency(remainingAmount)} dan follow-up ${formatDateTime(item.dueFollowUpAt)}.`,
             meta: [
+              `Service: ${item.serviceNo}`,
               `Invoice Type: ${item.invoiceType}`,
               `Invoice Status: ${item.invoiceStatus}`,
               `Total: ${formatCurrency(item.totalAmount)}`,
@@ -1903,6 +2006,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
           status: followUpState,
           detail: `Janji bayar one-time aktif dengan sisa tagihan ${formatCurrency(remainingAmount)} dan follow-up ${formatDateTime(item.dueFollowUpAt)}.`,
           meta: [
+            `Service: ${item.serviceNo}`,
             `Invoice Type: ${item.invoiceType}`,
             `Invoice Status: ${item.invoiceStatus}`,
             `Total: ${formatCurrency(item.totalAmount)}`,
@@ -1930,6 +2034,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         status: item.invoiceStatus,
         detail: `Invoice recurring pada jalur reconnect dengan sisa tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} masih perlu pemulihan layanan atau tindak lanjut billing.`,
         meta: [
+          `Service: ${item.serviceNo}`,
           `Invoice Type: ${item.invoiceType}`,
           `Invoice Status: ${item.invoiceStatus}`,
           `Collection Status: ${item.collectionStatus || '-'}`,
@@ -1952,6 +2057,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         status: item.invoiceStatus,
         detail: `Invoice one-time pada jalur reconnect dengan sisa tagihan ${formatCurrency(Number(item.totalAmount) - Number(item.paidAmount))} masih perlu tindak lanjut billing.`,
         meta: [
+          `Service: ${item.serviceNo}`,
           `Invoice Type: ${item.invoiceType}`,
           `Invoice Status: ${item.invoiceStatus}`,
           `Collection Status: ${item.collectionStatus || '-'}`,
@@ -1978,6 +2084,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
           status: followUpState,
           detail: `Invoice berada pada jalur write-off dengan sisa tagihan ${formatCurrency(remainingAmount)} dan perlu keputusan formal sebelum keluar penuh dari lifecycle billing.`,
           meta: [
+            `Service: ${item.serviceNo}`,
             `Invoice Type: ${item.invoiceType}`,
             `Invoice Status: ${item.invoiceStatus}`,
             `Total: ${formatCurrency(item.totalAmount)}`,
@@ -2009,6 +2116,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
           status: followUpState,
           detail: `Invoice one-time berada pada jalur write-off dengan sisa tagihan ${formatCurrency(remainingAmount)} dan perlu keputusan formal sebelum keluar penuh dari lifecycle billing.`,
           meta: [
+            `Service: ${item.serviceNo}`,
             `Invoice Type: ${item.invoiceType}`,
             `Invoice Status: ${item.invoiceStatus}`,
             `Total: ${formatCurrency(item.totalAmount)}`,
@@ -2037,6 +2145,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         detail: item.notes?.trim() || 'Belum ada catatan tambahan pada action collection ini.',
         meta: [
           `Customer: ${item.customerName}`,
+          `Service: ${item.serviceNo}`,
           `Invoice Type: ${item.invoiceType}`,
           `At: ${formatDateTime(item.actionAt)}`,
           `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
@@ -2055,6 +2164,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         detail: item.notes?.trim() || 'Belum ada catatan tambahan pada action collection ini.',
         meta: [
           `Customer: ${item.customerName}`,
+          `Service: ${item.serviceNo}`,
           `Invoice Type: ${item.invoiceType}`,
           `At: ${formatDateTime(item.actionAt)}`,
           `Follow Up: ${formatDateTime(item.dueFollowUpAt)}`,
@@ -2076,6 +2186,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
           status: followUpState,
           detail: `Action ${item.actionType} masih ${item.actionStatus} dengan sisa tagihan ${formatCurrency(remainingAmount)}.`,
           meta: [
+            `Service: ${item.serviceNo}`,
             `Invoice Type: ${item.invoiceType}`,
             `Invoice Status: ${item.invoiceStatus}`,
             `Total: ${formatCurrency(item.totalAmount)}`,
@@ -2108,6 +2219,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
           status: followUpState,
           detail: `Action ${item.actionType} masih ${item.actionStatus} dengan sisa tagihan ${formatCurrency(remainingAmount)}.`,
           meta: [
+            `Service: ${item.serviceNo}`,
             `Invoice Type: ${item.invoiceType}`,
             `Invoice Status: ${item.invoiceStatus}`,
             `Total: ${formatCurrency(item.totalAmount)}`,
@@ -2136,6 +2248,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         detail: item.notes?.trim() || 'Belum ada catatan tambahan pada payment entry ini.',
         meta: [
           `Customer: ${item.customerName}`,
+          `Service: ${item.serviceNo}`,
           `Amount: ${formatCurrency(item.amount)}`,
           `Paid At: ${formatDateTime(item.paymentDate)}`,
           `Reference: ${item.referenceNo || '-'}`,

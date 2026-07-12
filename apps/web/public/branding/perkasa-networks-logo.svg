@@ -1,0 +1,46 @@
+<svg width="900" height="340" viewBox="0 0 900 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="perkasa-loop" x1="30" y1="40" x2="250" y2="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1536FF"/>
+      <stop offset="0.4" stop-color="#00C2FF"/>
+      <stop offset="0.68" stop-color="#FF345D"/>
+      <stop offset="1" stop-color="#6C11D9"/>
+    </linearGradient>
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#020617" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <path
+    d="M134 42C94 42 62 90 59 146C56 210 84 278 127 278C154 278 174 247 177 203C181 148 154 98 126 98C100 98 81 132 83 176C85 225 118 266 153 266C204 266 246 214 249 150C252 83 209 26 146 26C89 26 38 77 29 143C21 205 43 290 94 309"
+    stroke="url(#perkasa-loop)"
+    stroke-width="18"
+    stroke-linecap="round"
+    filter="url(#soft-shadow)"
+  />
+
+  <g fill="#050816">
+    <text x="245" y="132" font-family="Arial, Helvetica, sans-serif" font-size="110" font-weight="500">Perkasa</text>
+    <text x="90" y="246" font-family="Arial, Helvetica, sans-serif" font-size="94" font-weight="300" letter-spacing="16">Networks</text>
+  </g>
+
+  <line x1="156" y1="164" x2="860" y2="164" stroke="#111827" stroke-width="5"/>
+
+  <text
+    x="88"
+    y="292"
+    fill="#475569"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="34"
+    font-weight="700"
+    letter-spacing="6"
+  >
+    Connect Your Future
+  </text>
+
+  <text x="470" y="328" font-family="Arial, Helvetica, sans-serif" font-size="58" font-style="italic" font-weight="800">
+    <tspan fill="#FF3B30">#</tspan>
+    <tspan fill="#1D4ED8">juaranya</tspan>
+    <tspan fill="#FF3B30">wifi</tspan>
+  </text>
+</svg>

@@ -1,14 +1,41 @@
 import { redirect } from 'next/navigation'
-import { OrganizationWorkspacePage } from '@/components/organization-workspace-page'
+import { CsAdminWorkspaceDashboard } from '@/components/cs-admin-workspace-dashboard'
 import { requireSession } from '@/lib/auth'
 import { canAccessPath } from '@/lib/access-control-server'
-import { csAdminWorkspace } from '@/lib/organization-workspaces'
+import { getWorklistBucketsData } from '@/lib/services/worklist-service'
 
-export default async function CsAdminWorkspacePage() {
+function resolveSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+const trackedQueues = ['Perlu Approval', 'Perlu Koreksi', 'Transfer atau Restore', 'Queue Risiko Tinggi'] as const
+
+export default async function CsAdminWorkspacePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{
+    queue?: string | string[]
+    selected?: string | string[]
+  }>
+}) {
   const session = await requireSession()
   if (!canAccessPath(session.role, '/customers/cs-admin')) {
     redirect('/dashboard')
   }
 
-  return <OrganizationWorkspacePage role={session.role} {...csAdminWorkspace} />
+  const resolvedSearchParams = (await searchParams) ?? {}
+  const selectedQueue = resolveSearchParam(resolvedSearchParams.queue) || trackedQueues[0]
+  const selectedItemId = resolveSearchParam(resolvedSearchParams.selected)
+  const payload = await getWorklistBucketsData(session, [...trackedQueues])
+
+  return (
+    <CsAdminWorkspaceDashboard
+      role={session.role}
+      source={payload.source}
+      baseCount={payload.baseCount}
+      buckets={payload.buckets}
+      selectedQueue={selectedQueue}
+      selectedItemId={selectedItemId}
+    />
+  )
 }

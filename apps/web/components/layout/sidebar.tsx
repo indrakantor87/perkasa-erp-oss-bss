@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -141,9 +142,23 @@ const sidebarCoreGroups: SidebarGroup[] = [
       buildSidebarNavItem('/sales', {
         key: 'sales-digital-creator',
         title: 'Digital Creator',
-        description: 'Lead digital, survey digital, dan funnel campaign',
-        href: '/sales?focus=DIGITAL_LEADS',
-        matchFocusPrefix: 'DIGITAL_',
+        description: 'Campaign, lead digital, content calendar, dan analytics Creator Digital',
+        href: '/sales/digital-creator',
+        requiredPath: '/sales/digital-creator',
+        assignHrefs: [
+          '/sales/digital-creator',
+          '/sales/campaigns',
+          '/sales/digital-leads',
+          '/sales/content-calendar',
+          '/sales/content-analytics',
+        ],
+        matchPrefixes: [
+          '/sales/digital-creator',
+          '/sales/campaigns',
+          '/sales/digital-leads',
+          '/sales/content-calendar',
+          '/sales/content-analytics',
+        ],
       }),
     ],
     emptyHint: DASHBOARD_DIVISION_CLUSTERS[0]?.items.map((item) => item.label).join(', '),
@@ -279,6 +294,47 @@ function isSidebarItemActive(item: SidebarNavItem, pathname: string, focus: stri
   }
 
   return true
+}
+
+function SidebarBrand({
+  collapsed,
+  onNavigate,
+}: {
+  collapsed: boolean
+  onNavigate?: () => void
+}) {
+  return (
+    <Link
+      href="/dashboard"
+      className={collapsed ? 'flex flex-col items-center gap-3' : 'space-y-3'}
+      onClick={onNavigate}
+    >
+      <div
+        className={`overflow-hidden border border-slate-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.24)] ${
+          collapsed ? 'flex h-14 w-14 items-center justify-center rounded-2xl p-2' : 'max-w-[13rem] rounded-2xl px-2 py-0.5'
+        }`}
+      >
+        <Image
+          src="/branding/perkasa-networks-original.png"
+          alt="Perkasa Networks"
+          width={collapsed ? 40 : 200}
+          height={collapsed ? 40 : 74}
+          priority
+          className={collapsed ? 'h-10 w-10 object-contain' : 'h-auto w-full object-contain'}
+        />
+      </div>
+      <div className={collapsed ? 'text-center' : ''}>
+        <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold">
+          {collapsed ? 'ERP' : 'ERP OSS BSS'}
+        </p>
+        {!collapsed ? (
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            Satu website operasional untuk migrasi data, kontrol divisi, dan modul bisnis ISP.
+          </p>
+        ) : null}
+      </div>
+    </Link>
+  )
 }
 
 function SidebarSection({
@@ -428,19 +484,7 @@ export function Sidebar({
     <>
       <aside className={`hidden flex-col border-r border-slate-800 bg-slate-950 py-8 text-slate-100 transition-all duration-200 lg:flex ${desktopWidthClass}`}>
         <div className={`flex ${collapsed ? 'justify-center' : 'items-start justify-between gap-4'}`}>
-          <Link href="/dashboard" className={collapsed ? 'flex flex-col items-center gap-3' : 'space-y-3'}>
-            <span className="badge border-slate-700 text-slate-300">{collapsed ? 'PP' : 'Perkasa Platform'}</span>
-            <div className={collapsed ? 'text-center' : ''}>
-              <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold">
-                {collapsed ? 'ERP' : 'ERP OSS BSS'}
-              </p>
-              {!collapsed ? (
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Satu website operasional untuk migrasi data, kontrol divisi, dan modul bisnis ISP.
-                </p>
-              ) : null}
-            </div>
-          </Link>
+          <SidebarBrand collapsed={collapsed} />
 
           {!collapsed ? (
             <button
@@ -559,15 +603,7 @@ export function Sidebar({
           />
           <aside className="relative flex h-full w-80 max-w-[88vw] flex-col border-r border-slate-800 bg-slate-950 px-6 py-6 text-slate-100 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
-              <Link href="/dashboard" className="space-y-3" onClick={() => setMobileOpen(false)}>
-                <span className="badge border-slate-700 text-slate-300">Perkasa Platform</span>
-                <div>
-                  <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold">ERP OSS BSS</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">
-                    Satu website operasional untuk migrasi data, kontrol divisi, dan modul bisnis ISP.
-                  </p>
-                </div>
-              </Link>
+              <SidebarBrand collapsed={false} onNavigate={() => setMobileOpen(false)} />
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}

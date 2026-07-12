@@ -13,6 +13,7 @@ File SQL yang dipakai:
 - `database/xampp_review_sample_import.sql`
 - `database/xampp_review_sample_import_wave_1a.sql`
 - `database/xampp_review_sample_import_wave_1b_ticket.sql`
+- `database/xampp_review_sample_import_wave_1c_sales.sql`
 
 ## Urutan Eksekusi
 
@@ -30,6 +31,10 @@ File SQL yang dipakai:
 12. `database/xampp_review_transform_wave_1a_network_odp.sql`
 13. `database/xampp_review_sample_import_wave_1b_ticket.sql`
 14. `database/xampp_review_transform_wave_1b_ticket.sql`
+15. `database/xampp_review_patch_wave_1c_existing_review_db.sql`
+16. `database/xampp_review_sample_import_wave_1c_sales.sql`
+17. `database/xampp_review_transform_wave_1c_sales.sql`
+18. `database/xampp_review_bootstrap_wave_1c_odp_ports.sql`
 
 ## Isi Sample
 
@@ -45,6 +50,7 @@ Sample ini sengaja kecil dan hanya dipakai untuk review:
 8. sample employee, attendance, salary, dan loan
 9. sample batch tambahan untuk `Wave 1A` support extension dan ODP header
 10. sample batch tambahan untuk `Wave 1B` ticket split
+11. sample batch tambahan untuk `Wave 1C` coverage dan marketing activity, plus bootstrap native ODP ports
 
 Tujuannya bukan menguji volume, tetapi menguji:
 
@@ -65,6 +71,8 @@ Batch code:
 - `SAMPLE-FINANCE-HR-001`
 - `SAMPLE-WEBPSB-SUPPORT-EXT-001`
 - `SAMPLE-WEBPSB-ODP-001`
+- `SAMPLE-WEBPSB-COVERAGE-001`
+- `SAMPLE-WEBPSB-MARKETING-001`
 
 Scope:
 
@@ -75,6 +83,8 @@ Scope:
 - `PSB_SUPPORT_EXT`
 - `PSB_ODP_HEADER`
 - `PSB_TICKET_SPLIT`
+- `PSB_COVERAGE`
+- `PSB_MARKETING_ACTIVITY`
 
 ## Hasil yang Diharapkan
 
@@ -94,6 +104,8 @@ Setelah file sample dijalankan:
 12. `staging_legacy_network_odp_records` punya satu row ODP header sample
 13. setelah transform `Wave 1A`, final table `support_dismantle_queue`, `support_trouble_ticket_photos`, `support_trouble_ticket_sla`, dan `network_odp` menerima row sample yang relevan
 14. setelah transform `Wave 1B Ticket`, final table `crm_customers`, `crm_customer_addresses`, `sales_orders`, `service_subscriptions`, dan `service_work_orders` menerima row sample hasil split dari source `Ticket`
+15. setelah transform `Wave 1C`, final table `sales_covered_areas`, `sales_marketing_activities`, dan `sales_marketing_activity_areas` menerima row sample yang relevan
+16. setelah bootstrap native `Wave 1C`, table `network_odp_ports` memiliki slot `1..total_ports` tanpa mengarang port `USED`
 
 ## Cara Review
 
@@ -199,17 +211,41 @@ WHERE batch_id = (
 );
 ```
 
+```sql
+SELECT legacy_id, area_code, area_name, target_covered_area_id, import_status
+FROM staging_legacy_sales_coverage_records
+WHERE batch_id = (
+  SELECT id FROM staging_import_batches WHERE batch_code = 'SAMPLE-WEBPSB-COVERAGE-001'
+);
+```
+
+```sql
+SELECT legacy_id, marketing_name, activity_type, target_activity_id, import_status
+FROM staging_legacy_marketing_activity_records
+WHERE batch_id = (
+  SELECT id FROM staging_import_batches WHERE batch_code = 'SAMPLE-WEBPSB-MARKETING-001'
+);
+```
+
+```sql
+SELECT code, total_ports, COUNT(*) AS generated_ports
+FROM network_odp_ports p
+JOIN network_odp o ON o.id = p.odp_id
+WHERE o.code = 'TRKL/07 - 16'
+GROUP BY code, total_ports;
+```
+
 ## Catatan Penting
 
 1. sample ini bukan data operasional
 2. sample ini hanya untuk membuktikan alur review staging pada satu platform tunggal
 3. row sample sengaja dibuat dengan `NOT EXISTS` agar lebih aman saat diulang
-4. file dasar `xampp_review_sample_import.sql` memang berhenti di staging, tetapi batch `wave 1A` sengaja diteruskan ke transform support/network untuk membuktikan landing zone baru benar-benar berfungsi
+4. file dasar `xampp_review_sample_import.sql` memang berhenti di staging, tetapi batch `Wave 1A`, `Wave 1B`, dan `Wave 1C` sengaja diteruskan ke transform agar landing zone baru benar-benar teruji sampai tabel final
 
 ## Langkah Berikutnya
 
 Setelah sample ini lolos review, langkah berikutnya paling masuk akal adalah:
 
 1. tambah variasi sample untuk status legacy yang lebih berantakan
-2. mulai buat script transform dari staging ke tabel final
+2. lanjutkan assertion query untuk `Wave 1B` dan `Wave 1C`
 3. mulai siapkan modul web import/review di satu website utama

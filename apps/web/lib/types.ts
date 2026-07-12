@@ -157,6 +157,77 @@ export type DashboardWorkItem = {
   href: string
 }
 
+export type WorklistShortcutLink = {
+  label: string
+  href: string
+}
+
+export type CaseCorrelationStatus = {
+  label: string
+  value: string
+  tone?: string
+}
+
+export type CaseCorrelationSummary = {
+  customer?: string
+  service?: string
+  owner?: string
+  items: CaseCorrelationStatus[]
+}
+
+export type CaseDecisionTrailEntry = {
+  label: string
+  detail: string
+  happenedAt?: string
+  tone?: string
+}
+
+export type CaseDecisionTrail = {
+  owner?: string
+  items: CaseDecisionTrailEntry[]
+}
+
+export type CaseEvidenceItem = {
+  label: string
+  detail: string
+  happenedAt?: string
+  tone?: string
+}
+
+export type CaseEvidencePanel = {
+  owner?: string
+  items: CaseEvidenceItem[]
+}
+
+export type CaseHealthSignal = {
+  label: string
+  detail: string
+  tone?: string
+}
+
+export type CaseRecommendedAction = {
+  label: string
+  detail: string
+  href: string
+  tone?: string
+}
+
+export type CaseRecommendedActionMatrix = {
+  owner?: string
+  items: CaseRecommendedAction[]
+}
+
+export type CaseActionOutcomeItem = {
+  label: string
+  detail: string
+  tone?: string
+}
+
+export type CaseActionOutcomeSummary = {
+  owner?: string
+  items: CaseActionOutcomeItem[]
+}
+
 export type WorklistItem = DashboardWorkItem & {
   queue: string
   actionLabel: string
@@ -166,6 +237,13 @@ export type WorklistItem = DashboardWorkItem & {
   nextAction?: string
   blockingInfo?: string
   prefillToken?: string
+  handoffLinks?: WorklistShortcutLink[]
+  correlationSummary?: CaseCorrelationSummary
+  decisionTrail?: CaseDecisionTrail
+  evidencePanel?: CaseEvidencePanel
+  healthSignal?: CaseHealthSignal
+  recommendedActions?: CaseRecommendedActionMatrix
+  actionOutcomeSummary?: CaseActionOutcomeSummary
 }
 
 export type ModuleCard = {
@@ -321,6 +399,8 @@ export type SupportLaneActionKey =
   | 'isolation-create'
   | 'isolation-restore'
   | 'dismantle-approve'
+  | 'dismantle-close'
+  | 'dismantle-reopen'
 
 export type SupportActionLink = {
   key: SupportLaneActionKey
@@ -332,6 +412,8 @@ export type SupportActionLink = {
 export type SupportFormPrefill = {
   ticket?: string
   isolation?: string
+  dismantle?: string
+  dismantleHistory?: string
   type?: string
 }
 

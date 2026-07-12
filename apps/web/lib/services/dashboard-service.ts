@@ -15,6 +15,7 @@ import {
 } from '@/lib/mock-dashboard'
 import type { AppSession } from '@/lib/auth-session'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { buildSupportLaneActionHref } from '@/lib/support-action-links'
 import { getRecentAuthPermissionAudits } from '@/lib/services/auth-permission-audit-service'
 import { getRecentAuthRolePermissionAudits } from '@/lib/services/auth-role-permission-audit-service'
 import { getRecentAuthUserAudits } from '@/lib/services/auth-user-audit-service'
@@ -22,9 +23,16 @@ import { resolveDailyActivityOrgContext } from '@/lib/services/daily-activity-us
 import { listMergedDashboardKpiDefinitions, resolveDashboardKpiManagerScope } from '@/lib/services/dashboard-kpi-service'
 import { getRecentHrAudits } from '@/lib/services/hr-audit-service'
 import { ensureImportBatchActionTable } from '@/lib/services/import-write-service'
+import { ensureSupportDismantleQueueTable } from '@/lib/services/support-dismantle-service'
 import type {
   AppRole,
   ActivityItem,
+  CaseActionOutcomeSummary,
+  CaseCorrelationSummary,
+  CaseDecisionTrail,
+  CaseEvidencePanel,
+  CaseHealthSignal,
+  CaseRecommendedActionMatrix,
   DashboardAlertItem,
   DashboardDailyActivityApprovalQueue,
   DashboardDailyActivityApprovalQueueItem,
@@ -56,6 +64,7 @@ type DashboardSalesOperationalRow = {
 type DashboardCsOperationalRow = {
   activeWorkOrders: number
   activeIsolations: number
+  openDismantles: number
   monthlyDismantles: number
 }
 
@@ -214,10 +223,12 @@ type DashboardWorkOrderRow = {
 }
 
 type DashboardDismantleRow = {
+  queueId: number
   dismantleId: number
   customerName: string
   closeNote: string | null
-  closedAt: string
+  closedAt: string | null
+  transferredAt: string | null
 }
 
 type DailyActivityApprovalQueueRow = {
@@ -249,14 +260,27 @@ type DashboardRejectedActivityRow = {
 type DashboardIsolationDecisionRow = {
   isolationId: number
   customerName: string
+  serviceNo: string | null
   reason: string | null
   isolationDate: string
+  agingDays: number
+}
+
+type DashboardDismantleDecisionRow = {
+  queueId: number
+  isolationId: number
+  customerName: string
+  serviceNo: string | null
+  isolationDate: string
+  transferNote: string | null
+  transferredAt: string
   agingDays: number
 }
 
 type DashboardHighRiskTicketRow = {
   ticketCode: string
   customerName: string
+  serviceNo: string | null
   status: string
   ticketType: string
   openedAt: string
@@ -385,6 +409,147 @@ function formatActivityTime(value: unknown) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(safeDate)
+}
+
+function buildIsolationPrefillToken(isolationId: number, customerName: string, subtitle: string) {
+  return `${isolationId} | ${customerName} | ${subtitle}`
+}
+
+function buildDismantleQueuePrefillToken(queueId: number, customerName: string, subtitle: string) {
+  return `${queueId} | ${customerName} | ${subtitle}`
+}
+
+function buildCaseCorrelationSummary(params: {
+  customerName: string
+  serviceNo?: string | null
+  owner: string
+  billing: string
+  isolation: string
+  ttSla: string
+  dismantle: string
+}): CaseCorrelationSummary {
+  return {
+    customer: params.customerName,
+    service: params.serviceNo?.trim() || undefined,
+    owner: params.owner,
+    items: [
+      {
+        label: 'Billing',
+        value: params.billing,
+        tone: 'border-violet-200 bg-violet-50 text-violet-700',
+      },
+      {
+        label: 'Isolir',
+        value: params.isolation,
+        tone: 'border-amber-200 bg-amber-50 text-amber-700',
+      },
+      {
+        label: 'TT/SLA',
+        value: params.ttSla,
+        tone: 'border-sky-200 bg-sky-50 text-sky-700',
+      },
+      {
+        label: 'Dismantle',
+        value: params.dismantle,
+        tone: 'border-rose-200 bg-rose-50 text-rose-700',
+      },
+      {
+        label: 'Owner Aktif',
+        value: params.owner,
+        tone: 'border-slate-200 bg-slate-50 text-slate-700',
+      },
+    ],
+  }
+}
+
+function buildCaseDecisionTrail(params: {
+  owner: string
+  entries: Array<{
+    label: string
+    detail: string
+    happenedAt?: unknown
+    tone?: string
+  }>
+}): CaseDecisionTrail {
+  return {
+    owner: params.owner,
+    items: params.entries.map((entry) => ({
+      label: entry.label,
+      detail: entry.detail,
+      happenedAt: entry.happenedAt ? formatActivityTime(entry.happenedAt) : undefined,
+      tone: entry.tone,
+    })),
+  }
+}
+
+function buildCaseEvidencePanel(params: {
+  owner: string
+  items: Array<{
+    label: string
+    detail: string
+    happenedAt?: unknown
+    tone?: string
+  }>
+}): CaseEvidencePanel {
+  return {
+    owner: params.owner,
+    items: params.items.map((item) => ({
+      label: item.label,
+      detail: item.detail,
+      happenedAt: item.happenedAt ? formatActivityTime(item.happenedAt) : undefined,
+      tone: item.tone,
+    })),
+  }
+}
+
+function buildCaseHealthSignal(params: {
+  label: string
+  detail: string
+  tone?: string
+}): CaseHealthSignal {
+  return {
+    label: params.label,
+    detail: params.detail,
+    tone: params.tone,
+  }
+}
+
+function buildCaseRecommendedActionMatrix(params: {
+  owner: string
+  items: Array<{
+    label: string
+    detail: string
+    href: string
+    tone?: string
+  }>
+}): CaseRecommendedActionMatrix {
+  return {
+    owner: params.owner,
+    items: params.items.map((item) => ({
+      label: item.label,
+      detail: item.detail,
+      href: item.href,
+      tone: item.tone,
+    })),
+  }
+}
+
+function buildCaseActionOutcomeSummary(params: {
+  owner: string
+  items: Array<{
+    label: string
+    detail: string
+    tone?: string
+  }>
+}): CaseActionOutcomeSummary {
+  return {
+    owner: params.owner,
+    items: params.items.map((item) => ({
+      label: item.label,
+      detail: item.detail,
+      tone: item.tone,
+    })),
+  }
 }
 
 function getActivitySortTime(value: unknown) {
@@ -735,6 +900,7 @@ async function getReviewDbOperationalCards(
   const digitalSources = ['DIGITAL', 'FACEBOOK', 'INSTAGRAM', 'TIKTOK', 'GOOGLE', 'WEBSITE', 'META ADS']
   const digitalSourceConditions = digitalSources.map(() => '?').join(', ')
   const hasSupportSlaDueAt = await hasReviewDbColumn('support_trouble_tickets', 'sla_due_at')
+  await ensureSupportDismantleQueueTable()
 
   const [salesRows, csRows, nocRows, digitalRows, billingRows, hrRows, inventoryRows] = await Promise.all([
     runReviewDbQuery<DashboardSalesOperationalRow>(
@@ -775,6 +941,10 @@ async function getReviewDbOperationalCards(
             WHERE status = 'OPEN'
               AND is_archived = 0
           ) AS activeIsolations,
+          (
+            SELECT COUNT(*)
+            FROM support_dismantle_queue
+          ) AS openDismantles,
           (
             SELECT COUNT(*)
             FROM support_dismantle_history
@@ -1245,8 +1415,8 @@ async function getReviewDbOperationalCards(
       href: '/support/dismantle',
       tone: 'border-rose-200 bg-rose-50 text-rose-900',
       metrics: [
-        { label: 'Queue Dismantle', value: formatNumber(Math.max(0, Math.round(Number(cs.activeIsolations ?? 0) / 2))) },
-        { label: 'Follow Up Lapangan', value: formatNumber(Math.max(0, Math.round(Number(cs.activeIsolations ?? 0) / 3))) },
+        { label: 'Queue Dismantle', value: formatNumber(Number(cs.openDismantles ?? 0)) },
+        { label: 'Follow Up Lapangan', value: formatNumber(Math.max(0, Number(cs.openDismantles ?? 0))) },
         { label: 'Close Periode Ini', value: formatNumber(Number(cs.monthlyDismantles ?? 0)) },
       ],
     },
@@ -1421,7 +1591,7 @@ async function getReviewDbDashboardAlerts(params: {
       nextStep:
         'Tindak invoice overdue terbesar lebih dulu, putuskan promise to pay atau suspend, lalu sinkronkan kasus yang berdampak ke isolir dan reconnect.',
       affectedModules: ['Support', 'Customer', 'Billing'],
-      href: '/billing',
+        href: '/billing#billing-action-collection-action',
       actionLabel: 'Tindak Billing',
     })
   }
@@ -1438,7 +1608,9 @@ async function getReviewDbDashboardAlerts(params: {
       nextStep:
         'Masuk ke lane ticket prioritas tertinggi, eksekusi update progress atau eskalasi, lalu close ticket yang memang sudah matang.',
       affectedModules: ['NOC', 'CS', 'Billing'],
-      href: '/support/tt',
+        href: buildSupportLaneActionHref('sla', 'sla-manage', {
+          focus: 'SLA_OVERDUE',
+        }),
       actionLabel: 'Buka Ticket',
     })
   }
@@ -1455,8 +1627,8 @@ async function getReviewDbDashboardAlerts(params: {
       nextStep:
         'Audit daftar isolir aktif, selaraskan keputusan billing dengan status support, lalu tetapkan apakah kasus harus direstore, difollow-up, atau didismantle.',
       affectedModules: ['Billing', 'Support', 'Sales'],
-      href: '/support/isolations',
-      actionLabel: 'Lihat Isolir',
+        href: '/customers/cs-admin?queue=Transfer+atau+Restore',
+        actionLabel: 'Sinkron Restore/Terminate',
     })
   }
 
@@ -1936,26 +2108,54 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
       )
       const restoreCandidates = await runReviewDbQuery<DashboardIsolationDecisionRow>(`
         SELECT
-          id AS isolationId,
-          customer_name AS customerName,
-          reason,
-          CAST(isolation_date AS CHAR) AS isolationDate,
-          DATEDIFF(CURRENT_DATE, DATE(isolation_date)) AS agingDays
-        FROM support_isolations
-        WHERE status = 'OPEN'
-          AND is_archived = 0
+          si.id AS isolationId,
+          si.customer_name AS customerName,
+          ss.service_no AS serviceNo,
+          si.reason,
+          CAST(si.isolation_date AS CHAR) AS isolationDate,
+          DATEDIFF(CURRENT_DATE, DATE(si.isolation_date)) AS agingDays
+        FROM support_isolations si
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = si.subscription_id
+        LEFT JOIN support_dismantle_queue dq
+          ON dq.isolation_id = si.id
+        WHERE si.status = 'OPEN'
+          AND si.is_archived = 0
+          AND dq.id IS NULL
         ORDER BY isolation_date ASC, id ASC
+        LIMIT 1
+      `)
+      await ensureSupportDismantleQueueTable()
+      const terminateCandidates = await runReviewDbQuery<DashboardDismantleDecisionRow>(`
+        SELECT
+          dq.id AS queueId,
+          si.id AS isolationId,
+          si.customer_name AS customerName,
+          ss.service_no AS serviceNo,
+          CAST(si.isolation_date AS CHAR) AS isolationDate,
+          dq.transfer_note AS transferNote,
+          CAST(dq.transferred_at AS CHAR) AS transferredAt,
+          DATEDIFF(CURRENT_DATE, DATE(dq.transferred_at)) AS agingDays
+        FROM support_dismantle_queue dq
+        INNER JOIN support_isolations si
+          ON si.id = dq.isolation_id
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = si.subscription_id
+        ORDER BY dq.transferred_at ASC, dq.id ASC
         LIMIT 1
       `)
       const highRiskTickets = await runReviewDbQuery<DashboardHighRiskTicketRow>(`
         SELECT
           ticket_code AS ticketCode,
           customer_name AS customerName,
+          ss.service_no AS serviceNo,
           status,
           type AS ticketType,
           CAST(opened_at AS CHAR) AS openedAt,
           TIMESTAMPDIFF(HOUR, opened_at, CURRENT_TIMESTAMP) AS agingHours
         FROM support_trouble_tickets
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = support_trouble_tickets.subscription_id
         WHERE closed_at IS NULL
           AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
           AND opened_at <= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)
@@ -2008,11 +2208,283 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           id: `iso-${item.isolationId}`,
           domain: 'Support',
           title: item.customerName,
-          subtitle: `Isolir aktif ${formatNumber(Number(item.agingDays ?? 0))} hari`,
+          subtitle: 'Owner Billing / Restore',
           status: 'OPEN',
           priority: 'tinggi' as const,
-          detail: `${item.reason?.trim() || 'Belum ada alasan isolir'} • Kandidat keputusan restore atau transfer ke dismantle sejak ${formatActivityTime(item.isolationDate)}.`,
-          href: '/support/isolations',
+          detail: `${item.reason?.trim() || 'Belum ada alasan isolir'} • Isolir ${formatNumber(Number(item.agingDays ?? 0))} hari dan masih menunggu validasi restore dari Billing sejak ${formatActivityTime(item.isolationDate)}.`,
+          href: buildSupportLaneActionHref('isolations', 'isolation-restore', {
+            isolation: buildIsolationPrefillToken(item.isolationId, item.customerName, 'Owner Billing / Restore'),
+            focus: 'ACTIVE_ISOLATIONS',
+          }),
+          actionLabel: 'Proses Restore Billing',
+          reason: 'Ownership utama berada di Billing untuk memutuskan apakah pelanggan dipulihkan, ditahan, atau butuh klarifikasi pembayaran.',
+          owner: 'Billing / Collection',
+          nextAction: 'Validasi kesiapan restore dari sisi Billing',
+          blockingInfo: 'Kasus belum boleh diteruskan ke terminate sebelum keputusan Billing jelas.',
+          prefillToken: buildIsolationPrefillToken(item.isolationId, item.customerName, 'Owner Billing / Restore'),
+          healthSignal: buildCaseHealthSignal({
+            label: 'Butuh Follow-Up Billing',
+            detail:
+              'Kasus masih sehat untuk jalur restore, tetapi belum aman dipulihkan sebelum Billing menyelesaikan validasi pembayaran dan arah keputusan layanan.',
+            tone: 'border-violet-200 bg-violet-50 text-violet-700',
+          }),
+          recommendedActions: buildCaseRecommendedActionMatrix({
+            owner: 'Billing / Collection',
+            items: [
+              {
+                label: 'Putuskan Restore Billing',
+                detail: 'Validasi pembayaran dan arah recovery layanan sebelum kasus bergerak ke lane lain.',
+                href: buildSupportLaneActionHref('isolations', 'isolation-restore', {
+                  isolation: buildIsolationPrefillToken(item.isolationId, item.customerName, 'Owner Billing / Restore'),
+                  focus: 'ACTIVE_ISOLATIONS',
+                }),
+                tone: 'border-violet-200 bg-violet-50 text-violet-700',
+              },
+              {
+                label: 'Audit Konteks Billing',
+                detail: 'Baca ulang keputusan collection, invoice, dan follow-up agar restore tidak salah arah.',
+                href: '/billing',
+                tone: 'border-slate-200 bg-slate-50 text-slate-700',
+              },
+              {
+                label: 'Alihkan ke Dismantle Bila Gagal',
+                detail: 'Pindahkan ke jalur terminate hanya jika Billing tidak lagi menempatkan kasus ini sebagai kandidat restore.',
+                href: buildSupportLaneActionHref('dismantle', 'dismantle-approve', {
+                  isolation: buildIsolationPrefillToken(item.isolationId, item.customerName, 'Transfer Dismantle'),
+                }),
+                tone: 'border-rose-200 bg-rose-50 text-rose-700',
+              },
+            ],
+          }),
+          actionOutcomeSummary: buildCaseActionOutcomeSummary({
+            owner: 'Billing / Collection',
+            items: [
+              {
+                label: 'Target Hasil',
+                detail: 'Billing memberi keputusan restore yang cukup jelas sehingga layanan aman dibaca sebagai kandidat pulih, bukan terminate.',
+                tone: 'border-violet-200 bg-violet-50 text-violet-700',
+              },
+              {
+                label: 'Sinyal Berhasil',
+                detail: 'Arah collection, invoice, dan follow-up sudah sinkron lalu kasus tetap terkontrol di jalur restore tanpa eskalasi tambahan.',
+                tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+              },
+              {
+                label: 'Fallback',
+                detail: 'Jika restore tidak lagi layak, pindahkan ke queue dismantle agar terminate tidak tertahan di area Billing.',
+                tone: 'border-rose-200 bg-rose-50 text-rose-700',
+              },
+            ],
+          }),
+          correlationSummary: buildCaseCorrelationSummary({
+            customerName: item.customerName,
+            serviceNo: item.serviceNo,
+            owner: 'Billing / Collection',
+            billing: 'Menunggu restore',
+            isolation: 'Aktif',
+            ttSla: 'Monitor dampak',
+            dismantle: 'Belum ditransfer',
+          }),
+          decisionTrail: buildCaseDecisionTrail({
+            owner: 'Billing / Collection',
+            entries: [
+              {
+                label: 'Isolir dibuka',
+                detail: item.reason?.trim()
+                  ? `Kasus masuk isolir dengan alasan "${item.reason.trim()}".`
+                  : 'Kasus masuk isolir aktif dan perlu dibaca sebagai keputusan layanan yang belum final.',
+                happenedAt: item.isolationDate,
+                tone: 'border-amber-200 bg-amber-50 text-amber-700',
+              },
+              {
+                label: 'Billing menilai jalur restore',
+                detail: 'Kasus belum boleh dipindah ke terminate sebelum Billing atau collection memberi arah pemulihan layanan.',
+                tone: 'border-violet-200 bg-violet-50 text-violet-700',
+              },
+              {
+                label: 'Supervisor memonitor keputusan',
+                detail: 'CS_ADMIN menjaga agar kasus tetap terbaca lintas divisi sampai restore benar-benar diputuskan.',
+                tone: 'border-slate-200 bg-slate-50 text-slate-700',
+              },
+            ],
+          }),
+          evidencePanel: buildCaseEvidencePanel({
+            owner: 'Billing / Collection',
+            items: [
+              {
+                label: 'Alasan isolir terakhir',
+                detail: item.reason?.trim() || 'Belum ada alasan isolir tertulis pada kasus ini.',
+                happenedAt: item.isolationDate,
+                tone: 'border-amber-200 bg-amber-50 text-amber-700',
+              },
+              {
+                label: 'Acuan keputusan Billing',
+                detail: 'Billing masih menjadi domain yang harus memberi keputusan restore atau menahan kasus sebelum bergerak ke terminate.',
+                tone: 'border-violet-200 bg-violet-50 text-violet-700',
+              },
+              {
+                label: 'Scope layanan terkait',
+                detail: item.serviceNo?.trim()
+                  ? `Service aktif yang terkait adalah ${item.serviceNo.trim()}.`
+                  : 'Service number belum terbaca pada snapshot supervisor saat ini.',
+                tone: 'border-slate-200 bg-slate-50 text-slate-700',
+              },
+            ],
+          }),
+          handoffLinks: [
+            {
+              label: 'Buka Billing',
+              href: '/billing',
+            },
+            {
+              label: 'Transfer ke Dismantle CS',
+              href: buildSupportLaneActionHref('dismantle', 'dismantle-approve', {
+                isolation: buildIsolationPrefillToken(item.isolationId, item.customerName, 'Transfer Dismantle'),
+              }),
+            },
+          ],
+        })),
+        ...terminateCandidates.map((item) => ({
+          id: `dismantle-queue-${item.queueId}`,
+          domain: 'Support',
+          title: item.customerName,
+          subtitle: 'Owner CS & Admin CS / Dismantle',
+          status: 'OPEN',
+          priority: 'tinggi' as const,
+          detail: `${item.transferNote?.trim() || 'Belum ada catatan transfer'} • Queue terminate aktif ${formatNumber(Number(item.agingDays ?? 0))} hari sejak ${formatActivityTime(item.transferredAt)}.`,
+          href: buildSupportLaneActionHref('dismantle', 'dismantle-close', {
+            dismantle: buildDismantleQueuePrefillToken(item.queueId, item.customerName, 'Close Dismantle'),
+            focus: 'RECENT_DISMANTLE',
+          }),
+          actionLabel: 'Tutup Dismantle',
+          reason: 'Ownership sudah berpindah ke CS & Admin CS untuk finalisasi terminate, close histori, atau reopen bila keputusan lapangan berubah.',
+          owner: 'CS & Admin CS',
+          nextAction: 'Putuskan close ke histori atau reopen ke queue aktif',
+          blockingInfo: 'Kasus terminate menunggu keputusan supervisor dan catatan lapangan yang final.',
+          prefillToken: buildDismantleQueuePrefillToken(item.queueId, item.customerName, 'Close Dismantle'),
+          healthSignal: buildCaseHealthSignal({
+            label: 'Siap Terminate',
+            detail:
+              'Kasus sudah bergerak melewati isolir dan aktif di queue dismantle, sehingga fokus utamanya adalah finalisasi terminate serta disposition akhir Billing.',
+            tone: 'border-rose-200 bg-rose-50 text-rose-700',
+          }),
+          recommendedActions: buildCaseRecommendedActionMatrix({
+            owner: 'CS & Admin CS',
+            items: [
+              {
+                label: 'Finalisasi Close Dismantle',
+                detail: 'Lengkapi keputusan lapangan dan pindahkan kasus ke histori terminate final.',
+                href: buildSupportLaneActionHref('dismantle', 'dismantle-close', {
+                  dismantle: buildDismantleQueuePrefillToken(item.queueId, item.customerName, 'Close Dismantle'),
+                  focus: 'RECENT_DISMANTLE',
+                }),
+                tone: 'border-rose-200 bg-rose-50 text-rose-700',
+              },
+              {
+                label: 'Sinkron Disposition Billing',
+                detail: 'Pastikan write-off, disposition, atau status tagihan akhir ikut terbaca sebelum kasus ditutup penuh.',
+                href: '/billing',
+                tone: 'border-violet-200 bg-violet-50 text-violet-700',
+              },
+              {
+                label: 'Rollback ke Restore Jika Berubah',
+                detail: 'Kembalikan ke jalur recovery saat keputusan lapangan atau Billing berbalik dari terminate ke restore.',
+                href: buildSupportLaneActionHref('isolations', 'isolation-restore', {
+                  isolation: buildIsolationPrefillToken(item.isolationId, item.customerName, 'Owner Billing / Recovery'),
+                }),
+                tone: 'border-amber-200 bg-amber-50 text-amber-700',
+              },
+            ],
+          }),
+          actionOutcomeSummary: buildCaseActionOutcomeSummary({
+            owner: 'CS & Admin CS',
+            items: [
+              {
+                label: 'Target Hasil',
+                detail: 'Kasus terminate ditutup ke histori dengan metadata lapangan dan disposition Billing yang sudah cukup final.',
+                tone: 'border-rose-200 bg-rose-50 text-rose-700',
+              },
+              {
+                label: 'Sinyal Berhasil',
+                detail: 'Queue dismantle tidak lagi aktif untuk customer yang sama dan keputusan close tidak perlu dibuka ulang oleh supervisor.',
+                tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+              },
+              {
+                label: 'Fallback',
+                detail: 'Jika keputusan lapangan berubah atau disposition belum kuat, rollback ke restore atau reopen sebelum close final dipaksakan.',
+                tone: 'border-amber-200 bg-amber-50 text-amber-700',
+              },
+            ],
+          }),
+          correlationSummary: buildCaseCorrelationSummary({
+            customerName: item.customerName,
+            serviceNo: item.serviceNo,
+            owner: 'CS & Admin CS',
+            billing: 'Cek disposition',
+            isolation: 'Sudah diisolir',
+            ttSla: 'Pastikan aman',
+            dismantle: 'Queue aktif',
+          }),
+          decisionTrail: buildCaseDecisionTrail({
+            owner: 'CS & Admin CS',
+            entries: [
+              {
+                label: 'Isolir aktif lebih dulu',
+                detail: 'Kasus sudah melalui fase isolir sebelum diteruskan ke terminate atau close dismantle.',
+                happenedAt: item.isolationDate,
+                tone: 'border-amber-200 bg-amber-50 text-amber-700',
+              },
+              {
+                label: 'Transfer ke queue dismantle',
+                detail: item.transferNote?.trim()
+                  ? `Catatan transfer: ${item.transferNote.trim()}`
+                  : 'Kasus dipindahkan ke queue dismantle aktif untuk finalisasi lapangan.',
+                happenedAt: item.transferredAt,
+                tone: 'border-rose-200 bg-rose-50 text-rose-700',
+              },
+              {
+                label: 'Menunggu close final dan disposition Billing',
+                detail: 'CS & Admin CS menutup terminasi lapangan, sementara Billing tetap perlu membaca disposition akhir pelanggan.',
+                tone: 'border-violet-200 bg-violet-50 text-violet-700',
+              },
+            ],
+          }),
+          evidencePanel: buildCaseEvidencePanel({
+            owner: 'CS & Admin CS',
+            items: [
+              {
+                label: 'Catatan transfer terakhir',
+                detail: item.transferNote?.trim() || 'Belum ada catatan transfer tertulis pada queue dismantle ini.',
+                happenedAt: item.transferredAt,
+                tone: 'border-rose-200 bg-rose-50 text-rose-700',
+              },
+              {
+                label: 'Jejak fase isolir',
+                detail: 'Kasus sudah melalui fase isolir sebelum dipindahkan ke queue terminate aktif.',
+                happenedAt: item.isolationDate,
+                tone: 'border-amber-200 bg-amber-50 text-amber-700',
+              },
+              {
+                label: 'Scope layanan terkait',
+                detail: item.serviceNo?.trim()
+                  ? `Service aktif yang terkait adalah ${item.serviceNo.trim()}.`
+                  : 'Service number belum terbaca pada snapshot queue terminate saat ini.',
+                tone: 'border-slate-200 bg-slate-50 text-slate-700',
+              },
+            ],
+          }),
+          handoffLinks: [
+            {
+              label: 'Kembali ke Restore Billing',
+              href: buildSupportLaneActionHref('isolations', 'isolation-restore', {
+                isolation: buildIsolationPrefillToken(item.isolationId, item.customerName, 'Owner Billing / Recovery'),
+              }),
+            },
+            {
+              label: 'Buka Billing',
+              href: '/billing',
+            },
+          ],
         })),
         ...highRiskTickets.map((item) => ({
           id: `tt-risk-${item.ticketCode}`,
@@ -2022,7 +2494,140 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           status: 'OVERDUE',
           priority: 'tinggi' as const,
           detail: `${item.ticketType} • Ticket sudah terbuka ${formatNumber(Number(item.agingHours ?? 0))} jam dan perlu keputusan supervisor.`,
-          href: '/support/sla',
+          href: buildSupportLaneActionHref('sla', 'sla-manage', {
+            ticket: item.ticketCode,
+            focus: 'SLA_OVERDUE',
+          }),
+          actionLabel: 'Kontrol SLA',
+          owner: 'NOC / TT',
+          nextAction: 'Amankan SLA dulu, lalu tentukan apakah ticket cukup diprogress, perlu eskalasi, atau siap ditutup.',
+          healthSignal: buildCaseHealthSignal({
+            label: 'Masih Tertahan SLA',
+            detail:
+              'Kasus masih berada di jalur troubleshooting dan belum aman dipindah ke restore atau terminate sebelum tekanan SLA turun dan arah teknis lebih jelas.',
+            tone: 'border-orange-200 bg-orange-50 text-orange-700',
+          }),
+          recommendedActions: buildCaseRecommendedActionMatrix({
+            owner: 'NOC / TT',
+            items: [
+              {
+                label: 'Kontrol SLA Sekarang',
+                detail: 'Amankan batas layanan lebih dulu agar kasus tidak terus menumpuk di zona overdue.',
+                href: buildSupportLaneActionHref('sla', 'sla-manage', {
+                  ticket: item.ticketCode,
+                  focus: 'SLA_OVERDUE',
+                }),
+                tone: 'border-orange-200 bg-orange-50 text-orange-700',
+              },
+              {
+                label: 'Update Progress Ticket',
+                detail: 'Tuliskan progres teknis terbaru agar operator berikutnya tidak kehilangan konteks penanganan.',
+                href: buildSupportLaneActionHref('tt', 'ticket-progress', {
+                  ticket: item.ticketCode,
+                  focus: 'OPEN_TICKETS',
+                }),
+                tone: 'border-sky-200 bg-sky-50 text-sky-700',
+              },
+              {
+                label: 'Eskalasi Bila Tetap Mandek',
+                detail: 'Naikkan ticket jika hambatan teknis belum terselesaikan setelah kontrol SLA dan update progres.',
+                href: buildSupportLaneActionHref('tt', 'ticket-escalate', {
+                  ticket: item.ticketCode,
+                  focus: 'OPEN_TICKETS',
+                }),
+                tone: 'border-slate-200 bg-slate-50 text-slate-700',
+              },
+            ],
+          }),
+          actionOutcomeSummary: buildCaseActionOutcomeSummary({
+            owner: 'NOC / TT',
+            items: [
+              {
+                label: 'Target Hasil',
+                detail: 'Tekanan SLA turun dan ticket kembali berada di jalur progress yang bisa ditutup atau dipantau normal.',
+                tone: 'border-orange-200 bg-orange-50 text-orange-700',
+              },
+              {
+                label: 'Sinyal Berhasil',
+                detail: 'Ada progres teknis yang jelas, update ticket terbaru terbaca, dan kasus tidak lagi stagnan di zona overdue.',
+                tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+              },
+              {
+                label: 'Fallback',
+                detail: 'Jika SLA tetap menekan atau progres teknis mandek, eskalasi ticket agar supervisor tidak menunggu tanpa arah teknis.',
+                tone: 'border-slate-200 bg-slate-50 text-slate-700',
+              },
+            ],
+          }),
+          correlationSummary: buildCaseCorrelationSummary({
+            customerName: item.customerName,
+            serviceNo: item.serviceNo,
+            owner: 'NOC / TT',
+            billing: 'Pantau dampak',
+            isolation: 'Cek bila perlu',
+            ttSla: 'Overdue',
+            dismantle: 'Belum prioritas',
+          }),
+          decisionTrail: buildCaseDecisionTrail({
+            owner: 'NOC / TT',
+            entries: [
+              {
+                label: 'Ticket dibuka',
+                detail: `Ticket ${item.ticketType} aktif dan perlu penyelesaian teknis sebelum kasus bergeser ke keputusan layanan lain.`,
+                happenedAt: item.openedAt,
+                tone: 'border-sky-200 bg-sky-50 text-sky-700',
+              },
+              {
+                label: 'SLA masuk zona kritis',
+                detail: `Aging ${formatNumber(item.agingHours)} jam menandakan supervisor perlu mengontrol progres, eskalasi, atau penutupan.`,
+                tone: 'border-orange-200 bg-orange-50 text-orange-700',
+              },
+              {
+                label: 'Owner terakhir tetap NOC / TT',
+                detail: 'Billing, Isolir, atau Dismantle hanya perlu ikut membaca dampak kasus ini setelah jalur troubleshooting benar-benar jelas.',
+                tone: 'border-slate-200 bg-slate-50 text-slate-700',
+              },
+            ],
+          }),
+          evidencePanel: buildCaseEvidencePanel({
+            owner: 'NOC / TT',
+            items: [
+              {
+                label: 'Ticket aktif terakhir',
+                detail: `Ticket ${item.ticketType} masih berstatus ${item.status} dan belum ditutup.`,
+                happenedAt: item.openedAt,
+                tone: 'border-sky-200 bg-sky-50 text-sky-700',
+              },
+              {
+                label: 'Sinyal SLA kritis',
+                detail: `Aging ${formatNumber(item.agingHours)} jam menunjukkan kasus ini sudah melewati ambang pantau normal dan perlu kontrol supervisor.`,
+                tone: 'border-orange-200 bg-orange-50 text-orange-700',
+              },
+              {
+                label: 'Scope layanan terkait',
+                detail: item.serviceNo?.trim()
+                  ? `Service aktif yang terkait adalah ${item.serviceNo.trim()}.`
+                  : 'Service number belum terbaca pada snapshot ticket kritis saat ini.',
+                tone: 'border-slate-200 bg-slate-50 text-slate-700',
+              },
+            ],
+          }),
+          handoffLinks: [
+            {
+              label: 'Update Progress TT',
+              href: buildSupportLaneActionHref('tt', 'ticket-progress', {
+                ticket: item.ticketCode,
+                focus: 'OPEN_TICKETS',
+              }),
+            },
+            {
+              label: 'Eskalasi Ticket',
+              href: buildSupportLaneActionHref('tt', 'ticket-escalate', {
+                ticket: item.ticketCode,
+                focus: 'OPEN_TICKETS',
+              }),
+            },
+          ],
         })),
         ...portIssues.map((item) => ({
           id: `port-${item.portId}`,
@@ -2060,7 +2665,27 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         status: item.status,
         priority: 'tinggi',
         detail: `${item.ticketType} • Dibuka ${formatActivityTime(item.openedAt)}.`,
-        href: '/support',
+        href: buildSupportLaneActionHref('tt', 'ticket-progress', {
+          ticket: item.ticketCode,
+          focus: 'OPEN_TICKETS',
+        }),
+        actionLabel: 'Update Ticket',
+        handoffLinks: [
+          {
+            label: 'Kontrol SLA',
+            href: buildSupportLaneActionHref('sla', 'sla-manage', {
+              ticket: item.ticketCode,
+              focus: 'SLA_OVERDUE',
+            }),
+          },
+          {
+            label: 'Eskalasi Ticket',
+            href: buildSupportLaneActionHref('tt', 'ticket-escalate', {
+              ticket: item.ticketCode,
+              focus: 'OPEN_TICKETS',
+            }),
+          },
+        ],
       }))
     }
     case 'FIELD_TECHNICIAN': {
@@ -2097,26 +2722,31 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
       }))
     }
     case 'DISMANTLE_OPERATOR': {
+      await ensureSupportDismantleQueueTable()
       const rows = await runReviewDbQuery<DashboardDismantleRow>(`
         SELECT
-          id AS dismantleId,
-          customer_name AS customerName,
-          close_note AS closeNote,
-          CAST(closed_at AS CHAR) AS closedAt
-        FROM support_dismantle_history
-        ORDER BY closed_at DESC, id DESC
+          dq.id AS queueId,
+          0 AS dismantleId,
+          si.customer_name AS customerName,
+          dq.transfer_note AS closeNote,
+          NULL AS closedAt,
+          CAST(dq.transferred_at AS CHAR) AS transferredAt
+        FROM support_dismantle_queue dq
+        INNER JOIN support_isolations si
+          ON si.id = dq.isolation_id
+        ORDER BY dq.transferred_at DESC, dq.id DESC
         LIMIT 4
       `)
 
       return rows.map((item) => ({
-        id: `dismantle-${item.dismantleId}`,
+        id: `dismantle-queue-${item.queueId}`,
         domain: 'Support',
         title: item.customerName,
-        subtitle: 'Histori dismantle terbaru',
-        status: 'DONE',
-        priority: 'sedang',
-        detail: `${item.closeNote?.trim() || 'Belum ada catatan lapangan'} • Closed ${formatActivityTime(item.closedAt)}.`,
-        href: '/support',
+        subtitle: 'Queue dismantle aktif',
+        status: 'OPEN',
+        priority: 'tinggi',
+        detail: `${item.closeNote?.trim() || 'Belum ada catatan transfer'} • Masuk queue ${formatActivityTime(item.transferredAt)}.`,
+        href: '/support/dismantle',
       }))
     }
     case 'DIGITAL_CREATOR': {

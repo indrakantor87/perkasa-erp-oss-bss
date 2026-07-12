@@ -1,0 +1,16 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="perkasa-mark-gradient" x1="16" y1="16" x2="104" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1536FF"/>
+      <stop offset="0.38" stop-color="#00C2FF"/>
+      <stop offset="0.68" stop-color="#FF345D"/>
+      <stop offset="1" stop-color="#6C11D9"/>
+    </linearGradient>
+  </defs>
+  <path
+    d="M66 13C49 13 36 32 35 55C34 83 45 112 63 112C74 112 82 99 83 82C85 59 74 40 62 40C52 40 44 54 45 72C46 92 60 107 76 107C95 107 111 87 112 63C114 35 98 10 74 10C51 10 31 31 27 58C23 82 32 117 52 122"
+    stroke="url(#perkasa-mark-gradient)"
+    stroke-width="11"
+    stroke-linecap="round"
+  />
+</svg>

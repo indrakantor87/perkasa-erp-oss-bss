@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BillingDecisionHandoffPanel } from '@/components/billing-decision-handoff-panel'
 
 type BillingInvoiceStatusFormProps = {
   canUpdate: boolean
@@ -133,6 +134,28 @@ export function BillingInvoiceStatusForm({
 
   const batchSuggestions = nextStatus === 'SUSPENDED' ? suspendBatchSuggestions : reconnectBatchSuggestions
   const batchAllowed = nextStatus !== 'CANCELLED'
+
+  const handoffCopy = useMemo(() => {
+    if (nextStatus === 'SUSPENDED') {
+      return {
+        label: 'Suspend invoice harus langsung terbaca di Isolir dan SLA',
+        detail:
+          'Begitu invoice dipindahkan ke jalur suspend, Billing perlu memastikan queue Isolir membaca pelanggan sebagai kandidat follow-up aktif, sementara TT/SLA tetap dipantau bila masih ada gangguan teknis yang berjalan.',
+      }
+    }
+    if (nextStatus === 'OVERDUE') {
+      return {
+        label: 'Reconnect ke overdue mengaktifkan jalur recovery lintas Billing dan Support',
+        detail:
+          'Saat invoice suspend diaktifkan lagi, fokus bergeser ke recovery: Billing memonitor follow-up baru, Isolir menilai restore, dan Supervisor memastikan kasus tidak salah dibaca sebagai terminate.',
+      }
+    }
+    return {
+      label: 'Cancel invoice tetap butuh validasi lintas divisi',
+      detail:
+        'Pembatalan invoice yang belum terbayar perlu dibaca ulang oleh Supervisor dan Support agar tidak ada ticket, isolir, atau queue terminate yang masih bergerak berdasarkan invoice yang sudah dibatalkan.',
+    }
+  }, [nextStatus])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -278,6 +301,11 @@ export function BillingInvoiceStatusForm({
             <div className="mt-1">Catatan aktif: {currentSuggestion.actionNotes || '-'}</div>
           </div>
         ) : null}
+
+        <BillingDecisionHandoffPanel
+          decisionLabel={handoffCopy.label}
+          detail={handoffCopy.detail}
+        />
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">

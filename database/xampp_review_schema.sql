@@ -368,6 +368,20 @@ CREATE TABLE IF NOT EXISTS support_dismantle_history (
   CONSTRAINT fk_support_dismantle_history_isolation FOREIGN KEY (isolation_id) REFERENCES support_isolations(id)
 );
 
+CREATE TABLE IF NOT EXISTS support_dismantle_queue (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  isolation_id BIGINT UNSIGNED NOT NULL,
+  transfer_note TEXT NULL,
+  transferred_by_username VARCHAR(120) NOT NULL,
+  transferred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reopened_note TEXT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_support_dismantle_queue_isolation (isolation_id),
+  KEY idx_support_dismantle_queue_transferred_at (transferred_at),
+  CONSTRAINT fk_support_dismantle_queue_isolation FOREIGN KEY (isolation_id) REFERENCES support_isolations(id)
+);
+
 CREATE TABLE IF NOT EXISTS hr_employees (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   branch_id BIGINT UNSIGNED NULL,

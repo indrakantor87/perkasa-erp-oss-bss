@@ -120,7 +120,25 @@ Alasannya:
 - semua butuh review status legacy dan relasi ke subscription/customer
 - queue dismantle, SLA, dan evidence foto tetap bisa masuk ke staging yang sama tanpa memecah review operator ke banyak tabel kecil
 
-### 5. Billing
+### 5. Sales Coverage dan Marketing Activity
+
+- `staging_legacy_sales_coverage_records`
+- `staging_legacy_marketing_activity_records`
+- `staging_legacy_marketing_activity_area_records`
+
+Dipakai untuk `Wave 1C`:
+
+- `CoveredArea` legacy -> `sales_covered_areas`
+- `MarketingActivity` legacy -> `sales_marketing_activities`
+- relasi satu aktivitas ke banyak area tanpa membatasi model final hanya 4 kolom area seperti source lama
+
+Alasannya:
+
+- `sales_covered_areas` sudah ada di schema final, tetapi perlu landing zone staging sendiri
+- `MarketingActivity` legacy membawa relasi area jamak (`areaId` sampai `areaId4`)
+- model ERP final lebih rapi jika activity utama dipisah dari tabel relasi area
+
+### 6. Billing
 
 - `staging_legacy_billing_invoice_records`
 - `staging_legacy_billing_item_records`
@@ -134,7 +152,7 @@ Dipakai untuk:
 - pembayaran
 - histori collection
 
-### 6. Inventory
+### 7. Inventory
 
 - `staging_legacy_inventory_item_records`
 - `staging_legacy_inventory_movement_records`
@@ -146,7 +164,7 @@ Dipakai untuk:
 - barang keluar
 - hubungan ke work order jika nanti sudah ditemukan mapping yang valid
 
-### 7. Network
+### 8. Network
 
 - `staging_legacy_network_odp_records`
 
@@ -156,7 +174,12 @@ Dipakai untuk:
 - kapasitas dan okupansi awal ODP
 - review mapping ke `network_odp` tanpa mencampur domain ini ke inventory gudang
 
-### 8. HR
+Catatan `Wave 1C`:
+
+- `network_odp_ports` tidak diisi dari staging legacy karena production `Web PSB` tidak memiliki detail port per slot
+- bootstrap port dilakukan native di ERP setelah header `network_odp` tervalidasi
+
+### 9. HR
 
 - `staging_legacy_employee_records`
 - `staging_legacy_attendance_records`

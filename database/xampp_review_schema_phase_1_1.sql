@@ -28,6 +28,36 @@ CREATE TABLE IF NOT EXISTS sales_covered_areas (
   CONSTRAINT fk_sales_covered_areas_branch FOREIGN KEY (branch_id) REFERENCES org_branches(id)
 );
 
+CREATE TABLE IF NOT EXISTS sales_marketing_activities (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  branch_id BIGINT UNSIGNED NULL,
+  activity_date DATETIME NOT NULL,
+  marketing_name VARCHAR(120) NOT NULL,
+  activity_type VARCHAR(150) NOT NULL,
+  notes TEXT NULL,
+  source_system ENUM('WEB_PSB','FINANCE','GA') NOT NULL DEFAULT 'WEB_PSB',
+  legacy_id VARCHAR(100) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_sales_marketing_activities_source_legacy (source_system, legacy_id),
+  KEY idx_sales_marketing_activities_branch_date (branch_id, activity_date),
+  CONSTRAINT fk_sales_marketing_activities_branch FOREIGN KEY (branch_id) REFERENCES org_branches(id)
+);
+
+CREATE TABLE IF NOT EXISTS sales_marketing_activity_areas (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  activity_id BIGINT UNSIGNED NOT NULL,
+  covered_area_id BIGINT UNSIGNED NOT NULL,
+  sort_order INT NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_sales_marketing_activity_areas_pair (activity_id, covered_area_id),
+  KEY idx_sales_marketing_activity_areas_sort (activity_id, sort_order),
+  CONSTRAINT fk_sales_marketing_activity_areas_activity FOREIGN KEY (activity_id) REFERENCES sales_marketing_activities(id),
+  CONSTRAINT fk_sales_marketing_activity_areas_covered_area FOREIGN KEY (covered_area_id) REFERENCES sales_covered_areas(id)
+);
+
 CREATE TABLE IF NOT EXISTS sales_surveys (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   lead_id BIGINT UNSIGNED NULL,

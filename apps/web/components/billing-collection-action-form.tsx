@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BillingDecisionHandoffPanel } from '@/components/billing-decision-handoff-panel'
 
 type BillingCollectionActionFormProps = {
   canCreate: boolean
@@ -125,6 +126,35 @@ export function BillingCollectionActionForm({
       return 'siap reconnect'
     }
     return 'tindak lanjut'
+  }, [actionType])
+
+  const handoffCopy = useMemo(() => {
+    if (actionType === 'SUSPEND') {
+      return {
+        label: 'Keputusan suspend siap diteruskan ke Isolir dan SLA',
+        detail:
+          'Setelah action suspend dibuka, tim perlu menyelaraskan kasus pelanggan pada queue isolir aktif, memantau ticket yang berisiko melewati SLA, dan menyiapkan supervisor jika kasus bergerak ke terminate.',
+      }
+    }
+    if (actionType === 'RECONNECT') {
+      return {
+        label: 'Keputusan reconnect siap diteruskan ke recovery Billing dan Isolir',
+        detail:
+          'Action reconnect perlu disambungkan ke jalur restore agar support membaca pelanggan sebagai kandidat pemulihan layanan, bukan terminate.',
+      }
+    }
+    if (actionType === 'PROMISE_TO_PAY') {
+      return {
+        label: 'Janji bayar menahan keputusan isolir atau terminate',
+        detail:
+          'Promise to pay menjaga kasus tetap pada jalur follow-up Billing. Queue isolir, SLA, dan supervisor tetap perlu memonitor agar tidak salah didorong ke terminate terlalu cepat.',
+      }
+    }
+    return {
+      label: 'Collection follow-up tetap perlu sinkron lintas divisi',
+      detail:
+        'Reminder, call, atau visit yang dibuka di Billing sebaiknya selalu dibaca ulang terhadap kondisi Isolir, TT/SLA, dan kebutuhan eskalasi supervisor agar keputusan layanan tetap sinkron.',
+    }
   }, [actionType])
 
   const allowedActionStatuses = useMemo(
@@ -317,6 +347,13 @@ export function BillingCollectionActionForm({
             <div className="mt-1">Catatan terakhir: {currentSuggestion.actionNotes || '-'}</div>
           </div>
         ) : null}
+
+        <div className="lg:col-span-2">
+          <BillingDecisionHandoffPanel
+            decisionLabel={handoffCopy.label}
+            detail={handoffCopy.detail}
+          />
+        </div>
 
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">

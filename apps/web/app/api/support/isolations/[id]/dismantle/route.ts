@@ -1,7 +1,11 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
+import {
+  buildSupportDismantleTransferNote,
+  ensureSupportDismantleQueueTable,
+} from '@/lib/services/support-dismantle-service'
 import { canProcessSupportDismantle } from '@/lib/support-lanes'
 
 type ReviewIsolationRow = {
@@ -14,6 +18,10 @@ type ReviewIsolationRow = {
   status: string
   closeNote: string | null
   archivedAt: string | Date | null
+}
+
+type ReviewDismantleQueueRow = {
+  id: number
 }
 
 function normalizeRequiredText(value: unknown) {
@@ -58,22 +66,24 @@ export async function POST(
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     return Response.json(
-      { message: 'Flow dismantle hanya aktif saat review DB benar-benar tersedia.' },
+      { message: 'Flow transfer dismantle hanya aktif saat review DB benar-benar tersedia.' },
       { status: 503 }
     )
   }
 
   try {
+    await ensureSupportDismantleQueueTable()
+
     const resolvedParams = await params
     const isolationId = String(resolvedParams.id ?? '').trim()
     if (!isolationId) {
       return Response.json({ message: 'ID isolir tidak valid.' }, { status: 400 })
     }
 
-    const payload = (await request.json()) as { closeNote?: unknown }
-    const closeNote = normalizeRequiredText(payload.closeNote)
-    if (!closeNote) {
-      return Response.json({ message: 'Catatan dismantle wajib diisi.' }, { status: 400 })
+    const payload = (await request.json()) as { transferNote?: unknown; closeNote?: unknown }
+    const transferNote = normalizeRequiredText(payload.transferNote ?? payload.closeNote)
+    if (!transferNote) {
+      return Response.json({ message: 'Catatan transfer dismantle wajib diisi.' }, { status: 400 })
     }
 
     const isolation = await getIsolationById(isolationId)
@@ -84,49 +94,41 @@ export async function POST(
       return Response.json({ message: `Isolir ${isolation.id} sudah masuk histori dismantle.` }, { status: 409 })
     }
 
-    const normalizedCloseNote = `[Dismantled via web] ${session.displayName} (${session.username}) - ${closeNote}`
-
-    await runReviewDbExecute(
+    const existingQueue = await runReviewDbQuery<ReviewDismantleQueueRow>(
       `
-        INSERT INTO support_dismantle_history (
-          isolation_id,
-          customer_name,
-          customer_address,
-          customer_phone,
-          marketing_name,
-          radbox_name,
-          closed_at,
-          close_note
-        )
-        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+        SELECT id
+        FROM support_dismantle_queue
+        WHERE isolation_id = ?
+        LIMIT 1
       `,
-      [
-        isolation.id,
-        isolation.customerName,
-        isolation.customerAddress,
-        isolation.customerPhone,
-        isolation.marketingName,
-        isolation.radboxName,
-        normalizedCloseNote,
-      ]
+      [isolation.id]
     )
+    if (existingQueue[0]) {
+      return Response.json({ message: `Isolir ${isolation.id} sudah ada di queue dismantle.` }, { status: 409 })
+    }
 
-    await runReviewDbExecute(
-      `
-        UPDATE support_isolations
-        SET
-          status = 'CLOSED',
-          close_note = ?,
-          is_archived = 1,
-          archived_at = CURRENT_TIMESTAMP,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `,
-      [normalizedCloseNote, isolation.id]
-    )
+    const normalizedTransferNote = buildSupportDismantleTransferNote(session, transferNote)
+
+    await runReviewDbTransaction(async (connection) => {
+      await connection.query(
+        `
+          INSERT INTO support_dismantle_queue (
+            isolation_id,
+            transfer_note,
+            transferred_by_username
+          )
+          VALUES (?, ?, ?)
+        `,
+        [
+          isolation.id,
+          normalizedTransferNote,
+          session.username,
+        ],
+      )
+    })
 
     return Response.json({
-      message: `Isolir ${isolation.id} untuk ${isolation.customerName} berhasil dipindahkan ke histori dismantle.`,
+      message: `Isolir ${isolation.id} untuk ${isolation.customerName} berhasil dipindahkan ke queue dismantle.`,
     })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })

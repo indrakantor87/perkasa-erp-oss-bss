@@ -26,7 +26,7 @@ export function SupportDismantleForm({
   const [isolationValue, setIsolationValue] = useState(
     initialIsolationValue?.trim() || isolationSuggestions[0] || '',
   )
-  const [closeNote, setCloseNote] = useState('')
+  const [transferNote, setTransferNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
@@ -61,7 +61,7 @@ export function SupportDismantleForm({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          closeNote,
+          transferNote,
         }),
       })
 
@@ -69,17 +69,17 @@ export function SupportDismantleForm({
       if (!response.ok) {
         setFeedback({
           tone: 'error',
-          message: payload?.message || 'Dismantle gagal diproses di review DB.',
+          message: payload?.message || 'Transfer ke queue dismantle gagal diproses di review DB.',
         })
         return
       }
 
       setFeedback({
         tone: 'success',
-        message: payload?.message || 'Dismantle berhasil diproses.',
+        message: payload?.message || 'Transfer ke queue dismantle berhasil diproses.',
       })
       setIsolationValue(isolationSuggestions[0] ?? '')
-      setCloseNote('')
+      setTransferNote('')
       router.refresh()
     } finally {
       setSubmitting(false)
@@ -90,14 +90,14 @@ export function SupportDismantleForm({
     <section className="panel p-6">
       <p className="section-title">Dismantle Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-        Pindahkan ke histori dismantle
+        Transfer ke queue dismantle
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">
         {!canProcess
           ? 'Role aktif belum memiliki akses operasional untuk memproses dismantle pada lane ini.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi flow dismantle dinonaktifkan agar tidak menulis ke mock.'
-            : 'Form ini menyimpan snapshot pelanggan ke histori dismantle lalu mengarsipkan sumber isolir agar jejak operasional tetap aman.'}
+            : 'Form ini memindahkan isolir aktif ke queue dismantle terlebih dahulu, sehingga terminasi final dan histori close diproses pada tahap berikutnya.'}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
@@ -120,12 +120,12 @@ export function SupportDismantleForm({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Catatan Dismantle</span>
+          <span className="font-semibold text-slate-950">Catatan Transfer</span>
           <textarea
-            value={closeNote}
-            onChange={(event) => setCloseNote(event.target.value)}
+            value={transferNote}
+            onChange={(event) => setTransferNote(event.target.value)}
             className="min-h-28 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            placeholder="Alasan terminasi, pelepasan perangkat, atau catatan lapangan"
+            placeholder="Alasan terminasi, status perangkat, atau konteks kenapa kasus dipindahkan ke queue dismantle"
             required
             disabled={isDisabled}
           />
@@ -133,14 +133,14 @@ export function SupportDismantleForm({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Data sumber akan diarsipkan setelah berhasil dipindahkan ke histori dismantle.
+            Data sumber belum diarsipkan pada tahap ini. Final close dilakukan dari queue dismantle aktif.
           </div>
           <button
             type="submit"
             disabled={isDisabled}
             className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            {submitting ? 'Memproses Dismantle...' : 'Simpan Dismantle'}
+            {submitting ? 'Memindahkan Queue...' : 'Transfer Ke Dismantle'}
           </button>
         </div>
       </form>

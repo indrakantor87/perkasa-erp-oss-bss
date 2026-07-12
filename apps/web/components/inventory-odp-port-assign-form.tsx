@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type InventoryOdpPortAssignFormProps = {
-  canCreate: boolean
+  canUpdate: boolean
   reviewDbReady: boolean
   odpSuggestions: string[]
 }
@@ -15,7 +15,7 @@ function extractOdpCode(value: string) {
 }
 
 export function InventoryOdpPortAssignForm({
-  canCreate,
+  canUpdate,
   reviewDbReady,
   odpSuggestions,
 }: InventoryOdpPortAssignFormProps) {
@@ -28,7 +28,7 @@ export function InventoryOdpPortAssignForm({
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
-  const isDisabled = !canCreate || !reviewDbReady || submitting
+  const isDisabled = !canUpdate || !reviewDbReady || submitting
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -91,8 +91,8 @@ export function InventoryOdpPortAssignForm({
         Assign port ODP
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">
-        {!canCreate
-          ? 'Role aktif belum memiliki izin create pada domain Inventory.'
+        {!canUpdate
+          ? 'Role aktif belum memiliki izin update pada domain Inventory.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi write action assign port dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini menandai port ODP sebagai USED dan menautkan ke subscription/customer bila tersedia.'}

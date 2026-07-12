@@ -1,7 +1,13 @@
 import Link from 'next/link'
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
+import { CaseActionOutcomeSummaryCard } from '@/components/case-action-outcome-summary'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
 import { BillingCollectionResolveForm } from '@/components/billing-collection-resolve-form'
+import { CaseDecisionTrailPanel } from '@/components/case-decision-trail'
+import { CaseEvidencePanelCard } from '@/components/case-evidence-panel'
+import { CaseHealthSignalCard } from '@/components/case-health-signal'
+import { CaseNextActionMatrixCard } from '@/components/case-next-action-matrix'
+import { CaseCorrelationSummaryPanel } from '@/components/case-correlation-summary'
 import { BillingInvoiceGenerateForm } from '@/components/billing-invoice-generate-form'
 import { BillingInvoiceStatusForm } from '@/components/billing-invoice-status-form'
 import { BillingPaymentForm } from '@/components/billing-payment-form'
@@ -43,7 +49,9 @@ import { SalesOrderCreateForm } from '@/components/sales-order-create-form'
 import { SalesSubscriptionActivateForm } from '@/components/sales-subscription-activate-form'
 import { SalesSurveyCreateForm } from '@/components/sales-survey-create-form'
 import { SalesWorkOrderCreateForm } from '@/components/sales-work-order-create-form'
+import { SupportDismantleCloseForm } from '@/components/support-dismantle-close-form'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
+import { SupportDismantleReopenForm } from '@/components/support-dismantle-reopen-form'
 import { SupportLaneDetailPanel } from '@/components/support-lane-detail-panel'
 import { SupportIsolationForm } from '@/components/support-isolation-form'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
@@ -60,10 +68,16 @@ import { SupportSlaQueuePanel } from '@/components/support-sla-queue-panel'
 import { SupportTroubleTicketQueuePanel } from '@/components/support-tt-queue-panel'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { getRoleMeta } from '@/lib/role-meta'
-import { getSupportActionAnchorId } from '@/lib/support-action-links'
+import { buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
 import { canProcessSupportDismantle, canUseSupportAction, getSupportLanePath } from '@/lib/support-lanes'
 import type {
   AppRole,
+  CaseActionOutcomeSummary,
+  CaseCorrelationSummary,
+  CaseDecisionTrail,
+  CaseEvidencePanel,
+  CaseHealthSignal,
+  CaseRecommendedActionMatrix,
   DomainCapability,
   DomainFormPrefill,
   DomainKey,
@@ -148,7 +162,15 @@ const supportActionCopyMap: Record<
   },
   'dismantle-approve': {
     label: 'Approve Dismantle',
-    description: 'Finalisasi terminasi pelanggan yang memang sudah siap dipindahkan ke proses dismantle.',
+    description: 'Transfer pelanggan dari isolir aktif ke queue dismantle agar terminasi final diproses bertahap.',
+  },
+  'dismantle-close': {
+    label: 'Close Dismantle',
+    description: 'Tutup queue dismantle aktif ke histori permanen setelah terminasi lapangan benar-benar selesai.',
+  },
+  'dismantle-reopen': {
+    label: 'Reopen Dismantle',
+    description: 'Buka kembali histori dismantle ke queue aktif saat kasus perlu dikoreksi atau dibuka ulang.',
   },
 }
 
@@ -353,7 +375,7 @@ function getInventorySectionAction(params: {
       description: 'Catat stok masuk sebelum dipakai oleh proses lapangan.',
     }
   }
-  if (title.includes('PORT') && params.canCreate && !params.isFieldTechnicianInventory) {
+  if (title.includes('PORT') && params.canUpdate && !params.isFieldTechnicianInventory) {
     return {
       key: 'odp-port-assign' as const,
       label: 'Assign Port',
@@ -622,6 +644,470 @@ function buildPrefillHref(anchorId: string, params: Record<string, string | unde
   return `${queryText ? `?${queryText}` : ''}#${anchorId}`
 }
 
+function buildSupportCaseHref(params: {
+  lane: SupportLaneKey
+  focus: string
+  customer?: string
+  service?: string
+}) {
+  return buildSupportLaneHref(params.lane, {
+    focus: params.focus,
+    customer: params.customer,
+    service: params.service,
+  })
+}
+
+function getReviewRowStatusTone(status: string) {
+  const normalized = status.trim().toUpperCase()
+  if (normalized.includes('OVERDUE') || normalized.includes('FAILED') || normalized.includes('BLOCKED')) {
+    return 'border-rose-200 bg-rose-50 text-rose-700'
+  }
+  if (normalized.includes('ACTIVE') || normalized.includes('OPEN') || normalized.includes('PROGRESS')) {
+    return 'border-sky-200 bg-sky-50 text-sky-700'
+  }
+  if (normalized.includes('PENDING') || normalized.includes('REVIEW') || normalized.includes('HOLD')) {
+    return 'border-amber-200 bg-amber-50 text-amber-700'
+  }
+  if (normalized.includes('DONE') || normalized.includes('CLOSE') || normalized.includes('PAID') || normalized.includes('SUCCESS')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+  return 'border-slate-200 bg-slate-50 text-slate-700'
+}
+
+function getReviewRowMetaHighlights(meta: string[]) {
+  return meta.slice(0, 4)
+}
+
+type DomainReviewRowAction = {
+  label: string
+  href: string
+  secondaryLabel?: string
+  secondaryHref?: string
+}
+
+function buildBillingDecisionTrail(row: DomainReviewRow, sectionTitle: string): CaseDecisionTrail | null {
+  const title = sectionTitle.trim().toUpperCase()
+  const invoiceStatus = pickReviewMetaValue(row.meta, 'Invoice Status: ') || row.status
+  const collectionStatus = pickReviewMetaValue(row.meta, 'Collection Status: ')
+  const followUpState = pickReviewMetaValue(row.meta, 'Follow Up State: ')
+  const actionType = pickReviewMetaValue(row.meta, 'Action Type: ') || row.primary
+  const invoiceDue = pickReviewMetaValue(row.meta, 'Invoice Due: ')
+  const followUp = pickReviewMetaValue(row.meta, 'Follow Up: ')
+  const actionAt = pickReviewMetaValue(row.meta, 'Action At: ')
+  const updatedAt = pickReviewMetaValue(row.meta, 'Updated: ')
+  const isReconnect = title.includes('RECONNECT') || collectionStatus.toUpperCase() === 'RECONNECT'
+  const isSuspend = title.includes('SUSPEND') || pickReviewMetaValue(row.meta, 'Suspend Candidate: ').toUpperCase() === 'YA'
+  const isTerminate = title.includes('WRITE OFF') || row.detail.toUpperCase().includes('TERMINASI')
+
+  if (!title.includes('INVOICE') && !title.includes('COLLECTION') && !title.includes('PAYMENT')) {
+    return null
+  }
+
+  return {
+    owner: isReconnect ? 'Billing / Recovery' : isTerminate ? 'Billing + CS & Admin CS' : 'Billing / Collection',
+    items: [
+      {
+        label: 'Status Billing terakhir',
+        detail: `Status saat ini ${collectionStatus || invoiceStatus || actionType}.`,
+        happenedAt: actionAt || updatedAt || invoiceDue || undefined,
+        tone: 'border-violet-200 bg-violet-50 text-violet-700',
+      },
+      {
+        label: 'Kontrol follow-up aktif',
+        detail:
+          followUpState
+            ? `Follow-up terbaca sebagai ${followUpState} dan tetap perlu dijaga agar keputusan layanan tidak melompat terlalu cepat.`
+            : isSuspend
+              ? 'Billing sedang berada di jalur suspend sehingga Isolir perlu dibaca sebagai dampak layanan yang mungkin aktif.'
+              : isReconnect
+                ? 'Billing berada di jalur reconnect sehingga fokus utamanya adalah pemulihan layanan, bukan terminate.'
+                : 'Billing tetap memegang kontrol awal sebelum kasus diserahkan ke lane support yang lebih spesifik.',
+        happenedAt: followUp || invoiceDue || updatedAt || undefined,
+        tone: 'border-sky-200 bg-sky-50 text-sky-700',
+      },
+      {
+        label: 'Keputusan lintas domain berikutnya',
+        detail: isTerminate
+          ? 'Kasus mulai mendekati jalur terminate sehingga CS & Admin CS dan Dismantle perlu ikut membaca disposition terakhir.'
+          : isReconnect
+            ? 'Kasus mengarah ke restore atau recovery sehingga Isolir menjadi jalur tindak lanjut paling dekat.'
+            : 'Kasus tetap perlu diselaraskan ke TT/SLA atau Isolir tergantung dampak operasional pelanggan.',
+        tone: 'border-amber-200 bg-amber-50 text-amber-700',
+      },
+    ],
+  }
+}
+
+function buildBillingEvidencePanel(row: DomainReviewRow, sectionTitle: string): CaseEvidencePanel | null {
+  const title = sectionTitle.trim().toUpperCase()
+  const actionNotes = pickReviewMetaValue(row.meta, 'Action Notes: ')
+  const invoiceDue = pickReviewMetaValue(row.meta, 'Invoice Due: ')
+  const followUp = pickReviewMetaValue(row.meta, 'Follow Up: ')
+  const actionAt = pickReviewMetaValue(row.meta, 'Action At: ')
+  const updatedAt = pickReviewMetaValue(row.meta, 'Updated: ')
+  const service = pickReviewMetaValue(row.meta, 'Service: ')
+  const collectionStatus = pickReviewMetaValue(row.meta, 'Collection Status: ')
+  const invoiceStatus = pickReviewMetaValue(row.meta, 'Invoice Status: ') || row.status
+
+  if (!title.includes('INVOICE') && !title.includes('COLLECTION') && !title.includes('PAYMENT')) {
+    return null
+  }
+
+  return {
+    owner: title.includes('RECONNECT') ? 'Billing / Recovery' : 'Billing / Collection',
+    items: [
+      {
+        label: 'Catatan action terakhir',
+        detail:
+          actionNotes && actionNotes !== '-'
+            ? actionNotes
+            : row.detail,
+        happenedAt: actionAt || updatedAt || undefined,
+        tone: 'border-violet-200 bg-violet-50 text-violet-700',
+      },
+      {
+        label: 'Batas due atau follow-up',
+        detail:
+          followUp && followUp !== '-'
+            ? `Follow-up aktif tercatat pada ${followUp}.`
+            : invoiceDue && invoiceDue !== '-'
+              ? `Invoice due tercatat pada ${invoiceDue}.`
+              : `Status tagihan saat ini ${collectionStatus || invoiceStatus}.`,
+        happenedAt: followUp || invoiceDue || updatedAt || undefined,
+        tone: 'border-sky-200 bg-sky-50 text-sky-700',
+      },
+      {
+        label: 'Scope service terkait',
+        detail: service ? `Kasus terkait service ${service}.` : 'Service belum terbaca pada row Billing ini.',
+        tone: 'border-slate-200 bg-slate-50 text-slate-700',
+      },
+    ],
+  }
+}
+
+function buildBillingHealthSignal(row: DomainReviewRow, sectionTitle: string): CaseHealthSignal | null {
+  const title = sectionTitle.trim().toUpperCase()
+  const collectionStatus = pickReviewMetaValue(row.meta, 'Collection Status: ').toUpperCase()
+  const followUpState = pickReviewMetaValue(row.meta, 'Follow Up State: ').toUpperCase()
+  const suspendCandidate = pickReviewMetaValue(row.meta, 'Suspend Candidate: ').toUpperCase()
+  const actionType = pickReviewMetaValue(row.meta, 'Action Type: ').toUpperCase()
+  const isReconnect = title.includes('RECONNECT') || collectionStatus === 'RECONNECT'
+  const isTerminate = title.includes('WRITE OFF') || row.detail.toUpperCase().includes('TERMINASI')
+  const isSuspend = title.includes('SUSPEND') || suspendCandidate === 'YA'
+
+  if (!title.includes('INVOICE') && !title.includes('COLLECTION') && !title.includes('PAYMENT')) {
+    return null
+  }
+
+  if (isReconnect) {
+    return {
+      label: 'Aman Direstore',
+      detail:
+        'Billing sudah bergerak ke jalur recovery atau reconnect, sehingga kasus paling dekat untuk dibaca sebagai kandidat restore layanan.',
+      tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    }
+  }
+
+  if (isTerminate || actionType === 'WRITE_OFF') {
+    return {
+      label: 'Siap Terminate',
+      detail:
+        'Kasus sudah mendekati jalur terminate atau write-off sehingga CS & Admin CS dan Dismantle perlu ikut membaca keputusan akhir.',
+      tone: 'border-rose-200 bg-rose-50 text-rose-700',
+    }
+  }
+
+  if (isSuspend || followUpState === 'OVERDUE' || followUpState === 'SCHEDULED') {
+    return {
+      label: 'Butuh Follow-Up Billing',
+      detail:
+        'Billing masih menjadi domain utama yang harus menutup follow-up sebelum kasus aman bergerak ke restore atau terminate.',
+      tone: 'border-violet-200 bg-violet-50 text-violet-700',
+    }
+  }
+
+  return {
+    label: 'Perlu Review Supervisor',
+    detail:
+      'Sinyal kasus belum cukup tegas untuk masuk ke restore atau terminate, sehingga supervisor dan Billing tetap perlu membaca konteks lintas domain.',
+    tone: 'border-slate-200 bg-slate-50 text-slate-700',
+  }
+}
+
+function buildBillingRecommendedActionMatrix(
+  row: DomainReviewRow,
+  sectionTitle: string,
+  rowAction: DomainReviewRowAction | null,
+): CaseRecommendedActionMatrix | null {
+  const title = sectionTitle.trim().toUpperCase()
+  const customerName = pickReviewMetaValue(row.meta, 'Customer: ') || row.secondary
+  const serviceNo = pickReviewMetaValue(row.meta, 'Service: ')
+  const collectionStatus = pickReviewMetaValue(row.meta, 'Collection Status: ').toUpperCase()
+  const followUpState = pickReviewMetaValue(row.meta, 'Follow Up State: ').toUpperCase()
+  const suspendCandidate = pickReviewMetaValue(row.meta, 'Suspend Candidate: ').toUpperCase()
+  const actionType = pickReviewMetaValue(row.meta, 'Action Type: ').toUpperCase()
+  const isReconnect = title.includes('RECONNECT') || collectionStatus === 'RECONNECT'
+  const isTerminate = title.includes('WRITE OFF') || row.detail.toUpperCase().includes('TERMINASI')
+  const isSuspend = title.includes('SUSPEND') || suspendCandidate === 'YA'
+  const preferSla = followUpState === 'OVERDUE'
+
+  if (!title.includes('INVOICE') && !title.includes('COLLECTION') && !title.includes('PAYMENT')) {
+    return null
+  }
+
+  const supportLink = isReconnect || isSuspend
+    ? {
+        label: rowAction?.secondaryLabel || 'Buka Isolir Terkait',
+        detail: isReconnect
+          ? 'Pastikan recovery di Billing sinkron dengan kasus isolir aktif agar restore tidak kehilangan konteks layanan.'
+          : 'Baca isolir aktif untuk memastikan suspend atau hold billing benar-benar sesuai kondisi layanan pelanggan.',
+        href:
+          rowAction?.secondaryHref ||
+          buildSupportCaseHref({
+            lane: 'isolations',
+            focus: 'ACTIVE_ISOLATIONS',
+            customer: customerName,
+            service: serviceNo,
+          }),
+        tone: isReconnect
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          : 'border-amber-200 bg-amber-50 text-amber-700',
+      }
+    : isTerminate || actionType === 'WRITE_OFF'
+      ? {
+          label: rowAction?.secondaryLabel || 'Buka Dismantle Terkait',
+          detail: 'Sambungkan keputusan write-off atau terminate Billing dengan queue CS & Admin CS yang akan menutup kasus di lapangan.',
+          href:
+            rowAction?.secondaryHref ||
+            buildSupportCaseHref({
+              lane: 'dismantle',
+              focus: 'RECENT_DISMANTLE',
+              customer: customerName,
+              service: serviceNo,
+            }),
+          tone: 'border-rose-200 bg-rose-50 text-rose-700',
+        }
+      : {
+          label: rowAction?.secondaryLabel || (preferSla ? 'Buka SLA Terkait' : 'Buka TT Terkait'),
+          detail: preferSla
+            ? 'Pantau tekanan SLA agar follow-up collection tidak berjalan tanpa konteks gangguan layanan yang masih aktif.'
+            : 'Buka ticket support terkait untuk membaca dampak teknis sebelum keputusan Billing diteruskan.',
+          href:
+            rowAction?.secondaryHref ||
+            buildSupportCaseHref({
+              lane: preferSla ? 'sla' : 'tt',
+              focus: preferSla ? 'SLA_OVERDUE' : 'OPEN_TICKETS',
+              customer: customerName,
+              service: serviceNo,
+            }),
+          tone: preferSla
+            ? 'border-orange-200 bg-orange-50 text-orange-700'
+            : 'border-sky-200 bg-sky-50 text-sky-700',
+        }
+
+  const primaryAction = rowAction
+    ? {
+        label: rowAction.label,
+        detail: isReconnect
+          ? 'Gunakan action Billing ini untuk mengunci keputusan recovery sebelum layanan benar-benar direstore.'
+          : isTerminate || actionType === 'WRITE_OFF'
+            ? 'Tegaskan disposition akhir Billing agar terminate tidak berhenti di tengah antara collection dan penutupan lapangan.'
+            : isSuspend || followUpState === 'OVERDUE' || followUpState === 'SCHEDULED'
+              ? 'Selesaikan follow-up Billing terlebih dulu supaya jalur suspend, restore, atau terminate punya dasar keputusan yang jelas.'
+              : 'Perbarui status Billing agar supervisor dan lane support membaca keputusan yang sama.',
+        href: rowAction.href,
+        tone: isReconnect
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          : isTerminate || actionType === 'WRITE_OFF'
+            ? 'border-violet-200 bg-violet-50 text-violet-700'
+            : 'border-violet-200 bg-violet-50 text-violet-700',
+      }
+    : {
+        label: 'Buka Antrean Billing',
+        detail: 'Mulai dari review Billing untuk memastikan status invoice, collection, dan follow-up tidak tertinggal.',
+        href: '/billing',
+        tone: 'border-violet-200 bg-violet-50 text-violet-700',
+      }
+
+  const reviewAction = {
+    label: isReconnect ? 'Audit Recovery Billing' : isTerminate ? 'Audit Disposition Billing' : 'Review Antrean Billing',
+    detail: isReconnect
+      ? 'Periksa invoice, payment, dan follow-up agar reconnect benar-benar siap tanpa blocker administratif.'
+      : isTerminate
+        ? 'Pastikan write-off, tagihan akhir, dan catatan customer sinkron sebelum kasus ditutup permanen.'
+        : 'Baca kembali meta Billing, due date, dan follow-up agar keputusan lintas lane tetap satu arah.',
+    href: '/billing',
+    tone: 'border-slate-200 bg-slate-50 text-slate-700',
+  }
+
+  const items = [primaryAction, supportLink, reviewAction].filter(
+    (item, index, array) => array.findIndex((candidate) => candidate.href === item.href && candidate.label === item.label) === index,
+  )
+
+  return {
+    owner: isReconnect ? 'Billing / Recovery' : isTerminate ? 'Billing + CS & Admin CS' : 'Billing / Collection',
+    items,
+  }
+}
+
+function buildBillingActionOutcomeSummary(
+  row: DomainReviewRow,
+  sectionTitle: string,
+): CaseActionOutcomeSummary | null {
+  const title = sectionTitle.trim().toUpperCase()
+  const collectionStatus = pickReviewMetaValue(row.meta, 'Collection Status: ').toUpperCase()
+  const followUpState = pickReviewMetaValue(row.meta, 'Follow Up State: ').toUpperCase()
+  const suspendCandidate = pickReviewMetaValue(row.meta, 'Suspend Candidate: ').toUpperCase()
+  const actionType = pickReviewMetaValue(row.meta, 'Action Type: ').toUpperCase()
+  const isReconnect = title.includes('RECONNECT') || collectionStatus === 'RECONNECT'
+  const isTerminate = title.includes('WRITE OFF') || row.detail.toUpperCase().includes('TERMINASI')
+  const isSuspend = title.includes('SUSPEND') || suspendCandidate === 'YA'
+
+  if (!title.includes('INVOICE') && !title.includes('COLLECTION') && !title.includes('PAYMENT')) {
+    return null
+  }
+
+  if (isReconnect) {
+    return {
+      owner: 'Billing / Recovery',
+      items: [
+        {
+          label: 'Target Hasil',
+          detail: 'Billing mengunci recovery atau reconnect sehingga kasus siap dibaca sebagai kandidat restore layanan.',
+          tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        },
+        {
+          label: 'Sinyal Berhasil',
+          detail: 'Tagihan, payment, dan follow-up tidak lagi menjadi blocker administratif untuk pemulihan layanan.',
+          tone: 'border-violet-200 bg-violet-50 text-violet-700',
+        },
+        {
+          label: 'Fallback',
+          detail: 'Jika recovery gagal, kembalikan kasus ke review Billing yang lebih ketat atau arahkan ke terminate sesuai disposition baru.',
+          tone: 'border-amber-200 bg-amber-50 text-amber-700',
+        },
+      ],
+    }
+  }
+
+  if (isTerminate || actionType === 'WRITE_OFF') {
+    return {
+      owner: 'Billing + CS & Admin CS',
+      items: [
+        {
+          label: 'Target Hasil',
+          detail: 'Disposition Billing cukup kuat untuk diteruskan ke terminate dan tidak berhenti di antara collection dan close lapangan.',
+          tone: 'border-rose-200 bg-rose-50 text-rose-700',
+        },
+        {
+          label: 'Sinyal Berhasil',
+          detail: 'Write-off atau keputusan akhir pelanggan sudah sinkron sehingga CS & Admin CS dapat menutup lifecycle tanpa bolak-balik review.',
+          tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        },
+        {
+          label: 'Fallback',
+          detail: 'Jika disposition belum matang, tahan dulu close akhir dan bawa kembali ke antrean Billing atau supervisor untuk keputusan final.',
+          tone: 'border-violet-200 bg-violet-50 text-violet-700',
+        },
+      ],
+    }
+  }
+
+  if (isSuspend || followUpState === 'OVERDUE' || followUpState === 'SCHEDULED') {
+    return {
+      owner: 'Billing / Collection',
+      items: [
+        {
+          label: 'Target Hasil',
+          detail: 'Follow-up Billing selesai dengan arah keputusan yang jelas: tetap suspend, siap restore, atau naik ke terminate.',
+          tone: 'border-violet-200 bg-violet-50 text-violet-700',
+        },
+        {
+          label: 'Sinyal Berhasil',
+          detail: 'Operator tidak lagi menebak lane berikutnya karena status follow-up dan dampak layanan sudah sinkron.',
+          tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        },
+        {
+          label: 'Fallback',
+          detail: 'Jika follow-up tetap abu-abu, eskalasi ke supervisor atau baca TT/SLA dan isolir terkait sebelum memaksa keputusan layanan.',
+          tone: 'border-slate-200 bg-slate-50 text-slate-700',
+        },
+      ],
+    }
+  }
+
+  return {
+    owner: 'Billing / Collection',
+    items: [
+      {
+        label: 'Target Hasil',
+        detail: 'Billing dan supervisor mencapai pembacaan kasus yang sama sebelum jalur restore atau terminate dipilih.',
+        tone: 'border-slate-200 bg-slate-50 text-slate-700',
+      },
+      {
+        label: 'Sinyal Berhasil',
+        detail: 'Meta review, due date, dan action type sudah cukup jelas untuk diteruskan ke lane support yang paling relevan.',
+        tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      },
+      {
+        label: 'Fallback',
+        detail: 'Jika konteks masih lemah, tahan keputusan besar dan lanjutkan audit Billing lebih dulu.',
+        tone: 'border-violet-200 bg-violet-50 text-violet-700',
+      },
+    ],
+  }
+}
+
+function buildBillingCorrelationSummary(row: DomainReviewRow, sectionTitle: string): CaseCorrelationSummary | null {
+  const title = sectionTitle.trim().toUpperCase()
+  const invoiceStatus = pickReviewMetaValue(row.meta, 'Invoice Status: ').toUpperCase() || row.status.trim().toUpperCase()
+  const collectionStatus = pickReviewMetaValue(row.meta, 'Collection Status: ').toUpperCase()
+  const followUpState = pickReviewMetaValue(row.meta, 'Follow Up State: ').toUpperCase()
+  const actionType = pickReviewMetaValue(row.meta, 'Action Type: ').toUpperCase() || row.primary.trim().toUpperCase()
+  const customer = pickReviewMetaValue(row.meta, 'Customer: ') || row.secondary
+  const service = pickReviewMetaValue(row.meta, 'Service: ')
+  const isReconnect = title.includes('RECONNECT') || collectionStatus === 'RECONNECT'
+  const isSuspend = title.includes('SUSPEND') || pickReviewMetaValue(row.meta, 'Suspend Candidate: ').toUpperCase() === 'YA'
+  const isTerminate = title.includes('WRITE OFF') || row.detail.toUpperCase().includes('TERMINASI')
+
+  if (!customer && !service && !title.includes('INVOICE') && !title.includes('COLLECTION')) {
+    return null
+  }
+
+  return {
+    customer,
+    service: service || undefined,
+    owner: isReconnect ? 'Billing / Recovery' : isTerminate ? 'Billing + CS & Admin CS' : 'Billing / Collection',
+    items: [
+      {
+        label: 'Billing',
+        value: collectionStatus || invoiceStatus || actionType || 'Perlu review',
+        tone: 'border-violet-200 bg-violet-50 text-violet-700',
+      },
+      {
+        label: 'Isolir',
+        value: isReconnect ? 'Siap restore' : isSuspend ? 'Potensi aktif' : 'Monitor',
+        tone: 'border-amber-200 bg-amber-50 text-amber-700',
+      },
+      {
+        label: 'TT/SLA',
+        value: followUpState === 'OVERDUE' ? 'Perlu kontrol SLA' : 'Cek ticket terkait',
+        tone: 'border-sky-200 bg-sky-50 text-sky-700',
+      },
+      {
+        label: 'Dismantle',
+        value: isTerminate ? 'Review terminate' : isReconnect ? 'Belum aktif' : 'Belum prioritas',
+        tone: 'border-rose-200 bg-rose-50 text-rose-700',
+      },
+      {
+        label: 'Owner Aktif',
+        value: isReconnect ? 'Billing / Recovery' : isTerminate ? 'Billing + CS & Admin CS' : 'Billing / Collection',
+        tone: 'border-slate-200 bg-slate-50 text-slate-700',
+      },
+    ],
+  }
+}
+
 function resolveSuggestionByTokens(suggestions: string[], ...tokens: Array<string | undefined>) {
   const normalizedTokens = tokens.map((item) => String(item ?? '').trim().toUpperCase()).filter(Boolean)
   if (!normalizedTokens.length) {
@@ -654,14 +1140,18 @@ function getDomainReviewRowAction(params: {
   canRequestInventory: boolean
   canProcessInventoryRequest: boolean
   isFieldTechnicianInventory: boolean
-}) {
+}): DomainReviewRowAction | null {
   const title = params.sectionTitle.trim().toUpperCase()
   const rowStatus = params.row.status.trim().toUpperCase()
   const collectionStatus = pickReviewMetaValue(params.row.meta, 'Collection Status: ').toUpperCase()
   const followUpState = pickReviewMetaValue(params.row.meta, 'Follow Up State: ').toUpperCase()
   const suspendCandidate = pickReviewMetaValue(params.row.meta, 'Suspend Candidate: ').toUpperCase()
+  const actionType = pickReviewMetaValue(params.row.meta, 'Action Type: ').toUpperCase()
   const orderId = pickReviewMetaValue(params.row.meta, 'Order ID: ')
   const orderCode = pickReviewMetaValue(params.row.meta, 'Order: ')
+  const customerName = pickReviewMetaValue(params.row.meta, 'Customer: ') || params.row.secondary
+  const serviceNo =
+    pickReviewMetaValue(params.row.meta, 'Service: ') || (title.includes('SUBSCRIPTION BILLING-READY') ? params.row.primary : '')
 
   if (params.domainKey === 'sales' && params.canCreate) {
     if (title.includes('WORK ORDER') || rowStatus.includes('WORK_ORDER')) {
@@ -720,36 +1210,81 @@ function getDomainReviewRowAction(params: {
       return {
         label: 'Proses Reconnect',
         href: buildPrefillHref(getBillingActionAnchorId('invoice-status'), { invoice: params.row.primary }),
+        secondaryLabel: 'Buka Isolir Terkait',
+        secondaryHref: buildSupportCaseHref({
+          lane: 'isolations',
+          focus: 'ACTIVE_ISOLATIONS',
+          customer: customerName,
+          service: serviceNo,
+        }),
       }
     }
     if (params.canUpdate && (title.includes('SUSPEND') || suspendCandidate === 'YA')) {
       return {
         label: 'Proses Suspend',
         href: buildPrefillHref(getBillingActionAnchorId('invoice-status'), { invoice: params.row.primary }),
+        secondaryLabel: 'Buka Isolir Terkait',
+        secondaryHref: buildSupportCaseHref({
+          lane: 'isolations',
+          focus: 'ACTIVE_ISOLATIONS',
+          customer: customerName,
+          service: serviceNo,
+        }),
       }
     }
     if (params.canUpdate && (title.includes('COLLECTION FOLLOW UP') || followUpState === 'OVERDUE' || followUpState === 'SCHEDULED')) {
+      const preferSla = followUpState === 'OVERDUE'
       return {
         label: 'Resolve Follow Up',
         href: buildPrefillHref(getBillingActionAnchorId('collection-resolve'), { invoice: params.row.primary }),
+        secondaryLabel: preferSla ? 'Buka SLA Terkait' : 'Buka TT Terkait',
+        secondaryHref: buildSupportCaseHref({
+          lane: preferSla ? 'sla' : 'tt',
+          focus: preferSla ? 'SLA_OVERDUE' : 'OPEN_TICKETS',
+          customer: customerName,
+          service: serviceNo,
+        }),
       }
     }
     if (params.canCreate && (title.includes('PROMISE TO PAY') || title.includes('PERLU TINDAK LANJUT'))) {
+      const preferDismantle = title.includes('ONE-TIME') && (actionType === 'WRITE_OFF' || rowStatus === 'OVERDUE')
       return {
         label: 'Tindak Collection',
         href: buildPrefillHref(getBillingActionAnchorId('collection-action'), { invoice: params.row.primary }),
+        secondaryLabel: preferDismantle ? 'Buka Dismantle Terkait' : 'Buka TT Terkait',
+        secondaryHref: buildSupportCaseHref({
+          lane: preferDismantle ? 'dismantle' : 'tt',
+          focus: preferDismantle ? 'RECENT_DISMANTLE' : 'OPEN_TICKETS',
+          customer: customerName,
+          service: serviceNo,
+        }),
       }
     }
     if (params.canCreate && title.includes('SUBSCRIPTION BILLING-READY')) {
       return {
         label: 'Generate Invoice',
         href: buildPrefillHref(getBillingActionAnchorId('invoice-generate'), { service: params.row.primary }),
+        secondaryLabel: 'Buka TT Terkait',
+        secondaryHref: buildSupportCaseHref({
+          lane: 'tt',
+          focus: 'OPEN_TICKETS',
+          customer: customerName,
+          service: serviceNo || params.row.primary,
+        }),
       }
     }
     if (params.canCreate && title.includes('INVOICE')) {
+      const preferDismantle = title.includes('ONE-TIME') && params.row.detail.toUpperCase().includes('TERMINASI')
       return {
         label: 'Catat Payment',
         href: buildPrefillHref(getBillingActionAnchorId('payment-entry'), { invoice: params.row.primary }),
+        secondaryLabel: preferDismantle ? 'Buka Dismantle Terkait' : 'Buka Isolir Terkait',
+        secondaryHref: buildSupportCaseHref({
+          lane: preferDismantle ? 'dismantle' : 'isolations',
+          focus: preferDismantle ? 'RECENT_DISMANTLE' : 'ACTIVE_ISOLATIONS',
+          customer: customerName,
+          service: serviceNo,
+        }),
       }
     }
   }
@@ -783,7 +1318,7 @@ function getDomainReviewRowAction(params: {
     if (title.includes('LOAN') && params.canCreate && !params.isFieldTechnicianInventory) {
       return { label: 'Pinjamkan Barang', href: `#${getInventoryActionAnchorId('item-loan')}` }
     }
-    if (title.includes('PORT') && params.canCreate && !params.isFieldTechnicianInventory) {
+    if (title.includes('PORT') && params.canUpdate && !params.isFieldTechnicianInventory) {
       return { label: 'Atur Port', href: `#${getInventoryActionAnchorId('odp-port-status')}` }
     }
     if (title.includes('ODP') && params.canCreate && !params.isFieldTechnicianInventory) {
@@ -1761,6 +2296,20 @@ export function DomainShell({
           .flatMap((section) => section.rows)
           .map((row) => `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`)
       : []
+  const supportDismantleQueueSuggestions =
+    content.key === 'support'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('QUEUE DISMANTLE OPEN'))
+          .flatMap((section) => section.rows)
+          .map((row) => `${row.id.replace(/^DISMANTLE-QUEUE-/, '')} | ${row.primary} | ${row.secondary}`)
+      : []
+  const supportDismantleHistorySuggestions =
+    content.key === 'support'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('HISTORI DISMANTLE'))
+          .flatMap((section) => section.rows)
+          .map((row) => `${row.id.replace(/^DIS-/, '')} | ${row.primary} | ${row.secondary}`)
+      : []
   const selectedSupportLane = supportFocus?.selectedLane ?? null
   const activeSupportLane = supportFocus?.activeLane ?? null
   const activeSupportLaneMeta =
@@ -1915,7 +2464,7 @@ export function DomainShell({
     if (canUseSupportAction({ role, actionKey: 'isolation-restore', canCreate, canUpdate, canApprove })) {
       supportForms.push({
         key: 'isolation-restore',
-        lanes: ['isolations'],
+        lanes: ['isolations', 'dismantle'],
         element: (
           <SupportIsolationRestoreForm
             canUpdate={canUpdate}
@@ -1937,6 +2486,36 @@ export function DomainShell({
             reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
             isolationSuggestions={supportIsolationSuggestions}
             initialIsolationValue={supportPrefill?.isolation}
+          />
+        ),
+      })
+    }
+
+    if (canUseSupportAction({ role, actionKey: 'dismantle-close', canCreate, canUpdate, canApprove })) {
+      supportForms.push({
+        key: 'dismantle-close',
+        lanes: ['dismantle'],
+        element: (
+          <SupportDismantleCloseForm
+            canProcess={canProcessSupportDismantle(role, canApprove)}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            dismantleSuggestions={supportDismantleQueueSuggestions}
+            initialDismantleValue={supportPrefill?.dismantle}
+          />
+        ),
+      })
+    }
+
+    if (canUseSupportAction({ role, actionKey: 'dismantle-reopen', canCreate, canUpdate, canApprove })) {
+      supportForms.push({
+        key: 'dismantle-reopen',
+        lanes: ['dismantle'],
+        element: (
+          <SupportDismantleReopenForm
+            canProcess={canProcessSupportDismantle(role, canApprove)}
+            reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            historySuggestions={supportDismantleHistorySuggestions}
+            initialHistoryValue={supportPrefill?.dismantleHistory}
           />
         ),
       })
@@ -2038,6 +2617,205 @@ export function DomainShell({
               Reset Fokus
             </Link>
           </div>
+        </section>
+      ) : null}
+
+      {visibleSections.length > 0 ? (
+        <section className="space-y-6">
+          {visibleSections.map((section) => {
+            const sectionAction = getDomainReviewSectionAction({
+              domainKey: content.key,
+              sectionTitle: section.title,
+              canCreate,
+              canUpdate,
+              canRequestInventory,
+              canProcessInventoryRequest,
+              isFieldTechnicianInventory,
+            })
+
+            return (
+              <div key={section.title} className="panel p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="section-title">{section.title}</p>
+                    <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+                      Tabel kerja utama menu
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-mute">{section.description}</p>
+                    {section.summary?.length ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {section.summary.map((item) => (
+                          <span key={`${section.title}-${item.label}`} className="badge border-slate-200 bg-white text-slate-600">
+                            {item.label}: {item.value}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  {sectionAction ? (
+                    <Link
+                      href={sectionAction.href}
+                      className="inline-flex rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                    >
+                      {sectionAction.label}
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200">
+                  <table className="min-w-[1080px] w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        <th className="px-4 py-3">Item</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Ringkasan</th>
+                        <th className="px-4 py-3">Metadata</th>
+                        <th className="px-4 py-3">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white">
+                      {section.rows.length ? (
+                        section.rows.map((row) => {
+                          const rowAction = getDomainReviewRowAction({
+                            domainKey: content.key,
+                            sectionTitle: section.title,
+                            row,
+                            canCreate,
+                            canUpdate,
+                            canRequestInventory,
+                            canProcessInventoryRequest,
+                            isFieldTechnicianInventory,
+                          })
+                          const billingCorrelationSummary =
+                            content.key === 'billing' ? buildBillingCorrelationSummary(row, section.title) : null
+                          const billingDecisionTrail =
+                            content.key === 'billing' ? buildBillingDecisionTrail(row, section.title) : null
+                          const billingEvidencePanel =
+                            content.key === 'billing' ? buildBillingEvidencePanel(row, section.title) : null
+                          const billingHealthSignal =
+                            content.key === 'billing' ? buildBillingHealthSignal(row, section.title) : null
+                          const billingRecommendedActions =
+                            content.key === 'billing' ? buildBillingRecommendedActionMatrix(row, section.title, rowAction) : null
+                          const billingActionOutcomeSummary =
+                            content.key === 'billing' ? buildBillingActionOutcomeSummary(row, section.title) : null
+                          const metaHighlights = getReviewRowMetaHighlights(row.meta)
+                          const hiddenMetaCount = Math.max(row.meta.length - metaHighlights.length, 0)
+                          const hasBillingContext =
+                            Boolean(billingCorrelationSummary) ||
+                            Boolean(billingDecisionTrail) ||
+                            Boolean(billingEvidencePanel) ||
+                            Boolean(billingHealthSignal) ||
+                            Boolean(billingRecommendedActions) ||
+                            Boolean(billingActionOutcomeSummary)
+
+                          return (
+                            <Fragment key={row.id}>
+                              <tr className="align-top">
+                                <td className="px-4 py-4">
+                                  <div className="min-w-[220px]">
+                                    <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
+                                    <p className="mt-1 text-sm text-slate-600">{row.secondary}</p>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4">
+                                  <span className={`badge ${getReviewRowStatusTone(row.status)}`}>{row.status}</span>
+                                </td>
+                                <td className="px-4 py-4">
+                                  <p className="max-w-xl text-sm leading-6 text-slate-700">{row.detail}</p>
+                                </td>
+                                <td className="px-4 py-4">
+                                  <div className="flex max-w-sm flex-wrap gap-2">
+                                    {metaHighlights.map((item) => (
+                                      <span key={`${row.id}-${item}`} className="badge border-slate-200 bg-white text-slate-600">
+                                        {item}
+                                      </span>
+                                    ))}
+                                    {hiddenMetaCount > 0 ? (
+                                      <span className="badge border-dashed border-slate-300 bg-slate-50 text-slate-500">
+                                        +{hiddenMetaCount} meta
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4">
+                                  {rowAction ? (
+                                    <div className="flex min-w-[210px] flex-col gap-2">
+                                      <Link
+                                        href={rowAction.href}
+                                        className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                                      >
+                                        {rowAction.label}
+                                      </Link>
+                                      {rowAction.secondaryLabel && rowAction.secondaryHref ? (
+                                        <Link
+                                          href={rowAction.secondaryHref}
+                                          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                                        >
+                                          {rowAction.secondaryLabel}
+                                        </Link>
+                                      ) : null}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-slate-400">Tidak ada aksi langsung</span>
+                                  )}
+                                </td>
+                              </tr>
+                              {hasBillingContext ? (
+                                <tr className="bg-slate-50">
+                                  <td colSpan={5} className="px-4 py-4">
+                                    <div className="grid gap-4 xl:grid-cols-2">
+                                      {billingHealthSignal ? (
+                                        <CaseHealthSignalCard signal={billingHealthSignal} title="Case Health Signal" />
+                                      ) : null}
+                                      {billingRecommendedActions ? (
+                                        <CaseNextActionMatrixCard
+                                          matrix={billingRecommendedActions}
+                                          title="Recommended Next Action"
+                                        />
+                                      ) : null}
+                                      {billingActionOutcomeSummary ? (
+                                        <CaseActionOutcomeSummaryCard
+                                          summary={billingActionOutcomeSummary}
+                                          title="Action Outcome Summary"
+                                        />
+                                      ) : null}
+                                      {billingCorrelationSummary ? (
+                                        <CaseCorrelationSummaryPanel
+                                          summary={billingCorrelationSummary}
+                                          title="Ringkasan Korelasi Customer / Service"
+                                        />
+                                      ) : null}
+                                      {billingDecisionTrail ? (
+                                        <CaseDecisionTrailPanel
+                                          trail={billingDecisionTrail}
+                                          title="Decision Trail Billing / Kasus"
+                                        />
+                                      ) : null}
+                                      {billingEvidencePanel ? (
+                                        <CaseEvidencePanelCard
+                                          evidence={billingEvidencePanel}
+                                          title="Evidence Billing / Kasus"
+                                        />
+                                      ) : null}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ) : null}
+                            </Fragment>
+                          )
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-6 text-sm text-slate-500">
+                            Belum ada data review pada section ini.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
         </section>
       ) : null}
 
@@ -2500,7 +3278,7 @@ export function DomainShell({
             {!isFieldTechnicianInventory ? (
               <div id={getInventoryActionAnchorId('odp-port-assign')} className="scroll-mt-24">
                 <InventoryOdpPortAssignForm
-                  canCreate={canCreate}
+                  canUpdate={canUpdate}
                   reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
                   odpSuggestions={inventoryOdpSuggestions}
                 />
@@ -2509,7 +3287,7 @@ export function DomainShell({
             {!isFieldTechnicianInventory ? (
               <div id={getInventoryActionAnchorId('odp-port-status')} className="scroll-mt-24">
                 <InventoryOdpPortStatusForm
-                  canCreate={canCreate}
+                  canUpdate={canUpdate}
                   reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
                   odpSuggestions={inventoryOdpSuggestions}
                 />
@@ -2769,98 +3547,6 @@ export function DomainShell({
         </>
       ) : null}
 
-      {visibleSections.length > 0 ? (
-        <section className="grid gap-6 xl:grid-cols-2">
-          {visibleSections.map((section) => {
-            const sectionAction = getDomainReviewSectionAction({
-              domainKey: content.key,
-              sectionTitle: section.title,
-              canCreate,
-              canUpdate,
-              canRequestInventory,
-              canProcessInventoryRequest,
-              isFieldTechnicianInventory,
-            })
-
-            return (
-              <div key={section.title} className="panel p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="section-title">{section.title}</p>
-                    <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-                      Review operasional awal dari data domain
-                    </h3>
-                    <p className="mt-3 text-sm leading-6 text-mute">{section.description}</p>
-                    {section.summary?.length ? (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {section.summary.map((item) => (
-                          <span key={`${section.title}-${item.label}`} className="badge border-slate-200 bg-white text-slate-600">
-                            {item.label}: {item.value}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                  {sectionAction ? (
-                    <Link
-                      href={sectionAction.href}
-                      className="inline-flex rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                    >
-                      {sectionAction.label}
-                    </Link>
-                  ) : null}
-                </div>
-                <div className="mt-6 space-y-3">
-                  {section.rows.map((row) => {
-                    const rowAction = getDomainReviewRowAction({
-                      domainKey: content.key,
-                      sectionTitle: section.title,
-                      row,
-                      canCreate,
-                      canUpdate,
-                      canRequestInventory,
-                      canProcessInventoryRequest,
-                      isFieldTechnicianInventory,
-                    })
-
-                    return (
-                      <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-5">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
-                            <p className="mt-1 text-sm text-mute">{row.secondary}</p>
-                          </div>
-                          <span className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
-                            {row.status}
-                          </span>
-                        </div>
-                        <p className="mt-4 text-sm leading-6 text-slate-700">{row.detail}</p>
-                        {rowAction ? (
-                          <div className="mt-4">
-                            <Link
-                              href={rowAction.href}
-                              className="inline-flex rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                            >
-                              {rowAction.label}
-                            </Link>
-                          </div>
-                        ) : null}
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {row.meta.map((item) => (
-                            <span key={`${row.id}-${item}`} className="badge border-slate-200 bg-white text-slate-600">
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      </article>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </section>
-      ) : null}
     </div>
   )
 }
