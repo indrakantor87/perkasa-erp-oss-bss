@@ -50,8 +50,26 @@
 - `hybrid-wave-1a-psb-tt-photo-production-runbook.md`  
   Runbook lokal untuk memuat `trouble-ticket-photo.production.json` ke review DB, menjalankan transform production evidence photo, dan memverifikasi linkage ke `support_trouble_tickets` final.
 
+- `hybrid-wave-1a-psb-tt-master-production-extraction-pack.md`  
+  Paket extraction read-only untuk menarik source production `TroubleTicketMaster` dari terminal app `Web PSB` ke format JSON yang siap dipakai pada batch katalog master support production.
+
+- `hybrid-wave-1a-psb-tt-master-production-runbook.md`  
+  Runbook lokal untuk memuat `trouble-ticket-master.production.json` ke review DB, menjalankan transform katalog `kind/value`, dan memverifikasi linkage ke `support_trouble_ticket_masters`.
+
+- `hybrid-wave-1-priority-production-extraction-pack.md`  
+  Paket extraction read-only untuk menarik source production `Priority` dari terminal app `Web PSB` ke format JSON yang siap dipakai pada batch master priority production.
+
+- `hybrid-wave-1-priority-production-runbook.md`  
+  Runbook lokal untuk memuat `priorities.production.json` ke review DB, menjalankan transform ke `master_priorities`, dan memverifikasi linkage final priority master.
+
+- `hybrid-wave-1-whatsapp-template-production-extraction-pack.md`  
+  Paket extraction read-only untuk menarik source production `WhatsappTemplate` dari terminal app `Web PSB` ke format JSON yang siap dipakai pada batch helper template WhatsApp production.
+
+- `hybrid-wave-1-whatsapp-template-production-runbook.md`  
+  Runbook lokal untuk memuat `whatsapp-templates.production.json` ke review DB, menjalankan transform ke `helper_whatsapp_templates`, dan memverifikasi hanya satu template default aktif.
+
 - `hybrid-psb-production-readiness-2026-07-11.md`  
-  Rekap readiness hybrid migration `Web PSB` setelah support core dan `TroubleTicketPhoto` production lulus, termasuk keputusan batch berikutnya untuk kesiapan cutover.
+  Rekap readiness hybrid migration `Web PSB` setelah support core, `TroubleTicketPhoto`, `User`, `TroubleTicketMaster`, `Priority`, dan `WhatsappTemplate` production lulus, termasuk fokus hardening dan cutover berikutnya.
 
 - `hybrid-wave-1-user-production-extraction-pack.md`  
   Paket extraction discovery read-only untuk menarik `User` production sekaligus menghitung distribusi `role` dan `division` sebagai dasar penguncian mapping ke `auth_users`, `auth_roles`, dan `org_divisions`.

@@ -23,6 +23,39 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.24] - 2026-07-11
+
+### Added
+
+- Ditambahkan jalur production `WhatsappTemplate` end-to-end yang mencakup patch schema review DB terisolasi, staging helper template, generator JSON ke staging, transform ke `helper_whatsapp_templates`, query review, assertion query, runner lokal, extraction pack, dan runbook untuk memuat `whatsapp-templates.production.json` dari `Web PSB`: [xampp_review_patch_wave1_whatsapp_template_existing_review_db.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_patch_wave1_whatsapp_template_existing_review_db.sql), [generate-wave1-whatsapp-template-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave1-whatsapp-template-production-loader.mjs), [xampp_review_transform_wave1_whatsapp_template_production.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave1_whatsapp_template_production.sql), [xampp_review_wave1_whatsapp_template_production_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1_whatsapp_template_production_review_queries.sql), [xampp_review_wave1_whatsapp_template_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1_whatsapp_template_production_assertions.sql), [run-review-wave1-whatsapp-template-production.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1-whatsapp-template-production.ps1), [hybrid-wave-1-whatsapp-template-production-extraction-pack.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-whatsapp-template-production-extraction-pack.md), [hybrid-wave-1-whatsapp-template-production-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-whatsapp-template-production-runbook.md)
+
+### Changed
+
+- Docs index diperluas agar extraction pack dan runbook `WhatsappTemplate production` muncul eksplisit pada urutan kerja hybrid migration `Web PSB`: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- Versioning diselaraskan ke `0.65.24` untuk menandai pembukaan helper template `WhatsappTemplate` dari production.
+
+## [0.65.23] - 2026-07-11
+
+### Added
+
+- Ditambahkan jalur production `Priority` end-to-end yang mencakup patch schema review DB terisolasi, staging khusus master priority, generator JSON ke staging, transform ke `master_priorities`, query review, assertion query, runner lokal, extraction pack, dan runbook untuk memuat `priorities.production.json` dari `Web PSB`: [xampp_review_patch_wave1_priority_existing_review_db.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_patch_wave1_priority_existing_review_db.sql), [generate-wave1-priority-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave1-priority-production-loader.mjs), [xampp_review_transform_wave1_priority_production.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave1_priority_production.sql), [xampp_review_wave1_priority_production_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1_priority_production_review_queries.sql), [xampp_review_wave1_priority_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1_priority_production_assertions.sql), [run-review-wave1-priority-production.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1-priority-production.ps1), [hybrid-wave-1-priority-production-extraction-pack.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-priority-production-extraction-pack.md), [hybrid-wave-1-priority-production-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1-priority-production-runbook.md)
+
+### Changed
+
+- Docs index diperluas agar extraction pack dan runbook `Priority production` muncul eksplisit pada urutan kerja hybrid migration `Web PSB`: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- Versioning diselaraskan ke `0.65.23` untuk menandai pembukaan adapter master `Priority` dari production.
+
+## [0.65.22] - 2026-07-11
+
+### Added
+
+- Ditambahkan jalur production `TroubleTicketMaster` end-to-end yang mencakup patch schema review DB terisolasi, generator JSON ke staging, transform katalog `kind/value`, query review, assertion query, runner lokal, extraction pack, dan runbook untuk memuat `trouble-ticket-master.production.json` ke `support_trouble_ticket_masters`: [xampp_review_patch_wave1a_tt_master_existing_review_db.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_patch_wave1a_tt_master_existing_review_db.sql), [generate-wave1a-tt-master-production-loader.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/generate-wave1a-tt-master-production-loader.mjs), [xampp_review_transform_wave1a_tt_master_production.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave1a_tt_master_production.sql), [xampp_review_wave1a_tt_master_production_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1a_tt_master_production_review_queries.sql), [xampp_review_wave1a_tt_master_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1a_tt_master_production_assertions.sql), [run-review-wave1a-tt-master-production.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1a-tt-master-production.ps1), [hybrid-wave-1a-psb-tt-master-production-extraction-pack.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1a-psb-tt-master-production-extraction-pack.md), [hybrid-wave-1a-psb-tt-master-production-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1a-psb-tt-master-production-runbook.md)
+
+### Changed
+
+- Docs index diperluas agar extraction pack dan runbook `TroubleTicketMaster production` muncul eksplisit pada urutan kerja hybrid migration `Web PSB`: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- Versioning diselaraskan ke `0.65.22` untuk menandai pembukaan adapter master support `TroubleTicketMaster` dari production.
+
 ## [0.65.21] - 2026-07-11
 
 ### Added

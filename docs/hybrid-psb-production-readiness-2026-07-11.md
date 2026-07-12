@@ -1,17 +1,18 @@
 # Hybrid PSB Production Readiness 2026-07-11
 
-Dokumen ini merangkum status readiness hybrid migration `Web PSB` setelah jalur support production inti dan `TroubleTicketPhoto` berhasil divalidasi nyata di review DB lokal.
+Dokumen ini merangkum status readiness hybrid migration `Web PSB` setelah jalur support production inti, `TroubleTicketPhoto`, `User`, `TroubleTicketMaster`, `Priority`, dan `WhatsappTemplate` berhasil divalidasi nyata di review DB lokal.
 
 ## Ringkasan Eksekutif
 
-- Status umum: `PARTIAL-GO`
+- Status umum: `GO-HARDENING`
 - Makna:
-  - fondasi support production inti sudah tervalidasi nyata
-  - sales/coverage/ODP production path utama sudah pernah dibuka
-  - jalur berikutnya paling bernilai untuk cutover adalah `User production`
+  - jalur operasional inti `Web PSB` yang paling penting untuk cutover bertahap sudah punya bukti production path nyata
+  - adapter auth, master support, dan helper template yang sebelumnya menjadi gap sudah berhasil ditutup
+  - pekerjaan berikutnya paling bernilai bukan membuka batch baru, tetapi hardening operasional, rekap cutover, dan disiplin release
 - Risiko utama yang tersisa:
-  - translasi `legacy_role` dan `legacy_division` user belum dikunci dari data production nyata
-  - beberapa adapter master legacy (`TroubleTicketMaster`, `Priority`, `WhatsappTemplate`) belum dibuka
+  - UAT lintas divisi dan validasi alur operator riil masih perlu dipadatkan ke checklist cutover
+  - beberapa perubahan UI/domain workspace di repo masih berjalan paralel, sehingga commit migration harus tetap terisolasi
+  - deploy, rollback, backup, dan guardrail pasca-go-live masih perlu difinalkan per lingkungan
 
 ## Jalur Production yang Sudah Tervalidasi Nyata
 
@@ -64,61 +65,92 @@ Dokumen ini merangkum status readiness hybrid migration `Web PSB` setelah jalur 
 - Makna:
   - jalur sales coverage, activity, ODP header, ODP port, dan SLA TT sudah punya bukti production path
 
+### 5. User Production
+
+- Batch: `PROD-WEBPSB-USER-001`
+- Status: `PASS`
+- Target final:
+  - `auth_roles`
+  - `org_divisions`
+  - `auth_users`
+- Catatan:
+  - `31` row imported
+  - mapping konservatif `legacy_role` dan `legacy_division` sudah dibekukan dari data production nyata
+  - semua assertion linkage final lulus
+
+### 6. TroubleTicketMaster Production
+
+- Batch: `PROD-WEBPSB-TTMASTER-001`
+- Status: `PASS`
+- Target final:
+  - `support_trouble_ticket_masters`
+- Catatan:
+  - `47` row imported
+  - distribusi final: `ONT=11`, `PROBLEM_CATEGORY=22`, `RESOLUTION_ACTION=14`
+  - katalog `kind/value` final sudah siap dipakai untuk parity dropdown support
+
+### 7. Priority Production
+
+- Batch: `PROD-WEBPSB-PRIORITY-001`
+- Status: `PASS`
+- Target final:
+  - `master_priorities`
+- Catatan:
+  - `3` row imported
+  - seluruh warna badge final tervalidasi nyata dari source production
+
+### 8. WhatsappTemplate Production
+
+- Batch: `PROD-WEBPSB-WATPL-001`
+- Status: `PASS`
+- Target final:
+  - `helper_whatsapp_templates`
+- Catatan:
+  - `3` row imported
+  - `1` template default aktif berhasil dipertahankan di final helper
+
 ## Jalur yang Sudah Punya Bukti Cukup untuk Cutover Bertahap
 
 - `Ticket` production ke domain customer/order/service
 - `Isolation`, `Dismantle`, `TroubleTicket`, `TroubleTicketPhoto`
 - `TroubleTicketSla`
+- `User`
+- `TroubleTicketMaster`
+- `Priority`
+- `WhatsappTemplate`
 - `CoveredArea`
 - `MarketingActivity`
 - `network_odp`
 - `network_odp_ports`
 
-## Jalur yang Masih Menjadi Gap
+## Gap yang Masih Tersisa
 
-### Gap 1. User Production
+### Gap 1. Hardening Operasional
 
-- Status mapping: `siap dibuka`, tetapi distribusi role/division production nyata belum dibekukan
-- Target final:
-  - `auth_roles`
-  - `org_divisions`
-  - `auth_users`
-- Alasan menjadi prioritas berikutnya:
-  - paling dekat ke kesiapan cutover operator nyata
-  - low-risk secara data shape
-  - langsung berdampak ke auth internal review DB
+- satukan acceptance checklist lintas support, billing, sales, dan supervisor
+- validasi ulang alur operator nyata pada workspace baru yang sedang berkembang paralel di repo
+- pastikan fallback error, audit trail, dan handoff antar-lane konsisten pada web baru
 
-### Gap 2. Master Support Adapter
+### Gap 2. Cutover dan Deploy
 
-- `TroubleTicketMaster`
-- `Priority`
-- `WhatsappTemplate`
-- Status:
-  - bernilai untuk parity UX dan dropdown operasional
-  - tidak sepenting `User production` untuk cutover awal
+- tetapkan checklist backup, rollback, dan smoke test pasca-deploy
+- sinkronkan release note final dengan batch production yang sudah lulus
+- pastikan strategi go-live bertahap per divisi tetap realistis terhadap kapasitas tim operator
 
-## Keputusan Batch Berikutnya
+## Keputusan Tahap Berikutnya
 
-### Batch Berikutnya yang Direkomendasikan: User Production
+### Fokus Berikutnya yang Direkomendasikan: Hardening dan Cutover
 
 Alasan:
 
-1. paling langsung meningkatkan kesiapan operasional user nyata
-2. schema staging dan transform final dasarnya sudah tersedia
-3. dependency ke domain lain rendah
-4. bisa dieksekusi setelah distribusi `role` dan `division` production diverifikasi dari data nyata
-
-### Guardrail User Production
-
-- jangan langsung memaksakan mapping `legacy_role` dan `legacy_division`
-- lakukan extraction discovery lebih dulu
-- kunci mapping berdasarkan distribusi nyata production
-- setelah itu baru buka loader/transform/import user
+1. jalur batch produksi yang paling bernilai sudah tervalidasi nyata
+2. risiko terbesar sekarang berpindah dari data migration ke kesiapan operasional dan deployment
+3. penguatan UI/workspace lintas divisi sedang aktif, sehingga perlu dipastikan sinkron dengan hasil import production yang sudah lulus
+4. release berikutnya akan lebih bernilai bila membawa rekap readiness dan commit migration yang rapi
 
 ## Urutan Kerja yang Disarankan Setelah Dokumen Ini
 
-1. extraction discovery `User production`
-2. audit distribusi `role` dan `division`
-3. kunci mapping legacy -> ERP
-4. buka batch `User production`
-5. setelah user stabil, lanjut ke `TroubleTicketMaster` atau adapter master support lain
+1. rekap final semua batch production yang sudah `PASS`
+2. commit/push terisolasi batch `TroubleTicketMaster + Priority + WhatsappTemplate`
+3. turunkan checklist hardening operasional lintas divisi
+4. susun checklist cutover dan smoke test production bertahap
