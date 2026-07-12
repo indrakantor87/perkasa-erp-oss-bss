@@ -23,6 +23,19 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.26] - 2026-07-11
+
+### Added
+
+- Ditambahkan rencana hardening per role fondasi `Web PSB` agar checklist pasca-migration bisa langsung dieksekusi sebagai bukti kerja untuk `SUPER_ADMIN`, `NOC_OPERATOR`, `TT_OPERATOR`, `DISMANTLE_OPERATOR`, `SALES_MARKETING`, `CS_OPERATOR`, dan `CS_ADMIN`: [hybrid-psb-role-hardening-plan.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-role-hardening-plan.md)
+- Ditambahkan timeline go-live hybrid `Web PSB` yang memecah kerja ke fase mingguan sampai `pilot` dan `go-live bertahap`, termasuk freeze release, validasi teknis, validasi role fondasi, dan keputusan pasca-pilot: [hybrid-psb-go-live-timeline.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-go-live-timeline.md)
+
+### Changed
+
+- Dokumen readiness hybrid production kini menunjuk langsung ke rencana hardening per role dan timeline go-live agar fase `GO-HARDENING` punya urutan kerja yang lebih operasional: [hybrid-psb-production-readiness-2026-07-11.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-readiness-2026-07-11.md)
+- Docs index diperluas agar dokumen role hardening dan timeline go-live muncul eksplisit di jalur dokumentasi hybrid migration yang aktif: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- Versioning diselaraskan ke `0.65.26` untuk menandai transisi dari penyusunan checklist ke rencana eksekusi hardening dan go-live.
+
 ## [0.65.25] - 2026-07-11
 
 ### Added

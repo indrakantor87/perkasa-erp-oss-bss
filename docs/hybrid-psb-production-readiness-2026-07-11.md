@@ -159,5 +159,7 @@ Alasan:
 
 - [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md)
 - [hybrid-psb-production-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-cutover-checklist.md)
+- [hybrid-psb-role-hardening-plan.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-role-hardening-plan.md)
+- [hybrid-psb-go-live-timeline.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-go-live-timeline.md)
 - [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md)
 - [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
