@@ -23,6 +23,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.25] - 2026-07-11
+
+### Added
+
+- Ditambahkan paket pasca-migration `Web PSB` untuk fase `hardening` dan `cutover`, sehingga hasil seluruh batch production yang sudah lulus kini diterjemahkan ke checklist operasional lintas role, validasi write-side berisiko, freeze batch migration, validasi data minimum, trigger rollback, dan bukti minimum hari-H: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md), [hybrid-psb-production-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-cutover-checklist.md)
+
+### Changed
+
+- Dokumen readiness hybrid production kini menunjuk langsung ke artefak pelaksana berikutnya untuk `hardening` dan `cutover`, sehingga status `GO-HARDENING` tidak berhenti di level ringkasan: [hybrid-psb-production-readiness-2026-07-11.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-readiness-2026-07-11.md)
+- Docs index diperluas agar checklist `hardening` dan `cutover` hybrid `Web PSB` muncul eksplisit di jalur dokumentasi migration yang aktif: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+- Versioning diselaraskan ke `0.65.25` untuk menandai transisi kerja dari pembukaan adapter production ke fase hardening dan cutover.
+
 ## [0.65.24] - 2026-07-11
 
 ### Added

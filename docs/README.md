@@ -71,6 +71,12 @@
 - `hybrid-psb-production-readiness-2026-07-11.md`  
   Rekap readiness hybrid migration `Web PSB` setelah support core, `TroubleTicketPhoto`, `User`, `TroubleTicketMaster`, `Priority`, dan `WhatsappTemplate` production lulus, termasuk fokus hardening dan cutover berikutnya.
 
+- `hybrid-psb-production-hardening-checklist.md`  
+  Checklist hardening pasca seluruh batch production inti `Web PSB` lulus, mencakup data migration, workspace operator, UAT, write-side berisiko, observability, dan syarat sebelum masuk cutover.
+
+- `hybrid-psb-production-cutover-checklist.md`  
+  Checklist cutover hybrid `Web PSB` yang mengikat batch production nyata ke freeze data, validasi role fondasi, keputusan `GO / PILOT / ROLLBACK`, dan bukti minimum hari-H.
+
 - `hybrid-wave-1-user-production-extraction-pack.md`  
   Paket extraction discovery read-only untuk menarik `User` production sekaligus menghitung distribusi `role` dan `division` sebagai dasar penguncian mapping ke `auth_users`, `auth_roles`, dan `org_divisions`.
 
