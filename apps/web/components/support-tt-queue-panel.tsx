@@ -133,6 +133,38 @@ function buildTicketSummary(rows: DomainReviewRow[]) {
   }
 }
 
+function buildOperationalTicketStats(rows: DomainReviewRow[]) {
+  let overdueCount = 0
+  let dueTodayCount = 0
+  let escalationCount = 0
+  let readyCloseCount = 0
+
+  for (const row of rows) {
+    const queueReason = pickMeta(row.meta, 'Queue Reason: ').trim().toUpperCase()
+    const slaState = pickMeta(row.meta, 'SLA State: ').trim().toUpperCase()
+
+    if (queueReason === 'READY_CLOSE') {
+      readyCloseCount += 1
+    }
+    if (queueReason.includes('ESCALATION')) {
+      escalationCount += 1
+    }
+    if (queueReason.includes('OVERDUE') || slaState === 'OVERDUE') {
+      overdueCount += 1
+    }
+    if (queueReason.includes('TODAY') || slaState === 'DUE_TODAY') {
+      dueTodayCount += 1
+    }
+  }
+
+  return {
+    overdueCount,
+    dueTodayCount,
+    escalationCount,
+    readyCloseCount,
+  }
+}
+
 function getQueueReasonActionCopy(reason: string) {
   const normalized = reason.trim().toUpperCase()
 
@@ -460,7 +492,9 @@ export function SupportTroubleTicketQueuePanel({
 
   const visibleSections = ttSections.filter((section) => section.rows.length > 0)
   const totalTickets = visibleSections.reduce((sum, section) => sum + section.rows.length, 0)
-  const summary = buildTicketSummary(visibleSections.flatMap((section) => section.rows))
+  const allRows = visibleSections.flatMap((section) => section.rows)
+  const summary = buildTicketSummary(allRows)
+  const operationalStats = buildOperationalTicketStats(allRows)
 
   return (
     <section className="panel p-6">
@@ -488,6 +522,60 @@ export function SupportTroubleTicketQueuePanel({
             </span>
           ))}
         </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 xl:grid-cols-4">
+        <article className="rounded-3xl border border-orange-200 bg-orange-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">Open Ticket</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-orange-950">
+            {totalTickets}
+          </p>
+          <p className="mt-2 text-sm text-orange-700">Backlog trouble ticket aktif yang sedang dibaca lane ini.</p>
+        </article>
+        <article className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">Perlu Eskalasi</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-rose-950">
+            {operationalStats.escalationCount}
+          </p>
+          <p className="mt-2 text-sm text-rose-700">Kasus yang tertahan dan butuh naik level penanganan.</p>
+        </article>
+        <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">SLA Hari Ini</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-amber-950">
+            {operationalStats.dueTodayCount + operationalStats.overdueCount}
+          </p>
+          <p className="mt-2 text-sm text-amber-700">
+            {operationalStats.overdueCount} overdue dan {operationalStats.dueTodayCount} jatuh tempo hari ini.
+          </p>
+        </article>
+        <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Siap Close</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-emerald-950">
+            {operationalStats.readyCloseCount}
+          </p>
+          <p className="mt-2 text-sm text-emerald-700">Ticket yang sudah paling dekat ke close formal operator.</p>
+        </article>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Link
+          href="/support/tt?focus=OPEN_TICKETS"
+          className="inline-flex items-center justify-center rounded-2xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 transition hover:opacity-90"
+        >
+          Fokus Ticket Open
+        </Link>
+        <Link
+          href="/support/sla?focus=SLA_OVERDUE"
+          className="inline-flex items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:opacity-90"
+        >
+          Amankan SLA Overdue
+        </Link>
+        <Link
+          href="/customers/cs-admin?queue=Trouble+Ticket"
+          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
+        >
+          Buka Supervisor CS
+        </Link>
       </div>
 
       <SupportActionQuickLinks
@@ -540,90 +628,219 @@ export function SupportTroubleTicketQueuePanel({
                   </div>
                 </div>
                 </div>
-              {section.rows.map((row) => {
-                const type = pickMeta(row.meta, 'Type: ')
-                const opened = pickMeta(row.meta, 'Opened: ')
-                const slaDays = pickMeta(row.meta, 'SLA Days: ')
-                const slaDue = pickMeta(row.meta, 'SLA Due: ')
-                const slaState = pickMeta(row.meta, 'SLA State: ')
-                const customerUser = pickMeta(row.meta, 'Customer User: ')
-                const owner = pickMeta(row.meta, 'PIC: ')
-                const followUp = pickMeta(row.meta, 'Next Follow Up: ')
-                const followUpState = pickMeta(row.meta, 'Follow Up State: ')
-                const progressUpdated = pickMeta(row.meta, 'Progress Updated: ')
-                const escalationTarget = pickMeta(row.meta, 'Escalation Target: ')
-                const escalationLevel = pickMeta(row.meta, 'Escalation Level: ')
-                const escalatedAt = pickMeta(row.meta, 'Escalated At: ')
-                const queuePriority = pickMeta(row.meta, 'Queue Priority: ')
-                const queueReason = pickMeta(row.meta, 'Queue Reason: ')
-                const closeCandidate = pickMeta(row.meta, 'Close Candidate: ')
-                const actionCopy = getQueueReasonActionCopy(queueReason)
-                const recommendedActionKey = getRecommendedRowActionKey(queueReason)
-                const rowActions = getRowActionItems({
-                  queueReason,
-                  ticket: row.primary,
-                  type,
-                  canUpdate,
-                  canApprove,
-                })
-                const hiddenActionCount = getRowActionCatalogCount(type) - rowActions.length
-                const actionSimplificationHint = getRowActionSimplificationHint(queueReason, hiddenActionCount)
+              <div className="hidden overflow-hidden rounded-3xl border border-line bg-white lg:block">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50/90">
+                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                        <th className="px-4 py-3">Ticket</th>
+                        <th className="px-4 py-3">Customer & Type</th>
+                        <th className="px-4 py-3">Priority & SLA</th>
+                        <th className="px-4 py-3">PIC & Follow Up</th>
+                        <th className="px-4 py-3">Queue Context</th>
+                        <th className="px-4 py-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {section.rows.map((row) => {
+                        const type = pickMeta(row.meta, 'Type: ')
+                        const opened = pickMeta(row.meta, 'Opened: ')
+                        const slaDays = pickMeta(row.meta, 'SLA Days: ')
+                        const slaDue = pickMeta(row.meta, 'SLA Due: ')
+                        const slaState = pickMeta(row.meta, 'SLA State: ')
+                        const customerUser = pickMeta(row.meta, 'Customer User: ')
+                        const owner = pickMeta(row.meta, 'PIC: ')
+                        const followUp = pickMeta(row.meta, 'Next Follow Up: ')
+                        const followUpState = pickMeta(row.meta, 'Follow Up State: ')
+                        const progressUpdated = pickMeta(row.meta, 'Progress Updated: ')
+                        const escalationTarget = pickMeta(row.meta, 'Escalation Target: ')
+                        const escalationLevel = pickMeta(row.meta, 'Escalation Level: ')
+                        const escalatedAt = pickMeta(row.meta, 'Escalated At: ')
+                        const queuePriority = pickMeta(row.meta, 'Queue Priority: ')
+                        const queueReason = pickMeta(row.meta, 'Queue Reason: ')
+                        const closeCandidate = pickMeta(row.meta, 'Close Candidate: ')
+                        const actionCopy = getQueueReasonActionCopy(queueReason)
+                        const recommendedActionKey = getRecommendedRowActionKey(queueReason)
+                        const rowActions = getRowActionItems({
+                          queueReason,
+                          ticket: row.primary,
+                          type,
+                          canUpdate,
+                          canApprove,
+                        })
+                        const hiddenActionCount = getRowActionCatalogCount(type) - rowActions.length
+                        const actionSimplificationHint = getRowActionSimplificationHint(queueReason, hiddenActionCount)
 
-                return (
-                  <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-5">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
-                        <p className="mt-1 text-sm text-mute">{row.secondary}</p>
+                        return (
+                          <tr key={row.id} className="align-top">
+                            <td className="px-4 py-4">
+                              <div className="space-y-2">
+                                <div>
+                                  <p className="font-semibold text-slate-950">{row.primary}</p>
+                                  <p className="text-sm text-mute">{row.secondary}</p>
+                                </div>
+                                <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
+                                <p className="text-sm text-slate-600">Opened: {opened}</p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="space-y-2">
+                                <span className="badge border-slate-200 bg-white text-slate-600">Type: {type}</span>
+                                <p className="text-sm text-slate-600">User: {customerUser}</p>
+                                <p className="max-w-xs text-sm leading-6 text-mute">{row.detail}</p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex max-w-xs flex-wrap gap-2">
+                                <span className={`badge ${getPriorityTone(queuePriority)}`}>Priority: {queuePriority}</span>
+                                <span className={`badge ${getSlaTone(slaState)}`}>SLA: {slaState}</span>
+                                <span className="badge border-slate-200 bg-white text-slate-600">SLA Days: {slaDays}</span>
+                                <span className="badge border-slate-200 bg-white text-slate-600">SLA Due: {slaDue}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="space-y-2 text-sm text-slate-600">
+                                <p>PIC: {owner}</p>
+                                <p>Follow Up: {followUp}</p>
+                                <span className="badge border-slate-200 bg-white text-slate-600">
+                                  Follow State: {followUpState}
+                                </span>
+                                <span className="badge border-slate-200 bg-white text-slate-600">
+                                  Progress: {progressUpdated}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap gap-2">
+                                  <span className={`badge ${getQueueReasonTone(queueReason)}`}>Reason: {queueReason}</span>
+                                  <span className={`badge ${getRecommendedActionTone(queueReason)}`}>
+                                    Aksi: {actionCopy.primaryLabel}
+                                  </span>
+                                  <span className="badge border-slate-200 bg-white text-slate-600">
+                                    Close Candidate: {closeCandidate}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-slate-600">Escalation: {escalationTarget}</p>
+                                <p className="text-sm text-slate-600">Esc Level: {escalationLevel}</p>
+                                <p className="text-sm text-slate-600">Esc At: {escalatedAt}</p>
+                                <p className="max-w-sm text-xs font-medium text-slate-600">
+                                  Langkah saat ini: {actionCopy.focusLabel}
+                                </p>
+                                {actionSimplificationHint ? (
+                                  <p className="max-w-sm text-xs text-slate-500">{actionSimplificationHint}</p>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              {canUpdate || canApprove ? (
+                                <div className="flex flex-col items-end gap-2">
+                                  {rowActions.map((action) => (
+                                    <Link
+                                      key={`${row.id}-${action.key}`}
+                                      href={action.href}
+                                      className={getRowActionButtonClass(action.key === recommendedActionKey)}
+                                    >
+                                      {action.label}
+                                    </Link>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="space-y-3 lg:hidden">
+                {section.rows.map((row) => {
+                  const type = pickMeta(row.meta, 'Type: ')
+                  const opened = pickMeta(row.meta, 'Opened: ')
+                  const slaDays = pickMeta(row.meta, 'SLA Days: ')
+                  const slaDue = pickMeta(row.meta, 'SLA Due: ')
+                  const slaState = pickMeta(row.meta, 'SLA State: ')
+                  const customerUser = pickMeta(row.meta, 'Customer User: ')
+                  const owner = pickMeta(row.meta, 'PIC: ')
+                  const followUp = pickMeta(row.meta, 'Next Follow Up: ')
+                  const followUpState = pickMeta(row.meta, 'Follow Up State: ')
+                  const progressUpdated = pickMeta(row.meta, 'Progress Updated: ')
+                  const escalationTarget = pickMeta(row.meta, 'Escalation Target: ')
+                  const escalationLevel = pickMeta(row.meta, 'Escalation Level: ')
+                  const escalatedAt = pickMeta(row.meta, 'Escalated At: ')
+                  const queuePriority = pickMeta(row.meta, 'Queue Priority: ')
+                  const queueReason = pickMeta(row.meta, 'Queue Reason: ')
+                  const closeCandidate = pickMeta(row.meta, 'Close Candidate: ')
+                  const actionCopy = getQueueReasonActionCopy(queueReason)
+                  const recommendedActionKey = getRecommendedRowActionKey(queueReason)
+                  const rowActions = getRowActionItems({
+                    queueReason,
+                    ticket: row.primary,
+                    type,
+                    canUpdate,
+                    canApprove,
+                  })
+                  const hiddenActionCount = getRowActionCatalogCount(type) - rowActions.length
+                  const actionSimplificationHint = getRowActionSimplificationHint(queueReason, hiddenActionCount)
+
+                  return (
+                    <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-5">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
+                          <p className="mt-1 text-sm text-mute">{row.secondary}</p>
+                        </div>
+                        <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
                       </div>
-                      <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-mute">{row.detail}</p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="badge border-slate-200 bg-white text-slate-600">Type: {type}</span>
-                      <span className={`badge ${getPriorityTone(queuePriority)}`}>Priority: {queuePriority}</span>
-                      <span className={`badge ${getQueueReasonTone(queueReason)}`}>Reason: {queueReason}</span>
-                      <span className={`badge ${getRecommendedActionTone(queueReason)}`}>
-                        Aksi Disarankan: {actionCopy.primaryLabel}
-                      </span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">
-                        Close Candidate: {closeCandidate}
-                      </span>
-                      <span className={`badge ${getSlaTone(slaState)}`}>SLA: {slaState}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">SLA Days: {slaDays}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">SLA Due: {slaDue}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">Opened: {opened}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">User: {customerUser}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">PIC: {owner}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">Follow Up: {followUp}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">State: {followUpState}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">Progress: {progressUpdated}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">Escalation: {escalationTarget}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">Esc Level: {escalationLevel}</span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">Esc At: {escalatedAt}</span>
-                    </div>
-                    <p className="mt-3 text-xs font-medium text-slate-600">
-                      Langkah saat ini: {actionCopy.focusLabel}
-                    </p>
-                    {canUpdate || canApprove ? (
+                      <p className="mt-3 text-sm leading-6 text-mute">{row.detail}</p>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {rowActions.map((action) => (
-                          <Link
-                            key={`${row.id}-${action.key}`}
-                            href={action.href}
-                            className={getRowActionButtonClass(action.key === recommendedActionKey)}
-                          >
-                            {action.label}
-                          </Link>
-                        ))}
+                        <span className="badge border-slate-200 bg-white text-slate-600">Type: {type}</span>
+                        <span className={`badge ${getPriorityTone(queuePriority)}`}>Priority: {queuePriority}</span>
+                        <span className={`badge ${getQueueReasonTone(queueReason)}`}>Reason: {queueReason}</span>
+                        <span className={`badge ${getRecommendedActionTone(queueReason)}`}>
+                          Aksi Disarankan: {actionCopy.primaryLabel}
+                        </span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">
+                          Close Candidate: {closeCandidate}
+                        </span>
+                        <span className={`badge ${getSlaTone(slaState)}`}>SLA: {slaState}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">SLA Days: {slaDays}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">SLA Due: {slaDue}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">Opened: {opened}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">User: {customerUser}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">PIC: {owner}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">Follow Up: {followUp}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">State: {followUpState}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">Progress: {progressUpdated}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">Escalation: {escalationTarget}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">Esc Level: {escalationLevel}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">Esc At: {escalatedAt}</span>
                       </div>
-                    ) : null}
-                    {actionSimplificationHint ? (
-                      <p className="mt-2 text-xs text-slate-500">{actionSimplificationHint}</p>
-                    ) : null}
-                  </article>
-                )
-              })}
+                      <p className="mt-3 text-xs font-medium text-slate-600">
+                        Langkah saat ini: {actionCopy.focusLabel}
+                      </p>
+                      {canUpdate || canApprove ? (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {rowActions.map((action) => (
+                            <Link
+                              key={`${row.id}-${action.key}`}
+                              href={action.href}
+                              className={getRowActionButtonClass(action.key === recommendedActionKey)}
+                            >
+                              {action.label}
+                            </Link>
+                          ))}
+                        </div>
+                      ) : null}
+                      {actionSimplificationHint ? (
+                        <p className="mt-2 text-xs text-slate-500">{actionSimplificationHint}</p>
+                      ) : null}
+                    </article>
+                  )
+                })}
+              </div>
               </div>
             )
           })}

@@ -23,6 +23,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.27] - 2026-07-12
+
+### Added
+
+- Ditambahkan workspace khusus `Trouble Ticket` dan `Dismantle` pada lane support agar kedua menu ini tidak lagi bergantung penuh pada `DomainShell`, melainkan punya hero, CTA, queue panel, dan blok write-side form sendiri yang lebih dekat ke ritme operasional legacy: [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/[lane]/page.tsx)
+
+### Changed
+
+- Console `Trouble Ticket`, `Monitoring Isolir`, `Dismantle`, `Ticket PSB`, dan `Port ODP` dipoles ke versi terang yang lebih mendekati baseline dark-mode legacy, dengan kartu ringkas di atas, shortcut tindakan cepat, dan tabel operasional sebagai fokus utama halaman: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx), [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx), [sales-domain-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/sales-domain-workspace.tsx), [inventory-network-ops-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-network-ops-panel.tsx)
+- Versioning diselaraskan ke `0.65.27` untuk menandai batch parity UI operasional versi terang pada menu kerja inti `Web PSB`.
+
 ## [0.65.26] - 2026-07-11
 
 ### Added

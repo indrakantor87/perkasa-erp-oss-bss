@@ -1,0 +1,309 @@
+'use client'
+
+import Link from 'next/link'
+import { DataSourceStatus } from '@/components/data-source-status'
+import { SupportSlaForm } from '@/components/support-sla-form'
+import { SupportTicketCloseForm } from '@/components/support-ticket-close-form'
+import { SupportTicketCreateForm } from '@/components/support-ticket-create-form'
+import { SupportTicketEscalateForm } from '@/components/support-ticket-escalate-form'
+import { SupportTicketProgressForm } from '@/components/support-ticket-progress-form'
+import { SupportTroubleTicketQueuePanel } from '@/components/support-tt-queue-panel'
+import {
+  buildSupportActionHref,
+  buildSupportLaneHref,
+  getSupportActionAnchorId,
+} from '@/lib/support-action-links'
+import { canUseSupportAction } from '@/lib/support-lanes'
+import type {
+  AppRole,
+  DataSourceSnapshot,
+  DomainCapability,
+  DomainPageContent,
+  DomainReviewRow,
+  SupportActionLink,
+  SupportDrilldownContext,
+} from '@/lib/types'
+
+function pickMeta(meta: string[], prefix: string) {
+  return meta.find((item) => item.startsWith(prefix))?.replace(prefix, '').trim() || ''
+}
+
+function buildTicketSuggestion(
+  row: DomainReviewRow,
+  includeEscalation: boolean,
+) {
+  const ticketCode = row.primary.trim()
+  if (!ticketCode) {
+    return ''
+  }
+
+  const slaDays = pickMeta(row.meta, 'SLA Days: ') || '-'
+  const slaDue = pickMeta(row.meta, 'SLA Due: ') || '-'
+  const slaState = pickMeta(row.meta, 'SLA State: ') || 'UNSET'
+  const owner = pickMeta(row.meta, 'PIC: ') || '-'
+  const followUp = pickMeta(row.meta, 'Next Follow Up: ') || '-'
+  const latestProgress = pickMeta(row.meta, 'Latest Progress: ') || '-'
+  const type = pickMeta(row.meta, 'Type: ') || '-'
+
+  if (!includeEscalation) {
+    return `${ticketCode} | ${row.secondary} | ${row.status} | ${type} | ${slaDays} | ${slaDue} | ${slaState} | ${owner} | ${followUp} | ${latestProgress}`
+  }
+
+  const escalationTarget = pickMeta(row.meta, 'Escalation Target: ') || '-'
+  const escalationLevel = pickMeta(row.meta, 'Escalation Level: ') || '-'
+  const escalationAt = pickMeta(row.meta, 'Escalated At: ') || '-'
+  const escalationReason = pickMeta(row.meta, 'Escalation Reason: ') || '-'
+
+  return `${ticketCode} | ${row.secondary} | ${row.status} | ${type} | ${slaDays} | ${slaDue} | ${slaState} | ${owner} | ${followUp} | ${latestProgress} | ${escalationTarget} | ${escalationLevel} | ${escalationAt} | ${escalationReason}`
+}
+
+export function SupportTroubleTicketWorkspace({
+  content,
+  source,
+  capabilities,
+  role,
+  supportPrefill,
+  supportDrilldown,
+}: {
+  content: DomainPageContent
+  source: DataSourceSnapshot
+  capabilities: DomainCapability[]
+  role: AppRole
+  supportPrefill?: {
+    ticket?: string
+    type?: string
+  }
+  supportDrilldown?: SupportDrilldownContext
+}) {
+  const reviewSections = content.reviewSections ?? []
+  const troubleRows = reviewSections
+    .filter((section) => section.title.toUpperCase().includes('TROUBLE'))
+    .flatMap((section) => section.rows)
+
+  const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
+  const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
+  const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
+  const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
+
+  const supportTypeSuggestions = Array.from(
+    new Set(
+      reviewSections
+        .flatMap((section) => section.rows)
+        .flatMap((row) =>
+          row.meta
+            .filter((item) => item.startsWith('Type: '))
+            .map((item) => item.replace('Type: ', '').trim())
+            .filter(Boolean),
+        ),
+    ),
+  )
+  const supportTicketSuggestions = troubleRows
+    .map((row) => buildTicketSuggestion(row, false))
+    .filter(Boolean)
+  const supportTicketEscalationSuggestions = troubleRows
+    .map((row) => buildTicketSuggestion(row, true))
+    .filter(Boolean)
+
+  const actionLinks = [
+    {
+      key: 'ticket-create',
+      label: 'Tambah Ticket',
+      description: 'Catat trouble ticket baru ke review DB.',
+      href: `#${getSupportActionAnchorId('ticket-create')}`,
+    },
+    {
+      key: 'ticket-progress',
+      label: 'Update Progress',
+      description: 'Dorong progress dan follow-up ticket aktif.',
+      href: `#${getSupportActionAnchorId('ticket-progress')}`,
+    },
+    {
+      key: 'ticket-escalate',
+      label: 'Eskalasi',
+      description: 'Naikkan kasus yang tertahan atau melewati SLA.',
+      href: `#${getSupportActionAnchorId('ticket-escalate')}`,
+    },
+    {
+      key: 'ticket-close',
+      label: 'Tutup Ticket',
+      description: 'Finalisasi ticket yang sudah ready close.',
+      href: `#${getSupportActionAnchorId('ticket-close')}`,
+    },
+    {
+      key: 'sla-manage',
+      label: 'Kelola SLA',
+      description: 'Atur SLA trouble type untuk lane TT.',
+      href: `#${getSupportActionAnchorId('sla-manage')}`,
+    },
+  ] satisfies SupportActionLink[]
+
+  const visibleActionLinks = actionLinks.filter((item) =>
+    canUseSupportAction({
+      role,
+      actionKey: item.key,
+      canCreate,
+      canUpdate,
+      canApprove,
+    }),
+  )
+
+  return (
+    <div className="space-y-6">
+      <DataSourceStatus source={source} />
+
+      <section className="panel p-6">
+        <p className="section-title">{content.eyebrow}</p>
+        <div className="mt-3 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
+              Trouble Ticket Console
+            </h2>
+            <p className="mt-3 max-w-4xl text-sm leading-6 text-mute">
+              Workspace ini memindahkan ritme halaman legacy ke mode terang ERP: antrean ticket sebagai
+              pusat baca, aksi utama di depan operator, dan form follow-up tetap menulis ke flow ERP
+              support yang sekarang.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })}
+              className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white"
+            >
+              Buka Kontrol SLA
+            </Link>
+            <Link
+              href="/customers/cs-admin?queue=Trouble+Ticket"
+              className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700"
+            >
+              Supervisor CS
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {supportDrilldown ? (
+        <section className="panel p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="section-title">{supportDrilldown.label}</p>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{supportDrilldown.detail}</p>
+            </div>
+            <Link
+              href={supportDrilldown.clearHref}
+              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Reset Fokus
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      <SupportTroubleTicketQueuePanel
+        sections={reviewSections}
+        actionLinks={visibleActionLinks}
+        canUpdate={canUpdate}
+        canApprove={canApprove}
+      />
+
+      <section className="space-y-4">
+        <div>
+          <p className="section-title">Aksi Trouble Ticket</p>
+          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+            Form operasional tetap hidup di fondasi ERP
+          </h3>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
+            Queue dibaca seperti console kerja, tetapi semua write-side tetap memakai endpoint support
+            review DB yang sama dengan fondasi ERP saat ini.
+          </p>
+          {!reviewDbReady ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Mode review database belum aktif, sehingga form write-side dinonaktifkan agar tidak menulis ke mock.
+            </div>
+          ) : null}
+        </div>
+        <div className="grid gap-6 xl:grid-cols-2">
+          {canUseSupportAction({ role, actionKey: 'ticket-create', canCreate, canUpdate, canApprove }) ? (
+            <div id={getSupportActionAnchorId('ticket-create')} className="scroll-mt-24">
+              <SupportTicketCreateForm
+                canCreate={canCreate}
+                reviewDbReady={reviewDbReady}
+                typeSuggestions={supportTypeSuggestions}
+              />
+            </div>
+          ) : null}
+          {canUseSupportAction({ role, actionKey: 'ticket-progress', canCreate, canUpdate, canApprove }) ? (
+            <div id={getSupportActionAnchorId('ticket-progress')} className="scroll-mt-24">
+              <SupportTicketProgressForm
+                canUpdate={canUpdate}
+                reviewDbReady={reviewDbReady}
+                ticketSuggestions={supportTicketSuggestions}
+                initialTicketCode={supportPrefill?.ticket}
+              />
+            </div>
+          ) : null}
+          {canUseSupportAction({ role, actionKey: 'ticket-escalate', canCreate, canUpdate, canApprove }) ? (
+            <div id={getSupportActionAnchorId('ticket-escalate')} className="scroll-mt-24">
+              <SupportTicketEscalateForm
+                canUpdate={canUpdate}
+                reviewDbReady={reviewDbReady}
+                ticketSuggestions={supportTicketEscalationSuggestions}
+                initialTicketCode={supportPrefill?.ticket}
+              />
+            </div>
+          ) : null}
+          {canUseSupportAction({ role, actionKey: 'ticket-close', canCreate, canUpdate, canApprove }) ? (
+            <div id={getSupportActionAnchorId('ticket-close')} className="scroll-mt-24">
+              <SupportTicketCloseForm
+                canUpdate={canUpdate}
+                reviewDbReady={reviewDbReady}
+                ticketSuggestions={supportTicketSuggestions}
+                initialTicketCode={supportPrefill?.ticket}
+              />
+            </div>
+          ) : null}
+          {canUseSupportAction({ role, actionKey: 'sla-manage', canCreate, canUpdate, canApprove }) ? (
+            <div id={getSupportActionAnchorId('sla-manage')} className="scroll-mt-24 xl:col-span-2">
+              <SupportSlaForm
+                canApprove={canApprove}
+                reviewDbReady={reviewDbReady}
+                typeSuggestions={supportTypeSuggestions}
+                initialTroubleType={supportPrefill?.type}
+              />
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      {content.highlights.length ? (
+        <section className="panel p-6">
+          <p className="section-title">Integrasi ERP / OSS / BSS</p>
+          <div className="mt-6 grid gap-4 xl:grid-cols-3">
+            {content.highlights.map((item) => (
+              <article key={item.title} className="rounded-2xl border border-line bg-slate-50 p-5">
+                <p className="text-sm font-semibold text-slate-950">{item.title}</p>
+                <p className="mt-3 text-sm leading-6 text-mute">{item.detail}</p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-6 flex flex-wrap gap-2">
+            {capabilities.map((item) => (
+              <span
+                key={item.action}
+                className={`badge ${
+                  item.enabled
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-400'
+                }`}
+              >
+                {item.label}
+              </span>
+            ))}
+          </div>
+          <p className="mt-4 text-sm leading-6 text-mute">
+            Shortcut tabel mengarah ke update progress, eskalasi, close, dan kontrol SLA tanpa memisahkan operator dari lane TT aktif.
+          </p>
+        </section>
+      ) : null}
+    </div>
+  )
+}

@@ -23,6 +23,23 @@ function buildOdpMapHref(row: DomainReviewRow) {
   })
 }
 
+function getStatusTone(status: string) {
+  const normalized = status.trim().toUpperCase()
+  if (normalized.includes('FAULT') || normalized.includes('DISABLED')) {
+    return 'border-rose-200 bg-rose-50 text-rose-700'
+  }
+  if (normalized.includes('RESERVED')) {
+    return 'border-amber-200 bg-amber-50 text-amber-700'
+  }
+  if (normalized.includes('USED') || normalized.includes('ACTIVE') || normalized.includes('/')) {
+    return 'border-sky-200 bg-sky-50 text-sky-700'
+  }
+  if (normalized.includes('DONE') || normalized.includes('AVAILABLE')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+  return 'border-slate-200 bg-white text-slate-600'
+}
+
 export function InventoryNetworkOpsPanel({
   sections,
 }: {
@@ -40,6 +57,10 @@ export function InventoryNetworkOpsPanel({
   const accessoryAssignments = (assignmentSection?.rows ?? []).filter((row) =>
     isAccessoryCategory(pickMeta(row.meta, 'Category: ')),
   )
+  const odpRows = odpSection?.rows ?? []
+  const usedPortRows = usedPortSection?.rows ?? []
+  const issuePortRows = issuePortSection?.rows ?? []
+  const assignmentRows = assignmentSection?.rows ?? []
 
   return (
     <section className="panel p-6">
@@ -83,84 +104,216 @@ export function InventoryNetworkOpsPanel({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <article className="rounded-2xl border border-line bg-slate-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">ODP Dan Maps</p>
-          <div className="mt-4 space-y-3">
-            {(odpSection?.rows ?? []).length ? (
-              odpSection?.rows.map((row) => {
-                const totalPorts = pickMeta(row.meta, 'Total Ports: ')
-                const activePorts = pickMeta(row.meta, 'Active Ports: ')
-                const mapHref = buildOdpMapHref(row)
+      <div className="mt-6 grid gap-4 xl:grid-cols-4">
+        <article className="rounded-3xl border border-sky-200 bg-sky-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">ODP Aktif</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-sky-950">
+            {odpRows.length}
+          </p>
+          <p className="mt-2 text-sm text-sky-700">Header ODP yang sedang jadi acuan pembacaan port.</p>
+        </article>
+        <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Port Terpakai</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-emerald-950">
+            {usedPortRows.length}
+          </p>
+          <p className="mt-2 text-sm text-emerald-700">Port yang sudah tertaut ke service/customer aktif.</p>
+        </article>
+        <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Port Issue</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-amber-950">
+            {issuePortRows.length}
+          </p>
+          <p className="mt-2 text-sm text-amber-700">Port reserved, faulty, atau disabled yang perlu ditindak.</p>
+        </article>
+        <article className="rounded-3xl border border-violet-200 bg-violet-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Assignment</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-violet-950">
+            {assignmentRows.length}
+          </p>
+          <p className="mt-2 text-sm text-violet-700">{accessoryAssignments.length} item terbaca sebagai accessories/device lapangan.</p>
+        </article>
+      </div>
 
-                return (
-                  <div key={row.id} className="rounded-2xl border border-line bg-white p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Link
+          href="/inventory?focus=ACTIVE_ITEMS"
+          className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:opacity-90"
+        >
+          Fokus ODP Aktif
+        </Link>
+        <Link
+          href="/inventory?focus=PENDING_REQUESTS"
+          className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:opacity-90"
+        >
+          Cek Request Pending
+        </Link>
+        <Link
+          href="/customers/cs-admin?queue=PORT+ODP"
+          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
+        >
+          Buka Supervisor CS
+        </Link>
+      </div>
+
+      <div className="mt-6 overflow-hidden rounded-3xl border border-line bg-white">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Console Port ODP</p>
+              <h4 className="mt-2 text-lg font-semibold text-slate-950">Tabel ODP dan kapasitas port</h4>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
+                Fokus utama dibuat table-first seperti console legacy, tetapi tetap memakai row metadata ERP yang tersedia saat ini.
+              </p>
+            </div>
+            <span className="badge border-slate-200 bg-slate-50 text-slate-700">{odpRows.length} ODP terbaca</span>
+          </div>
+        </div>
+        {odpRows.length ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-[1080px] w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <th className="px-4 py-3">ODP</th>
+                  <th className="px-4 py-3">Lokasi</th>
+                  <th className="px-4 py-3">Port</th>
+                  <th className="px-4 py-3">Koordinat</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {odpRows.map((row) => {
+                  const totalPorts = pickMeta(row.meta, 'Total Ports: ')
+                  const activePorts = pickMeta(row.meta, 'Active Ports: ')
+                  const latitude = pickMeta(row.meta, 'Latitude: ')
+                  const longitude = pickMeta(row.meta, 'Longitude: ')
+                  const mapHref = buildOdpMapHref(row)
+
+                  return (
+                    <tr key={row.id} className="align-top">
+                      <td className="px-4 py-4">
                         <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
                         <p className="mt-1 text-sm text-mute">{row.secondary}</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">{row.detail}</p>
-                      </div>
-                      <span className="badge border-slate-200 bg-white text-slate-600">{row.status}</span>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="badge border-slate-200 bg-white text-slate-600">
-                        Total Port: {totalPorts || '-'}
-                      </span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">
-                        Active: {activePorts || '-'}
-                      </span>
-                      {mapHref ? (
-                        <Link
-                          href={mapHref}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700"
-                        >
-                          Buka Maps
-                        </Link>
-                      ) : (
-                        <span className="badge border-slate-200 bg-white text-slate-500">
-                          Maps belum siap
-                        </span>
-                      )}
-                    </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="max-w-sm text-sm leading-6 text-slate-700">{row.detail}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          <span className="badge border-slate-200 bg-white text-slate-600">Total: {totalPorts || '-'}</span>
+                          <span className="badge border-sky-200 bg-sky-50 text-sky-700">Active: {activePorts || '-'}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="space-y-2 text-sm text-slate-600">
+                          <p>Lat: {latitude || '-'}</p>
+                          <p>Lng: {longitude || '-'}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-col items-end gap-2">
+                          {mapHref ? (
+                            <Link
+                              href={mapHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                            >
+                              Buka Maps
+                            </Link>
+                          ) : (
+                            <span className="text-sm text-slate-400">Maps belum siap</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="px-5 py-6 text-sm text-slate-500">Belum ada ODP yang bisa direview.</div>
+        )}
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <article className="rounded-2xl border border-line bg-slate-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Port Terpakai & Port Issue</p>
+          <div className="mt-4 space-y-3">
+            {usedPortRows.slice(0, 4).map((row) => (
+              <div key={row.id} className="rounded-2xl border border-line bg-white p-4">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
+                    <p className="mt-1 text-sm text-mute">{row.secondary}</p>
                   </div>
-                )
-              })
-            ) : (
-              <p className="text-sm text-slate-500">Belum ada ODP yang bisa direview.</p>
-            )}
+                  <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-700">{row.detail}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {row.meta.map((item) => (
+                    <span key={`${row.id}-${item}`} className="badge border-slate-200 bg-white text-slate-600">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {issuePortRows.slice(0, 3).map((row) => (
+              <div key={row.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-amber-950">{row.primary}</p>
+                    <p className="mt-1 text-sm text-amber-800">{row.secondary}</p>
+                  </div>
+                  <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-amber-900">{row.detail}</p>
+              </div>
+            ))}
+            {!usedPortRows.length && !issuePortRows.length ? (
+              <p className="text-sm text-slate-500">Belum ada port terpakai atau port issue yang tampil di review terbaru.</p>
+            ) : null}
           </div>
         </article>
 
         <article className="rounded-2xl border border-line bg-slate-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Port Dan Accessories</p>
-          <div className="mt-4 space-y-4">
-            <div className="rounded-2xl border border-line bg-white p-4">
-              <p className="text-sm font-semibold text-slate-950">Port aktif</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                {(usedPortSection?.rows ?? []).length
-                  ? `${usedPortSection?.rows.length} port sedang terpakai dan sudah tertaut ke layanan/customer.`
-                  : 'Belum ada port terpakai yang tampil di review saat ini.'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-line bg-white p-4">
-              <p className="text-sm font-semibold text-slate-950">Port bermasalah</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                {(issuePortSection?.rows ?? []).length
-                  ? `${issuePortSection?.rows.length} port berada pada status reserved/faulty/disabled dan perlu perhatian jaringan.`
-                  : 'Belum ada port reserved/faulty/disabled di review terbaru.'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-line bg-white p-4">
-              <p className="text-sm font-semibold text-slate-950">Accessories dan device</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                {assignmentSection?.rows.length
-                  ? `${assignmentSection.rows.length} assignment device tercatat, dengan ${accessoryAssignments.length} item yang sudah terindikasi sebagai accessories dari kategori inventory.`
-                  : 'Belum ada assignment device yang tampil pada review inventory.'}
-              </p>
-            </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Device Assignment</p>
+          <div className="mt-4 space-y-3">
+            {assignmentRows.slice(0, 6).map((row) => (
+              <div key={row.id} className="rounded-2xl border border-line bg-white p-4">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
+                    <p className="mt-1 text-sm text-mute">{row.secondary}</p>
+                  </div>
+                  <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-700">{row.detail}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {row.meta.map((item) => (
+                    <span
+                      key={`${row.id}-${item}`}
+                      className={`badge ${
+                        item.startsWith('Category: ') && isAccessoryCategory(item.replace('Category: ', ''))
+                          ? 'border-violet-200 bg-violet-50 text-violet-700'
+                          : 'border-slate-200 bg-white text-slate-600'
+                      }`}
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {!assignmentRows.length ? (
+              <p className="text-sm text-slate-500">Belum ada assignment device yang tampil pada review inventory.</p>
+            ) : null}
           </div>
         </article>
       </div>

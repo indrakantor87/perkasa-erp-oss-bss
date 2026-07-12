@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { SupportActionQuickLinks } from '@/components/support-action-quick-links'
-import { buildSupportActionHref } from '@/lib/support-action-links'
+import { buildSupportActionHref, buildSupportLaneHref } from '@/lib/support-action-links'
 import type { DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
@@ -41,11 +41,51 @@ function buildIsolationSummary(rows: DomainReviewRow[]) {
     ),
   ).slice(0, 4)
 
+  const terminateCount = rows.filter((row) => pickMeta(row.meta, 'Ticket Dismantle: ') === 'Sudah').length
+  const restoreCount = rows.length - terminateCount
+
   return {
     total: rows.length,
     statusItems,
     marketingNames,
+    restoreCount,
+    terminateCount,
   }
+}
+
+function getOwnershipState(row: DomainReviewRow) {
+  const dismantleTicket = pickMeta(row.meta, 'Ticket Dismantle: ')
+  if (dismantleTicket === 'Sudah') {
+    return {
+      label: 'Terminate / Dismantle',
+      owner: 'CS & Admin CS',
+      note: 'Kasus sudah masuk queue dismantle dan dibaca sebagai jalur terminate.',
+      tone: 'border-rose-200 bg-rose-50 text-rose-700',
+      nextLabel: 'Lihat Queue Dismantle CS',
+      nextHref: buildSupportActionHref('dismantle-approve', {
+        isolation: `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`,
+      }),
+    }
+  }
+
+  return {
+    label: 'Restore / Recovery',
+    owner: 'Billing',
+    note: 'Kasus masih berada di jalur restore dan menunggu validasi Billing.',
+    tone: 'border-sky-200 bg-sky-50 text-sky-700',
+    nextLabel: 'Transfer Ke Dismantle CS',
+    nextHref: buildSupportActionHref('dismantle-approve', {
+      isolation: `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`,
+    }),
+  }
+}
+
+function getActionButtonClass(isPrimary: boolean) {
+  if (isPrimary) {
+    return 'rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800'
+  }
+
+  return 'rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50'
 }
 
 export function SupportIsolationQueuePanel({
@@ -78,17 +118,54 @@ export function SupportIsolationQueuePanel({
           </h3>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
             Fokuskan identitas pelanggan, mapping radbox, marketing owner, dan tanggal isolir sebelum
-            melakukan restore atau meneruskan kasus ke dismantle.
+            memutuskan apakah kasus tetap menjadi jalur restore milik Billing atau diteruskan ke terminate milik CS & Admin CS.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="badge border-transparent bg-slate-950 text-white">{summary.total} isolir</span>
+          <span className="badge border-sky-200 bg-sky-50 text-sky-700">
+            Restore Billing: {summary.restoreCount}
+          </span>
+          <span className="badge border-rose-200 bg-rose-50 text-rose-700">
+            Queue Dismantle: {summary.terminateCount}
+          </span>
           {summary.statusItems.map((item) => (
             <span key={item.status} className="badge border-slate-200 bg-white text-slate-600">
               {item.status}: {item.count}
             </span>
           ))}
         </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 xl:grid-cols-4">
+        <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Isolir Aktif</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-amber-950">
+            {summary.total}
+          </p>
+          <p className="mt-2 text-sm text-amber-700">Backlog pelanggan suspend yang masih menunggu keputusan.</p>
+        </article>
+        <article className="rounded-3xl border border-sky-200 bg-sky-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Jalur Restore</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-sky-950">
+            {summary.restoreCount}
+          </p>
+          <p className="mt-2 text-sm text-sky-700">Kasus yang masih sehat dibaca sebagai recovery Billing.</p>
+        </article>
+        <article className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">Jalur Terminate</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-rose-950">
+            {summary.terminateCount}
+          </p>
+          <p className="mt-2 text-sm text-rose-700">Kasus yang sudah bergerak ke queue Dismantle CS & Admin CS.</p>
+        </article>
+        <article className="rounded-3xl border border-violet-200 bg-violet-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Owner Marketing</p>
+          <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-violet-950">
+            {summary.marketingNames.length}
+          </p>
+          <p className="mt-2 text-sm text-violet-700">Nama marketing dominan yang masih muncul di backlog isolir.</p>
+        </article>
       </div>
 
       {summary.marketingNames.length ? (
@@ -104,54 +181,170 @@ export function SupportIsolationQueuePanel({
 
       <SupportActionQuickLinks
         links={actionLinks}
-        description="Buka form suspend, restore, atau approval dismantle langsung dari lane isolir agar follow up lebih cepat."
+        description="Restore tetap dibaca sebagai keputusan Billing, sedangkan terminate diteruskan ke queue Dismantle milik CS & Admin CS."
       />
 
-      {isolationSection.rows.length ? (
-        <div className="mt-6 space-y-3">
-          {isolationSection.rows.map((row) => {
-            const phone = pickMeta(row.meta, 'Phone: ')
-            const marketing = pickMeta(row.meta, 'Marketing: ')
-            const isolasiAt = pickMeta(row.meta, 'Isolasi: ')
-            const isolationPrefillValue = buildIsolationPrefillValue(row)
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Link
+          href="/billing"
+          className="inline-flex items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:opacity-90"
+        >
+          Buka Billing Decision
+        </Link>
+        <Link
+          href={buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })}
+          className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:opacity-90"
+        >
+          Kontrol SLA Terkait
+        </Link>
+        <Link
+          href="/customers/cs-admin?queue=Transfer+atau+Restore"
+          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
+        >
+          Buka Supervisor CS
+        </Link>
+      </div>
 
-            return (
-              <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
-                    <p className="mt-1 text-sm text-mute">{row.secondary}</p>
+      {isolationSection.rows.length ? (
+        <>
+          <div className="mt-6 hidden overflow-hidden rounded-3xl border border-line bg-white lg:block">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50/90">
+                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    <th className="px-4 py-3">Customer</th>
+                    <th className="px-4 py-3">Kontak & Radbox</th>
+                    <th className="px-4 py-3">Marketing & Isolasi</th>
+                    <th className="px-4 py-3">Ownership</th>
+                    <th className="px-4 py-3">Konteks</th>
+                    <th className="px-4 py-3 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isolationSection.rows.map((row) => {
+                    const phone = pickMeta(row.meta, 'Phone: ')
+                    const marketing = pickMeta(row.meta, 'Marketing: ')
+                    const isolasiAt = pickMeta(row.meta, 'Isolasi: ')
+                    const dismantleTicket = pickMeta(row.meta, 'Ticket Dismantle: ')
+                    const isolationPrefillValue = buildIsolationPrefillValue(row)
+                    const ownership = getOwnershipState(row)
+
+                    return (
+                      <tr key={row.id} className="align-top">
+                        <td className="px-4 py-4">
+                          <div className="space-y-2">
+                            <div>
+                              <p className="font-semibold text-slate-950">{row.primary}</p>
+                              <p className="text-sm text-mute">{row.secondary}</p>
+                            </div>
+                            <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="space-y-2 text-sm text-slate-600">
+                            <p>Phone: {phone}</p>
+                            <p>Radbox: {row.secondary}</p>
+                            <span
+                              className={`badge ${
+                                dismantleTicket === 'Sudah'
+                                  ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                  : 'border-slate-200 bg-white text-slate-600'
+                              }`}
+                            >
+                              Ticket Dismantle: {dismantleTicket}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="space-y-2 text-sm text-slate-600">
+                            <p>Marketing: {marketing}</p>
+                            <p>Isolasi: {isolasiAt}</p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="space-y-2">
+                            <span className={`badge ${ownership.tone}`}>
+                              {ownership.label} • {ownership.owner}
+                            </span>
+                            <p className="max-w-xs text-sm leading-6 text-mute">{ownership.note}</p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="max-w-sm text-sm leading-6 text-mute">{row.detail}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex flex-col items-end gap-2">
+                            <Link
+                              href={buildSupportActionHref('isolation-restore', {
+                                isolation: isolationPrefillValue,
+                              })}
+                              className={getActionButtonClass(dismantleTicket !== 'Sudah')}
+                            >
+                              Proses Restore Billing
+                            </Link>
+                            <Link href={ownership.nextHref} className={getActionButtonClass(dismantleTicket === 'Sudah')}>
+                              {ownership.nextLabel}
+                            </Link>
+                            <Link href="/billing" className={getActionButtonClass(false)}>
+                              Sinkron Billing
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3 lg:hidden">
+            {isolationSection.rows.map((row) => {
+              const phone = pickMeta(row.meta, 'Phone: ')
+              const marketing = pickMeta(row.meta, 'Marketing: ')
+              const isolasiAt = pickMeta(row.meta, 'Isolasi: ')
+              const isolationPrefillValue = buildIsolationPrefillValue(row)
+              const ownership = getOwnershipState(row)
+
+              return (
+                <article key={`${row.id}-mobile`} className="rounded-2xl border border-line bg-slate-50 p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
+                      <p className="mt-1 text-sm text-mute">{row.secondary}</p>
+                    </div>
+                    <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
                   </div>
-                  <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-mute">{row.detail}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="badge border-slate-200 bg-white text-slate-600">Phone: {phone}</span>
-                  <span className="badge border-slate-200 bg-white text-slate-600">Marketing: {marketing}</span>
-                  <span className="badge border-slate-200 bg-white text-slate-600">Isolasi: {isolasiAt}</span>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link
-                    href={buildSupportActionHref('isolation-restore', {
-                      isolation: isolationPrefillValue,
-                    })}
-                    className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700"
-                  >
-                    Proses Restore
-                  </Link>
-                  <Link
-                    href={buildSupportActionHref('dismantle-approve', {
-                      isolation: isolationPrefillValue,
-                    })}
-                    className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700"
-                  >
-                    Ke Dismantle
-                  </Link>
-                </div>
-              </article>
-            )
-          })}
-        </div>
+                  <p className="mt-3 text-sm leading-6 text-mute">{row.detail}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="badge border-slate-200 bg-white text-slate-600">Phone: {phone}</span>
+                    <span className="badge border-slate-200 bg-white text-slate-600">Marketing: {marketing}</span>
+                    <span className="badge border-slate-200 bg-white text-slate-600">Isolasi: {isolasiAt}</span>
+                    <span className={`badge ${ownership.tone}`}>
+                      {ownership.owner} • {ownership.label}
+                    </span>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link
+                      href={buildSupportActionHref('isolation-restore', {
+                        isolation: isolationPrefillValue,
+                      })}
+                      className={getActionButtonClass(true)}
+                    >
+                      Proses Restore Billing
+                    </Link>
+                    <Link href={ownership.nextHref} className={getActionButtonClass(false)}>
+                      {ownership.nextLabel}
+                    </Link>
+                    <Link href="/billing" className={getActionButtonClass(false)}>
+                      Sinkron Billing
+                    </Link>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </>
       ) : (
         <p className="mt-6 text-sm text-slate-500">Belum ada data isolir aktif untuk direview.</p>
       )}
