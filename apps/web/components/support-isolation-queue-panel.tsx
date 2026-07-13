@@ -1,5 +1,9 @@
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
 import { SupportActionQuickLinks } from '@/components/support-action-quick-links'
+import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { canAccessPath } from '@/lib/access-control'
 import { buildSupportActionHref, buildSupportLaneHref } from '@/lib/support-action-links'
 import { canAccessSupportLane, canProcessSupportDismantle } from '@/lib/support-lanes'
@@ -152,6 +156,68 @@ function getIsolationRowActionItems(params: {
   })
 }
 
+function buildIsolationQuickActionPayload(params: {
+  row: DomainReviewRow
+  canUpdate: boolean
+  canTransferToDismantle: boolean
+  canOpenBillingDecision: boolean
+}): TableQuickActionPayload {
+  const phone = pickMeta(params.row.meta, 'Phone: ')
+  const marketing = pickMeta(params.row.meta, 'Marketing: ')
+  const isolasiAt = pickMeta(params.row.meta, 'Isolasi: ')
+  const dismantleTicket = pickMeta(params.row.meta, 'Ticket Dismantle: ')
+  const ownership = getOwnershipState(params.row)
+  const rowActions = getIsolationRowActionItems(params)
+
+  return {
+    id: params.row.id,
+    title: params.row.primary,
+    subtitle: params.row.secondary,
+    description: params.row.detail,
+    draftLabel: 'Isolir',
+    draftSeed: [
+      `Marketing: ${marketing}`,
+      `Isolasi: ${isolasiAt}`,
+      `Kepemilikan: ${ownership.owner}`,
+      `Jalur: ${ownership.label}`,
+    ].join('\n'),
+    badges: [
+      { label: params.row.status, tone: getRowTone(params.row.status) },
+      {
+        label: `Ticket Dismantle: ${dismantleTicket}`,
+        tone:
+          dismantleTicket === 'Sudah'
+            ? 'border-rose-200 bg-rose-50 text-rose-700'
+            : 'border-slate-200 bg-white text-slate-600',
+      },
+      { label: ownership.label, tone: ownership.tone },
+    ],
+    sections: [
+      {
+        title: 'Kontak & Radbox',
+        value: [`Phone: ${phone}`, `Radbox: ${params.row.secondary}`].join('\n'),
+      },
+      {
+        title: 'Marketing & Isolasi',
+        value: [`Marketing: ${marketing}`, `Isolasi: ${isolasiAt}`].join('\n'),
+      },
+      {
+        title: 'Kepemilikan Proses',
+        value: [`Owner: ${ownership.owner}`, ownership.note].join('\n'),
+      },
+      {
+        title: 'Ringkasan Kasus',
+        value: params.row.detail,
+      },
+    ],
+    actions: rowActions.map((action, index) => ({
+      label: action.label,
+      href: action.href,
+      tone: index === 0 ? 'primary' : 'secondary',
+    })),
+  }
+}
+
 export function SupportIsolationQueuePanel({
   sections,
   actionLinks = [],
@@ -177,6 +243,7 @@ export function SupportIsolationQueuePanel({
   const canOpenSlaLane = canAccessSupportLane(role, 'sla')
   const canOpenSupervisorWorkspace = canAccessPath(role, '/customers/cs-admin')
   const canTransferToDismantle = canProcessSupportDismantle(role, canApprove)
+  const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
 
   function buildIsolationPrefillValue(row: DomainReviewRow) {
     return `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`
@@ -362,15 +429,22 @@ export function SupportIsolationQueuePanel({
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex flex-col items-end gap-2">
-                            {rowActions.map((action) => (
-                              <Link
-                                key={`${row.id}-${action.key}`}
-                                href={action.href}
-                                className={getActionButtonClass(action.key === recommendedActionKey)}
-                              >
-                                {action.label}
-                              </Link>
-                            ))}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQuickActionItem(
+                                  buildIsolationQuickActionPayload({
+                                    row,
+                                    canUpdate,
+                                    canTransferToDismantle,
+                                    canOpenBillingDecision,
+                                  }),
+                                )
+                              }
+                              className={getActionButtonClass(true)}
+                            >
+                              Aksi cepat
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -414,15 +488,22 @@ export function SupportIsolationQueuePanel({
                     </span>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {rowActions.map((action) => (
-                      <Link
-                        key={`${row.id}-${action.key}-mobile`}
-                        href={action.href}
-                        className={getActionButtonClass(action.key === recommendedActionKey)}
-                      >
-                        {action.label}
-                      </Link>
-                    ))}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQuickActionItem(
+                          buildIsolationQuickActionPayload({
+                            row,
+                            canUpdate,
+                            canTransferToDismantle,
+                            canOpenBillingDecision,
+                          }),
+                        )
+                      }
+                      className={getActionButtonClass(true)}
+                    >
+                      Aksi cepat
+                    </button>
                   </div>
                 </article>
               )
@@ -432,6 +513,12 @@ export function SupportIsolationQueuePanel({
       ) : (
         <p className="mt-6 text-sm text-slate-500">Belum ada data isolir aktif untuk direview.</p>
       )}
+
+      <TableQuickActionModal
+        item={quickActionItem}
+        onClose={() => setQuickActionItem(null)}
+        heading="Aksi cepat dari tabel isolir"
+      />
     </section>
   )
 }

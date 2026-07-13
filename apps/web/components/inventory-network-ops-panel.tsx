@@ -1,4 +1,8 @@
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
+import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { buildGoogleMapsHref } from '@/lib/map-links'
 import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
 
@@ -40,6 +44,63 @@ function getStatusTone(status: string) {
   return 'border-slate-200 bg-white text-slate-600'
 }
 
+function buildInventoryQuickActionPayload(row: DomainReviewRow): TableQuickActionPayload {
+  const totalPorts = pickMeta(row.meta, 'Total Ports: ')
+  const activePorts = pickMeta(row.meta, 'Active Ports: ')
+  const latitude = pickMeta(row.meta, 'Latitude: ')
+  const longitude = pickMeta(row.meta, 'Longitude: ')
+  const mapHref = buildOdpMapHref(row)
+
+  return {
+    id: row.id,
+    title: row.primary,
+    subtitle: row.secondary,
+    description: row.detail,
+    draftLabel: 'ODP',
+    draftSeed: [
+      totalPorts ? `Total Ports: ${totalPorts}` : null,
+      activePorts ? `Active Ports: ${activePorts}` : null,
+      latitude ? `Latitude: ${latitude}` : null,
+      longitude ? `Longitude: ${longitude}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    badges: [
+      { label: row.status, tone: getStatusTone(row.status) },
+      ...(totalPorts ? [{ label: `Total ${totalPorts}` }] : []),
+      ...(activePorts ? [{ label: `Active ${activePorts}` }] : []),
+    ],
+    sections: [
+      {
+        title: 'Lokasi',
+        value: row.detail,
+      },
+      {
+        title: 'Port',
+        value: [`Total: ${totalPorts || '-'}`, `Active: ${activePorts || '-'}`].join('\n'),
+      },
+      {
+        title: 'Koordinat',
+        value: [`Lat: ${latitude || '-'}`, `Lng: ${longitude || '-'}`].join('\n'),
+      },
+      {
+        title: 'Referensi',
+        value: row.secondary,
+      },
+    ],
+    actions: mapHref
+      ? [
+          {
+            label: 'Buka Maps',
+            href: mapHref,
+            tone: 'primary',
+            external: true,
+          },
+        ]
+      : [],
+  }
+}
+
 export function InventoryNetworkOpsPanel({
   sections,
 }: {
@@ -61,6 +122,7 @@ export function InventoryNetworkOpsPanel({
   const usedPortRows = usedPortSection?.rows ?? []
   const issuePortRows = issuePortSection?.rows ?? []
   const assignmentRows = assignmentSection?.rows ?? []
+  const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
 
   return (
     <section className="panel p-4">
@@ -210,14 +272,13 @@ export function InventoryNetworkOpsPanel({
                       <td className="px-4 py-4">
                         <div className="flex flex-col items-end gap-2">
                           {mapHref ? (
-                            <Link
-                              href={mapHref}
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => setQuickActionItem(buildInventoryQuickActionPayload(row))}
                               className="rounded-md border border-slate-950 bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800"
                             >
-                              Buka Maps
-                            </Link>
+                              Aksi cepat
+                            </button>
                           ) : (
                             <span className="text-sm text-slate-400">Maps belum siap</span>
                           )}
@@ -310,6 +371,12 @@ export function InventoryNetworkOpsPanel({
           </div>
         </article>
       </div>
+
+      <TableQuickActionModal
+        item={quickActionItem}
+        onClose={() => setQuickActionItem(null)}
+        heading="Aksi cepat dari tabel ODP"
+      />
     </section>
   )
 }

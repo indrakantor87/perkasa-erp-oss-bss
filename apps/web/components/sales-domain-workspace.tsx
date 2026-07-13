@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { SalesCoverageCreateForm } from '@/components/sales-coverage-create-form'
 import { SalesLeadCreateForm } from '@/components/sales-lead-create-form'
@@ -6,6 +9,7 @@ import { SalesOrderCreateForm } from '@/components/sales-order-create-form'
 import { SalesSubscriptionActivateForm } from '@/components/sales-subscription-activate-form'
 import { SalesSurveyCreateForm } from '@/components/sales-survey-create-form'
 import { SalesWorkOrderCreateForm } from '@/components/sales-work-order-create-form'
+import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import type {
   AppRole,
   DataSourceSnapshot,
@@ -160,6 +164,55 @@ function getRowAction(sectionTitle: string, row: DomainReviewRow, canCreate: boo
   return null
 }
 
+function buildSalesQuickActionPayload(params: {
+  sectionTitle: string
+  row: DomainReviewRow
+  canCreate: boolean
+}): TableQuickActionPayload {
+  const action = getRowAction(params.sectionTitle, params.row, params.canCreate)
+  const primaryMeta = params.row.meta.slice(0, 4)
+
+  return {
+    id: params.row.id,
+    title: params.row.primary,
+    subtitle: params.row.secondary,
+    description: params.row.detail,
+    draftLabel: 'Referensi',
+    draftSeed: [params.sectionTitle, ...primaryMeta].filter(Boolean).join('\n'),
+    badges: [
+      { label: params.sectionTitle },
+      { label: params.row.status, tone: getStatusTone(params.row.status) },
+    ],
+    sections: [
+      {
+        title: 'Status',
+        value: params.row.status,
+      },
+      {
+        title: 'Section',
+        value: params.sectionTitle,
+      },
+      {
+        title: 'Keterangan',
+        value: params.row.detail,
+      },
+      {
+        title: 'PIC / Konteks',
+        value: primaryMeta.join('\n') || '-',
+      },
+    ],
+    actions: action
+      ? [
+          {
+            label: action.label,
+            href: action.href,
+            tone: 'primary',
+          },
+        ]
+      : [],
+  }
+}
+
 function getSectionRowsByKeyword(sections: DomainPageContent['reviewSections'], keyword: string) {
   return (sections ?? [])
     .filter((section) => section.title.toUpperCase().includes(keyword.toUpperCase()))
@@ -260,6 +313,7 @@ export function SalesDomainWorkspace({
     ),
   )
   const totalRows = reviewSections.reduce((sum, section) => sum + section.rows.length, 0)
+  const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
   const openRows = reviewSections.reduce(
     (sum, section) =>
       sum +
@@ -488,12 +542,21 @@ export function SalesDomainWorkspace({
                         </td>
                         <td className="px-4 py-4">
                           {action ? (
-                            <Link
-                              href={action.href}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQuickActionItem(
+                                  buildSalesQuickActionPayload({
+                                    sectionTitle: section.title,
+                                    row,
+                                    canCreate,
+                                  }),
+                                )
+                              }
                               className="inline-flex items-center justify-center rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800"
                             >
-                              {action.label}
-                            </Link>
+                              Aksi cepat
+                            </button>
                           ) : (
                             <span className="text-sm text-slate-400">Monitor</span>
                           )}
@@ -579,6 +642,12 @@ export function SalesDomainWorkspace({
           </details>
         </section>
       ) : null}
+
+      <TableQuickActionModal
+        item={quickActionItem}
+        onClose={() => setQuickActionItem(null)}
+        heading="Aksi cepat dari tabel PSB"
+      />
 
       {content.highlights.length ? (
         <details className="rounded-2xl border border-line bg-white p-4">

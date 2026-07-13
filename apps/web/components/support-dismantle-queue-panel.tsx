@@ -1,5 +1,9 @@
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
 import { SupportActionQuickLinks } from '@/components/support-action-quick-links'
+import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { canAccessPath } from '@/lib/access-control'
 import { buildSupportActionHref, buildSupportLaneHref } from '@/lib/support-action-links'
 import { canAccessSupportLane, canProcessSupportDismantle } from '@/lib/support-lanes'
@@ -152,6 +156,120 @@ function getHistoryRowActionItems(params: {
   })
 }
 
+function buildOpenDismantleQuickActionPayload(params: {
+  row: DomainReviewRow
+  canProcessDismantle: boolean
+  canUpdate: boolean
+  canOpenBillingDecision: boolean
+}): TableQuickActionPayload {
+  const phone = pickMeta(params.row.meta, 'Phone: ')
+  const marketing = pickMeta(params.row.meta, 'Marketing: ')
+  const transferredAt = pickMeta(params.row.meta, 'Transferred: ')
+  const aging = pickMeta(params.row.meta, 'Aging: ')
+  const rowActions = getOpenRowActionItems(params)
+
+  return {
+    id: params.row.id,
+    title: params.row.primary,
+    subtitle: params.row.secondary,
+    description: params.row.detail,
+    draftLabel: 'Dismantle',
+    draftSeed: [
+      `Transferred: ${transferredAt}`,
+      `Aging: ${aging}`,
+      `Marketing: ${marketing}`,
+      'Owner Close: CS & Admin CS',
+    ].join('\n'),
+    badges: [
+      { label: params.row.status, tone: getRowTone(params.row.status) },
+      { label: `Aging ${aging}`, tone: 'border-rose-200 bg-rose-50 text-rose-700' },
+      { label: 'Owner Close: CS & Admin CS', tone: 'border-rose-200 bg-rose-50 text-rose-700' },
+    ],
+    sections: [
+      {
+        title: 'Kontak & Konteks',
+        value: [`Phone: ${phone}`, `Marketing: ${marketing}`].join('\n'),
+      },
+      {
+        title: 'Transfer',
+        value: [`Transferred: ${transferredAt}`, `Aging: ${aging}`].join('\n'),
+      },
+      {
+        title: 'Kepemilikan Proses',
+        value: ['Owner Close: CS & Admin CS', 'Owner Restore: Billing'].join('\n'),
+      },
+      {
+        title: 'Catatan',
+        value: params.row.detail,
+      },
+    ],
+    actions: rowActions.map((action, index) => ({
+      label: action.label,
+      href: action.href,
+      tone: index === 0 ? 'primary' : 'secondary',
+    })),
+  }
+}
+
+function buildHistoryDismantleQuickActionPayload(params: {
+  row: DomainReviewRow
+  canProcessDismantle: boolean
+  canOpenBillingDecision: boolean
+}): TableQuickActionPayload {
+  const phone = pickMeta(params.row.meta, 'Phone: ')
+  const marketing = pickMeta(params.row.meta, 'Marketing: ')
+  const closedAt = pickMeta(params.row.meta, 'Closed: ')
+  const fieldPic = pickMeta(params.row.meta, 'Field PIC: ')
+  const deviceStatus = pickMeta(params.row.meta, 'Device Status: ')
+  const pickupStatus = pickMeta(params.row.meta, 'Pickup Status: ')
+  const closeOutcome = pickMeta(params.row.meta, 'Close Outcome: ')
+  const billingDisposition = pickMeta(params.row.meta, 'Billing Disposition: ')
+  const closedBy = pickMeta(params.row.meta, 'Closed By: ')
+  const rowActions = getHistoryRowActionItems(params)
+
+  return {
+    id: params.row.id,
+    title: params.row.primary,
+    subtitle: params.row.secondary,
+    description: params.row.detail,
+    draftLabel: 'Histori dismantle',
+    draftSeed: [
+      `Closed: ${closedAt}`,
+      `Closed By: ${closedBy}`,
+      `Field PIC: ${fieldPic}`,
+      `Billing: ${billingDisposition}`,
+    ].join('\n'),
+    badges: [
+      { label: params.row.status, tone: getRowTone(params.row.status) },
+      { label: `Billing: ${billingDisposition}`, tone: 'border-violet-200 bg-violet-50 text-violet-700' },
+      { label: `Pickup: ${pickupStatus}`, tone: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+    ],
+    sections: [
+      {
+        title: 'Audit Penutupan',
+        value: [`Closed: ${closedAt}`, `Closed By: ${closedBy}`, `Field PIC: ${fieldPic}`].join('\n'),
+      },
+      {
+        title: 'Field Metadata',
+        value: [`Device: ${deviceStatus}`, `Pickup: ${pickupStatus}`, `Outcome: ${closeOutcome}`].join('\n'),
+      },
+      {
+        title: 'Billing',
+        value: [`Billing: ${billingDisposition}`, 'Owner Histori: CS & Admin CS'].join('\n'),
+      },
+      {
+        title: 'Ringkasan',
+        value: [`Phone: ${phone}`, `Marketing: ${marketing}`, params.row.detail].join('\n'),
+      },
+    ],
+    actions: rowActions.map((action, index) => ({
+      label: action.label,
+      href: action.href,
+      tone: index === 0 ? 'primary' : 'secondary',
+    })),
+  }
+}
+
 export function SupportDismantleQueuePanel({
   sections,
   actionLinks = [],
@@ -181,6 +299,7 @@ export function SupportDismantleQueuePanel({
   const canOpenIsolationLane = canAccessSupportLane(role, 'isolations')
   const canOpenSupervisorWorkspace = canAccessPath(role, '/customers/cs-admin')
   const canProcessDismantle = canProcessSupportDismantle(role, canApprove)
+  const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
   function buildQueuePrefillValue(row: DomainReviewRow) {
     const queueId = row.id.replace(/^DISMANTLE-QUEUE-/, '')
     return `${queueId} | ${row.primary} | ${row.secondary}`
@@ -359,15 +478,22 @@ export function SupportDismantleQueuePanel({
                             </td>
                             <td className="px-4 py-4">
                               <div className="flex flex-col items-end gap-2">
-                                {rowActions.map((action) => (
-                                  <Link
-                                    key={`${row.id}-${action.key}`}
-                                    href={action.href}
-                                    className={getActionButtonClass(action.key === recommendedActionKey)}
-                                  >
-                                    {action.label}
-                                  </Link>
-                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setQuickActionItem(
+                                      buildOpenDismantleQuickActionPayload({
+                                        row,
+                                        canProcessDismantle,
+                                        canUpdate,
+                                        canOpenBillingDecision,
+                                      }),
+                                    )
+                                  }
+                                  className={getActionButtonClass(true)}
+                                >
+                                  Aksi cepat
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -410,15 +536,22 @@ export function SupportDismantleQueuePanel({
                         <span className="badge border-rose-200 bg-rose-50 text-rose-700">Close: CS & Admin CS</span>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {rowActions.map((action) => (
-                          <Link
-                            key={`${row.id}-${action.key}-mobile`}
-                            href={action.href}
-                            className={getActionButtonClass(action.key === recommendedActionKey)}
-                          >
-                            {action.label}
-                          </Link>
-                        ))}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQuickActionItem(
+                              buildOpenDismantleQuickActionPayload({
+                                row,
+                                canProcessDismantle,
+                                canUpdate,
+                                canOpenBillingDecision,
+                              }),
+                            )
+                          }
+                          className={getActionButtonClass(true)}
+                        >
+                          Aksi cepat
+                        </button>
                       </div>
                     </article>
                   )
@@ -522,15 +655,21 @@ export function SupportDismantleQueuePanel({
                             </td>
                             <td className="px-4 py-4">
                               <div className="flex flex-col items-end gap-2">
-                                {rowActions.map((action) => (
-                                  <Link
-                                    key={`${row.id}-${action.key}`}
-                                    href={action.href}
-                                    className={getActionButtonClass(action.key === recommendedActionKey)}
-                                  >
-                                    {action.label}
-                                  </Link>
-                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setQuickActionItem(
+                                      buildHistoryDismantleQuickActionPayload({
+                                        row,
+                                        canProcessDismantle,
+                                        canOpenBillingDecision,
+                                      }),
+                                    )
+                                  }
+                                  className={getActionButtonClass(true)}
+                                >
+                                  Aksi cepat
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -589,15 +728,21 @@ export function SupportDismantleQueuePanel({
                         </span>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {rowActions.map((action) => (
-                          <Link
-                            key={`${row.id}-${action.key}-mobile`}
-                            href={action.href}
-                            className={getActionButtonClass(action.key === recommendedActionKey)}
-                          >
-                            {action.label}
-                          </Link>
-                        ))}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQuickActionItem(
+                              buildHistoryDismantleQuickActionPayload({
+                                row,
+                                canProcessDismantle,
+                                canOpenBillingDecision,
+                              }),
+                            )
+                          }
+                          className={getActionButtonClass(true)}
+                        >
+                          Aksi cepat
+                        </button>
                       </div>
                     </article>
                   )
@@ -609,6 +754,12 @@ export function SupportDismantleQueuePanel({
           )}
         </div>
       ) : null}
+
+      <TableQuickActionModal
+        item={quickActionItem}
+        onClose={() => setQuickActionItem(null)}
+        heading="Aksi cepat dari tabel dismantle"
+      />
     </section>
   )
 }

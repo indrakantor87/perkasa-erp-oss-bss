@@ -1,12 +1,16 @@
 'use client'
 
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
 import { BillingCollectionResolveForm } from '@/components/billing-collection-resolve-form'
 import { BillingInvoiceGenerateForm } from '@/components/billing-invoice-generate-form'
 import { BillingInvoiceStatusForm } from '@/components/billing-invoice-status-form'
 import { BillingPaymentForm } from '@/components/billing-payment-form'
+import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import type {
   AppRole,
   DataSourceSnapshot,
@@ -152,6 +156,81 @@ function getRowAction(params: {
   return null
 }
 
+function buildBillingQuickActionPayload(params: {
+  sectionTitle: string
+  row: DomainReviewRow
+  canCreate: boolean
+  canUpdate: boolean
+}): TableQuickActionPayload {
+  const action = getRowAction({
+    sectionTitle: params.sectionTitle,
+    row: params.row,
+    canCreate: params.canCreate,
+    canUpdate: params.canUpdate,
+  })
+  const service = pickMeta(params.row.meta, 'Service: ')
+  const invoiceType = pickMeta(params.row.meta, 'Invoice Type: ')
+  const remaining = pickMeta(params.row.meta, 'Remaining: ')
+  const invoiceDue = pickMeta(params.row.meta, 'Invoice Due: ')
+  const followUp = pickMeta(params.row.meta, 'Follow Up: ')
+  const collectionStatus = pickMeta(params.row.meta, 'Collection Status: ')
+
+  return {
+    id: params.row.id,
+    title: params.row.primary,
+    subtitle: params.row.secondary,
+    description: params.row.detail,
+    draftLabel: 'Invoice',
+    draftSeed: [
+      service ? `Service: ${service}` : null,
+      remaining ? `Remaining: ${remaining}` : null,
+      invoiceDue ? `Due: ${invoiceDue}` : null,
+      followUp ? `Follow Up: ${followUp}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    badges: [
+      { label: params.sectionTitle },
+      { label: params.row.status, tone: getStatusTone(params.row.status) },
+      ...(invoiceType ? [{ label: invoiceType }] : []),
+    ],
+    sections: [
+      {
+        title: 'Customer / Service',
+        value: [params.row.secondary, service || '-'].filter(Boolean).join('\n'),
+      },
+      {
+        title: 'Keterangan',
+        value: params.row.detail,
+      },
+      {
+        title: 'Tagihan / Follow Up',
+        value: [
+          remaining ? `Remaining: ${remaining}` : null,
+          invoiceDue ? `Due: ${invoiceDue}` : null,
+          followUp ? `Follow Up: ${followUp}` : null,
+          collectionStatus ? `Collection: ${collectionStatus}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      },
+      {
+        title: 'Section Billing',
+        value: params.sectionTitle,
+      },
+    ],
+    actions: action
+      ? [
+          {
+            label: action.label,
+            href: action.href,
+            tone: 'primary',
+          },
+        ]
+      : [],
+  }
+}
+
 function buildBillingStats(sections: DomainReviewSection[]) {
   const rows = sections.flatMap((section) => section.rows)
   const sectionRowCount = (patterns: string[]) =>
@@ -202,6 +281,7 @@ export function BillingDomainWorkspace({
   }
 }) {
   const reviewSections = content.reviewSections ?? []
+  const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
   const allRows = reviewSections.flatMap((section) => section.rows)
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
@@ -518,12 +598,22 @@ export function BillingDomainWorkspace({
                         </td>
                         <td className="px-4 py-4">
                           {action ? (
-                            <Link
-                              href={action.href}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQuickActionItem(
+                                  buildBillingQuickActionPayload({
+                                    sectionTitle: section.title,
+                                    row,
+                                    canCreate,
+                                    canUpdate,
+                                  }),
+                                )
+                              }
                               className="inline-flex items-center justify-center rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800"
                             >
-                              {action.label}
-                            </Link>
+                              Aksi cepat
+                            </button>
                           ) : (
                             <span className="text-sm text-slate-400">Monitor</span>
                           )}
@@ -621,6 +711,12 @@ export function BillingDomainWorkspace({
           </details>
         </section>
       ) : null}
+
+      <TableQuickActionModal
+        item={quickActionItem}
+        onClose={() => setQuickActionItem(null)}
+        heading="Aksi cepat dari tabel billing"
+      />
 
       {content.highlights.length ? (
         <details className="rounded-2xl border border-line bg-white p-4">

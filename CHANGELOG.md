@@ -10,6 +10,16 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.30] - 2026-07-14
+
+### Improved
+
+- Popup `Aksi cepat` kini disatukan lewat komponen reusable umum untuk tabel operasional, sehingga baris kerja bisa membuka konteks, draft tindak lanjut, dan CTA tanpa duplikasi implementasi per modul: [table-quick-action-modal.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/table-quick-action-modal.tsx)
+- Console `Sales` dan `Billing` sekarang mengganti tombol aksi row langsung menjadi `Aksi cepat`, sehingga operator tetap fokus pada tabel sambil membawa detail item dan shortcut ke form sekunder melalui popup: [sales-domain-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/sales-domain-workspace.tsx), [billing-domain-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-domain-workspace.tsx)
+- Tabel `ODP` pada `Inventory` kini memakai popup aksi cepat untuk membuka konteks lokasi, port, koordinat, dan shortcut `Buka Maps`, sehingga aksi lapangan tidak lagi menonjol sebagai tombol tunggal yang terpisah dari detail row: [inventory-network-ops-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-network-ops-panel.tsx)
+- Panel `Support` yang sebelumnya masih memakai kumpulan tombol per row kini dipindahkan ke popup aksi cepat pada tabel `Trouble Ticket`, `Isolation`, dan `Dismantle` open/history, sehingga lane support lebih konsisten dengan pola table-first yang sudah dipakai di `List Kerja` dan `Supervisor CS`: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx), [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+- Versioning diselaraskan ke `0.66.30` untuk menandai batch penerapan popup aksi cepat pada tabel operasional utama lintas domain.
+
 ## [0.66.29] - 2026-07-14
 
 ### Improved

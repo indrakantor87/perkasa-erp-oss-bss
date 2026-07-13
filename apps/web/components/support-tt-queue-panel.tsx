@@ -1,5 +1,9 @@
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
 import { canAccessPath } from '@/lib/access-control'
+import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { buildSupportActionHref } from '@/lib/support-action-links'
 import { canAccessSupportLane, getSupportLaneSections } from '@/lib/support-lanes'
 import type { AppRole, DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
@@ -250,6 +254,74 @@ function getRowActionItems(params: {
   })
 }
 
+function buildTroubleTicketQuickActionPayload(params: {
+  row: DomainReviewRow
+  canUpdate: boolean
+  canApprove: boolean
+}): TableQuickActionPayload {
+  const type = pickMeta(params.row.meta, 'Type: ')
+  const opened = pickMeta(params.row.meta, 'Opened: ')
+  const slaDue = pickMeta(params.row.meta, 'SLA Due: ')
+  const slaState = pickMeta(params.row.meta, 'SLA State: ')
+  const customerUser = pickMeta(params.row.meta, 'Customer User: ')
+  const owner = pickMeta(params.row.meta, 'PIC: ')
+  const followUp = pickMeta(params.row.meta, 'Next Follow Up: ')
+  const progressUpdated = pickMeta(params.row.meta, 'Progress Updated: ')
+  const queuePriority = pickMeta(params.row.meta, 'Queue Priority: ')
+  const queueReason = pickMeta(params.row.meta, 'Queue Reason: ')
+  const rowActions = getRowActionItems({
+    queueReason,
+    ticket: params.row.primary,
+    type,
+    canUpdate: params.canUpdate,
+    canApprove: params.canApprove,
+  })
+  const recommendedActionKey = getRecommendedRowActionKey(queueReason)
+
+  return {
+    id: params.row.id,
+    title: params.row.primary,
+    subtitle: params.row.secondary,
+    description: params.row.detail,
+    draftLabel: 'Ticket',
+    draftSeed: [
+      `Queue: ${getQueueReasonLabel(queueReason)}`,
+      `Follow-up: ${followUp}`,
+      `PIC: ${owner}`,
+      `Update terakhir: ${progressUpdated}`,
+    ].join('\n'),
+    badges: [
+      { label: params.row.status, tone: getRowTone(params.row.status) },
+      { label: queuePriority, tone: getPriorityTone(queuePriority) },
+      { label: slaState, tone: getSlaTone(slaState) },
+      { label: getQueueReasonLabel(queueReason) },
+    ],
+    sections: [
+      {
+        title: 'Pelanggan / User',
+        value: [params.row.secondary, customerUser].filter(Boolean).join('\n'),
+      },
+      {
+        title: 'Gangguan',
+        value: [type, params.row.detail].filter(Boolean).join('\n'),
+      },
+      {
+        title: 'Prioritas / SLA',
+        value: [`Prioritas: ${queuePriority}`, `SLA: ${slaState}`, `Due: ${slaDue}`].join('\n'),
+      },
+      {
+        title: 'PIC / Follow Up',
+        value: [`PIC: ${owner}`, `Follow-up: ${followUp}`, `Update: ${progressUpdated}`, `Opened: ${opened}`].join('\n'),
+      },
+    ],
+    actions: rowActions.map((action) => ({
+      label: action.label,
+      href: action.href,
+      tone: action.key === recommendedActionKey ? 'primary' : 'secondary',
+    })),
+  }
+}
+
 export function SupportTroubleTicketQueuePanel({
   sections,
   actionLinks = [],
@@ -287,6 +359,7 @@ export function SupportTroubleTicketQueuePanel({
     title: section.title.replace(/^Trouble Ticket\s+/i, ''),
     count: section.rows.length,
   }))
+  const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
 
   return (
     <section className="panel p-4">
@@ -460,15 +533,21 @@ export function SupportTroubleTicketQueuePanel({
                               <span className="badge border-slate-200 bg-white text-slate-600">
                                 {getQueueReasonActionCopy(queueReason)}
                               </span>
-                              {rowActions.map((action) => (
-                                <Link
-                                  key={`${row.id}-${action.key}`}
-                                  href={action.href}
-                                  className={getRowActionButtonClass(action.key === recommendedActionKey)}
-                                >
-                                  {action.label}
-                                </Link>
-                              ))}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setQuickActionItem(
+                                    buildTroubleTicketQuickActionPayload({
+                                      row,
+                                      canUpdate,
+                                      canApprove,
+                                    }),
+                                  )
+                                }
+                                className={getRowActionButtonClass(true)}
+                              >
+                                Aksi cepat
+                              </button>
                             </div>
                           ) : (
                             <span className="badge border-slate-200 bg-white text-slate-600">
@@ -525,15 +604,21 @@ export function SupportTroubleTicketQueuePanel({
                   </div>
                   {(canUpdate || canApprove) && rowActions.length ? (
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {rowActions.map((action) => (
-                        <Link
-                          key={`${row.id}-${action.key}`}
-                          href={action.href}
-                          className={getRowActionButtonClass(action.key === recommendedActionKey)}
-                        >
-                          {action.label}
-                        </Link>
-                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setQuickActionItem(
+                            buildTroubleTicketQuickActionPayload({
+                              row,
+                              canUpdate,
+                              canApprove,
+                            }),
+                          )
+                        }
+                        className={getRowActionButtonClass(true)}
+                      >
+                        Aksi cepat
+                      </button>
                     </div>
                   ) : null}
                 </article>
@@ -544,6 +629,12 @@ export function SupportTroubleTicketQueuePanel({
       ) : (
         <p className="mt-6 text-sm text-slate-500">Belum ada trouble ticket terbuka untuk direview.</p>
       )}
+
+      <TableQuickActionModal
+        item={quickActionItem}
+        onClose={() => setQuickActionItem(null)}
+        heading="Aksi cepat dari tabel trouble ticket"
+      />
     </section>
   )
 }
