@@ -15,6 +15,7 @@ Dokumen ini melengkapi:
 3. [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md)
 4. [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md)
 5. [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md)
+6. [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
 
 ## Scope Hari-H
 
@@ -220,6 +221,10 @@ Saat validasi, simpan bukti minimum:
 4. screenshot landing `support`
 5. screenshot `/api/health` atau output `verify:health`
 6. catatan timestamp keputusan `GO / PILOT / ROLLBACK`
+
+Gunakan template siap-isi berikut agar bukti teknis, validasi per role, dan sign-off PIC tercatat dalam satu dokumen:
+
+- [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
 
 ## Penutup
 

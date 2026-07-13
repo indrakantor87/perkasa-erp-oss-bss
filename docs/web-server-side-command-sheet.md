@@ -11,6 +11,7 @@ Dokumen ini melengkapi:
 1. [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md)
 2. [web-deploy-rehearsal-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-deploy-rehearsal-checklist.md)
 3. [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+4. [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
 
 ## Sebelum Mulai
 
@@ -148,6 +149,10 @@ Simpan bukti:
 2. screenshot dashboard admin
 3. screenshot dashboard support
 4. output `verify:health`
+
+Template pencatatan lengkap tersedia di:
+
+- [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
 
 ## 8. Rollback Cepat
 
