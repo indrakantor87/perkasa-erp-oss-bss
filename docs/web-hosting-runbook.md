@@ -129,6 +129,10 @@ Gunakan helper ini hanya untuk rehearsal. Production final tetap wajib memakai `
 - Modul `sales`, `support`, `billing`, `inventory`, dan `hr` bisa diakses
 - Logout kembali ke `/login`
 
+Catatan:
+
+- Jika `docs/web-reverse-proxy-check.json` dan `docs/web-server-runtime-check.json` sudah dibuat di lokasi default, `collect:go-live-evidence` akan otomatis menyerap keduanya ke markdown evidence.
+
 ## Rollback Plan
 
 1. Siapkan minimal satu commit kandidat stabil sebelum deploy dan tulis di [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md).

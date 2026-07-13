@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.20] - 2026-07-13
+
+### Improved
+
+- `collect:go-live-evidence` kini dapat menyerap otomatis output `docs/web-reverse-proxy-check.json` dan `docs/web-server-runtime-check.json` bila keduanya sudah dibuat lebih dulu, sehingga markdown evidence hari-H langsung memuat ringkasan reverse proxy, runtime, dan detail JSON tanpa rangkuman manual terpisah: [collect-go-live-evidence.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/collect-go-live-evidence.mjs)
+- Runbook hosting, command sheet server-side, template evidence, dan checklist readiness kini menjelaskan bahwa collector otomatis membaca dua file JSON standar tersebut sebagai paket bukti teknis server-side: [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- Versioning diselaraskan ke `0.66.20` untuk menandai bundling evidence reverse proxy + runtime ke collector go-live.
+
 ## [0.66.19] - 2026-07-13
 
 ### Improved

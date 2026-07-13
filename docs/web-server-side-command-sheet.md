@@ -264,8 +264,9 @@ npm run collect:go-live-evidence -- \
 Checklist cepat:
 
 1. file output berhasil dibuat
-2. status `git`, `PM2`, `health`, dan probe `/login` terisi
-3. hasil otomatis tetap dilengkapi dengan screenshot browser, output `web-reverse-proxy-check.json`, dan sign-off PIC
+2. bila `docs/web-reverse-proxy-check.json` dan `docs/web-server-runtime-check.json` sudah ada, collector otomatis menyerap keduanya ke markdown evidence
+3. status `git`, `PM2`, `health`, reverse proxy, runtime JSON, dan probe `/login` terisi
+4. hasil otomatis tetap dilengkapi dengan screenshot browser dan sign-off PIC
 
 ## 7. Smoke Browser Minimum
 
