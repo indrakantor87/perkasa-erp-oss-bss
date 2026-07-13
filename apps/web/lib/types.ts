@@ -157,6 +157,17 @@ export type DashboardWorkItem = {
   href: string
 }
 
+export type DashboardNextActionItem = {
+  id: string
+  sourceLabel: string
+  domain: string
+  title: string
+  detail: string
+  actionLabel: string
+  href: string
+  tone: string
+}
+
 export type WorklistShortcutLink = {
   label: string
   href: string

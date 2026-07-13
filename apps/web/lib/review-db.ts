@@ -15,6 +15,8 @@ declare global {
   var __perkasaReviewDbPool: Promise<ReviewDbPool> | undefined
 }
 
+const reviewDbColumnCache = new Map<string, boolean>()
+
 function getDatabaseConfig() {
   const databaseUrl = process.env.DATABASE_URL?.trim()
   if (!databaseUrl) {
@@ -60,6 +62,28 @@ export async function runReviewDbExecute<T>(sql: string, values: unknown[] = [])
   const pool = await getPool()
   const [result] = await pool.query(sql, values)
   return result as T
+}
+
+export async function hasReviewDbColumn(tableName: string, columnName: string) {
+  const cacheKey = `${tableName}.${columnName}`.toLowerCase()
+  if (reviewDbColumnCache.has(cacheKey)) {
+    return reviewDbColumnCache.get(cacheKey) ?? false
+  }
+
+  const rows = await runReviewDbQuery<{ total: number }>(
+    `
+      SELECT COUNT(*) AS total
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = ?
+        AND column_name = ?
+    `,
+    [tableName, columnName],
+  )
+
+  const exists = Number(rows[0]?.total ?? 0) > 0
+  reviewDbColumnCache.set(cacheKey, exists)
+  return exists
 }
 
 export async function runReviewDbTransaction<T>(handler: (connection: ReviewDbConnection) => Promise<T>) {

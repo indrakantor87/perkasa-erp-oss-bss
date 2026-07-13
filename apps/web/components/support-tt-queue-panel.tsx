@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import { canAccessPath } from '@/lib/access-control'
 import { buildSupportActionHref } from '@/lib/support-action-links'
-import type { DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
+import { canAccessSupportLane, getSupportLaneSections } from '@/lib/support-lanes'
+import type { AppRole, DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
   return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? '-'
@@ -125,6 +127,21 @@ function getQueueReasonActionCopy(reason: string) {
   return 'Update Progress'
 }
 
+function getQueueReasonLabel(reason: string) {
+  const normalized = reason.trim().toUpperCase()
+
+  if (normalized === 'ESCALATION_PENDING') return 'Menunggu Eskalasi'
+  if (normalized === 'FOLLOW_UP_OVERDUE') return 'Follow-up Terlambat'
+  if (normalized === 'SLA_OVERDUE') return 'SLA Terlewati'
+  if (normalized === 'FOLLOW_UP_TODAY') return 'Follow-up Hari Ini'
+  if (normalized === 'SLA_DUE_TODAY') return 'SLA Jatuh Tempo Hari Ini'
+  if (normalized === 'FOLLOW_UP_SCHEDULED') return 'Follow-up Terjadwal'
+  if (normalized === 'WAITING_PROGRESS') return 'Menunggu Progress'
+  if (normalized === 'READY_CLOSE') return 'Siap Close'
+
+  return reason || '-'
+}
+
 function getRowActionButtonClass(isPrimary: boolean) {
   if (isPrimary) {
     return 'rounded-md border border-slate-950 bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800'
@@ -236,16 +253,17 @@ function getRowActionItems(params: {
 export function SupportTroubleTicketQueuePanel({
   sections,
   actionLinks = [],
+  role,
   canUpdate = true,
   canApprove = true,
 }: {
   sections: DomainReviewSection[]
   actionLinks?: SupportActionLink[]
+  role: AppRole
   canUpdate?: boolean
   canApprove?: boolean
 }) {
-  const ttSections = sections
-    .filter((section) => section.title.toUpperCase().includes('TROUBLE TICKET'))
+  const ttSections = getSupportLaneSections(sections, 'tt')
     .sort((left, right) => {
       const rankDiff = getSectionPriorityRank(left) - getSectionPriorityRank(right)
       if (rankDiff !== 0) {
@@ -263,6 +281,8 @@ export function SupportTroubleTicketQueuePanel({
   const totalTickets = allRows.length
   const summary = buildTicketSummary(allRows)
   const operationalStats = buildOperationalTicketStats(allRows)
+  const canOpenSlaLane = canAccessSupportLane(role, 'sla')
+  const canOpenSupervisorWorkspace = canAccessPath(role, '/customers/cs-admin')
   const sectionCounts = visibleSections.map((section) => ({
     title: section.title.replace(/^Trouble Ticket\s+/i, ''),
     count: section.rows.length,
@@ -298,19 +318,19 @@ export function SupportTroubleTicketQueuePanel({
           </p>
         </article>
         <article className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Close Ready</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Siap Close</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-emerald-950">
             {operationalStats.readyCloseCount}
           </p>
         </article>
         <article className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Due Today</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Jatuh Tempo Hari Ini</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-amber-950">
             {operationalStats.dueTodayCount}
           </p>
         </article>
         <article className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700">Overdue / Esc</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700">Overdue / Eskalasi</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-rose-950">
             {operationalStats.overdueCount + operationalStats.escalationCount}
           </p>
@@ -329,18 +349,22 @@ export function SupportTroubleTicketQueuePanel({
                 {action.label}
               </Link>
             ))}
-            <Link
-              href="/support/sla?focus=SLA_OVERDUE"
-              className="inline-flex items-center justify-center rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-rose-700 transition hover:opacity-90"
-            >
-              SLA Overdue
-            </Link>
-            <Link
-              href="/customers/cs-admin?queue=Trouble+Ticket"
-              className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-            >
-              Supervisor CS
-            </Link>
+            {canOpenSlaLane ? (
+              <Link
+                href="/support/sla?focus=SLA_OVERDUE"
+                className="inline-flex items-center justify-center rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-rose-700 transition hover:opacity-90"
+              >
+                SLA Overdue
+              </Link>
+            ) : null}
+            {canOpenSupervisorWorkspace ? (
+              <Link
+                href="/customers/cs-admin?queue=Trouble+Ticket"
+                className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+              >
+                Supervisor CS
+              </Link>
+            ) : null}
           </div>
           <div className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600">
             {summary.statusItems.map((item) => `${item.status}: ${item.count}`).join(' • ') || 'Semua ticket aktif terbaca.'}
@@ -366,10 +390,10 @@ export function SupportTroubleTicketQueuePanel({
                   <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                     <th className="px-3 py-3">ID Ticket</th>
                     <th className="px-3 py-3">Pelanggan</th>
-                    <th className="px-3 py-3">User</th>
+                    <th className="px-3 py-3">User / Layanan</th>
                     <th className="px-3 py-3">Gangguan</th>
-                    <th className="px-3 py-3">Priority / SLA</th>
-                    <th className="px-3 py-3">PIC / Follow Up</th>
+                    <th className="px-3 py-3">Prioritas / SLA</th>
+                    <th className="px-3 py-3">PIC / Follow-up</th>
                     <th className="px-3 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -406,7 +430,7 @@ export function SupportTroubleTicketQueuePanel({
                         <td className="px-3 py-3.5">
                           <div className="space-y-1">
                             <p className="font-medium text-slate-900">{row.secondary}</p>
-                            <p className="text-xs text-slate-500">{queueReason}</p>
+                            <p className="text-xs text-slate-500">{getQueueReasonLabel(queueReason)}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5 text-sm text-slate-600">{customerUser}</td>
@@ -426,8 +450,8 @@ export function SupportTroubleTicketQueuePanel({
                         <td className="px-3 py-3.5">
                           <div className="space-y-1 text-sm text-slate-600">
                             <p>{owner}</p>
-                            <p className="text-xs text-slate-500">{followUp}</p>
-                            <p className="text-xs text-slate-500">Progress: {progressUpdated}</p>
+                            <p className="text-xs text-slate-500">Follow-up: {followUp}</p>
+                            <p className="text-xs text-slate-500">Update terakhir: {progressUpdated}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
@@ -495,9 +519,9 @@ export function SupportTroubleTicketQueuePanel({
                   <p className="mt-3 text-sm leading-5 text-mute">{row.detail}</p>
                   <div className="mt-3 space-y-1 text-sm text-slate-600">
                     <p>User: {customerUser}</p>
-                    <p>Open: {opened}</p>
-                    <p>Follow Up: {followUp}</p>
-                    <p>Reason: {queueReason}</p>
+                    <p>Dibuka: {opened}</p>
+                    <p>Follow-up: {followUp}</p>
+                    <p>Antrian: {getQueueReasonLabel(queueReason)}</p>
                   </div>
                   {(canUpdate || canApprove) && rowActions.length ? (
                     <div className="mt-4 flex flex-wrap gap-2">

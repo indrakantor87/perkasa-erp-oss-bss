@@ -18,10 +18,11 @@ import { dashboardSummary } from '@/lib/mock-dashboard'
 import { domainPages } from '@/lib/mock-domains'
 import { getBatchDetail, getImportBatch, importBatches, transformStages } from '@/lib/mock-import'
 import { buildSupportLaneReviewSummary, getSupportLanePath, getSupportLaneSections, normalizeSupportLane } from '@/lib/support-lanes'
-import { getDashboardPageData, getDashboardSummary } from '@/lib/services/dashboard-service'
+import { buildDashboardNextActions, getDashboardPageData, getDashboardSummary } from '@/lib/services/dashboard-service'
 import { getAuthUsersPageData } from '@/lib/services/auth-user-service'
 import { getDomainPageData } from '@/lib/services/domain-service'
 import { getImportBatchDetail, getImportOverview } from '@/lib/services/import-service'
+import { canAccessWorklistHref, getWorklistPageData, sanitizeWorklistItemForRole } from '@/lib/services/worklist-service'
 
 async function main() {
   assert.equal(dashboardSummary.customers, 10284)
@@ -48,7 +49,14 @@ async function main() {
   assert.deepEqual(parseSessionToken(createSessionToken(session!)), session)
   assert.equal(parseSessionToken('invalid.token.value'), null)
   assert.equal(getDefaultLandingPath('SUPER_ADMIN'), '/dashboard')
-  assert.equal(getDefaultLandingPath('NOC_OPERATOR'), '/dashboard')
+  assert.equal(getDefaultLandingPath('SALES_MARKETING'), '/sales')
+  assert.equal(getDefaultLandingPath('CS_OPERATOR'), '/dashboard/worklist')
+  assert.equal(getDefaultLandingPath('CS_ADMIN'), '/customers/cs-admin')
+  assert.equal(getDefaultLandingPath('NOC_OPERATOR'), '/support/tt')
+  assert.equal(getDefaultLandingPath('FIELD_TECHNICIAN'), '/dashboard/worklist')
+  assert.equal(getDefaultLandingPath('TT_OPERATOR'), '/support/tt')
+  assert.equal(getDefaultLandingPath('DIGITAL_CREATOR'), '/sales/digital-creator')
+  assert.equal(getDefaultLandingPath('DISMANTLE_OPERATOR'), '/support/dismantle')
   assert.equal(canAccessPath('CS_ADMIN', '/hr'), false)
   assert.equal(canAccessPath('SUPER_ADMIN', '/settings/users'), true)
   assert.equal(canAccessPath('CS_ADMIN', '/settings/users'), false)
@@ -87,6 +95,226 @@ async function main() {
   assert.equal(dashboardData.roleQueues.length > 0, true)
   assert.equal(dashboardData.worklist.length > 0, true)
   assert.equal((await getDashboardSummary()).source.effectiveMode, 'mock')
+
+  const nocSession = authenticateMockUser('support.ops', 'SupportOps123!')
+  const ttSession = authenticateMockUser('tt.review', 'TtReview123!')
+  assert.ok(nocSession, 'Akun mock NOC harus valid.')
+  assert.ok(ttSession, 'Akun mock TT harus valid.')
+  const nocSlaWorklist = await getWorklistPageData(nocSession!, { queue: 'SLA Kritis' })
+  assert.ok(nocSlaWorklist.items.some((item) => item.queue === 'SLA Kritis'), 'NOC harus punya bucket SLA Kritis.')
+  const nocIsolationWorklist = await getWorklistPageData(nocSession!, { queue: 'Monitoring Isolir' })
+  assert.ok(
+    nocIsolationWorklist.items.some((item) => item.queue === 'Monitoring Isolir'),
+    'NOC harus punya bucket Monitoring Isolir.',
+  )
+  const ttOverdueWorklist = await getWorklistPageData(ttSession!, { queue: 'Follow Up Overdue' })
+  assert.ok(
+    ttOverdueWorklist.items.some((item) => item.queue === 'Follow Up Overdue'),
+    'TT Operator harus punya bucket Follow Up Overdue.',
+  )
+  const ttReadyCloseWorklist = await getWorklistPageData(ttSession!, { queue: 'Siap Close' })
+  assert.ok(
+    ttReadyCloseWorklist.items.some((item) => item.queue === 'Siap Close'),
+    'TT Operator harus punya bucket Siap Close.',
+  )
+  const nocDashboard = await getDashboardPageData(nocSession!)
+  assert.deepEqual(
+    nocDashboard.roleQueues.map((item) => item.href),
+    ['/support/tt?focus=OPEN_TICKETS', '/support/isolations?focus=ACTIVE_ISOLATIONS', '/inventory'],
+    'Role queue NOC harus langsung menuju lane atau modul yang benar, bukan support generic.',
+  )
+  assert.equal(
+    nocDashboard.dashboardAlerts.some((item) => item.href.startsWith('/billing')),
+    false,
+    'Alert billing tidak boleh tampil ke NOC.',
+  )
+  assert.equal(
+    nocDashboard.dashboardAlerts.some((item) => item.href.startsWith('/dashboard/daily-activity')),
+    false,
+    'Alert approval harian tidak boleh tampil ke role yang tidak punya approval.',
+  )
+  assert.equal(
+    nocDashboard.dashboardAlerts.every((item) => !/billing|invoice|collection/i.test(`${item.domain} ${item.detail} ${item.nextStep}`)),
+    true,
+    'Narasi billing tidak boleh bocor ke alert dashboard NOC.',
+  )
+  const nocNextActions = buildDashboardNextActions({
+    role: 'NOC_OPERATOR',
+    alerts: nocDashboard.dashboardAlerts,
+    worklist: nocDashboard.worklist,
+    roleQueues: nocDashboard.roleQueues,
+  })
+  assert.equal(
+    nocNextActions.every((item) => !['Masuk Queue', 'Kerjakan Sekarang', 'Buka Agenda'].includes(item.actionLabel)),
+    true,
+    'Next actions NOC tidak boleh kembali ke label generik setelah dihardening.',
+  )
+  assert.equal(
+    nocNextActions.every((item) => item.href !== '/support'),
+    true,
+    'Next actions NOC tidak boleh mengarah ke support generic.',
+  )
+  assert.deepEqual(
+    nocDashboard.operationalCards.map((item) => item.key),
+    ['NOC'],
+    'Operational card NOC harus terkunci ke kartu NOC miliknya.',
+  )
+  assert.deepEqual(
+    nocDashboard.operationalCards.map((item) => item.href),
+    ['/support/tt?focus=OPEN_TICKETS'],
+    'Kartu operasional NOC harus masuk langsung ke lane TT yang relevan.',
+  )
+  const nocDashboardWithAllDivision = await getDashboardPageData(nocSession!, {
+    month: 7,
+    year: 2026,
+    division: 'ALL',
+  })
+  assert.deepEqual(
+    nocDashboardWithAllDivision.operationalCards.map((item) => item.key),
+    ['NOC'],
+    'Manipulasi query division=ALL tidak boleh membuka kartu operasional lintas domain untuk NOC.',
+  )
+  const ttDashboard = await getDashboardPageData(ttSession!)
+  assert.deepEqual(
+    ttDashboard.roleQueues.map((item) => item.href),
+    ['/support/tt?focus=OPEN_TICKETS', '/support/sla?focus=SLA_OVERDUE'],
+    'Role queue TT harus langsung menuju lane TT dan SLA yang relevan.',
+  )
+  const ttNextActions = buildDashboardNextActions({
+    role: 'TT_OPERATOR',
+    alerts: ttDashboard.dashboardAlerts,
+    worklist: ttDashboard.worklist,
+    roleQueues: ttDashboard.roleQueues,
+  })
+  assert.equal(
+    ttNextActions.every((item) => !['Masuk Queue', 'Kerjakan Sekarang', 'Buka Agenda'].includes(item.actionLabel)),
+    true,
+    'Next actions TT tidak boleh memakai label generik setelah dipindah ke service layer.',
+  )
+  assert.deepEqual(
+    ttDashboard.operationalCards.map((item) => item.key),
+    ['TT'],
+    'Operational card TT harus terkunci ke kartu Trouble Ticket yang relevan.',
+  )
+  assert.equal(canAccessWorklistHref('NOC_OPERATOR', '/support/dismantle#support-action-dismantle-close'), false)
+  assert.equal(canAccessWorklistHref('NOC_OPERATOR', '/support/sla#support-action-sla-manage'), false)
+  assert.equal(canAccessWorklistHref('NOC_OPERATOR', '/support/tt#support-action-ticket-progress'), true)
+  const sanitizedNocItem = sanitizeWorklistItemForRole('NOC_OPERATOR', {
+    id: 'tt-risk-sanitize-1',
+    domain: 'Support',
+    title: 'Ticket SLA kritis sanitasi',
+    subtitle: 'Perlu kontrol cepat',
+    status: 'OVERDUE',
+    priority: 'tinggi',
+    detail: 'Ticket overdue dan perlu kontrol sekarang.',
+    queue: 'SLA Kritis',
+    href: '/support/dismantle#support-action-dismantle-close',
+    actionLabel: 'Tutup Dismantle',
+    handoffLinks: [
+      { label: 'Buka Billing', href: '/billing' },
+      { label: 'Buka TT', href: '/support/tt?focus=OPEN_TICKETS' },
+      { label: 'Buka Dismantle', href: '/support/dismantle' },
+    ],
+    recommendedActions: {
+      owner: 'NOC',
+      items: [
+        { label: 'Billing', detail: 'Tidak boleh untuk NOC.', href: '/billing' },
+        { label: 'Kontrol SLA', detail: 'Tetap boleh untuk NOC.', href: '/support/sla?focus=SLA_OVERDUE' },
+      ],
+    },
+  })
+  assert.equal(sanitizedNocItem.href, '/support/sla?focus=SLA_OVERDUE')
+  assert.equal(sanitizedNocItem.actionLabel, 'Kontrol SLA')
+  assert.deepEqual(
+    sanitizedNocItem.handoffLinks?.map((link) => link.label),
+    ['Buka TT'],
+    'NOC hanya boleh melihat handoff yang masih berada dalam scope lane/support miliknya.',
+  )
+  assert.deepEqual(
+    sanitizedNocItem.recommendedActions?.items.map((action) => action.label),
+    ['Kontrol SLA'],
+    'Recommended action lintas domain yang tidak boleh diakses harus disaring.',
+  )
+  const sanitizedSupportNarrativeItem = sanitizeWorklistItemForRole('NOC_OPERATOR', {
+    id: 'iso-billing-1',
+    domain: 'Support',
+    title: 'Restore billing kandidat',
+    subtitle: 'Ownership billing',
+    status: 'OPEN',
+    priority: 'tinggi',
+    detail: 'Kasus aktif yang masih perlu sinkronisasi.',
+    queue: 'Transfer atau Restore',
+    href: '/support/isolations?focus=ACTIVE_ISOLATIONS',
+    actionLabel: 'Buka support',
+    reason: 'Kasus ini masih berada pada ownership Billing untuk memutuskan restore atau tindak lanjut penagihan.',
+    nextAction: 'Pilih apakah Billing memulihkan layanan atau CS/Admin memfinalkan terminate',
+    owner: 'Billing / Collection',
+    blockingInfo: 'Menunggu keputusan Billing sebelum layanan bisa dipulihkan.',
+    correlationSummary: {
+      customer: 'PT Demo',
+      service: 'SVC-001',
+      owner: 'Billing / Collection',
+      items: [
+        { label: 'Billing', value: 'Perlu keputusan invoice overdue' },
+        { label: 'TT SLA', value: 'Normal' },
+      ],
+    },
+    decisionTrail: {
+      owner: 'Billing / Collection',
+      items: [
+        { label: 'Billing review', detail: 'Billing belum memutuskan restore atau hold.' },
+        { label: 'Isolir aktif', detail: 'Suspend aktif masih berjalan.' },
+      ],
+    },
+    evidencePanel: {
+      owner: 'Billing / Collection',
+      items: [
+        { label: 'Invoice overdue', detail: 'Masih ada tagihan yang belum diputuskan.' },
+        { label: 'Status isolir', detail: 'Pelanggan masih dalam status suspend aktif.' },
+      ],
+    },
+    healthSignal: {
+      label: 'Butuh Follow-Up Billing',
+      detail: 'Kasus belum aman dipulihkan sebelum Billing menyelesaikan validasi pembayaran.',
+    },
+    actionOutcomeSummary: {
+      owner: 'Billing / Collection',
+      items: [
+        { label: 'Target hasil', detail: 'Billing menentukan restore atau tindak lanjut tagihan.' },
+        { label: 'Fallback', detail: 'Jika Billing menolak restore, eskalasi support tetap berjalan.' },
+      ],
+    },
+  })
+  assert.equal(
+    sanitizedSupportNarrativeItem.reason,
+    'Item ini tetap relevan untuk role Anda, tetapi sebagian konteks lintas tim disembunyikan.',
+  )
+  assert.equal(
+    sanitizedSupportNarrativeItem.nextAction,
+    'Buka lane kerja yang tersedia untuk role Anda lalu lanjutkan follow up operasional.',
+  )
+  assert.equal(sanitizedSupportNarrativeItem.owner, 'Tim terkait')
+  assert.equal(
+    sanitizedSupportNarrativeItem.blockingInfo,
+    'Sebagian blocker berada pada tim lain dan disembunyikan untuk role ini.',
+  )
+  assert.deepEqual(
+    sanitizedSupportNarrativeItem.correlationSummary?.items.map((entry) => entry.label),
+    ['TT SLA'],
+    'Korelasi lintas-domain yang tidak sesuai role harus dibuang dari panel detail.',
+  )
+  assert.deepEqual(
+    sanitizedSupportNarrativeItem.decisionTrail?.items.map((entry) => entry.label),
+    ['Isolir aktif'],
+    'Jejak keputusan yang hanya relevan untuk tim lain harus disaring.',
+  )
+  assert.deepEqual(
+    sanitizedSupportNarrativeItem.evidencePanel?.items.map((entry) => entry.label),
+    ['Status isolir'],
+    'Evidence panel harus menyisakan bukti yang masih relevan untuk role aktif.',
+  )
+  assert.equal(sanitizedSupportNarrativeItem.healthSignal, undefined)
+  assert.equal(sanitizedSupportNarrativeItem.actionOutcomeSummary, undefined)
 
   const importOverview = await getImportOverview()
   assert.equal(importOverview.overview.items.length, 4)
@@ -127,6 +355,7 @@ async function main() {
   assert.equal((supportDomain?.supportFocus?.reviewSummary.topItems.length ?? 0) > 0, true)
   assert.equal((supportDomain?.supportFocus?.visibleSections.length ?? 0) >= 4, true)
   assert.equal(normalizeSupportLane('TT'), 'tt')
+  assert.equal(normalizeSupportLane('trouble-ticket'), 'tt')
   assert.equal(normalizeSupportLane('invalid'), null)
   assert.equal(getSupportLanePath('tt'), '/support/tt')
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'tt')[0]?.title, 'Trouble Ticket Open')

@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 const allowedSurveyTypes = new Set(['HOME', 'DEDICATED', 'RESELLER'])
 const allowedSurveyStatuses = new Set(['REQUESTED', 'SCHEDULED', 'ON_PROGRESS'])
@@ -55,6 +55,145 @@ async function generateSurveyNo() {
   return `SVY-${year}${month}-${padSequence(Number.isFinite(lastSequence) ? lastSequence + 1 : 1)}`
 }
 
+async function getSalesLeadQueryParts() {
+  const [hasCustomerName, hasLeadType, hasAddress] = await Promise.all([
+    hasReviewDbColumn('sales_leads', 'customer_name'),
+    hasReviewDbColumn('sales_leads', 'lead_type'),
+    hasReviewDbColumn('sales_leads', 'address'),
+  ])
+
+  if (!hasCustomerName || !hasLeadType) {
+    throw new Error('Schema inti sales_leads belum siap. Kolom customer_name dan lead_type wajib tersedia.')
+  }
+
+  return {
+    addressExpression: hasAddress ? 'address' : 'NULL',
+  }
+}
+
+async function buildSalesSurveyInsertPayload(params: {
+  leadId: number
+  surveyNo: string
+  surveyType: string
+  surveyStatus: string
+  feasibilityStatus: string
+  scheduledAt: Date | null
+  siteAddress: string | null
+  technicalNotes: string
+  customerRequestNotes: string | null
+}) {
+  const [
+    hasLeadId,
+    hasCustomerId,
+    hasCoveredAreaId,
+    hasSurveyNo,
+    hasSurveyType,
+    hasSurveyStatus,
+    hasFeasibilityStatus,
+    hasRequestedByUserId,
+    hasAssignedEmployeeId,
+    hasScheduledAt,
+    hasSurveyedAt,
+    hasSiteAddress,
+    hasTechnicalNotes,
+    hasCustomerRequestNotes,
+  ] = await Promise.all([
+    hasReviewDbColumn('sales_surveys', 'lead_id'),
+    hasReviewDbColumn('sales_surveys', 'customer_id'),
+    hasReviewDbColumn('sales_surveys', 'covered_area_id'),
+    hasReviewDbColumn('sales_surveys', 'survey_no'),
+    hasReviewDbColumn('sales_surveys', 'survey_type'),
+    hasReviewDbColumn('sales_surveys', 'survey_status'),
+    hasReviewDbColumn('sales_surveys', 'feasibility_status'),
+    hasReviewDbColumn('sales_surveys', 'requested_by_user_id'),
+    hasReviewDbColumn('sales_surveys', 'assigned_employee_id'),
+    hasReviewDbColumn('sales_surveys', 'scheduled_at'),
+    hasReviewDbColumn('sales_surveys', 'surveyed_at'),
+    hasReviewDbColumn('sales_surveys', 'site_address'),
+    hasReviewDbColumn('sales_surveys', 'technical_notes'),
+    hasReviewDbColumn('sales_surveys', 'customer_request_notes'),
+  ])
+
+  if (!hasLeadId || !hasSurveyNo || !hasSurveyStatus) {
+    throw new Error('Schema inti sales_surveys belum siap. Kolom lead_id, survey_no, dan survey_status wajib tersedia.')
+  }
+
+  const columns = ['lead_id', 'survey_no', 'survey_status']
+  const values: unknown[] = [params.leadId, params.surveyNo, params.surveyStatus]
+
+  if (hasCustomerId) {
+    columns.push('customer_id')
+    values.push(null)
+  }
+  if (hasCoveredAreaId) {
+    columns.push('covered_area_id')
+    values.push(null)
+  }
+  if (hasSurveyType) {
+    columns.push('survey_type')
+    values.push(params.surveyType)
+  }
+  if (hasFeasibilityStatus) {
+    columns.push('feasibility_status')
+    values.push(params.feasibilityStatus)
+  }
+  if (hasRequestedByUserId) {
+    columns.push('requested_by_user_id')
+    values.push(null)
+  }
+  if (hasAssignedEmployeeId) {
+    columns.push('assigned_employee_id')
+    values.push(null)
+  }
+  if (hasScheduledAt) {
+    columns.push('scheduled_at')
+    values.push(params.scheduledAt)
+  }
+  if (hasSurveyedAt) {
+    columns.push('surveyed_at')
+    values.push(null)
+  }
+  if (hasSiteAddress) {
+    columns.push('site_address')
+    values.push(params.siteAddress)
+  }
+  if (hasTechnicalNotes) {
+    columns.push('technical_notes')
+    values.push(params.technicalNotes)
+  }
+  if (hasCustomerRequestNotes) {
+    columns.push('customer_request_notes')
+    values.push(params.customerRequestNotes)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
+}
+
+async function buildSalesLeadUpdatePayload() {
+  const [hasStatus, hasUpdatedAt] = await Promise.all([
+    hasReviewDbColumn('sales_leads', 'status'),
+    hasReviewDbColumn('sales_leads', 'updated_at'),
+  ])
+
+  if (!hasStatus) {
+    throw new Error('Schema inti sales_leads belum siap. Kolom status wajib tersedia.')
+  }
+
+  const assignments = [`status = 'SURVEY_REQUEST'`]
+
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  return {
+    assignments,
+  }
+}
+
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) {
@@ -103,13 +242,14 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Status feasibility tidak valid.' }, { status: 400 })
     }
 
+    const salesLeadQueryParts = await getSalesLeadQueryParts()
     const [lead] = await runReviewDbQuery<ReviewLeadRow>(
       `
         SELECT
           id,
           customer_name AS customerName,
           lead_type AS leadType,
-          address
+          ${salesLeadQueryParts.addressExpression} AS address
         FROM sales_leads
         WHERE id = ?
         LIMIT 1
@@ -134,46 +274,34 @@ export async function POST(request: Request) {
     const technicalNotes = `[Review Survey] ${session.displayName} (${session.username})${
       technicalNotesRaw ? ` - ${technicalNotesRaw}` : ''
     }`
+    const salesSurveyInsertPayload = await buildSalesSurveyInsertPayload({
+      leadId: lead.id,
+      surveyNo,
+      surveyType,
+      surveyStatus,
+      feasibilityStatus,
+      scheduledAt,
+      siteAddress: siteAddressRaw || lead.address || null,
+      technicalNotes,
+      customerRequestNotes: customerRequestNotesRaw || null,
+    })
 
     await runReviewDbExecute<ExecuteResult>(
       `
         INSERT INTO sales_surveys (
-          lead_id,
-          customer_id,
-          covered_area_id,
-          survey_no,
-          survey_type,
-          survey_status,
-          feasibility_status,
-          requested_by_user_id,
-          assigned_employee_id,
-          scheduled_at,
-          surveyed_at,
-          site_address,
-          technical_notes,
-          customer_request_notes
+          ${salesSurveyInsertPayload.columns.join(',\n          ')}
         )
-        VALUES (?, NULL, NULL, ?, ?, ?, ?, NULL, NULL, ?, NULL, ?, ?, ?)
+        VALUES (${salesSurveyInsertPayload.placeholders.join(', ')})
       `,
-      [
-        lead.id,
-        surveyNo,
-        surveyType,
-        surveyStatus,
-        feasibilityStatus,
-        scheduledAt,
-        siteAddressRaw || lead.address || null,
-        technicalNotes,
-        customerRequestNotesRaw || null,
-      ],
+      salesSurveyInsertPayload.values,
     )
 
+    const salesLeadUpdatePayload = await buildSalesLeadUpdatePayload()
     await runReviewDbExecute<ExecuteResult>(
       `
         UPDATE sales_leads
         SET
-          status = 'SURVEY_REQUEST',
-          updated_at = CURRENT_TIMESTAMP
+          ${salesLeadUpdatePayload.assignments.join(',\n          ')}
         WHERE id = ?
       `,
       [lead.id],

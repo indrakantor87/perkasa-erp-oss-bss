@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 const allowedInvoiceTypes = new Set(['INSTALLATION', 'RECURRING', 'ADJUSTMENT', 'TERMINATION'])
 
@@ -79,22 +79,242 @@ function resolvePeriodStartEnd(billingYear: number, billingMonth: number) {
   return { start, end }
 }
 
+async function getBillingSubscriptionQueryParts() {
+  const [
+    hasSubscriptionId,
+    hasSubscriptionStatus,
+    hasSubscriptionServiceNo,
+    hasSubscriptionMonthlyPrice,
+    hasSubscriptionCustomerId,
+    hasSubscriptionPackageId,
+    hasCustomerId,
+    hasCustomerFullName,
+    hasPackageId,
+    hasPackageName,
+    hasPackageSpeedLabel,
+  ] = await Promise.all([
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'status'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+    hasReviewDbColumn('service_subscriptions', 'monthly_price'),
+    hasReviewDbColumn('service_subscriptions', 'customer_id'),
+    hasReviewDbColumn('service_subscriptions', 'package_id'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+    hasReviewDbColumn('sales_packages', 'id'),
+    hasReviewDbColumn('sales_packages', 'name'),
+    hasReviewDbColumn('sales_packages', 'speed_label'),
+  ])
+
+  if (!hasSubscriptionId || !hasSubscriptionStatus || !hasSubscriptionServiceNo) {
+    throw new Error('Schema inti service_subscriptions belum siap. Kolom id, status, dan service_no wajib tersedia.')
+  }
+
+  return {
+    monthlyPriceExpression: hasSubscriptionMonthlyPrice ? 'ss.monthly_price' : 'NULL',
+    customerJoin:
+      hasSubscriptionCustomerId && hasCustomerId
+        ? `
+      LEFT JOIN crm_customers c
+        ON c.id = ss.customer_id`
+        : '',
+    packageJoin:
+      hasSubscriptionPackageId && hasPackageId
+        ? `
+      LEFT JOIN sales_packages sp
+        ON sp.id = ss.package_id`
+        : '',
+    customerNameExpression:
+      hasSubscriptionCustomerId && hasCustomerId && hasCustomerFullName ? 'c.full_name' : "'Customer belum terpetakan'",
+    packageNameExpression: hasSubscriptionPackageId && hasPackageId && hasPackageName ? 'sp.name' : 'NULL',
+    speedLabelExpression: hasSubscriptionPackageId && hasPackageId && hasPackageSpeedLabel ? 'sp.speed_label' : 'NULL',
+  }
+}
+
+async function canRunRecurringInvoiceDuplicateGuard() {
+  const [hasSubscriptionId, hasInvoiceType, hasBillingYear, hasBillingMonth, hasInvoiceStatus] = await Promise.all([
+    hasReviewDbColumn('billing_invoices', 'subscription_id'),
+    hasReviewDbColumn('billing_invoices', 'invoice_type'),
+    hasReviewDbColumn('billing_invoices', 'billing_year'),
+    hasReviewDbColumn('billing_invoices', 'billing_month'),
+    hasReviewDbColumn('billing_invoices', 'invoice_status'),
+  ])
+
+  return hasSubscriptionId && hasInvoiceType && hasBillingYear && hasBillingMonth && hasInvoiceStatus
+}
+
+async function buildBillingInvoiceInsertPayload(params: {
+  subscriptionId: number
+  invoiceNo: string
+  invoiceType: string
+  billingMonth: number
+  billingYear: number
+  periodStart: Date
+  periodEnd: Date
+  issueDate: Date
+  dueDate: Date | null
+  subtotal: number
+  totalAmount: number
+  notes: string
+}) {
+  const [
+    hasSubscriptionId,
+    hasInvoiceNo,
+    hasInvoiceType,
+    hasBillingMonth,
+    hasBillingYear,
+    hasPeriodStart,
+    hasPeriodEnd,
+    hasIssueDate,
+    hasDueDate,
+    hasSubtotal,
+    hasPenaltyAmount,
+    hasDiscountAmount,
+    hasTotalAmount,
+    hasPaidAmount,
+    hasInvoiceStatus,
+    hasCollectionStatus,
+    hasSuspendCandidate,
+    hasNotes,
+  ] = await Promise.all([
+    hasReviewDbColumn('billing_invoices', 'subscription_id'),
+    hasReviewDbColumn('billing_invoices', 'invoice_no'),
+    hasReviewDbColumn('billing_invoices', 'invoice_type'),
+    hasReviewDbColumn('billing_invoices', 'billing_month'),
+    hasReviewDbColumn('billing_invoices', 'billing_year'),
+    hasReviewDbColumn('billing_invoices', 'period_start'),
+    hasReviewDbColumn('billing_invoices', 'period_end'),
+    hasReviewDbColumn('billing_invoices', 'issue_date'),
+    hasReviewDbColumn('billing_invoices', 'due_date'),
+    hasReviewDbColumn('billing_invoices', 'subtotal'),
+    hasReviewDbColumn('billing_invoices', 'penalty_amount'),
+    hasReviewDbColumn('billing_invoices', 'discount_amount'),
+    hasReviewDbColumn('billing_invoices', 'total_amount'),
+    hasReviewDbColumn('billing_invoices', 'paid_amount'),
+    hasReviewDbColumn('billing_invoices', 'invoice_status'),
+    hasReviewDbColumn('billing_invoices', 'collection_status'),
+    hasReviewDbColumn('billing_invoices', 'suspend_candidate'),
+    hasReviewDbColumn('billing_invoices', 'notes'),
+  ])
+
+  if (!hasSubscriptionId || !hasInvoiceNo || !hasSubtotal || !hasTotalAmount || !hasPaidAmount || !hasInvoiceStatus) {
+    throw new Error(
+      'Schema inti billing_invoices belum siap. Kolom subscription_id, invoice_no, subtotal, total_amount, paid_amount, dan invoice_status wajib tersedia.',
+    )
+  }
+
+  const columns = ['subscription_id', 'invoice_no', 'subtotal', 'total_amount', 'paid_amount', 'invoice_status']
+  const values: unknown[] = [params.subscriptionId, params.invoiceNo, params.subtotal, params.totalAmount, 0, 'ISSUED']
+
+  if (hasInvoiceType) {
+    columns.push('invoice_type')
+    values.push(params.invoiceType)
+  }
+  if (hasBillingMonth) {
+    columns.push('billing_month')
+    values.push(params.invoiceType === 'RECURRING' ? params.billingMonth : null)
+  }
+  if (hasBillingYear) {
+    columns.push('billing_year')
+    values.push(params.invoiceType === 'RECURRING' ? params.billingYear : null)
+  }
+  if (hasPeriodStart) {
+    columns.push('period_start')
+    values.push(params.invoiceType === 'RECURRING' ? params.periodStart : null)
+  }
+  if (hasPeriodEnd) {
+    columns.push('period_end')
+    values.push(params.invoiceType === 'RECURRING' ? params.periodEnd : null)
+  }
+  if (hasIssueDate) {
+    columns.push('issue_date')
+    values.push(params.issueDate)
+  }
+  if (hasDueDate) {
+    columns.push('due_date')
+    values.push(params.dueDate)
+  }
+  if (hasPenaltyAmount) {
+    columns.push('penalty_amount')
+    values.push(0)
+  }
+  if (hasDiscountAmount) {
+    columns.push('discount_amount')
+    values.push(0)
+  }
+  if (hasCollectionStatus) {
+    columns.push('collection_status')
+    values.push('NORMAL')
+  }
+  if (hasSuspendCandidate) {
+    columns.push('suspend_candidate')
+    values.push(0)
+  }
+  if (hasNotes) {
+    columns.push('notes')
+    values.push(params.notes)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
+}
+
+async function buildBillingInvoiceItemInsertPayload(params: {
+  invoiceId: number
+  itemType: string
+  description: string
+  subtotal: number
+}) {
+  const [hasInvoiceId, hasItemType, hasDescription, hasQty, hasUnitPrice, hasLineTotal] = await Promise.all([
+    hasReviewDbColumn('billing_invoice_items', 'invoice_id'),
+    hasReviewDbColumn('billing_invoice_items', 'item_type'),
+    hasReviewDbColumn('billing_invoice_items', 'description'),
+    hasReviewDbColumn('billing_invoice_items', 'qty'),
+    hasReviewDbColumn('billing_invoice_items', 'unit_price'),
+    hasReviewDbColumn('billing_invoice_items', 'line_total'),
+  ])
+
+  if (!hasInvoiceId || !hasDescription || !hasQty || !hasLineTotal) {
+    return null
+  }
+
+  const columns = ['invoice_id', 'description', 'qty', 'line_total']
+  const values: unknown[] = [params.invoiceId, params.description, 1, params.subtotal]
+
+  if (hasItemType) {
+    columns.push('item_type')
+    values.push(params.itemType)
+  }
+  if (hasUnitPrice) {
+    columns.push('unit_price')
+    values.push(params.subtotal)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
+}
+
 async function createInvoiceForSubscription(params: CreateInvoiceParams): Promise<CreatedInvoiceSummary> {
+  const subscriptionQueryParts = await getBillingSubscriptionQueryParts()
   const [subscription] = await runReviewDbQuery<SubscriptionRow>(
     `
       SELECT
         ss.id,
         ss.status,
         ss.service_no AS serviceNo,
-        ss.monthly_price AS monthlyPrice,
-        c.full_name AS customerName,
-        sp.name AS packageName,
-        sp.speed_label AS speedLabel
+        ${subscriptionQueryParts.monthlyPriceExpression} AS monthlyPrice,
+        ${subscriptionQueryParts.customerNameExpression} AS customerName,
+        ${subscriptionQueryParts.packageNameExpression} AS packageName,
+        ${subscriptionQueryParts.speedLabelExpression} AS speedLabel
       FROM service_subscriptions ss
-      JOIN crm_customers c
-        ON c.id = ss.customer_id
-      LEFT JOIN sales_packages sp
-        ON sp.id = ss.package_id
+      ${subscriptionQueryParts.customerJoin}
+      ${subscriptionQueryParts.packageJoin}
       WHERE ss.service_no = ?
       LIMIT 1
     `,
@@ -111,7 +331,7 @@ async function createInvoiceForSubscription(params: CreateInvoiceParams): Promis
     throw new Error(`Harga bulanan subscription ${subscription.serviceNo} belum diisi (0).`)
   }
 
-  if (params.invoiceType === 'RECURRING') {
+  if (params.invoiceType === 'RECURRING' && (await canRunRecurringInvoiceDuplicateGuard())) {
     const existing = await runReviewDbQuery<ExistingInvoiceRow>(
       `
         SELECT id, invoice_no AS invoiceNo
@@ -149,45 +369,29 @@ async function createInvoiceForSubscription(params: CreateInvoiceParams): Promis
       ? Number(subscription.monthlyPrice)
       : Number(params.customAmount ?? 0)
   const totalAmount = subtotal
+  const invoiceInsertPayload = await buildBillingInvoiceInsertPayload({
+    subscriptionId: subscription.id,
+    invoiceNo,
+    invoiceType: params.invoiceType,
+    billingMonth: params.billingMonth,
+    billingYear: params.billingYear,
+    periodStart,
+    periodEnd,
+    issueDate: params.issueDate,
+    dueDate: finalDueDate,
+    subtotal,
+    totalAmount,
+    notes: userNote,
+  })
 
   const invoiceResult = await runReviewDbExecute<ExecuteResult>(
     `
       INSERT INTO billing_invoices (
-        subscription_id,
-        invoice_no,
-        invoice_type,
-        billing_month,
-        billing_year,
-        period_start,
-        period_end,
-        issue_date,
-        due_date,
-        subtotal,
-        penalty_amount,
-        discount_amount,
-        total_amount,
-        paid_amount,
-        invoice_status,
-        collection_status,
-        suspend_candidate,
-        notes
+        ${invoiceInsertPayload.columns.join(',\n        ')}
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0, 'ISSUED', 'NORMAL', 0, ?)
+      VALUES (${invoiceInsertPayload.placeholders.join(', ')})
     `,
-    [
-      subscription.id,
-      invoiceNo,
-      params.invoiceType,
-      params.invoiceType === 'RECURRING' ? params.billingMonth : null,
-      params.invoiceType === 'RECURRING' ? params.billingYear : null,
-      params.invoiceType === 'RECURRING' ? periodStart : null,
-      params.invoiceType === 'RECURRING' ? periodEnd : null,
-      params.issueDate,
-      finalDueDate,
-      subtotal,
-      totalAmount,
-      userNote,
-    ],
+    invoiceInsertPayload.values,
   )
 
   const invoiceId = Number(invoiceResult.insertId)
@@ -207,21 +411,24 @@ async function createInvoiceForSubscription(params: CreateInvoiceParams): Promis
     params.invoiceType === 'RECURRING'
       ? `Subscription ${subscription.serviceNo} • ${packageLabel} • ${periodLabel}`
       : `${params.customDescription} • ${subscription.serviceNo} • ${subscription.customerName}`
+  const invoiceItemInsertPayload = await buildBillingInvoiceItemInsertPayload({
+    invoiceId,
+    itemType,
+    description: itemDescription,
+    subtotal,
+  })
 
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      INSERT INTO billing_invoice_items (
-        invoice_id,
-        item_type,
-        description,
-        qty,
-        unit_price,
-        line_total
-      )
-      VALUES (?, ?, ?, 1, ?, ?)
-    `,
-    [invoiceId, itemType, itemDescription, subtotal, subtotal],
-  )
+  if (invoiceItemInsertPayload) {
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        INSERT INTO billing_invoice_items (
+          ${invoiceItemInsertPayload.columns.join(',\n          ')}
+        )
+        VALUES (${invoiceItemInsertPayload.placeholders.join(', ')})
+      `,
+      invoiceItemInsertPayload.values,
+    )
+  }
 
   return {
     invoiceNo,

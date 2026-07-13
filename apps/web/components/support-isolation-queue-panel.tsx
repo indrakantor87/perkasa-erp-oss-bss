@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { SupportActionQuickLinks } from '@/components/support-action-quick-links'
+import { canAccessPath } from '@/lib/access-control'
 import { buildSupportActionHref, buildSupportLaneHref } from '@/lib/support-action-links'
-import type { DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
+import { canAccessSupportLane, canProcessSupportDismantle } from '@/lib/support-lanes'
+import type { AppRole, DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
   return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? '-'
@@ -57,11 +59,11 @@ function getOwnershipState(row: DomainReviewRow) {
   const dismantleTicket = pickMeta(row.meta, 'Ticket Dismantle: ')
   if (dismantleTicket === 'Sudah') {
     return {
-      label: 'Terminate / Dismantle',
+      label: 'Jalur Dismantle',
       owner: 'CS & Admin CS',
-      note: 'Kasus sudah masuk queue dismantle dan dibaca sebagai jalur terminate.',
+      note: 'Kasus sudah masuk queue dismantle dan diperlakukan sebagai terminate permanen.',
       tone: 'border-rose-200 bg-rose-50 text-rose-700',
-      nextLabel: 'Lihat Queue Dismantle CS',
+      nextLabel: 'Buka Form Dismantle',
       nextHref: buildSupportActionHref('dismantle-approve', {
         isolation: `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`,
       }),
@@ -69,11 +71,11 @@ function getOwnershipState(row: DomainReviewRow) {
   }
 
   return {
-    label: 'Restore / Recovery',
+    label: 'Jalur Restore',
     owner: 'Billing',
-    note: 'Kasus masih berada di jalur restore dan menunggu validasi Billing.',
+    note: 'Kasus masih berada di jalur restore dan menunggu keputusan Billing.',
     tone: 'border-sky-200 bg-sky-50 text-sky-700',
-    nextLabel: 'Transfer Ke Dismantle CS',
+    nextLabel: 'Lanjut ke Dismantle',
     nextHref: buildSupportActionHref('dismantle-approve', {
       isolation: `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`,
     }),
@@ -88,12 +90,80 @@ function getActionButtonClass(isPrimary: boolean) {
   return 'rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50'
 }
 
+function getIsolationRowActionItems(params: {
+  row: DomainReviewRow
+  canUpdate: boolean
+  canTransferToDismantle: boolean
+  canOpenBillingDecision: boolean
+}) {
+  const isolationPrefillValue = `${params.row.id.replace(/^ISO-/, '')} | ${params.row.primary} | ${params.row.secondary}`
+  const ownership = getOwnershipState(params.row)
+  const isDismantleTrack = pickMeta(params.row.meta, 'Ticket Dismantle: ') === 'Sudah'
+
+  const actions = [
+    ...(params.canUpdate
+      ? [
+          {
+            key: 'restore',
+            label: 'Buka Form Restore',
+            href: buildSupportActionHref('isolation-restore', {
+              isolation: isolationPrefillValue,
+            }),
+          },
+        ]
+      : []),
+    ...(params.canTransferToDismantle
+      ? [
+          {
+            key: 'dismantle',
+            label: ownership.nextLabel,
+            href: ownership.nextHref,
+          },
+        ]
+      : []),
+    ...(params.canOpenBillingDecision
+      ? [
+          {
+            key: 'billing',
+            label: 'Buka Billing',
+            href: '/billing',
+          },
+        ]
+      : []),
+  ]
+
+  const recommendedKey = isDismantleTrack
+    ? params.canTransferToDismantle
+      ? 'dismantle'
+      : params.canUpdate
+        ? 'restore'
+        : 'billing'
+    : params.canUpdate
+      ? 'restore'
+      : params.canTransferToDismantle
+        ? 'dismantle'
+        : 'billing'
+
+  return actions.sort((left, right) => {
+    const leftRank = left.key === recommendedKey ? 0 : 1
+    const rightRank = right.key === recommendedKey ? 0 : 1
+    if (leftRank !== rightRank) return leftRank - rightRank
+    return left.key.localeCompare(right.key)
+  })
+}
+
 export function SupportIsolationQueuePanel({
   sections,
   actionLinks = [],
+  role,
+  canUpdate = true,
+  canApprove = false,
 }: {
   sections: DomainReviewSection[]
   actionLinks?: SupportActionLink[]
+  role: AppRole
+  canUpdate?: boolean
+  canApprove?: boolean
 }) {
   const isolationSection =
     sections.find((section) => section.title.toUpperCase().includes('ISOLIR')) ?? null
@@ -103,6 +173,10 @@ export function SupportIsolationQueuePanel({
   }
 
   const summary = buildIsolationSummary(isolationSection.rows)
+  const canOpenBillingDecision = canAccessPath(role, '/billing')
+  const canOpenSlaLane = canAccessSupportLane(role, 'sla')
+  const canOpenSupervisorWorkspace = canAccessPath(role, '/customers/cs-admin')
+  const canTransferToDismantle = canProcessSupportDismantle(role, canApprove)
 
   function buildIsolationPrefillValue(row: DomainReviewRow) {
     return `${row.id.replace(/^ISO-/, '')} | ${row.primary} | ${row.secondary}`
@@ -160,7 +234,7 @@ export function SupportIsolationQueuePanel({
           <p className="mt-2 text-sm text-rose-700">Kasus yang sudah bergerak ke queue Dismantle CS & Admin CS.</p>
         </article>
         <article className="rounded-3xl border border-violet-200 bg-violet-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Owner Marketing</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">Marketing Aktif</p>
           <p className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-violet-950">
             {summary.marketingNames.length}
           </p>
@@ -185,24 +259,30 @@ export function SupportIsolationQueuePanel({
       />
 
       <div className="mt-4 flex flex-wrap gap-3">
-        <Link
-          href="/billing"
-          className="inline-flex items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:opacity-90"
-        >
-          Buka Billing Decision
-        </Link>
-        <Link
-          href={buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })}
-          className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:opacity-90"
-        >
-          Kontrol SLA Terkait
-        </Link>
-        <Link
-          href="/customers/cs-admin?queue=Transfer+atau+Restore"
-          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
-        >
-          Buka Supervisor CS
-        </Link>
+        {canOpenBillingDecision ? (
+          <Link
+            href="/billing"
+            className="inline-flex items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:opacity-90"
+          >
+            Buka Billing
+          </Link>
+        ) : null}
+        {canOpenSlaLane ? (
+          <Link
+            href={buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })}
+            className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:opacity-90"
+          >
+            Kontrol SLA Terkait
+          </Link>
+        ) : null}
+        {canOpenSupervisorWorkspace ? (
+          <Link
+            href="/customers/cs-admin?queue=Transfer+atau+Restore"
+            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
+          >
+            Buka Supervisor CS
+          </Link>
+        ) : null}
       </div>
 
       {isolationSection.rows.length ? (
@@ -215,8 +295,8 @@ export function SupportIsolationQueuePanel({
                     <th className="px-4 py-3">Customer</th>
                     <th className="px-4 py-3">Kontak & Radbox</th>
                     <th className="px-4 py-3">Marketing & Isolasi</th>
-                    <th className="px-4 py-3">Ownership</th>
-                    <th className="px-4 py-3">Konteks</th>
+                    <th className="px-4 py-3">Kepemilikan Proses</th>
+                    <th className="px-4 py-3">Ringkasan Kasus</th>
                     <th className="px-4 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -226,8 +306,16 @@ export function SupportIsolationQueuePanel({
                     const marketing = pickMeta(row.meta, 'Marketing: ')
                     const isolasiAt = pickMeta(row.meta, 'Isolasi: ')
                     const dismantleTicket = pickMeta(row.meta, 'Ticket Dismantle: ')
-                    const isolationPrefillValue = buildIsolationPrefillValue(row)
                     const ownership = getOwnershipState(row)
+                    const rowActions = getIsolationRowActionItems({
+                      row,
+                      canUpdate,
+                      canTransferToDismantle,
+                      canOpenBillingDecision,
+                    })
+                    const recommendedActionKey =
+                      rowActions[0]?.key ??
+                      (dismantleTicket === 'Sudah' ? 'dismantle' : 'restore')
 
                     return (
                       <tr key={row.id} className="align-top">
@@ -274,20 +362,15 @@ export function SupportIsolationQueuePanel({
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex flex-col items-end gap-2">
-                            <Link
-                              href={buildSupportActionHref('isolation-restore', {
-                                isolation: isolationPrefillValue,
-                              })}
-                              className={getActionButtonClass(dismantleTicket !== 'Sudah')}
-                            >
-                              Proses Restore Billing
-                            </Link>
-                            <Link href={ownership.nextHref} className={getActionButtonClass(dismantleTicket === 'Sudah')}>
-                              {ownership.nextLabel}
-                            </Link>
-                            <Link href="/billing" className={getActionButtonClass(false)}>
-                              Sinkron Billing
-                            </Link>
+                            {rowActions.map((action) => (
+                              <Link
+                                key={`${row.id}-${action.key}`}
+                                href={action.href}
+                                className={getActionButtonClass(action.key === recommendedActionKey)}
+                              >
+                                {action.label}
+                              </Link>
+                            ))}
                           </div>
                         </td>
                       </tr>
@@ -303,8 +386,14 @@ export function SupportIsolationQueuePanel({
               const phone = pickMeta(row.meta, 'Phone: ')
               const marketing = pickMeta(row.meta, 'Marketing: ')
               const isolasiAt = pickMeta(row.meta, 'Isolasi: ')
-              const isolationPrefillValue = buildIsolationPrefillValue(row)
               const ownership = getOwnershipState(row)
+              const rowActions = getIsolationRowActionItems({
+                row,
+                canUpdate,
+                canTransferToDismantle,
+                canOpenBillingDecision,
+              })
+              const recommendedActionKey = rowActions[0]?.key ?? 'restore'
 
               return (
                 <article key={`${row.id}-mobile`} className="rounded-2xl border border-line bg-slate-50 p-5">
@@ -321,24 +410,19 @@ export function SupportIsolationQueuePanel({
                     <span className="badge border-slate-200 bg-white text-slate-600">Marketing: {marketing}</span>
                     <span className="badge border-slate-200 bg-white text-slate-600">Isolasi: {isolasiAt}</span>
                     <span className={`badge ${ownership.tone}`}>
-                      {ownership.owner} • {ownership.label}
+                        {ownership.owner} • {ownership.label}
                     </span>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <Link
-                      href={buildSupportActionHref('isolation-restore', {
-                        isolation: isolationPrefillValue,
-                      })}
-                      className={getActionButtonClass(true)}
-                    >
-                      Proses Restore Billing
-                    </Link>
-                    <Link href={ownership.nextHref} className={getActionButtonClass(false)}>
-                      {ownership.nextLabel}
-                    </Link>
-                    <Link href="/billing" className={getActionButtonClass(false)}>
-                      Sinkron Billing
-                    </Link>
+                    {rowActions.map((action) => (
+                      <Link
+                        key={`${row.id}-${action.key}-mobile`}
+                        href={action.href}
+                        className={getActionButtonClass(action.key === recommendedActionKey)}
+                      >
+                        {action.label}
+                      </Link>
+                    ))}
                   </div>
                 </article>
               )

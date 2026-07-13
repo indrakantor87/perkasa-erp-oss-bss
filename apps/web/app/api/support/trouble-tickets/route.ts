@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 const allowedCategories = new Set(['TT', 'PV'])
 const allowedStatuses = new Set(['OPEN', 'ON_PROGRESS'])
@@ -142,20 +142,23 @@ export async function POST(request: Request) {
       )
     }
 
-    const knownTroubleTypes = await runReviewDbQuery<TroubleTypeRow>(
-      `
-        SELECT trouble_type AS troubleType
-        FROM support_trouble_ticket_sla
-        WHERE UPPER(TRIM(trouble_type)) = UPPER(TRIM(?))
-        LIMIT 1
-      `,
-      [type],
-    )
-    if (!knownTroubleTypes.length) {
-      return Response.json(
-        { message: 'Tipe ticket belum terdaftar pada master SLA trouble ticket.' },
-        { status: 400 },
+    const hasSupportSlaTroubleType = await hasReviewDbColumn('support_trouble_ticket_sla', 'trouble_type')
+    if (hasSupportSlaTroubleType) {
+      const knownTroubleTypes = await runReviewDbQuery<TroubleTypeRow>(
+        `
+          SELECT trouble_type AS troubleType
+          FROM support_trouble_ticket_sla
+          WHERE UPPER(TRIM(trouble_type)) = UPPER(TRIM(?))
+          LIMIT 1
+        `,
+        [type],
       )
+      if (!knownTroubleTypes.length) {
+        return Response.json(
+          { message: 'Tipe ticket belum terdaftar pada master SLA trouble ticket.' },
+          { status: 400 },
+        )
+      }
     }
 
     const ticketCode = await generateTicketCode(category)

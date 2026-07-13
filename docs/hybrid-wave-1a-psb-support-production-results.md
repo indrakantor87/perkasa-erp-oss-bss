@@ -66,6 +66,17 @@ Dokumen ini merangkum hasil riil eksekusi batch production support inti `Web PSB
   - transform membuat `support_isolation` sintetis minimum
   - queue tetap bisa masuk final tanpa melanggar FK `support_dismantle_queue`
 
+### Temuan 4: Residual Radbox Histori Memang Tipis di Source
+
+- Status: `validated`
+- Detail:
+  - audit lanjutan pada `production-data/web-psb-wave1a-support/dismantle-history.production.json` menunjukkan hanya `4` dari `293` row source yang memiliki nilai `radboox`
+  - empat row source yang punya `radboox` tersebut sudah terwakili di tabel final, termasuk `ARI AGUNG DARMAWAN`, `Aulia Chairunnisa`, dan dua histori `Yohanes Wahyu Tri Bayu S.`
+  - sisa histori final yang masih `Radbox belum terpetakan` karena memang source production juga tidak menyimpan `radboox`, bukan karena bug transform atau backfill yang terlewat
+- Dampak:
+  - residual `radbox_name` kosong pada `support_dismantle_history` harus diperlakukan sebagai keterbatasan source data
+  - fallback UI tetap dipertahankan sebagai narasi jujur sampai ada artefak source lain yang lebih kaya
+
 ## Keputusan Lanjut
 
 - Batch support core production dinyatakan siap menjadi parent resolver untuk batch lanjutan support extension.

@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 type ReviewIsolationRow = {
   id: string
@@ -15,13 +15,23 @@ function normalizeRequiredText(value: unknown) {
 }
 
 async function getIsolationById(id: string) {
+  const [hasCustomerName, hasStatus, hasRestorationDate] = await Promise.all([
+    hasReviewDbColumn('support_isolations', 'customer_name'),
+    hasReviewDbColumn('support_isolations', 'status'),
+    hasReviewDbColumn('support_isolations', 'restoration_date'),
+  ])
+
+  if (!hasStatus) {
+    throw new Error('Schema inti support_isolations belum siap. Kolom status wajib tersedia.')
+  }
+
   const [row] = await runReviewDbQuery<ReviewIsolationRow>(
     `
       SELECT
         id,
-        customer_name AS customerName,
+        ${hasCustomerName ? 'customer_name' : "''"} AS customerName,
         status,
-        restoration_date AS restorationDate
+        ${hasRestorationDate ? 'restoration_date' : 'NULL'} AS restorationDate
       FROM support_isolations
       WHERE id = ?
       LIMIT 1
@@ -74,18 +84,36 @@ export async function POST(
     }
 
     const normalizedCloseNote = `[Restored via billing workflow] ${session.displayName} (${session.username}) - ${closeNote}`
+    const [hasRestorationDate, hasCloseNote, hasUpdatedAt] = await Promise.all([
+      hasReviewDbColumn('support_isolations', 'restoration_date'),
+      hasReviewDbColumn('support_isolations', 'close_note'),
+      hasReviewDbColumn('support_isolations', 'updated_at'),
+    ])
+
+    const updateAssignments = [`status = 'CLOSED'`]
+    const updateValues: unknown[] = []
+
+    if (hasRestorationDate) {
+      updateAssignments.push('restoration_date = CURRENT_TIMESTAMP')
+    }
+    if (hasCloseNote) {
+      updateAssignments.push('close_note = ?')
+      updateValues.push(normalizedCloseNote)
+    }
+    if (hasUpdatedAt) {
+      updateAssignments.push('updated_at = CURRENT_TIMESTAMP')
+    }
+
+    updateValues.push(isolationId)
 
     await runReviewDbExecute(
       `
         UPDATE support_isolations
         SET
-          status = 'CLOSED',
-          restoration_date = CURRENT_TIMESTAMP,
-          close_note = ?,
-          updated_at = CURRENT_TIMESTAMP
+          ${updateAssignments.join(',\n          ')}
         WHERE id = ?
       `,
-      [normalizedCloseNote, isolationId]
+      updateValues
     )
 
     return Response.json({

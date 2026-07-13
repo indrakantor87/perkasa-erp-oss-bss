@@ -1,4 +1,5 @@
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
+import { canAccessPath, canPerformAction, getDefaultLandingPath } from '@/lib/access-control'
 import {
   getDailyActivityDivisionAliases,
   getDailyActivitySubdivisionAliases,
@@ -15,7 +16,7 @@ import {
 } from '@/lib/mock-dashboard'
 import type { AppSession } from '@/lib/auth-session'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
-import { buildSupportLaneActionHref } from '@/lib/support-action-links'
+import { buildSupportLaneActionHref, buildSupportLaneHref } from '@/lib/support-action-links'
 import { getRecentAuthPermissionAudits } from '@/lib/services/auth-permission-audit-service'
 import { getRecentAuthRolePermissionAudits } from '@/lib/services/auth-role-permission-audit-service'
 import { getRecentAuthUserAudits } from '@/lib/services/auth-user-audit-service'
@@ -24,6 +25,9 @@ import { listMergedDashboardKpiDefinitions, resolveDashboardKpiManagerScope } fr
 import { getRecentHrAudits } from '@/lib/services/hr-audit-service'
 import { ensureImportBatchActionTable } from '@/lib/services/import-write-service'
 import { ensureSupportDismantleQueueTable } from '@/lib/services/support-dismantle-service'
+import { ensureSupportTroubleTicketEscalationTable } from '@/lib/services/support-ticket-escalation-service'
+import { ensureSupportTroubleTicketProgressTable } from '@/lib/services/support-ticket-progress-service'
+import { canAccessSupportLane, canUseSupportAction, normalizeSupportLane } from '@/lib/support-lanes'
 import type {
   AppRole,
   ActivityItem,
@@ -38,10 +42,12 @@ import type {
   DashboardDailyActivityApprovalQueueItem,
   DashboardDailyActivityPendingApprovalItem,
   DashboardMetric,
+  DashboardNextActionItem,
   DashboardOperationalCard,
   DashboardOperationalDivisionKey,
   DashboardQueueItem,
   DashboardSummary,
+  SupportLaneActionKey,
   DashboardWorkItem,
 } from '@/lib/types'
 
@@ -72,6 +78,8 @@ type DashboardNocOperationalRow = {
   openTickets: number
   overdueTickets: number
   monthlyOpenedTickets: number
+  escalationPending: number
+  readyClose: number
 }
 
 type DashboardDigitalOperationalRow = {
@@ -202,6 +210,506 @@ type DashboardSupportRow = {
   status: string
   ticketType: string
   openedAt: string
+  agingHours?: number
+}
+
+function parseDashboardHrefParts(href: string) {
+  try {
+    const url = new URL(href, 'https://perkasa.local')
+    return {
+      pathname: url.pathname,
+      hash: url.hash,
+    }
+  } catch {
+    return {
+      pathname: '',
+      hash: '',
+    }
+  }
+}
+
+function parseSupportActionKey(hash: string): SupportLaneActionKey | null {
+  const normalizedHash = String(hash ?? '').trim()
+  if (!normalizedHash.startsWith('#support-action-')) {
+    return null
+  }
+
+  const rawKey = normalizedHash.replace(/^#support-action-/, '') as SupportLaneActionKey
+  const allowedKeys: SupportLaneActionKey[] = [
+    'ticket-create',
+    'ticket-progress',
+    'ticket-escalate',
+    'ticket-close',
+    'sla-manage',
+    'isolation-create',
+    'isolation-restore',
+    'dismantle-approve',
+    'dismantle-close',
+    'dismantle-reopen',
+  ]
+
+  return allowedKeys.includes(rawKey) ? rawKey : null
+}
+
+function getRoleSupportActionCapability(role: AppRole) {
+  return {
+    role,
+    canCreate: canPerformAction(role, 'support', 'create'),
+    canUpdate: canPerformAction(role, 'support', 'update'),
+    canApprove: canPerformAction(role, 'support', 'approve'),
+  }
+}
+
+function canAccessDashboardHref(role: AppRole, href: string) {
+  const { pathname, hash } = parseDashboardHrefParts(href)
+  if (!pathname || !canAccessPath(role, pathname)) {
+    return false
+  }
+
+  if (pathname.startsWith('/support/')) {
+    const lane = normalizeSupportLane(pathname.split('/')[2] ?? '')
+    if (lane && !canAccessSupportLane(role, lane)) {
+      return false
+    }
+  }
+
+  const actionKey = parseSupportActionKey(hash)
+  if (actionKey && !canUseSupportAction({ ...getRoleSupportActionCapability(role), actionKey })) {
+    return false
+  }
+
+  return true
+}
+
+function getLockedOperationalDivision(role: AppRole): DashboardOperationalDivisionKey {
+  switch (role) {
+    case 'SALES_MARKETING':
+      return 'SALES'
+    case 'CS_OPERATOR':
+    case 'CS_ADMIN':
+      return 'CS'
+    case 'NOC_OPERATOR':
+    case 'FIELD_TECHNICIAN':
+      return 'NOC'
+    case 'TT_OPERATOR':
+      return 'TT'
+    case 'DIGITAL_CREATOR':
+      return 'DIGITAL'
+    case 'DISMANTLE_OPERATOR':
+      return 'DISMANTLE'
+    default:
+      return 'ALL'
+  }
+}
+
+function getDashboardOperationalCardHref(role: AppRole, card: DashboardOperationalCard) {
+  switch (card.key) {
+    case 'CS':
+      if (canAccessSupportLane(role, 'isolations')) {
+        return buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' })
+      }
+      break
+    case 'NOC':
+      if (canAccessSupportLane(role, 'tt')) {
+        return buildSupportLaneHref('tt', { focus: 'OPEN_TICKETS' })
+      }
+      break
+    case 'TT':
+      if (canAccessSupportLane(role, 'tt')) {
+        return buildSupportLaneHref('tt', { focus: 'OPEN_TICKETS' })
+      }
+      break
+    case 'DISMANTLE':
+      if (canAccessSupportLane(role, 'dismantle')) {
+        return buildSupportLaneHref('dismantle')
+      }
+      if (canAccessSupportLane(role, 'isolations')) {
+        return buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' })
+      }
+      break
+    case 'SALES':
+    case 'DIGITAL':
+      if (canAccessDashboardHref(role, '/sales')) {
+        return '/sales'
+      }
+      break
+    case 'BILLING':
+      if (canAccessDashboardHref(role, '/billing')) {
+        return '/billing'
+      }
+      break
+    case 'HR':
+      if (canAccessDashboardHref(role, '/hr')) {
+        return '/hr'
+      }
+      break
+    case 'INVENTORY':
+      if (canAccessDashboardHref(role, '/inventory')) {
+        return '/inventory'
+      }
+      break
+  }
+
+  return canAccessDashboardHref(role, card.href) ? card.href : getDefaultLandingPath(role)
+}
+
+function sanitizeDashboardOperationalMetric(
+  role: AppRole,
+  metric: DashboardOperationalCard['metrics'][number],
+): DashboardOperationalCard['metrics'][number] {
+  const hint = isRoleSafeDashboardText(role, metric.hint) ? metric.hint : undefined
+  const hintBadges = metric.hintBadges?.filter((item) => isRoleSafeDashboardText(role, item))
+
+  return {
+    ...metric,
+    href: metric.href && canAccessDashboardHref(role, metric.href) ? metric.href : undefined,
+    hint,
+    hintBadges: hintBadges?.length ? hintBadges : undefined,
+  }
+}
+
+function sanitizeDashboardOperationalCards(
+  role: AppRole,
+  cards: DashboardOperationalCard[],
+  filters: DashboardPageFilters,
+) {
+  const visibleDivision = role === 'SUPER_ADMIN' ? filters.division : getLockedOperationalDivision(role)
+  const nextCards = cards
+    .filter((card) => visibleDivision === 'ALL' || card.key === visibleDivision)
+    .map((card) => ({
+      ...card,
+      href: getDashboardOperationalCardHref(role, card),
+      description: isRoleSafeDashboardText(role, card.description)
+        ? card.description
+        : 'Ringkasan operasional ini disederhanakan agar tetap sesuai dengan scope role aktif.',
+      metrics: card.metrics.map((metric) => sanitizeDashboardOperationalMetric(role, metric)),
+    }))
+
+  return nextCards
+}
+
+function getAlertTone(severity: DashboardAlertItem['severity']) {
+  switch (severity) {
+    case 'critical':
+      return 'border-rose-200 bg-rose-50 text-rose-700'
+    case 'high':
+      return 'border-amber-200 bg-amber-50 text-amber-700'
+    default:
+      return 'border-sky-200 bg-sky-50 text-sky-700'
+  }
+}
+
+function getWorklistTone(priority: DashboardWorkItem['priority']) {
+  switch (priority) {
+    case 'tinggi':
+      return 'border-rose-200 bg-rose-50 text-rose-700'
+    case 'sedang':
+      return 'border-amber-200 bg-amber-50 text-amber-700'
+    default:
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+}
+
+function getQueueTone(accent: string) {
+  if (accent.includes('rose') || accent.includes('orange')) {
+    return 'border-rose-200 bg-rose-50 text-rose-700'
+  }
+  if (accent.includes('amber')) {
+    return 'border-amber-200 bg-amber-50 text-amber-700'
+  }
+  if (accent.includes('emerald')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+  if (accent.includes('sky') || accent.includes('blue') || accent.includes('indigo') || accent.includes('cyan')) {
+    return 'border-sky-200 bg-sky-50 text-sky-700'
+  }
+
+  return 'border-slate-200 bg-slate-50 text-slate-700'
+}
+
+function getDashboardNextActionLabel(href: string, fallbackLabel?: string) {
+  const { pathname, hash } = parseDashboardHrefParts(href)
+  const actionKey = parseSupportActionKey(hash)
+
+  switch (actionKey) {
+    case 'ticket-progress':
+      return 'Update Ticket'
+    case 'ticket-escalate':
+      return 'Eskalasi Ticket'
+    case 'ticket-close':
+      return 'Tutup Ticket'
+    case 'sla-manage':
+      return 'Kontrol SLA'
+    case 'isolation-create':
+      return 'Buat Isolir'
+    case 'isolation-restore':
+      return 'Proses Restore'
+    case 'dismantle-approve':
+      return 'Masuk Dismantle'
+    case 'dismantle-close':
+      return 'Tutup Dismantle'
+    case 'dismantle-reopen':
+      return 'Reopen Dismantle'
+    default:
+      break
+  }
+
+  if (pathname.startsWith('/support/sla')) return 'Kontrol SLA'
+  if (pathname.startsWith('/support/tt')) return 'Buka Ticket'
+  if (pathname.startsWith('/support/isolations')) return 'Buka Isolir'
+  if (pathname.startsWith('/support/dismantle')) return 'Buka Dismantle'
+  if (pathname.startsWith('/billing')) return 'Buka Billing'
+  if (pathname.startsWith('/dashboard/daily-activity')) return 'Buka Approval'
+  if (pathname.startsWith('/sales')) return 'Buka Sales'
+  if (pathname.startsWith('/inventory')) return 'Buka Inventory'
+  if (pathname.startsWith('/customers')) return 'Buka Customer'
+  if (pathname.startsWith('/import')) return 'Review Import'
+  if (pathname.startsWith('/dashboard/worklist')) return 'Buka Worklist'
+  if (pathname.startsWith('/dashboard')) return 'Buka Dashboard'
+
+  return fallbackLabel || 'Buka Detail'
+}
+
+export function buildDashboardNextActions(params: {
+  role: AppRole
+  alerts: DashboardAlertItem[]
+  worklist: DashboardWorkItem[]
+  roleQueues: DashboardQueueItem[]
+}) {
+  const items: DashboardNextActionItem[] = [
+    ...params.alerts.slice(0, 3).map((item) => ({
+      id: `alert-${item.id}`,
+      sourceLabel: 'Alert',
+      domain: item.domain,
+      title: item.title,
+      detail: item.nextStep,
+      actionLabel: getDashboardNextActionLabel(item.href, item.actionLabel),
+      href: item.href,
+      tone: getAlertTone(item.severity),
+    })),
+    ...params.worklist.slice(0, 2).map((item) => ({
+      id: `worklist-${item.id}`,
+      sourceLabel: 'List Kerja',
+      domain: item.domain,
+      title: item.title,
+      detail: item.detail,
+      actionLabel: getDashboardNextActionLabel(item.href),
+      href: item.href,
+      tone: getWorklistTone(item.priority),
+    })),
+    ...params.roleQueues.slice(0, 2).map((item) => ({
+      id: `queue-${item.title}-${item.href}`,
+      sourceLabel: 'Queue',
+      domain: 'Role Aktif',
+      title: item.title,
+      detail: `${item.count} item aktif. ${item.description}`,
+      actionLabel: getDashboardNextActionLabel(item.href),
+      href: item.href,
+      tone: getQueueTone(item.accent),
+    })),
+  ]
+
+  const seen = new Set<string>()
+
+  return items.filter((item) => {
+    if (!canAccessDashboardHref(params.role, item.href)) {
+      return false
+    }
+
+    const key = `${item.href}::${item.title}`
+    if (seen.has(key)) {
+      return false
+    }
+
+    seen.add(key)
+    return true
+  })
+}
+
+function canAccessBillingContext(role: AppRole) {
+  return canAccessPath(role, '/billing')
+}
+
+function canAccessHrContext(role: AppRole) {
+  return canAccessPath(role, '/hr')
+}
+
+function canAccessSupervisorContext(role: AppRole) {
+  return canAccessPath(role, '/customers/cs-admin')
+}
+
+function isRoleSafeDashboardText(role: AppRole, text?: string | null) {
+  const normalized = String(text ?? '').trim().toLowerCase()
+  if (!normalized) {
+    return true
+  }
+
+  if (!canAccessBillingContext(role) && /(billing|collection|invoice|penagihan)/i.test(normalized)) {
+    return false
+  }
+
+  if (!canAccessHrContext(role) && /(hr|daily activity|approval harian|approval supervisor)/i.test(normalized)) {
+    return false
+  }
+
+  if (!canAccessSupervisorContext(role) && /(supervisor cs|admin cs|cs admin)/i.test(normalized)) {
+    return false
+  }
+
+  return true
+}
+
+function getDashboardQueueFallbackHref(role: AppRole, item: DashboardQueueItem) {
+  const title = `${item.title} ${item.description}`.toLowerCase()
+
+  if ((title.includes('sla') || title.includes('ticket') || title.includes('tt')) && canAccessSupportLane(role, 'tt')) {
+    return title.includes('sla') && canAccessSupportLane(role, 'sla')
+      ? buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })
+      : buildSupportLaneHref('tt', { focus: 'OPEN_TICKETS' })
+  }
+  if (title.includes('isolir') && canAccessSupportLane(role, 'isolations')) {
+    return buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' })
+  }
+  if ((title.includes('dismantle') || title.includes('lapangan')) && canAccessSupportLane(role, 'dismantle')) {
+    return buildSupportLaneHref('dismantle')
+  }
+  if ((title.includes('odp') || title.includes('port') || title.includes('inventory')) && canAccessDashboardHref(role, '/inventory')) {
+    return '/inventory'
+  }
+  if ((title.includes('lead') || title.includes('order') || title.includes('coverage')) && canAccessDashboardHref(role, '/sales')) {
+    return '/sales'
+  }
+  if (title.includes('customer') && canAccessDashboardHref(role, '/customers')) {
+    return '/customers'
+  }
+  if ((title.includes('approval') || title.includes('daily')) && canAccessDashboardHref(role, '/dashboard/daily-activity')) {
+    return '/dashboard/daily-activity'
+  }
+  if (title.includes('import') && canAccessDashboardHref(role, '/import')) {
+    return '/import'
+  }
+  return getDefaultLandingPath(role)
+}
+
+function sanitizeDashboardQueueItem(role: AppRole, item: DashboardQueueItem): DashboardQueueItem {
+  const needsSpecificSupportFallback =
+    item.href === '/support' && /(ticket|tt|sla|isolir|dismantle|lapangan)/i.test(`${item.title} ${item.description}`)
+  const href =
+    !needsSpecificSupportFallback && canAccessDashboardHref(role, item.href)
+      ? item.href
+      : getDashboardQueueFallbackHref(role, item)
+  const description = isRoleSafeDashboardText(role, item.description)
+    ? item.description
+    : 'Queue ini tetap relevan untuk role Anda, dengan konteks lintas tim disederhanakan.'
+
+  return {
+    ...item,
+    href,
+    description,
+  }
+}
+
+function sanitizeAffectedModules(role: AppRole, modules: string[]) {
+  return modules.filter((item) => isRoleSafeDashboardText(role, item))
+}
+
+function getDashboardAlertFallback(role: AppRole, item: DashboardAlertItem) {
+  const haystack = `${item.domain} ${item.title} ${item.detail}`.toLowerCase()
+
+  if ((haystack.includes('import') || haystack.includes('batch')) && canAccessDashboardHref(role, '/import')) {
+    return { href: '/import', actionLabel: 'Review Import' }
+  }
+  if ((haystack.includes('daily') || haystack.includes('approval')) && canAccessDashboardHref(role, '/dashboard/daily-activity')) {
+    return { href: '/dashboard/daily-activity', actionLabel: 'Buka Approval' }
+  }
+  if ((haystack.includes('isolir') || haystack.includes('restore')) && canAccessSupportLane(role, 'isolations')) {
+    return { href: buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' }), actionLabel: 'Buka Isolir' }
+  }
+  if ((haystack.includes('ticket') || haystack.includes('sla') || haystack.includes('tt')) && canAccessSupportLane(role, 'tt')) {
+    return canAccessSupportLane(role, 'sla')
+      ? { href: buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' }), actionLabel: 'Kontrol SLA' }
+      : { href: buildSupportLaneHref('tt', { focus: 'OPEN_TICKETS' }), actionLabel: 'Buka Ticket' }
+  }
+  if ((haystack.includes('billing') || haystack.includes('invoice')) && canAccessDashboardHref(role, '/billing')) {
+    return { href: '/billing', actionLabel: 'Buka Billing' }
+  }
+
+  const fallbackHref =
+    ['/dashboard', '/support/tt', '/support/isolations', '/inventory', '/sales']
+      .find((candidate) => canAccessDashboardHref(role, candidate))
+      ?? getDefaultLandingPath(role)
+
+  return {
+    href: fallbackHref,
+    actionLabel: 'Buka Detail',
+  }
+}
+
+function sanitizeDashboardAlertItem(role: AppRole, item: DashboardAlertItem): DashboardAlertItem | null {
+  const haystack = `${item.domain} ${item.title} ${item.detail} ${item.nextStep}`.toLowerCase()
+  const isBillingAlert = /(billing|invoice|collection|penagihan)/i.test(haystack)
+  const isApprovalAlert = /(daily activity|approval)/i.test(haystack)
+  const isImportAlert = /(import|batch)/i.test(haystack)
+
+  if (isBillingAlert && !canAccessBillingContext(role)) {
+    return null
+  }
+
+  if (isApprovalAlert && !canPerformAction(role, 'daily_activity', 'approve')) {
+    return null
+  }
+
+  if (isImportAlert && !canAccessDashboardHref(role, '/import')) {
+    return null
+  }
+
+  const primaryAction = canAccessDashboardHref(role, item.href)
+    ? { href: item.href, actionLabel: item.actionLabel }
+    : getDashboardAlertFallback(role, item)
+
+  const detail = isRoleSafeDashboardText(role, item.detail)
+    ? item.detail
+    : 'Alert ini tetap relevan untuk role Anda, dengan detail lintas tim disederhanakan.'
+  const impactSummary = isRoleSafeDashboardText(role, item.impactSummary)
+    ? item.impactSummary
+    : 'Sebagian dampak lintas domain disembunyikan agar fokus tetap sesuai scope role aktif.'
+  const nextStep = isRoleSafeDashboardText(role, item.nextStep)
+    ? item.nextStep
+    : 'Buka queue atau modul yang tersedia untuk role Anda lalu tindak lanjuti prioritas operasional yang aman.'
+  const affectedModules = sanitizeAffectedModules(role, item.affectedModules)
+  const domain = isRoleSafeDashboardText(role, item.domain) ? item.domain : 'Operasional'
+
+  const isCompletelyHidden =
+    !affectedModules.length &&
+    !isRoleSafeDashboardText(role, item.domain) &&
+    !isRoleSafeDashboardText(role, item.detail) &&
+    !isRoleSafeDashboardText(role, item.impactSummary) &&
+    !isRoleSafeDashboardText(role, item.nextStep)
+
+  if (isCompletelyHidden && !canAccessDashboardHref(role, primaryAction.href)) {
+    return null
+  }
+
+  return {
+    ...item,
+    domain,
+    detail,
+    impactSummary,
+    nextStep,
+    affectedModules,
+    href: primaryAction.href,
+    actionLabel: primaryAction.actionLabel,
+  }
+}
+
+function sanitizeDashboardQueueItems(role: AppRole, items: DashboardQueueItem[]) {
+  return items.map((item) => sanitizeDashboardQueueItem(role, item))
+}
+
+function sanitizeDashboardAlerts(role: AppRole, items: DashboardAlertItem[]) {
+  return items
+    .map((item) => sanitizeDashboardAlertItem(role, item))
+    .filter(Boolean) as DashboardAlertItem[]
 }
 
 type DashboardIsolationRow = {
@@ -209,7 +717,7 @@ type DashboardIsolationRow = {
   customerName: string
   status: string
   reason: string | null
-  isolationDate: string
+  isolationDate: string | null
 }
 
 type DashboardWorkOrderRow = {
@@ -262,8 +770,8 @@ type DashboardIsolationDecisionRow = {
   customerName: string
   serviceNo: string | null
   reason: string | null
-  isolationDate: string
-  agingDays: number
+  isolationDate: string | null
+  agingDays: number | null
 }
 
 type DashboardDismantleDecisionRow = {
@@ -271,10 +779,10 @@ type DashboardDismantleDecisionRow = {
   isolationId: number
   customerName: string
   serviceNo: string | null
-  isolationDate: string
+  isolationDate: string | null
   transferNote: string | null
-  transferredAt: string
-  agingDays: number
+  transferredAt: string | null
+  agingDays: number | null
 }
 
 type DashboardHighRiskTicketRow = {
@@ -298,7 +806,72 @@ type SupportAuditActivityRow = {
   entityRef: string
   customerName: string | null
   detailText: string | null
-  happenedAt: string
+  happenedAt: string | null
+}
+
+type DashboardPortIssueQueryParts = {
+  serviceSubscriptionJoin: string
+  customerJoin: string
+  customerCodeExpression: string
+  serviceNoExpression: string
+  installedAtExpression: string
+}
+
+type DashboardSupportTicketServiceQueryParts = {
+  serviceSubscriptionJoin: string
+  serviceNoExpression: string
+}
+
+type DashboardSalesOrderQueryParts = {
+  leadJoin: string
+  customerJoin: string
+  customerNameExpression: string
+  marketingNameExpression: string
+  requestDateExpression: string
+  sourceExpression: string
+  sourceFilterEnabled: boolean
+  orderByExpression: string
+}
+
+type DashboardWorkOrderQueryParts = {
+  salesOrderJoin: string
+  leadJoin: string
+  customerJoin: string
+  customerNameExpression: string
+  workTypeExpression: string
+  technicianNameExpression: string
+  scheduledAtExpression: string
+  orderByExpression: string
+}
+
+type DashboardSalesSurveyQueryParts = {
+  leadJoin: string
+  customerJoin: string
+  customerNameExpression: string
+  sourceExpression: string
+  scheduledAtExpression: string
+  orderByExpression: string
+}
+
+type DashboardCustomerCompletenessQueryParts = {
+  addressJoin: string
+  customerCodeExpression: string
+  customerNameExpression: string
+  phoneExpression: string
+  emailExpression: string
+  addressExpression: string
+  whereClause: string
+  enabled: boolean
+}
+
+type DashboardBillingAuditQueryParts = {
+  subscriptionJoin: string
+  customerJoin: string
+  customerNameExpression: string
+  paymentMethodExpression: string
+  paymentDateExpression: string
+  actionTypeExpression: string
+  actionAtExpression: string
 }
 
 type InventoryAuditActivityRow = {
@@ -608,8 +1181,350 @@ async function hasReviewDbColumn(tableName: string, columnName: string) {
   return exists
 }
 
+async function getDashboardPortIssueQueryParts(): Promise<DashboardPortIssueQueryParts> {
+  const [
+    hasPortSubscriptionId,
+    hasPortCustomerId,
+    hasPortInstalledAt,
+    hasSubscriptionId,
+    hasSubscriptionServiceNo,
+    hasCustomerId,
+    hasCustomerCode,
+  ] = await Promise.all([
+    hasReviewDbColumn('network_odp_ports', 'subscription_id'),
+    hasReviewDbColumn('network_odp_ports', 'customer_id'),
+    hasReviewDbColumn('network_odp_ports', 'installed_at'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'customer_code'),
+  ])
+
+  return {
+    serviceSubscriptionJoin:
+      hasPortSubscriptionId && hasSubscriptionId
+        ? `
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = nop.subscription_id`
+        : '',
+    customerJoin:
+      hasPortCustomerId && hasCustomerId
+        ? `
+        LEFT JOIN crm_customers c
+          ON c.id = nop.customer_id`
+        : '',
+    customerCodeExpression: hasPortCustomerId && hasCustomerId && hasCustomerCode ? 'c.customer_code' : 'NULL',
+    serviceNoExpression: hasPortSubscriptionId && hasSubscriptionId && hasSubscriptionServiceNo ? 'ss.service_no' : 'NULL',
+    installedAtExpression: hasPortInstalledAt ? 'CAST(nop.installed_at AS CHAR)' : 'NULL',
+  }
+}
+
+async function getDashboardSupportTicketServiceQueryParts(): Promise<DashboardSupportTicketServiceQueryParts> {
+  const [hasTicketSubscriptionId, hasSubscriptionId, hasSubscriptionServiceNo] = await Promise.all([
+    hasReviewDbColumn('support_trouble_tickets', 'subscription_id'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+  ])
+
+  return {
+    serviceSubscriptionJoin:
+      hasTicketSubscriptionId && hasSubscriptionId
+        ? `
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = support_trouble_tickets.subscription_id`
+        : '',
+    serviceNoExpression:
+      hasTicketSubscriptionId && hasSubscriptionId && hasSubscriptionServiceNo ? 'ss.service_no' : 'NULL',
+  }
+}
+
+async function getDashboardCustomerCompletenessQueryParts(): Promise<DashboardCustomerCompletenessQueryParts> {
+  const [
+    hasCustomerId,
+    hasCustomerCode,
+    hasCustomerFullName,
+    hasCustomerPhone,
+    hasCustomerEmail,
+    hasCustomerAddressId,
+    hasCustomerAddressCustomerId,
+    hasCustomerAddressIsPrimary,
+    hasCustomerAddressAddress,
+  ] = await Promise.all([
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'customer_code'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+    hasReviewDbColumn('crm_customers', 'phone'),
+    hasReviewDbColumn('crm_customers', 'email'),
+    hasReviewDbColumn('crm_customer_addresses', 'id'),
+    hasReviewDbColumn('crm_customer_addresses', 'customer_id'),
+    hasReviewDbColumn('crm_customer_addresses', 'is_primary'),
+    hasReviewDbColumn('crm_customer_addresses', 'address'),
+  ])
+
+  const canJoinAddress = hasCustomerId && hasCustomerAddressCustomerId
+  const addressExpression = canJoinAddress && hasCustomerAddressAddress ? 'a.address' : 'NULL'
+
+  return {
+    addressJoin: canJoinAddress
+      ? `
+        LEFT JOIN crm_customer_addresses a
+          ON a.customer_id = c.id${hasCustomerAddressIsPrimary ? `
+          AND a.is_primary = 1` : ''}`
+      : '',
+    customerCodeExpression: hasCustomerCode ? 'c.customer_code' : 'NULL',
+    customerNameExpression: hasCustomerFullName ? 'c.full_name' : "'Customer belum terpetakan'",
+    phoneExpression: hasCustomerPhone ? 'c.phone' : 'NULL',
+    emailExpression: hasCustomerEmail ? 'c.email' : 'NULL',
+    addressExpression,
+    whereClause: [
+      hasCustomerPhone ? `COALESCE(TRIM(c.phone), '') = ''` : '1 = 0',
+      hasCustomerEmail ? `COALESCE(TRIM(c.email), '') = ''` : '1 = 0',
+      addressExpression !== 'NULL' ? `COALESCE(TRIM(${addressExpression}), '') = ''` : '1 = 0',
+    ].join(`
+          OR `),
+    enabled: hasCustomerId && hasCustomerFullName,
+  }
+}
+
+async function getDashboardSalesOrderQueryParts(): Promise<DashboardSalesOrderQueryParts> {
+  const [
+    hasOrderLeadId,
+    hasOrderCustomerId,
+    hasOrderMarketingName,
+    hasOrderRequestDate,
+    hasOrderCreatedAt,
+    hasLeadId,
+    hasLeadCustomerName,
+    hasLeadSource,
+    hasCustomerId,
+    hasCustomerFullName,
+  ] = await Promise.all([
+    hasReviewDbColumn('sales_orders', 'lead_id'),
+    hasReviewDbColumn('sales_orders', 'customer_id'),
+    hasReviewDbColumn('sales_orders', 'marketing_name'),
+    hasReviewDbColumn('sales_orders', 'request_date'),
+    hasReviewDbColumn('sales_orders', 'created_at'),
+    hasReviewDbColumn('sales_leads', 'id'),
+    hasReviewDbColumn('sales_leads', 'customer_name'),
+    hasReviewDbColumn('sales_leads', 'source'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+  ])
+
+  const canJoinLead = hasOrderLeadId && hasLeadId
+  const canJoinCustomer = hasOrderCustomerId && hasCustomerId
+
+  return {
+    leadJoin: canJoinLead
+      ? `
+        LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id`
+      : '',
+    customerJoin: canJoinCustomer
+      ? `
+        LEFT JOIN crm_customers c
+          ON c.id = so.customer_id`
+      : '',
+    customerNameExpression:
+      canJoinLead && hasLeadCustomerName
+        ? `COALESCE(sl.customer_name, ${canJoinCustomer && hasCustomerFullName ? 'c.full_name' : "'Customer belum terpetakan'"})`
+        : canJoinCustomer && hasCustomerFullName
+          ? `COALESCE(c.full_name, 'Customer belum terpetakan')`
+          : `'Customer belum terpetakan'`,
+    marketingNameExpression: hasOrderMarketingName ? 'so.marketing_name' : 'NULL',
+    requestDateExpression: hasOrderRequestDate ? 'CAST(so.request_date AS CHAR)' : 'NULL',
+    sourceExpression: canJoinLead && hasLeadSource ? 'sl.source' : 'NULL',
+    sourceFilterEnabled: canJoinLead && hasLeadSource,
+    orderByExpression:
+      hasOrderRequestDate && hasOrderCreatedAt
+        ? 'COALESCE(so.request_date, so.created_at) DESC, so.id DESC'
+        : hasOrderRequestDate
+          ? 'so.request_date DESC, so.id DESC'
+          : hasOrderCreatedAt
+            ? 'so.created_at DESC, so.id DESC'
+            : 'so.id DESC',
+  }
+}
+
+async function getDashboardWorkOrderQueryParts(): Promise<DashboardWorkOrderQueryParts> {
+  const [
+    hasWorkOrderSalesOrderId,
+    hasWorkOrderType,
+    hasWorkOrderTechnicianName,
+    hasWorkOrderScheduledAt,
+    hasWorkOrderCreatedAt,
+    hasSalesOrderId,
+    hasSalesOrderLeadId,
+    hasSalesOrderCustomerId,
+    hasLeadId,
+    hasLeadCustomerName,
+    hasCustomerId,
+    hasCustomerFullName,
+  ] = await Promise.all([
+    hasReviewDbColumn('service_work_orders', 'sales_order_id'),
+    hasReviewDbColumn('service_work_orders', 'work_type'),
+    hasReviewDbColumn('service_work_orders', 'technician_name'),
+    hasReviewDbColumn('service_work_orders', 'scheduled_at'),
+    hasReviewDbColumn('service_work_orders', 'created_at'),
+    hasReviewDbColumn('sales_orders', 'id'),
+    hasReviewDbColumn('sales_orders', 'lead_id'),
+    hasReviewDbColumn('sales_orders', 'customer_id'),
+    hasReviewDbColumn('sales_leads', 'id'),
+    hasReviewDbColumn('sales_leads', 'customer_name'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+  ])
+
+  const canJoinSalesOrder = hasWorkOrderSalesOrderId && hasSalesOrderId
+  const canJoinLead = canJoinSalesOrder && hasSalesOrderLeadId && hasLeadId
+  const canJoinCustomer = canJoinSalesOrder && hasSalesOrderCustomerId && hasCustomerId
+
+  return {
+    salesOrderJoin: canJoinSalesOrder
+      ? `
+        LEFT JOIN sales_orders so
+          ON so.id = swo.sales_order_id`
+      : '',
+    leadJoin: canJoinLead
+      ? `
+        LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id`
+      : '',
+    customerJoin: canJoinCustomer
+      ? `
+        LEFT JOIN crm_customers c
+          ON c.id = so.customer_id`
+      : '',
+    customerNameExpression:
+      canJoinLead && hasLeadCustomerName
+        ? `COALESCE(sl.customer_name, ${canJoinCustomer && hasCustomerFullName ? 'c.full_name' : "'Customer belum terpetakan'"})`
+        : canJoinCustomer && hasCustomerFullName
+          ? `COALESCE(c.full_name, 'Customer belum terpetakan')`
+          : `'Customer belum terpetakan'`,
+    workTypeExpression: hasWorkOrderType ? 'swo.work_type' : "'UNKNOWN'",
+    technicianNameExpression: hasWorkOrderTechnicianName ? 'swo.technician_name' : 'NULL',
+    scheduledAtExpression: hasWorkOrderScheduledAt ? 'CAST(swo.scheduled_at AS CHAR)' : 'NULL',
+    orderByExpression:
+      hasWorkOrderScheduledAt && hasWorkOrderCreatedAt
+        ? 'COALESCE(swo.scheduled_at, swo.created_at) DESC, swo.id DESC'
+        : hasWorkOrderScheduledAt
+          ? 'swo.scheduled_at DESC, swo.id DESC'
+          : hasWorkOrderCreatedAt
+            ? 'swo.created_at DESC, swo.id DESC'
+            : 'swo.id DESC',
+  }
+}
+
+async function getDashboardSalesSurveyQueryParts(): Promise<DashboardSalesSurveyQueryParts> {
+  const [
+    hasSurveyLeadId,
+    hasSurveyCustomerId,
+    hasSurveyScheduledAt,
+    hasSurveyCreatedAt,
+    hasLeadId,
+    hasLeadCustomerName,
+    hasLeadSource,
+    hasCustomerId,
+    hasCustomerFullName,
+  ] = await Promise.all([
+    hasReviewDbColumn('sales_surveys', 'lead_id'),
+    hasReviewDbColumn('sales_surveys', 'customer_id'),
+    hasReviewDbColumn('sales_surveys', 'scheduled_at'),
+    hasReviewDbColumn('sales_surveys', 'created_at'),
+    hasReviewDbColumn('sales_leads', 'id'),
+    hasReviewDbColumn('sales_leads', 'customer_name'),
+    hasReviewDbColumn('sales_leads', 'source'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+  ])
+
+  const canJoinLead = hasSurveyLeadId && hasLeadId
+  const canJoinCustomer = hasSurveyCustomerId && hasCustomerId
+
+  return {
+    leadJoin: canJoinLead
+      ? `
+        LEFT JOIN sales_leads sl
+          ON sl.id = ss.lead_id`
+      : '',
+    customerJoin: canJoinCustomer
+      ? `
+        LEFT JOIN crm_customers c
+          ON c.id = ss.customer_id`
+      : '',
+    customerNameExpression:
+      canJoinLead && hasLeadCustomerName
+        ? `COALESCE(sl.customer_name, ${canJoinCustomer && hasCustomerFullName ? 'c.full_name' : "'Customer belum terpetakan'"})`
+        : canJoinCustomer && hasCustomerFullName
+          ? `COALESCE(c.full_name, 'Customer belum terpetakan')`
+          : `'Customer belum terpetakan'`,
+    sourceExpression: canJoinLead && hasLeadSource ? 'sl.source' : 'NULL',
+    scheduledAtExpression:
+      hasSurveyScheduledAt && hasSurveyCreatedAt
+        ? 'CAST(COALESCE(ss.scheduled_at, ss.created_at) AS CHAR)'
+        : hasSurveyScheduledAt
+          ? 'CAST(ss.scheduled_at AS CHAR)'
+          : hasSurveyCreatedAt
+            ? 'CAST(ss.created_at AS CHAR)'
+            : 'NULL',
+    orderByExpression:
+      hasSurveyScheduledAt && hasSurveyCreatedAt
+        ? 'COALESCE(ss.scheduled_at, ss.created_at) DESC, ss.id DESC'
+        : hasSurveyScheduledAt
+          ? 'ss.scheduled_at DESC, ss.id DESC'
+          : hasSurveyCreatedAt
+            ? 'ss.created_at DESC, ss.id DESC'
+            : 'ss.id DESC',
+  }
+}
+
+async function getDashboardBillingAuditQueryParts(): Promise<DashboardBillingAuditQueryParts> {
+  const [
+    hasInvoiceSubscriptionId,
+    hasSubscriptionId,
+    hasSubscriptionCustomerId,
+    hasCustomerId,
+    hasCustomerFullName,
+    hasPaymentMethod,
+    hasPaymentDate,
+    hasCollectionActionType,
+    hasCollectionActionAt,
+  ] = await Promise.all([
+    hasReviewDbColumn('billing_invoices', 'subscription_id'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'customer_id'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+    hasReviewDbColumn('billing_payments', 'payment_method'),
+    hasReviewDbColumn('billing_payments', 'payment_date'),
+    hasReviewDbColumn('billing_collection_actions', 'action_type'),
+    hasReviewDbColumn('billing_collection_actions', 'action_at'),
+  ])
+
+  const canJoinSubscription = hasInvoiceSubscriptionId && hasSubscriptionId
+  const canJoinCustomer = canJoinSubscription && hasSubscriptionCustomerId && hasCustomerId
+
+  return {
+    subscriptionJoin: canJoinSubscription
+      ? `
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = bi.subscription_id`
+      : '',
+    customerJoin: canJoinCustomer
+      ? `
+        LEFT JOIN crm_customers c
+          ON c.id = ss.customer_id`
+      : '',
+    customerNameExpression: canJoinCustomer && hasCustomerFullName ? 'c.full_name' : 'NULL',
+    paymentMethodExpression: hasPaymentMethod ? 'bp.payment_method' : 'NULL',
+    paymentDateExpression: hasPaymentDate ? 'bp.payment_date' : 'NULL',
+    actionTypeExpression: hasCollectionActionType ? 'bca.action_type' : 'NULL',
+    actionAtExpression: hasCollectionActionAt ? 'bca.action_at' : 'NULL',
+  }
+}
+
 function buildRoleQueues(role: AppRole, summary: DashboardSummary): DashboardQueueItem[] {
-  return getMockRoleQueues(role, summary)
+  return sanitizeDashboardQueueItems(role, getMockRoleQueues(role, summary))
 }
 
 function buildMockDashboardAlerts(params: {
@@ -703,7 +1618,7 @@ function buildMockDashboardAlerts(params: {
     })
   }
 
-  return items.slice(0, 4)
+  return sanitizeDashboardAlerts(params.role, items).slice(0, 4)
 }
 
 function getMonthRange(filters: DashboardPageFilters) {
@@ -889,7 +1804,7 @@ function buildMockOperationalCards(summary: DashboardSummary, filters: Dashboard
     },
   ]
 
-  return filters.division === 'ALL' ? cards : cards.filter((card) => card.key === filters.division)
+  return sanitizeDashboardOperationalCards('SUPER_ADMIN', cards, filters)
 }
 
 async function getReviewDbOperationalCards(
@@ -899,8 +1814,356 @@ async function getReviewDbOperationalCards(
   const { startText, endText } = getMonthRange(filters)
   const digitalSources = ['DIGITAL', 'FACEBOOK', 'INSTAGRAM', 'TIKTOK', 'GOOGLE', 'WEBSITE', 'META ADS']
   const digitalSourceConditions = digitalSources.map(() => '?').join(', ')
-  const hasSupportSlaDueAt = await hasReviewDbColumn('support_trouble_tickets', 'sla_due_at')
   await ensureSupportDismantleQueueTable()
+  await ensureSupportTroubleTicketProgressTable()
+  await ensureSupportTroubleTicketEscalationTable()
+
+  const [
+    hasSupportSlaDueAt,
+    hasSupportSlaTroubleType,
+    hasSupportSlaDurationDays,
+    hasProgressId,
+    hasProgressTicketId,
+    hasProgressStatus,
+    hasProgressFollowUpAt,
+    hasProgressUpdatedAt,
+    hasEscalationId,
+    hasEscalationTicketId,
+    hasEscalationEscalatedAt,
+    hasSalesLeadStatus,
+    hasSalesLeadSource,
+    hasSalesOrderRequestDate,
+    hasSalesOrderLeadId,
+    hasSalesSubscriptionActivatedAt,
+    hasSalesSurveyLeadId,
+    hasSalesSurveyScheduledAt,
+    hasSalesSurveyCreatedAt,
+    hasBillingInvoiceId,
+    hasBillingInvoiceStatus,
+    hasBillingInvoiceDueDate,
+    hasBillingInvoicePaidAmount,
+    hasBillingInvoiceTotalAmount,
+    hasBillingInvoiceBillingYear,
+    hasBillingInvoiceBillingMonth,
+    hasBillingInvoiceCollectionStatus,
+    hasBillingInvoiceSuspendCandidate,
+    hasBillingCollectionActionId,
+    hasBillingCollectionActionInvoiceId,
+    hasBillingCollectionActionType,
+    hasBillingCollectionActionStatus,
+    hasBillingCollectionActionDueFollowUpAt,
+    hasInventoryItemStatus,
+    hasInventoryMovementAt,
+    hasInventoryRequestStatus,
+  ] = await Promise.all([
+    hasReviewDbColumn('support_trouble_tickets', 'sla_due_at'),
+    hasReviewDbColumn('support_trouble_ticket_sla', 'trouble_type'),
+    hasReviewDbColumn('support_trouble_ticket_sla', 'duration_days'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'id'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'trouble_ticket_id'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'progress_status'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'follow_up_at'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'updated_at'),
+    hasReviewDbColumn('support_trouble_ticket_escalation_logs', 'id'),
+    hasReviewDbColumn('support_trouble_ticket_escalation_logs', 'trouble_ticket_id'),
+    hasReviewDbColumn('support_trouble_ticket_escalation_logs', 'escalated_at'),
+    hasReviewDbColumn('sales_leads', 'status'),
+    hasReviewDbColumn('sales_leads', 'source'),
+    hasReviewDbColumn('sales_orders', 'request_date'),
+    hasReviewDbColumn('sales_orders', 'lead_id'),
+    hasReviewDbColumn('service_subscriptions', 'activated_at'),
+    hasReviewDbColumn('sales_surveys', 'lead_id'),
+    hasReviewDbColumn('sales_surveys', 'scheduled_at'),
+    hasReviewDbColumn('sales_surveys', 'created_at'),
+    hasReviewDbColumn('billing_invoices', 'id'),
+    hasReviewDbColumn('billing_invoices', 'invoice_status'),
+    hasReviewDbColumn('billing_invoices', 'due_date'),
+    hasReviewDbColumn('billing_invoices', 'paid_amount'),
+    hasReviewDbColumn('billing_invoices', 'total_amount'),
+    hasReviewDbColumn('billing_invoices', 'billing_year'),
+    hasReviewDbColumn('billing_invoices', 'billing_month'),
+    hasReviewDbColumn('billing_invoices', 'collection_status'),
+    hasReviewDbColumn('billing_invoices', 'suspend_candidate'),
+    hasReviewDbColumn('billing_collection_actions', 'id'),
+    hasReviewDbColumn('billing_collection_actions', 'invoice_id'),
+    hasReviewDbColumn('billing_collection_actions', 'action_type'),
+    hasReviewDbColumn('billing_collection_actions', 'action_status'),
+    hasReviewDbColumn('billing_collection_actions', 'due_follow_up_at'),
+    hasReviewDbColumn('inventory_items', 'status'),
+    hasReviewDbColumn('inventory_stock_movements', 'movement_at'),
+    hasReviewDbColumn('inventory_item_requests', 'request_status'),
+  ])
+
+  const canJoinSupportSla = hasSupportSlaTroubleType && hasSupportSlaDurationDays
+  const canUseProgressLogs =
+    hasProgressId &&
+    hasProgressTicketId &&
+    hasProgressStatus &&
+    hasProgressFollowUpAt &&
+    hasProgressUpdatedAt
+  const canUseEscalationLogs = hasEscalationId && hasEscalationTicketId && hasEscalationEscalatedAt
+
+  const supportSlaJoinClause = canJoinSupportSla
+    ? `LEFT JOIN support_trouble_ticket_sla sla
+              ON UPPER(TRIM(sla.trouble_type)) = UPPER(TRIM(stt.type))`
+    : `LEFT JOIN (
+              SELECT
+                NULL AS trouble_type,
+                NULL AS duration_days
+            ) sla
+              ON 1 = 0`
+
+  const latestProgressJoinClause = canUseProgressLogs
+    ? `LEFT JOIN (
+              SELECT
+                progress.trouble_ticket_id,
+                progress.progress_status,
+                progress.follow_up_at,
+                progress.updated_at
+              FROM support_trouble_ticket_progress_logs progress
+              INNER JOIN (
+                SELECT trouble_ticket_id, MAX(id) AS latestId
+                FROM support_trouble_ticket_progress_logs
+                GROUP BY trouble_ticket_id
+              ) latest_progress
+                ON latest_progress.latestId = progress.id
+            ) latest
+              ON latest.trouble_ticket_id = stt.id`
+    : `LEFT JOIN (
+              SELECT
+                NULL AS trouble_ticket_id,
+                NULL AS progress_status,
+                NULL AS follow_up_at,
+                NULL AS updated_at
+            ) latest
+              ON 1 = 0`
+
+  const latestEscalationJoinClause = canUseEscalationLogs
+    ? `LEFT JOIN (
+              SELECT
+                escalation.trouble_ticket_id,
+                escalation.escalated_at
+              FROM support_trouble_ticket_escalation_logs escalation
+              INNER JOIN (
+                SELECT trouble_ticket_id, MAX(id) AS latestId
+                FROM support_trouble_ticket_escalation_logs
+                GROUP BY trouble_ticket_id
+              ) latest_escalation
+                ON latest_escalation.latestId = escalation.id
+            ) escalations
+              ON escalations.trouble_ticket_id = stt.id`
+    : `LEFT JOIN (
+              SELECT
+                NULL AS trouble_ticket_id,
+                NULL AS escalated_at
+            ) escalations
+              ON 1 = 0`
+
+  const salesActiveLeadFilter = hasSalesLeadStatus
+    ? `
+            FROM sales_leads
+            WHERE COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')`
+    : `
+            FROM sales_leads`
+  const salesMonthlyOrderFilter = hasSalesOrderRequestDate
+    ? `
+            FROM sales_orders
+            WHERE request_date >= ?
+              AND request_date < ?`
+    : `
+            FROM (SELECT NULL AS request_date) sales_orders
+            WHERE 1 = 0`
+  const salesMonthlyOrderArgs = hasSalesOrderRequestDate ? [startText, endText] : []
+  const salesMonthlyActivationFilter = hasSalesSubscriptionActivatedAt
+    ? `
+            FROM service_subscriptions
+            WHERE activated_at IS NOT NULL
+              AND activated_at >= ?
+              AND activated_at < ?`
+    : `
+            FROM (SELECT NULL AS activated_at) service_subscriptions
+            WHERE 1 = 0`
+  const salesMonthlyActivationArgs = hasSalesSubscriptionActivatedAt ? [startText, endText] : []
+
+  const digitalLeadFilter = hasSalesLeadSource
+    ? `
+            FROM sales_leads
+            WHERE UPPER(COALESCE(source, '')) IN (${digitalSourceConditions})`
+    : `
+            FROM (SELECT NULL AS source) sales_leads
+            WHERE 1 = 0`
+  const digitalLeadArgs = hasSalesLeadSource ? [...digitalSources] : []
+  const digitalOrderFilter =
+    hasSalesLeadSource && hasSalesOrderLeadId && hasSalesOrderRequestDate
+      ? `
+            FROM sales_orders so
+            JOIN sales_leads sl
+              ON sl.id = so.lead_id
+            WHERE UPPER(COALESCE(sl.source, '')) IN (${digitalSourceConditions})
+              AND so.request_date >= ?
+              AND so.request_date < ?`
+      : `
+            FROM (SELECT NULL AS request_date) sales_orders
+            WHERE 1 = 0`
+  const digitalOrderArgs =
+    hasSalesLeadSource && hasSalesOrderLeadId && hasSalesOrderRequestDate
+      ? [...digitalSources, startText, endText]
+      : []
+  const digitalSurveyDateExpression =
+    hasSalesSurveyScheduledAt && hasSalesSurveyCreatedAt
+      ? 'COALESCE(ss.scheduled_at, ss.created_at)'
+      : hasSalesSurveyScheduledAt
+        ? 'ss.scheduled_at'
+        : hasSalesSurveyCreatedAt
+          ? 'ss.created_at'
+          : null
+  const digitalSurveyFilter =
+    hasSalesLeadSource && hasSalesSurveyLeadId && digitalSurveyDateExpression
+      ? `
+            FROM sales_surveys ss
+            JOIN sales_leads sl
+              ON sl.id = ss.lead_id
+            WHERE UPPER(COALESCE(sl.source, '')) IN (${digitalSourceConditions})
+              AND ${digitalSurveyDateExpression} >= ?
+              AND ${digitalSurveyDateExpression} < ?`
+      : `
+            FROM (SELECT NULL AS id) sales_surveys
+            WHERE 1 = 0`
+  const digitalSurveyArgs =
+    hasSalesLeadSource && hasSalesSurveyLeadId && digitalSurveyDateExpression
+      ? [...digitalSources, startText, endText]
+      : []
+
+  const billingPeriodClauses: string[] = []
+  const billingPeriodArgs: unknown[] = []
+  if (hasBillingInvoiceBillingYear && hasBillingInvoiceBillingMonth) {
+    billingPeriodClauses.push('(bi.billing_year = ? AND bi.billing_month = ?)')
+    billingPeriodArgs.push(filters.year, filters.month)
+  }
+  if (hasBillingInvoiceDueDate) {
+    billingPeriodClauses.push('(bi.due_date >= ? AND bi.due_date < ?)')
+    billingPeriodArgs.push(startText, endText)
+  }
+  const billingPeriodWhere = billingPeriodClauses.length ? ` AND (${billingPeriodClauses.join(' OR ')})` : ''
+  const billingCollectionOpenFilter = hasBillingInvoiceCollectionStatus
+    ? ` AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') NOT IN ('WRITE_OFF', 'CLOSED')`
+    : ''
+  const billingBaseEnabled =
+    hasBillingInvoiceStatus && hasBillingInvoicePaidAmount && hasBillingInvoiceTotalAmount && billingPeriodClauses.length > 0
+  const billingOverdueCondition = `(
+                ${hasBillingInvoiceStatus ? `bi.invoice_status = 'OVERDUE'` : '1 = 0'}
+                OR (
+                  ${hasBillingInvoiceDueDate ? 'bi.due_date < CURRENT_DATE' : '1 = 0'}
+                  AND COALESCE(bi.paid_amount, 0) < COALESCE(bi.total_amount, 0)
+                  AND ${hasBillingInvoiceStatus ? `bi.invoice_status NOT IN ('PAID', 'CANCELLED')` : '1 = 0'}
+                )
+              )`
+  const canUseBillingLatestActions =
+    hasBillingCollectionActionId &&
+    hasBillingCollectionActionInvoiceId &&
+    hasBillingCollectionActionStatus &&
+    hasBillingInvoiceId
+  const billingLatestActionJoinClause = canUseBillingLatestActions
+    ? `JOIN (
+              SELECT
+                action_latest.invoice_id,
+                ${hasBillingCollectionActionType ? 'action_latest.action_type' : 'NULL'} AS action_type,
+                action_latest.action_status,
+                ${hasBillingCollectionActionDueFollowUpAt ? 'action_latest.due_follow_up_at' : 'NULL'} AS due_follow_up_at
+              FROM billing_collection_actions action_latest
+              INNER JOIN (
+                SELECT invoice_id, MAX(id) AS latestId
+                FROM billing_collection_actions
+                GROUP BY invoice_id
+              ) latest_ids
+                ON latest_ids.latestId = action_latest.id
+            ) latest
+              ON latest.invoice_id = bi.id`
+    : `JOIN (
+              SELECT
+                NULL AS invoice_id,
+                NULL AS action_type,
+                NULL AS action_status,
+                NULL AS due_follow_up_at
+            ) latest
+              ON 1 = 0`
+  const suspendCandidateConditions = [
+    hasBillingInvoiceSuspendCandidate ? `COALESCE(bi.suspend_candidate, 0) = 1` : '1 = 0',
+    canUseBillingLatestActions && hasBillingCollectionActionType
+      ? `COALESCE(UPPER(TRIM(latest.action_type)), '') = 'SUSPEND'`
+      : '1 = 0',
+    canUseBillingLatestActions && hasBillingCollectionActionType && hasBillingCollectionActionDueFollowUpAt
+      ? `(
+                  COALESCE(UPPER(TRIM(latest.action_type)), '') = 'PROMISE_TO_PAY'
+                  AND latest.due_follow_up_at IS NOT NULL
+                  AND latest.due_follow_up_at < CURRENT_TIMESTAMP
+                )`
+      : '1 = 0',
+  ]
+
+  const inventoryActiveItemFilter = hasInventoryItemStatus
+    ? `
+            FROM inventory_items
+            WHERE status = 'ACTIVE'`
+    : `
+            FROM inventory_items`
+  const inventoryMovementFilter = hasInventoryMovementAt
+    ? `
+            FROM inventory_stock_movements
+            WHERE movement_at >= ?
+              AND movement_at < ?`
+    : `
+            FROM (SELECT NULL AS movement_at) inventory_stock_movements
+            WHERE 1 = 0`
+  const inventoryMovementArgs = hasInventoryMovementAt ? [startText, endText] : []
+  const inventoryPendingRequestFilter = hasInventoryRequestStatus
+    ? `
+            FROM inventory_item_requests
+            WHERE UPPER(COALESCE(request_status, 'REQUEST')) = 'PENDING'`
+    : `
+            FROM (SELECT NULL AS request_status) inventory_item_requests
+            WHERE 1 = 0`
+
+  const supportSlaDueExpression = hasSupportSlaDueAt
+    ? `COALESCE(
+        stt.sla_due_at,
+        CASE
+          WHEN sla.duration_days IS NULL THEN NULL
+          ELSE DATE_ADD(stt.opened_at, INTERVAL sla.duration_days DAY)
+        END
+      )`
+    : `CASE
+        WHEN sla.duration_days IS NULL THEN NULL
+        ELSE DATE_ADD(stt.opened_at, INTERVAL sla.duration_days DAY)
+      END`
+
+  const [
+    hasIsolationStatus,
+    hasIsolationIsArchived,
+    hasDismantleHistoryClosedAt,
+  ] = await Promise.all([
+    hasReviewDbColumn('support_isolations', 'status'),
+    hasReviewDbColumn('support_isolations', 'is_archived'),
+    hasReviewDbColumn('support_dismantle_history', 'closed_at'),
+  ])
+  const isolationActiveFilter = hasIsolationStatus
+    ? `
+            FROM support_isolations
+            WHERE status = 'OPEN'${hasIsolationIsArchived ? `
+              AND is_archived = 0` : ''}`
+    : `
+            FROM (SELECT 0 AS id) support_isolations
+            WHERE 1 = 0`
+  const monthlyDismantleFilter = hasDismantleHistoryClosedAt
+    ? `
+            FROM support_dismantle_history
+            WHERE closed_at IS NOT NULL
+              AND closed_at >= ?
+              AND closed_at < ?`
+    : `
+            FROM (SELECT NULL AS closed_at) support_dismantle_history
+            WHERE 1 = 0`
+  const monthlyDismantleArgs = hasDismantleHistoryClosedAt ? [startText, endText] : []
 
   const [salesRows, csRows, nocRows, digitalRows, billingRows, hrRows, inventoryRows] = await Promise.all([
     runReviewDbQuery<DashboardSalesOperationalRow>(
@@ -908,24 +2171,18 @@ async function getReviewDbOperationalCards(
         SELECT
           (
             SELECT COUNT(*)
-            FROM sales_leads
-            WHERE COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')
+            ${salesActiveLeadFilter}
           ) AS activeLeads,
           (
             SELECT COUNT(*)
-            FROM sales_orders
-            WHERE request_date >= ?
-              AND request_date < ?
+            ${salesMonthlyOrderFilter}
           ) AS monthlyOrders,
           (
             SELECT COUNT(*)
-            FROM service_subscriptions
-            WHERE activated_at IS NOT NULL
-              AND activated_at >= ?
-              AND activated_at < ?
+            ${salesMonthlyActivationFilter}
           ) AS monthlyActivations
       `,
-      [startText, endText, startText, endText]
+      [...salesMonthlyOrderArgs, ...salesMonthlyActivationArgs]
     ),
     runReviewDbQuery<DashboardCsOperationalRow>(
       `
@@ -937,9 +2194,7 @@ async function getReviewDbOperationalCards(
           ) AS activeWorkOrders,
           (
             SELECT COUNT(*)
-            FROM support_isolations
-            WHERE status = 'OPEN'
-              AND is_archived = 0
+            ${isolationActiveFilter}
           ) AS activeIsolations,
           (
             SELECT COUNT(*)
@@ -947,55 +2202,73 @@ async function getReviewDbOperationalCards(
           ) AS openDismantles,
           (
             SELECT COUNT(*)
-            FROM support_dismantle_history
-            WHERE closed_at IS NOT NULL
-              AND closed_at >= ?
-              AND closed_at < ?
+            ${monthlyDismantleFilter}
           ) AS monthlyDismantles
       `,
-      [startText, endText]
+      monthlyDismantleArgs
     ),
     runReviewDbQuery<DashboardNocOperationalRow>(
-      hasSupportSlaDueAt
-        ? `
-            SELECT
-              (
-                SELECT COUNT(*)
-                FROM support_trouble_tickets
-                WHERE closed_at IS NULL
-                  AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
-              ) AS openTickets,
-              (
-                SELECT COUNT(*)
-                FROM support_trouble_tickets
-                WHERE closed_at IS NULL
-                  AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
-                  AND sla_due_at IS NOT NULL
-                  AND sla_due_at < CURRENT_TIMESTAMP
-              ) AS overdueTickets,
-              (
-                SELECT COUNT(*)
-                FROM support_trouble_tickets
-                WHERE opened_at >= ?
-                  AND opened_at < ?
-              ) AS monthlyOpenedTickets
-          `
-        : `
-            SELECT
-              (
-                SELECT COUNT(*)
-                FROM support_trouble_tickets
-                WHERE closed_at IS NULL
-                  AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
-              ) AS openTickets,
-              0 AS overdueTickets,
-              (
-                SELECT COUNT(*)
-                FROM support_trouble_tickets
-                WHERE opened_at >= ?
-                  AND opened_at < ?
-              ) AS monthlyOpenedTickets
-          `,
+      `
+        SELECT
+          (
+            SELECT COUNT(*)
+            FROM support_trouble_tickets stt
+            WHERE stt.closed_at IS NULL
+              AND COALESCE(UPPER(TRIM(stt.status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+          ) AS openTickets,
+          (
+            SELECT COUNT(*)
+            FROM support_trouble_tickets stt
+            ${supportSlaJoinClause}
+            WHERE stt.closed_at IS NULL
+              AND COALESCE(UPPER(TRIM(stt.status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+              AND ${supportSlaDueExpression} IS NOT NULL
+              AND ${supportSlaDueExpression} < CURRENT_TIMESTAMP
+          ) AS overdueTickets,
+          (
+            SELECT COUNT(*)
+            FROM support_trouble_tickets stt
+            WHERE stt.opened_at >= ?
+              AND stt.opened_at < ?
+          ) AS monthlyOpenedTickets,
+          (
+            SELECT COUNT(*)
+            FROM support_trouble_tickets stt
+            ${supportSlaJoinClause}
+            ${latestProgressJoinClause}
+            ${latestEscalationJoinClause}
+            WHERE stt.closed_at IS NULL
+              AND COALESCE(UPPER(TRIM(stt.status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+              AND (
+                (
+                  escalations.escalated_at IS NOT NULL
+                  AND (latest.updated_at IS NULL OR escalations.escalated_at > latest.updated_at)
+                )
+                OR (
+                  latest.follow_up_at IS NOT NULL
+                  AND latest.follow_up_at < CURRENT_TIMESTAMP
+                )
+                OR (
+                  ${supportSlaDueExpression} IS NOT NULL
+                  AND ${supportSlaDueExpression} < CURRENT_TIMESTAMP
+                )
+              )
+          ) AS escalationPending,
+          (
+            SELECT COUNT(*)
+            FROM support_trouble_tickets stt
+            ${latestProgressJoinClause}
+            ${latestEscalationJoinClause}
+            WHERE stt.closed_at IS NULL
+              AND COALESCE(UPPER(TRIM(stt.status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+              AND COALESCE(UPPER(TRIM(latest.progress_status)), '') IN ('ON_PROGRESS', 'FOLLOW_UP')
+              AND latest.follow_up_at IS NULL
+              AND (
+                escalations.escalated_at IS NULL
+                OR (latest.updated_at IS NOT NULL AND escalations.escalated_at <= latest.updated_at)
+              )
+          ) AS readyClose
+      `,
       [startText, endText]
     ),
     runReviewDbQuery<DashboardDigitalOperationalRow>(
@@ -1003,29 +2276,18 @@ async function getReviewDbOperationalCards(
         SELECT
           (
             SELECT COUNT(*)
-            FROM sales_leads
-            WHERE UPPER(COALESCE(source, '')) IN (${digitalSourceConditions})
+            ${digitalLeadFilter}
           ) AS digitalLeads,
           (
             SELECT COUNT(*)
-            FROM sales_orders so
-            JOIN sales_leads sl
-              ON sl.id = so.lead_id
-            WHERE UPPER(COALESCE(sl.source, '')) IN (${digitalSourceConditions})
-              AND so.request_date >= ?
-              AND so.request_date < ?
+            ${digitalOrderFilter}
           ) AS digitalOrders,
           (
             SELECT COUNT(*)
-            FROM sales_surveys ss
-            JOIN sales_leads sl
-              ON sl.id = ss.lead_id
-            WHERE UPPER(COALESCE(sl.source, '')) IN (${digitalSourceConditions})
-              AND COALESCE(ss.scheduled_at, ss.created_at) >= ?
-              AND COALESCE(ss.scheduled_at, ss.created_at) < ?
+            ${digitalSurveyFilter}
           ) AS digitalSurveys
       `,
-      [...digitalSources, ...digitalSources, startText, endText, ...digitalSources, startText, endText]
+      [...digitalLeadArgs, ...digitalOrderArgs, ...digitalSurveyArgs]
     ),
     runReviewDbQuery<DashboardBillingOperationalRow>(
       `
@@ -1033,102 +2295,53 @@ async function getReviewDbOperationalCards(
           (
             SELECT COUNT(*)
             FROM billing_invoices bi
-            WHERE (
-                bi.invoice_status = 'OVERDUE'
-                OR (
-                  bi.due_date < CURRENT_DATE
-                  AND COALESCE(bi.paid_amount, 0) < COALESCE(bi.total_amount, 0)
-                  AND bi.invoice_status NOT IN ('PAID', 'CANCELLED')
-                )
-              )
-              AND (
-                (bi.billing_year = ? AND bi.billing_month = ?)
-                OR (bi.due_date >= ? AND bi.due_date < ?)
-              )
-              AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') NOT IN ('WRITE_OFF', 'CLOSED')
+            WHERE ${billingBaseEnabled ? billingOverdueCondition : '1 = 0'}
+              ${billingPeriodWhere}
+              ${billingCollectionOpenFilter}
           ) AS overdueInvoices,
           (
             SELECT COALESCE(SUM(GREATEST(COALESCE(total_amount, 0) - COALESCE(paid_amount, 0), 0)), 0)
             FROM billing_invoices bi
-            WHERE (
-                bi.invoice_status = 'OVERDUE'
-                OR (
-                  bi.due_date < CURRENT_DATE
-                  AND COALESCE(bi.paid_amount, 0) < COALESCE(bi.total_amount, 0)
-                  AND bi.invoice_status NOT IN ('PAID', 'CANCELLED')
-                )
-              )
-              AND (
-                (bi.billing_year = ? AND bi.billing_month = ?)
-                OR (bi.due_date >= ? AND bi.due_date < ?)
-              )
-              AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') NOT IN ('WRITE_OFF', 'CLOSED')
+            WHERE ${billingBaseEnabled ? billingOverdueCondition : '1 = 0'}
+              ${billingPeriodWhere}
+              ${billingCollectionOpenFilter}
           ) AS overdueAmount,
           (
             SELECT COUNT(*)
             FROM billing_invoices bi
-            WHERE bi.invoice_status = 'PARTIAL'
+            WHERE ${
+              billingBaseEnabled && hasBillingInvoiceStatus
+                ? `bi.invoice_status = 'PARTIAL'`
+                : '1 = 0'
+            }
               AND COALESCE(bi.paid_amount, 0) < COALESCE(bi.total_amount, 0)
-              AND (
-                (bi.billing_year = ? AND bi.billing_month = ?)
-                OR (bi.due_date >= ? AND bi.due_date < ?)
-              )
-              AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') NOT IN ('WRITE_OFF', 'CLOSED')
+              ${billingPeriodWhere}
+              ${billingCollectionOpenFilter}
           ) AS partialInvoices,
           (
             SELECT COUNT(*)
             FROM billing_invoices bi
-            JOIN (
-              SELECT
-                action_latest.invoice_id,
-                action_latest.action_type,
-                action_latest.action_status,
-                action_latest.due_follow_up_at
-              FROM billing_collection_actions action_latest
-              INNER JOIN (
-                SELECT invoice_id, MAX(id) AS latestId
-                FROM billing_collection_actions
-                GROUP BY invoice_id
-              ) latest_ids
-                ON latest_ids.latestId = action_latest.id
-            ) latest
-              ON latest.invoice_id = bi.id
-            WHERE COALESCE(UPPER(TRIM(latest.action_status)), 'OPEN') = 'OPEN'
-              AND COALESCE(UPPER(TRIM(bi.invoice_status)), 'ISSUED') IN ('ISSUED', 'OVERDUE', 'PARTIAL')
-              AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') <> 'CLOSED'
-              AND (
-                COALESCE(bi.suspend_candidate, 0) = 1
-                OR COALESCE(UPPER(TRIM(latest.action_type)), '') = 'SUSPEND'
-                OR (
-                  COALESCE(UPPER(TRIM(latest.action_type)), '') = 'PROMISE_TO_PAY'
-                  AND latest.due_follow_up_at IS NOT NULL
-                  AND latest.due_follow_up_at < CURRENT_TIMESTAMP
-                )
-              )
-              AND (
-                (bi.billing_year = ? AND bi.billing_month = ?)
-                OR (bi.due_date >= ? AND bi.due_date < ?)
-              )
+            ${billingLatestActionJoinClause}
+            WHERE ${
+              billingBaseEnabled && hasBillingInvoiceStatus
+                ? `COALESCE(UPPER(TRIM(bi.invoice_status)), 'ISSUED') IN ('ISSUED', 'OVERDUE', 'PARTIAL')`
+                : '1 = 0'
+            }
+              ${
+                canUseBillingLatestActions
+                  ? `AND COALESCE(UPPER(TRIM(latest.action_status)), 'OPEN') = 'OPEN'`
+                  : ''
+              }
+              ${
+                hasBillingInvoiceCollectionStatus
+                  ? `AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') <> 'CLOSED'`
+                  : ''
+              }
+              AND (${suspendCandidateConditions.join('\n                OR ')})
+              ${billingPeriodWhere}
           ) AS suspendCandidates
       `,
-      [
-        filters.year,
-        filters.month,
-        startText,
-        endText,
-        filters.year,
-        filters.month,
-        startText,
-        endText,
-        filters.year,
-        filters.month,
-        startText,
-        endText,
-        filters.year,
-        filters.month,
-        startText,
-        endText,
-      ]
+      [...billingPeriodArgs, ...billingPeriodArgs, ...billingPeriodArgs, ...billingPeriodArgs]
     ),
     runReviewDbQuery<DashboardHrOperationalRow>(
       `
@@ -1155,28 +2368,30 @@ async function getReviewDbOperationalCards(
         SELECT
           (
             SELECT COUNT(*)
-            FROM inventory_items
-            WHERE status = 'ACTIVE'
+            ${inventoryActiveItemFilter}
           ) AS activeItems,
           (
             SELECT COUNT(*)
-            FROM inventory_stock_movements
-            WHERE movement_at >= ?
-              AND movement_at < ?
+            ${inventoryMovementFilter}
           ) AS currentMonthMovements,
           (
             SELECT COUNT(*)
-            FROM inventory_item_requests
-            WHERE UPPER(COALESCE(request_status, 'REQUEST')) = 'PENDING'
+            ${inventoryPendingRequestFilter}
           ) AS pendingRequests
       `,
-      [startText, endText]
+      inventoryMovementArgs
     ),
   ])
 
   const sales = salesRows[0] ?? { activeLeads: 0, monthlyOrders: 0, monthlyActivations: 0 }
   const cs = csRows[0] ?? { activeWorkOrders: 0, activeIsolations: 0, monthlyDismantles: 0 }
-  const noc = nocRows[0] ?? { openTickets: 0, overdueTickets: 0, monthlyOpenedTickets: 0 }
+  const noc = nocRows[0] ?? {
+    openTickets: 0,
+    overdueTickets: 0,
+    monthlyOpenedTickets: 0,
+    escalationPending: 0,
+    readyClose: 0,
+  }
   const digital = digitalRows[0] ?? { digitalLeads: 0, digitalOrders: 0, digitalSurveys: 0 }
   const billing = billingRows[0] ?? { overdueInvoices: 0, partialInvoices: 0, suspendCandidates: 0, overdueAmount: 0 }
   const hr = hrRows[0] ?? { employees: 0, attendanceToday: 0, activeLoans: 0 }
@@ -1219,9 +2434,9 @@ async function getReviewDbOperationalCards(
       case 'TT_OPEN_TICKETS':
         return Number(noc.openTickets ?? 0)
       case 'TT_NEED_ESCALATION':
-        return Number(noc.overdueTickets ?? 0)
+        return Number(noc.escalationPending ?? 0)
       case 'TT_READY_CLOSE':
-        return Math.max(0, Math.round(Number(noc.monthlyOpenedTickets ?? 0) / 3))
+        return Number(noc.readyClose ?? 0)
       case 'DISMANTLE_OPEN_QUEUE':
         return Math.max(0, Math.round(Number(cs.activeIsolations ?? 0) / 2))
       case 'DISMANTLE_FIELD_FOLLOW_UP':
@@ -1403,8 +2618,8 @@ async function getReviewDbOperationalCards(
       tone: 'border-orange-200 bg-orange-50 text-orange-900',
       metrics: [
         { label: 'TT Open', value: formatNumber(Number(noc.openTickets ?? 0)) },
-        { label: 'Perlu Eskalasi', value: formatNumber(Math.max(0, Math.round(Number(noc.overdueTickets ?? 0)))) },
-        { label: 'Siap Close', value: formatNumber(Math.max(0, Math.round(Number(noc.monthlyOpenedTickets ?? 0) / 3))) },
+        { label: 'Perlu Eskalasi', value: formatNumber(Number(noc.escalationPending ?? 0)) },
+        { label: 'Siap Close', value: formatNumber(Number(noc.readyClose ?? 0)) },
       ],
     },
     {
@@ -1533,9 +2748,7 @@ async function getReviewDbOperationalCards(
     return { ...card, metrics }
   })
 
-  return filters.division === 'ALL'
-    ? nextCards
-    : nextCards.filter((card) => card.key === filters.division)
+  return sanitizeDashboardOperationalCards(session.role, nextCards, filters)
 }
 
 async function getReviewDbDashboardAlerts(params: {
@@ -1649,7 +2862,7 @@ async function getReviewDbDashboardAlerts(params: {
     })
   }
 
-  return items.slice(0, 4)
+  return sanitizeDashboardAlerts(params.role, items).slice(0, 4)
 }
 
 function getTodayIsoDate() {
@@ -1795,6 +3008,10 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
       }))
     }
     case 'SALES_MARKETING': {
+      const [customerCompletenessQueryParts, salesOrderQueryParts] = await Promise.all([
+        getDashboardCustomerCompletenessQueryParts(),
+        getDashboardSalesOrderQueryParts(),
+      ])
       const leads = await runReviewDbQuery<DashboardLeadRow>(`
         SELECT
           id AS leadId,
@@ -1807,24 +3024,22 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         ORDER BY created_at DESC, id DESC
         LIMIT 2
       `)
-      const customers = await runReviewDbQuery<DashboardMarketingCustomerRow>(`
-        SELECT
-          c.id AS customerId,
-          c.customer_code AS customerCode,
-          c.full_name AS customerName,
-          c.phone,
-          c.email,
-          a.address
-        FROM crm_customers c
-        LEFT JOIN crm_customer_addresses a
-          ON a.customer_id = c.id
-          AND a.is_primary = 1
-        WHERE COALESCE(TRIM(c.phone), '') = ''
-          OR COALESCE(TRIM(c.email), '') = ''
-          OR COALESCE(TRIM(a.address), '') = ''
-        ORDER BY c.id DESC
-        LIMIT 1
-      `)
+      const customers = customerCompletenessQueryParts.enabled
+        ? await runReviewDbQuery<DashboardMarketingCustomerRow>(`
+            SELECT
+              c.id AS customerId,
+              ${customerCompletenessQueryParts.customerCodeExpression} AS customerCode,
+              ${customerCompletenessQueryParts.customerNameExpression} AS customerName,
+              ${customerCompletenessQueryParts.phoneExpression} AS phone,
+              ${customerCompletenessQueryParts.emailExpression} AS email,
+              ${customerCompletenessQueryParts.addressExpression} AS address
+            FROM crm_customers c
+            ${customerCompletenessQueryParts.addressJoin}
+            WHERE ${customerCompletenessQueryParts.whereClause}
+            ORDER BY c.id DESC
+            LIMIT 1
+          `)
+        : []
       const coverages = await runReviewDbQuery<DashboardCoverageRow>(`
         SELECT
           id AS coverageId,
@@ -1842,18 +3057,16 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         SELECT
           so.id AS orderId,
           so.order_no AS orderNo,
-          COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+          ${salesOrderQueryParts.customerNameExpression} AS customerName,
           so.status,
           so.order_type AS orderType,
-          so.marketing_name AS marketingName,
-          CAST(so.request_date AS CHAR) AS requestDate
+          ${salesOrderQueryParts.marketingNameExpression} AS marketingName,
+          ${salesOrderQueryParts.requestDateExpression} AS requestDate
         FROM sales_orders so
-        LEFT JOIN sales_leads sl
-          ON sl.id = so.lead_id
-        LEFT JOIN crm_customers c
-          ON c.id = so.customer_id
+        ${salesOrderQueryParts.leadJoin}
+        ${salesOrderQueryParts.customerJoin}
         WHERE COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')
-        ORDER BY COALESCE(so.request_date, so.created_at) DESC, so.id DESC
+        ORDER BY ${salesOrderQueryParts.orderByExpression}
         LIMIT 1
       `)
 
@@ -1901,42 +3114,47 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
       ]
     }
     case 'CS_OPERATOR': {
-      const customers = await runReviewDbQuery<DashboardMarketingCustomerRow>(`
-        SELECT
-          c.id AS customerId,
-          c.customer_code AS customerCode,
-          c.full_name AS customerName,
-          c.phone,
-          c.email,
-          a.address
-        FROM crm_customers c
-        LEFT JOIN crm_customer_addresses a
-          ON a.customer_id = c.id
-          AND a.is_primary = 1
-        WHERE COALESCE(TRIM(c.phone), '') = ''
-          OR COALESCE(TRIM(c.email), '') = ''
-          OR COALESCE(TRIM(a.address), '') = ''
-        ORDER BY c.id DESC
-        LIMIT 1
-      `)
+      const [hasIsolationReason, hasIsolationDate, hasIsolationIsArchived] = await Promise.all([
+        hasReviewDbColumn('support_isolations', 'reason'),
+        hasReviewDbColumn('support_isolations', 'isolation_date'),
+        hasReviewDbColumn('support_isolations', 'is_archived'),
+      ])
+      const [portIssueQueryParts, customerCompletenessQueryParts, workOrderQueryParts] = await Promise.all([
+        getDashboardPortIssueQueryParts(),
+        getDashboardCustomerCompletenessQueryParts(),
+        getDashboardWorkOrderQueryParts(),
+      ])
+      const customers = customerCompletenessQueryParts.enabled
+        ? await runReviewDbQuery<DashboardMarketingCustomerRow>(`
+            SELECT
+              c.id AS customerId,
+              ${customerCompletenessQueryParts.customerCodeExpression} AS customerCode,
+              ${customerCompletenessQueryParts.customerNameExpression} AS customerName,
+              ${customerCompletenessQueryParts.phoneExpression} AS phone,
+              ${customerCompletenessQueryParts.emailExpression} AS email,
+              ${customerCompletenessQueryParts.addressExpression} AS address
+            FROM crm_customers c
+            ${customerCompletenessQueryParts.addressJoin}
+            WHERE ${customerCompletenessQueryParts.whereClause}
+            ORDER BY c.id DESC
+            LIMIT 1
+          `)
+        : []
       const orders = await runReviewDbQuery<DashboardWorkOrderRow>(`
         SELECT
           swo.id AS workOrderId,
           swo.work_order_no AS workOrderNo,
-          COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+          ${workOrderQueryParts.customerNameExpression} AS customerName,
           swo.status,
-          swo.work_type AS workType,
-          swo.technician_name AS technicianName,
-          CAST(swo.scheduled_at AS CHAR) AS scheduledAt
+          ${workOrderQueryParts.workTypeExpression} AS workType,
+          ${workOrderQueryParts.technicianNameExpression} AS technicianName,
+          ${workOrderQueryParts.scheduledAtExpression} AS scheduledAt
         FROM service_work_orders swo
-        LEFT JOIN sales_orders so
-          ON so.id = swo.sales_order_id
-        LEFT JOIN sales_leads sl
-          ON sl.id = so.lead_id
-        LEFT JOIN crm_customers c
-          ON c.id = so.customer_id
+        ${workOrderQueryParts.salesOrderJoin}
+        ${workOrderQueryParts.leadJoin}
+        ${workOrderQueryParts.customerJoin}
         WHERE COALESCE(UPPER(TRIM(swo.status)), 'OPEN') NOT IN ('COMPLETED', 'CLOSED', 'CANCELLED')
-        ORDER BY COALESCE(swo.scheduled_at, swo.created_at) DESC, swo.id DESC
+        ORDER BY ${workOrderQueryParts.orderByExpression}
         LIMIT 2
       `)
       const tickets = await runReviewDbQuery<DashboardSupportRow>(`
@@ -1957,12 +3175,12 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           id AS isolationId,
           customer_name AS customerName,
           status,
-          reason,
-          CAST(isolation_date AS CHAR) AS isolationDate
+          ${hasIsolationReason ? 'reason' : 'NULL'} AS reason,
+          ${hasIsolationDate ? 'CAST(isolation_date AS CHAR)' : 'NULL'} AS isolationDate
         FROM support_isolations
         WHERE status = 'OPEN'
-          AND is_archived = 0
-        ORDER BY isolation_date DESC, id DESC
+          ${hasIsolationIsArchived ? 'AND is_archived = 0' : ''}
+        ORDER BY ${hasIsolationDate ? 'isolation_date' : 'id'} DESC, id DESC
         LIMIT 1
       `)
       const portIssues = await runReviewDbQuery<DashboardOdpPortIssueRow>(`
@@ -1971,16 +3189,14 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           no.code AS odpCode,
           nop.port_no AS portNo,
           nop.port_status AS portStatus,
-          c.customer_code AS customerCode,
-          ss.service_no AS serviceNo,
-          CAST(nop.installed_at AS CHAR) AS installedAt
+          ${portIssueQueryParts.customerCodeExpression} AS customerCode,
+          ${portIssueQueryParts.serviceNoExpression} AS serviceNo,
+          ${portIssueQueryParts.installedAtExpression} AS installedAt
         FROM network_odp_ports nop
         JOIN network_odp no
           ON no.id = nop.odp_id
-        LEFT JOIN service_subscriptions ss
-          ON ss.id = nop.subscription_id
-        LEFT JOIN crm_customers c
-          ON c.id = nop.customer_id
+        ${portIssueQueryParts.serviceSubscriptionJoin}
+        ${portIssueQueryParts.customerJoin}
         WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
         ORDER BY nop.updated_at DESC, nop.id DESC
         LIMIT 1
@@ -2040,6 +3256,35 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
       ]
     }
     case 'CS_ADMIN': {
+      const [
+        hasIsolationSubscriptionId,
+        hasSubscriptionId,
+        hasSubscriptionServiceNo,
+        hasIsolationReason,
+        hasIsolationDate,
+        hasIsolationIsArchived,
+        hasDismantleQueueTransferNote,
+        hasDismantleQueueTransferredAt,
+      ] = await Promise.all([
+        hasReviewDbColumn('support_isolations', 'subscription_id'),
+        hasReviewDbColumn('service_subscriptions', 'id'),
+        hasReviewDbColumn('service_subscriptions', 'service_no'),
+        hasReviewDbColumn('support_isolations', 'reason'),
+        hasReviewDbColumn('support_isolations', 'isolation_date'),
+        hasReviewDbColumn('support_isolations', 'is_archived'),
+        hasReviewDbColumn('support_dismantle_queue', 'transfer_note'),
+        hasReviewDbColumn('support_dismantle_queue', 'transferred_at'),
+      ])
+      const isolationSubscriptionJoin =
+        hasIsolationSubscriptionId && hasSubscriptionId
+          ? `
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = si.subscription_id`
+          : ''
+      const isolationServiceNoExpression =
+        hasIsolationSubscriptionId && hasSubscriptionId && hasSubscriptionServiceNo ? 'ss.service_no' : 'NULL'
+      const portIssueQueryParts = await getDashboardPortIssueQueryParts()
+      const supportTicketServiceQueryParts = await getDashboardSupportTicketServiceQueryParts()
       const today = getTodayIsoDate()
       const month = today.slice(0, 7)
       const userOrg = await resolveDailyActivityOrgContext(session)
@@ -2110,19 +3355,18 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         SELECT
           si.id AS isolationId,
           si.customer_name AS customerName,
-          ss.service_no AS serviceNo,
-          si.reason,
-          CAST(si.isolation_date AS CHAR) AS isolationDate,
-          DATEDIFF(CURRENT_DATE, DATE(si.isolation_date)) AS agingDays
+          ${isolationServiceNoExpression} AS serviceNo,
+          ${hasIsolationReason ? 'si.reason' : 'NULL'} AS reason,
+          ${hasIsolationDate ? 'CAST(si.isolation_date AS CHAR)' : 'NULL'} AS isolationDate,
+          ${hasIsolationDate ? 'DATEDIFF(CURRENT_DATE, DATE(si.isolation_date))' : 'NULL'} AS agingDays
         FROM support_isolations si
-        LEFT JOIN service_subscriptions ss
-          ON ss.id = si.subscription_id
+        ${isolationSubscriptionJoin}
         LEFT JOIN support_dismantle_queue dq
           ON dq.isolation_id = si.id
         WHERE si.status = 'OPEN'
-          AND si.is_archived = 0
+          ${hasIsolationIsArchived ? 'AND si.is_archived = 0' : ''}
           AND dq.id IS NULL
-        ORDER BY isolation_date ASC, id ASC
+        ORDER BY ${hasIsolationDate ? 'si.isolation_date' : 'si.id'} ASC, si.id ASC
         LIMIT 1
       `)
       await ensureSupportDismantleQueueTable()
@@ -2131,31 +3375,29 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           dq.id AS queueId,
           si.id AS isolationId,
           si.customer_name AS customerName,
-          ss.service_no AS serviceNo,
-          CAST(si.isolation_date AS CHAR) AS isolationDate,
-          dq.transfer_note AS transferNote,
-          CAST(dq.transferred_at AS CHAR) AS transferredAt,
-          DATEDIFF(CURRENT_DATE, DATE(dq.transferred_at)) AS agingDays
+          ${isolationServiceNoExpression} AS serviceNo,
+          ${hasIsolationDate ? 'CAST(si.isolation_date AS CHAR)' : 'NULL'} AS isolationDate,
+          ${hasDismantleQueueTransferNote ? 'dq.transfer_note' : 'NULL'} AS transferNote,
+          ${hasDismantleQueueTransferredAt ? 'CAST(dq.transferred_at AS CHAR)' : 'NULL'} AS transferredAt,
+          ${hasDismantleQueueTransferredAt ? 'DATEDIFF(CURRENT_DATE, DATE(dq.transferred_at))' : 'NULL'} AS agingDays
         FROM support_dismantle_queue dq
         INNER JOIN support_isolations si
           ON si.id = dq.isolation_id
-        LEFT JOIN service_subscriptions ss
-          ON ss.id = si.subscription_id
-        ORDER BY dq.transferred_at ASC, dq.id ASC
+        ${isolationSubscriptionJoin}
+        ORDER BY ${hasDismantleQueueTransferredAt ? 'dq.transferred_at' : 'dq.id'} ASC, dq.id ASC
         LIMIT 1
       `)
       const highRiskTickets = await runReviewDbQuery<DashboardHighRiskTicketRow>(`
         SELECT
           ticket_code AS ticketCode,
           customer_name AS customerName,
-          ss.service_no AS serviceNo,
+          ${supportTicketServiceQueryParts.serviceNoExpression} AS serviceNo,
           status,
           type AS ticketType,
           CAST(opened_at AS CHAR) AS openedAt,
           TIMESTAMPDIFF(HOUR, opened_at, CURRENT_TIMESTAMP) AS agingHours
         FROM support_trouble_tickets
-        LEFT JOIN service_subscriptions ss
-          ON ss.id = support_trouble_tickets.subscription_id
+        ${supportTicketServiceQueryParts.serviceSubscriptionJoin}
         WHERE closed_at IS NULL
           AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
           AND opened_at <= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)
@@ -2168,16 +3410,14 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           no.code AS odpCode,
           nop.port_no AS portNo,
           nop.port_status AS portStatus,
-          c.customer_code AS customerCode,
-          ss.service_no AS serviceNo,
-          CAST(nop.installed_at AS CHAR) AS installedAt
+          ${portIssueQueryParts.customerCodeExpression} AS customerCode,
+          ${portIssueQueryParts.serviceNoExpression} AS serviceNo,
+          ${portIssueQueryParts.installedAtExpression} AS installedAt
         FROM network_odp_ports nop
         JOIN network_odp no
           ON no.id = nop.odp_id
-        LEFT JOIN service_subscriptions ss
-          ON ss.id = nop.subscription_id
-        LEFT JOIN crm_customers c
-          ON c.id = nop.customer_id
+        ${portIssueQueryParts.serviceSubscriptionJoin}
+        ${portIssueQueryParts.customerJoin}
         WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
         ORDER BY nop.updated_at DESC, nop.id DESC
         LIMIT 1
@@ -2641,7 +3881,120 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         })),
       ]
     }
-    case 'NOC_OPERATOR':
+    case 'NOC_OPERATOR': {
+      const [hasIsolationReason, hasIsolationDate, hasIsolationIsArchived] = await Promise.all([
+        hasReviewDbColumn('support_isolations', 'reason'),
+        hasReviewDbColumn('support_isolations', 'isolation_date'),
+        hasReviewDbColumn('support_isolations', 'is_archived'),
+      ])
+      const portIssueQueryParts = await getDashboardPortIssueQueryParts()
+      const tickets = await runReviewDbQuery<DashboardSupportRow>(`
+        SELECT
+          ticket_code AS ticketCode,
+          customer_name AS customerName,
+          status,
+          type AS ticketType,
+          CAST(opened_at AS CHAR) AS openedAt,
+          TIMESTAMPDIFF(HOUR, opened_at, CURRENT_TIMESTAMP) AS agingHours
+        FROM support_trouble_tickets
+        WHERE closed_at IS NULL
+          AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+        ORDER BY opened_at DESC, id DESC
+        LIMIT 5
+      `)
+      const isolations = await runReviewDbQuery<DashboardIsolationRow>(`
+        SELECT
+          id AS isolationId,
+          customer_name AS customerName,
+          status,
+          ${hasIsolationReason ? 'reason' : 'NULL'} AS reason,
+          ${hasIsolationDate ? 'CAST(isolation_date AS CHAR)' : 'NULL'} AS isolationDate
+        FROM support_isolations
+        WHERE status = 'OPEN'
+          ${hasIsolationIsArchived ? 'AND is_archived = 0' : ''}
+        ORDER BY ${hasIsolationDate ? 'isolation_date' : 'id'} DESC, id DESC
+        LIMIT 2
+      `)
+      const portIssues = await runReviewDbQuery<DashboardOdpPortIssueRow>(`
+        SELECT
+          nop.id AS portId,
+          no.code AS odpCode,
+          nop.port_no AS portNo,
+          nop.port_status AS portStatus,
+          ${portIssueQueryParts.customerCodeExpression} AS customerCode,
+          ${portIssueQueryParts.serviceNoExpression} AS serviceNo,
+          ${portIssueQueryParts.installedAtExpression} AS installedAt
+        FROM network_odp_ports nop
+        JOIN network_odp no
+          ON no.id = nop.odp_id
+        ${portIssueQueryParts.serviceSubscriptionJoin}
+        ${portIssueQueryParts.customerJoin}
+        WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
+        ORDER BY nop.updated_at DESC, nop.id DESC
+        LIMIT 2
+      `)
+
+      return [
+        ...tickets.map((item) => {
+          const agingHours = Number(item.agingHours ?? 0)
+          const isSlaCritical = agingHours >= 24
+
+          return {
+            id: `${isSlaCritical ? 'tt-risk' : 'tt'}-${item.ticketCode}`,
+            domain: 'Support',
+            title: item.ticketCode,
+            subtitle: item.customerName,
+            status: isSlaCritical ? 'OVERDUE' : item.status,
+            priority: 'tinggi' as const,
+            detail: isSlaCritical
+              ? `${item.ticketType} • SLA overdue ${formatNumber(agingHours)} jam dan perlu kontrol NOC sekarang.`
+              : `${item.ticketType} • Ticket teknis aktif ${formatNumber(agingHours)} jam sejak ${formatActivityTime(item.openedAt)}.`,
+            href: isSlaCritical
+              ? buildSupportLaneActionHref('sla', 'sla-manage', {
+                  ticket: item.ticketCode,
+                  focus: 'SLA_OVERDUE',
+                })
+              : buildSupportLaneActionHref('tt', 'ticket-progress', {
+                  ticket: item.ticketCode,
+                  focus: 'OPEN_TICKETS',
+                }),
+            actionLabel: isSlaCritical ? 'Kontrol SLA' : 'Update Ticket',
+            handoffLinks: isSlaCritical
+              ? [
+                  {
+                    label: 'Update Progress TT',
+                    href: buildSupportLaneActionHref('tt', 'ticket-progress', {
+                      ticket: item.ticketCode,
+                      focus: 'OPEN_TICKETS',
+                    }),
+                  },
+                ]
+              : undefined,
+          }
+        }),
+        ...isolations.map((item) => ({
+          id: `iso-${item.isolationId}`,
+          domain: 'Support',
+          title: item.customerName,
+          subtitle: 'Monitoring isolir',
+          status: item.status,
+          priority: 'sedang' as const,
+          detail: `${item.reason?.trim() || 'Belum ada alasan isolir'} • Isolir aktif sejak ${formatActivityTime(item.isolationDate)} dan perlu monitoring jaringan.`,
+          href: '/support/isolations?focus=ACTIVE_ISOLATIONS',
+          actionLabel: 'Monitor isolir',
+        })),
+        ...portIssues.map((item) => ({
+          id: `port-${item.portId}`,
+          domain: 'Inventory',
+          title: `${item.odpCode} / Port ${item.portNo}`,
+          subtitle: item.customerCode || item.serviceNo || 'Port perlu koreksi tim',
+          status: item.portStatus,
+          priority: 'sedang' as const,
+          detail: `Port ${item.portStatus} menahan ritme order/restore dan perlu sinkron koreksi inventory sejak ${formatActivityTime(item.installedAt)}.`,
+          href: '/inventory',
+        })),
+      ]
+    }
     case 'TT_OPERATOR': {
       const tickets = await runReviewDbQuery<DashboardSupportRow>(`
         SELECT
@@ -2649,7 +4002,8 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           customer_name AS customerName,
           status,
           type AS ticketType,
-          CAST(opened_at AS CHAR) AS openedAt
+          CAST(opened_at AS CHAR) AS openedAt,
+          TIMESTAMPDIFF(HOUR, opened_at, CURRENT_TIMESTAMP) AS agingHours
         FROM support_trouble_tickets
         WHERE closed_at IS NULL
           AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
@@ -2657,56 +4011,69 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         LIMIT 5
       `)
 
-      return tickets.map((item) => ({
-        id: item.ticketCode,
-        domain: 'Support',
-        title: item.ticketCode,
-        subtitle: item.customerName,
-        status: item.status,
-        priority: 'tinggi',
-        detail: `${item.ticketType} • Dibuka ${formatActivityTime(item.openedAt)}.`,
-        href: buildSupportLaneActionHref('tt', 'ticket-progress', {
-          ticket: item.ticketCode,
-          focus: 'OPEN_TICKETS',
-        }),
-        actionLabel: 'Update Ticket',
-        handoffLinks: [
-          {
-            label: 'Kontrol SLA',
-            href: buildSupportLaneActionHref('sla', 'sla-manage', {
-              ticket: item.ticketCode,
-              focus: 'SLA_OVERDUE',
-            }),
-          },
-          {
-            label: 'Eskalasi Ticket',
-            href: buildSupportLaneActionHref('tt', 'ticket-escalate', {
-              ticket: item.ticketCode,
-              focus: 'OPEN_TICKETS',
-            }),
-          },
-        ],
-      }))
+      return tickets.map((item) => {
+        const agingHours = Number(item.agingHours ?? 0)
+        const normalizedStatus = String(item.status ?? '').trim().toUpperCase()
+        const isReadyClose = ['READY', 'DONE', 'COMPLETED'].includes(normalizedStatus)
+        const isEscalationCandidate = normalizedStatus.includes('ESCALAT') || agingHours >= 18
+        const isOverdue = agingHours >= 24 && !isReadyClose
+
+        return {
+          id: `tt-${item.ticketCode}`,
+          domain: 'Support',
+          title: item.ticketCode,
+          subtitle: item.customerName,
+          status: isReadyClose ? 'READY' : isOverdue ? 'OVERDUE' : item.status,
+          priority: 'tinggi' as const,
+          detail: isReadyClose
+            ? `${item.ticketType} • Ticket siap close setelah progres terakhir tervalidasi.`
+            : isOverdue
+              ? `${item.ticketType} • Follow up overdue ${formatNumber(agingHours)} jam dan perlu update progress sekarang.`
+              : isEscalationCandidate
+                ? `${item.ticketType} • Ticket siap eskalasi bila progres teknis masih mandek setelah ${formatNumber(agingHours)} jam.`
+                : `${item.ticketType} • Ticket baru perlu update awal sejak ${formatActivityTime(item.openedAt)}.`,
+          href: isReadyClose
+            ? buildSupportLaneActionHref('tt', 'ticket-close', {
+                ticket: item.ticketCode,
+                focus: 'OPEN_TICKETS',
+              })
+            : buildSupportLaneActionHref('tt', 'ticket-progress', {
+                ticket: item.ticketCode,
+                focus: 'OPEN_TICKETS',
+              }),
+          actionLabel: isReadyClose ? 'Tutup Ticket' : 'Update Ticket',
+          handoffLinks:
+            isReadyClose || !isEscalationCandidate
+              ? undefined
+              : [
+                  {
+                    label: 'Eskalasi Ticket',
+                    href: buildSupportLaneActionHref('tt', 'ticket-escalate', {
+                      ticket: item.ticketCode,
+                      focus: 'OPEN_TICKETS',
+                    }),
+                  },
+                ],
+        }
+      })
     }
     case 'FIELD_TECHNICIAN': {
+      const workOrderQueryParts = await getDashboardWorkOrderQueryParts()
       const rows = await runReviewDbQuery<DashboardWorkOrderRow>(`
         SELECT
           swo.id AS workOrderId,
           swo.work_order_no AS workOrderNo,
-          COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+          ${workOrderQueryParts.customerNameExpression} AS customerName,
           swo.status,
-          swo.work_type AS workType,
-          swo.technician_name AS technicianName,
-          CAST(swo.scheduled_at AS CHAR) AS scheduledAt
+          ${workOrderQueryParts.workTypeExpression} AS workType,
+          ${workOrderQueryParts.technicianNameExpression} AS technicianName,
+          ${workOrderQueryParts.scheduledAtExpression} AS scheduledAt
         FROM service_work_orders swo
-        LEFT JOIN sales_orders so
-          ON so.id = swo.sales_order_id
-        LEFT JOIN sales_leads sl
-          ON sl.id = so.lead_id
-        LEFT JOIN crm_customers c
-          ON c.id = so.customer_id
+        ${workOrderQueryParts.salesOrderJoin}
+        ${workOrderQueryParts.leadJoin}
+        ${workOrderQueryParts.customerJoin}
         WHERE COALESCE(UPPER(TRIM(swo.status)), 'OPEN') NOT IN ('COMPLETED', 'CLOSED', 'CANCELLED')
-        ORDER BY COALESCE(swo.scheduled_at, swo.created_at) DESC, swo.id DESC
+        ORDER BY ${workOrderQueryParts.orderByExpression}
         LIMIT 4
       `)
 
@@ -2723,18 +4090,22 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
     }
     case 'DISMANTLE_OPERATOR': {
       await ensureSupportDismantleQueueTable()
+      const [hasDismantleQueueTransferNote, hasDismantleQueueTransferredAt] = await Promise.all([
+        hasReviewDbColumn('support_dismantle_queue', 'transfer_note'),
+        hasReviewDbColumn('support_dismantle_queue', 'transferred_at'),
+      ])
       const rows = await runReviewDbQuery<DashboardDismantleRow>(`
         SELECT
           dq.id AS queueId,
           0 AS dismantleId,
           si.customer_name AS customerName,
-          dq.transfer_note AS closeNote,
+          ${hasDismantleQueueTransferNote ? 'dq.transfer_note' : 'NULL'} AS closeNote,
           NULL AS closedAt,
-          CAST(dq.transferred_at AS CHAR) AS transferredAt
+          ${hasDismantleQueueTransferredAt ? 'CAST(dq.transferred_at AS CHAR)' : 'NULL'} AS transferredAt
         FROM support_dismantle_queue dq
         INNER JOIN support_isolations si
           ON si.id = dq.isolation_id
-        ORDER BY dq.transferred_at DESC, dq.id DESC
+        ORDER BY ${hasDismantleQueueTransferredAt ? 'dq.transferred_at' : 'dq.id'} DESC, dq.id DESC
         LIMIT 4
       `)
 
@@ -2751,6 +4122,10 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
     }
     case 'DIGITAL_CREATOR': {
       const digitalSourcePlaceholders = DIGITAL_SALES_SOURCES.map(() => '?').join(', ')
+      const [salesOrderQueryParts, salesSurveyQueryParts] = await Promise.all([
+        getDashboardSalesOrderQueryParts(),
+        getDashboardSalesSurveyQueryParts(),
+      ])
       const leads = await runReviewDbQuery<DashboardLeadRow>(
         `
           SELECT
@@ -2771,19 +4146,17 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           SELECT
             so.id AS orderId,
             so.order_no AS orderNo,
-            COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+            ${salesOrderQueryParts.customerNameExpression} AS customerName,
             so.status,
-            sl.source AS source,
+            ${salesOrderQueryParts.sourceExpression} AS source,
             so.order_type AS orderType,
-            CAST(so.request_date AS CHAR) AS requestDate
+            ${salesOrderQueryParts.requestDateExpression} AS requestDate
           FROM sales_orders so
-          LEFT JOIN sales_leads sl
-            ON sl.id = so.lead_id
-          LEFT JOIN crm_customers c
-            ON c.id = so.customer_id
-          WHERE UPPER(COALESCE(sl.source, '')) IN (${digitalSourcePlaceholders})
+          ${salesOrderQueryParts.leadJoin}
+          ${salesOrderQueryParts.customerJoin}
+          WHERE ${salesOrderQueryParts.sourceFilterEnabled ? `UPPER(COALESCE(${salesOrderQueryParts.sourceExpression}, '')) IN (${digitalSourcePlaceholders})` : '1 = 0'}
             AND COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')
-          ORDER BY COALESCE(so.request_date, so.created_at) DESC, so.id DESC
+          ORDER BY ${salesOrderQueryParts.orderByExpression}
           LIMIT 2
         `,
         [...DIGITAL_SALES_SOURCES],
@@ -2793,18 +4166,16 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           SELECT
             ss.id AS surveyId,
             ss.survey_no AS surveyNo,
-            COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+            ${salesSurveyQueryParts.customerNameExpression} AS customerName,
             ss.survey_status AS status,
-            sl.source AS source,
+            ${salesSurveyQueryParts.sourceExpression} AS source,
             ss.feasibility_status AS feasibilityStatus,
-            CAST(COALESCE(ss.scheduled_at, ss.created_at) AS CHAR) AS scheduledAt
+            ${salesSurveyQueryParts.scheduledAtExpression} AS scheduledAt
           FROM sales_surveys ss
-          LEFT JOIN sales_leads sl
-            ON sl.id = ss.lead_id
-          LEFT JOIN crm_customers c
-            ON c.id = ss.customer_id
-          WHERE UPPER(COALESCE(sl.source, '')) IN (${digitalSourcePlaceholders})
-          ORDER BY COALESCE(ss.scheduled_at, ss.created_at) DESC, ss.id DESC
+          ${salesSurveyQueryParts.leadJoin}
+          ${salesSurveyQueryParts.customerJoin}
+          WHERE UPPER(COALESCE(${salesSurveyQueryParts.sourceExpression}, '')) IN (${digitalSourcePlaceholders})
+          ORDER BY ${salesSurveyQueryParts.orderByExpression}
           LIMIT 1
         `,
         [...DIGITAL_SALES_SOURCES],
@@ -2876,6 +4247,20 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
 }
 
 async function getReviewDbDashboardSummary() {
+  const [hasIsolationStatus, hasIsolationIsArchived] = await Promise.all([
+    hasReviewDbColumn('support_isolations', 'status'),
+    hasReviewDbColumn('support_isolations', 'is_archived'),
+  ])
+  const dashboardIsolationCountFilter = hasIsolationStatus
+    ? `
+        SELECT COUNT(*)
+        FROM support_isolations
+        WHERE status = 'OPEN'${hasIsolationIsArchived ? `
+          AND is_archived = 0` : ''}`
+    : `
+        SELECT COUNT(*)
+        FROM (SELECT 0 AS id) support_isolations
+        WHERE 1 = 0`
   const [row] = await runReviewDbQuery<DashboardSummaryRow>(`
     SELECT
       (SELECT COUNT(*) FROM crm_customers) AS customers,
@@ -2887,10 +4272,7 @@ async function getReviewDbDashboardSummary() {
           AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
       ) AS troubleTickets,
       (
-        SELECT COUNT(*)
-        FROM support_isolations
-        WHERE status = 'OPEN'
-          AND is_archived = 0
+        ${dashboardIsolationCountFilter}
       ) AS isolations,
       (
         SELECT COUNT(*)
@@ -2996,6 +4378,29 @@ function formatSupportAuditTitle(actionType: string, entityRef: string, customer
 }
 
 async function getReviewDbSupportAuditTimeline(limit = 8): Promise<TimelineActivityItem[]> {
+  const [
+    hasSupportTicketNotes,
+    hasSupportTicketCloseNotes,
+    hasSupportTicketClosedAt,
+    hasIsolationReason,
+    hasIsolationDate,
+    hasIsolationCloseNote,
+    hasIsolationRestorationDate,
+    hasDismantleHistoryCustomerName,
+    hasDismantleHistoryCloseNote,
+    hasDismantleHistoryClosedAt,
+  ] = await Promise.all([
+    hasReviewDbColumn('support_trouble_tickets', 'notes'),
+    hasReviewDbColumn('support_trouble_tickets', 'close_notes'),
+    hasReviewDbColumn('support_trouble_tickets', 'closed_at'),
+    hasReviewDbColumn('support_isolations', 'reason'),
+    hasReviewDbColumn('support_isolations', 'isolation_date'),
+    hasReviewDbColumn('support_isolations', 'close_note'),
+    hasReviewDbColumn('support_isolations', 'restoration_date'),
+    hasReviewDbColumn('support_dismantle_history', 'customer_name'),
+    hasReviewDbColumn('support_dismantle_history', 'close_note'),
+    hasReviewDbColumn('support_dismantle_history', 'closed_at'),
+  ])
   const rows = await runReviewDbQuery<SupportAuditActivityRow>(
     `
       SELECT *
@@ -3004,12 +4409,12 @@ async function getReviewDbSupportAuditTimeline(limit = 8): Promise<TimelineActiv
           'TT_CREATE' AS actionType,
           ticket_code AS entityRef,
           customer_name AS customerName,
-          notes AS detailText,
+          ${hasSupportTicketNotes ? 'notes' : 'NULL'} AS detailText,
           opened_at AS happenedAt
         FROM support_trouble_tickets
-        WHERE notes IS NOT NULL
-          AND notes <> ''
-          AND notes LIKE '[Review Ticket]%'
+        WHERE ${hasSupportTicketNotes ? 'notes IS NOT NULL' : '1 = 0'}
+          AND ${hasSupportTicketNotes ? "notes <> ''" : '1 = 0'}
+          AND ${hasSupportTicketNotes ? "notes LIKE '[Review Ticket]%'" : '1 = 0'}
 
         UNION ALL
 
@@ -3017,13 +4422,13 @@ async function getReviewDbSupportAuditTimeline(limit = 8): Promise<TimelineActiv
           'TT_CLOSE' AS actionType,
           ticket_code AS entityRef,
           customer_name AS customerName,
-          close_notes AS detailText,
-          closed_at AS happenedAt
+          ${hasSupportTicketCloseNotes ? 'close_notes' : 'NULL'} AS detailText,
+          ${hasSupportTicketClosedAt ? 'closed_at' : 'NULL'} AS happenedAt
         FROM support_trouble_tickets
-        WHERE closed_at IS NOT NULL
-          AND close_notes IS NOT NULL
-          AND close_notes <> ''
-          AND close_notes LIKE '[Closed via web]%'
+        WHERE ${hasSupportTicketClosedAt ? 'closed_at IS NOT NULL' : '1 = 0'}
+          AND ${hasSupportTicketCloseNotes ? 'close_notes IS NOT NULL' : '1 = 0'}
+          AND ${hasSupportTicketCloseNotes ? "close_notes <> ''" : '1 = 0'}
+          AND ${hasSupportTicketCloseNotes ? "close_notes LIKE '[Closed via web]%'" : '1 = 0'}
 
         UNION ALL
 
@@ -3031,12 +4436,12 @@ async function getReviewDbSupportAuditTimeline(limit = 8): Promise<TimelineActiv
           'ISOLATION_CREATE' AS actionType,
           CONCAT('ISOLIR-', id) AS entityRef,
           customer_name AS customerName,
-          reason AS detailText,
-          isolation_date AS happenedAt
+          ${hasIsolationReason ? 'reason' : 'NULL'} AS detailText,
+          ${hasIsolationDate ? 'isolation_date' : 'NULL'} AS happenedAt
         FROM support_isolations
-        WHERE reason IS NOT NULL
-          AND reason <> ''
-          AND reason LIKE '[Review Isolir]%'
+        WHERE ${hasIsolationReason ? 'reason IS NOT NULL' : '1 = 0'}
+          AND ${hasIsolationReason ? "reason <> ''" : '1 = 0'}
+          AND ${hasIsolationReason ? "reason LIKE '[Review Isolir]%'" : '1 = 0'}
 
         UNION ALL
 
@@ -3044,27 +4449,27 @@ async function getReviewDbSupportAuditTimeline(limit = 8): Promise<TimelineActiv
           'ISOLATION_RESTORE' AS actionType,
           CONCAT('ISOLIR-', id) AS entityRef,
           customer_name AS customerName,
-          close_note AS detailText,
-          restoration_date AS happenedAt
+          ${hasIsolationCloseNote ? 'close_note' : 'NULL'} AS detailText,
+          ${hasIsolationRestorationDate ? 'restoration_date' : 'NULL'} AS happenedAt
         FROM support_isolations
-        WHERE restoration_date IS NOT NULL
-          AND close_note IS NOT NULL
-          AND close_note <> ''
-          AND close_note LIKE '[Restored via web]%'
+        WHERE ${hasIsolationRestorationDate ? 'restoration_date IS NOT NULL' : '1 = 0'}
+          AND ${hasIsolationCloseNote ? 'close_note IS NOT NULL' : '1 = 0'}
+          AND ${hasIsolationCloseNote ? "close_note <> ''" : '1 = 0'}
+          AND ${hasIsolationCloseNote ? "close_note LIKE '[Restored via web]%'" : '1 = 0'}
 
         UNION ALL
 
         SELECT
           'DISMANTLE' AS actionType,
           CONCAT('DISMANTLE-', id) AS entityRef,
-          customer_name AS customerName,
-          close_note AS detailText,
-          closed_at AS happenedAt
+          ${hasDismantleHistoryCustomerName ? 'customer_name' : 'NULL'} AS customerName,
+          ${hasDismantleHistoryCloseNote ? 'close_note' : 'NULL'} AS detailText,
+          ${hasDismantleHistoryClosedAt ? 'closed_at' : 'NULL'} AS happenedAt
         FROM support_dismantle_history
-        WHERE closed_at IS NOT NULL
-          AND close_note IS NOT NULL
-          AND close_note <> ''
-          AND close_note LIKE '[Dismantled via web]%'
+        WHERE ${hasDismantleHistoryClosedAt ? 'closed_at IS NOT NULL' : '1 = 0'}
+          AND ${hasDismantleHistoryCloseNote ? 'close_note IS NOT NULL' : '1 = 0'}
+          AND ${hasDismantleHistoryCloseNote ? "close_note <> ''" : '1 = 0'}
+          AND ${hasDismantleHistoryCloseNote ? "close_note LIKE '[Dismantled via web]%'" : '1 = 0'}
       ) support_audits
       ORDER BY happenedAt DESC
       LIMIT ?
@@ -3109,6 +4514,10 @@ function formatInventoryAuditTitle(actionType: string, entityRef: string, itemCo
 }
 
 async function getReviewDbInventoryAuditTimeline(limit = 8): Promise<TimelineActivityItem[]> {
+  const [hasInventoryRequestNotes, hasInventoryStockMovementNotes] = await Promise.all([
+    hasReviewDbColumn('inventory_item_requests', 'request_notes'),
+    hasReviewDbColumn('inventory_stock_movements', 'notes'),
+  ])
   const rows = await runReviewDbQuery<InventoryAuditActivityRow>(
     `
       SELECT *
@@ -3121,7 +4530,7 @@ async function getReviewDbInventoryAuditTimeline(limit = 8): Promise<TimelineAct
           iir.request_qty AS qty,
           iir.requested_subdivision AS statusText,
           iir.requested_by AS actorName,
-          iir.request_notes AS detailText,
+          ${hasInventoryRequestNotes ? 'iir.request_notes' : 'NULL'} AS detailText,
           iir.requested_at AS happenedAt
         FROM inventory_item_requests iir
         JOIN inventory_items ii
@@ -3137,7 +4546,7 @@ async function getReviewDbInventoryAuditTimeline(limit = 8): Promise<TimelineAct
           iir.request_qty AS qty,
           iir.request_status AS statusText,
           iir.processed_by AS actorName,
-          iir.request_notes AS detailText,
+          ${hasInventoryRequestNotes ? 'iir.request_notes' : 'NULL'} AS detailText,
           iir.processed_at AS happenedAt
         FROM inventory_item_requests iir
         JOIN inventory_items ii
@@ -3157,15 +4566,15 @@ async function getReviewDbInventoryAuditTimeline(limit = 8): Promise<TimelineAct
           ism.qty AS qty,
           ism.movement_type AS statusText,
           NULL AS actorName,
-          ism.notes AS detailText,
+          ${hasInventoryStockMovementNotes ? 'ism.notes' : 'NULL'} AS detailText,
           ism.movement_at AS happenedAt
         FROM inventory_stock_movements ism
         JOIN inventory_items ii
           ON ii.id = ism.item_id
         WHERE ism.movement_type = 'IN'
-          AND ism.notes IS NOT NULL
-          AND ism.notes <> ''
-          AND ism.notes LIKE '[BARANG MASUK]%'
+          AND ${hasInventoryStockMovementNotes ? 'ism.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasInventoryStockMovementNotes ? "ism.notes <> ''" : '1 = 0'}
+          AND ${hasInventoryStockMovementNotes ? "ism.notes LIKE '[BARANG MASUK]%'" : '1 = 0'}
 
         UNION ALL
 
@@ -3177,15 +4586,15 @@ async function getReviewDbInventoryAuditTimeline(limit = 8): Promise<TimelineAct
           ism.qty AS qty,
           ism.movement_type AS statusText,
           NULL AS actorName,
-          ism.notes AS detailText,
+          ${hasInventoryStockMovementNotes ? 'ism.notes' : 'NULL'} AS detailText,
           ism.movement_at AS happenedAt
         FROM inventory_stock_movements ism
         JOIN inventory_items ii
           ON ii.id = ism.item_id
         WHERE ism.movement_type = 'OUT'
-          AND ism.notes IS NOT NULL
-          AND ism.notes <> ''
-          AND ism.notes LIKE '[PINJAM]%'
+          AND ${hasInventoryStockMovementNotes ? 'ism.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasInventoryStockMovementNotes ? "ism.notes <> ''" : '1 = 0'}
+          AND ${hasInventoryStockMovementNotes ? "ism.notes LIKE '[PINJAM]%'" : '1 = 0'}
 
         UNION ALL
 
@@ -3197,15 +4606,15 @@ async function getReviewDbInventoryAuditTimeline(limit = 8): Promise<TimelineAct
           ism.qty AS qty,
           ism.movement_type AS statusText,
           NULL AS actorName,
-          ism.notes AS detailText,
+          ${hasInventoryStockMovementNotes ? 'ism.notes' : 'NULL'} AS detailText,
           ism.movement_at AS happenedAt
         FROM inventory_stock_movements ism
         JOIN inventory_items ii
           ON ii.id = ism.item_id
         WHERE ism.movement_type = 'IN'
-          AND ism.notes IS NOT NULL
-          AND ism.notes <> ''
-          AND ism.notes LIKE '[KEMBALI]%'
+          AND ${hasInventoryStockMovementNotes ? 'ism.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasInventoryStockMovementNotes ? "ism.notes <> ''" : '1 = 0'}
+          AND ${hasInventoryStockMovementNotes ? "ism.notes LIKE '[KEMBALI]%'" : '1 = 0'}
       ) inventory_audits
       ORDER BY happenedAt DESC
       LIMIT ?
@@ -3258,6 +4667,12 @@ function formatBillingAuditTitle(actionType: string, entityRef: string, customer
 }
 
 async function getReviewDbBillingAuditTimeline(limit = 8): Promise<TimelineActivityItem[]> {
+  const [hasBillingInvoiceNotes, hasBillingPaymentNotes, hasBillingCollectionActionNotes] = await Promise.all([
+    hasReviewDbColumn('billing_invoices', 'notes'),
+    hasReviewDbColumn('billing_payments', 'notes'),
+    hasReviewDbColumn('billing_collection_actions', 'notes'),
+  ])
+  const billingAuditQueryParts = await getDashboardBillingAuditQueryParts()
   const rows = await runReviewDbQuery<BillingAuditActivityRow>(
     `
       SELECT *
@@ -3265,38 +4680,34 @@ async function getReviewDbBillingAuditTimeline(limit = 8): Promise<TimelineActiv
         SELECT
           'INVOICE_CREATE' AS actionType,
           bi.invoice_no AS entityRef,
-          c.full_name AS customerName,
+          ${billingAuditQueryParts.customerNameExpression} AS customerName,
           bi.total_amount AS amount,
           bi.invoice_status AS statusText,
-          bi.notes AS detailText,
+          ${hasBillingInvoiceNotes ? 'bi.notes' : 'NULL'} AS detailText,
           bi.created_at AS happenedAt
         FROM billing_invoices bi
-        JOIN service_subscriptions ss
-          ON ss.id = bi.subscription_id
-        JOIN crm_customers c
-          ON c.id = ss.customer_id
-        WHERE bi.notes IS NOT NULL
-          AND bi.notes <> ''
-          AND bi.notes LIKE '[Review Invoice]%'
+        ${billingAuditQueryParts.subscriptionJoin}
+        ${billingAuditQueryParts.customerJoin}
+        WHERE ${hasBillingInvoiceNotes ? 'bi.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasBillingInvoiceNotes ? "bi.notes <> ''" : '1 = 0'}
+          AND ${hasBillingInvoiceNotes ? "bi.notes LIKE '[Review Invoice]%'" : '1 = 0'}
 
         UNION ALL
 
         SELECT
           'INVOICE_CANCEL' AS actionType,
           bi.invoice_no AS entityRef,
-          c.full_name AS customerName,
+          ${billingAuditQueryParts.customerNameExpression} AS customerName,
           bi.total_amount AS amount,
           bi.invoice_status AS statusText,
-          bi.notes AS detailText,
+          ${hasBillingInvoiceNotes ? 'bi.notes' : 'NULL'} AS detailText,
           bi.updated_at AS happenedAt
         FROM billing_invoices bi
-        JOIN service_subscriptions ss
-          ON ss.id = bi.subscription_id
-        JOIN crm_customers c
-          ON c.id = ss.customer_id
-        WHERE bi.notes IS NOT NULL
-          AND bi.notes <> ''
-          AND bi.notes LIKE '%[Status Update]%'
+        ${billingAuditQueryParts.subscriptionJoin}
+        ${billingAuditQueryParts.customerJoin}
+        WHERE ${hasBillingInvoiceNotes ? 'bi.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasBillingInvoiceNotes ? "bi.notes <> ''" : '1 = 0'}
+          AND ${hasBillingInvoiceNotes ? "bi.notes LIKE '%[Status Update]%'" : '1 = 0'}
           AND bi.invoice_status = 'CANCELLED'
 
         UNION ALL
@@ -3304,42 +4715,38 @@ async function getReviewDbBillingAuditTimeline(limit = 8): Promise<TimelineActiv
         SELECT
           'PAYMENT_CREATE' AS actionType,
           bp.payment_no AS entityRef,
-          c.full_name AS customerName,
+          ${billingAuditQueryParts.customerNameExpression} AS customerName,
           bp.amount AS amount,
-          bp.payment_method AS statusText,
-          bp.notes AS detailText,
-          bp.payment_date AS happenedAt
+          ${billingAuditQueryParts.paymentMethodExpression} AS statusText,
+          ${hasBillingPaymentNotes ? 'bp.notes' : 'NULL'} AS detailText,
+          ${billingAuditQueryParts.paymentDateExpression} AS happenedAt
         FROM billing_payments bp
         JOIN billing_invoices bi
           ON bi.id = bp.invoice_id
-        JOIN service_subscriptions ss
-          ON ss.id = bi.subscription_id
-        JOIN crm_customers c
-          ON c.id = ss.customer_id
-        WHERE bp.notes IS NOT NULL
-          AND bp.notes <> ''
-          AND bp.notes LIKE '[Review Payment]%'
+        ${billingAuditQueryParts.subscriptionJoin}
+        ${billingAuditQueryParts.customerJoin}
+        WHERE ${hasBillingPaymentNotes ? 'bp.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasBillingPaymentNotes ? "bp.notes <> ''" : '1 = 0'}
+          AND ${hasBillingPaymentNotes ? "bp.notes LIKE '[Review Payment]%'" : '1 = 0'}
 
         UNION ALL
 
         SELECT
           'COLLECTION_ACTION' AS actionType,
           bi.invoice_no AS entityRef,
-          c.full_name AS customerName,
+          ${billingAuditQueryParts.customerNameExpression} AS customerName,
           bi.total_amount AS amount,
-          bca.action_type AS statusText,
-          bca.notes AS detailText,
-          bca.action_at AS happenedAt
+          ${billingAuditQueryParts.actionTypeExpression} AS statusText,
+          ${hasBillingCollectionActionNotes ? 'bca.notes' : 'NULL'} AS detailText,
+          ${billingAuditQueryParts.actionAtExpression} AS happenedAt
         FROM billing_collection_actions bca
         JOIN billing_invoices bi
           ON bi.id = bca.invoice_id
-        JOIN service_subscriptions ss
-          ON ss.id = bi.subscription_id
-        JOIN crm_customers c
-          ON c.id = ss.customer_id
-        WHERE bca.notes IS NOT NULL
-          AND bca.notes <> ''
-          AND bca.notes LIKE '[Review Action]%'
+        ${billingAuditQueryParts.subscriptionJoin}
+        ${billingAuditQueryParts.customerJoin}
+        WHERE ${hasBillingCollectionActionNotes ? 'bca.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasBillingCollectionActionNotes ? "bca.notes <> ''" : '1 = 0'}
+          AND ${hasBillingCollectionActionNotes ? "bca.notes LIKE '[Review Action]%'" : '1 = 0'}
       ) billing_audits
       ORDER BY happenedAt DESC
       LIMIT ?
@@ -3445,6 +4852,13 @@ function formatHrAuditTitle(actionType: string, targetRef: string) {
 }
 
 async function getReviewDbSalesAuditTimeline(limit = 8): Promise<TimelineActivityItem[]> {
+  const [hasSalesLeadNotes, hasSalesSurveyTechnicalNotes, hasSalesOrderNotes, hasServiceWorkOrderNotes] =
+    await Promise.all([
+      hasReviewDbColumn('sales_leads', 'notes'),
+      hasReviewDbColumn('sales_surveys', 'technical_notes'),
+      hasReviewDbColumn('sales_orders', 'notes'),
+      hasReviewDbColumn('service_work_orders', 'notes'),
+    ])
   const rows = await runReviewDbQuery<SalesAuditActivityRow>(
     `
       SELECT *
@@ -3454,12 +4868,12 @@ async function getReviewDbSalesAuditTimeline(limit = 8): Promise<TimelineActivit
           CONCAT('LEAD-', sl.id) AS entityRef,
           sl.customer_name AS customerName,
           sl.status AS statusText,
-          sl.notes AS detailText,
+          ${hasSalesLeadNotes ? 'sl.notes' : 'NULL'} AS detailText,
           sl.created_at AS happenedAt
         FROM sales_leads sl
-        WHERE sl.notes IS NOT NULL
-          AND sl.notes <> ''
-          AND sl.notes LIKE '[Review Lead]%'
+        WHERE ${hasSalesLeadNotes ? 'sl.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasSalesLeadNotes ? "sl.notes <> ''" : '1 = 0'}
+          AND ${hasSalesLeadNotes ? "sl.notes LIKE '[Review Lead]%'" : '1 = 0'}
 
         UNION ALL
 
@@ -3468,14 +4882,14 @@ async function getReviewDbSalesAuditTimeline(limit = 8): Promise<TimelineActivit
           ss.survey_no AS entityRef,
           sl.customer_name AS customerName,
           ss.survey_status AS statusText,
-          ss.technical_notes AS detailText,
+          ${hasSalesSurveyTechnicalNotes ? 'ss.technical_notes' : 'NULL'} AS detailText,
           COALESCE(ss.scheduled_at, ss.created_at) AS happenedAt
         FROM sales_surveys ss
         LEFT JOIN sales_leads sl
           ON sl.id = ss.lead_id
-        WHERE ss.technical_notes IS NOT NULL
-          AND ss.technical_notes <> ''
-          AND ss.technical_notes LIKE '[Review Survey]%'
+        WHERE ${hasSalesSurveyTechnicalNotes ? 'ss.technical_notes IS NOT NULL' : '1 = 0'}
+          AND ${hasSalesSurveyTechnicalNotes ? "ss.technical_notes <> ''" : '1 = 0'}
+          AND ${hasSalesSurveyTechnicalNotes ? "ss.technical_notes LIKE '[Review Survey]%'" : '1 = 0'}
 
         UNION ALL
 
@@ -3484,14 +4898,14 @@ async function getReviewDbSalesAuditTimeline(limit = 8): Promise<TimelineActivit
           so.order_no AS entityRef,
           sl.customer_name AS customerName,
           so.status AS statusText,
-          so.notes AS detailText,
+          ${hasSalesOrderNotes ? 'so.notes' : 'NULL'} AS detailText,
           so.request_date AS happenedAt
         FROM sales_orders so
         LEFT JOIN sales_leads sl
           ON sl.id = so.lead_id
-        WHERE so.notes IS NOT NULL
-          AND so.notes <> ''
-          AND so.notes LIKE '[Review Sales Order]%'
+        WHERE ${hasSalesOrderNotes ? 'so.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasSalesOrderNotes ? "so.notes <> ''" : '1 = 0'}
+          AND ${hasSalesOrderNotes ? "so.notes LIKE '[Review Sales Order]%'" : '1 = 0'}
 
         UNION ALL
 
@@ -3500,7 +4914,7 @@ async function getReviewDbSalesAuditTimeline(limit = 8): Promise<TimelineActivit
           swo.work_order_no AS entityRef,
           COALESCE(sl.customer_name, c.full_name) AS customerName,
           swo.status AS statusText,
-          swo.notes AS detailText,
+          ${hasServiceWorkOrderNotes ? 'swo.notes' : 'NULL'} AS detailText,
           COALESCE(swo.scheduled_at, swo.created_at) AS happenedAt
         FROM service_work_orders swo
         LEFT JOIN sales_orders so
@@ -3509,9 +4923,9 @@ async function getReviewDbSalesAuditTimeline(limit = 8): Promise<TimelineActivit
           ON sl.id = so.lead_id
         LEFT JOIN crm_customers c
           ON c.id = so.customer_id
-        WHERE swo.notes IS NOT NULL
-          AND swo.notes <> ''
-          AND swo.notes LIKE '[Review Work Order]%'
+        WHERE ${hasServiceWorkOrderNotes ? 'swo.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasServiceWorkOrderNotes ? "swo.notes <> ''" : '1 = 0'}
+          AND ${hasServiceWorkOrderNotes ? "swo.notes LIKE '[Review Work Order]%'" : '1 = 0'}
 
         UNION ALL
 
@@ -3520,7 +4934,7 @@ async function getReviewDbSalesAuditTimeline(limit = 8): Promise<TimelineActivit
           swo.work_order_no AS entityRef,
           COALESCE(sl.customer_name, c.full_name) AS customerName,
           'COMPLETED' AS statusText,
-          swo.notes AS detailText,
+          ${hasServiceWorkOrderNotes ? 'swo.notes' : 'NULL'} AS detailText,
           COALESCE(swo.completed_at, swo.updated_at) AS happenedAt
         FROM service_work_orders swo
         LEFT JOIN sales_orders so
@@ -3529,9 +4943,9 @@ async function getReviewDbSalesAuditTimeline(limit = 8): Promise<TimelineActivit
           ON sl.id = so.lead_id
         LEFT JOIN crm_customers c
           ON c.id = so.customer_id
-        WHERE swo.notes IS NOT NULL
-          AND swo.notes <> ''
-          AND swo.notes LIKE '%[Activation]%'
+        WHERE ${hasServiceWorkOrderNotes ? 'swo.notes IS NOT NULL' : '1 = 0'}
+          AND ${hasServiceWorkOrderNotes ? "swo.notes <> ''" : '1 = 0'}
+          AND ${hasServiceWorkOrderNotes ? "swo.notes LIKE '%[Activation]%'" : '1 = 0'}
       ) sales_audits
       ORDER BY happenedAt DESC
       LIMIT ?
@@ -3553,22 +4967,30 @@ async function getReviewDbSalesAuditTimeline(limit = 8): Promise<TimelineActivit
   })
 }
 
+async function runSafeDashboardActivitySource<T>(loader: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await loader()
+  } catch {
+    return []
+  }
+}
+
 async function getReviewDbActivities(role: AppRole) {
   if (role !== 'SUPER_ADMIN') {
-    const importActivities = await getReviewDbImportBatchActivities()
+    const importActivities = await runSafeDashboardActivitySource(() => getReviewDbImportBatchActivities())
     return importActivities.length ? importActivities : dashboardActivities
   }
 
   const [importAudits, supportAudits, inventoryAudits, billingAudits, salesAudits, hrAudits, userAudits, permissionAudits, rolePermissionAudits] = await Promise.all([
-    getReviewDbImportAuditTimeline(8),
-    getReviewDbSupportAuditTimeline(8),
-    getReviewDbInventoryAuditTimeline(8),
-    getReviewDbBillingAuditTimeline(8),
-    getReviewDbSalesAuditTimeline(8),
-    getRecentHrAudits(8),
-    getRecentAuthUserAudits(8),
-    getRecentAuthPermissionAudits(8),
-    getRecentAuthRolePermissionAudits(8),
+    runSafeDashboardActivitySource(() => getReviewDbImportAuditTimeline(8)),
+    runSafeDashboardActivitySource(() => getReviewDbSupportAuditTimeline(8)),
+    runSafeDashboardActivitySource(() => getReviewDbInventoryAuditTimeline(8)),
+    runSafeDashboardActivitySource(() => getReviewDbBillingAuditTimeline(8)),
+    runSafeDashboardActivitySource(() => getReviewDbSalesAuditTimeline(8)),
+    runSafeDashboardActivitySource(() => getRecentHrAudits(8)),
+    runSafeDashboardActivitySource(() => getRecentAuthUserAudits(8)),
+    runSafeDashboardActivitySource(() => getRecentAuthPermissionAudits(8)),
+    runSafeDashboardActivitySource(() => getRecentAuthRolePermissionAudits(8)),
   ])
 
   const timeline: TimelineActivityItem[] = [
@@ -3602,7 +5024,7 @@ async function getReviewDbActivities(role: AppRole) {
     .slice(0, 10)
 
   if (!timeline.length) {
-    const importActivities = await getReviewDbImportBatchActivities()
+    const importActivities = await runSafeDashboardActivitySource(() => getReviewDbImportBatchActivities())
     return importActivities.length ? importActivities : dashboardActivities
   }
 
@@ -3660,9 +5082,9 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
       source,
       summary: dashboardSummary,
       metrics: dashboardMetrics,
-      roleQueues: getMockRoleQueues(role, dashboardSummary),
+      roleQueues: buildRoleQueues(role, dashboardSummary),
       worklist: getMockWorklist(role),
-      operationalCards: buildMockOperationalCards(dashboardSummary, resolvedFilters),
+      operationalCards: sanitizeDashboardOperationalCards(role, buildMockOperationalCards(dashboardSummary, resolvedFilters), resolvedFilters),
       dashboardAlerts: buildMockDashboardAlerts({
         summary: dashboardSummary,
         approvalPending: mockDailyActivityApprovalQueue.totalPending,
@@ -3708,9 +5130,9 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
       source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
       summary: dashboardSummary,
       metrics: dashboardMetrics,
-      roleQueues: getMockRoleQueues(role, dashboardSummary),
+      roleQueues: buildRoleQueues(role, dashboardSummary),
       worklist: getMockWorklist(role),
-      operationalCards: buildMockOperationalCards(dashboardSummary, resolvedFilters),
+      operationalCards: sanitizeDashboardOperationalCards(role, buildMockOperationalCards(dashboardSummary, resolvedFilters), resolvedFilters),
       dashboardAlerts: buildMockDashboardAlerts({
         summary: dashboardSummary,
         approvalPending: fallbackDailyActivityApprovalQueue.totalPending,

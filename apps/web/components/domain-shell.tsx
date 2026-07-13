@@ -3474,18 +3474,31 @@ export function DomainShell({
             <SupportTroubleTicketQueuePanel
               sections={visibleSections}
               actionLinks={laneActionLinks}
+              role={role}
               canUpdate={canUpdate}
               canApprove={canApprove}
             />
           ) : null}
           {supportPageMode === 'lane' && activeSupportLane === 'isolations' ? (
-            <SupportIsolationQueuePanel sections={visibleSections} actionLinks={laneActionLinks} />
+            <SupportIsolationQueuePanel
+              sections={visibleSections}
+              actionLinks={laneActionLinks}
+              role={role}
+              canUpdate={canUpdate}
+              canApprove={canApprove}
+            />
           ) : null}
           {supportPageMode === 'lane' && activeSupportLane === 'dismantle' ? (
-            <SupportDismantleQueuePanel sections={visibleSections} actionLinks={laneActionLinks} />
+            <SupportDismantleQueuePanel
+              sections={visibleSections}
+              actionLinks={laneActionLinks}
+              role={role}
+              canUpdate={canUpdate}
+              canApprove={canApprove}
+            />
           ) : null}
           {supportPageMode === 'lane' && activeSupportLane === 'sla' ? (
-            <SupportSlaQueuePanel sections={visibleSections} actionLinks={laneActionLinks} />
+            <SupportSlaQueuePanel sections={visibleSections} actionLinks={laneActionLinks} role={role} />
           ) : null}
           {supportFocusCopy && activeSupportLaneMeta && supportRoleMeta && activeSupportWorkspace ? (
             <SupportLaneWorkspacePanel

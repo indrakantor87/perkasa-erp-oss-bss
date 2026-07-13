@@ -17,6 +17,16 @@ async function main() {
     throw new Error('Payload health check tidak menandai `ok=true`.')
   }
 
+  const effectiveMode = payload?.dataSource?.effectiveMode
+  const isFallback = Boolean(payload?.dataSource?.isFallback)
+  const reviewDb = payload?.reviewDb
+  if (effectiveMode === 'review-db' && !isFallback) {
+    if (!reviewDb?.ready) {
+      const details = reviewDb?.missingColumns?.length ? `Missing: ${reviewDb.missingColumns.join(', ')}` : ''
+      throw new Error(`Review DB belum ready. ${details}`.trim())
+    }
+  }
+
   console.log(`Health check sukses: ${target}`)
   console.log(JSON.stringify(payload, null, 2))
 }

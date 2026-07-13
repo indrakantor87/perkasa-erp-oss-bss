@@ -3,6 +3,7 @@ import {
   buildResourceActionPermissionCode,
   buildRoutePrefixPermissionCode,
   getBaselineAllowedPrefixes,
+  getBaselineDefaultLandingPath,
   getBaselinePermissionMatrix,
 } from '@/lib/access-control'
 import { getDataSourceSnapshot } from '@/lib/data-source'
@@ -105,7 +106,14 @@ export function canAccessPath(role: AppRole, pathname: string) {
 }
 
 export function getDefaultLandingPath(role: AppRole) {
-  return getAllowedPrefixes(role)[0] ?? '/dashboard'
+  const allowedPrefixes = getAllowedPrefixes(role)
+  const preferredPath = getBaselineDefaultLandingPath(role)
+
+  if (preferredPath && allowedPrefixes.some((prefix) => matchesPrefix(preferredPath, prefix))) {
+    return preferredPath
+  }
+
+  return allowedPrefixes[0] ?? '/dashboard'
 }
 
 export function getPermissionMatrix(role: AppRole) {

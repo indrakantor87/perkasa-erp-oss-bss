@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 type OdpRow = {
   id: number
@@ -30,6 +30,99 @@ type InsertResult = {
 
 function normalizePortStatus(value: string) {
   return String(value ?? '').trim().toUpperCase()
+}
+
+async function getOdpPortQueryParts() {
+  const [hasPortStatus] = await Promise.all([hasReviewDbColumn('network_odp_ports', 'port_status')])
+
+  return {
+    portStatusExpression: hasPortStatus ? 'port_status' : "'AVAILABLE'",
+  }
+}
+
+async function buildOdpPortUpdatePayload(params: {
+  subscriptionId: number | null
+  customerId: number | null
+  noteText: string
+}) {
+  const [hasPortStatus, hasSubscriptionId, hasCustomerId, hasInstalledAt, hasNotes, hasUpdatedAt] = await Promise.all([
+    hasReviewDbColumn('network_odp_ports', 'port_status'),
+    hasReviewDbColumn('network_odp_ports', 'subscription_id'),
+    hasReviewDbColumn('network_odp_ports', 'customer_id'),
+    hasReviewDbColumn('network_odp_ports', 'installed_at'),
+    hasReviewDbColumn('network_odp_ports', 'notes'),
+    hasReviewDbColumn('network_odp_ports', 'updated_at'),
+  ])
+
+  const assignments: string[] = []
+  const values: unknown[] = []
+
+  if (hasPortStatus) {
+    assignments.push(`port_status = 'USED'`)
+  }
+  if (hasSubscriptionId) {
+    assignments.push('subscription_id = ?')
+    values.push(params.subscriptionId)
+  }
+  if (hasCustomerId) {
+    assignments.push('customer_id = ?')
+    values.push(params.customerId)
+  }
+  if (hasInstalledAt) {
+    assignments.push('installed_at = CURRENT_TIMESTAMP')
+  }
+  if (hasNotes) {
+    assignments.push(`notes = CASE
+            WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
+            ELSE CONCAT(notes, '\n', ?)
+          END`)
+    values.push(params.noteText, params.noteText)
+  }
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  if (!assignments.length) {
+    throw new Error('Schema network_odp_ports belum siap untuk assignment port.')
+  }
+
+  return {
+    assignments,
+    values,
+  }
+}
+
+async function buildOdpActivePortUpdatePayload(odpId: number) {
+  const [hasActivePorts, hasUpdatedAt, hasPortStatus] = await Promise.all([
+    hasReviewDbColumn('network_odp', 'active_ports'),
+    hasReviewDbColumn('network_odp', 'updated_at'),
+    hasReviewDbColumn('network_odp_ports', 'port_status'),
+  ])
+
+  if (!hasActivePorts && !hasUpdatedAt) {
+    return null
+  }
+
+  const assignments: string[] = []
+  const values: unknown[] = []
+
+  if (hasActivePorts) {
+    assignments.push(`active_ports = (
+            SELECT COUNT(*)
+            FROM network_odp_ports
+            WHERE odp_id = ?
+              ${hasPortStatus ? "AND port_status = 'USED'" : ''}
+          )`)
+    values.push(odpId)
+  }
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  return {
+    assignments,
+    values,
+  }
 }
 
 export async function POST(request: Request) {
@@ -81,9 +174,10 @@ export async function POST(request: Request) {
       return Response.json({ message: 'ODP tidak ditemukan di review DB.' }, { status: 404 })
     }
 
+    const odpPortQueryParts = await getOdpPortQueryParts()
     const [port] = await runReviewDbQuery<PortRow>(
       `
-        SELECT id, port_status AS portStatus
+        SELECT id, ${odpPortQueryParts.portStatusExpression} AS portStatus
         FROM network_odp_ports
         WHERE odp_id = ?
           AND port_no = ?
@@ -135,40 +229,35 @@ export async function POST(request: Request) {
     }
 
     const noteText = `[Assign ODP] ${session.displayName} (${session.username})${notesRaw ? ` - ${notesRaw}` : ''}`
+    const odpPortUpdatePayload = await buildOdpPortUpdatePayload({
+      subscriptionId,
+      customerId,
+      noteText,
+    })
 
     await runReviewDbExecute<InsertResult>(
       `
         UPDATE network_odp_ports
         SET
-          port_status = 'USED',
-          subscription_id = ?,
-          customer_id = ?,
-          installed_at = CURRENT_TIMESTAMP,
-          notes = CASE
-            WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
-            ELSE CONCAT(notes, '\n', ?)
-          END,
-          updated_at = CURRENT_TIMESTAMP
+          ${odpPortUpdatePayload.assignments.join(',\n          ')}
         WHERE id = ?
       `,
-      [subscriptionId, customerId, noteText, noteText, port.id],
+      [...odpPortUpdatePayload.values, port.id],
     )
 
-    await runReviewDbExecute<InsertResult>(
-      `
-        UPDATE network_odp
-        SET
-          active_ports = (
-            SELECT COUNT(*)
-            FROM network_odp_ports
-            WHERE odp_id = ?
-              AND port_status = 'USED'
-          ),
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `,
-      [odp.id, odp.id],
-    )
+    const odpActivePortUpdatePayload = await buildOdpActivePortUpdatePayload(odp.id)
+
+    if (odpActivePortUpdatePayload) {
+      await runReviewDbExecute<InsertResult>(
+        `
+          UPDATE network_odp
+          SET
+            ${odpActivePortUpdatePayload.assignments.join(',\n            ')}
+          WHERE id = ?
+        `,
+        [...odpActivePortUpdatePayload.values, odp.id],
+      )
+    }
 
     return Response.json({
       message: `Port ${odp.code} #${portNo} berhasil di-assign.`,

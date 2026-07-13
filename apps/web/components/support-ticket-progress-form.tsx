@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { SupportFormContextNote } from '@/components/support-form-context-note'
 
 type SupportTicketProgressFormProps = {
   canUpdate: boolean
@@ -131,7 +132,7 @@ export function SupportTicketProgressForm({
 
   return (
     <section className="panel p-6">
-      <p className="section-title">Progress Flow Support</p>
+      <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Update progress trouble ticket
       </h3>
@@ -142,6 +143,22 @@ export function SupportTicketProgressForm({
             ? 'Mode review database belum aktif, jadi progress trouble ticket dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini mencatat progress non-destruktif per ticket, termasuk PIC, status kerja terbaru, dan jadwal follow-up berikutnya.'}
       </p>
+      <SupportFormContextNote
+        items={[
+          {
+            label: 'Tujuan',
+            value: 'Memperbarui status kerja, PIC, dan follow-up tanpa menutup ticket terlalu cepat.',
+          },
+          {
+            label: 'Sumber',
+            value: 'Pilihan ticket membawa snapshot SLA, owner, dan progress terakhir dari lane TT aktif.',
+          },
+          {
+            label: 'Hasil',
+            value: 'Ticket tetap hidup di queue dengan jejak follow-up yang lebih jelas untuk operator berikutnya.',
+          },
+        ]}
+      />
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-slate-700">

@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { SupportFormContextNote } from '@/components/support-form-context-note'
 
 type SupportDismantleFormProps = {
   canProcess: boolean
@@ -88,7 +89,7 @@ export function SupportDismantleForm({
 
   return (
     <section className="panel p-6">
-      <p className="section-title">Dismantle Support</p>
+      <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Transfer ke queue dismantle
       </h3>
@@ -99,6 +100,22 @@ export function SupportDismantleForm({
             ? 'Mode review database belum aktif, jadi flow dismantle dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini memindahkan isolir aktif ke queue dismantle terlebih dahulu, sehingga terminasi final dan histori close diproses pada tahap berikutnya.'}
       </p>
+      <SupportFormContextNote
+        items={[
+          {
+            label: 'Tujuan',
+            value: 'Mendorong kasus yang sudah tidak layak restore ke antrean terminate yang lebih formal.',
+          },
+          {
+            label: 'Sumber',
+            value: 'Sumber kasus berasal dari isolir aktif, bukan dari histori close atau data buatan baru.',
+          },
+          {
+            label: 'Hasil',
+            value: 'Kasus siap ditangani di queue dismantle untuk close lapangan atau reopen bila keputusan berubah.',
+          },
+        ]}
+      />
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
         <label className="flex flex-col gap-2 text-sm text-slate-700">

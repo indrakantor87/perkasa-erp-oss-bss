@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { ensureSupportTroubleTicketProgressTable } from '@/lib/services/support-ticket-progress-service'
 
 type TroubleTicketRow = {
@@ -14,6 +14,10 @@ type TroubleTicketRow = {
 
 type TroubleTicketProgressRow = {
   progressStatus: string
+}
+
+type TroubleTicketMasterRow = {
+  masterValue: string
 }
 
 function normalizeRequiredText(value: unknown) {
@@ -40,6 +44,16 @@ async function getTroubleTicketByCode(ticketCode: string) {
 }
 
 async function getLatestProgressByTicketId(ticketId: number) {
+  const [hasProgressId, hasProgressTicketId, hasProgressStatus] = await Promise.all([
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'id'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'trouble_ticket_id'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'progress_status'),
+  ])
+
+  if (!hasProgressId || !hasProgressTicketId || !hasProgressStatus) {
+    return null
+  }
+
   const [row] = await runReviewDbQuery<TroubleTicketProgressRow>(
     `
       SELECT
@@ -53,6 +67,30 @@ async function getLatestProgressByTicketId(ticketId: number) {
   )
 
   return row ?? null
+}
+
+async function hasResolutionActionMaster(resolutionAction: string) {
+  const [hasMasterKind, hasMasterValue] = await Promise.all([
+    hasReviewDbColumn('support_trouble_ticket_masters', 'kind'),
+    hasReviewDbColumn('support_trouble_ticket_masters', 'master_value'),
+  ])
+
+  if (!hasMasterKind || !hasMasterValue) {
+    return null
+  }
+
+  const rows = await runReviewDbQuery<TroubleTicketMasterRow>(
+    `
+      SELECT master_value AS masterValue
+      FROM support_trouble_ticket_masters
+      WHERE UPPER(TRIM(kind)) = 'RESOLUTION_ACTION'
+        AND UPPER(TRIM(master_value)) = UPPER(TRIM(?))
+      LIMIT 1
+    `,
+    [resolutionAction],
+  )
+
+  return rows.length > 0
 }
 
 export async function POST(
@@ -105,11 +143,23 @@ export async function POST(
       return Response.json({ message: `Trouble ticket ${ticket.ticketCode} sudah berstatus closed.` }, { status: 409 })
     }
 
+    const hasKnownResolutionAction = await hasResolutionActionMaster(resolutionAction)
+    if (hasKnownResolutionAction === false) {
+      return Response.json(
+        { message: 'Tindakan penyelesaian belum terdaftar pada master resolution action.' },
+        { status: 400 },
+      )
+    }
+
     await ensureSupportTroubleTicketProgressTable()
 
     const latestProgress = await getLatestProgressByTicketId(ticket.id)
     const latestProgressStatus = String(latestProgress?.progressStatus ?? '').trim().toUpperCase()
-    if (!latestProgress || !['ON_PROGRESS', 'FOLLOW_UP'].includes(latestProgressStatus)) {
+    const ticketStatus = ticket.status.trim().toUpperCase()
+    const hasValidProgressState = latestProgress
+      ? ['ON_PROGRESS', 'FOLLOW_UP'].includes(latestProgressStatus)
+      : ['ON_PROGRESS', 'FOLLOW_UP'].includes(ticketStatus)
+    if (!hasValidProgressState) {
       return Response.json(
         {
           message: `Trouble ticket ${ticket.ticketCode} belum memiliki progress aktif yang valid. Update progress ticket terlebih dahulu sebelum close.`,

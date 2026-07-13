@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { SupportFormContextNote } from '@/components/support-form-context-note'
 
 type SupportIsolationRestoreFormProps = {
   canUpdate: boolean
@@ -88,7 +89,7 @@ export function SupportIsolationRestoreForm({
 
   return (
     <section className="panel p-6">
-      <p className="section-title">Restorasi Isolir</p>
+      <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Tutup isolir aktif melalui jalur Billing
       </h3>
@@ -99,6 +100,22 @@ export function SupportIsolationRestoreForm({
             ? 'Mode review database belum aktif, jadi restorasi isolir dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini dipakai untuk keputusan restore milik Billing atau collection, bukan untuk terminate. Kasus terminate dipindahkan ke queue Dismantle milik CS & Admin CS.'}
       </p>
+      <SupportFormContextNote
+        items={[
+          {
+            label: 'Tujuan',
+            value: 'Memulihkan pelanggan yang sudah aman dibuka kembali dari sisi billing atau collection.',
+          },
+          {
+            label: 'Sumber',
+            value: 'Daftar pilihan hanya mengambil isolir aktif agar restore tidak salah mengarah ke histori lama.',
+          },
+          {
+            label: 'Hasil',
+            value: 'Kasus keluar dari isolir aktif dan tidak ikut terbawa ke jalur terminate permanen.',
+          },
+        ]}
+      />
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
         <label className="flex flex-col gap-2 text-sm text-slate-700">

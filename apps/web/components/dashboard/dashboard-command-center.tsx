@@ -11,6 +11,7 @@ export function DashboardCommandCenter({
   worklistCount,
   moduleCount,
   approvalCount,
+  quickLinks,
 }: {
   roleLabel: string
   roleShortLabel: string
@@ -22,6 +23,11 @@ export function DashboardCommandCenter({
   worklistCount: number
   moduleCount: number
   approvalCount: number
+  quickLinks: Array<{
+    label: string
+    href: string
+    tone: 'primary' | 'secondary'
+  }>
 }) {
   const statusCards = [
     {
@@ -72,24 +78,19 @@ export function DashboardCommandCenter({
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              href="/dashboard/daily-activity"
-              className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800"
-            >
-              Buka Daily Activity
-            </Link>
-            <Link
-              href="/support"
-              className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              Lihat Support
-            </Link>
-            <Link
-              href="/billing"
-              className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              Lihat Billing
-            </Link>
+            {quickLinks.map((item) => (
+              <Link
+                key={`${item.href}-${item.label}`}
+                href={item.href}
+                className={
+                  item.tone === 'primary'
+                    ? 'rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800'
+                    : 'rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50'
+                }
+              >
+                {item.label}
+              </Link>
+            ))}
           </div>
         </div>
 

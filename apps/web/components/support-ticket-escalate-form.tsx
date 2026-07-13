@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { SupportFormContextNote } from '@/components/support-form-context-note'
 
 type SupportTicketEscalateFormProps = {
   canUpdate: boolean
@@ -161,11 +162,27 @@ export function SupportTicketEscalateForm({
 
   return (
     <section className="panel p-6">
-      <p className="section-title">Escalation Flow Support</p>
+      <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Eskalasi trouble ticket overdue
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">{helperText}</p>
+      <SupportFormContextNote
+        items={[
+          {
+            label: 'Tujuan',
+            value: 'Menaikkan ticket yang tertahan atau rawan overdue ke owner yang lebih tepat.',
+          },
+          {
+            label: 'Sumber',
+            value: 'Pilihan ticket membawa konteks SLA, progress terakhir, dan jejak eskalasi sebelumnya.',
+          },
+          {
+            label: 'Hasil',
+            value: 'Ticket punya jejak eskalasi formal yang bisa dilacak oleh SPV, NOC lead, atau tim lapangan.',
+          },
+        ]}
+      />
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-slate-700">

@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 const allowedStatuses = new Set(['CANCELLED', 'SUSPENDED', 'OVERDUE'])
 
@@ -19,27 +19,147 @@ function normalizeText(value: unknown) {
   return String(value ?? '').trim()
 }
 
+async function getBillingInvoiceStatusQueryParts() {
+  const [
+    hasSubscriptionId,
+    hasNotes,
+    hasSubscriptionTableId,
+    hasSubscriptionCustomerId,
+    hasCustomerId,
+    hasCustomerFullName,
+  ] = await Promise.all([
+    hasReviewDbColumn('billing_invoices', 'subscription_id'),
+    hasReviewDbColumn('billing_invoices', 'notes'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'customer_id'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+  ])
+
+  const canJoinSubscription = hasSubscriptionId && hasSubscriptionTableId
+  const canJoinCustomer = canJoinSubscription && hasSubscriptionCustomerId && hasCustomerId
+
+  return {
+    customerJoin: canJoinCustomer
+      ? `
+      LEFT JOIN service_subscriptions ss
+        ON ss.id = bi.subscription_id
+      LEFT JOIN crm_customers c
+        ON c.id = ss.customer_id`
+      : '',
+    customerNameExpression: canJoinCustomer && hasCustomerFullName ? 'c.full_name' : "'Customer belum terpetakan'",
+    notesExpression: hasNotes ? 'bi.notes' : 'NULL',
+  }
+}
+
+async function buildBillingInvoiceStatusUpdatePayload(params: {
+  nextStatus: string
+  mergedNotes: string
+}) {
+  const [hasInvoiceStatus, hasCollectionStatus, hasSuspendCandidate, hasNotes, hasUpdatedAt] = await Promise.all([
+    hasReviewDbColumn('billing_invoices', 'invoice_status'),
+    hasReviewDbColumn('billing_invoices', 'collection_status'),
+    hasReviewDbColumn('billing_invoices', 'suspend_candidate'),
+    hasReviewDbColumn('billing_invoices', 'notes'),
+    hasReviewDbColumn('billing_invoices', 'updated_at'),
+  ])
+
+  if (!hasInvoiceStatus) {
+    throw new Error('Schema inti billing_invoices belum siap. Kolom invoice_status wajib tersedia.')
+  }
+
+  const assignments = ['invoice_status = ?']
+  const values: unknown[] = [params.nextStatus]
+
+  if (hasCollectionStatus) {
+    assignments.push(`collection_status = CASE
+          WHEN ? = 'SUSPENDED' THEN 'SUSPEND'
+          WHEN ? = 'OVERDUE' THEN 'REMINDER'
+          ELSE 'CLOSED'
+        END`)
+    values.push(params.nextStatus, params.nextStatus)
+  }
+  if (hasSuspendCandidate) {
+    assignments.push(`suspend_candidate = CASE
+          WHEN ? = 'SUSPENDED' THEN 1
+          ELSE 0
+        END`)
+    values.push(params.nextStatus)
+  }
+  if (hasNotes) {
+    assignments.push('notes = ?')
+    values.push(params.mergedNotes)
+  }
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  return {
+    assignments,
+    values,
+  }
+}
+
+async function buildReconnectResolutionPayload(invoiceId: number, resolutionNote: string) {
+  const [hasInvoiceId, hasActionStatus, hasDueFollowUpAt, hasNotes, hasActionType] = await Promise.all([
+    hasReviewDbColumn('billing_collection_actions', 'invoice_id'),
+    hasReviewDbColumn('billing_collection_actions', 'action_status'),
+    hasReviewDbColumn('billing_collection_actions', 'due_follow_up_at'),
+    hasReviewDbColumn('billing_collection_actions', 'notes'),
+    hasReviewDbColumn('billing_collection_actions', 'action_type'),
+  ])
+
+  if (!hasInvoiceId || !hasActionStatus) {
+    return null
+  }
+
+  const assignments = [`action_status = 'DONE'`]
+  const values: unknown[] = []
+
+  if (hasDueFollowUpAt) {
+    assignments.push('due_follow_up_at = NULL')
+  }
+  if (hasNotes) {
+    assignments.push(`notes = CASE
+            WHEN notes IS NULL OR notes = '' THEN ?
+            ELSE CONCAT(notes, '\n', ?)
+          END`)
+    values.push(resolutionNote, resolutionNote)
+  }
+
+  const whereClauses = ['invoice_id = ?', `COALESCE(UPPER(TRIM(action_status)), 'OPEN') = 'OPEN'`]
+  values.push(invoiceId)
+
+  if (hasActionType) {
+    whereClauses.push(`COALESCE(UPPER(TRIM(action_type)), '') = 'RECONNECT'`)
+  }
+
+  return {
+    assignments,
+    whereClauses,
+    values,
+  }
+}
+
 async function updateInvoiceStatus(params: {
   invoiceNo: string
   nextStatus: string
   notes: string
   actorLabel: string
 }) {
+  const invoiceQueryParts = await getBillingInvoiceStatusQueryParts()
   const [invoice] = await runReviewDbQuery<BillingInvoiceRow>(
     `
       SELECT
         bi.id,
         bi.invoice_no AS invoiceNo,
-        c.full_name AS customerName,
+        ${invoiceQueryParts.customerNameExpression} AS customerName,
         bi.invoice_status AS invoiceStatus,
         bi.paid_amount AS paidAmount,
         bi.total_amount AS totalAmount,
-        bi.notes
+        ${invoiceQueryParts.notesExpression} AS notes
       FROM billing_invoices bi
-      JOIN service_subscriptions ss
-        ON ss.id = bi.subscription_id
-      JOIN crm_customers c
-        ON c.id = ss.customer_id
+      ${invoiceQueryParts.customerJoin}
       WHERE bi.invoice_no = ?
       LIMIT 1
     `,
@@ -87,46 +207,35 @@ async function updateInvoiceStatus(params: {
     .filter(Boolean)
     .join('\n')
 
+  const invoiceUpdatePayload = await buildBillingInvoiceStatusUpdatePayload({
+    nextStatus: params.nextStatus,
+    mergedNotes,
+  })
   await runReviewDbExecute(
     `
       UPDATE billing_invoices
       SET
-        invoice_status = ?,
-        collection_status = CASE
-          WHEN ? = 'SUSPENDED' THEN 'SUSPEND'
-          WHEN ? = 'OVERDUE' THEN 'REMINDER'
-          ELSE 'CLOSED'
-        END,
-        suspend_candidate = CASE
-          WHEN ? = 'SUSPENDED' THEN 1
-          ELSE 0
-        END,
-        notes = ?,
-        updated_at = CURRENT_TIMESTAMP
+        ${invoiceUpdatePayload.assignments.join(',\n        ')}
       WHERE id = ?
     `,
-    [params.nextStatus, params.nextStatus, params.nextStatus, params.nextStatus, mergedNotes, invoice.id],
+    [...invoiceUpdatePayload.values, invoice.id],
   )
 
   if (params.nextStatus === 'OVERDUE') {
     const resolutionNote = `[Auto Resolved via Status Update] ${params.actorLabel} mengaktifkan kembali invoice ke OVERDUE.`
+    const reconnectResolutionPayload = await buildReconnectResolutionPayload(invoice.id, resolutionNote)
 
-    await runReviewDbExecute(
-      `
-        UPDATE billing_collection_actions
-        SET
-          action_status = 'DONE',
-          due_follow_up_at = NULL,
-          notes = CASE
-            WHEN notes IS NULL OR notes = '' THEN ?
-            ELSE CONCAT(notes, '\n', ?)
-          END
-        WHERE invoice_id = ?
-          AND COALESCE(UPPER(TRIM(action_status)), 'OPEN') = 'OPEN'
-          AND COALESCE(UPPER(TRIM(action_type)), '') = 'RECONNECT'
-      `,
-      [resolutionNote, resolutionNote, invoice.id],
-    )
+    if (reconnectResolutionPayload) {
+      await runReviewDbExecute(
+        `
+          UPDATE billing_collection_actions
+          SET
+            ${reconnectResolutionPayload.assignments.join(',\n            ')}
+          WHERE ${reconnectResolutionPayload.whereClauses.join('\n          AND ')}
+        `,
+        reconnectResolutionPayload.values,
+      )
+    }
   }
 
   return invoice

@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 import {
   buildSupportDismantleReopenNote,
   ensureSupportDismantleQueueTable,
@@ -18,17 +18,33 @@ type ReviewDismantleQueueRow = {
   id: number
 }
 
+type ReviewIsolationReopenStateRow = {
+  id: number
+  status: string
+  archivedAt: string | Date | null
+  restorationDate: string | Date | null
+}
+
 function normalizeRequiredText(value: unknown) {
   return String(value ?? '').trim()
 }
 
 async function getDismantleHistoryById(id: string) {
+  const [hasIsolationId, hasCustomerName] = await Promise.all([
+    hasReviewDbColumn('support_dismantle_history', 'isolation_id'),
+    hasReviewDbColumn('support_dismantle_history', 'customer_name'),
+  ])
+
+  if (!hasIsolationId) {
+    throw new Error('Schema inti support_dismantle_history belum siap. Kolom isolation_id wajib tersedia.')
+  }
+
   const [row] = await runReviewDbQuery<ReviewDismantleHistoryRow>(
     `
       SELECT
         id AS historyId,
         isolation_id AS isolationId,
-        customer_name AS customerName
+        ${hasCustomerName ? 'customer_name' : "''"} AS customerName
       FROM support_dismantle_history
       WHERE id = ?
       LIMIT 1
@@ -37,6 +53,115 @@ async function getDismantleHistoryById(id: string) {
   )
 
   return row ?? null
+}
+
+async function getIsolationReopenState(id: number) {
+  const [hasStatus, hasArchivedAt, hasRestorationDate] = await Promise.all([
+    hasReviewDbColumn('support_isolations', 'status'),
+    hasReviewDbColumn('support_isolations', 'archived_at'),
+    hasReviewDbColumn('support_isolations', 'restoration_date'),
+  ])
+
+  if (!hasStatus) {
+    throw new Error('Schema inti support_isolations belum siap. Kolom status wajib tersedia.')
+  }
+
+  const [row] = await runReviewDbQuery<ReviewIsolationReopenStateRow>(
+    `
+      SELECT
+        id,
+        status,
+        ${hasArchivedAt ? 'archived_at' : 'NULL'} AS archivedAt,
+        ${hasRestorationDate ? 'restoration_date' : 'NULL'} AS restorationDate
+      FROM support_isolations
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [id],
+  )
+
+  return row ?? null
+}
+
+async function buildIsolationReopenAssignments(normalizedReopenNote: string) {
+  const [hasStatus, hasRestorationDate, hasCloseNote, hasIsArchived, hasArchivedAt, hasUpdatedAt] =
+    await Promise.all([
+      hasReviewDbColumn('support_isolations', 'status'),
+      hasReviewDbColumn('support_isolations', 'restoration_date'),
+      hasReviewDbColumn('support_isolations', 'close_note'),
+      hasReviewDbColumn('support_isolations', 'is_archived'),
+      hasReviewDbColumn('support_isolations', 'archived_at'),
+      hasReviewDbColumn('support_isolations', 'updated_at'),
+    ])
+
+  if (!hasStatus) {
+    throw new Error('Schema inti support_isolations belum siap. Kolom status wajib tersedia.')
+  }
+
+  const assignments = [`status = 'OPEN'`]
+  const values: unknown[] = []
+
+  if (hasRestorationDate) {
+    assignments.push('restoration_date = NULL')
+  }
+  if (hasCloseNote) {
+    assignments.push('close_note = ?')
+    values.push(normalizedReopenNote)
+  }
+  if (hasIsArchived) {
+    assignments.push('is_archived = 0')
+  }
+  if (hasArchivedAt) {
+    assignments.push('archived_at = NULL')
+  }
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  return {
+    assignments,
+    values,
+  }
+}
+
+async function buildDismantleQueueInsertPayload(params: {
+  isolationId: number
+  transferNote: string
+  username: string
+  reopenedNote: string
+}) {
+  const [hasIsolationId, hasTransferNote, hasTransferredByUsername, hasReopenedNote] = await Promise.all([
+    hasReviewDbColumn('support_dismantle_queue', 'isolation_id'),
+    hasReviewDbColumn('support_dismantle_queue', 'transfer_note'),
+    hasReviewDbColumn('support_dismantle_queue', 'transferred_by_username'),
+    hasReviewDbColumn('support_dismantle_queue', 'reopened_note'),
+  ])
+
+  if (!hasIsolationId) {
+    throw new Error('Schema inti support_dismantle_queue belum siap. Kolom isolation_id wajib tersedia.')
+  }
+
+  const columns = ['isolation_id']
+  const values: unknown[] = [params.isolationId]
+
+  if (hasTransferNote) {
+    columns.push('transfer_note')
+    values.push(params.transferNote)
+  }
+  if (hasTransferredByUsername) {
+    columns.push('transferred_by_username')
+    values.push(params.username)
+  }
+  if (hasReopenedNote) {
+    columns.push('reopened_note')
+    values.push(params.reopenedNote)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
 }
 
 export async function POST(
@@ -82,6 +207,22 @@ export async function POST(
       return Response.json({ message: 'Histori dismantle ini tidak punya referensi isolir aktif.' }, { status: 409 })
     }
 
+    const isolationState = await getIsolationReopenState(history.isolationId)
+    if (!isolationState) {
+      return Response.json({ message: 'Data isolir asal histori dismantle tidak ditemukan.' }, { status: 404 })
+    }
+    const normalizedIsolationStatus = normalizeRequiredText(isolationState.status).toUpperCase()
+    if (
+      normalizedIsolationStatus === 'OPEN' &&
+      !isolationState.archivedAt &&
+      !isolationState.restorationDate
+    ) {
+      return Response.json(
+        { message: `Isolir ${history.isolationId} sudah aktif dan tidak perlu dibuka ulang.` },
+        { status: 409 },
+      )
+    }
+
     const existingQueue = await runReviewDbQuery<ReviewDismantleQueueRow>(
       `
         SELECT id
@@ -96,34 +237,33 @@ export async function POST(
     }
 
     const normalizedReopenNote = buildSupportDismantleReopenNote(session, reopenNote)
+    const isolationReopenPayload = await buildIsolationReopenAssignments(normalizedReopenNote)
+    const queueInsertPayload = await buildDismantleQueueInsertPayload({
+      isolationId: history.isolationId,
+      transferNote: normalizedReopenNote,
+      username: session.username,
+      reopenedNote: normalizedReopenNote,
+    })
 
     await runReviewDbTransaction(async (connection) => {
       await connection.query(
         `
           UPDATE support_isolations
           SET
-            status = 'OPEN',
-            restoration_date = NULL,
-            close_note = ?,
-            is_archived = 0,
-            archived_at = NULL,
-            updated_at = CURRENT_TIMESTAMP
+            ${isolationReopenPayload.assignments.join(',\n            ')}
           WHERE id = ?
         `,
-        [normalizedReopenNote, history.isolationId],
+        [...isolationReopenPayload.values, history.isolationId],
       )
 
       await connection.query(
         `
           INSERT INTO support_dismantle_queue (
-            isolation_id,
-            transfer_note,
-            transferred_by_username,
-            reopened_note
+            ${queueInsertPayload.columns.join(',\n            ')}
           )
-          VALUES (?, ?, ?, ?)
+          VALUES (${queueInsertPayload.placeholders.join(', ')})
         `,
-        [history.isolationId, normalizedReopenNote, session.username, normalizedReopenNote],
+        queueInsertPayload.values,
       )
 
       await connection.query(

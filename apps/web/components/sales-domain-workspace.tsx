@@ -167,13 +167,30 @@ function getSectionRowsByKeyword(sections: DomainPageContent['reviewSections'], 
 }
 
 function buildSalesConsoleStats(sections: DomainPageContent['reviewSections']) {
-  const leadRows = getSectionRowsByKeyword(sections, 'LEAD')
-  const coverageRows = getSectionRowsByKeyword(sections, 'COVERAGE')
-  const flowRows = getSectionRowsByKeyword(sections, 'SURVEY')
-    .concat(getSectionRowsByKeyword(sections, 'ORDER'))
+  const categorizedSections = (sections ?? []).map((section) => ({
+    title: section.title.toUpperCase(),
+    rows: section.rows,
+  }))
+  const leadRows = categorizedSections
+    .filter((section) => section.title.startsWith('LEAD '))
+    .flatMap((section) => section.rows)
+  const coverageRows = categorizedSections
+    .filter((section) => section.title.startsWith('COVERAGE '))
+    .flatMap((section) => section.rows)
+  const flowRows = categorizedSections
+    .filter(
+      (section) =>
+        section.title.startsWith('SURVEY ') ||
+        (section.title.startsWith('ORDER ') && !section.title.startsWith('WORK ORDER ')),
+    )
+    .flatMap((section) => section.rows)
     .filter((row, index, rows) => rows.findIndex((item) => item.id === row.id) === index)
-  const workOrderRows = getSectionRowsByKeyword(sections, 'WORK ORDER')
-  const activationRows = getSectionRowsByKeyword(sections, 'AKTIVASI').concat(getSectionRowsByKeyword(sections, 'SUBSCRIPTION'))
+  const workOrderRows = categorizedSections
+    .filter((section) => section.title.startsWith('WORK ORDER '))
+    .flatMap((section) => section.rows)
+  const activationRows = categorizedSections
+    .filter((section) => section.title.startsWith('SUBSCRIPTION AKTIVASI '))
+    .flatMap((section) => section.rows)
   const marketingNames = Array.from(
     new Set(
       (sections ?? [])

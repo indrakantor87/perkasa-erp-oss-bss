@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 const allowedActionTypes = new Set([
   'REMINDER',
@@ -63,15 +63,120 @@ function mapCollectionStatus(actionType: string) {
   }
 }
 
+async function getBillingInvoiceQueryParts() {
+  const [hasCollectionStatus, hasSuspendCandidate] = await Promise.all([
+    hasReviewDbColumn('billing_invoices', 'collection_status'),
+    hasReviewDbColumn('billing_invoices', 'suspend_candidate'),
+  ])
+
+  return {
+    collectionStatusExpression: hasCollectionStatus ? 'collection_status' : 'NULL',
+    suspendCandidateExpression: hasSuspendCandidate ? 'suspend_candidate' : 'NULL',
+  }
+}
+
+async function buildCollectionActionInsertPayload(params: {
+  invoiceId: number
+  actionType: string
+  actionStatus: string
+  dueFollowUpAt: Date | null
+  handledByUserId: number | null
+  notes: string
+}) {
+  const [hasInvoiceId, hasActionType, hasActionStatus, hasActionAt, hasDueFollowUpAt, hasHandledByUserId, hasNotes] =
+    await Promise.all([
+      hasReviewDbColumn('billing_collection_actions', 'invoice_id'),
+      hasReviewDbColumn('billing_collection_actions', 'action_type'),
+      hasReviewDbColumn('billing_collection_actions', 'action_status'),
+      hasReviewDbColumn('billing_collection_actions', 'action_at'),
+      hasReviewDbColumn('billing_collection_actions', 'due_follow_up_at'),
+      hasReviewDbColumn('billing_collection_actions', 'handled_by_user_id'),
+      hasReviewDbColumn('billing_collection_actions', 'notes'),
+    ])
+
+  if (!hasInvoiceId || !hasActionType || !hasActionStatus) {
+    throw new Error(
+      'Schema inti billing_collection_actions belum siap. Kolom invoice_id, action_type, dan action_status wajib tersedia.',
+    )
+  }
+
+  const columns = ['invoice_id', 'action_type', 'action_status']
+  const values: unknown[] = [params.invoiceId, params.actionType, params.actionStatus]
+
+  if (hasActionAt) {
+    columns.push('action_at')
+    values.push(new Date())
+  }
+  if (hasDueFollowUpAt) {
+    columns.push('due_follow_up_at')
+    values.push(params.dueFollowUpAt)
+  }
+  if (hasHandledByUserId) {
+    columns.push('handled_by_user_id')
+    values.push(params.handledByUserId)
+  }
+  if (hasNotes) {
+    columns.push('notes')
+    values.push(params.notes)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
+}
+
+async function buildBillingInvoiceCollectionUpdatePayload(params: {
+  actionType: string
+  actionStatus: string
+  currentCollectionStatus: string
+}) {
+  const [hasCollectionStatus, hasSuspendCandidate, hasUpdatedAt] = await Promise.all([
+    hasReviewDbColumn('billing_invoices', 'collection_status'),
+    hasReviewDbColumn('billing_invoices', 'suspend_candidate'),
+    hasReviewDbColumn('billing_invoices', 'updated_at'),
+  ])
+
+  const assignments: string[] = []
+  const values: unknown[] = []
+
+  if (hasCollectionStatus) {
+    assignments.push('collection_status = ?')
+    values.push(
+      params.actionStatus === 'OPEN' ? mapCollectionStatus(params.actionType) : params.currentCollectionStatus || 'REMINDER',
+    )
+  }
+  if (hasSuspendCandidate) {
+    assignments.push(`suspend_candidate = CASE
+            WHEN ? = 'SUSPEND' THEN 1
+            WHEN ? = 'RECONNECT' THEN 0
+            ELSE suspend_candidate
+          END`)
+    values.push(params.actionStatus === 'OPEN' ? params.actionType : '', params.actionStatus === 'OPEN' ? params.actionType : '')
+  }
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  return assignments.length
+    ? {
+        assignments,
+        values,
+      }
+    : null
+}
+
 async function createCollectionAction(params: CreateCollectionActionParams) {
+  const billingInvoiceQueryParts = await getBillingInvoiceQueryParts()
   const [invoice] = await runReviewDbQuery<BillingInvoiceRow>(
     `
       SELECT
         id,
         invoice_no AS invoiceNo,
         invoice_status AS invoiceStatus,
-        collection_status AS collectionStatus,
-        suspend_candidate AS suspendCandidate
+        ${billingInvoiceQueryParts.collectionStatusExpression} AS collectionStatus,
+        ${billingInvoiceQueryParts.suspendCandidateExpression} AS suspendCandidate
       FROM billing_invoices
       WHERE invoice_no = ?
       LIMIT 1
@@ -115,42 +220,41 @@ async function createCollectionAction(params: CreateCollectionActionParams) {
   const userNote = `[Review Action] ${params.sessionDisplayName} (${params.sessionUsername})${
     params.notesRaw ? ` - ${params.notesRaw}` : ''
   }`
+  const collectionActionInsertPayload = await buildCollectionActionInsertPayload({
+    invoiceId: invoice.id,
+    actionType: params.actionType,
+    actionStatus: params.actionStatus,
+    dueFollowUpAt: params.dueFollowUpAt,
+    handledByUserId: handledBy?.id ?? null,
+    notes: userNote,
+  })
 
   await runReviewDbExecute<ExecuteResult>(
     `
       INSERT INTO billing_collection_actions (
-        invoice_id,
-        action_type,
-        action_status,
-        action_at,
-        due_follow_up_at,
-        handled_by_user_id,
-        notes
+        ${collectionActionInsertPayload.columns.join(',\n        ')}
       )
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
+      VALUES (${collectionActionInsertPayload.placeholders.join(', ')})
     `,
-    [invoice.id, params.actionType, params.actionStatus, params.dueFollowUpAt, handledBy?.id ?? null, userNote],
+    collectionActionInsertPayload.values,
   )
 
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      UPDATE billing_invoices
-      SET collection_status = ?,
-          suspend_candidate = CASE
-            WHEN ? = 'SUSPEND' THEN 1
-            WHEN ? = 'RECONNECT' THEN 0
-            ELSE suspend_candidate
-          END,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `,
-    [
-      params.actionStatus === 'OPEN' ? mapCollectionStatus(params.actionType) : currentCollectionStatus || 'REMINDER',
-      params.actionStatus === 'OPEN' ? params.actionType : '',
-      params.actionStatus === 'OPEN' ? params.actionType : '',
-      invoice.id,
-    ],
-  )
+  const billingInvoiceUpdatePayload = await buildBillingInvoiceCollectionUpdatePayload({
+    actionType: params.actionType,
+    actionStatus: params.actionStatus,
+    currentCollectionStatus,
+  })
+
+  if (billingInvoiceUpdatePayload) {
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        UPDATE billing_invoices
+        SET ${billingInvoiceUpdatePayload.assignments.join(',\n          ')}
+        WHERE id = ?
+      `,
+      [...billingInvoiceUpdatePayload.values, invoice.id],
+    )
+  }
 }
 
 export async function POST(request: Request) {

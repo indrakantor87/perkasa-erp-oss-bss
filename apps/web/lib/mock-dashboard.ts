@@ -325,17 +325,26 @@ export function getMockWorklist(role: AppRole): DashboardWorkItem[] {
         },
       ]
     case 'NOC_OPERATOR':
-    case 'TT_OPERATOR':
       return [
         {
-          id: 'noc-tt-1',
+          id: 'tt-risk-noc-1',
           domain: 'Support',
-          title: 'Trouble ticket fiber down',
-          subtitle: 'Perlu analisis teknis awal',
-          status: 'OPEN',
+          title: 'Trouble ticket SLA kritis',
+          subtitle: 'Perlu kontrol NOC segera',
+          status: 'OVERDUE',
           priority: 'tinggi',
-          detail: 'Cek histori gangguan dan koordinasikan eskalasi bila perlu.',
-          href: '/support',
+          detail: 'Gangguan backbone • SLA overdue 28 jam dan perlu kontrol NOC sekarang.',
+          href: '/support/sla?focus=SLA_OVERDUE',
+        },
+        {
+          id: 'iso-1',
+          domain: 'Support',
+          title: 'Monitoring isolir pelanggan premium',
+          subtitle: 'Isolir aktif',
+          status: 'OPEN',
+          priority: 'sedang',
+          detail: 'Suspend aktif sejak kemarin dan perlu monitoring jaringan sebelum diputuskan restore.',
+          href: '/support/isolations?focus=ACTIVE_ISOLATIONS',
         },
         {
           id: 'noc-odp-1',
@@ -346,6 +355,49 @@ export function getMockWorklist(role: AppRole): DashboardWorkItem[] {
           priority: 'sedang',
           detail: 'Pastikan kapasitas port masih aman untuk order aktif.',
           href: '/inventory',
+        },
+      ]
+    case 'TT_OPERATOR':
+      return [
+        {
+          id: 'tt-open-1',
+          domain: 'Support',
+          title: 'Ticket baru pelanggan fiber down',
+          subtitle: 'Perlu update awal',
+          status: 'OPEN',
+          priority: 'tinggi',
+          detail: 'Gangguan last mile • Ticket baru perlu update awal sejak pagi ini.',
+          href: '/support/tt?focus=OPEN_TICKETS',
+        },
+        {
+          id: 'tt-overdue-1',
+          domain: 'Support',
+          title: 'Ticket follow up overdue area kota',
+          subtitle: 'Belum ada progres lanjutan',
+          status: 'OVERDUE',
+          priority: 'tinggi',
+          detail: 'Gangguan perangkat • Follow up overdue 26 jam dan perlu update progress sekarang.',
+          href: '/support/tt?focus=OPEN_TICKETS',
+        },
+        {
+          id: 'tt-escalate-1',
+          domain: 'Support',
+          title: 'Ticket kandidat eskalasi',
+          subtitle: 'Butuh keputusan teknis',
+          status: 'OPEN',
+          priority: 'tinggi',
+          detail: 'Core issue • Ticket siap eskalasi bila progres teknis masih mandek.',
+          href: '/support/tt?focus=OPEN_TICKETS',
+        },
+        {
+          id: 'tt-ready-1',
+          domain: 'Support',
+          title: 'Ticket siap close pelanggan enterprise',
+          subtitle: 'Progress akhir sudah masuk',
+          status: 'READY',
+          priority: 'sedang',
+          detail: 'Gangguan modem • Ticket siap close setelah progres terakhir tervalidasi.',
+          href: '/support/tt?focus=OPEN_TICKETS',
         },
       ]
     case 'FIELD_TECHNICIAN':

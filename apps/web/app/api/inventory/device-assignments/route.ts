@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 const allowedStatuses = new Set(['ASSIGNED', 'RETURNED', 'DAMAGED', 'LOST'])
 
@@ -31,6 +31,169 @@ type CustomerRow = {
 type InsertResult = {
   insertId?: number
   affectedRows?: number
+}
+
+async function getSubscriptionQueryParts() {
+  const [hasCustomerId] = await Promise.all([hasReviewDbColumn('service_subscriptions', 'customer_id')])
+
+  return {
+    customerIdExpression: hasCustomerId ? 'customer_id' : 'NULL',
+  }
+}
+
+async function buildDeviceAssignmentInsertPayload(params: {
+  subscriptionId: number | null
+  workOrderId: number | null
+  inventoryItemId: number
+  customerId: number | null
+  serialNumber: string | null
+  macAddress: string | null
+  assignmentStatus: string
+  notes: string
+}) {
+  const [
+    hasSubscriptionId,
+    hasWorkOrderId,
+    hasInventoryItemId,
+    hasCustomerId,
+    hasSerialNumber,
+    hasMacAddress,
+    hasAssignmentStatus,
+    hasAssignedAt,
+    hasReturnedAt,
+    hasNotes,
+  ] = await Promise.all([
+    hasReviewDbColumn('service_device_assignments', 'subscription_id'),
+    hasReviewDbColumn('service_device_assignments', 'work_order_id'),
+    hasReviewDbColumn('service_device_assignments', 'inventory_item_id'),
+    hasReviewDbColumn('service_device_assignments', 'customer_id'),
+    hasReviewDbColumn('service_device_assignments', 'serial_number'),
+    hasReviewDbColumn('service_device_assignments', 'mac_address'),
+    hasReviewDbColumn('service_device_assignments', 'assignment_status'),
+    hasReviewDbColumn('service_device_assignments', 'assigned_at'),
+    hasReviewDbColumn('service_device_assignments', 'returned_at'),
+    hasReviewDbColumn('service_device_assignments', 'notes'),
+  ])
+
+  if (!hasInventoryItemId || !hasAssignmentStatus) {
+    throw new Error('Schema inti service_device_assignments belum siap. Kolom inventory_item_id dan assignment_status wajib tersedia.')
+  }
+
+  const columns = ['inventory_item_id', 'assignment_status']
+  const values: unknown[] = [params.inventoryItemId, params.assignmentStatus]
+
+  if (hasSubscriptionId) {
+    columns.push('subscription_id')
+    values.push(params.subscriptionId)
+  }
+  if (hasWorkOrderId) {
+    columns.push('work_order_id')
+    values.push(params.workOrderId)
+  }
+  if (hasCustomerId) {
+    columns.push('customer_id')
+    values.push(params.customerId)
+  }
+  if (hasSerialNumber) {
+    columns.push('serial_number')
+    values.push(params.serialNumber)
+  }
+  if (hasMacAddress) {
+    columns.push('mac_address')
+    values.push(params.macAddress)
+  }
+  if (hasAssignedAt) {
+    columns.push('assigned_at')
+    values.push(new Date())
+  }
+  if (hasReturnedAt) {
+    columns.push('returned_at')
+    values.push(null)
+  }
+  if (hasNotes) {
+    columns.push('notes')
+    values.push(params.notes)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
+}
+
+async function buildInventoryStockMovementInsertPayload(params: {
+  itemId: number
+  workOrderId: number | null
+  referenceNo: string
+  noteText: string
+}) {
+  const [hasItemId, hasWorkOrderId, hasMovementType, hasReferenceNo, hasQty, hasUnitPrice, hasNotes, hasMovementAt] =
+    await Promise.all([
+      hasReviewDbColumn('inventory_stock_movements', 'item_id'),
+      hasReviewDbColumn('inventory_stock_movements', 'work_order_id'),
+      hasReviewDbColumn('inventory_stock_movements', 'movement_type'),
+      hasReviewDbColumn('inventory_stock_movements', 'reference_no'),
+      hasReviewDbColumn('inventory_stock_movements', 'qty'),
+      hasReviewDbColumn('inventory_stock_movements', 'unit_price'),
+      hasReviewDbColumn('inventory_stock_movements', 'notes'),
+      hasReviewDbColumn('inventory_stock_movements', 'movement_at'),
+    ])
+
+  if (!hasItemId || !hasMovementType || !hasQty) {
+    return null
+  }
+
+  const columns = ['item_id', 'movement_type', 'qty']
+  const values: unknown[] = [params.itemId, 'OUT', 1]
+
+  if (hasWorkOrderId) {
+    columns.push('work_order_id')
+    values.push(params.workOrderId)
+  }
+  if (hasReferenceNo) {
+    columns.push('reference_no')
+    values.push(params.referenceNo)
+  }
+  if (hasUnitPrice) {
+    columns.push('unit_price')
+    values.push(0)
+  }
+  if (hasNotes) {
+    columns.push('notes')
+    values.push(params.noteText)
+  }
+  if (hasMovementAt) {
+    columns.push('movement_at')
+    values.push(new Date())
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
+}
+
+async function buildInventoryItemStockUpdatePayload() {
+  const [hasCurrentStock, hasUpdatedAt] = await Promise.all([
+    hasReviewDbColumn('inventory_items', 'current_stock'),
+    hasReviewDbColumn('inventory_items', 'updated_at'),
+  ])
+
+  if (!hasCurrentStock) {
+    return null
+  }
+
+  const assignments = ['current_stock = current_stock - 1']
+
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  return {
+    assignments,
+  }
 }
 
 export async function POST(request: Request) {
@@ -106,9 +269,10 @@ export async function POST(request: Request) {
     let resolvedCustomerId: number | null = null
 
     if (serviceNo) {
+      const subscriptionQueryParts = await getSubscriptionQueryParts()
       const [subscription] = await runReviewDbQuery<SubscriptionRow>(
         `
-          SELECT id, service_no AS serviceNo, customer_id AS customerId
+          SELECT id, service_no AS serviceNo, ${subscriptionQueryParts.customerIdExpression} AS customerId
           FROM service_subscriptions
           WHERE UPPER(service_no) = UPPER(?)
           LIMIT 1
@@ -159,33 +323,25 @@ export async function POST(request: Request) {
     }
 
     const noteText = `[Assign Device] ${session.displayName} (${session.username})${notesRaw ? ` - ${notesRaw}` : ''}`
+    const deviceAssignmentInsertPayload = await buildDeviceAssignmentInsertPayload({
+      subscriptionId,
+      workOrderId,
+      inventoryItemId: item.id,
+      customerId: resolvedCustomerId,
+      serialNumber: serialNumber || null,
+      macAddress: macAddress || null,
+      assignmentStatus,
+      notes: noteText,
+    })
 
     const insert = await runReviewDbExecute<InsertResult>(
       `
         INSERT INTO service_device_assignments (
-          subscription_id,
-          work_order_id,
-          inventory_item_id,
-          customer_id,
-          serial_number,
-          mac_address,
-          assignment_status,
-          assigned_at,
-          returned_at,
-          notes
+          ${deviceAssignmentInsertPayload.columns.join(',\n          ')}
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, NULL, ?)
+        VALUES (${deviceAssignmentInsertPayload.placeholders.join(', ')})
       `,
-      [
-        subscriptionId,
-        workOrderId,
-        item.id,
-        resolvedCustomerId,
-        serialNumber || null,
-        macAddress || null,
-        assignmentStatus,
-        noteText,
-      ],
+      deviceAssignmentInsertPayload.values,
     )
 
     const assignmentId = Number(insert.insertId ?? 0)
@@ -194,33 +350,38 @@ export async function POST(request: Request) {
     }
 
     if (assignmentStatus === 'ASSIGNED') {
-      await runReviewDbExecute<InsertResult>(
-        `
-          INSERT INTO inventory_stock_movements (
-            item_id,
-            work_order_id,
-            movement_type,
-            reference_no,
-            qty,
-            unit_price,
-            notes,
-            movement_at
-          )
-          VALUES (?, ?, 'OUT', ?, 1, 0, ?, CURRENT_TIMESTAMP)
-        `,
-        [item.id, workOrderId, workOrderNo || serviceNo || `ASSIGN-${assignmentId}`, noteText],
-      )
+      const inventoryStockMovementInsertPayload = await buildInventoryStockMovementInsertPayload({
+        itemId: item.id,
+        workOrderId,
+        referenceNo: workOrderNo || serviceNo || `ASSIGN-${assignmentId}`,
+        noteText,
+      })
 
-      await runReviewDbExecute<InsertResult>(
-        `
-          UPDATE inventory_items
-          SET
-            current_stock = current_stock - 1,
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `,
-        [item.id],
-      )
+      if (inventoryStockMovementInsertPayload) {
+        await runReviewDbExecute<InsertResult>(
+          `
+            INSERT INTO inventory_stock_movements (
+              ${inventoryStockMovementInsertPayload.columns.join(',\n              ')}
+            )
+            VALUES (${inventoryStockMovementInsertPayload.placeholders.join(', ')})
+          `,
+          inventoryStockMovementInsertPayload.values,
+        )
+      }
+
+      const inventoryItemStockUpdatePayload = await buildInventoryItemStockUpdatePayload()
+
+      if (inventoryItemStockUpdatePayload) {
+        await runReviewDbExecute<InsertResult>(
+          `
+            UPDATE inventory_items
+            SET
+              ${inventoryItemStockUpdatePayload.assignments.join(',\n              ')}
+            WHERE id = ?
+          `,
+          [item.id],
+        )
+      }
     }
 
     return Response.json({
@@ -230,4 +391,3 @@ export async function POST(request: Request) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
   }
 }
-

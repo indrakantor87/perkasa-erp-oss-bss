@@ -11,14 +11,16 @@ import { ModuleGrid } from '@/components/dashboard/module-grid'
 import { OperationalDivisionBoard } from '@/components/dashboard/operational-division-board'
 import { RoleQueueGrid } from '@/components/dashboard/role-queue-grid'
 import { WorklistBoard } from '@/components/dashboard/worklist-board'
+import { canAccessPath, canPerformAction, getDefaultLandingPath } from '@/lib/access-control-server'
 import { DataSourceStatus } from '@/components/data-source-status'
-import { canPerformAction } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getRoleMeta } from '@/lib/role-meta'
 import { listMergedDashboardKpiDefinitions, resolveDashboardKpiManagerScope } from '@/lib/services/dashboard-kpi-service'
-import { getDashboardPageData } from '@/lib/services/dashboard-service'
+import { buildDashboardNextActions, getDashboardPageData } from '@/lib/services/dashboard-service'
 import { buildWorklistHref } from '@/lib/services/worklist-service'
+import { buildSupportLaneHref } from '@/lib/support-action-links'
+import { getPreferredSupportLane } from '@/lib/support-lanes'
 import type { DashboardOperationalDivisionKey } from '@/lib/types'
 import type { AppRole } from '@/lib/types'
 import { getVisibleModuleCards } from '@/lib/ui-access'
@@ -71,6 +73,44 @@ function getDefaultDivision(role: AppRole): DashboardOperationalDivisionKey {
   }
 }
 
+function buildDashboardCommandLinks(role: AppRole) {
+  const links: Array<{ label: string; href: string; tone: 'primary' | 'secondary' }> = []
+  const seen = new Set<string>()
+
+  const pushLink = (label: string, href: string, tone: 'primary' | 'secondary') => {
+    if (!href || seen.has(href)) {
+      return
+    }
+    seen.add(href)
+    links.push({ label, href, tone })
+  }
+
+  const landingHref = getDefaultLandingPath(role)
+  pushLink(landingHref === '/dashboard' ? 'Buka Dashboard' : 'Masuk Workspace', landingHref, 'primary')
+
+  if (canAccessPath(role, '/dashboard/daily-activity')) {
+    pushLink('Buka Daily Activity', '/dashboard/daily-activity', 'secondary')
+  }
+
+  if (canAccessPath(role, '/support')) {
+    pushLink('Lihat Support', buildSupportLaneHref(getPreferredSupportLane(role)), 'secondary')
+  }
+
+  if (canAccessPath(role, '/billing')) {
+    pushLink('Lihat Billing', '/billing', 'secondary')
+  }
+
+  if (canAccessPath(role, '/sales')) {
+    pushLink('Lihat Sales', '/sales', 'secondary')
+  }
+
+  if (canAccessPath(role, '/inventory')) {
+    pushLink('Lihat Inventory', '/inventory', 'secondary')
+  }
+
+  return links.slice(0, 3)
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -108,6 +148,13 @@ export default async function DashboardPage({
   const roleMeta = getRoleMeta(session.role)
   const canApproveDailyActivity = canPerformAction(session.role, 'daily_activity', 'approve')
   const visibleModuleCards = getVisibleModuleCards(session.role)
+  const commandCenterLinks = buildDashboardCommandLinks(session.role)
+  const dashboardNextActions = buildDashboardNextActions({
+    role: session.role,
+    alerts: dashboardAlerts,
+    worklist,
+    roleQueues,
+  }).slice(0, 6)
   const lockDivisionFilter = session.role !== 'SUPER_ADMIN'
   const sourceSnapshot = getDataSourceSnapshot()
   const reviewDbReady = sourceSnapshot.effectiveMode === 'review-db' && !sourceSnapshot.isFallback
@@ -141,6 +188,7 @@ export default async function DashboardPage({
         worklistCount={worklist.length}
         moduleCount={visibleModuleCards.length}
         approvalCount={canApproveDailyActivity ? dailyActivityApprovalQueue.totalPending : 0}
+        quickLinks={commandCenterLinks}
       />
       <section className="grid items-start gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="panel p-4">
@@ -216,7 +264,7 @@ export default async function DashboardPage({
           />
           <DashboardProcessKpis cards={operationalCards} month={month} year={year} />
           <CrossDomainAlerts items={dashboardAlerts} />
-          <DashboardNextActions alerts={dashboardAlerts} worklist={worklist} roleQueues={roleQueues} />
+          <DashboardNextActions items={dashboardNextActions} />
         </div>
       </details>
     </div>

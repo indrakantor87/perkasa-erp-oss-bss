@@ -1,10 +1,10 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 type TroubleTicketSlaRow = {
-  id: number
+  troubleType: string
 }
 
 function normalizeRequiredText(value: unknown) {
@@ -44,25 +44,46 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Durasi SLA harus berupa angka 1 sampai 365 hari.' }, { status: 400 })
     }
 
+    const [hasTroubleType, hasDurationDays, hasUpdatedAt] = await Promise.all([
+      hasReviewDbColumn('support_trouble_ticket_sla', 'trouble_type'),
+      hasReviewDbColumn('support_trouble_ticket_sla', 'duration_days'),
+      hasReviewDbColumn('support_trouble_ticket_sla', 'updated_at'),
+    ])
+
+    if (!hasTroubleType || !hasDurationDays) {
+      return Response.json(
+        { message: 'Master SLA trouble ticket belum siap pada review DB aktif. Lengkapi schema inti terlebih dahulu.' },
+        { status: 503 },
+      )
+    }
+
     const [existingSla] = await runReviewDbQuery<TroubleTicketSlaRow>(
       `
-        SELECT id
+        SELECT trouble_type AS troubleType
         FROM support_trouble_ticket_sla
-        WHERE UPPER(trouble_type) = ?
+        WHERE UPPER(TRIM(trouble_type)) = UPPER(TRIM(?))
         LIMIT 1
       `,
       [troubleType]
     )
 
     if (existingSla) {
+      const updateAssignments = ['duration_days = ?']
+      const updateValues: unknown[] = [durationDays]
+
+      if (hasUpdatedAt) {
+        updateAssignments.push('updated_at = CURRENT_TIMESTAMP')
+      }
+
+      updateValues.push(troubleType)
+
       await runReviewDbExecute(
         `
           UPDATE support_trouble_ticket_sla
-          SET duration_days = ?,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
+          SET ${updateAssignments.join(',\n              ')}
+          WHERE UPPER(TRIM(trouble_type)) = UPPER(TRIM(?))
         `,
-        [durationDays, existingSla.id]
+        updateValues
       )
 
       return Response.json({

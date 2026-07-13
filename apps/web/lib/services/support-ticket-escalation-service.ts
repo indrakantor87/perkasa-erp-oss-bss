@@ -18,4 +18,34 @@ export async function ensureSupportTroubleTicketEscalationTable() {
       CONSTRAINT fk_support_tt_escalation_ticket FOREIGN KEY (trouble_ticket_id) REFERENCES support_trouble_tickets(id)
     )
   `)
+
+  await runReviewDbExecute(`
+    ALTER TABLE support_trouble_ticket_escalation_logs
+    ADD COLUMN IF NOT EXISTS escalation_target VARCHAR(150) NOT NULL DEFAULT 'UNSPECIFIED' AFTER trouble_ticket_id
+  `)
+
+  await runReviewDbExecute(`
+    ALTER TABLE support_trouble_ticket_escalation_logs
+    ADD COLUMN IF NOT EXISTS escalation_level VARCHAR(40) NOT NULL DEFAULT 'OVERDUE' AFTER escalation_target
+  `)
+
+  await runReviewDbExecute(`
+    ALTER TABLE support_trouble_ticket_escalation_logs
+    ADD COLUMN IF NOT EXISTS escalation_reason TEXT NULL AFTER escalation_level
+  `)
+
+  await runReviewDbExecute(`
+    ALTER TABLE support_trouble_ticket_escalation_logs
+    ADD COLUMN IF NOT EXISTS escalated_by VARCHAR(150) NOT NULL DEFAULT 'system' AFTER escalation_reason
+  `)
+
+  await runReviewDbExecute(`
+    ALTER TABLE support_trouble_ticket_escalation_logs
+    ADD COLUMN IF NOT EXISTS escalated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER escalated_by
+  `)
+
+  await runReviewDbExecute(`
+    ALTER TABLE support_trouble_ticket_escalation_logs
+    ADD COLUMN IF NOT EXISTS created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER escalated_at
+  `)
 }

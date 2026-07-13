@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { SupportFormContextNote } from '@/components/support-form-context-note'
 
 type SupportDismantleCloseFormProps = {
   canProcess: boolean
@@ -109,7 +110,7 @@ export function SupportDismantleCloseForm({
 
   return (
     <section className="panel p-6">
-      <p className="section-title">Close Dismantle</p>
+      <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Tutup queue dismantle ke histori
       </h3>
@@ -120,6 +121,22 @@ export function SupportDismantleCloseForm({
             ? 'Mode review database belum aktif, jadi close dismantle dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini memindahkan queue dismantle aktif ke histori close lengkap dengan metadata lapangan, kondisi perangkat, dan keputusan billing agar parity terminasi lebih dekat ke baseline.'}
       </p>
+      <SupportFormContextNote
+        items={[
+          {
+            label: 'Tujuan',
+            value: 'Memfinalkan terminate dari queue aktif ke histori dengan jejak lapangan yang lengkap.',
+          },
+          {
+            label: 'Sumber',
+            value: 'Pilihan diambil dari queue dismantle aktif yang memang masih menunggu close lapangan.',
+          },
+          {
+            label: 'Hasil',
+            value: 'Kasus pindah ke histori close dengan outcome, kondisi perangkat, dan keputusan billing yang terdokumentasi.',
+          },
+        ]}
+      />
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-slate-700">

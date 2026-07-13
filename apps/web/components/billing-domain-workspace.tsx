@@ -14,6 +14,7 @@ import type {
   DomainFormPrefill,
   DomainPageContent,
   DomainReviewRow,
+  DomainReviewSection,
 } from '@/lib/types'
 
 type BillingActionKey =
@@ -151,13 +152,30 @@ function getRowAction(params: {
   return null
 }
 
-function buildBillingStats(rows: DomainReviewRow[]) {
+function buildBillingStats(sections: DomainReviewSection[]) {
+  const rows = sections.flatMap((section) => section.rows)
+  const sectionRowCount = (patterns: string[]) =>
+    sections
+      .filter((section) => {
+        const title = section.title.toUpperCase()
+        return patterns.some((pattern) => title.includes(pattern))
+      })
+      .reduce((total, section) => total + section.rows.length, 0)
+
   return {
     total: rows.length,
-    overdue: rows.filter((row) => row.status.toUpperCase().includes('OVERDUE')).length,
-    promiseToPay: rows.filter((row) => row.detail.toUpperCase().includes('JANJI BAYAR')).length,
-    suspendReady: rows.filter((row) => row.detail.toUpperCase().includes('SUSPEND')).length,
-    reconnect: rows.filter((row) => row.detail.toUpperCase().includes('RECONNECT')).length,
+    overdue:
+      sectionRowCount(['OVERDUE INVOICE', 'PERLU TINDAK LANJUT']) ||
+      rows.filter((row) => row.status.toUpperCase().includes('OVERDUE')).length,
+    promiseToPay:
+      sectionRowCount(['PROMISE TO PAY QUEUE']) ||
+      rows.filter((row) => row.detail.toUpperCase().includes('JANJI BAYAR')).length,
+    suspendReady:
+      sectionRowCount(['SUSPEND READY QUEUE']) ||
+      rows.filter((row) => row.detail.toUpperCase().includes('SUSPEND')).length,
+    reconnect:
+      sectionRowCount(['RECONNECT READY QUEUE']) ||
+      rows.filter((row) => row.detail.toUpperCase().includes('RECONNECT')).length,
   }
 }
 
@@ -295,7 +313,7 @@ export function BillingDomainWorkspace({
     .filter(isSectionAction)
     .filter((item, index, array) => array.findIndex((entry) => entry.key === item.key) === index)
 
-  const stats = buildBillingStats(allRows)
+  const stats = buildBillingStats(reviewSections)
 
   return (
     <div className="space-y-4">

@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { SupportActionQuickLinks } from '@/components/support-action-quick-links'
+import { canAccessPath } from '@/lib/access-control'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
-import type { DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
+import { canAccessSupportLane } from '@/lib/support-lanes'
+import type { AppRole, DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
   return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? '-'
@@ -36,9 +38,13 @@ function buildSlaSummary(rows: DomainReviewRow[]) {
 export function SupportSlaQueuePanel({
   sections,
   actionLinks = [],
+  role,
+  canOpenBillingDecision = false,
 }: {
   sections: DomainReviewSection[]
   actionLinks?: SupportActionLink[]
+  role: AppRole
+  canOpenBillingDecision?: boolean
 }) {
   const slaSection = sections.find((section) => section.title.toUpperCase().includes('SLA')) ?? null
 
@@ -47,6 +53,8 @@ export function SupportSlaQueuePanel({
   }
 
   const summary = buildSlaSummary(slaSection.rows)
+  const canOpenTicketLane = canAccessSupportLane(role, 'tt')
+  const canOpenSupervisorWorkspace = canAccessPath(role, '/customers/cs-admin')
 
   return (
     <section className="panel p-4">
@@ -61,9 +69,9 @@ export function SupportSlaQueuePanel({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <span className="badge border-transparent bg-slate-950 text-white">{summary.total} rule</span>
+          <span className="badge border-transparent bg-slate-950 text-white">{summary.total} aturan</span>
           {summary.lastUpdated ? (
-            <span className="badge border-slate-200 bg-white text-slate-600">Updated: {summary.lastUpdated}</span>
+            <span className="badge border-slate-200 bg-white text-slate-600">Diperbarui: {summary.lastUpdated}</span>
           ) : null}
         </div>
       </div>
@@ -85,24 +93,30 @@ export function SupportSlaQueuePanel({
       />
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <Link
-          href={buildSupportLaneHref('tt', { focus: 'OPEN_TICKETS' })}
-          className="inline-flex items-center justify-center rounded-md border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-orange-700 transition hover:opacity-90"
-        >
-          Buka TT Aktif
-        </Link>
-        <Link
-          href="/billing"
-          className="inline-flex items-center justify-center rounded-md border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-violet-700 transition hover:opacity-90"
-        >
-          Sinkron Billing Recovery
-        </Link>
-        <Link
-          href="/customers/cs-admin?queue=Queue+Risiko+Tinggi"
-          className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:opacity-90"
-        >
-          Buka Supervisor CS
-        </Link>
+        {canOpenTicketLane ? (
+          <Link
+            href={buildSupportLaneHref('tt', { focus: 'OPEN_TICKETS' })}
+            className="inline-flex items-center justify-center rounded-md border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-orange-700 transition hover:opacity-90"
+          >
+            Buka TT Aktif
+          </Link>
+        ) : null}
+        {canOpenBillingDecision ? (
+          <Link
+            href="/billing"
+            className="inline-flex items-center justify-center rounded-md border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-violet-700 transition hover:opacity-90"
+          >
+            Sinkron Billing Recovery
+          </Link>
+        ) : null}
+        {canOpenSupervisorWorkspace ? (
+          <Link
+            href="/customers/cs-admin?queue=Queue+Risiko+Tinggi"
+            className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:opacity-90"
+          >
+            Buka Supervisor CS
+          </Link>
+        ) : null}
       </div>
 
       {slaSection.rows.length ? (
@@ -110,12 +124,12 @@ export function SupportSlaQueuePanel({
           <table className="min-w-[980px] w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                <th className="px-4 py-3">Rule</th>
+                <th className="px-4 py-3">Aturan</th>
                 <th className="px-4 py-3">Scope</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Detail</th>
                 <th className="px-4 py-3">Durasi</th>
-                <th className="px-4 py-3">Updated</th>
+                <th className="px-4 py-3">Diperbarui</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">

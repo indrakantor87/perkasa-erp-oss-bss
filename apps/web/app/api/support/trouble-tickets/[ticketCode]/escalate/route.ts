@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { ensureSupportTroubleTicketEscalationTable } from '@/lib/services/support-ticket-escalation-service'
 import { ensureSupportTroubleTicketProgressTable } from '@/lib/services/support-ticket-progress-service'
 
@@ -35,25 +35,51 @@ function normalizeRequiredText(value: unknown) {
 }
 
 async function getTroubleTicketByCode(ticketCode: string) {
+  const [hasSupportSlaDueAt, hasSupportSlaTroubleType, hasSupportSlaDurationDays] = await Promise.all([
+    hasReviewDbColumn('support_trouble_tickets', 'sla_due_at'),
+    hasReviewDbColumn('support_trouble_ticket_sla', 'trouble_type'),
+    hasReviewDbColumn('support_trouble_ticket_sla', 'duration_days'),
+  ])
+
+  const supportSlaJoinClause =
+    hasSupportSlaTroubleType && hasSupportSlaDurationDays
+      ? `LEFT JOIN support_trouble_ticket_sla sla
+        ON UPPER(TRIM(sla.trouble_type)) = UPPER(TRIM(stt.type))`
+      : `LEFT JOIN (
+        SELECT
+          NULL AS trouble_type,
+          NULL AS duration_days
+      ) sla
+        ON 1 = 0`
+
+  const supportSlaDueExpression = hasSupportSlaDueAt
+    ? `COALESCE(
+        stt.sla_due_at,
+        CASE
+          WHEN sla.duration_days IS NULL THEN NULL
+          ELSE DATE_ADD(stt.opened_at, INTERVAL sla.duration_days DAY)
+        END
+      )`
+    : `CASE
+        WHEN sla.duration_days IS NULL THEN NULL
+        ELSE DATE_ADD(stt.opened_at, INTERVAL sla.duration_days DAY)
+      END`
+
   const [row] = await runReviewDbQuery<TroubleTicketRow>(
     `
       SELECT
-        id,
-        ticket_code AS ticketCode,
-        customer_name AS customerName,
-        type AS ticketType,
-        status,
-        closed_at AS closedAt,
-        opened_at AS openedAt,
+        stt.id AS id,
+        stt.ticket_code AS ticketCode,
+        stt.customer_name AS customerName,
+        stt.type AS ticketType,
+        stt.status AS status,
+        stt.closed_at AS closedAt,
+        stt.opened_at AS openedAt,
         sla.duration_days AS slaDurationDays,
-        CASE
-          WHEN sla.duration_days IS NULL THEN NULL
-          ELSE DATE_ADD(opened_at, INTERVAL sla.duration_days DAY)
-        END AS slaDueAt
-      FROM support_trouble_tickets
-      LEFT JOIN support_trouble_ticket_sla sla
-        ON UPPER(TRIM(sla.trouble_type)) = UPPER(TRIM(support_trouble_tickets.type))
-      WHERE UPPER(ticket_code) = ?
+        ${supportSlaDueExpression} AS slaDueAt
+      FROM support_trouble_tickets stt
+      ${supportSlaJoinClause}
+      WHERE UPPER(stt.ticket_code) = ?
       LIMIT 1
     `,
     [ticketCode],
@@ -164,7 +190,15 @@ export async function POST(
 
     const slaDueAt = ticket.slaDueAt ? new Date(ticket.slaDueAt) : null
     const hasValidSlaDueAt = !!slaDueAt && Number.isFinite(slaDueAt.getTime())
-    if (escalationLevel === 'OVERDUE' && (!hasValidSlaDueAt || slaDueAt >= new Date())) {
+    if (escalationLevel === 'OVERDUE' && !hasValidSlaDueAt) {
+      return Response.json(
+        {
+          message: `Trouble ticket ${ticket.ticketCode} belum memiliki konteks SLA yang cukup untuk eskalasi OVERDUE. Lengkapi master SLA atau gunakan level MANUAL.`,
+        },
+        { status: 409 },
+      )
+    }
+    if (escalationLevel === 'OVERDUE' && hasValidSlaDueAt && slaDueAt >= new Date()) {
       return Response.json(
         {
           message: `Trouble ticket ${ticket.ticketCode} belum OVERDUE menurut SLA. Gunakan level MANUAL bila eskalasi tetap diperlukan.`,
@@ -172,7 +206,19 @@ export async function POST(
         { status: 409 },
       )
     }
-    if (escalationLevel === 'DUE_TODAY' && (!hasValidSlaDueAt || !isDateWithinToday(slaDueAt) || slaDueAt < new Date())) {
+    if (escalationLevel === 'DUE_TODAY' && !hasValidSlaDueAt) {
+      return Response.json(
+        {
+          message: `Trouble ticket ${ticket.ticketCode} belum memiliki konteks SLA yang cukup untuk eskalasi DUE_TODAY. Lengkapi master SLA atau gunakan level MANUAL.`,
+        },
+        { status: 409 },
+      )
+    }
+    if (
+      escalationLevel === 'DUE_TODAY' &&
+      hasValidSlaDueAt &&
+      (!isDateWithinToday(slaDueAt) || slaDueAt < new Date())
+    ) {
       return Response.json(
         {
           message: `Trouble ticket ${ticket.ticketCode} tidak berada pada status SLA DUE_TODAY. Gunakan level yang sesuai dengan kondisi aktual.`,

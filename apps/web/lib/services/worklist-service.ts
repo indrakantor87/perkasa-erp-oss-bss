@@ -1,6 +1,15 @@
 import type { AppSession } from '@/lib/auth-session'
-import type { AppRole, DashboardDailyActivityApprovalQueue, WorklistItem } from '@/lib/types'
+import { canAccessPath, canPerformAction, getDefaultLandingPath } from '@/lib/access-control'
+import { buildSupportLaneHref } from '@/lib/support-action-links'
 import { getDashboardPageData } from '@/lib/services/dashboard-service'
+import { canAccessSupportLane, canUseSupportAction, normalizeSupportLane } from '@/lib/support-lanes'
+import type {
+  AppRole,
+  DashboardDailyActivityApprovalQueue,
+  SupportLaneActionKey,
+  WorklistItem,
+  WorklistShortcutLink,
+} from '@/lib/types'
 
 export type WorklistPageFilters = {
   queue?: string
@@ -86,6 +95,328 @@ function getActionLabel(domain: string, role: AppRole) {
   if (normalizedDomain === 'inventory') return 'Buka inventory'
   if (normalizedDomain === 'import') return 'Buka import'
   return 'Buka modul'
+}
+
+function parseHrefParts(href: string) {
+  try {
+    const url = new URL(href, 'https://perkasa.local')
+    return {
+      pathname: url.pathname,
+      hash: url.hash,
+    }
+  } catch {
+    return {
+      pathname: '',
+      hash: '',
+    }
+  }
+}
+
+function parseSupportActionKey(hash: string): SupportLaneActionKey | null {
+  const normalizedHash = String(hash ?? '').trim()
+  if (!normalizedHash.startsWith('#support-action-')) {
+    return null
+  }
+
+  const rawKey = normalizedHash.replace(/^#support-action-/, '') as SupportLaneActionKey
+  const allowedKeys: SupportLaneActionKey[] = [
+    'ticket-create',
+    'ticket-progress',
+    'ticket-escalate',
+    'ticket-close',
+    'sla-manage',
+    'isolation-create',
+    'isolation-restore',
+    'dismantle-approve',
+    'dismantle-close',
+    'dismantle-reopen',
+  ]
+
+  return allowedKeys.includes(rawKey) ? rawKey : null
+}
+
+function getRoleSupportActionCapability(role: AppRole) {
+  return {
+    role,
+    canCreate: canPerformAction(role, 'support', 'create'),
+    canUpdate: canPerformAction(role, 'support', 'update'),
+    canApprove: canPerformAction(role, 'support', 'approve'),
+  }
+}
+
+export function canAccessWorklistHref(role: AppRole, href: string) {
+  const { pathname, hash } = parseHrefParts(href)
+  if (!pathname || !canAccessPath(role, pathname)) {
+    return false
+  }
+
+  if (pathname.startsWith('/support/')) {
+    const lane = normalizeSupportLane(pathname.split('/')[2] ?? '')
+    if (lane && !canAccessSupportLane(role, lane)) {
+      return false
+    }
+  }
+
+  const actionKey = parseSupportActionKey(hash)
+  if (actionKey && !canUseSupportAction({ ...getRoleSupportActionCapability(role), actionKey })) {
+    return false
+  }
+
+  return true
+}
+
+function getSupportFallbackHref(role: AppRole, queue: string) {
+  if (queue === 'SLA Kritis' && canAccessSupportLane(role, 'sla')) {
+    return buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })
+  }
+  if (queue === 'Monitoring Isolir' && canAccessSupportLane(role, 'isolations')) {
+    return buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' })
+  }
+  if ((queue === 'Siap Dismantle' || queue === 'On Progress' || queue === 'Perlu Catatan Close') && canAccessSupportLane(role, 'dismantle')) {
+    return buildSupportLaneHref('dismantle')
+  }
+  if (queue === 'Transfer atau Restore' && canAccessSupportLane(role, 'isolations')) {
+    return buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' })
+  }
+  if (canAccessSupportLane(role, 'tt')) {
+    return buildSupportLaneHref('tt', { focus: 'OPEN_TICKETS' })
+  }
+  if (canAccessSupportLane(role, 'isolations')) {
+    return buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' })
+  }
+  if (canAccessSupportLane(role, 'dismantle')) {
+    return buildSupportLaneHref('dismantle')
+  }
+  if (canAccessSupportLane(role, 'sla')) {
+    return buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })
+  }
+  return '/support'
+}
+
+function getWorklistFallback(role: AppRole, item: WorklistItem) {
+  const domain = String(item.domain ?? '').trim().toLowerCase()
+
+  if (domain === 'support') {
+    if (item.queue === 'SLA Kritis') {
+      return { href: getSupportFallbackHref(role, item.queue), actionLabel: 'Kontrol SLA' }
+    }
+    if (item.queue === 'Monitoring Isolir') {
+      return { href: getSupportFallbackHref(role, item.queue), actionLabel: 'Monitor isolir' }
+    }
+    if (item.queue === 'Siap Dismantle' || item.queue === 'On Progress' || item.queue === 'Perlu Catatan Close') {
+      return { href: getSupportFallbackHref(role, item.queue), actionLabel: 'Buka dismantle' }
+    }
+    if (role === 'TT_OPERATOR') {
+      return { href: getSupportFallbackHref(role, item.queue), actionLabel: 'Update ticket' }
+    }
+    return { href: getSupportFallbackHref(role, item.queue), actionLabel: 'Buka support' }
+  }
+
+  const domainFallbacks = [
+    domain === 'inventory' ? '/inventory' : null,
+    domain === 'sales' ? '/sales' : null,
+    domain === 'customers' ? '/customers' : null,
+    domain === 'daily activity' ? '/dashboard/daily-activity' : null,
+    domain === 'dashboard' ? '/dashboard' : null,
+    domain === 'import' ? '/import' : null,
+  ].filter(Boolean) as string[]
+
+  const fallbackHref = domainFallbacks.find((href) => canAccessWorklistHref(role, href)) ?? getDefaultLandingPath(role)
+  return {
+    href: fallbackHref,
+    actionLabel: getActionLabel(item.domain, role),
+  }
+}
+
+function sanitizeShortcutLinks(role: AppRole, links?: WorklistShortcutLink[]) {
+  if (!links?.length) {
+    return undefined
+  }
+
+  const sanitizedLinks = links.filter((link) => canAccessWorklistHref(role, link.href))
+  return sanitizedLinks.length ? sanitizedLinks : undefined
+}
+
+function canAccessBillingContext(role: AppRole) {
+  return canAccessPath(role, '/billing')
+}
+
+function canAccessSupervisorContext(role: AppRole) {
+  return canAccessPath(role, '/customers/cs-admin')
+}
+
+function isRoleSafeText(role: AppRole, text?: string | null) {
+  const normalized = String(text ?? '').trim().toLowerCase()
+  if (!normalized) {
+    return true
+  }
+
+  if (!canAccessBillingContext(role) && /(billing|collection|invoice|penagihan)/i.test(normalized)) {
+    return false
+  }
+
+  if (!canAccessSupervisorContext(role) && /(supervisor cs|admin cs|cs & admin cs)/i.test(normalized)) {
+    return false
+  }
+
+  return true
+}
+
+function sanitizeOwnerLabel(role: AppRole, owner?: string) {
+  const normalizedOwner = String(owner ?? '').trim()
+  if (!normalizedOwner) {
+    return undefined
+  }
+
+  if (!isRoleSafeText(role, normalizedOwner)) {
+    return 'Tim terkait'
+  }
+
+  return normalizedOwner
+}
+
+function getRoleSafeReason(role: AppRole, item: WorklistItem) {
+  if (isRoleSafeText(role, item.reason)) {
+    return item.reason
+  }
+  if (String(item.domain ?? '').trim().toLowerCase() === 'support') {
+    return 'Item ini tetap relevan untuk role Anda, tetapi sebagian konteks lintas tim disembunyikan.'
+  }
+  return 'Item ini masih membutuhkan tindak lanjut, dengan sebagian konteks detail dibatasi sesuai role.'
+}
+
+function getRoleSafeNextAction(role: AppRole, item: WorklistItem) {
+  if (isRoleSafeText(role, item.nextAction)) {
+    return item.nextAction
+  }
+  if (String(item.domain ?? '').trim().toLowerCase() === 'support') {
+    return 'Buka lane kerja yang tersedia untuk role Anda lalu lanjutkan follow up operasional.'
+  }
+  return 'Buka modul yang tersedia untuk role Anda lalu lanjutkan tindak lanjut yang aman.'
+}
+
+function getRoleSafeBlockingInfo(role: AppRole, item: WorklistItem) {
+  if (isRoleSafeText(role, item.blockingInfo)) {
+    return item.blockingInfo
+  }
+  return 'Sebagian blocker berada pada tim lain dan disembunyikan untuk role ini.'
+}
+
+function sanitizeCorrelationSummary(role: AppRole, summary: WorklistItem['correlationSummary']) {
+  if (!summary) {
+    return undefined
+  }
+
+  const items = summary.items.filter((entry) => isRoleSafeText(role, `${entry.label} ${entry.value}`))
+  const customer = isRoleSafeText(role, summary.customer) ? summary.customer : undefined
+  const service = isRoleSafeText(role, summary.service) ? summary.service : undefined
+  const owner = sanitizeOwnerLabel(role, summary.owner)
+
+  if (!items.length && !customer && !service && !owner) {
+    return undefined
+  }
+
+  return {
+    ...summary,
+    customer,
+    service,
+    owner,
+    items,
+  }
+}
+
+function sanitizeDecisionTrail(role: AppRole, trail: WorklistItem['decisionTrail']) {
+  if (!trail) {
+    return undefined
+  }
+
+  const items = trail.items.filter((entry) => isRoleSafeText(role, `${entry.label} ${entry.detail}`))
+  if (!items.length) {
+    return undefined
+  }
+
+  return {
+    ...trail,
+    owner: sanitizeOwnerLabel(role, trail.owner),
+    items,
+  }
+}
+
+function sanitizeEvidencePanel(role: AppRole, evidence: WorklistItem['evidencePanel']) {
+  if (!evidence) {
+    return undefined
+  }
+
+  const items = evidence.items.filter((entry) => isRoleSafeText(role, `${entry.label} ${entry.detail}`))
+  if (!items.length) {
+    return undefined
+  }
+
+  return {
+    ...evidence,
+    owner: sanitizeOwnerLabel(role, evidence.owner),
+    items,
+  }
+}
+
+function sanitizeHealthSignal(role: AppRole, signal: WorklistItem['healthSignal']) {
+  if (!signal || !isRoleSafeText(role, `${signal.label} ${signal.detail}`)) {
+    return undefined
+  }
+  return signal
+}
+
+function sanitizeActionOutcomeSummary(role: AppRole, summary: WorklistItem['actionOutcomeSummary']) {
+  if (!summary) {
+    return undefined
+  }
+
+  const items = summary.items.filter((entry) => isRoleSafeText(role, `${entry.label} ${entry.detail}`))
+  if (!items.length) {
+    return undefined
+  }
+
+  return {
+    ...summary,
+    owner: sanitizeOwnerLabel(role, summary.owner),
+    items,
+  }
+}
+
+export function sanitizeWorklistItemForRole(role: AppRole, item: WorklistItem): WorklistItem {
+  const primaryAction = canAccessWorklistHref(role, item.href)
+    ? { href: item.href, actionLabel: item.actionLabel }
+    : getWorklistFallback(role, item)
+
+  const recommendedActions = item.recommendedActions
+    ? {
+        ...item.recommendedActions,
+        owner: sanitizeOwnerLabel(role, item.recommendedActions.owner),
+        items: item.recommendedActions.items.filter(
+          (action) => canAccessWorklistHref(role, action.href) && isRoleSafeText(role, `${action.label} ${action.detail}`),
+        ),
+      }
+    : undefined
+
+  return {
+    ...item,
+    href: primaryAction.href,
+    actionLabel: primaryAction.actionLabel,
+    reason: getRoleSafeReason(role, item),
+    nextAction: getRoleSafeNextAction(role, item),
+    owner: sanitizeOwnerLabel(role, item.owner),
+    blockingInfo: getRoleSafeBlockingInfo(role, item),
+    handoffLinks: sanitizeShortcutLinks(role, item.handoffLinks),
+    correlationSummary: sanitizeCorrelationSummary(role, item.correlationSummary),
+    decisionTrail: sanitizeDecisionTrail(role, item.decisionTrail),
+    evidencePanel: sanitizeEvidencePanel(role, item.evidencePanel),
+    healthSignal: sanitizeHealthSignal(role, item.healthSignal),
+    actionOutcomeSummary: sanitizeActionOutcomeSummary(role, item.actionOutcomeSummary),
+    recommendedActions:
+      recommendedActions && recommendedActions.items.length
+        ? recommendedActions
+        : undefined,
+  }
 }
 
 function getQueueForRole(role: AppRole, item: Pick<WorklistItem, 'id' | 'domain' | 'status' | 'priority' | 'detail'>) {
@@ -241,7 +572,7 @@ function buildDueLabel(item: Pick<WorklistItem, 'priority' | 'status' | 'detail'
 function upgradeDashboardItems(role: AppRole, items: Array<Omit<WorklistItem, 'queue' | 'actionLabel'> & Partial<Pick<WorklistItem, 'queue' | 'actionLabel'>>>) {
   return items.map((item) => {
     const queue = item.queue || getQueueForRole(role, item)
-    return {
+    return sanitizeWorklistItemForRole(role, {
       ...item,
       queue,
       actionLabel: item.actionLabel || getActionLabel(item.domain, role),
@@ -253,7 +584,7 @@ function upgradeDashboardItems(role: AppRole, items: Array<Omit<WorklistItem, 'q
         item.blockingInfo ||
         (String(item.status ?? '').trim().toUpperCase() === 'REVIEW' ? 'Menunggu validasi lanjutan.' : undefined),
       prefillToken: item.prefillToken || item.id,
-    } satisfies WorklistItem
+    } satisfies WorklistItem)
   })
 }
 

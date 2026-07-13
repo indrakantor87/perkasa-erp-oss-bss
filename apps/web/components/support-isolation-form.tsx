@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { SupportFormContextNote } from '@/components/support-form-context-note'
 
 type SupportIsolationFormProps = {
   canCreate: boolean
@@ -87,7 +88,7 @@ export function SupportIsolationForm({
 
   return (
     <section className="panel p-6">
-      <p className="section-title">Isolir Support</p>
+      <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Tambah pelanggan isolir aktif
       </h3>
@@ -98,6 +99,22 @@ export function SupportIsolationForm({
             ? 'Mode review database belum aktif, jadi write action isolir dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini menambah data isolir aktif ke review DB agar alur suspend dan tindak lanjut support mulai bisa diuji dari web.'}
       </p>
+      <SupportFormContextNote
+        items={[
+          {
+            label: 'Tujuan',
+            value: 'Mencatat pelanggan yang masuk status suspend aktif agar keputusan restore atau terminate punya anchor yang jelas.',
+          },
+          {
+            label: 'Sumber',
+            value: 'Service No, customer code, radbox, dan marketing mengikuti data support yang sedang tampil di lane isolir.',
+          },
+          {
+            label: 'Hasil',
+            value: 'Kasus baru siap diproses lebih lanjut ke restore billing atau transfer dismantle.',
+          },
+        ]}
+      />
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-slate-700">

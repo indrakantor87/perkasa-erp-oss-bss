@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 type ExecuteResult = {
   insertId?: number
@@ -11,12 +11,12 @@ type ExecuteResult = {
 type LinkedSubscriptionRow = {
   subscriptionId: number
   customerId: number
+  orderId: number | null
   serviceNo: string | null
   customerCode: string | null
   customerName: string
   customerPhone: string | null
   customerAddress: string | null
-  marketingName: string | null
 }
 
 function normalizeOptionalText(value: unknown) {
@@ -34,27 +34,39 @@ function normalizePrice(value: unknown) {
 }
 
 async function resolveLinkedSubscription(serviceReference: string) {
+  const [hasAddressCustomerId, hasAddressAddress, hasAddressIsPrimary] = await Promise.all([
+    hasReviewDbColumn('crm_customer_addresses', 'customer_id'),
+    hasReviewDbColumn('crm_customer_addresses', 'address'),
+    hasReviewDbColumn('crm_customer_addresses', 'is_primary'),
+  ])
+
+  const addressJoinClause =
+    hasAddressCustomerId && hasAddressAddress && hasAddressIsPrimary
+      ? `LEFT JOIN crm_customer_addresses a
+        ON a.customer_id = c.id
+        AND a.is_primary = 1`
+      : `LEFT JOIN (
+        SELECT
+          NULL AS customer_id,
+          NULL AS address
+      ) a
+        ON 1 = 0`
+
   const [linkedSubscription] = await runReviewDbQuery<LinkedSubscriptionRow>(
     `
       SELECT
         ss.id AS subscriptionId,
         ss.customer_id AS customerId,
+        ss.order_id AS orderId,
         ss.service_no AS serviceNo,
         c.customer_code AS customerCode,
         c.full_name AS customerName,
         c.phone AS customerPhone,
-        a.address AS customerAddress,
-        COALESCE(so.marketing_name, sl.marketing_name) AS marketingName
+        a.address AS customerAddress
       FROM service_subscriptions ss
       INNER JOIN crm_customers c
         ON c.id = ss.customer_id
-      LEFT JOIN crm_customer_addresses a
-        ON a.customer_id = c.id
-        AND a.is_primary = 1
-      LEFT JOIN sales_orders so
-        ON so.id = ss.order_id
-      LEFT JOIN sales_leads sl
-        ON sl.id = so.lead_id
+      ${addressJoinClause}
       WHERE ss.status IN ('ACTIVE', 'PENDING')
         AND (
           UPPER(ss.service_no) = UPPER(?)
@@ -72,6 +84,66 @@ async function resolveLinkedSubscription(serviceReference: string) {
   )
 
   return linkedSubscription ?? null
+}
+
+async function resolveMarketingNameFromSalesContext(orderId: number | null) {
+  if (!orderId) {
+    return null
+  }
+
+  try {
+    const [
+      hasSalesOrderId,
+      hasSalesOrderMarketingName,
+      hasSalesOrderLeadId,
+      hasSalesLeadId,
+      hasSalesLeadMarketingName,
+    ] = await Promise.all([
+      hasReviewDbColumn('sales_orders', 'id'),
+      hasReviewDbColumn('sales_orders', 'marketing_name'),
+      hasReviewDbColumn('sales_orders', 'lead_id'),
+      hasReviewDbColumn('sales_leads', 'id'),
+      hasReviewDbColumn('sales_leads', 'marketing_name'),
+    ])
+
+    if (!hasSalesOrderId || (!hasSalesOrderMarketingName && !(hasSalesOrderLeadId && hasSalesLeadId && hasSalesLeadMarketingName))) {
+      return null
+    }
+
+    const marketingExpression =
+      hasSalesOrderMarketingName && hasSalesOrderLeadId && hasSalesLeadId && hasSalesLeadMarketingName
+        ? 'COALESCE(so.marketing_name, sl.marketing_name)'
+        : hasSalesOrderMarketingName
+          ? 'so.marketing_name'
+          : 'sl.marketing_name'
+
+    const leadJoinClause =
+      hasSalesOrderLeadId && hasSalesLeadId && hasSalesLeadMarketingName
+        ? `LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id`
+        : `LEFT JOIN (
+          SELECT
+            NULL AS id,
+            NULL AS marketing_name
+        ) sl
+          ON 1 = 0`
+
+    const [row] = await runReviewDbQuery<{ marketingName: string | null }>(
+      `
+        SELECT ${marketingExpression} AS marketingName
+        FROM sales_orders so
+        ${leadJoinClause}
+        WHERE so.id = ?
+        LIMIT 1
+      `,
+      [orderId],
+    )
+
+    return normalizeOptionalText(row?.marketingName)
+  } catch {
+    // Sales context is optional for support write flow; ignore drift here.
+    return null
+  }
 }
 
 export async function POST(request: Request) {
@@ -134,7 +206,8 @@ export async function POST(request: Request) {
     const resolvedCustomerName = customerName || linkedSubscription.customerName
     const resolvedCustomerPhone = customerPhone || linkedSubscription.customerPhone
     const resolvedCustomerAddress = customerAddress || linkedSubscription.customerAddress
-    const resolvedMarketingName = marketingName || linkedSubscription.marketingName
+    const salesMarketingName = await resolveMarketingNameFromSalesContext(linkedSubscription.orderId)
+    const resolvedMarketingName = marketingName || salesMarketingName
 
     await runReviewDbExecute<ExecuteResult>(
       `

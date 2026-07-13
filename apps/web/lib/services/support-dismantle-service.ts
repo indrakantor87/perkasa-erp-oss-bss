@@ -41,6 +41,41 @@ export async function ensureSupportDismantleQueueTable() {
       )
     `,
   )
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE support_dismantle_queue
+      ADD COLUMN IF NOT EXISTS transfer_note TEXT NULL AFTER isolation_id
+    `,
+  )
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE support_dismantle_queue
+      ADD COLUMN IF NOT EXISTS transferred_by_username VARCHAR(120) NOT NULL DEFAULT 'system' AFTER transfer_note
+    `,
+  )
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE support_dismantle_queue
+      ADD COLUMN IF NOT EXISTS transferred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER transferred_by_username
+    `,
+  )
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE support_dismantle_queue
+      ADD COLUMN IF NOT EXISTS reopened_note TEXT NULL AFTER transferred_at
+    `,
+  )
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE support_dismantle_queue
+      ADD COLUMN IF NOT EXISTS updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER reopened_note
+    `,
+  )
 }
 
 export function buildSupportDismantleTransferNote(session: AppSession, note: string) {

@@ -23,6 +23,423 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.91] - 2026-07-13
+
+### Improved
+
+- Endpoint `/api/health` kini tidak lagi “false green”: saat mode efektif `review-db` dan bukan fallback, health akan melakukan ping DB (`SELECT 1`) dan validasi minimal schema (kolom inti seperti `support_isolations.status` dan `support_trouble_tickets.ticket_code`). Jika review DB tidak ready, response mengembalikan `ok=false` dan status `503`: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/health/route.ts)
+- Script `verify-health` kini ikut memvalidasi readiness review DB saat mode efektif `review-db`, sehingga pipeline/deploy tidak hanya lolos karena `ok=true` generik: [verify-health.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/verify-health.mjs)
+- Versioning diselaraskan ke `0.65.91` untuk menandai batch hardening guardrail deploy/operasional.
+
+## [0.65.90] - 2026-07-13
+
+### Improved
+
+- Guardrail skrip backfill support diperketat: mode `--apply` sekarang wajib menyertakan konfirmasi target (`--confirm-db` atau `--confirm-host`) dan skrip menampilkan ringkasan target DB yang akan disentuh agar mengurangi risiko salah environment saat backfill: [backfill-support-legacy-context.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/backfill-support-legacy-context.mjs), [backfill-support-dismantle-history.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/backfill-support-dismantle-history.mjs)
+- Produksi key matching pada production pack kini mendeteksi collision (duplicate key) dan otomatis menandai key ambigu sebagai `skip`, sehingga backfill tidak memaksa “first match wins” pada data legacy yang bisa punya nama + timestamp serupa.
+- Versioning diselaraskan ke `0.65.90` untuk menandai batch hardening guardrail backfill.
+
+## [0.65.89] - 2026-07-13
+
+### Fixed
+
+- Route `restore` untuk `support_isolations` kini schema-aware sejak fase baca awal, sehingga review DB parsial yang belum punya `customer_name` atau `restoration_date` tidak lagi gagal lebih dulu sebelum guard update sempat berjalan: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/isolations/[id]/restore/route.ts)
+- Flow `reopen` dari `support_dismantle_history` kini memvalidasi state isolir asal sebelum mutasi lintas tabel, sehingga histori tidak bisa sembarang dibuka ulang saat isolir sebenarnya sudah aktif dan queue belum kosong: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle-history/[id]/reopen/route.ts)
+- Flow `close` untuk `support_dismantle_queue` kini memvalidasi kolom inti `isolation_id` dan state isolir asal sebelum insert histori + update isolir + delete queue, sehingga jalur penutupan lebih tahan terhadap schema drift maupun state data setengah konsisten: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle/[id]/close/route.ts)
+- Versioning diselaraskan ke `0.65.89` untuk menandai batch hardening write-side support prioritas tinggi.
+
+## [0.65.88] - 2026-07-13
+
+### Improved
+
+- Skrip audit `support_isolations` dan `support_dismantle_queue` kini membaca langsung production pack `isolation.production.json` dan `dismantle-tickets.production.json`, lalu menghitung coverage kandidat enrichment untuk row hasil `Legacy Sanitizer`, sehingga keputusan sanitasi lane isolir/dismantle aktif bisa didasarkan pada angka source pack yang bisa diulang: [backfill-support-legacy-context.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/backfill-support-legacy-context.mjs)
+- Audit final menunjukkan `132` row `support_isolations.reason` open dan `32` row `support_dismantle_queue.transfer_note` yang berasal dari `Legacy Sanitizer` tidak memiliki pasangan source-pack yang lebih kaya (`enrichable = 0` untuk keduanya), sehingga konteks generik yang tersisa saat ini dipastikan merupakan batas source data, bukan missed backfill baru.
+- Versioning diselaraskan ke `0.65.88` untuk menandai batch audit final lane isolir dan dismantle queue berbasis production pack.
+
+## [0.65.87] - 2026-07-13
+
+### Fixed
+
+- `support_dismantle_history.close_note` yang sebelumnya hanya berisi suffix `Closed By: ...` kini diperkaya menggunakan `reason` / `closeNote` dari production pack `dismantle-history.production.json` (matching by `customer_name + closed_at`), sehingga histori penutupan dismantle legacy lebih informatif untuk operator tanpa mengubah `Closed By`: [backfill-support-dismantle-history.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/backfill-support-dismantle-history.mjs)
+- Batch backfill berhasil mengupdate `73` histori dismantle agar menampilkan kalimat alasan sebelum `Closed By:`. Residual `Closed By:` tanpa alasan dipertahankan karena memang source pack tidak memiliki note untuk pasangan tersebut.
+- Versioning diselaraskan ke `0.65.87` untuk menandai batch enrichment close note histori dismantle berbasis production pack.
+
+## [0.65.86] - 2026-07-13
+
+### Improved
+
+- Skrip audit `support_dismantle_history` kini membaca langsung production pack `dismantle-history.production.json` dan melaporkan coverage `radboox`, `reason`, `closeNote`, serta `sourceIsolationId`, sehingga batas maksimum pemulihan radbox histori bisa dibuktikan dari source production asli, bukan hanya dari review DB dan staging: [backfill-support-dismantle-history.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/backfill-support-dismantle-history.mjs)
+- Audit final production pack mengonfirmasi hanya `4` dari `293` row `DismantleHistory` source yang memiliki `radboox`, dan tidak ada kandidat backfill baru untuk `271` histori residual yang masih kosong di final table; residual tersebut dipastikan memang berasal dari source data yang kosong.
+- Dokumentasi hasil batch `Wave 1A support production` diperluas dengan temuan residual radbox histori agar keputusan mempertahankan fallback `Radbox belum terpetakan` tercatat resmi sebagai keterbatasan source data, bukan bug transform: [hybrid-wave-1a-psb-support-production-results.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1a-psb-support-production-results.md)
+- Versioning diselaraskan ke `0.65.86` untuk menandai batch audit final residual histori dismantle berbasis production pack.
+
+## [0.65.85] - 2026-07-13
+
+### Improved
+
+- Skrip audit/backfill histori `support_dismantle_history` kini juga memeriksa fallback kedua dari `staging_legacy_support_records`, lalu menampilkan ringkasan cakupan sumber radbox (`support_isolations`, `staging`, atau benar-benar tanpa sumber`) agar keputusan sanitasi data legacy bisa didasarkan pada angka nyata, bukan asumsi: [backfill-support-dismantle-history.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/backfill-support-dismantle-history.mjs)
+- Audit lanjutan mengonfirmasi bahwa `271` row histori dismantle yang radbox-nya masih kosong memang tidak punya sumber aman tambahan di review DB maupun staging legacy, sehingga residual `Radbox belum terpetakan` dipertahankan sebagai fallback jujur dan tidak lagi dipaksa backfill.
+- Versioning diselaraskan ke `0.65.85` untuk menandai batch audit sumber residual histori dismantle.
+
+## [0.65.84] - 2026-07-13
+
+### Fixed
+
+- Ditambahkan skrip reusable untuk audit dan backfill histori `support_dismantle_history`, dengan mode `dry-run` dan `--apply`, agar perbaikan `radbox_name` histori lama bisa dijalankan ulang secara aman bila nanti ada sumber data fallback tambahan: [backfill-support-dismantle-history.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/backfill-support-dismantle-history.mjs)
+- Audit review DB mengonfirmasi `close_note` histori dismantle sebenarnya sudah terisi (`0` row kosong), sehingga batch ini difokuskan ke `radbox_name`; dari `286` row histori yang radbox-nya kosong, `15` row berhasil di-backfill aman dari `support_isolations.radbox_name`.
+- Recheck browser pada `/support/dismantle` mengonfirmasi sebagian histori yang sebelumnya jatuh ke `Radbox belum terpetakan` kini kembali menampilkan radbox aktual, sementara residual row yang belum terisi tetap dipertahankan sebagai fallback jujur karena tidak ada sumber data aman.
+- Versioning diselaraskan ke `0.65.84` untuk menandai batch sanitasi histori dismantle legacy pada review DB.
+
+## [0.65.83] - 2026-07-13
+
+### Fixed
+
+- Ditambahkan skrip reusable untuk audit dan backfill konteks support legacy pada review DB, dengan mode `dry-run` dan `--apply`, sehingga sanitasi `support_isolations.reason` dan `support_dismantle_queue.transfer_note` bisa dijalankan ulang secara aman pada batch data lama berikutnya: [backfill-support-legacy-context.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/backfill-support-legacy-context.mjs)
+- Backfill review DB berhasil mengisi `132` row kosong pada `support_isolations.reason` dan `32` row kosong pada `support_dismantle_queue.transfer_note`, sehingga lane `isolir` dan `dismantle` tidak lagi bergantung pada placeholder generik untuk mayoritas backlog legacy.
+- Recheck browser mengonfirmasi placeholder `Belum ada alasan isolir yang tercatat.` dan `Belum ada catatan transfer untuk kandidat dismantle ini.` sudah hilang dari daftar utama UI setelah batch backfill dijalankan.
+- Versioning diselaraskan ke `0.65.83` untuk menandai batch sanitasi data legacy support pada review DB.
+
+## [0.65.82] - 2026-07-13
+
+### Fixed
+
+- Read-side `dismantle` kini mem-fallback `radbox` histori ke `support_isolations.radbox_name` saat `support_dismantle_history.radbox_name` kosong, sehingga histori terminate lama tidak lagi kehilangan konteks perangkat hanya karena kolom histori legacy belum lengkap: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Queue `dismantle` aktif kini mem-fallback detail utama ke `alasan isolir` saat `transfer_note` legacy kosong, sehingga panel operasional tidak lagi terlalu cepat jatuh ke placeholder generik pada antrean lama: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Audit DB review mengonfirmasi gap `isolation reason` dan `transfer_note` mayoritas berasal dari data legacy (`NULL`) alih-alih bug query, sementara recheck browser menunjukkan placeholder misleading di `/support/dismantle` turun signifikan setelah hardening fallback.
+- Versioning diselaraskan ke `0.65.82` untuk menandai follow-up UAT support non-TT pada lane dismantle.
+
+## [0.65.81] - 2026-07-13
+
+### Fixed
+
+- Alias lane support `/support/trouble-ticket` kini dinormalisasi ke lane `tt`, sehingga route lama tidak lagi berakhir blank dan kembali merender workspace Trouble Ticket yang sama dengan `/support/tt`: [support-lanes.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/support-lanes.ts)
+- Hitungan lane `Queue Trouble Ticket` kini hanya mengambil section queue TT yang benar-benar operasional dan tidak lagi ikut menghitung master `SLA Trouble Ticket`, sehingga jumlah item di landing `/support` kembali sinkron dengan KPI dan daftar pada lane TT: [support-lanes.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/support-lanes.ts), [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Smoke coverage ditambah untuk alias `normalizeSupportLane('trouble-ticket')`, dan recheck browser mengonfirmasi angka TT kini sinkron `5` di `/support`, `/support/trouble-ticket`, dan `/support/tt`: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- Versioning diselaraskan ke `0.65.81` untuk menandai follow-up final UAT support pada lane Trouble Ticket.
+
+## [0.65.80] - 2026-07-12
+
+### Fixed
+
+- Statistik ringkas `sales` kini memetakan section pipeline secara eksplisit berdasarkan judul section, sehingga kartu `Survey / Order` tidak lagi ikut menghitung `Work Order` hanya karena substring `ORDER` muncul pada judul `Work Order Aktif`: [sales-domain-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/sales-domain-workspace.tsx)
+- Verifikasi browser pada `/sales` menunjukkan KPI kecil kini konsisten dengan section yang dirender: `Lead 0`, `Coverage 5`, `Survey / Order 5`, `Work Order 5`, dan `Aktivasi 5`.
+- Versioning diselaraskan ke `0.65.80` untuk menandai follow-up hasil UAT sales.
+
+## [0.65.79] - 2026-07-12
+
+### Fixed
+
+- Statistik ringkas di workspace `billing` kini membaca section queue yang benar-benar dirender, termasuk `Invoice ... Perlu Tindak Lanjut`, sehingga KPI kecil `Invoice Overdue` tidak lagi tertahan di `0` saat tabel operasional billing sudah menampilkan invoice yang perlu ditindaklanjuti: [billing-domain-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-domain-workspace.tsx)
+- Verifikasi browser pada `/billing` menunjukkan KPI `Invoice Overdue` kini sinkron dengan section invoice operasional yang tampil setelah reload halaman.
+- Versioning diselaraskan ke `0.65.79` untuk menandai follow-up hasil UAT billing.
+
+## [0.65.78] - 2026-07-12
+
+### Fixed
+
+- `getReviewDbOperationalCards()` di `dashboard-service.ts` kini schema-aware untuk blok operasional `sales`, `digital`, `billing`, dan `inventory`, sehingga filter periode, status, source digital, follow-up collection, serta request/movement inventory tidak lagi hard-assume kolom review DB selalu lengkap: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Kartu operasional dashboard non-support sekarang memakai fallback `best-effort` atau `1 = 0` saat kolom inti seperti `request_date`, `activated_at`, `source`, `due_date`, `billing_year`, `billing_month`, `movement_at`, atau `request_status` tidak tersedia, sehingga satu schema drift tidak lagi mematahkan seluruh query agregasi operasional: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Versioning diselaraskan ke `0.65.78` untuk menandai hardening residual operational dashboard terhadap review DB parsial.
+
+## [0.65.77] - 2026-07-12
+
+### Fixed
+
+- `getReviewDbWorklist()` di `dashboard-service.ts` kini memakai helper schema-aware untuk relasi `crm_customers`, `crm_customer_addresses`, `sales_orders`, `sales_leads`, `sales_surveys`, `service_work_orders`, dan `service_subscriptions` pada role non-support seperti `SALES_MARKETING`, `CS_OPERATOR`, `FIELD_TECHNICIAN`, dan `DIGITAL_CREATOR`, sehingga worklist dashboard tidak lagi hard-fail saat review DB parsial: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- `getReviewDbBillingAuditTimeline()` kini memakai join billing/customer yang schema-aware, sehingga audit timeline billing tetap aman meski relasi `billing_invoices -> service_subscriptions -> crm_customers` atau kolom `payment_method`, `payment_date`, `action_type`, dan `action_at` belum lengkap di review DB lama: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Versioning diselaraskan ke `0.65.77` untuk menandai hardening residual dashboard/worklist non-support terhadap schema drift review DB.
+
+## [0.65.76] - 2026-07-12
+
+### Fixed
+
+- Read-side `inventory` di `domain-service.ts` kini schema-aware untuk tabel `inventory_items`, `inventory_categories`, `inventory_units`, `inventory_stock_movements`, `network_odp`, `network_odp_ports`, `service_device_assignments`, `service_subscriptions`, `crm_customers`, `inventory_item_requests`, dan `inventory_item_loans`, sehingga join dan kolom opsional tidak lagi diasumsikan selalu lengkap pada review DB parsial: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Subsection `inventory` seperti `items`, `movements`, `ODP`, `used ports`, `device assignments`, `port issues`, `device returns`, `requests`, dan `loans` kini dimuat secara partial-safe per query, sehingga kegagalan schema pada satu blok tidak lagi menjatuhkan seluruh halaman domain inventory: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Versioning diselaraskan ke `0.65.76` untuk menandai hardening read-side domain inventory terhadap review DB parsial.
+
+## [0.65.75] - 2026-07-12
+
+### Fixed
+
+- Read-side `sales` di `domain-service.ts` kini schema-aware untuk tabel `sales_leads`, `sales_covered_areas`, `sales_surveys`, `sales_orders`, `service_work_orders`, `service_subscriptions`, `crm_customers`, dan `sales_packages`, sehingga join/kolom opsional tidak lagi diasumsikan selalu lengkap di review DB parsial: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Subsection `sales` seperti `lead`, `coverage`, `survey/order flow`, `work order`, `activation`, dan agregat `activation rate` kini dimuat secara partial-safe per query, sehingga kegagalan pada satu blok tidak lagi menjatuhkan seluruh halaman domain sales: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Versioning diselaraskan ke `0.65.75` untuk menandai hardening read-side domain sales terhadap review DB parsial.
+
+## [0.65.74] - 2026-07-12
+
+### Fixed
+
+- Read-side `billing` di `domain-service.ts` kini memakai helper schema-aware untuk relasi `service_subscriptions`, `crm_customers`, `sales_packages`, `billing_invoices`, `billing_collection_actions`, dan `billing_payments`, sehingga kolom/join opsional tidak lagi diasumsikan selalu lengkap pada review DB parsial: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Subsection `billing` seperti `ready subscriptions`, `invoice follow-up`, `latest invoice`, `cancelled`, `suspended`, `reconnect`, `collection actions`, `collection follow-ups`, dan `payments` kini dimuat secara partial-safe per query, sehingga error schema pada satu blok tidak lagi menjatuhkan seluruh halaman domain billing: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Versioning diselaraskan ke `0.65.74` untuk menandai hardening read-side domain billing terhadap review DB parsial.
+
+## [0.65.73] - 2026-07-12
+
+### Fixed
+
+- Route `sales/surveys` kini schema-aware terhadap review DB parsial. Lookup `sales_leads`, insert `sales_surveys`, dan update status lead tidak lagi langsung mengasumsikan kolom seperti `address`, `survey_type`, `feasibility_status`, `requested_by_user_id`, `assigned_employee_id`, `scheduled_at`, `surveyed_at`, `site_address`, `technical_notes`, `customer_request_notes`, atau `updated_at` selalu tersedia: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/sales/surveys/route.ts)
+- Route `inventory/odp-ports/assign` kini membangun update `network_odp_ports` dan `network_odp` secara dinamis. Jalur assign port tidak lagi hard-assume kolom enrichment seperti `subscription_id`, `customer_id`, `installed_at`, `notes`, `active_ports`, dan `updated_at` selalu ada di review DB aktif: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/odp-ports/assign/route.ts)
+- Route `inventory/device-assignments` kini schema-aware saat lookup subscription, insert `service_device_assignments`, insert `inventory_stock_movements`, dan update stok `inventory_items`, sehingga kolom opsional seperti `customer_id`, `serial_number`, `mac_address`, `assigned_at`, `returned_at`, `reference_no`, `unit_price`, `notes`, dan `updated_at` tidak lagi dipaksa selalu ada: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/device-assignments/route.ts)
+- Versioning diselaraskan ke `0.65.73` untuk menandai hardening write-side sales survey dan inventory terhadap review DB parsial.
+
+## [0.65.72] - 2026-07-12
+
+### Fixed
+
+- Route `sales/work-orders` kini schema-aware terhadap review DB parsial. Lookup sales order, insert `service_work_orders`, dan update `sales_orders` tidak lagi langsung mengasumsikan kolom seperti `lead_id`, `customer_id`, `work_type`, `subscription_id`, `technician_name`, `scheduled_at`, `started_at`, `completed_at`, `teknisi_name`, `scheduled_installation_at`, atau `updated_at` selalu tersedia: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/sales/work-orders/route.ts)
+- Route `billing/collection-actions` kini membangun insert action dan update `billing_invoices` secara dinamis. Jalur create collection action tidak lagi hard-assume kolom seperti `action_at`, `due_follow_up_at`, `handled_by_user_id`, `notes`, `collection_status`, `suspend_candidate`, dan `updated_at` selalu ada di review DB aktif: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/collection-actions/route.ts)
+- Route `billing/invoices/status` kini schema-aware saat membaca invoice, mengubah status, dan menutup jalur reconnect. Join ke `service_subscriptions` dan `crm_customers` serta update ke `billing_invoices` dan `billing_collection_actions` tidak lagi memaksa relasi atau kolom seperti `subscription_id`, `customer_id`, `notes`, `collection_status`, `suspend_candidate`, `action_type`, dan `due_follow_up_at` selalu lengkap: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/invoices/status/route.ts)
+- Versioning diselaraskan ke `0.65.72` untuk menandai hardening residual write-side sales dan billing terhadap review DB parsial.
+
+## [0.65.71] - 2026-07-12
+
+### Fixed
+
+- Route `billing/payments` kini schema-aware terhadap review DB parsial. Jalur simpan payment, update invoice, dan auto-resolve `billing_collection_actions` tidak lagi langsung mengasumsikan kolom seperti `payment_method`, `reference_no`, `received_by_user_id`, `notes`, `collection_status`, `suspend_candidate`, `due_follow_up_at`, atau `updated_at` selalu tersedia: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/payments/route.ts)
+- Route `billing/invoices/generate` kini membangun insert invoice dan invoice item secara dinamis. Lookup subscription/customer/package, recurring guard, serta insert ke `billing_invoices` dan `billing_invoice_items` sekarang hanya memakai kolom yang memang tersedia, sehingga batch generate tetap bisa berjalan pada schema billing yang parsial: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/billing/invoices/generate/route.ts)
+- Route `sales/subscriptions` kini schema-aware saat aktivasi subscription. Lookup order/package, pembuatan `crm_customers` dan `crm_customer_addresses`, insert `service_subscriptions`, update `sales_orders`, serta sinkronisasi `service_work_orders` tidak lagi hard-assume seluruh kolom opsional phase 1.1 sudah lengkap di review DB: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/sales/subscriptions/route.ts)
+- Versioning diselaraskan ke `0.65.71` untuk menandai hardening write-side billing dan aktivasi subscription terhadap review DB parsial.
+
+## [0.65.70] - 2026-07-12
+
+### Fixed
+
+- Agregasi activity timeline super admin di `dashboard-service.ts` kini partial-safe per source. Query `import`, `support`, `inventory`, `billing`, `sales`, `HR`, dan `auth` tidak lagi saling menjatuhkan saat salah satu source audit gagal dibaca akibat schema drift atau tabel audit parsial: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Jalur activity untuk role non-`SUPER_ADMIN` juga kini memuat import activity secara best-effort, sehingga dashboard tetap turun ke `dashboardActivities` mock bila query import batch gagal alih-alih melempar error ke seluruh widget aktivitas.
+- Versioning diselaraskan ke `0.65.70` untuk menandai hardening agregasi timeline dashboard terhadap kegagalan parsial per source audit.
+
+## [0.65.69] - 2026-07-12
+
+### Fixed
+
+- Timeline audit lintas domain di `dashboard-service.ts` kini mengeraskan jalur inventory, billing, dan sales secara schema-aware. Query tidak lagi langsung mengasumsikan kolom `inventory_item_requests.request_notes`, `inventory_stock_movements.notes`, `billing_invoices.notes`, `billing_payments.notes`, `billing_collection_actions.notes`, `sales_leads.notes`, `sales_surveys.technical_notes`, `sales_orders.notes`, dan `service_work_orders.notes` selalu tersedia di review DB aktif: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Jika review DB parsial belum memiliki kolom note/technical note pada salah satu lane inventory, billing, atau sales, subsection timeline terkait sekarang turun aman ke nol row tanpa memicu kegagalan seluruh activity timeline dashboard.
+- Versioning diselaraskan ke `0.65.69` untuk menandai hardening audit timeline lintas domain terhadap schema review DB parsial.
+
+## [0.65.68] - 2026-07-12
+
+### Fixed
+
+- Timeline audit support di `dashboard-service.ts` kini mengeraskan jalur `TT_CREATE` dan `TT_CLOSE` secara schema-aware. Query tidak lagi langsung mengasumsikan kolom `support_trouble_tickets.notes`, `support_trouble_tickets.close_notes`, dan `support_trouble_tickets.closed_at` selalu tersedia di review DB aktif: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Jika review DB parsial belum memiliki kolom note/close pada trouble ticket, blok audit terkait sekarang turun aman ke nol row tanpa memicu kegagalan seluruh timeline support.
+- Versioning diselaraskan ke `0.65.68` untuk menandai hardening audit timeline support terhadap schema review DB parsial.
+
+## [0.65.67] - 2026-07-12
+
+### Fixed
+
+- `getReviewDbDashboardSummary()` di `dashboard-service.ts` kini menghitung total isolir secara schema-aware, sehingga summary dashboard tidak lagi mengasumsikan kolom `support_isolations.status` dan `support_isolations.is_archived` selalu tersedia di review DB aktif: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Bila review DB parsial belum memiliki `is_archived`, summary isolir tetap memakai count `status = 'OPEN'`; bila kolom inti `status` sendiri tidak tersedia, count turun aman ke nol alih-alih memicu error SQL.
+- Versioning diselaraskan ke `0.65.67` untuk menandai hardening summary dashboard support terhadap schema review DB parsial.
+
+## [0.65.66] - 2026-07-12
+
+### Fixed
+
+- Query `highRiskTickets` di `dashboard-service.ts` kini memakai helper schema-aware untuk relasi `support_trouble_tickets -> service_subscriptions`, sehingga kartu dan rekomendasi TT/NOC tidak lagi mengasumsikan kolom `subscription_id`, `id`, dan `service_no` selalu tersedia di review DB aktif: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Informasi `serviceNo` pada rekomendasi dashboard TT/NOC sekarang fallback aman ke `NULL` bila relasi subscription parsial, alih-alih memicu query gagal pada jalur `CS_ADMIN`.
+- Versioning diselaraskan ke `0.65.66` untuk menandai hardening dashboard TT/NOC terhadap schema review DB parsial.
+
+## [0.65.65] - 2026-07-12
+
+### Fixed
+
+- Query `Port ODP` di `dashboard-service.ts` kini memakai helper schema-aware bersama untuk jalur `CUSTOMER_SERVICE`, `CS_ADMIN`, dan `NOC_OPERATOR`. Join ke `service_subscriptions` dan `crm_customers` hanya diaktifkan bila kolom `subscription_id`, `customer_id`, `service_no`, dan `customer_code` memang tersedia di review DB aktif: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Kartu dashboard lintas lane yang menampilkan `Port ODP` tidak lagi mengasumsikan `installed_at` selalu ada. Jika relasi subscription/customer atau timestamp instalasi belum lengkap, dashboard tetap tampil dengan fallback aman untuk `customerCode`, `serviceNo`, dan `installedAt`.
+- Versioning diselaraskan ke `0.65.65` untuk menandai hardening dashboard `Port ODP` terhadap schema review DB parsial.
+
+## [0.65.64] - 2026-07-12
+
+### Fixed
+
+- `dashboard-service.ts` kini mengeraskan jalur `Isolir` dan `Dismantle` pada dashboard. KPI CS, rekomendasi `CS_ADMIN`, kartu `NOC_OPERATOR`, kartu `DISMANTLE_OPERATOR`, dan timeline audit support tidak lagi mengasumsikan kolom seperti `is_archived`, `reason`, `isolation_date`, `subscription_id`, `service_no`, `transfer_note`, `transferred_at`, `close_note`, `restoration_date`, atau `closed_at` selalu tersedia: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Count dan timeline dashboard sekarang memakai fallback schema-aware sehingga partial review DB tidak lagi mudah memicu kegagalan baca pada kartu operasional support non-TT. Jika kolom opsional belum ada, dashboard tetap tampil dengan nilai kosong, sorting alternatif, atau count nol yang aman.
+- Versioning diselaraskan ke `0.65.64` untuk menandai hardening dashboard support non-TT terhadap schema review DB parsial.
+
+## [0.65.63] - 2026-07-12
+
+### Fixed
+
+- Read-side `Isolir` dan `Dismantle` di service layer kini membaca schema review DB secara adaptif. Query section `Isolir Aktif`, `Queue Dismantle Open`, dan `Histori Dismantle` tidak lagi langsung mengasumsikan kolom opsional seperti `service_no`, `customer_code`, `radbox_name`, `customer_phone`, `marketing_name`, `transfer_note`, atau `closed_at` selalu tersedia: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Join ke `service_subscriptions`, `crm_customers`, dan histori/queue dismantle sekarang hanya diaktifkan bila kolom kunci relasinya memang tersedia. Jika schema lama belum lengkap, subsection terkait tetap tampil dengan fallback nilai `NULL` atau sorting alternatif, alih-alih memicu fallback mock total untuk lane non-TT.
+- Versioning diselaraskan ke `0.65.63` untuk menandai hardening read-side support non-TT terhadap review DB parsial.
+
+## [0.65.62] - 2026-07-12
+
+### Fixed
+
+- Route support non-TT untuk `Restore Isolir`, `Transfer Dismantle`, `Close Dismantle`, dan `Reopen Dismantle` kini lebih tahan review DB parsial. Update ke `support_isolations` tidak lagi selalu mengasumsikan kolom `restoration_date`, `close_note`, `is_archived`, `archived_at`, atau `updated_at` wajib ada; route hanya menyentuh kolom yang memang tersedia sambil tetap mewajibkan kolom inti seperti `status`: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/isolations/[id]/restore/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle/[id]/close/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle-history/[id]/reopen/route.ts)
+- Jalur `Transfer Dismantle`, `Close Dismantle`, dan `Reopen Dismantle` juga kini membangun payload insert secara schema-aware untuk `support_dismantle_queue` dan `support_dismantle_history`, sekaligus membaca kolom pelanggan opsional dari `support_isolations` dengan fallback aman bila schema review DB lama belum lengkap: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/isolations/[id]/dismantle/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle/[id]/close/route.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle-history/[id]/reopen/route.ts)
+- Versioning diselaraskan ke `0.65.62` untuk menandai hardening backend support non-TT terhadap schema review DB parsial.
+
+## [0.65.61] - 2026-07-12
+
+### Fixed
+
+- Route `SLA Trouble Ticket` kini memeriksa schema inti `support_trouble_ticket_sla` sebelum melakukan create/update. Jika kolom wajib `trouble_type` atau `duration_days` belum siap di review DB aktif, route mengembalikan pesan operasional yang jelas alih-alih gagal dengan SQL error mentah: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-ticket-sla/route.ts)
+- Update SLA juga tidak lagi mengasumsikan kolom `updated_at` selalu tersedia; field tersebut hanya disentuh bila memang ada pada schema aktif, sehingga review DB parsial tetap bisa memproses perubahan durasi SLA dengan aman.
+- Versioning diselaraskan ke `0.65.61` untuk menandai hardening route master SLA trouble ticket terhadap review DB parsial.
+
+## [0.65.60] - 2026-07-12
+
+### Fixed
+
+- Route `Update Progress Trouble Ticket` kini membentuk payload insert log secara schema-aware, sehingga review DB parsial yang belum memiliki kolom opsional seperti `owner_name`, `progress_notes`, `follow_up_at`, atau `updated_by` tidak lagi memutus update progress utama pada ticket: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/[ticketCode]/progress/route.ts)
+- Jika kolom inti log `trouble_ticket_id` dan `progress_status` tersedia, route tetap mencatat log dengan subset kolom yang aman; jika kolom inti belum siap, update status ticket tetap berjalan tanpa hard-fail di insert log.
+- Versioning diselaraskan ke `0.65.60` untuk menandai hardening route progress trouble ticket terhadap review DB parsial.
+
+## [0.65.59] - 2026-07-12
+
+### Fixed
+
+- Route `Close Trouble Ticket` kini memvalidasi `resolution_action` ke master hanya bila schema `support_trouble_ticket_masters` memang tersedia lengkap, sehingga review DB parsial tidak lagi membuat close flow hard-fail hanya karena tabel master lama belum siap: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/[ticketCode]/close/route.ts)
+- Validasi progress aktif pada jalur close juga dibuat lebih tahan schema drift. Bila log progress lengkap, route tetap memakai `support_trouble_ticket_progress_logs` seperti sebelumnya; bila schema log parsial belum lengkap, route jatuh ke fallback aman berbasis status ticket aktif (`ON_PROGRESS`/`FOLLOW_UP`) alih-alih memutus close flow karena query log tidak dapat dijalankan.
+- Versioning diselaraskan ke `0.65.59` untuk menandai hardening route penutupan trouble ticket terhadap review DB parsial.
+
+## [0.65.58] - 2026-07-12
+
+### Fixed
+
+- Route `Eskalasi Trouble Ticket` kini lebih tahan review DB parsial saat membaca konteks SLA. Query ticket tidak lagi mewajibkan tabel/kolom master SLA selalu lengkap; bila `support_trouble_ticket_sla` atau kolom `duration_days` belum tersedia, route tetap bisa membuka ticket dan hanya membatasi level SLA-driven (`DUE_TODAY`/`OVERDUE`) dengan pesan yang lebih tepat, sementara eskalasi `MANUAL` tetap bisa berjalan: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/[ticketCode]/escalate/route.ts)
+- Perhitungan `slaDueAt` pada jalur eskalasi juga kini mengikuti pola fallback yang sama dengan dashboard support, termasuk pemakaian `support_trouble_tickets.sla_due_at` bila tersedia dan fallback ke `duration_days` bila master SLA lengkap.
+- Versioning diselaraskan ke `0.65.58` untuk menandai hardening route eskalasi trouble ticket terhadap schema review DB parsial.
+
+## [0.65.57] - 2026-07-12
+
+### Fixed
+
+- Route write-side `Tambah Isolir` kini membaca schema review DB lebih defensif sebelum melakukan join ke `crm_customer_addresses`, `sales_orders`, dan `sales_leads`, sehingga lookup alamat pelanggan dan marketing turun menjadi best-effort saat review DB lama belum memiliki kolom opsional seperti `is_primary`, `marketing_name`, atau `lead_id`: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/isolations/route.ts), [review-db.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/review-db.ts)
+- Route `Tambah Trouble Ticket` kini hanya memaksa validasi master SLA bila kolom `support_trouble_ticket_sla.trouble_type` memang tersedia pada review DB aktif; bila schema SLA lama belum lengkap, pembuatan ticket tidak lagi terhenti hanya karena query validasi master hard-fail: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/route.ts), [review-db.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/review-db.ts)
+- Ditambahkan helper cache `hasReviewDbColumn(...)` di layer review DB agar hardening schema check pada jalur support bisa dipakai ulang tanpa query `information_schema` berulang untuk kolom yang sama.
+- Versioning diselaraskan ke `0.65.57` untuk menandai hardening route write-side support terhadap review DB parsial.
+
+## [0.65.56] - 2026-07-12
+
+### Fixed
+
+- KPI operasional `Support/NOC` di dashboard review DB kini memakai join SLA, progress log, dan escalation log yang lebih tahan schema drift. Bila tabel log tambahan atau kolom master SLA belum lengkap di review DB lama, query dashboard tetap berjalan dengan fallback join kosong alih-alih hard-fail seluruh kartu operasional: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Hardening ini menutup celah ketika `support_trouble_ticket_sla.trouble_type`, `duration_days`, atau kolom inti pada log progress/escalation belum tersedia penuh, sehingga metrik seperti `overdue`, `escalation pending`, dan `ready close` tidak lagi menjadi titik kegagalan utama jalur Support/NOC.
+- Versioning diselaraskan ke `0.65.56` untuk menandai hardening query dashboard support terhadap schema review DB parsial.
+
+## [0.65.55] - 2026-07-12
+
+### Improved
+
+- Panel aksi support kini memakai container bersama `SupportActionPanelContainer` yang dapat otomatis membuka panel induk saat URL hash mengarah ke salah satu action form di dalamnya, sehingga navigasi lintas-lane langsung jatuh ke area kerja yang relevan tanpa operator harus membuka panel manual: [support-action-panel-container.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-action-panel-container.tsx), [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-sla-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-workspace.tsx), [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx), [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx)
+- Slot form yang collapsible sekarang ikut membaca hash action dan konteks prefill untuk membuka dirinya sendiri, sehingga pola interaksi `TT`, `SLA`, `Isolir`, dan `Dismantle` menjadi lebih seragam saat operator datang dari CTA, queue action, atau deep-link support: [support-action-panel-slot.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-action-panel-slot.tsx), [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-sla-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-workspace.tsx), [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx), [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx)
+- Prefill `type` pada lane `TT` dan `SLA` kini juga ikut menandai panel prioritas sebagai terbuka secara default, sehingga transisi dari konteks kontrol SLA ke form pengaturan durasi tidak lagi terasa berbeda dibanding prefill ticket/isolir/dismantle.
+- Versioning diselaraskan ke `0.65.55` untuk menandai parity state panel aksi support yang lebih konsisten antar lane.
+
+## [0.65.54] - 2026-07-12
+
+### Fixed
+
+- Action create isolir pada review DB tidak lagi menggantungkan lookup subscription inti ke tabel `sales_orders` dan `sales_leads`; query utama sekarang hanya memakai tabel yang wajib untuk jalur support (`service_subscriptions`, `crm_customers`, dan `crm_customer_addresses`): [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/isolations/route.ts)
+- Pengambilan `marketing_name` untuk isolir dipindahkan menjadi best-effort lookup terpisah, sehingga drift di domain sales tidak lagi ikut memutus write flow support/NOC saat operator membuat isolasi baru.
+- Operational card dashboard kini di-sanitize di service layer per role, sehingga role non-`SUPER_ADMIN` tidak lagi bisa membuka kartu lintas domain hanya dengan memanipulasi filter `division=ALL`; kartu NOC, TT, CS, Digital, dan Dismantle kini terkunci pada scope operasionalnya masing-masing: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Shortcut href pada operational card support juga diarahkan ke lane yang lebih spesifik (`TT`, `Isolir`, `Dismantle`) agar dashboard lebih konsisten dengan pola workspace role-aware.
+- Smoke test diperluas untuk memverifikasi bahwa role NOC dan TT hanya menerima operational card yang relevan dan tetap aman walau query dashboard diminta dengan `division=ALL`: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- Helper schema support kini tidak lagi berhenti di `CREATE TABLE IF NOT EXISTS`; service sekarang juga menambahkan kolom yang mungkin hilang pada review DB lama untuk `support_dismantle_queue`, `support_trouble_ticket_progress_logs`, dan `support_trouble_ticket_escalation_logs`, sehingga route `reopen dismantle`, `progress`, dan `escalate` lebih tahan terhadap schema drift parsial: [support-dismantle-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/support-dismantle-service.ts), [support-ticket-progress-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/support-ticket-progress-service.ts), [support-ticket-escalation-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/support-ticket-escalation-service.ts)
+- Shortcut pada header `DashboardCommandCenter` tidak lagi hardcoded ke `/support` dan `/billing`; link kini dibentuk dari server sesuai role aktif, default landing, dan lane support prioritas agar header dashboard tetap konsisten dengan RBAC dan landing parity: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx), [dashboard-command-center.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-command-center.tsx)
+- Next actions dashboard kini dibentuk di service layer, bukan lagi di komponen, sehingga label aksi mengikuti konteks `href`, lane support, dan action key aktual; rekomendasi tidak lagi kembali ke label generik seperti `Masuk Queue`, `Kerjakan Sekarang`, atau `Buka Agenda`: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [dashboard-next-actions.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-next-actions.tsx)
+- Smoke test diperluas untuk memastikan next actions role `NOC_OPERATOR` dan `TT_OPERATOR` tetap spesifik, tidak mengarah ke `/support` generic, dan tidak memakai label aksi generik: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- CTA lintas-lane pada workspace support kini langsung mengarah ke form aksi yang relevan bila role memiliki capability yang sesuai, bukan lagi selalu jatuh ke lane generik; ini diterapkan pada workspace `TT`, `SLA`, `Isolir`, dan `Dismantle` agar operator bisa lompat langsung ke panel `SLA`, `Update Progress`, `Transfer Dismantle`, atau `Restore` sesuai otoritasnya: [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-sla-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-workspace.tsx), [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx), [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx)
+- Form utama support kini memakai blok konteks seragam `Tujuan`, `Sumber`, dan `Hasil`, sehingga panel `TT`, `SLA`, `Isolir`, `Restore`, `Transfer Dismantle`, `Close`, dan `Reopen` menjelaskan alur operasional dengan pola yang sama dan lebih mudah dipindai operator: [support-form-context-note.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-form-context-note.tsx), [support-ticket-create-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-create-form.tsx), [support-ticket-progress-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-progress-form.tsx), [support-ticket-escalate-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-escalate-form.tsx), [support-ticket-close-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-ticket-close-form.tsx), [support-sla-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-form.tsx), [support-isolation-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-form.tsx), [support-isolation-restore-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-restore-form.tsx), [support-dismantle-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-form.tsx), [support-dismantle-close-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-close-form.tsx), [support-dismantle-reopen-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-reopen-form.tsx)
+- Section header form support juga diseragamkan ke pola `Form Action Support` agar perpindahan antar lane tidak terasa seperti modul yang berbeda-beda.
+- Istilah pada baris queue support kini diseragamkan ke bahasa operasional yang sama dengan workspace dan form, termasuk label antrian `TT`, terminologi SLA, kepemilikan proses `Isolir`, dan status/aksi pada queue `Dismantle`, sehingga operator tidak lagi melihat campuran istilah Inggris, kode internal, dan label UI yang berbeda-beda: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx), [support-sla-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-queue-panel.tsx), [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+- Urutan aksi per baris pada queue `Isolir` dan `Dismantle` kini dibentuk dari helper rekomendasi yang mempertimbangkan konteks kasus dan capability role, sehingga tombol utama tidak lagi hardcoded sama untuk semua kondisi; kasus restore menonjolkan `Buka Form Restore`, kasus terminate aktif menonjolkan `Tutup ke Histori`, dan histori dismantle menonjolkan `Reopen ke Queue Aktif` bila role memang berwenang: [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+- Desktop dan mobile sekarang memakai sumber urutan aksi row yang sama, sehingga prioritas tombol antar breakpoint tidak lagi bisa berbeda.
+- Workspace support kini memakai blok helper note seragam `Ringkasan Operasional` untuk `TT`, `SLA`, `Isolir`, dan `Dismantle`, sehingga bagian atas tiap lane selalu menjelaskan prioritas kerja, konteks lane, dan indikator kunci dengan pola yang sama: [support-workspace-helper-note.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-workspace-helper-note.tsx), [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-sla-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-workspace.tsx), [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx), [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx)
+- Istilah ringkasan atas juga dirapikan agar lebih seragam secara operasional, misalnya `tipe trouble`, `jalur restore`, `jalur terminate`, `queue aktif`, dan `histori penutupan`.
+- Label filter workspace support kini diseragamkan ke pola `Fokus Antrian`, `Status Kerja`, `Tipe Trouble`, `Cari Pelanggan`, dan `Cari Layanan / Konteks`, lengkap dengan placeholder yang lebih konsisten di lane `TT`, `SLA`, `Isolir`, dan `Dismantle`, sehingga operator tidak lagi berpindah-pindah istilah saat menyaring data: [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-sla-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-workspace.tsx), [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx), [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx)
+- Pilihan fokus yang sebelumnya campur Inggris dan istilah internal juga dirapikan menjadi bahasa kerja yang lebih konsisten seperti `Ticket Aktif`, `SLA Terlewati`, `Queue Aktif`, dan `Follow-up Lapangan`.
+- Panel aksi workspace support kini memakai intro bersama `SupportActionPanelIntro`, sehingga judul section, helper write-side, warning review DB, label `Buka panel aksi lane ...`, dan ringkasan isi panel menjadi seragam antara `TT`, `SLA`, `Isolir`, dan `Dismantle`: [support-action-panel-intro.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-action-panel-intro.tsx), [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-sla-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-workspace.tsx), [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx), [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx)
+- Istilah aksi di lane `TT` juga dirapikan agar konsisten dengan lane lain, misalnya `Tutup ticket` menggantikan label campuran `Close ticket`.
+- Layout item di dalam panel aksi workspace support kini memakai slot seragam `SupportActionPanelSlot`, sehingga form write-side memiliki ritme visual, spacing, dan grouping yang lebih konsisten baik untuk lane yang collapsible seperti `TT` maupun lane grid seperti `SLA`, `Isolir`, dan `Dismantle`: [support-action-panel-slot.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-action-panel-slot.tsx), [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-sla-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-workspace.tsx), [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx), [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx)
+- Setiap slot panel aksi sekarang juga memiliki deskripsi singkat di level item, sehingga operator bisa membedakan kapan harus membuat ticket, restore, transfer terminate, close, atau reopen tanpa langsung membaca seluruh form.
+- Versioning diselaraskan ke `0.65.54` untuk menandai parity layout panel aksi support yang lebih konsisten antar lane.
+
+## [0.65.41] - 2026-07-12
+
+### Improved
+
+- Pembacaan review section pada workspace `support` kini dibuat `partial-safe`, sehingga satu subsection yang gagal dibaca dari review DB tidak lagi otomatis menjatuhkan seluruh halaman `NOC & Troubleshoots` ke `Mock Fallback`: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Query `Trouble Ticket`, `Isolir Aktif`, `SLA Trouble Ticket`, `Queue Dismantle Open`, dan `Histori Dismantle` sekarang dijalankan terpisah dengan guard error per subsection; subsection yang sehat tetap tampil dari DB, sedangkan subsection yang gagal akan muncul sebagai catatan `WARNING` pada review section support.
+- Workspace `support` kini hanya fallback penuh ke mock bila seluruh subsection support gagal dimuat sekaligus, sehingga schema drift kecil tidak langsung memutus pengalaman operasional web secara total.
+- Versioning diselaraskan ke `0.65.41` untuk menandai hardening koneksi review DB pada workspace support.
+
+## [0.65.40] - 2026-07-12
+
+### Fixed
+
+- Halaman `support` tidak lagi jatuh ke `Mock Fallback` karena query histori dismantle salah mengasumsikan kolom `support_dismantle_history.subscription_id`; service kini mengikuti schema final yang benar dengan join `support_dismantle_history -> support_isolations -> service_subscriptions -> crm_customers`: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Patch ini menutup error SQL konkret `Unknown column 'dh.subscription_id' in 'on clause'` yang sempat memutus pembacaan review DB pada workspace `NOC & Troubleshoots, Ticket, dan Kontrol SLA`.
+- Versioning diselaraskan ke `0.65.40` untuk menandai perbaikan koneksi DB pada jalur support workspace.
+
+## [0.65.39] - 2026-07-12
+
+### Fixed
+
+- Metrik `NOC` dan `Troubleshoots` di dashboard tidak lagi memakai angka turunan semu seperti `overdue -> escalation` atau `monthly opened / 3 -> ready close`, tetapi sekarang dihitung langsung dari review DB dengan membaca `support_trouble_tickets`, `support_trouble_ticket_sla`, `support_trouble_ticket_progress_logs`, dan `support_trouble_ticket_escalation_logs`: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Hitungan `ticket overdue` untuk jalur `NOC` kini tetap bisa terbentuk walau kolom `support_trouble_tickets.sla_due_at` belum tersedia, karena service menurunkan due date dari master SLA trouble type secara langsung saat query dashboard dijalankan.
+- Kartu `Troubleshoots` kini memakai count DB nyata untuk `Perlu Eskalasi` dan `Siap Close`, mengikuti logika operasional yang sama dengan workspace support: pending escalation/follow-up/SLA dan kandidat close dari progress terakhir tanpa follow-up aktif.
+- Batch ini juga memastikan tabel progress dan escalation support di-bootstrap lebih dulu sebelum query dashboard dijalankan, sehingga metrik TT tidak kembali jatuh ke angka dummy saat tabel log belum tersentuh sebelumnya.
+- Versioning diselaraskan ke `0.65.39` untuk menandai penutupan gap koneksi DB pada NOC dan Troubleshoots.
+
+## [0.65.38] - 2026-07-12
+
+### Changed
+
+- `dashboard-service` kini menyaring `dashboardAlerts` dan `roleQueues` berdasarkan akses route aktual, lane support, action anchor, serta konteks domain yang benar-benar boleh dilihat role aktif, sehingga kartu queue dan alert dashboard tidak lagi terlalu global untuk role mikro: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+- Queue role yang sebelumnya masih menuju `/support` generik kini otomatis diturunkan ke lane yang lebih presisi seperti `TT`, `SLA`, `Isolir`, atau `Dismantle`, sehingga `NOC`, `TT Operator`, dan role support lain masuk ke queue operasional yang tepat sejak landing dashboard.
+- Alert `Billing`, `Import`, dan `Daily Activity approval` kini dibuang total untuk role yang tidak punya konteks atau otoritas inti di area tersebut, sementara alert support yang masih relevan akan diturunkan ke narasi dan jalur aksi yang aman.
+- Smoke test diperluas untuk memverifikasi bahwa `NOC` tidak lagi menerima alert billing/approval dan queue support generic, serta `TT Operator` langsung menerima queue lane-specific yang benar: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- Artefak generated `.next/dev/types` yang korup dibersihkan agar verifikasi TypeScript kembali merefleksikan source code aktual.
+- Versioning diselaraskan ke `0.65.38` untuk menandai batch hardening dashboard alert dan role queue card per role.
+
+## [0.65.37] - 2026-07-12
+
+### Changed
+
+- `worklist-service` kini juga menyaring narasi panel detail seperti `reason`, `nextAction`, `owner`, `blockingInfo`, `healthSignal`, `correlationSummary`, `decisionTrail`, `evidencePanel`, dan `actionOutcomeSummary`, sehingga role mikro tidak lagi melihat konteks `Billing / Collection` atau `CS & Admin CS` yang berada di luar scope kerjanya: [worklist-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/worklist-service.ts)
+- Saat sebagian konteks detail milik tim lain disembunyikan, service otomatis menurunkan narasi ke versi generik yang masih aman dan operasional, misalnya mengganti owner menjadi `Tim terkait` dan mengganti instruksi detail menjadi follow-up yang masih relevan untuk role aktif.
+- Smoke test diperluas untuk memverifikasi sanitasi detail panel worklist, termasuk penyaringan blok `Billing`, penghapusan `healthSignal`/`actionOutcomeSummary` yang keluar dari scope role, serta penyisaan hanya evidence dan decision trail yang masih relevan: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- Versioning diselaraskan ke `0.65.37` untuk menandai batch hardening detail panel worklist per role.
+
+## [0.65.36] - 2026-07-12
+
+### Changed
+
+- `worklist-service` kini menyaring `href`, `actionLabel`, `handoffLinks`, dan `recommendedActions` berdasarkan akses route, lane support, serta action anchor yang benar-benar dimiliki role aktif, sehingga item worklist tidak lagi bisa menampilkan CTA lintas-domain atau lintas-lane yang secara operasional seharusnya tertutup: [worklist-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/worklist-service.ts)
+- Saat CTA utama item worklist ternyata tidak layak diakses oleh role aktif, service kini otomatis menurunkannya ke fallback yang masih relevan seperti `TT`, `SLA`, `Isolir`, `Dismantle`, atau modul induk yang tetap sah, sehingga operator tetap punya jalur tindak lanjut yang aman tanpa dilempar ke area terlarang.
+- Smoke test diperluas untuk memverifikasi sanitasi link worklist, termasuk pembuangan handoff `Billing`/`Dismantle` yang tidak boleh untuk `NOC`, fallback action ke lane `SLA`, serta filtering `recommendedActions` yang keluar dari scope role: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- Versioning diselaraskan ke `0.65.36` untuk menandai batch hardening action dan handoff worklist per role.
+
+## [0.65.35] - 2026-07-12
+
+### Changed
+
+- Feed worklist support kini dibedakan lebih tegas antara `NOC_OPERATOR` dan `TT_OPERATOR`, sehingga `NOC` mendapat campuran item `SLA Kritis`, `Monitoring Isolir`, dan `ODP/Port`, sedangkan `TT Operator` fokus ke bucket `Ticket Baru`, `Follow Up Overdue`, `Siap Eskalasi`, dan `Siap Close` dengan sinyal aging/status yang lebih relevan: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts), [worklist-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/worklist-service.ts)
+- Data mock dashboard/worklist kini ikut mencerminkan pemisahan queue support per role agar fallback mode dan smoke test tidak kembali ke perilaku generik yang sama untuk `NOC` dan `TT`: [mock-dashboard.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/mock-dashboard.ts), [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- Smoke test diperluas untuk memverifikasi bucket `SLA Kritis`, `Monitoring Isolir`, `Follow Up Overdue`, dan `Siap Close`, sehingga hardening relevansi queue support punya guardrail otomatis saat service worklist atau dashboard berubah lagi.
+- Versioning diselaraskan ke `0.65.35` untuk menandai batch hardening queue relevance per role pada dashboard/worklist support.
+
+## [0.65.34] - 2026-07-12
+
+### Changed
+
+- Workspace dan queue panel support kini memfilter quick link lintas-domain sesuai akses role aktif, sehingga shortcut ke `Billing`, `Supervisor CS`, `SLA`, `TT`, `Isolir`, atau `Dismantle` tidak lagi bocor ke role mikro yang tidak berhak: [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx), [support-sla-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-workspace.tsx), [support-sla-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-queue-panel.tsx), [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx), [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx), [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+- Row action pada panel `Isolir` dan `Dismantle` kini mengikuti guard role yang sama dengan form utama, sehingga aksi seperti transfer ke dismantle, close ke histori, reopen queue, dan sinkron billing tidak lagi tampil pada role yang hanya boleh membaca atau follow-up terbatas: [support-isolation-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-queue-panel.tsx), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx), [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Versioning diselaraskan ke `0.65.34` untuk menandai batch hardening action visibility dan CTA parity pada workspace support.
+
+## [0.65.33] - 2026-07-12
+
+### Changed
+
+- Landing path default kini dibedakan per role operasional, sehingga `CS Operator`, `CS Admin`, `NOC`, `TT Operator`, `Dismantle`, dan `Digital Creator` langsung masuk ke workspace yang paling relevan setelah login, bukan selalu berhenti di dashboard global: [access-control.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control.ts), [access-control-server.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control-server.ts), [login page](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(auth)/login/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/page.tsx)
+- Smoke test akses diperluas untuk memverifikasi redirect default tiap role prioritas, sehingga batch hardening ini punya guardrail otomatis saat login, root redirect, atau permission baseline berubah lagi: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- Versioning diselaraskan ke `0.65.33` untuk menandai batch hardening parity role pada jalur masuk workspace operasional.
+
 ## [0.65.32] - 2026-07-12
 
 ### Changed

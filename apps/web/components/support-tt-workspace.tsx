@@ -2,18 +2,24 @@
 
 import Link from 'next/link'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { SupportActionPanelContainer } from '@/components/support-action-panel-container'
+import { SupportActionPanelIntro } from '@/components/support-action-panel-intro'
+import { SupportActionPanelSlot } from '@/components/support-action-panel-slot'
 import { SupportSlaForm } from '@/components/support-sla-form'
 import { SupportTicketCloseForm } from '@/components/support-ticket-close-form'
 import { SupportTicketCreateForm } from '@/components/support-ticket-create-form'
 import { SupportTicketEscalateForm } from '@/components/support-ticket-escalate-form'
 import { SupportTicketProgressForm } from '@/components/support-ticket-progress-form'
 import { SupportTroubleTicketQueuePanel } from '@/components/support-tt-queue-panel'
+import { SupportWorkspaceHelperNote } from '@/components/support-workspace-helper-note'
 import {
   buildSupportActionHref,
+  buildSupportLaneActionHref,
   buildSupportLaneHref,
   getSupportActionAnchorId,
 } from '@/lib/support-action-links'
-import { canUseSupportAction } from '@/lib/support-lanes'
+import { canAccessPath } from '@/lib/access-control'
+import { canAccessSupportLane, canUseSupportAction, getSupportLaneSections } from '@/lib/support-lanes'
 import type {
   AppRole,
   DataSourceSnapshot,
@@ -80,14 +86,17 @@ export function SupportTroubleTicketWorkspace({
   supportDrilldown?: SupportDrilldownContext
 }) {
   const reviewSections = content.reviewSections ?? []
-  const troubleRows = reviewSections
-    .filter((section) => section.title.toUpperCase().includes('TROUBLE'))
-    .flatMap((section) => section.rows)
+  const troubleRows = getSupportLaneSections(reviewSections, 'tt').flatMap((section) => section.rows)
 
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
   const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
+  const canOpenSlaLane = canAccessSupportLane(role, 'sla')
+  const canOpenSupervisorWorkspace = canAccessPath(role, '/customers/cs-admin')
+  const slaControlHref = canUseSupportAction({ role, actionKey: 'sla-manage', canCreate, canUpdate, canApprove })
+    ? buildSupportLaneActionHref('sla', 'sla-manage', { focus: 'SLA_OVERDUE' })
+    : buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })
 
   const supportTypeSuggestions = Array.from(
     new Set(
@@ -130,6 +139,7 @@ export function SupportTroubleTicketWorkspace({
   const supportTicketEscalationSuggestions = troubleRows
     .map((row) => buildTicketSuggestion(row, true))
     .filter(Boolean)
+  const readyCloseCount = troubleRows.filter((row) => String(row.status ?? '').trim().toUpperCase().includes('READY')).length
   const statusOptions = Array.from(
     new Set(
       troubleRows
@@ -191,52 +201,66 @@ export function SupportTroubleTicketWorkspace({
               Trouble Ticket
             </h2>
             <p className="mt-1 text-sm leading-5 text-mute">
-              Queue utama, tindak lanjut cepat, dan kontrol SLA.
+              Lane utama untuk intake ticket, follow-up cepat, eskalasi, dan kontrol SLA.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href={buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })}
-              className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
-            >
-              Kontrol SLA
-            </Link>
-            <Link
-              href="/customers/cs-admin?queue=Trouble+Ticket"
-              className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
-            >
-              Supervisor CS
-            </Link>
+            {canOpenSlaLane ? (
+              <Link
+                href={slaControlHref}
+                className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
+              >
+                Kontrol SLA
+              </Link>
+            ) : null}
+            {canOpenSupervisorWorkspace ? (
+              <Link
+                href="/customers/cs-admin?queue=Trouble+Ticket"
+                className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
+              >
+                Supervisor CS
+              </Link>
+            ) : null}
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
           <span className="badge border-slate-200 bg-white text-slate-600">{troubleRows.length} ticket</span>
-          <span className="badge border-slate-200 bg-white text-slate-600">{supportTypeSuggestions.length} type</span>
+          <span className="badge border-slate-200 bg-white text-slate-600">{supportTypeSuggestions.length} tipe trouble</span>
           {!reviewDbReady ? (
             <span className="badge border-amber-200 bg-amber-50 text-amber-700">Review DB belum aktif</span>
           ) : null}
         </div>
       </section>
 
+      <SupportWorkspaceHelperNote
+        title="Prioritaskan follow-up ticket aktif sebelum menutup atau menaikkan eskalasi."
+        detail="Gunakan lane ini untuk menjaga ticket tetap bergerak: update progress saat kasus masih berjalan, eskalasi saat owner atau SLA membutuhkan bantuan lintas tim, lalu close hanya ketika bukti penyelesaian sudah cukup."
+        badges={[
+          { label: `${troubleRows.length} ticket aktif`, tone: 'neutral' },
+          { label: `${readyCloseCount} siap close`, tone: 'success' },
+          { label: `${supportTypeSuggestions.length} tipe trouble`, tone: 'info' },
+        ]}
+      />
+
       <DataSourceStatus source={source} />
 
       <section className="rounded-xl border border-line bg-slate-50 p-3">
         <form action="/support/tt" className="flex flex-col gap-3 xl:flex-row xl:items-end">
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus Antrian</span>
             <select
               name="focus"
               defaultValue={supportPrefill?.focus ?? ''}
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
               <option value="">Semua Ticket</option>
-              <option value="OPEN_TICKETS">Open Tickets</option>
+              <option value="OPEN_TICKETS">Ticket Aktif</option>
               <option value="MONTHLY_OPENED">Periode Ini</option>
               <option value="READY_CLOSE">Siap Close</option>
             </select>
           </label>
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Status</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Status Kerja</span>
             <select
               name="status"
               defaultValue={supportPrefill?.status ?? ''}
@@ -251,13 +275,13 @@ export function SupportTroubleTicketWorkspace({
             </select>
           </label>
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Type</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Tipe Trouble</span>
             <select
               name="type"
               defaultValue={supportPrefill?.type ?? ''}
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
-              <option value="">Semua Type</option>
+              <option value="">Semua Tipe</option>
               {supportTypeSuggestions.map((type) => (
                 <option key={type} value={type}>
                   {type}
@@ -266,20 +290,20 @@ export function SupportTroubleTicketWorkspace({
             </select>
           </label>
           <label className="flex flex-[1.2] flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Customer</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Pelanggan</span>
             <input
               name="customer"
               defaultValue={supportPrefill?.customer ?? ''}
-              placeholder="Nama customer / kode yang ingin difokuskan"
+              placeholder="Nama pelanggan / kode pelanggan"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
           <label className="flex flex-[1.2] flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Service</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Layanan / Konteks</span>
             <input
               name="service"
               defaultValue={supportPrefill?.service ?? ''}
-              placeholder="User / service / petunjuk kasus"
+              placeholder="User, service, atau petunjuk kasus"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
@@ -320,110 +344,112 @@ export function SupportTroubleTicketWorkspace({
       <SupportTroubleTicketQueuePanel
         sections={reviewSections}
         actionLinks={visibleActionLinks}
+        role={role}
         canUpdate={canUpdate}
         canApprove={canApprove}
       />
 
       <section className="space-y-4">
-        <div>
-          <p className="section-title">Aksi Trouble Ticket</p>
-          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-            Form tindak lanjut
-          </h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
-            Default halaman tetap fokus ke tabel. Buka panel ini hanya saat operator perlu menulis aksi.
-          </p>
-          {!reviewDbReady ? (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Mode review database belum aktif, sehingga form write-side dinonaktifkan agar tidak menulis ke mock.
-            </div>
-          ) : null}
-        </div>
-        <details className="group rounded-2xl border border-line bg-white p-4">
-          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-            Buka panel aksi TT
-          </summary>
-          <p className="mt-2 text-sm text-mute">
-            Berisi `Tambah Ticket`, `Update Progress`, `Eskalasi`, `Close Ticket`, dan `Kelola SLA`.
-          </p>
-          <div className="mt-4 space-y-4">
+        <SupportActionPanelIntro
+          laneLabel="TT"
+          detail="Default workspace tetap fokus ke tabel ticket. Buka panel ini hanya saat operator perlu menulis intake, progress, eskalasi, close, atau pengaturan SLA."
+          reviewDbReady={reviewDbReady}
+        />
+        <SupportActionPanelContainer
+          title="Buka panel aksi lane TT"
+          description="Panel ini berisi form write-side untuk `Tambah Ticket`, `Update Progress`, `Eskalasi`, `Tutup Ticket`, dan `Kelola SLA`."
+          actionIds={[
+            getSupportActionAnchorId('ticket-create'),
+            getSupportActionAnchorId('ticket-progress'),
+            getSupportActionAnchorId('ticket-escalate'),
+            getSupportActionAnchorId('ticket-close'),
+            getSupportActionAnchorId('sla-manage'),
+          ]}
+          itemCount={5}
+          defaultOpen={Boolean(supportPrefill?.ticket || supportPrefill?.type)}
+        >
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
           {canUseSupportAction({ role, actionKey: 'ticket-create', canCreate, canUpdate, canApprove }) ? (
-            <details id={getSupportActionAnchorId('ticket-create')} className="rounded-2xl border border-line bg-slate-50 p-4 scroll-mt-24">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-                Tambah trouble ticket
-              </summary>
-              <div className="mt-4">
+            <SupportActionPanelSlot
+              id={getSupportActionAnchorId('ticket-create')}
+              title="Tambah trouble ticket"
+              description="Gunakan form ini untuk intake ticket baru sebelum kasus masuk ke jalur progress, eskalasi, atau close."
+              collapsible
+            >
                 <SupportTicketCreateForm
                   canCreate={canCreate}
                   reviewDbReady={reviewDbReady}
                   typeSuggestions={supportTypeSuggestions}
                   serviceSuggestions={supportServiceSuggestions}
                 />
-              </div>
-            </details>
+            </SupportActionPanelSlot>
           ) : null}
           {canUseSupportAction({ role, actionKey: 'ticket-progress', canCreate, canUpdate, canApprove }) ? (
-            <details id={getSupportActionAnchorId('ticket-progress')} className="rounded-2xl border border-line bg-slate-50 p-4 scroll-mt-24">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-                Update progress ticket
-              </summary>
-              <div className="mt-4">
+            <SupportActionPanelSlot
+              id={getSupportActionAnchorId('ticket-progress')}
+              title="Update progress ticket"
+              description="Pakai form ini saat ticket masih berjalan dan operator perlu memperbarui PIC, status kerja, atau follow-up."
+              collapsible
+              defaultOpen={Boolean(supportPrefill?.ticket)}
+            >
                 <SupportTicketProgressForm
                   canUpdate={canUpdate}
                   reviewDbReady={reviewDbReady}
                   ticketSuggestions={supportTicketSuggestions}
                   initialTicketCode={supportPrefill?.ticket}
                 />
-              </div>
-            </details>
+            </SupportActionPanelSlot>
           ) : null}
           {canUseSupportAction({ role, actionKey: 'ticket-escalate', canCreate, canUpdate, canApprove }) ? (
-            <details id={getSupportActionAnchorId('ticket-escalate')} className="rounded-2xl border border-line bg-slate-50 p-4 scroll-mt-24">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-                Eskalasi ticket
-              </summary>
-              <div className="mt-4">
+            <SupportActionPanelSlot
+              id={getSupportActionAnchorId('ticket-escalate')}
+              title="Eskalasi ticket"
+              description="Gunakan form ini saat kasus tertahan, owner perlu bantuan lintas tim, atau risiko SLA mulai meningkat."
+              collapsible
+              defaultOpen={Boolean(supportPrefill?.ticket)}
+            >
                 <SupportTicketEscalateForm
                   canUpdate={canUpdate}
                   reviewDbReady={reviewDbReady}
                   ticketSuggestions={supportTicketEscalationSuggestions}
                   initialTicketCode={supportPrefill?.ticket}
                 />
-              </div>
-            </details>
+            </SupportActionPanelSlot>
           ) : null}
           {canUseSupportAction({ role, actionKey: 'ticket-close', canCreate, canUpdate, canApprove }) ? (
-            <details id={getSupportActionAnchorId('ticket-close')} className="rounded-2xl border border-line bg-slate-50 p-4 scroll-mt-24">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-                Close ticket
-              </summary>
-              <div className="mt-4">
+            <SupportActionPanelSlot
+              id={getSupportActionAnchorId('ticket-close')}
+              title="Tutup ticket"
+              description="Pakai form ini hanya saat penyelesaian sudah siap dibukukan dan ticket benar-benar dapat keluar dari antrean aktif."
+              collapsible
+              defaultOpen={Boolean(supportPrefill?.ticket)}
+            >
                 <SupportTicketCloseForm
                   canUpdate={canUpdate}
                   reviewDbReady={reviewDbReady}
                   ticketSuggestions={supportTicketSuggestions}
                   initialTicketCode={supportPrefill?.ticket}
                 />
-              </div>
-            </details>
+            </SupportActionPanelSlot>
           ) : null}
           {canUseSupportAction({ role, actionKey: 'sla-manage', canCreate, canUpdate, canApprove }) ? (
-            <details id={getSupportActionAnchorId('sla-manage')} className="rounded-2xl border border-line bg-slate-50 p-4 scroll-mt-24">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-                Kelola SLA trouble ticket
-              </summary>
-              <div className="mt-4">
+            <SupportActionPanelSlot
+              id={getSupportActionAnchorId('sla-manage')}
+              title="Kelola SLA trouble ticket"
+              description="Gunakan form ini untuk memperbarui rule durasi agar lane TT tetap selaras dengan kebutuhan operasional terbaru."
+              collapsible
+              defaultOpen={Boolean(supportPrefill?.type)}
+            >
                 <SupportSlaForm
                   canApprove={canApprove}
                   reviewDbReady={reviewDbReady}
                   typeSuggestions={supportTypeSuggestions}
                   initialTroubleType={supportPrefill?.type}
                 />
-              </div>
-            </details>
+            </SupportActionPanelSlot>
           ) : null}
           </div>
-        </details>
+        </SupportActionPanelContainer>
       </section>
     </div>
   )

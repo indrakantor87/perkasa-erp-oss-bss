@@ -33,6 +33,18 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
   DISMANTLE_OPERATOR: ['/dashboard', '/support'],
 }
 
+const baselineRoleLandingPaths: Record<AppRole, string> = {
+  SUPER_ADMIN: '/dashboard',
+  SALES_MARKETING: '/sales',
+  CS_OPERATOR: '/dashboard/worklist',
+  CS_ADMIN: '/customers/cs-admin',
+  NOC_OPERATOR: '/support/tt',
+  FIELD_TECHNICIAN: '/dashboard/worklist',
+  TT_OPERATOR: '/support/tt',
+  DIGITAL_CREATOR: '/sales/digital-creator',
+  DISMANTLE_OPERATOR: '/support/dismantle',
+}
+
 const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
   SUPER_ADMIN: [
     { resource: 'dashboard', label: 'Dashboard Global', actions: ['view', 'export', 'manage'] },
@@ -137,7 +149,14 @@ export function getAllowedPrefixes(role: AppRole) {
 }
 
 export function getDefaultLandingPath(role: AppRole) {
-  return getAllowedPrefixes(role)[0] ?? '/dashboard'
+  const allowedPrefixes = getAllowedPrefixes(role)
+  const preferredPath = baselineRoleLandingPaths[role]
+
+  if (preferredPath && allowedPrefixes.some((prefix) => matchesPrefix(preferredPath, prefix))) {
+    return preferredPath
+  }
+
+  return allowedPrefixes[0] ?? '/dashboard'
 }
 
 export function getPermissionMatrix(role: AppRole) {
@@ -184,6 +203,10 @@ export function getPermissionSummary(role: AppRole) {
 
 export function getBaselineAllowedPrefixes(role: AppRole) {
   return baselineRoleAllowedPrefixes[role]
+}
+
+export function getBaselineDefaultLandingPath(role: AppRole) {
+  return baselineRoleLandingPaths[role]
 }
 
 export function getBaselinePermissionMatrix(role: AppRole) {

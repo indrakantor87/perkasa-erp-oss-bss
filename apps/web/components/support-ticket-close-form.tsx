@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { SupportFormContextNote } from '@/components/support-form-context-note'
 
 type SupportTicketCloseFormProps = {
   canUpdate: boolean
@@ -100,7 +101,7 @@ export function SupportTicketCloseForm({
 
   return (
     <section className="panel p-6">
-      <p className="section-title">Close Flow Support</p>
+      <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Tutup trouble ticket review
       </h3>
@@ -111,6 +112,22 @@ export function SupportTicketCloseForm({
             ? 'Mode review database belum aktif, jadi close flow support dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini menutup trouble ticket yang sudah melewati fase progress aktif pada review DB, sehingga alur support tidak lagi lompat dari open langsung ke close.'}
       </p>
+      <SupportFormContextNote
+        items={[
+          {
+            label: 'Tujuan',
+            value: 'Memfinalkan ticket yang benar-benar selesai agar queue tetap bersih dan terukur.',
+          },
+          {
+            label: 'Sumber',
+            value: 'Snapshot ticket menampilkan status, SLA, PIC, dan progress terakhir sebagai guard sebelum close.',
+          },
+          {
+            label: 'Hasil',
+            value: 'Ticket keluar dari antrian aktif dengan tindakan penyelesaian dan catatan penutupan yang terdokumentasi.',
+          },
+        ]}
+      />
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
         <label className="flex flex-col gap-2 text-sm text-slate-700">

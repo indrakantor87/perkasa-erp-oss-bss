@@ -1,11 +1,16 @@
 import Link from 'next/link'
+import { SupportActionPanelContainer } from '@/components/support-action-panel-container'
+import { SupportActionPanelIntro } from '@/components/support-action-panel-intro'
+import { SupportActionPanelSlot } from '@/components/support-action-panel-slot'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
 import { SupportIsolationForm } from '@/components/support-isolation-form'
 import { SupportIsolationQueuePanel } from '@/components/support-isolation-queue-panel'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
-import { buildSupportActionHref, buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
-import { canProcessSupportDismantle } from '@/lib/support-lanes'
+import { SupportWorkspaceHelperNote } from '@/components/support-workspace-helper-note'
+import { canAccessPath } from '@/lib/access-control'
+import { buildSupportActionHref, buildSupportLaneActionHref, buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
+import { canAccessSupportLane, canProcessSupportDismantle, canUseSupportAction } from '@/lib/support-lanes'
 import type { AppRole, DataSourceSnapshot, DomainCapability, DomainPageContent, DomainReviewRow, SupportActionLink, SupportDrilldownContext } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
@@ -77,6 +82,13 @@ export function SupportIsolationWorkspace({
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
   const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
+  const canOpenBillingDecision = canAccessPath(role, '/billing')
+  const canOpenDismantleLane = canAccessSupportLane(role, 'dismantle')
+  const canOpenSlaLane = canAccessSupportLane(role, 'sla')
+  const canOpenSupervisorWorkspace = canAccessPath(role, '/customers/cs-admin')
+  const dismantleTransferHref = canUseSupportAction({ role, actionKey: 'dismantle-approve', canCreate, canUpdate, canApprove })
+    ? buildSupportLaneActionHref('dismantle', 'dismantle-approve')
+    : buildSupportLaneHref('dismantle')
 
   const supportRadboxSuggestions = Array.from(
     new Set(
@@ -122,11 +134,15 @@ export function SupportIsolationWorkspace({
     },
   ] satisfies SupportActionLink[]
 
-  const visibleActionLinks = actionLinks.filter((item) => {
-    if (item.key === 'isolation-create') return canCreate
-    if (item.key === 'isolation-restore') return canUpdate
-    return canProcessSupportDismantle(role, canApprove)
-  })
+  const visibleActionLinks = actionLinks.filter((item) =>
+    canUseSupportAction({
+      role,
+      actionKey: item.key,
+      canCreate,
+      canUpdate,
+      canApprove,
+    }),
+  )
 
   return (
     <div className="space-y-4">
@@ -138,25 +154,29 @@ export function SupportIsolationWorkspace({
               Monitoring Isolir Pelanggan
             </h2>
             <p className="mt-1 text-sm leading-5 text-mute">
-              Monitoring backlog isolir, restore, dan transfer ke dismantle.
+              Lane keputusan suspend aktif untuk restore billing atau transfer terminate.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/billing" className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
-              Buka Billing Decision
-            </Link>
-            <Link
-              href={buildSupportLaneHref('dismantle')}
-              className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
-            >
-              Queue Dismantle
-            </Link>
+            {canOpenBillingDecision ? (
+              <Link href="/billing" className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+                Buka Billing Decision
+              </Link>
+            ) : null}
+            {canOpenDismantleLane ? (
+              <Link
+                href={dismantleTransferHref}
+                className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
+              >
+                {canProcessSupportDismantle(role, canApprove) ? 'Transfer Dismantle' : 'Queue Dismantle'}
+              </Link>
+            ) : null}
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
           <span className="badge border-slate-200 bg-white text-slate-600">{summary.total} isolir</span>
           <span className="badge border-sky-200 bg-sky-50 text-sky-700">Restore: {summary.restoreCount}</span>
-          <span className="badge border-rose-200 bg-rose-50 text-rose-700">Dismantle: {summary.terminateCount}</span>
+          <span className="badge border-rose-200 bg-rose-50 text-rose-700">Terminate: {summary.terminateCount}</span>
           {summary.marketingCount ? (
             <span className="badge border-slate-200 bg-white text-slate-600">{summary.marketingCount} marketing terlibat</span>
           ) : null}
@@ -165,6 +185,16 @@ export function SupportIsolationWorkspace({
           ) : null}
         </div>
       </section>
+
+      <SupportWorkspaceHelperNote
+        title="Pisahkan cepat kasus yang masih layak dipulihkan dari kasus yang harus diteruskan ke terminate."
+        detail="Gunakan lane ini sebagai gerbang keputusan. Restore tetap berada di jalur billing, sedangkan kasus yang tidak layak dibuka kembali harus segera dipindahkan ke dismantle agar tidak menggantung di backlog isolir."
+        badges={[
+          { label: `${summary.total} backlog isolir`, tone: 'neutral' },
+          { label: `${summary.restoreCount} jalur restore`, tone: 'info' },
+          { label: `${summary.terminateCount} jalur terminate`, tone: 'danger' },
+        ]}
+      />
 
       {summary.topStatuses.length ? (
         <section className="rounded-xl border border-line bg-white p-3">
@@ -175,18 +205,22 @@ export function SupportIsolationWorkspace({
                 {status}: {count}
               </span>
             ))}
-            <Link
-              href={buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })}
-              className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:opacity-90"
-            >
-              Kontrol SLA Terkait
-            </Link>
-            <Link
-              href="/customers/cs-admin?queue=Transfer+atau+Restore"
-              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
-            >
-              Buka Supervisor CS
-            </Link>
+            {canOpenSlaLane ? (
+              <Link
+                href={buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })}
+                className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:opacity-90"
+              >
+                Kontrol SLA Terkait
+              </Link>
+            ) : null}
+            {canOpenSupervisorWorkspace ? (
+              <Link
+                href="/customers/cs-admin?queue=Transfer+atau+Restore"
+                className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
+              >
+                Buka Supervisor CS
+              </Link>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -196,7 +230,7 @@ export function SupportIsolationWorkspace({
       <section className="rounded-xl border border-line bg-slate-50 p-3">
         <form action="/support/isolations" className="flex flex-col gap-3 xl:flex-row xl:items-end">
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus Antrian</span>
             <select
               name="focus"
               defaultValue={supportPrefill?.focus ?? ''}
@@ -207,29 +241,29 @@ export function SupportIsolationWorkspace({
             </select>
           </label>
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Status</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Status Kerja</span>
             <input
               name="status"
               defaultValue={supportPrefill?.status ?? ''}
-              placeholder="ACTIVE / PENDING / lainnya"
+              placeholder="ACTIVE, PENDING, atau status lain"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
           <label className="flex flex-[1.2] flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Customer</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Pelanggan</span>
             <input
               name="customer"
               defaultValue={supportPrefill?.customer ?? ''}
-              placeholder="Nama customer / kode"
+              placeholder="Nama pelanggan / kode pelanggan"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
           <label className="flex flex-[1.2] flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Service</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Layanan / Konteks</span>
             <input
               name="service"
               defaultValue={supportPrefill?.service ?? ''}
-              placeholder="Radbox / service / catatan"
+              placeholder="Radbox, layanan, atau catatan kasus"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
@@ -264,33 +298,38 @@ export function SupportIsolationWorkspace({
         </section>
       ) : null}
 
-      <SupportIsolationQueuePanel sections={reviewSections} actionLinks={visibleActionLinks} />
+      <SupportIsolationQueuePanel
+        sections={reviewSections}
+        actionLinks={visibleActionLinks}
+        role={role}
+        canUpdate={canUpdate}
+        canApprove={canApprove}
+      />
 
       <section className="space-y-4">
-        <div>
-          <p className="section-title">Aksi Isolir</p>
-          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-            Form tindak lanjut
-          </h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
-            Default layar tetap fokus ke tabel. Buka panel ini hanya saat operator perlu menulis aksi.
-          </p>
-          {!reviewDbReady ? (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Mode review database belum aktif, sehingga form write-side dinonaktifkan agar tidak menulis ke mock.
-            </div>
-          ) : null}
-        </div>
-        <details className="group rounded-2xl border border-line bg-white p-4">
-          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-            Buka panel aksi isolir
-          </summary>
-          <p className="mt-2 text-sm text-mute">
-            Berisi `Tambah Isolir`, `Restore Billing`, dan `Transfer Dismantle`.
-          </p>
-          <div className="mt-4 grid gap-6 xl:grid-cols-3">
+        <SupportActionPanelIntro
+          laneLabel="Isolir"
+          detail="Default workspace tetap fokus ke backlog suspend aktif. Buka panel ini hanya saat operator perlu menulis kasus isolir baru, restore billing, atau transfer terminate."
+          reviewDbReady={reviewDbReady}
+        />
+        <SupportActionPanelContainer
+          title="Buka panel aksi lane Isolir"
+          description="Panel ini berisi form write-side untuk `Tambah Isolir`, `Restore Billing`, dan `Transfer Dismantle`."
+          actionIds={[
+            getSupportActionAnchorId('isolation-create'),
+            getSupportActionAnchorId('isolation-restore'),
+            getSupportActionAnchorId('dismantle-approve'),
+          ]}
+          itemCount={3}
+          defaultOpen={Boolean(supportPrefill?.isolation)}
+        >
+          <div className="mt-4 grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
             {canCreate ? (
-              <div id={getSupportActionAnchorId('isolation-create')} className="scroll-mt-24">
+              <SupportActionPanelSlot
+                id={getSupportActionAnchorId('isolation-create')}
+                title="Tambah isolir"
+                description="Gunakan form ini untuk mencatat suspend aktif baru sebelum kasus masuk ke jalur restore atau terminate."
+              >
                 <SupportIsolationForm
                   canCreate={canCreate}
                   reviewDbReady={reviewDbReady}
@@ -298,30 +337,40 @@ export function SupportIsolationWorkspace({
                   marketingSuggestions={supportMarketingSuggestions}
                   serviceSuggestions={supportServiceSuggestions}
                 />
-              </div>
+              </SupportActionPanelSlot>
             ) : null}
             {canUpdate ? (
-              <div id={getSupportActionAnchorId('isolation-restore')} className="scroll-mt-24">
+              <SupportActionPanelSlot
+                id={getSupportActionAnchorId('isolation-restore')}
+                title="Restore billing"
+                description="Pakai form ini saat kasus isolir masih layak dipulihkan dan keputusan billing sudah mengizinkan pembukaan layanan."
+                defaultOpen={Boolean(supportPrefill?.isolation)}
+              >
                 <SupportIsolationRestoreForm
                   canUpdate={canUpdate}
                   reviewDbReady={reviewDbReady}
                   isolationSuggestions={supportIsolationSuggestions}
                   initialIsolationValue={supportPrefill?.isolation}
                 />
-              </div>
+              </SupportActionPanelSlot>
             ) : null}
             {canProcessSupportDismantle(role, canApprove) ? (
-              <div id={getSupportActionAnchorId('dismantle-approve')} className="scroll-mt-24">
+              <SupportActionPanelSlot
+                id={getSupportActionAnchorId('dismantle-approve')}
+                title="Transfer dismantle"
+                description="Gunakan form ini saat kasus isolir harus keluar dari jalur restore dan diproses sebagai terminate permanen."
+                defaultOpen={Boolean(supportPrefill?.isolation)}
+              >
                 <SupportDismantleForm
                   canProcess={canProcessSupportDismantle(role, canApprove)}
                   reviewDbReady={reviewDbReady}
                   isolationSuggestions={supportIsolationSuggestions}
                   initialIsolationValue={supportPrefill?.isolation}
                 />
-              </div>
+              </SupportActionPanelSlot>
             ) : null}
           </div>
-        </details>
+        </SupportActionPanelContainer>
       </section>
     </div>
   )

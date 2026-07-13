@@ -44,6 +44,29 @@ const supportLaneMetaMap: Record<SupportLaneKey, SupportLaneMeta> = {
   },
 }
 
+const supportLaneAliases: Record<string, SupportLaneKey> = {
+  'trouble-ticket': 'tt',
+  troubleticket: 'tt',
+  trouble_tickets: 'tt',
+  'trouble-tickets': 'tt',
+  isolation: 'isolations',
+  dismantles: 'dismantle',
+}
+
+function matchesSupportLaneSectionTitle(title: string, lane: SupportLaneKey) {
+  const normalizedTitle = title.trim().toUpperCase()
+
+  if (lane === 'tt') {
+    return normalizedTitle.startsWith('TROUBLE TICKET ')
+  }
+
+  if (lane === 'sla') {
+    return normalizedTitle.startsWith('SLA TICKET ') || normalizedTitle.startsWith('SLA TROUBLE TICKET')
+  }
+
+  return supportLaneMetaMap[lane].sectionKeywords.some((keyword) => normalizedTitle.includes(keyword))
+}
+
 const supportLaneOrder: Record<AppRole, SupportLaneKey[]> = {
   SUPER_ADMIN: ['tt', 'isolations', 'dismantle', 'sla'],
   SALES_MARKETING: ['isolations', 'tt', 'dismantle', 'sla'],
@@ -63,6 +86,10 @@ export function normalizeSupportLane(value: string | string[] | undefined): Supp
   }
 
   const normalized = raw.trim().toLowerCase()
+  if (supportLaneAliases[normalized]) {
+    return supportLaneAliases[normalized]
+  }
+
   if (!SUPPORT_LANE_KEYS.includes(normalized as SupportLaneKey)) {
     return null
   }
@@ -101,10 +128,7 @@ export function getSupportLaneMeta(lane: SupportLaneKey) {
 }
 
 export function getSupportLaneSections(sections: DomainReviewSection[], lane: SupportLaneKey) {
-  const keywords = supportLaneMetaMap[lane].sectionKeywords
-  return sections.filter((section) =>
-    keywords.some((keyword) => section.title.toUpperCase().includes(keyword)),
-  )
+  return sections.filter((section) => matchesSupportLaneSectionTitle(section.title, lane))
 }
 
 export function buildSupportLaneSnapshots(

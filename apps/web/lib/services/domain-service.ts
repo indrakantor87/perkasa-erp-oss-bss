@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { domainPages } from '@/lib/mock-domains'
-import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import { getHrAttendanceFaceConfig } from '@/lib/services/hr-attendance-face-service'
 import { getRecentHrEmployeeFaceReferenceItems } from '@/lib/services/hr-attendance-face-service'
 import { getRecentHrEmployeeFaceReferenceHistoryItems } from '@/lib/services/hr-attendance-face-service'
@@ -111,7 +111,7 @@ type ReviewDbSupportIsolationRow = {
   marketingName: string | null
   status: string
   reason: string | null
-  isolationDate: string | Date
+  isolationDate: string | Date | null
   hasDismantleQueue: number
 }
 
@@ -126,7 +126,8 @@ type ReviewDbSupportDismantleOpenRow = {
   marketingName: string | null
   status: string
   transferNote: string | null
-  transferredAt: string | Date
+  isolationReason: string | null
+  transferredAt: string | Date | null
   ageDays: number | null
 }
 
@@ -145,7 +146,229 @@ type ReviewDbSupportDismantleRow = {
   customerPhone: string | null
   marketingName: string | null
   closeNote: string | null
-  closedAt: string | Date
+  closedAt: string | Date | null
+}
+
+type SupportNonTicketReadSchema = {
+  isolationStatus: boolean
+  isolationCustomerName: boolean
+  isolationSubscriptionId: boolean
+  isolationRadboxName: boolean
+  isolationCustomerPhone: boolean
+  isolationMarketingName: boolean
+  isolationReason: boolean
+  isolationDate: boolean
+  isolationIsArchived: boolean
+  subscriptionId: boolean
+  subscriptionServiceNo: boolean
+  subscriptionCustomerId: boolean
+  customerId: boolean
+  customerCode: boolean
+  dismantleQueueId: boolean
+  dismantleQueueIsolationId: boolean
+  dismantleQueueTransferNote: boolean
+  dismantleQueueTransferredAt: boolean
+  dismantleHistoryId: boolean
+  dismantleHistoryIsolationId: boolean
+  dismantleHistoryCustomerName: boolean
+  dismantleHistoryRadboxName: boolean
+  dismantleHistoryCustomerPhone: boolean
+  dismantleHistoryMarketingName: boolean
+  dismantleHistoryCloseNote: boolean
+  dismantleHistoryClosedAt: boolean
+}
+
+type BillingReadSchema = {
+  subscriptionId: boolean
+  subscriptionServiceNo: boolean
+  subscriptionStatus: boolean
+  subscriptionCustomerId: boolean
+  subscriptionPackageId: boolean
+  subscriptionMonthlyPrice: boolean
+  subscriptionActivatedAt: boolean
+  subscriptionCreatedAt: boolean
+  customerId: boolean
+  customerFullName: boolean
+  packageId: boolean
+  packageName: boolean
+  packageSpeedLabel: boolean
+  invoiceId: boolean
+  invoiceSubscriptionId: boolean
+  invoiceNo: boolean
+  invoiceType: boolean
+  invoiceStatus: boolean
+  invoiceTotalAmount: boolean
+  invoicePaidAmount: boolean
+  invoiceDueDate: boolean
+  invoiceIssueDate: boolean
+  invoiceBillingMonth: boolean
+  invoiceBillingYear: boolean
+  invoiceCollectionStatus: boolean
+  invoiceSuspendCandidate: boolean
+  invoiceUpdatedAt: boolean
+  invoiceNotes: boolean
+  actionId: boolean
+  actionInvoiceId: boolean
+  actionType: boolean
+  actionStatus: boolean
+  actionAt: boolean
+  actionDueFollowUpAt: boolean
+  actionNotes: boolean
+  paymentId: boolean
+  paymentInvoiceId: boolean
+  paymentNo: boolean
+  paymentDate: boolean
+  paymentAmount: boolean
+  paymentMethod: boolean
+  paymentReferenceNo: boolean
+  paymentNotes: boolean
+}
+
+type SalesReadSchema = {
+  leadId: boolean
+  leadCustomerName: boolean
+  leadType: boolean
+  leadStatus: boolean
+  leadSource: boolean
+  leadMarketingName: boolean
+  leadPhone: boolean
+  leadNotes: boolean
+  leadCreatedAt: boolean
+  coverageId: boolean
+  coverageAreaCode: boolean
+  coverageAreaName: boolean
+  coverageVillage: boolean
+  coverageDistrict: boolean
+  coverageCity: boolean
+  coverageProvince: boolean
+  coverageStatus: boolean
+  coverageNotes: boolean
+  coverageUpdatedAt: boolean
+  surveyId: boolean
+  surveyNo: boolean
+  surveyLeadId: boolean
+  surveyCustomerId: boolean
+  surveyStatus: boolean
+  surveyFeasibilityStatus: boolean
+  surveyScheduledAt: boolean
+  surveyCreatedAt: boolean
+  orderId: boolean
+  orderNo: boolean
+  orderLeadId: boolean
+  orderCustomerId: boolean
+  orderStatus: boolean
+  orderType: boolean
+  orderScheduledInstallationAt: boolean
+  orderRequestDate: boolean
+  orderMarketingName: boolean
+  workOrderId: boolean
+  workOrderNo: boolean
+  workOrderStatus: boolean
+  workOrderType: boolean
+  workOrderScheduledAt: boolean
+  workOrderCreatedAt: boolean
+  workOrderTechnicianName: boolean
+  workOrderSalesOrderId: boolean
+  subscriptionId: boolean
+  subscriptionServiceNo: boolean
+  subscriptionCustomerId: boolean
+  subscriptionOrderId: boolean
+  subscriptionPackageId: boolean
+  subscriptionStatus: boolean
+  subscriptionMonthlyPrice: boolean
+  subscriptionActivatedAt: boolean
+  subscriptionCreatedAt: boolean
+  customerId: boolean
+  customerFullName: boolean
+  packageId: boolean
+  packageName: boolean
+  packageSpeedLabel: boolean
+}
+
+type InventoryReadSchema = {
+  itemId: boolean
+  itemCode: boolean
+  itemName: boolean
+  itemCategoryId: boolean
+  itemUnitId: boolean
+  itemCurrentStock: boolean
+  itemMinimumStock: boolean
+  itemStatus: boolean
+  itemUpdatedAt: boolean
+  categoryId: boolean
+  categoryCode: boolean
+  unitId: boolean
+  unitCode: boolean
+  movementId: boolean
+  movementItemId: boolean
+  movementType: boolean
+  movementReferenceNo: boolean
+  movementQty: boolean
+  movementUnitPrice: boolean
+  movementAt: boolean
+  movementNotes: boolean
+  odpId: boolean
+  odpCode: boolean
+  odpName: boolean
+  odpTotalPorts: boolean
+  odpActivePorts: boolean
+  odpLocationText: boolean
+  odpLatitude: boolean
+  odpLongitude: boolean
+  odpUpdatedAt: boolean
+  odpPortId: boolean
+  odpPortOdpId: boolean
+  odpPortNo: boolean
+  odpPortStatus: boolean
+  odpPortSubscriptionId: boolean
+  odpPortCustomerId: boolean
+  odpPortInstalledAt: boolean
+  odpPortCreatedAt: boolean
+  odpPortUpdatedAt: boolean
+  subscriptionId: boolean
+  subscriptionServiceNo: boolean
+  customerId: boolean
+  customerCode: boolean
+  customerFullName: boolean
+  deviceAssignmentId: boolean
+  deviceAssignmentInventoryItemId: boolean
+  deviceAssignmentSubscriptionId: boolean
+  deviceAssignmentWorkOrderId: boolean
+  deviceAssignmentCustomerId: boolean
+  deviceAssignmentStatus: boolean
+  deviceAssignmentAssignedAt: boolean
+  deviceAssignmentReturnedAt: boolean
+  deviceAssignmentSerialNumber: boolean
+  workOrderId: boolean
+  workOrderNo: boolean
+  requestId: boolean
+  requestInventoryItemId: boolean
+  requestCode: boolean
+  requestQty: boolean
+  requestStatus: boolean
+  requestRequestedDivision: boolean
+  requestRequestedSubdivision: boolean
+  requestRequestedFor: boolean
+  requestNotes: boolean
+  requestPendingReason: boolean
+  requestRequestedBy: boolean
+  requestProcessedBy: boolean
+  requestRequestedAt: boolean
+  requestProcessedAt: boolean
+  loanId: boolean
+  loanInventoryItemId: boolean
+  loanCode: boolean
+  loanQty: boolean
+  loanReturnedQty: boolean
+  loanStatus: boolean
+  loanBorrowerName: boolean
+  loanBorrowerDivision: boolean
+  loanBorrowerSubdivision: boolean
+  loanNotes: boolean
+  loanReturnNotes: boolean
+  loanBorrowedAt: boolean
+  loanDueAt: boolean
+  loanReturnedAt: boolean
 }
 
 type ReviewDbCustomerRow = {
@@ -741,6 +964,132 @@ function getSlaState(value: string | Date | null | undefined) {
   return 'ON_TRACK'
 }
 
+function getReadableErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim()
+  }
+
+  return 'Query support tidak bisa dibaca dari review DB.'
+}
+
+async function runSafeSupportSectionQuery<T>(params: {
+  sectionLabel: string
+  enabled: boolean
+  query: () => Promise<T[]>
+}) {
+  if (!params.enabled) {
+    return {
+      rows: [] as T[],
+      error: null as string | null,
+      enabled: false,
+      sectionLabel: params.sectionLabel,
+    }
+  }
+
+  try {
+    return {
+      rows: await params.query(),
+      error: null as string | null,
+      enabled: true,
+      sectionLabel: params.sectionLabel,
+    }
+  } catch (error) {
+    return {
+      rows: [] as T[],
+      error: getReadableErrorMessage(error),
+      enabled: true,
+      sectionLabel: params.sectionLabel,
+    }
+  }
+}
+
+async function getSupportNonTicketReadSchema(): Promise<SupportNonTicketReadSchema> {
+  const [
+    isolationStatus,
+    isolationCustomerName,
+    isolationSubscriptionId,
+    isolationRadboxName,
+    isolationCustomerPhone,
+    isolationMarketingName,
+    isolationReason,
+    isolationDate,
+    isolationIsArchived,
+    subscriptionId,
+    subscriptionServiceNo,
+    subscriptionCustomerId,
+    customerId,
+    customerCode,
+    dismantleQueueId,
+    dismantleQueueIsolationId,
+    dismantleQueueTransferNote,
+    dismantleQueueTransferredAt,
+    dismantleHistoryId,
+    dismantleHistoryIsolationId,
+    dismantleHistoryCustomerName,
+    dismantleHistoryRadboxName,
+    dismantleHistoryCustomerPhone,
+    dismantleHistoryMarketingName,
+    dismantleHistoryCloseNote,
+    dismantleHistoryClosedAt,
+  ] = await Promise.all([
+    hasReviewDbColumn('support_isolations', 'status'),
+    hasReviewDbColumn('support_isolations', 'customer_name'),
+    hasReviewDbColumn('support_isolations', 'subscription_id'),
+    hasReviewDbColumn('support_isolations', 'radbox_name'),
+    hasReviewDbColumn('support_isolations', 'customer_phone'),
+    hasReviewDbColumn('support_isolations', 'marketing_name'),
+    hasReviewDbColumn('support_isolations', 'reason'),
+    hasReviewDbColumn('support_isolations', 'isolation_date'),
+    hasReviewDbColumn('support_isolations', 'is_archived'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+    hasReviewDbColumn('service_subscriptions', 'customer_id'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'customer_code'),
+    hasReviewDbColumn('support_dismantle_queue', 'id'),
+    hasReviewDbColumn('support_dismantle_queue', 'isolation_id'),
+    hasReviewDbColumn('support_dismantle_queue', 'transfer_note'),
+    hasReviewDbColumn('support_dismantle_queue', 'transferred_at'),
+    hasReviewDbColumn('support_dismantle_history', 'id'),
+    hasReviewDbColumn('support_dismantle_history', 'isolation_id'),
+    hasReviewDbColumn('support_dismantle_history', 'customer_name'),
+    hasReviewDbColumn('support_dismantle_history', 'radbox_name'),
+    hasReviewDbColumn('support_dismantle_history', 'customer_phone'),
+    hasReviewDbColumn('support_dismantle_history', 'marketing_name'),
+    hasReviewDbColumn('support_dismantle_history', 'close_note'),
+    hasReviewDbColumn('support_dismantle_history', 'closed_at'),
+  ])
+
+  return {
+    isolationStatus,
+    isolationCustomerName,
+    isolationSubscriptionId,
+    isolationRadboxName,
+    isolationCustomerPhone,
+    isolationMarketingName,
+    isolationReason,
+    isolationDate,
+    isolationIsArchived,
+    subscriptionId,
+    subscriptionServiceNo,
+    subscriptionCustomerId,
+    customerId,
+    customerCode,
+    dismantleQueueId,
+    dismantleQueueIsolationId,
+    dismantleQueueTransferNote,
+    dismantleQueueTransferredAt,
+    dismantleHistoryId,
+    dismantleHistoryIsolationId,
+    dismantleHistoryCustomerName,
+    dismantleHistoryRadboxName,
+    dismantleHistoryCustomerPhone,
+    dismantleHistoryMarketingName,
+    dismantleHistoryCloseNote,
+    dismantleHistoryClosedAt,
+  }
+}
+
 async function getReviewDbDomainStats() {
   const [row] = await runReviewDbQuery<DomainStatsRow>(`
     SELECT
@@ -849,22 +1198,63 @@ async function getReviewDbSupportSections(params?: {
       AND stt.opened_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)
     `
       : ''
-  const dismantleClosedMonthFilter =
-    focus === 'CLOSED_THIS_PERIOD' || focus === 'MONTHLY_DISMANTLES'
-      ? `
-      WHERE dh.closed_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01')
-        AND dh.closed_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)
-    `
-      : ''
-
   if (wantIsolations || wantDismantle) {
     await ensureSupportDismantleQueueTable()
   }
 
-  const tickets = wantTickets
-    ? (await ensureSupportTroubleTicketProgressTable(),
-      await ensureSupportTroubleTicketEscalationTable(),
-      await runReviewDbQuery<ReviewDbSupportTicketRow>(`
+  const supportNonTicketReadSchema =
+    wantIsolations || wantDismantle ? await getSupportNonTicketReadSchema() : null
+  const isolationSubscriptionJoinClause =
+    supportNonTicketReadSchema?.isolationSubscriptionId &&
+    supportNonTicketReadSchema.subscriptionId
+      ? `
+    LEFT JOIN service_subscriptions ss
+      ON ss.id = si.subscription_id`
+      : ''
+  const isolationCustomerJoinClause =
+    isolationSubscriptionJoinClause &&
+    supportNonTicketReadSchema?.subscriptionCustomerId &&
+    supportNonTicketReadSchema.customerId
+      ? `
+    LEFT JOIN crm_customers c
+      ON c.id = ss.customer_id`
+      : ''
+  const isolationServiceNoExpression =
+    isolationSubscriptionJoinClause && supportNonTicketReadSchema?.subscriptionServiceNo
+      ? 'ss.service_no'
+      : 'NULL'
+  const isolationCustomerCodeExpression =
+    isolationCustomerJoinClause && supportNonTicketReadSchema?.customerCode
+      ? 'c.customer_code'
+      : 'NULL'
+  const isolationArchivedFilter = supportNonTicketReadSchema?.isolationIsArchived ? '\n      AND si.is_archived = 0' : ''
+  const dismantleHistoryRadboxExpression =
+    supportNonTicketReadSchema?.dismantleHistoryRadboxName && supportNonTicketReadSchema?.dismantleHistoryIsolationId
+      ? supportNonTicketReadSchema.isolationRadboxName
+        ? 'COALESCE(NULLIF(TRIM(dh.radbox_name), \'\'), NULLIF(TRIM(si.radbox_name), \'\'))'
+        : 'NULLIF(TRIM(dh.radbox_name), \'\')'
+      : supportNonTicketReadSchema?.dismantleHistoryRadboxName
+        ? 'NULLIF(TRIM(dh.radbox_name), \'\')'
+        : supportNonTicketReadSchema?.dismantleHistoryIsolationId && supportNonTicketReadSchema?.isolationRadboxName
+          ? 'NULLIF(TRIM(si.radbox_name), \'\')'
+          : 'NULL'
+  const dismantleClosedMonthFilter =
+    focus === 'CLOSED_THIS_PERIOD' || focus === 'MONTHLY_DISMANTLES'
+      ? supportNonTicketReadSchema?.dismantleHistoryClosedAt
+        ? `
+      WHERE dh.closed_at >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01')
+        AND dh.closed_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)
+    `
+        : ''
+      : ''
+
+  const ticketResult = await runSafeSupportSectionQuery<ReviewDbSupportTicketRow>({
+    sectionLabel: 'Trouble Ticket',
+    enabled: wantTickets,
+    query: async () => {
+      await ensureSupportTroubleTicketProgressTable()
+      await ensureSupportTroubleTicketEscalationTable()
+      return runReviewDbQuery<ReviewDbSupportTicketRow>(`
     SELECT
       stt.id AS ticketId,
       ticket_code AS ticketCode,
@@ -952,39 +1342,48 @@ async function getReviewDbSupportSections(params?: {
       stt.opened_at DESC,
       stt.id DESC
     LIMIT 5
-  `))
-    : []
+  `)
+    },
+  })
 
-  const isolations = wantIsolations
-    ? await runReviewDbQuery<ReviewDbSupportIsolationRow>(`
+  const isolationResult = await runSafeSupportSectionQuery<ReviewDbSupportIsolationRow>({
+    sectionLabel: 'Isolir Aktif',
+    enabled: wantIsolations,
+    query: () => {
+      if (!supportNonTicketReadSchema?.isolationStatus || !supportNonTicketReadSchema.isolationCustomerName) {
+        throw new Error('Schema inti Isolir belum siap pada review DB aktif.')
+      }
+
+      return runReviewDbQuery<ReviewDbSupportIsolationRow>(`
     SELECT
       si.id AS isolationId,
       si.customer_name AS customerName,
-      ss.service_no AS serviceNo,
-      c.customer_code AS customerCode,
-      si.radbox_name AS radboxName,
-      si.customer_phone AS customerPhone,
-      si.marketing_name AS marketingName,
+      ${isolationServiceNoExpression} AS serviceNo,
+      ${isolationCustomerCodeExpression} AS customerCode,
+      ${supportNonTicketReadSchema.isolationRadboxName ? 'si.radbox_name' : 'NULL'} AS radboxName,
+      ${supportNonTicketReadSchema.isolationCustomerPhone ? 'si.customer_phone' : 'NULL'} AS customerPhone,
+      ${supportNonTicketReadSchema.isolationMarketingName ? 'si.marketing_name' : 'NULL'} AS marketingName,
       si.status,
-      si.reason,
-      si.isolation_date AS isolationDate,
-      CASE WHEN dq.id IS NULL THEN 0 ELSE 1 END AS hasDismantleQueue
+      ${supportNonTicketReadSchema.isolationReason ? 'si.reason' : 'NULL'} AS reason,
+      ${supportNonTicketReadSchema.isolationDate ? 'si.isolation_date' : 'NULL'} AS isolationDate,
+      CASE WHEN ${supportNonTicketReadSchema.dismantleQueueId ? 'dq.id' : 'NULL'} IS NULL THEN 0 ELSE 1 END AS hasDismantleQueue
     FROM support_isolations si
-    LEFT JOIN service_subscriptions ss
-      ON ss.id = si.subscription_id
-    LEFT JOIN crm_customers c
-      ON c.id = ss.customer_id
+    ${isolationSubscriptionJoinClause}
+    ${isolationCustomerJoinClause}
     LEFT JOIN support_dismantle_queue dq
       ON dq.isolation_id = si.id
     WHERE si.status = 'OPEN'
-      AND si.is_archived = 0
-    ORDER BY si.isolation_date DESC, si.id DESC
+      ${isolationArchivedFilter}
+    ORDER BY ${supportNonTicketReadSchema.isolationDate ? 'si.isolation_date' : 'si.id'} DESC, si.id DESC
     LIMIT 5
   `)
-    : []
+    },
+  })
 
-  const slaRows = wantSla
-    ? await runReviewDbQuery<ReviewDbSupportSlaRow>(`
+  const slaResult = await runSafeSupportSectionQuery<ReviewDbSupportSlaRow>({
+    sectionLabel: 'SLA Trouble Ticket',
+    enabled: wantSla,
+    query: () => runReviewDbQuery<ReviewDbSupportSlaRow>(`
     SELECT
       trouble_type AS troubleType,
       duration_days AS durationDays,
@@ -993,57 +1392,107 @@ async function getReviewDbSupportSections(params?: {
     ORDER BY updated_at DESC, trouble_type ASC
     LIMIT 5
   `)
-    : []
+  })
 
-  const dismantleOpenRows = wantDismantle
-    ? await runReviewDbQuery<ReviewDbSupportDismantleOpenRow>(`
+  const dismantleOpenResult = await runSafeSupportSectionQuery<ReviewDbSupportDismantleOpenRow>({
+    sectionLabel: 'Queue Dismantle Open',
+    enabled: wantDismantle,
+    query: () => {
+      if (!supportNonTicketReadSchema?.dismantleQueueId || !supportNonTicketReadSchema.dismantleQueueIsolationId) {
+        throw new Error('Schema inti queue dismantle belum siap pada review DB aktif.')
+      }
+      if (!supportNonTicketReadSchema.isolationCustomerName || !supportNonTicketReadSchema.isolationStatus) {
+        throw new Error('Schema inti isolir belum siap untuk membaca queue dismantle.')
+      }
+
+      return runReviewDbQuery<ReviewDbSupportDismantleOpenRow>(`
     SELECT
       dq.id AS queueId,
       si.id AS isolationId,
       si.customer_name AS customerName,
-      ss.service_no AS serviceNo,
-      c.customer_code AS customerCode,
-      si.radbox_name AS radboxName,
-      si.customer_phone AS customerPhone,
-      si.marketing_name AS marketingName,
+      ${isolationServiceNoExpression} AS serviceNo,
+      ${isolationCustomerCodeExpression} AS customerCode,
+      ${supportNonTicketReadSchema.isolationRadboxName ? 'si.radbox_name' : 'NULL'} AS radboxName,
+      ${supportNonTicketReadSchema.isolationCustomerPhone ? 'si.customer_phone' : 'NULL'} AS customerPhone,
+      ${supportNonTicketReadSchema.isolationMarketingName ? 'si.marketing_name' : 'NULL'} AS marketingName,
       si.status,
-      dq.transfer_note AS transferNote,
-      dq.transferred_at AS transferredAt,
-      DATEDIFF(CURRENT_DATE, DATE(dq.transferred_at)) AS ageDays
+      ${supportNonTicketReadSchema.dismantleQueueTransferNote ? 'dq.transfer_note' : 'NULL'} AS transferNote,
+      ${supportNonTicketReadSchema.isolationReason ? 'si.reason' : 'NULL'} AS isolationReason,
+      ${supportNonTicketReadSchema.dismantleQueueTransferredAt ? 'dq.transferred_at' : 'NULL'} AS transferredAt,
+      ${
+        supportNonTicketReadSchema.dismantleQueueTransferredAt
+          ? 'DATEDIFF(CURRENT_DATE, DATE(dq.transferred_at))'
+          : 'NULL'
+      } AS ageDays
     FROM support_dismantle_queue dq
     INNER JOIN support_isolations si
       ON si.id = dq.isolation_id
-    LEFT JOIN service_subscriptions ss
-      ON ss.id = si.subscription_id
-    LEFT JOIN crm_customers c
-      ON c.id = ss.customer_id
-    ORDER BY dq.transferred_at DESC, dq.id DESC
+    ${isolationSubscriptionJoinClause}
+    ${isolationCustomerJoinClause}
+    ORDER BY ${supportNonTicketReadSchema.dismantleQueueTransferredAt ? 'dq.transferred_at' : 'dq.id'} DESC, dq.id DESC
     LIMIT 8
   `)
-    : []
+    },
+  })
 
-  const dismantles = wantDismantle
-    ? await runReviewDbQuery<ReviewDbSupportDismantleRow>(`
+  const dismantleHistoryResult = await runSafeSupportSectionQuery<ReviewDbSupportDismantleRow>({
+    sectionLabel: 'Histori Dismantle',
+    enabled: wantDismantle,
+    query: () => {
+      if (!supportNonTicketReadSchema?.dismantleHistoryId) {
+        throw new Error('Schema inti histori dismantle belum siap pada review DB aktif.')
+      }
+
+      return runReviewDbQuery<ReviewDbSupportDismantleRow>(`
     SELECT
       dh.id AS dismantleId,
-      dh.customer_name AS customerName,
-      ss.service_no AS serviceNo,
-      c.customer_code AS customerCode,
-      dh.radbox_name AS radboxName,
-      dh.customer_phone AS customerPhone,
-      dh.marketing_name AS marketingName,
-      dh.close_note AS closeNote,
-      dh.closed_at AS closedAt
+      ${
+        supportNonTicketReadSchema.dismantleHistoryCustomerName
+          ? 'dh.customer_name'
+          : supportNonTicketReadSchema.isolationCustomerName
+            ? 'si.customer_name'
+            : "CONCAT('Histori Dismantle #', dh.id)"
+      } AS customerName,
+      ${isolationServiceNoExpression} AS serviceNo,
+      ${isolationCustomerCodeExpression} AS customerCode,
+      ${dismantleHistoryRadboxExpression} AS radboxName,
+      ${supportNonTicketReadSchema.dismantleHistoryCustomerPhone ? 'dh.customer_phone' : 'NULL'} AS customerPhone,
+      ${supportNonTicketReadSchema.dismantleHistoryMarketingName ? 'dh.marketing_name' : 'NULL'} AS marketingName,
+      ${supportNonTicketReadSchema.dismantleHistoryCloseNote ? 'dh.close_note' : 'NULL'} AS closeNote,
+      ${supportNonTicketReadSchema.dismantleHistoryClosedAt ? 'dh.closed_at' : 'NULL'} AS closedAt
     FROM support_dismantle_history dh
-    LEFT JOIN service_subscriptions ss
-      ON ss.id = dh.subscription_id
-    LEFT JOIN crm_customers c
-      ON c.id = ss.customer_id
+    LEFT JOIN support_isolations si
+      ON si.id = ${
+        supportNonTicketReadSchema.dismantleHistoryIsolationId ? 'dh.isolation_id' : 'NULL'
+      }
+    ${isolationSubscriptionJoinClause}
+    ${isolationCustomerJoinClause}
     ${dismantleClosedMonthFilter}
-    ORDER BY dh.closed_at DESC, dh.id DESC
+    ORDER BY ${supportNonTicketReadSchema.dismantleHistoryClosedAt ? 'dh.closed_at' : 'dh.id'} DESC, dh.id DESC
     LIMIT 5
   `)
-    : []
+    },
+  })
+
+  const tickets = ticketResult.rows
+  const isolations = isolationResult.rows
+  const slaRows = slaResult.rows
+  const dismantleOpenRows = dismantleOpenResult.rows
+  const dismantles = dismantleHistoryResult.rows
+  const supportSectionFailures = [
+    ticketResult,
+    isolationResult,
+    slaResult,
+    dismantleOpenResult,
+    dismantleHistoryResult,
+  ].filter((item) => item.enabled && item.error)
+
+  const totalLoadedRows =
+    tickets.length + isolations.length + slaRows.length + dismantleOpenRows.length + dismantles.length
+
+  if (!totalLoadedRows && supportSectionFailures.length > 0) {
+    throw new Error(supportSectionFailures.map((item) => item.error).join(' | '))
+  }
 
   const readyCloseTickets = tickets
     .filter((item) => isSupportTicketReadyToClose(item))
@@ -1247,7 +1696,10 @@ async function getReviewDbSupportSections(params?: {
         primary: item.customerName,
         secondary: item.radboxName || 'Radbox belum terpetakan',
         status: item.status,
-        detail: item.transferNote?.trim() || 'Belum ada catatan transfer untuk kandidat dismantle ini.',
+        detail:
+          item.transferNote?.trim() ||
+          item.isolationReason?.trim() ||
+          'Belum ada catatan transfer untuk kandidat dismantle ini.',
         meta: [
           `Queue ID: ${item.queueId}`,
           `Isolation ID: ${item.isolationId}`,
@@ -1289,6 +1741,26 @@ async function getReviewDbSupportSections(params?: {
         }
       }),
     },
+    ...(supportSectionFailures.length
+      ? [
+          {
+            title: 'Catatan Koneksi Support',
+            description:
+              'Sebagian subsection support belum bisa dibaca dari review DB, tetapi subsection lain tetap dipertahankan agar workspace tidak langsung jatuh ke mock fallback penuh.',
+            rows: supportSectionFailures.map((item, index) => ({
+              id: `support-warning-${index + 1}`,
+              primary: item.sectionLabel,
+              secondary: 'Partial review-db',
+              status: 'WARNING',
+              detail: item.error ?? 'Subsection support gagal dibaca.',
+              meta: [
+                `Lane: ${lane || 'all'}`,
+                `Focus: ${focus || '-'}`,
+              ],
+            })),
+          },
+        ]
+      : []),
   ].filter((section) => section.rows.length > 0)
 }
 
@@ -1364,62 +1836,771 @@ async function getReviewDbCustomerSections(): Promise<DomainReviewSection[]> {
   ].filter((section) => section.rows.length > 0)
 }
 
+async function runSafeDomainSectionQuery<T>(params: {
+  sectionLabel: string
+  enabled: boolean
+  query: () => Promise<T[]>
+}) {
+  if (!params.enabled) {
+    return {
+      rows: [] as T[],
+      error: null as string | null,
+      enabled: false,
+      sectionLabel: params.sectionLabel,
+    }
+  }
+
+  try {
+    return {
+      rows: await params.query(),
+      error: null as string | null,
+      enabled: true,
+      sectionLabel: params.sectionLabel,
+    }
+  } catch (error) {
+    return {
+      rows: [] as T[],
+      error: getReadableErrorMessage(error),
+      enabled: true,
+      sectionLabel: params.sectionLabel,
+    }
+  }
+}
+
+async function getBillingReadSchema(): Promise<BillingReadSchema> {
+  const [
+    subscriptionId,
+    subscriptionServiceNo,
+    subscriptionStatus,
+    subscriptionCustomerId,
+    subscriptionPackageId,
+    subscriptionMonthlyPrice,
+    subscriptionActivatedAt,
+    subscriptionCreatedAt,
+    customerId,
+    customerFullName,
+    packageId,
+    packageName,
+    packageSpeedLabel,
+    invoiceId,
+    invoiceSubscriptionId,
+    invoiceNo,
+    invoiceType,
+    invoiceStatus,
+    invoiceTotalAmount,
+    invoicePaidAmount,
+    invoiceDueDate,
+    invoiceIssueDate,
+    invoiceBillingMonth,
+    invoiceBillingYear,
+    invoiceCollectionStatus,
+    invoiceSuspendCandidate,
+    invoiceUpdatedAt,
+    invoiceNotes,
+    actionId,
+    actionInvoiceId,
+    actionType,
+    actionStatus,
+    actionAt,
+    actionDueFollowUpAt,
+    actionNotes,
+    paymentId,
+    paymentInvoiceId,
+    paymentNo,
+    paymentDate,
+    paymentAmount,
+    paymentMethod,
+    paymentReferenceNo,
+    paymentNotes,
+  ] = await Promise.all([
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+    hasReviewDbColumn('service_subscriptions', 'status'),
+    hasReviewDbColumn('service_subscriptions', 'customer_id'),
+    hasReviewDbColumn('service_subscriptions', 'package_id'),
+    hasReviewDbColumn('service_subscriptions', 'monthly_price'),
+    hasReviewDbColumn('service_subscriptions', 'activated_at'),
+    hasReviewDbColumn('service_subscriptions', 'created_at'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+    hasReviewDbColumn('sales_packages', 'id'),
+    hasReviewDbColumn('sales_packages', 'name'),
+    hasReviewDbColumn('sales_packages', 'speed_label'),
+    hasReviewDbColumn('billing_invoices', 'id'),
+    hasReviewDbColumn('billing_invoices', 'subscription_id'),
+    hasReviewDbColumn('billing_invoices', 'invoice_no'),
+    hasReviewDbColumn('billing_invoices', 'invoice_type'),
+    hasReviewDbColumn('billing_invoices', 'invoice_status'),
+    hasReviewDbColumn('billing_invoices', 'total_amount'),
+    hasReviewDbColumn('billing_invoices', 'paid_amount'),
+    hasReviewDbColumn('billing_invoices', 'due_date'),
+    hasReviewDbColumn('billing_invoices', 'issue_date'),
+    hasReviewDbColumn('billing_invoices', 'billing_month'),
+    hasReviewDbColumn('billing_invoices', 'billing_year'),
+    hasReviewDbColumn('billing_invoices', 'collection_status'),
+    hasReviewDbColumn('billing_invoices', 'suspend_candidate'),
+    hasReviewDbColumn('billing_invoices', 'updated_at'),
+    hasReviewDbColumn('billing_invoices', 'notes'),
+    hasReviewDbColumn('billing_collection_actions', 'id'),
+    hasReviewDbColumn('billing_collection_actions', 'invoice_id'),
+    hasReviewDbColumn('billing_collection_actions', 'action_type'),
+    hasReviewDbColumn('billing_collection_actions', 'action_status'),
+    hasReviewDbColumn('billing_collection_actions', 'action_at'),
+    hasReviewDbColumn('billing_collection_actions', 'due_follow_up_at'),
+    hasReviewDbColumn('billing_collection_actions', 'notes'),
+    hasReviewDbColumn('billing_payments', 'id'),
+    hasReviewDbColumn('billing_payments', 'invoice_id'),
+    hasReviewDbColumn('billing_payments', 'payment_no'),
+    hasReviewDbColumn('billing_payments', 'payment_date'),
+    hasReviewDbColumn('billing_payments', 'amount'),
+    hasReviewDbColumn('billing_payments', 'payment_method'),
+    hasReviewDbColumn('billing_payments', 'reference_no'),
+    hasReviewDbColumn('billing_payments', 'notes'),
+  ])
+
+  return {
+    subscriptionId,
+    subscriptionServiceNo,
+    subscriptionStatus,
+    subscriptionCustomerId,
+    subscriptionPackageId,
+    subscriptionMonthlyPrice,
+    subscriptionActivatedAt,
+    subscriptionCreatedAt,
+    customerId,
+    customerFullName,
+    packageId,
+    packageName,
+    packageSpeedLabel,
+    invoiceId,
+    invoiceSubscriptionId,
+    invoiceNo,
+    invoiceType,
+    invoiceStatus,
+    invoiceTotalAmount,
+    invoicePaidAmount,
+    invoiceDueDate,
+    invoiceIssueDate,
+    invoiceBillingMonth,
+    invoiceBillingYear,
+    invoiceCollectionStatus,
+    invoiceSuspendCandidate,
+    invoiceUpdatedAt,
+    invoiceNotes,
+    actionId,
+    actionInvoiceId,
+    actionType,
+    actionStatus,
+    actionAt,
+    actionDueFollowUpAt,
+    actionNotes,
+    paymentId,
+    paymentInvoiceId,
+    paymentNo,
+    paymentDate,
+    paymentAmount,
+    paymentMethod,
+    paymentReferenceNo,
+    paymentNotes,
+  }
+}
+
+function getBillingSubscriptionQueryParts(schema: BillingReadSchema) {
+  const canJoinCustomer = schema.subscriptionCustomerId && schema.customerId
+  const canJoinPackage = schema.subscriptionPackageId && schema.packageId
+
+  return {
+    customerJoin: canJoinCustomer
+      ? `
+    LEFT JOIN crm_customers c
+      ON c.id = ss.customer_id`
+      : '',
+    packageJoin: canJoinPackage
+      ? `
+    LEFT JOIN sales_packages sp
+      ON sp.id = ss.package_id`
+      : '',
+    customerNameExpression: canJoinCustomer && schema.customerFullName ? 'c.full_name' : "'Customer belum terpetakan'",
+    packageNameExpression: canJoinPackage && schema.packageName ? 'sp.name' : 'NULL',
+    speedLabelExpression: canJoinPackage && schema.packageSpeedLabel ? 'sp.speed_label' : 'NULL',
+    monthlyPriceExpression: schema.subscriptionMonthlyPrice ? 'ss.monthly_price' : '0',
+    activatedAtExpression: schema.subscriptionActivatedAt ? 'ss.activated_at' : 'NULL',
+    orderByExpression: schema.subscriptionActivatedAt
+      ? schema.subscriptionCreatedAt
+        ? 'COALESCE(ss.activated_at, ss.created_at) DESC, ss.id DESC'
+        : 'ss.activated_at DESC, ss.id DESC'
+      : schema.subscriptionCreatedAt
+        ? 'ss.created_at DESC, ss.id DESC'
+        : 'ss.id DESC',
+  }
+}
+
+function getBillingInvoiceQueryParts(schema: BillingReadSchema) {
+  const canJoinSubscription = schema.invoiceSubscriptionId && schema.subscriptionId
+  const canJoinCustomer = canJoinSubscription && schema.subscriptionCustomerId && schema.customerId
+
+  return {
+    subscriptionJoin: canJoinSubscription
+      ? `
+    LEFT JOIN service_subscriptions ss
+      ON ss.id = bi.subscription_id`
+      : '',
+    customerJoin: canJoinCustomer
+      ? `
+    LEFT JOIN crm_customers c
+      ON c.id = ss.customer_id`
+      : '',
+    customerNameExpression: canJoinCustomer && schema.customerFullName ? 'c.full_name' : "'Customer belum terpetakan'",
+    serviceNoExpression: canJoinSubscription && schema.subscriptionServiceNo ? 'ss.service_no' : "'-'",
+    issueDateExpression: schema.invoiceIssueDate ? 'bi.issue_date' : 'NULL',
+    dueDateExpression: schema.invoiceDueDate ? 'bi.due_date' : 'NULL',
+    billingMonthExpression: schema.invoiceBillingMonth ? 'bi.billing_month' : 'NULL',
+    billingYearExpression: schema.invoiceBillingYear ? 'bi.billing_year' : 'NULL',
+    collectionStatusExpression: schema.invoiceCollectionStatus ? 'bi.collection_status' : 'NULL',
+    suspendCandidateExpression: schema.invoiceSuspendCandidate ? 'bi.suspend_candidate' : '0',
+    updatedAtExpression: schema.invoiceUpdatedAt ? 'bi.updated_at' : 'NULL',
+    notesExpression: schema.invoiceNotes ? 'bi.notes' : 'NULL',
+    collectionOpenFilter: schema.invoiceCollectionStatus
+      ? "AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') NOT IN ('WRITE_OFF', 'CLOSED')"
+      : '',
+    latestOrderByExpression: schema.invoiceIssueDate
+      ? schema.invoiceUpdatedAt
+        ? 'COALESCE(bi.issue_date, bi.updated_at) DESC, bi.id DESC'
+        : 'bi.issue_date DESC, bi.id DESC'
+      : schema.invoiceUpdatedAt
+        ? 'bi.updated_at DESC, bi.id DESC'
+        : 'bi.id DESC',
+    updatedOrderByExpression: schema.invoiceUpdatedAt ? 'bi.updated_at DESC, bi.id DESC' : 'bi.id DESC',
+  }
+}
+
+function getBillingActionQueryParts(schema: BillingReadSchema) {
+  return {
+    actionAtExpression: schema.actionAt ? 'bca.action_at' : 'NULL',
+    dueFollowUpAtExpression: schema.actionDueFollowUpAt ? 'bca.due_follow_up_at' : 'NULL',
+    notesExpression: schema.actionNotes ? 'bca.notes' : 'NULL',
+    orderByExpression: schema.actionAt ? 'bca.action_at DESC, bca.id DESC' : 'bca.id DESC',
+    latestActionAtExpression: schema.actionAt ? 'action_latest.action_at' : 'NULL',
+    latestDueFollowUpAtExpression: schema.actionDueFollowUpAt ? 'action_latest.due_follow_up_at' : 'NULL',
+    latestNotesExpression: schema.actionNotes ? 'action_latest.notes' : 'NULL',
+  }
+}
+
+async function getSalesReadSchema(): Promise<SalesReadSchema> {
+  const [
+    leadId,
+    leadCustomerName,
+    leadType,
+    leadStatus,
+    leadSource,
+    leadMarketingName,
+    leadPhone,
+    leadNotes,
+    leadCreatedAt,
+    coverageId,
+    coverageAreaCode,
+    coverageAreaName,
+    coverageVillage,
+    coverageDistrict,
+    coverageCity,
+    coverageProvince,
+    coverageStatus,
+    coverageNotes,
+    coverageUpdatedAt,
+    surveyId,
+    surveyNo,
+    surveyLeadId,
+    surveyCustomerId,
+    surveyStatus,
+    surveyFeasibilityStatus,
+    surveyScheduledAt,
+    surveyCreatedAt,
+    orderId,
+    orderNo,
+    orderLeadId,
+    orderCustomerId,
+    orderStatus,
+    orderType,
+    orderScheduledInstallationAt,
+    orderRequestDate,
+    orderMarketingName,
+    workOrderId,
+    workOrderNo,
+    workOrderStatus,
+    workOrderType,
+    workOrderScheduledAt,
+    workOrderCreatedAt,
+    workOrderTechnicianName,
+    workOrderSalesOrderId,
+    subscriptionId,
+    subscriptionServiceNo,
+    subscriptionCustomerId,
+    subscriptionOrderId,
+    subscriptionPackageId,
+    subscriptionStatus,
+    subscriptionMonthlyPrice,
+    subscriptionActivatedAt,
+    subscriptionCreatedAt,
+    customerId,
+    customerFullName,
+    packageId,
+    packageName,
+    packageSpeedLabel,
+  ] = await Promise.all([
+    hasReviewDbColumn('sales_leads', 'id'),
+    hasReviewDbColumn('sales_leads', 'customer_name'),
+    hasReviewDbColumn('sales_leads', 'lead_type'),
+    hasReviewDbColumn('sales_leads', 'status'),
+    hasReviewDbColumn('sales_leads', 'source'),
+    hasReviewDbColumn('sales_leads', 'marketing_name'),
+    hasReviewDbColumn('sales_leads', 'phone'),
+    hasReviewDbColumn('sales_leads', 'notes'),
+    hasReviewDbColumn('sales_leads', 'created_at'),
+    hasReviewDbColumn('sales_covered_areas', 'id'),
+    hasReviewDbColumn('sales_covered_areas', 'area_code'),
+    hasReviewDbColumn('sales_covered_areas', 'area_name'),
+    hasReviewDbColumn('sales_covered_areas', 'village'),
+    hasReviewDbColumn('sales_covered_areas', 'district'),
+    hasReviewDbColumn('sales_covered_areas', 'city'),
+    hasReviewDbColumn('sales_covered_areas', 'province'),
+    hasReviewDbColumn('sales_covered_areas', 'coverage_status'),
+    hasReviewDbColumn('sales_covered_areas', 'notes'),
+    hasReviewDbColumn('sales_covered_areas', 'updated_at'),
+    hasReviewDbColumn('sales_surveys', 'id'),
+    hasReviewDbColumn('sales_surveys', 'survey_no'),
+    hasReviewDbColumn('sales_surveys', 'lead_id'),
+    hasReviewDbColumn('sales_surveys', 'customer_id'),
+    hasReviewDbColumn('sales_surveys', 'survey_status'),
+    hasReviewDbColumn('sales_surveys', 'feasibility_status'),
+    hasReviewDbColumn('sales_surveys', 'scheduled_at'),
+    hasReviewDbColumn('sales_surveys', 'created_at'),
+    hasReviewDbColumn('sales_orders', 'id'),
+    hasReviewDbColumn('sales_orders', 'order_no'),
+    hasReviewDbColumn('sales_orders', 'lead_id'),
+    hasReviewDbColumn('sales_orders', 'customer_id'),
+    hasReviewDbColumn('sales_orders', 'status'),
+    hasReviewDbColumn('sales_orders', 'order_type'),
+    hasReviewDbColumn('sales_orders', 'scheduled_installation_at'),
+    hasReviewDbColumn('sales_orders', 'request_date'),
+    hasReviewDbColumn('sales_orders', 'marketing_name'),
+    hasReviewDbColumn('service_work_orders', 'id'),
+    hasReviewDbColumn('service_work_orders', 'work_order_no'),
+    hasReviewDbColumn('service_work_orders', 'status'),
+    hasReviewDbColumn('service_work_orders', 'work_type'),
+    hasReviewDbColumn('service_work_orders', 'scheduled_at'),
+    hasReviewDbColumn('service_work_orders', 'created_at'),
+    hasReviewDbColumn('service_work_orders', 'technician_name'),
+    hasReviewDbColumn('service_work_orders', 'sales_order_id'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+    hasReviewDbColumn('service_subscriptions', 'customer_id'),
+    hasReviewDbColumn('service_subscriptions', 'order_id'),
+    hasReviewDbColumn('service_subscriptions', 'package_id'),
+    hasReviewDbColumn('service_subscriptions', 'status'),
+    hasReviewDbColumn('service_subscriptions', 'monthly_price'),
+    hasReviewDbColumn('service_subscriptions', 'activated_at'),
+    hasReviewDbColumn('service_subscriptions', 'created_at'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+    hasReviewDbColumn('sales_packages', 'id'),
+    hasReviewDbColumn('sales_packages', 'name'),
+    hasReviewDbColumn('sales_packages', 'speed_label'),
+  ])
+
+  return {
+    leadId,
+    leadCustomerName,
+    leadType,
+    leadStatus,
+    leadSource,
+    leadMarketingName,
+    leadPhone,
+    leadNotes,
+    leadCreatedAt,
+    coverageId,
+    coverageAreaCode,
+    coverageAreaName,
+    coverageVillage,
+    coverageDistrict,
+    coverageCity,
+    coverageProvince,
+    coverageStatus,
+    coverageNotes,
+    coverageUpdatedAt,
+    surveyId,
+    surveyNo,
+    surveyLeadId,
+    surveyCustomerId,
+    surveyStatus,
+    surveyFeasibilityStatus,
+    surveyScheduledAt,
+    surveyCreatedAt,
+    orderId,
+    orderNo,
+    orderLeadId,
+    orderCustomerId,
+    orderStatus,
+    orderType,
+    orderScheduledInstallationAt,
+    orderRequestDate,
+    orderMarketingName,
+    workOrderId,
+    workOrderNo,
+    workOrderStatus,
+    workOrderType,
+    workOrderScheduledAt,
+    workOrderCreatedAt,
+    workOrderTechnicianName,
+    workOrderSalesOrderId,
+    subscriptionId,
+    subscriptionServiceNo,
+    subscriptionCustomerId,
+    subscriptionOrderId,
+    subscriptionPackageId,
+    subscriptionStatus,
+    subscriptionMonthlyPrice,
+    subscriptionActivatedAt,
+    subscriptionCreatedAt,
+    customerId,
+    customerFullName,
+    packageId,
+    packageName,
+    packageSpeedLabel,
+  }
+}
+
+async function getInventoryReadSchema(): Promise<InventoryReadSchema> {
+  const [
+    itemId,
+    itemCode,
+    itemName,
+    itemCategoryId,
+    itemUnitId,
+    itemCurrentStock,
+    itemMinimumStock,
+    itemStatus,
+    itemUpdatedAt,
+    categoryId,
+    categoryCode,
+    unitId,
+    unitCode,
+    movementId,
+    movementItemId,
+    movementType,
+    movementReferenceNo,
+    movementQty,
+    movementUnitPrice,
+    movementAt,
+    movementNotes,
+    odpId,
+    odpCode,
+    odpName,
+    odpTotalPorts,
+    odpActivePorts,
+    odpLocationText,
+    odpLatitude,
+    odpLongitude,
+    odpUpdatedAt,
+    odpPortId,
+    odpPortOdpId,
+    odpPortNo,
+    odpPortStatus,
+    odpPortSubscriptionId,
+    odpPortCustomerId,
+    odpPortInstalledAt,
+    odpPortCreatedAt,
+    odpPortUpdatedAt,
+    subscriptionId,
+    subscriptionServiceNo,
+    customerId,
+    customerCode,
+    customerFullName,
+    deviceAssignmentId,
+    deviceAssignmentInventoryItemId,
+    deviceAssignmentSubscriptionId,
+    deviceAssignmentWorkOrderId,
+    deviceAssignmentCustomerId,
+    deviceAssignmentStatus,
+    deviceAssignmentAssignedAt,
+    deviceAssignmentReturnedAt,
+    deviceAssignmentSerialNumber,
+    workOrderId,
+    workOrderNo,
+    requestId,
+    requestInventoryItemId,
+    requestCode,
+    requestQty,
+    requestStatus,
+    requestRequestedDivision,
+    requestRequestedSubdivision,
+    requestRequestedFor,
+    requestNotes,
+    requestPendingReason,
+    requestRequestedBy,
+    requestProcessedBy,
+    requestRequestedAt,
+    requestProcessedAt,
+    loanId,
+    loanInventoryItemId,
+    loanCode,
+    loanQty,
+    loanReturnedQty,
+    loanStatus,
+    loanBorrowerName,
+    loanBorrowerDivision,
+    loanBorrowerSubdivision,
+    loanNotes,
+    loanReturnNotes,
+    loanBorrowedAt,
+    loanDueAt,
+    loanReturnedAt,
+  ] = await Promise.all([
+    hasReviewDbColumn('inventory_items', 'id'),
+    hasReviewDbColumn('inventory_items', 'item_code'),
+    hasReviewDbColumn('inventory_items', 'item_name'),
+    hasReviewDbColumn('inventory_items', 'category_id'),
+    hasReviewDbColumn('inventory_items', 'unit_id'),
+    hasReviewDbColumn('inventory_items', 'current_stock'),
+    hasReviewDbColumn('inventory_items', 'minimum_stock'),
+    hasReviewDbColumn('inventory_items', 'status'),
+    hasReviewDbColumn('inventory_items', 'updated_at'),
+    hasReviewDbColumn('inventory_categories', 'id'),
+    hasReviewDbColumn('inventory_categories', 'code'),
+    hasReviewDbColumn('inventory_units', 'id'),
+    hasReviewDbColumn('inventory_units', 'code'),
+    hasReviewDbColumn('inventory_stock_movements', 'id'),
+    hasReviewDbColumn('inventory_stock_movements', 'item_id'),
+    hasReviewDbColumn('inventory_stock_movements', 'movement_type'),
+    hasReviewDbColumn('inventory_stock_movements', 'reference_no'),
+    hasReviewDbColumn('inventory_stock_movements', 'qty'),
+    hasReviewDbColumn('inventory_stock_movements', 'unit_price'),
+    hasReviewDbColumn('inventory_stock_movements', 'movement_at'),
+    hasReviewDbColumn('inventory_stock_movements', 'notes'),
+    hasReviewDbColumn('network_odp', 'id'),
+    hasReviewDbColumn('network_odp', 'code'),
+    hasReviewDbColumn('network_odp', 'name'),
+    hasReviewDbColumn('network_odp', 'total_ports'),
+    hasReviewDbColumn('network_odp', 'active_ports'),
+    hasReviewDbColumn('network_odp', 'location_text'),
+    hasReviewDbColumn('network_odp', 'latitude'),
+    hasReviewDbColumn('network_odp', 'longitude'),
+    hasReviewDbColumn('network_odp', 'updated_at'),
+    hasReviewDbColumn('network_odp_ports', 'id'),
+    hasReviewDbColumn('network_odp_ports', 'odp_id'),
+    hasReviewDbColumn('network_odp_ports', 'port_no'),
+    hasReviewDbColumn('network_odp_ports', 'port_status'),
+    hasReviewDbColumn('network_odp_ports', 'subscription_id'),
+    hasReviewDbColumn('network_odp_ports', 'customer_id'),
+    hasReviewDbColumn('network_odp_ports', 'installed_at'),
+    hasReviewDbColumn('network_odp_ports', 'created_at'),
+    hasReviewDbColumn('network_odp_ports', 'updated_at'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'customer_code'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+    hasReviewDbColumn('service_device_assignments', 'id'),
+    hasReviewDbColumn('service_device_assignments', 'inventory_item_id'),
+    hasReviewDbColumn('service_device_assignments', 'subscription_id'),
+    hasReviewDbColumn('service_device_assignments', 'work_order_id'),
+    hasReviewDbColumn('service_device_assignments', 'customer_id'),
+    hasReviewDbColumn('service_device_assignments', 'assignment_status'),
+    hasReviewDbColumn('service_device_assignments', 'assigned_at'),
+    hasReviewDbColumn('service_device_assignments', 'returned_at'),
+    hasReviewDbColumn('service_device_assignments', 'serial_number'),
+    hasReviewDbColumn('service_work_orders', 'id'),
+    hasReviewDbColumn('service_work_orders', 'work_order_no'),
+    hasReviewDbColumn('inventory_item_requests', 'id'),
+    hasReviewDbColumn('inventory_item_requests', 'inventory_item_id'),
+    hasReviewDbColumn('inventory_item_requests', 'request_code'),
+    hasReviewDbColumn('inventory_item_requests', 'request_qty'),
+    hasReviewDbColumn('inventory_item_requests', 'request_status'),
+    hasReviewDbColumn('inventory_item_requests', 'requested_division'),
+    hasReviewDbColumn('inventory_item_requests', 'requested_subdivision'),
+    hasReviewDbColumn('inventory_item_requests', 'requested_for'),
+    hasReviewDbColumn('inventory_item_requests', 'request_notes'),
+    hasReviewDbColumn('inventory_item_requests', 'pending_reason'),
+    hasReviewDbColumn('inventory_item_requests', 'requested_by'),
+    hasReviewDbColumn('inventory_item_requests', 'processed_by'),
+    hasReviewDbColumn('inventory_item_requests', 'requested_at'),
+    hasReviewDbColumn('inventory_item_requests', 'processed_at'),
+    hasReviewDbColumn('inventory_item_loans', 'id'),
+    hasReviewDbColumn('inventory_item_loans', 'inventory_item_id'),
+    hasReviewDbColumn('inventory_item_loans', 'loan_code'),
+    hasReviewDbColumn('inventory_item_loans', 'loan_qty'),
+    hasReviewDbColumn('inventory_item_loans', 'returned_qty'),
+    hasReviewDbColumn('inventory_item_loans', 'loan_status'),
+    hasReviewDbColumn('inventory_item_loans', 'borrower_name'),
+    hasReviewDbColumn('inventory_item_loans', 'borrower_division'),
+    hasReviewDbColumn('inventory_item_loans', 'borrower_subdivision'),
+    hasReviewDbColumn('inventory_item_loans', 'loan_notes'),
+    hasReviewDbColumn('inventory_item_loans', 'return_notes'),
+    hasReviewDbColumn('inventory_item_loans', 'borrowed_at'),
+    hasReviewDbColumn('inventory_item_loans', 'due_at'),
+    hasReviewDbColumn('inventory_item_loans', 'returned_at'),
+  ])
+
+  return {
+    itemId,
+    itemCode,
+    itemName,
+    itemCategoryId,
+    itemUnitId,
+    itemCurrentStock,
+    itemMinimumStock,
+    itemStatus,
+    itemUpdatedAt,
+    categoryId,
+    categoryCode,
+    unitId,
+    unitCode,
+    movementId,
+    movementItemId,
+    movementType,
+    movementReferenceNo,
+    movementQty,
+    movementUnitPrice,
+    movementAt,
+    movementNotes,
+    odpId,
+    odpCode,
+    odpName,
+    odpTotalPorts,
+    odpActivePorts,
+    odpLocationText,
+    odpLatitude,
+    odpLongitude,
+    odpUpdatedAt,
+    odpPortId,
+    odpPortOdpId,
+    odpPortNo,
+    odpPortStatus,
+    odpPortSubscriptionId,
+    odpPortCustomerId,
+    odpPortInstalledAt,
+    odpPortCreatedAt,
+    odpPortUpdatedAt,
+    subscriptionId,
+    subscriptionServiceNo,
+    customerId,
+    customerCode,
+    customerFullName,
+    deviceAssignmentId,
+    deviceAssignmentInventoryItemId,
+    deviceAssignmentSubscriptionId,
+    deviceAssignmentWorkOrderId,
+    deviceAssignmentCustomerId,
+    deviceAssignmentStatus,
+    deviceAssignmentAssignedAt,
+    deviceAssignmentReturnedAt,
+    deviceAssignmentSerialNumber,
+    workOrderId,
+    workOrderNo,
+    requestId,
+    requestInventoryItemId,
+    requestCode,
+    requestQty,
+    requestStatus,
+    requestRequestedDivision,
+    requestRequestedSubdivision,
+    requestRequestedFor,
+    requestNotes,
+    requestPendingReason,
+    requestRequestedBy,
+    requestProcessedBy,
+    requestRequestedAt,
+    requestProcessedAt,
+    loanId,
+    loanInventoryItemId,
+    loanCode,
+    loanQty,
+    loanReturnedQty,
+    loanStatus,
+    loanBorrowerName,
+    loanBorrowerDivision,
+    loanBorrowerSubdivision,
+    loanNotes,
+    loanReturnNotes,
+    loanBorrowedAt,
+    loanDueAt,
+    loanReturnedAt,
+  }
+}
+
 async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
   const focus = String(filters?.focus ?? '')
     .trim()
     .toUpperCase()
   const period = resolveSqlPeriodRange(filters)
+  const billingSchema = await getBillingReadSchema()
+  const billingSubscriptionParts = getBillingSubscriptionQueryParts(billingSchema)
+  const billingInvoiceParts = getBillingInvoiceQueryParts(billingSchema)
+  const billingActionParts = getBillingActionQueryParts(billingSchema)
 
-  const subscriptionsReady = await runReviewDbQuery<ReviewDbBillingReadySubscriptionRow>(`
-    SELECT
-      ss.id AS subscriptionId,
-      ss.service_no AS serviceNo,
-      c.full_name AS customerName,
-      sp.name AS packageName,
-      sp.speed_label AS speedLabel,
-      ss.monthly_price AS monthlyPrice,
-      ss.activated_at AS activatedAt
-    FROM service_subscriptions ss
-    JOIN crm_customers c
-      ON c.id = ss.customer_id
-    LEFT JOIN sales_packages sp
-      ON sp.id = ss.package_id
-    WHERE ss.status = 'ACTIVE'
-      AND COALESCE(ss.monthly_price, 0) > 0
-      AND NOT EXISTS (
-        SELECT 1
-        FROM billing_invoices bi
-        WHERE bi.subscription_id = ss.id
-          AND bi.invoice_type = 'RECURRING'
-          AND bi.billing_year = YEAR(CURRENT_DATE)
-          AND bi.billing_month = MONTH(CURRENT_DATE)
-          AND bi.invoice_status NOT IN ('CANCELLED')
-      )
-    ORDER BY COALESCE(ss.activated_at, ss.created_at) DESC, ss.id DESC
-    LIMIT 5
-  `)
+  const subscriptionsReadyResult = await runSafeDomainSectionQuery<ReviewDbBillingReadySubscriptionRow>({
+    sectionLabel: 'billing-ready-subscriptions',
+    enabled:
+      billingSchema.subscriptionId &&
+      billingSchema.subscriptionServiceNo &&
+      billingSchema.subscriptionStatus &&
+      billingSchema.subscriptionMonthlyPrice &&
+      billingSchema.invoiceSubscriptionId &&
+      billingSchema.invoiceType &&
+      billingSchema.invoiceBillingYear &&
+      billingSchema.invoiceBillingMonth &&
+      billingSchema.invoiceStatus,
+    query: () =>
+      runReviewDbQuery<ReviewDbBillingReadySubscriptionRow>(`
+        SELECT
+          ss.id AS subscriptionId,
+          ss.service_no AS serviceNo,
+          ${billingSubscriptionParts.customerNameExpression} AS customerName,
+          ${billingSubscriptionParts.packageNameExpression} AS packageName,
+          ${billingSubscriptionParts.speedLabelExpression} AS speedLabel,
+          ${billingSubscriptionParts.monthlyPriceExpression} AS monthlyPrice,
+          ${billingSubscriptionParts.activatedAtExpression} AS activatedAt
+        FROM service_subscriptions ss
+        ${billingSubscriptionParts.customerJoin}
+        ${billingSubscriptionParts.packageJoin}
+        WHERE ss.status = 'ACTIVE'
+          AND COALESCE(ss.monthly_price, 0) > 0
+          AND NOT EXISTS (
+            SELECT 1
+            FROM billing_invoices bi
+            WHERE bi.subscription_id = ss.id
+              AND bi.invoice_type = 'RECURRING'
+              AND bi.billing_year = YEAR(CURRENT_DATE)
+              AND bi.billing_month = MONTH(CURRENT_DATE)
+              AND bi.invoice_status NOT IN ('CANCELLED')
+          )
+        ORDER BY ${billingSubscriptionParts.orderByExpression}
+        LIMIT 5
+      `),
+  })
+  const subscriptionsReady = subscriptionsReadyResult.rows
 
   const invoiceValues: unknown[] = []
-  const invoicePeriodWhere = period
-    ? ` AND (
-          (bi.billing_year = ? AND bi.billing_month = ?)
-          OR (bi.due_date >= ? AND bi.due_date < ?)
-        ) `
-    : ''
-  if (invoicePeriodWhere && period) {
-    invoiceValues.push(period.year, period.month, period.startDate, period.endDate)
+  const invoicePeriodClauses: string[] = []
+  if (period && billingSchema.invoiceBillingYear && billingSchema.invoiceBillingMonth) {
+    invoicePeriodClauses.push('(bi.billing_year = ? AND bi.billing_month = ?)')
+    invoiceValues.push(period.year, period.month)
   }
+  if (period && billingSchema.invoiceDueDate) {
+    invoicePeriodClauses.push('(bi.due_date >= ? AND bi.due_date < ?)')
+    invoiceValues.push(period.startDate, period.endDate)
+  }
+  const invoicePeriodWhere = invoicePeriodClauses.length ? ` AND (${invoicePeriodClauses.join(' OR ')}) ` : ''
 
   const invoiceFocusWhere = (() => {
     if (focus === 'OVERDUE_INVOICES' || focus === 'BILLING_OVERDUE_AMOUNT') {
       return `
         AND (
           bi.invoice_status = 'OVERDUE'
-          OR (
+          ${billingSchema.invoiceDueDate ? `OR (
             bi.due_date < CURRENT_DATE
             AND COALESCE(bi.paid_amount, 0) < COALESCE(bi.total_amount, 0)
             AND bi.invoice_status NOT IN ('PAID', 'CANCELLED')
-          )
+          )` : ''}
         )
       `
     }
@@ -1432,155 +2613,211 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
     return `
       AND (
         bi.invoice_status IN ('OVERDUE', 'PARTIAL')
-        OR (
+        ${billingSchema.invoiceDueDate ? `OR (
           bi.due_date < CURRENT_DATE
           AND COALESCE(bi.paid_amount, 0) < COALESCE(bi.total_amount, 0)
           AND bi.invoice_status NOT IN ('PAID', 'CANCELLED')
-        )
+        )` : ''}
       )
     `
   })()
 
   const invoiceOrderBy =
     focus === 'BILLING_OVERDUE_AMOUNT'
-      ? `ORDER BY (COALESCE(bi.total_amount, 0) - COALESCE(bi.paid_amount, 0)) DESC, bi.due_date ASC, bi.id DESC`
-      : `ORDER BY bi.due_date ASC, bi.id DESC`
+      ? `ORDER BY (COALESCE(bi.total_amount, 0) - COALESCE(bi.paid_amount, 0)) DESC${
+          billingSchema.invoiceDueDate ? ', bi.due_date ASC' : ''
+        }, bi.id DESC`
+      : `ORDER BY ${billingSchema.invoiceDueDate ? 'bi.due_date ASC, ' : ''}bi.id DESC`
   const invoiceLimit = focus === 'BILLING_OVERDUE_AMOUNT' ? 10 : 5
 
-  const invoices = await runReviewDbQuery<ReviewDbBillingInvoiceRow>(
-    `
-      SELECT
-        bi.invoice_no AS invoiceNo,
-        c.full_name AS customerName,
-        ss.service_no AS serviceNo,
-        bi.invoice_type AS invoiceType,
-        bi.invoice_status AS invoiceStatus,
-        bi.total_amount AS totalAmount,
-        bi.total_amount AS totalAmount,
-        bi.paid_amount AS paidAmount,
-        bi.due_date AS dueDate
-      FROM billing_invoices bi
-      JOIN service_subscriptions ss
-        ON ss.id = bi.subscription_id
-      JOIN crm_customers c
-        ON c.id = ss.customer_id
-      WHERE 1 = 1
-        ${invoiceFocusWhere}
-        ${invoicePeriodWhere}
-        AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') NOT IN ('WRITE_OFF', 'CLOSED')
-      ${invoiceOrderBy}
-      LIMIT ${invoiceLimit}
-    `,
-    invoiceValues,
-  )
+  const invoicesResult = await runSafeDomainSectionQuery<ReviewDbBillingInvoiceRow>({
+    sectionLabel: 'billing-overdue-invoices',
+    enabled:
+      billingSchema.invoiceNo &&
+      billingSchema.invoiceType &&
+      billingSchema.invoiceStatus &&
+      billingSchema.invoiceTotalAmount &&
+      billingSchema.invoicePaidAmount &&
+      billingSchema.invoiceDueDate,
+    query: () =>
+      runReviewDbQuery<ReviewDbBillingInvoiceRow>(
+        `
+          SELECT
+            bi.invoice_no AS invoiceNo,
+            ${billingInvoiceParts.customerNameExpression} AS customerName,
+            ${billingInvoiceParts.serviceNoExpression} AS serviceNo,
+            bi.invoice_type AS invoiceType,
+            bi.invoice_status AS invoiceStatus,
+            bi.total_amount AS totalAmount,
+            bi.paid_amount AS paidAmount,
+            ${billingInvoiceParts.dueDateExpression} AS dueDate
+          FROM billing_invoices bi
+          ${billingInvoiceParts.subscriptionJoin}
+          ${billingInvoiceParts.customerJoin}
+          WHERE 1 = 1
+            ${invoiceFocusWhere}
+            ${invoicePeriodWhere}
+            ${billingInvoiceParts.collectionOpenFilter}
+          ${invoiceOrderBy}
+          LIMIT ${invoiceLimit}
+        `,
+        invoiceValues,
+      ),
+  })
+  const invoices = invoicesResult.rows
 
-  const latestInvoices = await runReviewDbQuery<ReviewDbBillingLatestInvoiceRow>(`
-    SELECT
-      bi.invoice_no AS invoiceNo,
-      bi.invoice_type AS invoiceType,
-      bi.invoice_status AS invoiceStatus,
-      bi.total_amount AS totalAmount,
-      bi.paid_amount AS paidAmount,
-      bi.issue_date AS issueDate,
-      bi.due_date AS dueDate,
-      bi.billing_month AS billingMonth,
-      bi.billing_year AS billingYear,
-      ss.service_no AS serviceNo,
-      c.full_name AS customerName
-    FROM billing_invoices bi
-    JOIN service_subscriptions ss
-      ON ss.id = bi.subscription_id
-    JOIN crm_customers c
-      ON c.id = ss.customer_id
-    ORDER BY bi.issue_date DESC, bi.id DESC
-    LIMIT 5
-  `)
+  const latestInvoicesResult = await runSafeDomainSectionQuery<ReviewDbBillingLatestInvoiceRow>({
+    sectionLabel: 'billing-latest-invoices',
+    enabled:
+      billingSchema.invoiceNo &&
+      billingSchema.invoiceType &&
+      billingSchema.invoiceStatus &&
+      billingSchema.invoiceTotalAmount &&
+      billingSchema.invoicePaidAmount,
+    query: () =>
+      runReviewDbQuery<ReviewDbBillingLatestInvoiceRow>(`
+        SELECT
+          bi.invoice_no AS invoiceNo,
+          bi.invoice_type AS invoiceType,
+          bi.invoice_status AS invoiceStatus,
+          bi.total_amount AS totalAmount,
+          bi.paid_amount AS paidAmount,
+          ${billingInvoiceParts.issueDateExpression} AS issueDate,
+          ${billingInvoiceParts.dueDateExpression} AS dueDate,
+          ${billingInvoiceParts.billingMonthExpression} AS billingMonth,
+          ${billingInvoiceParts.billingYearExpression} AS billingYear,
+          ${billingInvoiceParts.serviceNoExpression} AS serviceNo,
+          ${billingInvoiceParts.customerNameExpression} AS customerName
+        FROM billing_invoices bi
+        ${billingInvoiceParts.subscriptionJoin}
+        ${billingInvoiceParts.customerJoin}
+        ORDER BY ${billingInvoiceParts.latestOrderByExpression}
+        LIMIT 5
+      `),
+  })
+  const latestInvoices = latestInvoicesResult.rows
 
-  const cancelledInvoices = await runReviewDbQuery<ReviewDbBillingCancelledInvoiceRow>(`
-    SELECT
-      bi.invoice_no AS invoiceNo,
-      c.full_name AS customerName,
-        ss.service_no AS serviceNo,
-      bi.total_amount AS totalAmount,
-      bi.updated_at AS updatedAt,
-      bi.notes
-    FROM billing_invoices bi
-    JOIN service_subscriptions ss
-      ON ss.id = bi.subscription_id
-    JOIN crm_customers c
-      ON c.id = ss.customer_id
-    WHERE bi.invoice_status = 'CANCELLED'
-    ORDER BY bi.updated_at DESC, bi.id DESC
-    LIMIT 5
-  `)
+  const cancelledInvoicesResult = await runSafeDomainSectionQuery<ReviewDbBillingCancelledInvoiceRow>({
+    sectionLabel: 'billing-cancelled-invoices',
+    enabled: billingSchema.invoiceNo && billingSchema.invoiceStatus && billingSchema.invoiceTotalAmount,
+    query: () =>
+      runReviewDbQuery<ReviewDbBillingCancelledInvoiceRow>(`
+        SELECT
+          bi.invoice_no AS invoiceNo,
+          ${billingInvoiceParts.customerNameExpression} AS customerName,
+          ${billingInvoiceParts.serviceNoExpression} AS serviceNo,
+          bi.total_amount AS totalAmount,
+          ${billingInvoiceParts.updatedAtExpression} AS updatedAt,
+          ${billingInvoiceParts.notesExpression} AS notes
+        FROM billing_invoices bi
+        ${billingInvoiceParts.subscriptionJoin}
+        ${billingInvoiceParts.customerJoin}
+        WHERE bi.invoice_status = 'CANCELLED'
+        ORDER BY ${billingInvoiceParts.updatedOrderByExpression}
+        LIMIT 5
+      `),
+  })
+  const cancelledInvoices = cancelledInvoicesResult.rows
 
-  const suspendedInvoices = await runReviewDbQuery<ReviewDbBillingInvoiceRow>(`
-    SELECT
-      bi.invoice_no AS invoiceNo,
-      c.full_name AS customerName,
-        ss.service_no AS serviceNo,
-      bi.invoice_status AS invoiceStatus,
-      bi.total_amount AS totalAmount,
-      bi.paid_amount AS paidAmount,
-      bi.due_date AS dueDate
-    FROM billing_invoices bi
-    JOIN service_subscriptions ss
-      ON ss.id = bi.subscription_id
-    JOIN crm_customers c
-      ON c.id = ss.customer_id
-    WHERE COALESCE(UPPER(TRIM(bi.invoice_status)), '') = 'SUSPENDED'
-       OR COALESCE(UPPER(TRIM(bi.collection_status)), '') = 'SUSPEND'
-       OR COALESCE(bi.suspend_candidate, 0) = 1
-    ORDER BY bi.updated_at DESC, bi.id DESC
-    LIMIT 5
-  `)
+  const suspendedWhereParts = [
+    billingSchema.invoiceStatus ? `COALESCE(UPPER(TRIM(bi.invoice_status)), '') = 'SUSPENDED'` : '',
+    billingSchema.invoiceCollectionStatus ? `COALESCE(UPPER(TRIM(bi.collection_status)), '') = 'SUSPEND'` : '',
+    billingSchema.invoiceSuspendCandidate ? `COALESCE(bi.suspend_candidate, 0) = 1` : '',
+  ].filter(Boolean)
+  const suspendedInvoicesResult = await runSafeDomainSectionQuery<ReviewDbBillingInvoiceRow>({
+    sectionLabel: 'billing-suspended-invoices',
+    enabled:
+      billingSchema.invoiceNo &&
+      billingSchema.invoiceTotalAmount &&
+      billingSchema.invoicePaidAmount &&
+      suspendedWhereParts.length > 0,
+    query: () =>
+      runReviewDbQuery<ReviewDbBillingInvoiceRow>(`
+        SELECT
+          bi.invoice_no AS invoiceNo,
+          ${billingInvoiceParts.customerNameExpression} AS customerName,
+          ${billingInvoiceParts.serviceNoExpression} AS serviceNo,
+          bi.invoice_status AS invoiceStatus,
+          bi.total_amount AS totalAmount,
+          bi.paid_amount AS paidAmount,
+          ${billingInvoiceParts.dueDateExpression} AS dueDate
+        FROM billing_invoices bi
+        ${billingInvoiceParts.subscriptionJoin}
+        ${billingInvoiceParts.customerJoin}
+        WHERE ${suspendedWhereParts.join('\n       OR ')}
+        ORDER BY ${billingInvoiceParts.updatedOrderByExpression}
+        LIMIT 5
+      `),
+  })
+  const suspendedInvoices = suspendedInvoicesResult.rows
 
-  const reconnectReadyInvoices = await runReviewDbQuery<ReviewDbBillingReconnectRow>(`
-    SELECT
-      bi.invoice_no AS invoiceNo,
-      c.full_name AS customerName,
-      bi.invoice_type AS invoiceType,
-      bi.invoice_status AS invoiceStatus,
-      bi.total_amount AS totalAmount,
-      bi.paid_amount AS paidAmount,
-      bi.due_date AS dueDate,
-      bi.collection_status AS collectionStatus,
-      bi.updated_at AS updatedAt
-    FROM billing_invoices bi
-    JOIN service_subscriptions ss
-      ON ss.id = bi.subscription_id
-    JOIN crm_customers c
-      ON c.id = ss.customer_id
-    WHERE COALESCE(UPPER(TRIM(bi.collection_status)), '') = 'RECONNECT'
-      AND COALESCE(UPPER(TRIM(bi.invoice_status)), 'ISSUED') IN ('ISSUED', 'OVERDUE', 'PARTIAL')
-    ORDER BY bi.updated_at DESC, bi.id DESC
-    LIMIT 5
-  `)
+  const reconnectReadyInvoicesResult = await runSafeDomainSectionQuery<ReviewDbBillingReconnectRow>({
+    sectionLabel: 'billing-reconnect-ready',
+    enabled:
+      billingSchema.invoiceNo &&
+      billingSchema.invoiceType &&
+      billingSchema.invoiceStatus &&
+      billingSchema.invoiceTotalAmount &&
+      billingSchema.invoicePaidAmount &&
+      billingSchema.invoiceCollectionStatus,
+    query: () =>
+      runReviewDbQuery<ReviewDbBillingReconnectRow>(`
+        SELECT
+          bi.invoice_no AS invoiceNo,
+          ${billingInvoiceParts.customerNameExpression} AS customerName,
+          ${billingInvoiceParts.serviceNoExpression} AS serviceNo,
+          bi.invoice_type AS invoiceType,
+          bi.invoice_status AS invoiceStatus,
+          bi.total_amount AS totalAmount,
+          bi.paid_amount AS paidAmount,
+          ${billingInvoiceParts.dueDateExpression} AS dueDate,
+          ${billingInvoiceParts.collectionStatusExpression} AS collectionStatus,
+          ${billingInvoiceParts.updatedAtExpression} AS updatedAt
+        FROM billing_invoices bi
+        ${billingInvoiceParts.subscriptionJoin}
+        ${billingInvoiceParts.customerJoin}
+        WHERE COALESCE(UPPER(TRIM(bi.collection_status)), '') = 'RECONNECT'
+          AND COALESCE(UPPER(TRIM(bi.invoice_status)), 'ISSUED') IN ('ISSUED', 'OVERDUE', 'PARTIAL')
+        ORDER BY ${billingInvoiceParts.updatedOrderByExpression}
+        LIMIT 5
+      `),
+  })
+  const reconnectReadyInvoices = reconnectReadyInvoicesResult.rows
 
-  const actions = await runReviewDbQuery<ReviewDbCollectionActionRow>(`
-    SELECT
-      bi.invoice_type AS invoiceType,
-      bca.action_type AS actionType,
-      bca.action_status AS actionStatus,
-      bca.action_at AS actionAt,
-      bca.due_follow_up_at AS dueFollowUpAt,
-      c.full_name AS customerName,
-        ss.service_no AS serviceNo,
-      bi.invoice_no AS invoiceNo,
-      bca.notes
-    FROM billing_collection_actions bca
-    JOIN billing_invoices bi
-      ON bi.id = bca.invoice_id
-    JOIN service_subscriptions ss
-      ON ss.id = bi.subscription_id
-    JOIN crm_customers c
-      ON c.id = ss.customer_id
-    ORDER BY bca.action_at DESC, bca.id DESC
-    LIMIT 5
-  `)
+  const actionsResult = await runSafeDomainSectionQuery<ReviewDbCollectionActionRow>({
+    sectionLabel: 'billing-collection-actions',
+    enabled:
+      billingSchema.actionInvoiceId &&
+      billingSchema.actionType &&
+      billingSchema.actionStatus &&
+      billingSchema.invoiceId &&
+      billingSchema.invoiceNo &&
+      billingSchema.invoiceType,
+    query: () =>
+      runReviewDbQuery<ReviewDbCollectionActionRow>(`
+        SELECT
+          bi.invoice_type AS invoiceType,
+          bca.action_type AS actionType,
+          bca.action_status AS actionStatus,
+          ${billingActionParts.actionAtExpression} AS actionAt,
+          ${billingActionParts.dueFollowUpAtExpression} AS dueFollowUpAt,
+          ${billingInvoiceParts.customerNameExpression} AS customerName,
+          ${billingInvoiceParts.serviceNoExpression} AS serviceNo,
+          bi.invoice_no AS invoiceNo,
+          ${billingActionParts.notesExpression} AS notes
+        FROM billing_collection_actions bca
+        JOIN billing_invoices bi
+          ON bi.id = bca.invoice_id
+        ${billingInvoiceParts.subscriptionJoin}
+        ${billingInvoiceParts.customerJoin}
+        ORDER BY ${billingActionParts.orderByExpression}
+        LIMIT 5
+      `),
+  })
+  const actions = actionsResult.rows
 
   const followUpValues: unknown[] = []
-  const followUpPeriodWhere = period ? ` AND bi.due_date >= ? AND bi.due_date < ? ` : ''
+  const followUpPeriodWhere = period && billingSchema.invoiceDueDate ? ` AND bi.due_date >= ? AND bi.due_date < ? ` : ''
   if (followUpPeriodWhere && period) {
     followUpValues.push(period.startDate, period.endDate)
   }
@@ -1589,71 +2826,93 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
     focus === 'SUSPEND_CANDIDATES'
       ? `
         AND (
-          COALESCE(bi.suspend_candidate, 0) = 1
-          OR COALESCE(UPPER(TRIM(latest.action_type)), '') = 'SUSPEND'
-          OR (
+          ${billingSchema.invoiceSuspendCandidate ? 'COALESCE(bi.suspend_candidate, 0) = 1' : '1 = 0'}
+          OR ${billingSchema.actionType ? "COALESCE(UPPER(TRIM(latest.action_type)), '') = 'SUSPEND'" : '1 = 0'}
+          OR ${
+            billingSchema.actionType && billingSchema.actionDueFollowUpAt
+              ? `(
             COALESCE(UPPER(TRIM(latest.action_type)), '') = 'PROMISE_TO_PAY'
             AND latest.due_follow_up_at IS NOT NULL
             AND latest.due_follow_up_at < CURRENT_TIMESTAMP
-          )
+          )`
+              : '1 = 0'
+          }
         )
       `
       : ''
 
-  const collectionFollowUps = await runReviewDbQuery<ReviewDbCollectionFollowUpRow>(
-    `
-    SELECT
-      bi.invoice_no AS invoiceNo,
-      c.full_name AS customerName,
-      ss.service_no AS serviceNo,
-      bi.invoice_type AS invoiceType,
-      bi.invoice_status AS invoiceStatus,
-      bi.total_amount AS totalAmount,
-      bi.paid_amount AS paidAmount,
-      bi.due_date AS dueDate,
-      bi.collection_status AS collectionStatus,
-      bi.suspend_candidate AS suspendCandidate,
-      latest.action_type AS actionType,
-      latest.action_status AS actionStatus,
-      latest.action_at AS actionAt,
-      latest.due_follow_up_at AS dueFollowUpAt,
-      latest.notes
-    FROM billing_invoices bi
-    JOIN service_subscriptions ss
-      ON ss.id = bi.subscription_id
-    JOIN crm_customers c
-      ON c.id = ss.customer_id
-    JOIN (
-      SELECT
-        action_latest.invoice_id,
-        action_latest.action_type,
-        action_latest.action_status,
-        action_latest.action_at,
-        action_latest.due_follow_up_at,
-        action_latest.notes
-      FROM billing_collection_actions action_latest
-      INNER JOIN (
-        SELECT invoice_id, MAX(id) AS latestId
-        FROM billing_collection_actions
-        GROUP BY invoice_id
-      ) latest_ids
-        ON latest_ids.latestId = action_latest.id
-    ) latest
-      ON latest.invoice_id = bi.id
-    WHERE COALESCE(UPPER(TRIM(latest.action_status)), 'OPEN') = 'OPEN'
-      AND COALESCE(UPPER(TRIM(bi.invoice_status)), 'ISSUED') IN ('ISSUED', 'OVERDUE', 'PARTIAL')
-      AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') <> 'CLOSED'
-      ${followUpFocusWhere}
-      ${followUpPeriodWhere}
-    ORDER BY
-      CASE WHEN latest.due_follow_up_at IS NULL THEN 1 ELSE 0 END ASC,
-      latest.due_follow_up_at ASC,
-      bi.due_date ASC,
-      bi.id DESC
-    LIMIT 10
-  `,
-    followUpValues,
-  )
+  const collectionFollowUpsResult = await runSafeDomainSectionQuery<ReviewDbCollectionFollowUpRow>({
+    sectionLabel: 'billing-collection-followups',
+    enabled:
+      billingSchema.invoiceId &&
+      billingSchema.invoiceNo &&
+      billingSchema.invoiceType &&
+      billingSchema.invoiceStatus &&
+      billingSchema.invoiceTotalAmount &&
+      billingSchema.invoicePaidAmount &&
+      billingSchema.actionId &&
+      billingSchema.actionInvoiceId &&
+      billingSchema.actionType &&
+      billingSchema.actionStatus,
+    query: () =>
+      runReviewDbQuery<ReviewDbCollectionFollowUpRow>(
+        `
+        SELECT
+          bi.invoice_no AS invoiceNo,
+          ${billingInvoiceParts.customerNameExpression} AS customerName,
+          ${billingInvoiceParts.serviceNoExpression} AS serviceNo,
+          bi.invoice_type AS invoiceType,
+          bi.invoice_status AS invoiceStatus,
+          bi.total_amount AS totalAmount,
+          bi.paid_amount AS paidAmount,
+          ${billingInvoiceParts.dueDateExpression} AS dueDate,
+          ${billingInvoiceParts.collectionStatusExpression} AS collectionStatus,
+          ${billingInvoiceParts.suspendCandidateExpression} AS suspendCandidate,
+          latest.action_type AS actionType,
+          latest.action_status AS actionStatus,
+          latest.action_at AS actionAt,
+          latest.due_follow_up_at AS dueFollowUpAt,
+          latest.notes
+        FROM billing_invoices bi
+        ${billingInvoiceParts.subscriptionJoin}
+        ${billingInvoiceParts.customerJoin}
+        JOIN (
+          SELECT
+            action_latest.invoice_id,
+            action_latest.action_type,
+            action_latest.action_status,
+            ${billingActionParts.latestActionAtExpression} AS action_at,
+            ${billingActionParts.latestDueFollowUpAtExpression} AS due_follow_up_at,
+            ${billingActionParts.latestNotesExpression} AS notes
+          FROM billing_collection_actions action_latest
+          INNER JOIN (
+            SELECT invoice_id, MAX(id) AS latestId
+            FROM billing_collection_actions
+            GROUP BY invoice_id
+          ) latest_ids
+            ON latest_ids.latestId = action_latest.id
+        ) latest
+          ON latest.invoice_id = bi.id
+        WHERE COALESCE(UPPER(TRIM(latest.action_status)), 'OPEN') = 'OPEN'
+          AND COALESCE(UPPER(TRIM(bi.invoice_status)), 'ISSUED') IN ('ISSUED', 'OVERDUE', 'PARTIAL')
+          ${billingSchema.invoiceCollectionStatus ? "AND COALESCE(UPPER(TRIM(bi.collection_status)), 'REMINDER') <> 'CLOSED'" : ''}
+          ${followUpFocusWhere}
+          ${followUpPeriodWhere}
+        ORDER BY
+          ${
+            billingSchema.actionDueFollowUpAt
+              ? `CASE WHEN latest.due_follow_up_at IS NULL THEN 1 ELSE 0 END ASC,
+          latest.due_follow_up_at ASC,`
+              : ''
+          }
+          ${billingSchema.invoiceDueDate ? 'bi.due_date ASC,' : ''}
+          bi.id DESC
+        LIMIT 10
+      `,
+        followUpValues,
+      ),
+  })
+  const collectionFollowUps = collectionFollowUpsResult.rows
 
   const activeCollectionFollowUps = collectionFollowUps.filter(
     (item) => !['WRITE_OFF', 'CLOSED'].includes(String(item.collectionStatus ?? '').trim().toUpperCase()),
@@ -1733,27 +2992,36 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
     ],
   }
 
-  const payments = await runReviewDbQuery<ReviewDbPaymentRow>(`
-    SELECT
-      bp.payment_no AS paymentNo,
-      bp.payment_date AS paymentDate,
-      bp.amount,
-      bp.payment_method AS paymentMethod,
-      bp.reference_no AS referenceNo,
-      c.full_name AS customerName,
-      ss.service_no AS serviceNo,
-      bi.invoice_no AS invoiceNo,
-      bp.notes
-    FROM billing_payments bp
-    JOIN billing_invoices bi
-      ON bi.id = bp.invoice_id
-    JOIN service_subscriptions ss
-      ON ss.id = bi.subscription_id
-    JOIN crm_customers c
-      ON c.id = ss.customer_id
-    ORDER BY bp.payment_date DESC, bp.id DESC
-    LIMIT 5
-  `)
+  const paymentsResult = await runSafeDomainSectionQuery<ReviewDbPaymentRow>({
+    sectionLabel: 'billing-payments',
+    enabled:
+      billingSchema.paymentInvoiceId &&
+      billingSchema.paymentDate &&
+      billingSchema.paymentAmount &&
+      billingSchema.invoiceId &&
+      billingSchema.invoiceNo,
+    query: () =>
+      runReviewDbQuery<ReviewDbPaymentRow>(`
+        SELECT
+          ${billingSchema.paymentNo ? 'bp.payment_no' : 'NULL'} AS paymentNo,
+          bp.payment_date AS paymentDate,
+          bp.amount,
+          ${billingSchema.paymentMethod ? 'bp.payment_method' : 'NULL'} AS paymentMethod,
+          ${billingSchema.paymentReferenceNo ? 'bp.reference_no' : 'NULL'} AS referenceNo,
+          ${billingInvoiceParts.customerNameExpression} AS customerName,
+          ${billingInvoiceParts.serviceNoExpression} AS serviceNo,
+          bi.invoice_no AS invoiceNo,
+          ${billingSchema.paymentNotes ? 'bp.notes' : 'NULL'} AS notes
+        FROM billing_payments bp
+        JOIN billing_invoices bi
+          ON bi.id = bp.invoice_id
+        ${billingInvoiceParts.subscriptionJoin}
+        ${billingInvoiceParts.customerJoin}
+        ORDER BY ${billingSchema.paymentDate ? 'bp.payment_date DESC,' : ''} bp.id DESC
+        LIMIT 5
+      `),
+  })
+  const payments = paymentsResult.rows
 
   return [
     {
@@ -2320,6 +3588,16 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
     .toUpperCase()
   const period = resolveSqlPeriodRange(filters)
   const digitalSourcePlaceholders = DIGITAL_SALES_SOURCES.map(() => '?').join(', ')
+  const salesSchema = await getSalesReadSchema()
+
+  const canJoinLeadCustomer = salesSchema.orderLeadId && salesSchema.leadId
+  const canJoinOrderCustomer = salesSchema.orderCustomerId && salesSchema.customerId
+  const canJoinSurveyLead = salesSchema.surveyLeadId && salesSchema.leadId
+  const canJoinSurveyCustomer = salesSchema.surveyCustomerId && salesSchema.customerId
+  const canJoinActivationCustomer = salesSchema.subscriptionCustomerId && salesSchema.customerId
+  const canJoinActivationPackage = salesSchema.subscriptionPackageId && salesSchema.packageId
+  const canJoinActivationOrder = salesSchema.subscriptionOrderId && salesSchema.orderId
+  const canJoinWorkOrderOrder = salesSchema.workOrderSalesOrderId && salesSchema.orderId
 
   const leadValues: unknown[] = []
   const leadWhereParts: string[] = []
@@ -2327,80 +3605,142 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
     leadWhereParts.push(`COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')`)
   }
   if (focus === 'DIGITAL_LEADS') {
-    leadWhereParts.push(`UPPER(COALESCE(source, '')) IN (${digitalSourcePlaceholders})`)
-    leadValues.push(...DIGITAL_SALES_SOURCES)
+    leadWhereParts.push(
+      salesSchema.leadSource ? `UPPER(COALESCE(source, '')) IN (${digitalSourcePlaceholders})` : '1 = 0',
+    )
+    if (salesSchema.leadSource) {
+      leadValues.push(...DIGITAL_SALES_SOURCES)
+    }
   }
   const leadWhere = leadWhereParts.length ? ` WHERE ${leadWhereParts.join(' AND ')} ` : ''
 
-  const leads = await runReviewDbQuery<ReviewDbSalesLeadRow>(
-    `
-    SELECT
-      id AS leadId,
-      customer_name AS customerName,
-      lead_type AS leadType,
-      status,
-      source,
-      marketing_name AS marketingName,
-      phone,
-      notes
-    FROM sales_leads
-    ${leadWhere}
-    ORDER BY created_at DESC, id DESC
-    LIMIT 5
-  `,
-    leadValues,
-  )
+  const leadsResult = await runSafeDomainSectionQuery<ReviewDbSalesLeadRow>({
+    sectionLabel: 'sales-leads',
+    enabled: salesSchema.leadId && salesSchema.leadCustomerName && salesSchema.leadType && salesSchema.leadStatus,
+    query: () =>
+      runReviewDbQuery<ReviewDbSalesLeadRow>(
+        `
+        SELECT
+          id AS leadId,
+          customer_name AS customerName,
+          lead_type AS leadType,
+          status,
+          ${salesSchema.leadSource ? 'source' : 'NULL'} AS source,
+          ${salesSchema.leadMarketingName ? 'marketing_name' : 'NULL'} AS marketingName,
+          ${salesSchema.leadPhone ? 'phone' : 'NULL'} AS phone,
+          ${salesSchema.leadNotes ? 'notes' : 'NULL'} AS notes
+        FROM sales_leads
+        ${leadWhere}
+        ORDER BY ${salesSchema.leadCreatedAt ? 'created_at DESC,' : ''} id DESC
+        LIMIT 5
+      `,
+        leadValues,
+      ),
+  })
+  const leads = leadsResult.rows
 
-  const coverages = await runReviewDbQuery<ReviewDbSalesCoverageRow>(`
-    SELECT
-      id AS coverageId,
-      area_code AS areaCode,
-      area_name AS areaName,
-      village,
-      district,
-      city,
-      province,
-      coverage_status AS coverageStatus,
-      notes
-    FROM sales_covered_areas
-    ORDER BY updated_at DESC, id DESC
-    LIMIT 5
-  `)
+  const coveragesResult = await runSafeDomainSectionQuery<ReviewDbSalesCoverageRow>({
+    sectionLabel: 'sales-coverages',
+    enabled: salesSchema.coverageId && salesSchema.coverageAreaCode && salesSchema.coverageAreaName && salesSchema.coverageStatus,
+    query: () =>
+      runReviewDbQuery<ReviewDbSalesCoverageRow>(`
+        SELECT
+          id AS coverageId,
+          area_code AS areaCode,
+          area_name AS areaName,
+          ${salesSchema.coverageVillage ? 'village' : 'NULL'} AS village,
+          ${salesSchema.coverageDistrict ? 'district' : 'NULL'} AS district,
+          ${salesSchema.coverageCity ? 'city' : 'NULL'} AS city,
+          ${salesSchema.coverageProvince ? 'province' : 'NULL'} AS province,
+          coverage_status AS coverageStatus,
+          ${salesSchema.coverageNotes ? 'notes' : 'NULL'} AS notes
+        FROM sales_covered_areas
+        ORDER BY ${salesSchema.coverageUpdatedAt ? 'updated_at DESC,' : ''} id DESC
+        LIMIT 5
+      `),
+  })
+  const coverages = coveragesResult.rows
 
   const flowValues: unknown[] = []
+  const surveyLeadJoin =
+    canJoinSurveyLead
+      ? `
+      LEFT JOIN sales_leads sl
+        ON sl.id = ss.lead_id`
+      : ''
+  const surveyCustomerJoin =
+    canJoinSurveyCustomer
+      ? `
+      LEFT JOIN crm_customers c
+        ON c.id = ss.customer_id`
+      : ''
+  const surveyCustomerNameExpression =
+    canJoinSurveyLead && salesSchema.leadCustomerName
+      ? `COALESCE(sl.customer_name, ${canJoinSurveyCustomer && salesSchema.customerFullName ? 'c.full_name' : "'Customer belum terpetakan'"})`
+      : canJoinSurveyCustomer && salesSchema.customerFullName
+        ? `COALESCE(c.full_name, 'Customer belum terpetakan')`
+        : `'Customer belum terpetakan'`
+  const surveyMarketingExpression = canJoinSurveyLead && salesSchema.leadMarketingName ? 'sl.marketing_name' : 'NULL'
+  const surveyDateExpression = salesSchema.surveyScheduledAt
+    ? 'ss.scheduled_at'
+    : salesSchema.surveyCreatedAt
+      ? 'ss.created_at'
+      : 'NULL'
+
+  const orderLeadJoin =
+    canJoinLeadCustomer
+      ? `
+      LEFT JOIN sales_leads sl
+        ON sl.id = so.lead_id`
+      : ''
+  const orderCustomerJoin =
+    canJoinOrderCustomer
+      ? `
+      LEFT JOIN crm_customers c
+        ON c.id = so.customer_id`
+      : ''
+  const orderCustomerNameExpression =
+    canJoinLeadCustomer && salesSchema.leadCustomerName
+      ? `COALESCE(sl.customer_name, ${canJoinOrderCustomer && salesSchema.customerFullName ? 'c.full_name' : "'Customer belum terpetakan'"})`
+      : canJoinOrderCustomer && salesSchema.customerFullName
+        ? `COALESCE(c.full_name, 'Customer belum terpetakan')`
+        : `'Customer belum terpetakan'`
+  const orderMarketingExpression = salesSchema.orderMarketingName ? 'so.marketing_name' : 'NULL'
+  const orderDateExpression = salesSchema.orderScheduledInstallationAt
+    ? 'so.scheduled_installation_at'
+    : salesSchema.orderRequestDate
+      ? 'so.request_date'
+      : 'NULL'
+
   let flowsQuery = `
     SELECT *
     FROM (
       SELECT
         ss.id AS sourceId,
-        survey_no AS flowCode,
-        COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+        ss.survey_no AS flowCode,
+        ${surveyCustomerNameExpression} AS customerName,
         'SURVEY' AS flowKind,
-        survey_status AS status,
-        feasibility_status AS detailLine,
-        scheduled_at AS detailDate,
-        sl.marketing_name AS marketingName
+        ss.survey_status AS status,
+        ${salesSchema.surveyFeasibilityStatus ? 'ss.feasibility_status' : 'NULL'} AS detailLine,
+        ${surveyDateExpression} AS detailDate,
+        ${surveyMarketingExpression} AS marketingName
       FROM sales_surveys ss
-      LEFT JOIN sales_leads sl
-        ON sl.id = ss.lead_id
-      LEFT JOIN crm_customers c
-        ON c.id = ss.customer_id
-      WHERE survey_status IN ('REQUESTED', 'SCHEDULED', 'ON_PROGRESS')
+      ${surveyLeadJoin}
+      ${surveyCustomerJoin}
+      WHERE ss.survey_status IN ('REQUESTED', 'SCHEDULED', 'ON_PROGRESS')
       UNION ALL
       SELECT
         so.id AS sourceId,
         so.order_no AS flowCode,
-        COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+        ${orderCustomerNameExpression} AS customerName,
         'ORDER' AS flowKind,
         so.status AS status,
-        so.order_type AS detailLine,
-        so.scheduled_installation_at AS detailDate,
-        so.marketing_name AS marketingName
+        ${salesSchema.orderType ? 'so.order_type' : 'NULL'} AS detailLine,
+        ${orderDateExpression} AS detailDate,
+        ${orderMarketingExpression} AS marketingName
       FROM sales_orders so
-      LEFT JOIN sales_leads sl
-        ON sl.id = so.lead_id
-      LEFT JOIN crm_customers c
-        ON c.id = so.customer_id
+      ${orderLeadJoin}
+      ${orderCustomerJoin}
       WHERE COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')
     ) sales_flow
     WHERE detailDate IS NOT NULL
@@ -2410,12 +3750,16 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
 
   if (focus === 'MONTHLY_ORDERS' || focus === 'DIGITAL_ORDERS' || focus === 'ACTIVATION_RATE') {
     const digitalOrderWhere =
-      focus === 'DIGITAL_ORDERS' ? ` AND UPPER(COALESCE(sl.source, '')) IN (${digitalSourcePlaceholders}) ` : ''
+      focus === 'DIGITAL_ORDERS'
+        ? canJoinLeadCustomer && salesSchema.leadSource
+          ? ` AND UPPER(COALESCE(sl.source, '')) IN (${digitalSourcePlaceholders}) `
+          : ' AND 1 = 0 '
+        : ''
 
-    if (focus === 'DIGITAL_ORDERS') {
+    if (focus === 'DIGITAL_ORDERS' && canJoinLeadCustomer && salesSchema.leadSource) {
       flowValues.push(...DIGITAL_SALES_SOURCES)
     }
-    if (period) {
+    if (period && salesSchema.orderRequestDate) {
       flowValues.push(period.startDate, period.endDate)
     }
 
@@ -2423,26 +3767,26 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
       SELECT
         so.id AS sourceId,
         so.order_no AS flowCode,
-        COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+        ${orderCustomerNameExpression} AS customerName,
         'ORDER' AS flowKind,
         so.status AS status,
-        so.order_type AS detailLine,
-        so.request_date AS detailDate,
-        so.marketing_name AS marketingName
+        ${salesSchema.orderType ? 'so.order_type' : 'NULL'} AS detailLine,
+        ${salesSchema.orderRequestDate ? 'so.request_date' : 'NULL'} AS detailDate,
+        ${orderMarketingExpression} AS marketingName
       FROM sales_orders so
-      LEFT JOIN sales_leads sl
-        ON sl.id = so.lead_id
-      LEFT JOIN crm_customers c
-        ON c.id = so.customer_id
+      ${orderLeadJoin}
+      ${orderCustomerJoin}
       WHERE 1 = 1
         ${digitalOrderWhere}
-        ${period ? 'AND so.request_date >= ? AND so.request_date < ?' : ''}
-      ORDER BY so.request_date DESC, so.id DESC
+        ${period && salesSchema.orderRequestDate ? 'AND so.request_date >= ? AND so.request_date < ?' : ''}
+      ORDER BY ${salesSchema.orderRequestDate ? 'so.request_date DESC,' : ''} so.id DESC
       LIMIT 5
     `
   } else if (focus === 'DIGITAL_SURVEYS') {
-    flowValues.push(...DIGITAL_SALES_SOURCES)
-    if (period) {
+    if (canJoinSurveyLead && salesSchema.leadSource) {
+      flowValues.push(...DIGITAL_SALES_SOURCES)
+    }
+    if (period && (salesSchema.surveyScheduledAt || salesSchema.surveyCreatedAt)) {
       flowValues.push(period.startDate, period.endDate)
     }
 
@@ -2450,50 +3794,93 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
       SELECT
         ss.id AS sourceId,
         ss.survey_no AS flowCode,
-        COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
+        ${surveyCustomerNameExpression} AS customerName,
         'SURVEY' AS flowKind,
         ss.survey_status AS status,
-        ss.feasibility_status AS detailLine,
-        COALESCE(ss.scheduled_at, ss.created_at) AS detailDate,
-        sl.marketing_name AS marketingName
+        ${salesSchema.surveyFeasibilityStatus ? 'ss.feasibility_status' : 'NULL'} AS detailLine,
+        ${
+          salesSchema.surveyScheduledAt && salesSchema.surveyCreatedAt
+            ? 'COALESCE(ss.scheduled_at, ss.created_at)'
+            : surveyDateExpression
+        } AS detailDate,
+        ${surveyMarketingExpression} AS marketingName
       FROM sales_surveys ss
-      LEFT JOIN sales_leads sl
-        ON sl.id = ss.lead_id
-      LEFT JOIN crm_customers c
-        ON c.id = ss.customer_id
-      WHERE UPPER(COALESCE(sl.source, '')) IN (${digitalSourcePlaceholders})
-        ${period ? 'AND COALESCE(ss.scheduled_at, ss.created_at) >= ? AND COALESCE(ss.scheduled_at, ss.created_at) < ?' : ''}
-      ORDER BY COALESCE(ss.scheduled_at, ss.created_at) DESC, ss.id DESC
+      ${surveyLeadJoin}
+      ${surveyCustomerJoin}
+      WHERE ${
+        canJoinSurveyLead && salesSchema.leadSource
+          ? `UPPER(COALESCE(sl.source, '')) IN (${digitalSourcePlaceholders})`
+          : '1 = 0'
+      }
+        ${
+          period && (salesSchema.surveyScheduledAt || salesSchema.surveyCreatedAt)
+            ? `AND ${
+                salesSchema.surveyScheduledAt && salesSchema.surveyCreatedAt
+                  ? 'COALESCE(ss.scheduled_at, ss.created_at)'
+                  : surveyDateExpression
+              } >= ? AND ${
+                salesSchema.surveyScheduledAt && salesSchema.surveyCreatedAt
+                  ? 'COALESCE(ss.scheduled_at, ss.created_at)'
+                  : surveyDateExpression
+              } < ?`
+            : ''
+        }
+      ORDER BY ${
+        salesSchema.surveyScheduledAt && salesSchema.surveyCreatedAt
+          ? 'COALESCE(ss.scheduled_at, ss.created_at) DESC,'
+          : surveyDateExpression !== 'NULL'
+            ? `${surveyDateExpression} DESC,`
+            : ''
+      } ss.id DESC
       LIMIT 5
     `
   }
 
-  const flows = await runReviewDbQuery<ReviewDbSalesFlowRow>(flowsQuery, flowValues)
+  const flowsResult = await runSafeDomainSectionQuery<ReviewDbSalesFlowRow>({
+    sectionLabel: 'sales-flows',
+    enabled:
+      (salesSchema.surveyId && salesSchema.surveyNo && salesSchema.surveyStatus) ||
+      (salesSchema.orderId && salesSchema.orderNo && salesSchema.orderStatus),
+    query: () => runReviewDbQuery<ReviewDbSalesFlowRow>(flowsQuery, flowValues),
+  })
+  const flows = flowsResult.rows
 
   const activationRateSummary =
     focus === 'ACTIVATION_RATE'
       ? await (async () => {
-          const orderAggregate = await runReviewDbQuery<{ total: number }>(
-            `
-              SELECT COUNT(*) AS total
-              FROM sales_orders so
-              WHERE 1 = 1
-                ${period ? 'AND so.request_date >= ? AND so.request_date < ?' : ''}
-            `,
-            period ? [period.startDate, period.endDate] : [],
-          )
-          const activationAggregate = await runReviewDbQuery<{ total: number }>(
-            `
-              SELECT COUNT(*) AS total
-              FROM service_subscriptions ss
-              WHERE ss.activated_at IS NOT NULL
-                ${period ? 'AND ss.activated_at >= ? AND ss.activated_at < ?' : ''}
-            `,
-            period ? [period.startDate, period.endDate] : [],
-          )
+          const orderAggregateResult = await runSafeDomainSectionQuery<{ total: number }>({
+            sectionLabel: 'sales-order-aggregate',
+            enabled: salesSchema.orderId,
+            query: () =>
+              runReviewDbQuery<{ total: number }>(
+                `
+                  SELECT COUNT(*) AS total
+                  FROM sales_orders so
+                  WHERE 1 = 1
+                    ${period && salesSchema.orderRequestDate ? 'AND so.request_date >= ? AND so.request_date < ?' : ''}
+                `,
+                period && salesSchema.orderRequestDate ? [period.startDate, period.endDate] : [],
+              ),
+          })
+          const activationAggregateResult = await runSafeDomainSectionQuery<{ total: number }>({
+            sectionLabel: 'sales-activation-aggregate',
+            enabled: salesSchema.subscriptionId && salesSchema.subscriptionActivatedAt,
+            query: () =>
+              runReviewDbQuery<{ total: number }>(
+                `
+                  SELECT COUNT(*) AS total
+                  FROM service_subscriptions ss
+                  WHERE ss.activated_at IS NOT NULL
+                    ${
+                      period && salesSchema.subscriptionActivatedAt ? 'AND ss.activated_at >= ? AND ss.activated_at < ?' : ''
+                    }
+                `,
+                period && salesSchema.subscriptionActivatedAt ? [period.startDate, period.endDate] : [],
+              ),
+          })
 
-          const orderTotal = Number(orderAggregate[0]?.total ?? 0)
-          const activationTotal = Number(activationAggregate[0]?.total ?? 0)
+          const orderTotal = Number(orderAggregateResult.rows[0]?.total ?? 0)
+          const activationTotal = Number(activationAggregateResult.rows[0]?.total ?? 0)
 
           return [
             { label: 'Order Periode', value: formatNumber(orderTotal) },
@@ -2503,64 +3890,132 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
         })()
       : undefined
 
-  const workOrders = await runReviewDbQuery<ReviewDbSalesWorkOrderRow>(`
-    SELECT
-      swo.id AS workOrderId,
-      swo.work_order_no AS workOrderNo,
-      COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
-      swo.status,
-      swo.work_type AS workType,
-      swo.scheduled_at AS scheduledAt,
-      swo.technician_name AS technicianName,
-      so.order_no AS orderNo
-    FROM service_work_orders swo
-    LEFT JOIN sales_orders so
-      ON so.id = swo.sales_order_id
-    LEFT JOIN sales_leads sl
-      ON sl.id = so.lead_id
-    LEFT JOIN crm_customers c
-      ON c.id = so.customer_id
-    WHERE COALESCE(UPPER(TRIM(swo.status)), 'OPEN') NOT IN ('COMPLETED', 'CLOSED', 'CANCELLED')
-    ORDER BY COALESCE(swo.scheduled_at, swo.created_at) DESC, swo.id DESC
-    LIMIT 5
-  `)
+  const workOrderCustomerNameExpression =
+    canJoinWorkOrderOrder && canJoinLeadCustomer && salesSchema.leadCustomerName
+      ? `COALESCE(sl.customer_name, ${canJoinOrderCustomer && salesSchema.customerFullName ? 'c.full_name' : "'Customer belum terpetakan'"})`
+      : canJoinWorkOrderOrder && canJoinOrderCustomer && salesSchema.customerFullName
+        ? `COALESCE(c.full_name, 'Customer belum terpetakan')`
+        : `'Customer belum terpetakan'`
+  const workOrdersResult = await runSafeDomainSectionQuery<ReviewDbSalesWorkOrderRow>({
+    sectionLabel: 'sales-work-orders',
+    enabled: salesSchema.workOrderId && salesSchema.workOrderNo && salesSchema.workOrderStatus,
+    query: () =>
+      runReviewDbQuery<ReviewDbSalesWorkOrderRow>(`
+        SELECT
+          swo.id AS workOrderId,
+          swo.work_order_no AS workOrderNo,
+          ${workOrderCustomerNameExpression} AS customerName,
+          swo.status,
+          ${salesSchema.workOrderType ? 'swo.work_type' : "'UNKNOWN'"} AS workType,
+          ${salesSchema.workOrderScheduledAt ? 'swo.scheduled_at' : 'NULL'} AS scheduledAt,
+          ${salesSchema.workOrderTechnicianName ? 'swo.technician_name' : 'NULL'} AS technicianName,
+          ${canJoinWorkOrderOrder && salesSchema.orderNo ? 'so.order_no' : 'NULL'} AS orderNo
+        FROM service_work_orders swo
+        ${
+          canJoinWorkOrderOrder
+            ? `
+        LEFT JOIN sales_orders so
+          ON so.id = swo.sales_order_id`
+            : ''
+        }
+        ${
+          canJoinWorkOrderOrder && canJoinLeadCustomer
+            ? `
+        LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id`
+            : ''
+        }
+        ${
+          canJoinWorkOrderOrder && canJoinOrderCustomer
+            ? `
+        LEFT JOIN crm_customers c
+          ON c.id = so.customer_id`
+            : ''
+        }
+        WHERE COALESCE(UPPER(TRIM(swo.status)), 'OPEN') NOT IN ('COMPLETED', 'CLOSED', 'CANCELLED')
+        ORDER BY ${
+          salesSchema.workOrderScheduledAt && salesSchema.workOrderCreatedAt
+            ? 'COALESCE(swo.scheduled_at, swo.created_at) DESC,'
+            : salesSchema.workOrderScheduledAt
+              ? 'swo.scheduled_at DESC,'
+              : salesSchema.workOrderCreatedAt
+                ? 'swo.created_at DESC,'
+                : ''
+        } swo.id DESC
+        LIMIT 5
+      `),
+  })
+  const workOrders = workOrdersResult.rows
 
   const activationValues: unknown[] = []
   const activationWhereParts = ["ss.status IN ('PENDING', 'ACTIVE')"]
   if (focus === 'MONTHLY_ACTIVATIONS' || focus === 'ACTIVATION_RATE') {
-    activationWhereParts.splice(0, activationWhereParts.length, 'ss.activated_at IS NOT NULL')
-    if (period) {
+    activationWhereParts.splice(0, activationWhereParts.length, salesSchema.subscriptionActivatedAt ? 'ss.activated_at IS NOT NULL' : '1 = 0')
+    if (period && salesSchema.subscriptionActivatedAt) {
       activationWhereParts.push('ss.activated_at >= ? AND ss.activated_at < ?')
       activationValues.push(period.startDate, period.endDate)
     }
   }
   const activationWhere = activationWhereParts.length ? `WHERE ${activationWhereParts.join(' AND ')}` : ''
 
-  const activations = await runReviewDbQuery<ReviewDbSalesActivationRow>(
-    `
-    SELECT
-      ss.id AS subscriptionId,
-      ss.service_no AS serviceNo,
-      c.full_name AS customerName,
-      ss.status,
-      sp.name AS packageName,
-      sp.speed_label AS speedLabel,
-      ss.monthly_price AS monthlyPrice,
-      ss.activated_at AS activatedAt,
-      so.order_no AS orderNo
-    FROM service_subscriptions ss
-    JOIN crm_customers c
-      ON c.id = ss.customer_id
-    LEFT JOIN sales_orders so
-      ON so.id = ss.order_id
-    LEFT JOIN sales_packages sp
-      ON sp.id = ss.package_id
-    ${activationWhere}
-    ORDER BY COALESCE(ss.activated_at, ss.created_at) DESC, ss.id DESC
-    LIMIT 5
-  `,
-    activationValues,
-  )
+  const activationsResult = await runSafeDomainSectionQuery<ReviewDbSalesActivationRow>({
+    sectionLabel: 'sales-activations',
+    enabled: salesSchema.subscriptionId && salesSchema.subscriptionServiceNo && salesSchema.subscriptionStatus,
+    query: () =>
+      runReviewDbQuery<ReviewDbSalesActivationRow>(
+        `
+        SELECT
+          ss.id AS subscriptionId,
+          ss.service_no AS serviceNo,
+          ${
+            canJoinActivationCustomer && salesSchema.customerFullName
+              ? 'c.full_name'
+              : "'Customer belum terpetakan'"
+          } AS customerName,
+          ss.status,
+          ${canJoinActivationPackage && salesSchema.packageName ? 'sp.name' : 'NULL'} AS packageName,
+          ${canJoinActivationPackage && salesSchema.packageSpeedLabel ? 'sp.speed_label' : 'NULL'} AS speedLabel,
+          ${salesSchema.subscriptionMonthlyPrice ? 'ss.monthly_price' : '0'} AS monthlyPrice,
+          ${salesSchema.subscriptionActivatedAt ? 'ss.activated_at' : 'NULL'} AS activatedAt,
+          ${canJoinActivationOrder && salesSchema.orderNo ? 'so.order_no' : 'NULL'} AS orderNo
+        FROM service_subscriptions ss
+        ${
+          canJoinActivationCustomer
+            ? `
+        LEFT JOIN crm_customers c
+          ON c.id = ss.customer_id`
+            : ''
+        }
+        ${
+          canJoinActivationOrder
+            ? `
+        LEFT JOIN sales_orders so
+          ON so.id = ss.order_id`
+            : ''
+        }
+        ${
+          canJoinActivationPackage
+            ? `
+        LEFT JOIN sales_packages sp
+          ON sp.id = ss.package_id`
+            : ''
+        }
+        ${activationWhere}
+        ORDER BY ${
+          salesSchema.subscriptionActivatedAt && salesSchema.subscriptionCreatedAt
+            ? 'COALESCE(ss.activated_at, ss.created_at) DESC,'
+            : salesSchema.subscriptionActivatedAt
+              ? 'ss.activated_at DESC,'
+              : salesSchema.subscriptionCreatedAt
+                ? 'ss.created_at DESC,'
+                : ''
+        } ss.id DESC
+        LIMIT 5
+      `,
+        activationValues,
+      ),
+  })
+  const activations = activationsResult.rows
 
   return [
     {
@@ -2690,227 +4145,442 @@ async function getReviewDbInventorySections(filters?: DomainReviewDrilldownFilte
 
   await ensureInventoryLoanTable()
   await ensureInventoryRequestTable()
+  const inventorySchema = await getInventoryReadSchema()
+  const canJoinItemCategory = inventorySchema.itemCategoryId && inventorySchema.categoryId
+  const canJoinItemUnit = inventorySchema.itemUnitId && inventorySchema.unitId
+  const canJoinMovementItem = inventorySchema.movementItemId && inventorySchema.itemId
+  const canJoinPortOdp = inventorySchema.odpPortOdpId && inventorySchema.odpId
+  const canJoinPortSubscription = inventorySchema.odpPortSubscriptionId && inventorySchema.subscriptionId
+  const canJoinPortCustomer = inventorySchema.odpPortCustomerId && inventorySchema.customerId
+  const canJoinAssignmentItem = inventorySchema.deviceAssignmentInventoryItemId && inventorySchema.itemId
+  const canJoinAssignmentSubscription = inventorySchema.deviceAssignmentSubscriptionId && inventorySchema.subscriptionId
+  const canJoinAssignmentWorkOrder = inventorySchema.deviceAssignmentWorkOrderId && inventorySchema.workOrderId
+  const canJoinAssignmentCustomer = inventorySchema.deviceAssignmentCustomerId && inventorySchema.customerId
+  const canJoinRequestItem = inventorySchema.requestInventoryItemId && inventorySchema.itemId
+  const canJoinLoanItem = inventorySchema.loanInventoryItemId && inventorySchema.itemId
 
-  const items = await runReviewDbQuery<ReviewDbInventoryItemRow>(`
-    SELECT
-      ii.id AS itemId,
-      ii.item_code AS itemCode,
-      ii.item_name AS itemName,
-      ic.code AS categoryCode,
-      iu.code AS unitCode,
-      ii.current_stock AS currentStock,
-      ii.minimum_stock AS minimumStock,
-      ii.status
-    FROM inventory_items ii
-    LEFT JOIN inventory_categories ic
-      ON ic.id = ii.category_id
-    LEFT JOIN inventory_units iu
-      ON iu.id = ii.unit_id
-    ORDER BY ii.updated_at DESC, ii.id DESC
-    LIMIT 5
-  `)
+  const itemsResult = await runSafeDomainSectionQuery<ReviewDbInventoryItemRow>({
+    sectionLabel: 'inventory-items',
+    enabled:
+      inventorySchema.itemId &&
+      inventorySchema.itemCode &&
+      inventorySchema.itemName &&
+      inventorySchema.itemCurrentStock &&
+      inventorySchema.itemMinimumStock &&
+      inventorySchema.itemStatus,
+    query: () =>
+      runReviewDbQuery<ReviewDbInventoryItemRow>(`
+        SELECT
+          ii.id AS itemId,
+          ii.item_code AS itemCode,
+          ii.item_name AS itemName,
+          ${canJoinItemCategory && inventorySchema.categoryCode ? 'ic.code' : 'NULL'} AS categoryCode,
+          ${canJoinItemUnit && inventorySchema.unitCode ? 'iu.code' : 'NULL'} AS unitCode,
+          ii.current_stock AS currentStock,
+          ii.minimum_stock AS minimumStock,
+          ii.status
+        FROM inventory_items ii
+        ${
+          canJoinItemCategory
+            ? `
+        LEFT JOIN inventory_categories ic
+          ON ic.id = ii.category_id`
+            : ''
+        }
+        ${
+          canJoinItemUnit
+            ? `
+        LEFT JOIN inventory_units iu
+          ON iu.id = ii.unit_id`
+            : ''
+        }
+        ORDER BY ${inventorySchema.itemUpdatedAt ? 'ii.updated_at DESC,' : ''} ii.id DESC
+        LIMIT 5
+      `),
+  })
+  const items = itemsResult.rows
 
   const movementValues: unknown[] = []
-  const movementPeriodWhere = focus === 'MONTHLY_MOVEMENTS' && period ? ` WHERE ism.movement_at >= ? AND ism.movement_at < ? ` : ''
+  const movementPeriodWhere =
+    focus === 'MONTHLY_MOVEMENTS' && period && inventorySchema.movementAt
+      ? ` WHERE ism.movement_at >= ? AND ism.movement_at < ? `
+      : ''
   if (movementPeriodWhere && period) {
     movementValues.push(period.startDate, period.endDate)
   }
 
-  const movements = await runReviewDbQuery<ReviewDbInventoryMovementRow>(
-    `
-    SELECT
-      ism.id AS movementId,
-      ism.movement_type AS movementType,
-      ism.reference_no AS referenceNo,
-      ism.qty,
-      ism.unit_price AS unitPrice,
-      ism.movement_at AS movementAt,
-      ii.item_name AS itemName,
-      ii.item_code AS itemCode,
-      ism.notes
-    FROM inventory_stock_movements ism
-    JOIN inventory_items ii
-      ON ii.id = ism.item_id
-    ${movementPeriodWhere}
-    ORDER BY ism.movement_at DESC, ism.id DESC
-    LIMIT 5
-  `,
-    movementValues,
-  )
+  const movementsResult = await runSafeDomainSectionQuery<ReviewDbInventoryMovementRow>({
+    sectionLabel: 'inventory-movements',
+    enabled:
+      inventorySchema.movementId &&
+      inventorySchema.movementType &&
+      inventorySchema.movementQty &&
+      canJoinMovementItem &&
+      inventorySchema.itemCode &&
+      inventorySchema.itemName,
+    query: () =>
+      runReviewDbQuery<ReviewDbInventoryMovementRow>(
+        `
+        SELECT
+          ism.id AS movementId,
+          ism.movement_type AS movementType,
+          ${inventorySchema.movementReferenceNo ? 'ism.reference_no' : 'NULL'} AS referenceNo,
+          ism.qty,
+          ${inventorySchema.movementUnitPrice ? 'ism.unit_price' : '0'} AS unitPrice,
+          ${inventorySchema.movementAt ? 'ism.movement_at' : 'CURRENT_TIMESTAMP'} AS movementAt,
+          ii.item_name AS itemName,
+          ii.item_code AS itemCode,
+          ${inventorySchema.movementNotes ? 'ism.notes' : 'NULL'} AS notes
+        FROM inventory_stock_movements ism
+        JOIN inventory_items ii
+          ON ii.id = ism.item_id
+        ${movementPeriodWhere}
+        ORDER BY ${inventorySchema.movementAt ? 'ism.movement_at DESC,' : ''} ism.id DESC
+        LIMIT 5
+      `,
+        movementValues,
+      ),
+  })
+  const movements = movementsResult.rows
 
-  const odps = await runReviewDbQuery<ReviewDbInventoryOdpRow>(`
-    SELECT
-      id AS odpId,
-      code AS odpCode,
-      name AS odpName,
-      total_ports AS totalPorts,
-      active_ports AS activePorts,
-      location_text AS locationText,
-      latitude,
-      longitude
-    FROM network_odp
-    ORDER BY updated_at DESC, id DESC
-    LIMIT 5
-  `)
+  const odpsResult = await runSafeDomainSectionQuery<ReviewDbInventoryOdpRow>({
+    sectionLabel: 'inventory-odps',
+    enabled:
+      inventorySchema.odpId &&
+      inventorySchema.odpCode &&
+      inventorySchema.odpName &&
+      inventorySchema.odpTotalPorts &&
+      inventorySchema.odpActivePorts,
+    query: () =>
+      runReviewDbQuery<ReviewDbInventoryOdpRow>(`
+        SELECT
+          id AS odpId,
+          code AS odpCode,
+          name AS odpName,
+          total_ports AS totalPorts,
+          active_ports AS activePorts,
+          ${inventorySchema.odpLocationText ? 'location_text' : 'NULL'} AS locationText,
+          ${inventorySchema.odpLatitude ? 'latitude' : 'NULL'} AS latitude,
+          ${inventorySchema.odpLongitude ? 'longitude' : 'NULL'} AS longitude
+        FROM network_odp
+        ORDER BY ${inventorySchema.odpUpdatedAt ? 'updated_at DESC,' : ''} id DESC
+        LIMIT 5
+      `),
+  })
+  const odps = odpsResult.rows
 
-  const usedPorts = await runReviewDbQuery<ReviewDbInventoryOdpPortRow>(`
-    SELECT
-      nop.id AS portId,
-      no.code AS odpCode,
-      nop.port_no AS portNo,
-      nop.port_status AS portStatus,
-      ss.service_no AS serviceNo,
-      c.customer_code AS customerCode,
-      nop.installed_at AS installedAt
-    FROM network_odp_ports nop
-    JOIN network_odp no
-      ON no.id = nop.odp_id
-    LEFT JOIN service_subscriptions ss
-      ON ss.id = nop.subscription_id
-    LEFT JOIN crm_customers c
-      ON c.id = nop.customer_id
-    WHERE nop.port_status = 'USED'
-    ORDER BY COALESCE(nop.installed_at, nop.created_at) DESC, nop.id DESC
-    LIMIT 5
-  `)
+  const portServiceExpression = canJoinPortSubscription && inventorySchema.subscriptionServiceNo ? 'ss.service_no' : 'NULL'
+  const portCustomerCodeExpression = canJoinPortCustomer && inventorySchema.customerCode ? 'c.customer_code' : 'NULL'
+  const portInstalledExpression = inventorySchema.odpPortInstalledAt
+    ? 'nop.installed_at'
+    : inventorySchema.odpPortCreatedAt
+      ? 'nop.created_at'
+      : 'NULL'
+  const portOrderByExpression = inventorySchema.odpPortInstalledAt && inventorySchema.odpPortCreatedAt
+    ? 'COALESCE(nop.installed_at, nop.created_at) DESC, nop.id DESC'
+    : inventorySchema.odpPortInstalledAt
+      ? 'nop.installed_at DESC, nop.id DESC'
+      : inventorySchema.odpPortCreatedAt
+        ? 'nop.created_at DESC, nop.id DESC'
+        : inventorySchema.odpPortUpdatedAt
+          ? 'nop.updated_at DESC, nop.id DESC'
+          : 'nop.id DESC'
 
-  const assignments = await runReviewDbQuery<ReviewDbInventoryDeviceAssignmentRow>(`
-    SELECT
-      sda.id AS assignmentId,
-      ii.item_code AS itemCode,
-      ii.item_name AS itemName,
-      ic.code AS categoryCode,
-      sda.assignment_status AS assignmentStatus,
-      sda.assigned_at AS assignedAt,
-      ss.service_no AS serviceNo,
-      swo.work_order_no AS workOrderNo,
-      c.full_name AS customerName,
-      sda.serial_number AS serialNumber
-    FROM service_device_assignments sda
-    JOIN inventory_items ii
-      ON ii.id = sda.inventory_item_id
-    LEFT JOIN inventory_categories ic
-      ON ic.id = ii.category_id
-    LEFT JOIN service_subscriptions ss
-      ON ss.id = sda.subscription_id
-    LEFT JOIN service_work_orders swo
-      ON swo.id = sda.work_order_id
-    LEFT JOIN crm_customers c
-      ON c.id = sda.customer_id
-    ORDER BY sda.assigned_at DESC, sda.id DESC
-    LIMIT 5
-  `)
+  const usedPortsResult = await runSafeDomainSectionQuery<ReviewDbInventoryOdpPortRow>({
+    sectionLabel: 'inventory-used-ports',
+    enabled:
+      inventorySchema.odpPortId &&
+      inventorySchema.odpPortNo &&
+      inventorySchema.odpPortStatus &&
+      canJoinPortOdp &&
+      inventorySchema.odpCode,
+    query: () =>
+      runReviewDbQuery<ReviewDbInventoryOdpPortRow>(`
+        SELECT
+          nop.id AS portId,
+          no.code AS odpCode,
+          nop.port_no AS portNo,
+          nop.port_status AS portStatus,
+          ${portServiceExpression} AS serviceNo,
+          ${portCustomerCodeExpression} AS customerCode,
+          ${portInstalledExpression} AS installedAt
+        FROM network_odp_ports nop
+        JOIN network_odp no
+          ON no.id = nop.odp_id
+        ${
+          canJoinPortSubscription
+            ? `
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = nop.subscription_id`
+            : ''
+        }
+        ${
+          canJoinPortCustomer
+            ? `
+        LEFT JOIN crm_customers c
+          ON c.id = nop.customer_id`
+            : ''
+        }
+        WHERE nop.port_status = 'USED'
+        ORDER BY ${portOrderByExpression}
+        LIMIT 5
+      `),
+  })
+  const usedPorts = usedPortsResult.rows
 
-  const portIssues = await runReviewDbQuery<ReviewDbInventoryOdpPortRow>(`
-    SELECT
-      nop.id AS portId,
-      no.code AS odpCode,
-      nop.port_no AS portNo,
-      nop.port_status AS portStatus,
-      ss.service_no AS serviceNo,
-      c.customer_code AS customerCode,
-      nop.installed_at AS installedAt
-    FROM network_odp_ports nop
-    JOIN network_odp no
-      ON no.id = nop.odp_id
-    LEFT JOIN service_subscriptions ss
-      ON ss.id = nop.subscription_id
-    LEFT JOIN crm_customers c
-      ON c.id = nop.customer_id
-    WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
-    ORDER BY nop.updated_at DESC, nop.id DESC
-    LIMIT 5
-  `)
+  const assignmentServiceExpression =
+    canJoinAssignmentSubscription && inventorySchema.subscriptionServiceNo ? 'ss.service_no' : 'NULL'
+  const assignmentWorkOrderExpression =
+    canJoinAssignmentWorkOrder && inventorySchema.workOrderNo ? 'swo.work_order_no' : 'NULL'
+  const assignmentCustomerExpression =
+    canJoinAssignmentCustomer && inventorySchema.customerFullName ? 'c.full_name' : 'NULL'
 
-  const returns = await runReviewDbQuery<ReviewDbInventoryDeviceReturnRow>(`
-    SELECT
-      sda.id AS assignmentId,
-      ii.item_code AS itemCode,
-      ii.item_name AS itemName,
-      sda.assignment_status AS assignmentStatus,
-      sda.returned_at AS returnedAt,
-      ss.service_no AS serviceNo,
-      swo.work_order_no AS workOrderNo,
-      c.full_name AS customerName,
-      sda.serial_number AS serialNumber
-    FROM service_device_assignments sda
-    JOIN inventory_items ii
-      ON ii.id = sda.inventory_item_id
-    LEFT JOIN service_subscriptions ss
-      ON ss.id = sda.subscription_id
-    LEFT JOIN service_work_orders swo
-      ON swo.id = sda.work_order_id
-    LEFT JOIN crm_customers c
-      ON c.id = sda.customer_id
-    WHERE sda.assignment_status IN ('RETURNED', 'DAMAGED', 'LOST')
-      AND sda.returned_at IS NOT NULL
-    ORDER BY sda.returned_at DESC, sda.id DESC
-    LIMIT 5
-  `)
+  const assignmentsResult = await runSafeDomainSectionQuery<ReviewDbInventoryDeviceAssignmentRow>({
+    sectionLabel: 'inventory-device-assignments',
+    enabled:
+      inventorySchema.deviceAssignmentId &&
+      inventorySchema.deviceAssignmentStatus &&
+      canJoinAssignmentItem &&
+      inventorySchema.itemCode &&
+      inventorySchema.itemName &&
+      inventorySchema.deviceAssignmentAssignedAt,
+    query: () =>
+      runReviewDbQuery<ReviewDbInventoryDeviceAssignmentRow>(`
+        SELECT
+          sda.id AS assignmentId,
+          ii.item_code AS itemCode,
+          ii.item_name AS itemName,
+          ${canJoinItemCategory && inventorySchema.categoryCode ? 'ic.code' : 'NULL'} AS categoryCode,
+          sda.assignment_status AS assignmentStatus,
+          sda.assigned_at AS assignedAt,
+          ${assignmentServiceExpression} AS serviceNo,
+          ${assignmentWorkOrderExpression} AS workOrderNo,
+          ${assignmentCustomerExpression} AS customerName,
+          ${inventorySchema.deviceAssignmentSerialNumber ? 'sda.serial_number' : 'NULL'} AS serialNumber
+        FROM service_device_assignments sda
+        JOIN inventory_items ii
+          ON ii.id = sda.inventory_item_id
+        ${
+          canJoinItemCategory
+            ? `
+        LEFT JOIN inventory_categories ic
+          ON ic.id = ii.category_id`
+            : ''
+        }
+        ${
+          canJoinAssignmentSubscription
+            ? `
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = sda.subscription_id`
+            : ''
+        }
+        ${
+          canJoinAssignmentWorkOrder
+            ? `
+        LEFT JOIN service_work_orders swo
+          ON swo.id = sda.work_order_id`
+            : ''
+        }
+        ${
+          canJoinAssignmentCustomer
+            ? `
+        LEFT JOIN crm_customers c
+          ON c.id = sda.customer_id`
+            : ''
+        }
+        ORDER BY sda.assigned_at DESC, sda.id DESC
+        LIMIT 5
+      `),
+  })
+  const assignments = assignmentsResult.rows
+
+  const portIssuesResult = await runSafeDomainSectionQuery<ReviewDbInventoryOdpPortRow>({
+    sectionLabel: 'inventory-port-issues',
+    enabled:
+      inventorySchema.odpPortId &&
+      inventorySchema.odpPortNo &&
+      inventorySchema.odpPortStatus &&
+      canJoinPortOdp &&
+      inventorySchema.odpCode,
+    query: () =>
+      runReviewDbQuery<ReviewDbInventoryOdpPortRow>(`
+        SELECT
+          nop.id AS portId,
+          no.code AS odpCode,
+          nop.port_no AS portNo,
+          nop.port_status AS portStatus,
+          ${portServiceExpression} AS serviceNo,
+          ${portCustomerCodeExpression} AS customerCode,
+          ${portInstalledExpression} AS installedAt
+        FROM network_odp_ports nop
+        JOIN network_odp no
+          ON no.id = nop.odp_id
+        ${
+          canJoinPortSubscription
+            ? `
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = nop.subscription_id`
+            : ''
+        }
+        ${
+          canJoinPortCustomer
+            ? `
+        LEFT JOIN crm_customers c
+          ON c.id = nop.customer_id`
+            : ''
+        }
+        WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
+        ORDER BY ${inventorySchema.odpPortUpdatedAt ? 'nop.updated_at DESC,' : ''} nop.id DESC
+        LIMIT 5
+      `),
+  })
+  const portIssues = portIssuesResult.rows
+
+  const returnsResult = await runSafeDomainSectionQuery<ReviewDbInventoryDeviceReturnRow>({
+    sectionLabel: 'inventory-device-returns',
+    enabled:
+      inventorySchema.deviceAssignmentId &&
+      inventorySchema.deviceAssignmentStatus &&
+      canJoinAssignmentItem &&
+      inventorySchema.itemCode &&
+      inventorySchema.itemName &&
+      inventorySchema.deviceAssignmentReturnedAt,
+    query: () =>
+      runReviewDbQuery<ReviewDbInventoryDeviceReturnRow>(`
+        SELECT
+          sda.id AS assignmentId,
+          ii.item_code AS itemCode,
+          ii.item_name AS itemName,
+          sda.assignment_status AS assignmentStatus,
+          sda.returned_at AS returnedAt,
+          ${assignmentServiceExpression} AS serviceNo,
+          ${assignmentWorkOrderExpression} AS workOrderNo,
+          ${assignmentCustomerExpression} AS customerName,
+          ${inventorySchema.deviceAssignmentSerialNumber ? 'sda.serial_number' : 'NULL'} AS serialNumber
+        FROM service_device_assignments sda
+        JOIN inventory_items ii
+          ON ii.id = sda.inventory_item_id
+        ${
+          canJoinAssignmentSubscription
+            ? `
+        LEFT JOIN service_subscriptions ss
+          ON ss.id = sda.subscription_id`
+            : ''
+        }
+        ${
+          canJoinAssignmentWorkOrder
+            ? `
+        LEFT JOIN service_work_orders swo
+          ON swo.id = sda.work_order_id`
+            : ''
+        }
+        ${
+          canJoinAssignmentCustomer
+            ? `
+        LEFT JOIN crm_customers c
+          ON c.id = sda.customer_id`
+            : ''
+        }
+        WHERE sda.assignment_status IN ('RETURNED', 'DAMAGED', 'LOST')
+          AND sda.returned_at IS NOT NULL
+        ORDER BY sda.returned_at DESC, sda.id DESC
+        LIMIT 5
+      `),
+  })
+  const returns = returnsResult.rows
 
   const requestValues: unknown[] = []
   const requestWhereParts: string[] = []
   if (focus === 'PENDING_REQUESTS') {
-    requestWhereParts.push(`UPPER(TRIM(iir.request_status)) = 'PENDING'`)
+    requestWhereParts.push(inventorySchema.requestStatus ? `UPPER(TRIM(iir.request_status)) = 'PENDING'` : '1 = 0')
   }
-  if (period) {
+  if (period && inventorySchema.requestRequestedAt) {
     requestWhereParts.push(`iir.requested_at >= ? AND iir.requested_at < ?`)
     requestValues.push(period.startDate, period.endDate)
   }
   const requestWhere = requestWhereParts.length ? ` WHERE ${requestWhereParts.join(' AND ')} ` : ''
 
-  const requests = await runReviewDbQuery<ReviewDbInventoryRequestRow>(
-    `
-    SELECT
-      iir.id AS requestId,
-      iir.request_code AS requestCode,
-      iir.request_qty AS requestQty,
-      iir.request_status AS requestStatus,
-      iir.requested_division AS requestedDivision,
-      iir.requested_subdivision AS requestedSubdivision,
-      iir.requested_for AS requestedFor,
-      iir.request_notes AS requestNotes,
-      iir.pending_reason AS pendingReason,
-      iir.requested_by AS requestedBy,
-      iir.processed_by AS processedBy,
-      iir.requested_at AS requestedAt,
-      iir.processed_at AS processedAt,
-      ii.item_code AS itemCode,
-      ii.item_name AS itemName,
-      ii.current_stock AS currentStock
-    FROM inventory_item_requests iir
-    JOIN inventory_items ii
-      ON ii.id = iir.inventory_item_id
-    ${requestWhere}
-    ORDER BY iir.requested_at DESC, iir.id DESC
-    LIMIT 5
-  `,
-    requestValues,
-  )
+  const requestsResult = await runSafeDomainSectionQuery<ReviewDbInventoryRequestRow>({
+    sectionLabel: 'inventory-requests',
+    enabled:
+      inventorySchema.requestId &&
+      inventorySchema.requestCode &&
+      inventorySchema.requestQty &&
+      inventorySchema.requestStatus &&
+      inventorySchema.requestRequestedBy &&
+      canJoinRequestItem &&
+      inventorySchema.itemCode &&
+      inventorySchema.itemName,
+    query: () =>
+      runReviewDbQuery<ReviewDbInventoryRequestRow>(
+        `
+        SELECT
+          iir.id AS requestId,
+          iir.request_code AS requestCode,
+          iir.request_qty AS requestQty,
+          iir.request_status AS requestStatus,
+          ${inventorySchema.requestRequestedDivision ? 'iir.requested_division' : 'NULL'} AS requestedDivision,
+          ${inventorySchema.requestRequestedSubdivision ? 'iir.requested_subdivision' : 'NULL'} AS requestedSubdivision,
+          ${inventorySchema.requestRequestedFor ? 'iir.requested_for' : 'NULL'} AS requestedFor,
+          ${inventorySchema.requestNotes ? 'iir.request_notes' : 'NULL'} AS requestNotes,
+          ${inventorySchema.requestPendingReason ? 'iir.pending_reason' : 'NULL'} AS pendingReason,
+          iir.requested_by AS requestedBy,
+          ${inventorySchema.requestProcessedBy ? 'iir.processed_by' : 'NULL'} AS processedBy,
+          ${inventorySchema.requestRequestedAt ? 'iir.requested_at' : 'CURRENT_TIMESTAMP'} AS requestedAt,
+          ${inventorySchema.requestProcessedAt ? 'iir.processed_at' : 'NULL'} AS processedAt,
+          ii.item_code AS itemCode,
+          ii.item_name AS itemName,
+          ${inventorySchema.itemCurrentStock ? 'ii.current_stock' : '0'} AS currentStock
+        FROM inventory_item_requests iir
+        JOIN inventory_items ii
+          ON ii.id = iir.inventory_item_id
+        ${requestWhere}
+        ORDER BY ${inventorySchema.requestRequestedAt ? 'iir.requested_at DESC,' : ''} iir.id DESC
+        LIMIT 5
+      `,
+        requestValues,
+      ),
+  })
+  const requests = requestsResult.rows
 
-  const loans = await runReviewDbQuery<ReviewDbInventoryLoanRow>(`
-    SELECT
-      iil.id AS loanId,
-      iil.loan_code AS loanCode,
-      iil.loan_qty AS loanQty,
-      iil.returned_qty AS returnedQty,
-      iil.loan_status AS loanStatus,
-      iil.borrower_name AS borrowerName,
-      iil.borrower_division AS borrowerDivision,
-      iil.borrower_subdivision AS borrowerSubdivision,
-      iil.loan_notes AS loanNotes,
-      iil.return_notes AS returnNotes,
-      iil.borrowed_at AS borrowedAt,
-      iil.due_at AS dueAt,
-      iil.returned_at AS returnedAt,
-      ii.item_code AS itemCode,
-      ii.item_name AS itemName
-    FROM inventory_item_loans iil
-    JOIN inventory_items ii
-      ON ii.id = iil.inventory_item_id
-    ORDER BY iil.borrowed_at DESC, iil.id DESC
-    LIMIT 5
-  `)
+  const loansResult = await runSafeDomainSectionQuery<ReviewDbInventoryLoanRow>({
+    sectionLabel: 'inventory-loans',
+    enabled:
+      inventorySchema.loanId &&
+      inventorySchema.loanCode &&
+      inventorySchema.loanQty &&
+      inventorySchema.loanReturnedQty &&
+      inventorySchema.loanStatus &&
+      inventorySchema.loanBorrowerName &&
+      canJoinLoanItem &&
+      inventorySchema.itemCode &&
+      inventorySchema.itemName,
+    query: () =>
+      runReviewDbQuery<ReviewDbInventoryLoanRow>(`
+        SELECT
+          iil.id AS loanId,
+          iil.loan_code AS loanCode,
+          iil.loan_qty AS loanQty,
+          iil.returned_qty AS returnedQty,
+          iil.loan_status AS loanStatus,
+          iil.borrower_name AS borrowerName,
+          ${inventorySchema.loanBorrowerDivision ? 'iil.borrower_division' : 'NULL'} AS borrowerDivision,
+          ${inventorySchema.loanBorrowerSubdivision ? 'iil.borrower_subdivision' : 'NULL'} AS borrowerSubdivision,
+          ${inventorySchema.loanNotes ? 'iil.loan_notes' : 'NULL'} AS loanNotes,
+          ${inventorySchema.loanReturnNotes ? 'iil.return_notes' : 'NULL'} AS returnNotes,
+          ${inventorySchema.loanBorrowedAt ? 'iil.borrowed_at' : 'CURRENT_TIMESTAMP'} AS borrowedAt,
+          ${inventorySchema.loanDueAt ? 'iil.due_at' : 'NULL'} AS dueAt,
+          ${inventorySchema.loanReturnedAt ? 'iil.returned_at' : 'NULL'} AS returnedAt,
+          ii.item_code AS itemCode,
+          ii.item_name AS itemName
+        FROM inventory_item_loans iil
+        JOIN inventory_items ii
+          ON ii.id = iil.inventory_item_id
+        ORDER BY ${inventorySchema.loanBorrowedAt ? 'iil.borrowed_at DESC,' : ''} iil.id DESC
+        LIMIT 5
+      `),
+  })
+  const loans = loansResult.rows
 
   return [
     {

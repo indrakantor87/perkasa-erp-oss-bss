@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { SupportFormContextNote } from '@/components/support-form-context-note'
 
 type SupportDismantleReopenFormProps = {
   canProcess: boolean
@@ -88,7 +89,7 @@ export function SupportDismantleReopenForm({
 
   return (
     <section className="panel p-6">
-      <p className="section-title">Reopen Dismantle</p>
+      <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Buka kembali histori ke queue aktif
       </h3>
@@ -99,6 +100,22 @@ export function SupportDismantleReopenForm({
             ? 'Mode review database belum aktif, jadi reopen dismantle dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini mengembalikan histori dismantle ke queue aktif bila kasus perlu dibuka kembali tanpa membuat isolir baru dari nol.'}
       </p>
+      <SupportFormContextNote
+        items={[
+          {
+            label: 'Tujuan',
+            value: 'Membuka kembali kasus yang ternyata belum layak dianggap selesai permanen.',
+          },
+          {
+            label: 'Sumber',
+            value: 'Pilihan hanya berasal dari histori dismantle yang sudah pernah ditutup sebelumnya.',
+          },
+          {
+            label: 'Hasil',
+            value: 'Kasus kembali ke queue aktif untuk ditinjau ulang tanpa membuat record isolir baru dari awal.',
+          },
+        ]}
+      />
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
         <label className="flex flex-col gap-2 text-sm text-slate-700">

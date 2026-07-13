@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 type ReviewSalesOrderRow = {
   id: number
@@ -101,6 +101,335 @@ async function generateCustomerCode(customerType: string) {
   return `${prefix}-${padSequence(Number.isFinite(lastSequence) ? lastSequence + 1 : 1, 5)}`
 }
 
+async function getSalesOrderQueryParts() {
+  const [
+    hasSalesOrderId,
+    hasSalesOrderOrderNo,
+    hasSalesOrderStatus,
+    hasSalesOrderCustomerId,
+    hasSalesOrderPackageId,
+    hasSalesOrderLeadId,
+    hasSalesLeadId,
+    hasSalesLeadCustomerName,
+    hasSalesLeadLeadType,
+    hasSalesLeadPhone,
+    hasSalesLeadAddress,
+    hasCustomerId,
+    hasCustomerFullName,
+  ] = await Promise.all([
+    hasReviewDbColumn('sales_orders', 'id'),
+    hasReviewDbColumn('sales_orders', 'order_no'),
+    hasReviewDbColumn('sales_orders', 'status'),
+    hasReviewDbColumn('sales_orders', 'customer_id'),
+    hasReviewDbColumn('sales_orders', 'package_id'),
+    hasReviewDbColumn('sales_orders', 'lead_id'),
+    hasReviewDbColumn('sales_leads', 'id'),
+    hasReviewDbColumn('sales_leads', 'customer_name'),
+    hasReviewDbColumn('sales_leads', 'lead_type'),
+    hasReviewDbColumn('sales_leads', 'phone'),
+    hasReviewDbColumn('sales_leads', 'address'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+  ])
+
+  if (!hasSalesOrderId || !hasSalesOrderOrderNo || !hasSalesOrderStatus) {
+    throw new Error('Schema inti sales_orders belum siap. Kolom id, order_no, dan status wajib tersedia.')
+  }
+
+  const canJoinSalesLead = hasSalesOrderLeadId && hasSalesLeadId
+  const canJoinCustomer = hasSalesOrderCustomerId && hasCustomerId
+
+  return {
+    customerIdExpression: hasSalesOrderCustomerId ? 'so.customer_id' : 'NULL',
+    packageIdExpression: hasSalesOrderPackageId ? 'so.package_id' : 'NULL',
+    salesLeadJoin: canJoinSalesLead
+      ? `
+        LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id`
+      : '',
+    customerJoin: canJoinCustomer
+      ? `
+        LEFT JOIN crm_customers c
+          ON c.id = so.customer_id`
+      : '',
+    customerNameExpression: canJoinSalesLead && hasSalesLeadCustomerName
+      ? `COALESCE(sl.customer_name, ${canJoinCustomer && hasCustomerFullName ? 'c.full_name' : "'Customer belum terpetakan'"})`
+      : canJoinCustomer && hasCustomerFullName
+        ? `COALESCE(c.full_name, 'Customer belum terpetakan')`
+        : `'Customer belum terpetakan'`,
+    leadTypeExpression: canJoinSalesLead && hasSalesLeadLeadType ? 'sl.lead_type' : 'NULL',
+    phoneExpression: canJoinSalesLead && hasSalesLeadPhone ? 'sl.phone' : 'NULL',
+    addressExpression: canJoinSalesLead && hasSalesLeadAddress ? 'sl.address' : 'NULL',
+  }
+}
+
+async function getSalesPackageQueryParts() {
+  const [hasStatus, hasServiceType, hasSpeedLabel, hasPrice] = await Promise.all([
+    hasReviewDbColumn('sales_packages', 'status'),
+    hasReviewDbColumn('sales_packages', 'service_type'),
+    hasReviewDbColumn('sales_packages', 'speed_label'),
+    hasReviewDbColumn('sales_packages', 'price'),
+  ])
+
+  return {
+    statusFilter: hasStatus ? "status = 'ACTIVE' AND" : '',
+    serviceTypeExpression: hasServiceType ? 'service_type' : 'NULL',
+    speedLabelExpression: hasSpeedLabel ? 'speed_label' : 'NULL',
+    priceExpression: hasPrice ? 'price' : '0',
+  }
+}
+
+async function buildCustomerInsertPayload(params: {
+  customerCode: string
+  customerType: string
+  customerName: string
+  phone: string | null
+}) {
+  const [hasCustomerCode, hasCustomerType, hasFullName, hasIdentityNo, hasPhone, hasEmail, hasBranchId] =
+    await Promise.all([
+      hasReviewDbColumn('crm_customers', 'customer_code'),
+      hasReviewDbColumn('crm_customers', 'customer_type'),
+      hasReviewDbColumn('crm_customers', 'full_name'),
+      hasReviewDbColumn('crm_customers', 'identity_no'),
+      hasReviewDbColumn('crm_customers', 'phone'),
+      hasReviewDbColumn('crm_customers', 'email'),
+      hasReviewDbColumn('crm_customers', 'branch_id'),
+    ])
+
+  if (!hasCustomerCode || !hasCustomerType || !hasFullName) {
+    throw new Error('Schema inti crm_customers belum siap. Kolom customer_code, customer_type, dan full_name wajib tersedia.')
+  }
+
+  const columns = ['customer_code', 'customer_type', 'full_name']
+  const values: unknown[] = [params.customerCode, params.customerType, params.customerName]
+
+  if (hasIdentityNo) {
+    columns.push('identity_no')
+    values.push(null)
+  }
+  if (hasPhone) {
+    columns.push('phone')
+    values.push(params.phone)
+  }
+  if (hasEmail) {
+    columns.push('email')
+    values.push(null)
+  }
+  if (hasBranchId) {
+    columns.push('branch_id')
+    values.push(null)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
+}
+
+async function buildCustomerAddressInsertPayload(params: {
+  customerId: number
+  label: string
+  address: string
+  mapsUrl: string | null
+}) {
+  const [hasCustomerId, hasLabel, hasAddress, hasMapsUrl, hasIsPrimary] = await Promise.all([
+    hasReviewDbColumn('crm_customer_addresses', 'customer_id'),
+    hasReviewDbColumn('crm_customer_addresses', 'label'),
+    hasReviewDbColumn('crm_customer_addresses', 'address'),
+    hasReviewDbColumn('crm_customer_addresses', 'maps_url'),
+    hasReviewDbColumn('crm_customer_addresses', 'is_primary'),
+  ])
+
+  if (!hasCustomerId || !hasAddress) {
+    return null
+  }
+
+  const columns = ['customer_id', 'address']
+  const values: unknown[] = [params.customerId, params.address]
+
+  if (hasLabel) {
+    columns.push('label')
+    values.push(params.label)
+  }
+  if (hasMapsUrl) {
+    columns.push('maps_url')
+    values.push(params.mapsUrl)
+  }
+  if (hasIsPrimary) {
+    columns.push('is_primary')
+    values.push(1)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
+}
+
+async function buildSubscriptionInsertPayload(params: {
+  customerId: number
+  orderId: number
+  packageId: number
+  serviceNo: string
+  activatedAt: Date
+  monthlyPrice: number
+}) {
+  const [hasCustomerId, hasOrderId, hasPackageId, hasServiceNo, hasStatus, hasActivatedAt, hasTerminatedAt, hasMonthlyPrice] =
+    await Promise.all([
+      hasReviewDbColumn('service_subscriptions', 'customer_id'),
+      hasReviewDbColumn('service_subscriptions', 'order_id'),
+      hasReviewDbColumn('service_subscriptions', 'package_id'),
+      hasReviewDbColumn('service_subscriptions', 'service_no'),
+      hasReviewDbColumn('service_subscriptions', 'status'),
+      hasReviewDbColumn('service_subscriptions', 'activated_at'),
+      hasReviewDbColumn('service_subscriptions', 'terminated_at'),
+      hasReviewDbColumn('service_subscriptions', 'monthly_price'),
+    ])
+
+  if (!hasCustomerId || !hasOrderId || !hasServiceNo || !hasStatus) {
+    throw new Error('Schema inti service_subscriptions belum siap. Kolom customer_id, order_id, service_no, dan status wajib tersedia.')
+  }
+
+  const columns = ['customer_id', 'order_id', 'service_no', 'status']
+  const values: unknown[] = [params.customerId, params.orderId, params.serviceNo, 'ACTIVE']
+
+  if (hasPackageId) {
+    columns.push('package_id')
+    values.push(params.packageId)
+  }
+  if (hasActivatedAt) {
+    columns.push('activated_at')
+    values.push(params.activatedAt)
+  }
+  if (hasTerminatedAt) {
+    columns.push('terminated_at')
+    values.push(null)
+  }
+  if (hasMonthlyPrice) {
+    columns.push('monthly_price')
+    values.push(params.monthlyPrice)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
+}
+
+async function buildSalesOrderUpdatePayload(params: {
+  customerId: number
+  packageId: number
+}) {
+  const [hasCustomerId, hasPackageId, hasStatus, hasUpdatedAt] = await Promise.all([
+    hasReviewDbColumn('sales_orders', 'customer_id'),
+    hasReviewDbColumn('sales_orders', 'package_id'),
+    hasReviewDbColumn('sales_orders', 'status'),
+    hasReviewDbColumn('sales_orders', 'updated_at'),
+  ])
+
+  if (!hasStatus) {
+    throw new Error('Schema inti sales_orders belum siap. Kolom status wajib tersedia.')
+  }
+
+  const assignments = [`status = 'COMPLETED'`]
+  const values: unknown[] = []
+
+  if (hasCustomerId) {
+    assignments.push('customer_id = ?')
+    values.push(params.customerId)
+  }
+  if (hasPackageId) {
+    assignments.push('package_id = ?')
+    values.push(params.packageId)
+  }
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  return {
+    assignments,
+    values,
+  }
+}
+
+async function getWorkOrderQueryParts() {
+  const [
+    hasSalesOrderId,
+    hasWorkType,
+    hasWorkOrderNo,
+    hasStatus,
+    hasScheduledAt,
+    hasCreatedAt,
+  ] = await Promise.all([
+    hasReviewDbColumn('service_work_orders', 'sales_order_id'),
+    hasReviewDbColumn('service_work_orders', 'work_type'),
+    hasReviewDbColumn('service_work_orders', 'work_order_no'),
+    hasReviewDbColumn('service_work_orders', 'status'),
+    hasReviewDbColumn('service_work_orders', 'scheduled_at'),
+    hasReviewDbColumn('service_work_orders', 'created_at'),
+  ])
+
+  if (!hasSalesOrderId) {
+    return null
+  }
+
+  return {
+    workTypeFilter: hasWorkType ? `AND work_type = 'INSTALLATION'` : '',
+    workOrderNoExpression: hasWorkOrderNo ? 'work_order_no' : `CONCAT('WO-', id)`,
+    statusExpression: hasStatus ? 'status' : `'OPEN'`,
+    orderByExpression: hasScheduledAt && hasCreatedAt ? 'COALESCE(scheduled_at, created_at) DESC, id DESC' : 'id DESC',
+  }
+}
+
+async function buildWorkOrderUpdatePayload(params: {
+  subscriptionId: number
+  completedAt: Date
+  note: string
+}) {
+  const [hasSubscriptionId, hasStatus, hasCompletedAt, hasNotes, hasUpdatedAt] = await Promise.all([
+    hasReviewDbColumn('service_work_orders', 'subscription_id'),
+    hasReviewDbColumn('service_work_orders', 'status'),
+    hasReviewDbColumn('service_work_orders', 'completed_at'),
+    hasReviewDbColumn('service_work_orders', 'notes'),
+    hasReviewDbColumn('service_work_orders', 'updated_at'),
+  ])
+
+  const assignments: string[] = []
+  const values: unknown[] = []
+
+  if (hasSubscriptionId) {
+    assignments.push('subscription_id = ?')
+    values.push(params.subscriptionId)
+  }
+  if (hasStatus) {
+    assignments.push(`status = 'COMPLETED'`)
+  }
+  if (hasCompletedAt) {
+    assignments.push('completed_at = ?')
+    values.push(params.completedAt)
+  }
+  if (hasNotes) {
+    assignments.push(`notes = CASE
+              WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
+              ELSE CONCAT(notes, '\n', ?)
+            END`)
+    values.push(params.note, params.note)
+  }
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  return assignments.length
+    ? {
+        assignments,
+        values,
+      }
+    : null
+}
+
 export async function GET() {
   const session = await getSession()
   if (!session) {
@@ -186,23 +515,22 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Kode atau nama paket wajib diisi.' }, { status: 400 })
     }
 
+    const salesOrderQueryParts = await getSalesOrderQueryParts()
     const [salesOrder] = await runReviewDbQuery<ReviewSalesOrderRow>(
       `
         SELECT
           so.id,
           so.order_no AS orderNo,
           so.status AS orderStatus,
-          so.customer_id AS customerId,
-          so.package_id AS packageId,
-          COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName,
-          sl.lead_type AS leadType,
-          sl.phone,
-          sl.address
+          ${salesOrderQueryParts.customerIdExpression} AS customerId,
+          ${salesOrderQueryParts.packageIdExpression} AS packageId,
+          ${salesOrderQueryParts.customerNameExpression} AS customerName,
+          ${salesOrderQueryParts.leadTypeExpression} AS leadType,
+          ${salesOrderQueryParts.phoneExpression} AS phone,
+          ${salesOrderQueryParts.addressExpression} AS address
         FROM sales_orders so
-        LEFT JOIN sales_leads sl
-          ON sl.id = so.lead_id
-        LEFT JOIN crm_customers c
-          ON c.id = so.customer_id
+        ${salesOrderQueryParts.salesLeadJoin}
+        ${salesOrderQueryParts.customerJoin}
         WHERE so.id = ?
         LIMIT 1
       `,
@@ -212,17 +540,20 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Sales order sumber tidak ditemukan di review DB.' }, { status: 404 })
     }
 
-    const existingSubscriptions = await runReviewDbQuery<ReviewSubscriptionRow>(
-      `
-        SELECT
-          id,
-          service_no AS serviceNo
-        FROM service_subscriptions
-        WHERE order_id = ?
-        LIMIT 1
-      `,
-      [salesOrder.id],
-    )
+    const hasSubscriptionOrderId = await hasReviewDbColumn('service_subscriptions', 'order_id')
+    const existingSubscriptions = hasSubscriptionOrderId
+      ? await runReviewDbQuery<ReviewSubscriptionRow>(
+          `
+            SELECT
+              id,
+              service_no AS serviceNo
+            FROM service_subscriptions
+            WHERE order_id = ?
+            LIMIT 1
+          `,
+          [salesOrder.id],
+        )
+      : []
     if (existingSubscriptions.length > 0) {
       return Response.json(
         { message: `Sales order ini sudah memiliki subscription ${existingSubscriptions[0]?.serviceNo}.` },
@@ -230,17 +561,18 @@ export async function POST(request: Request) {
       )
     }
 
+    const salesPackageQueryParts = await getSalesPackageQueryParts()
     const packages = await runReviewDbQuery<ReviewPackageRow>(
       `
         SELECT
           id,
           code,
           name,
-          service_type AS serviceType,
-          speed_label AS speedLabel,
-          price
+          ${salesPackageQueryParts.serviceTypeExpression} AS serviceType,
+          ${salesPackageQueryParts.speedLabelExpression} AS speedLabel,
+          ${salesPackageQueryParts.priceExpression} AS price
         FROM sales_packages
-        WHERE status = 'ACTIVE'
+        WHERE ${salesPackageQueryParts.statusFilter}
           AND (
             UPPER(code) = UPPER(?)
             OR UPPER(name) = UPPER(?)
@@ -272,20 +604,20 @@ export async function POST(request: Request) {
       }
 
       const customerCode = await generateCustomerCode(customerType)
+      const customerInsertPayload = await buildCustomerInsertPayload({
+        customerCode,
+        customerType,
+        customerName: salesOrder.customerName,
+        phone: salesOrder.phone || null,
+      })
       const customerInsert = await runReviewDbExecute<InsertResult>(
         `
           INSERT INTO crm_customers (
-            customer_code,
-            customer_type,
-            full_name,
-            identity_no,
-            phone,
-            email,
-            branch_id
+            ${customerInsertPayload.columns.join(',\n            ')}
           )
-          VALUES (?, ?, ?, NULL, ?, NULL, NULL)
+          VALUES (${customerInsertPayload.placeholders.join(', ')})
         `,
-        [customerCode, customerType, salesOrder.customerName, salesOrder.phone || null],
+        customerInsertPayload.values,
       )
 
       customerId = Number(customerInsert.insertId ?? 0)
@@ -293,40 +625,46 @@ export async function POST(request: Request) {
         return Response.json({ message: 'Customer master gagal dibuat saat aktivasi subscription.' }, { status: 500 })
       }
 
-      await runReviewDbExecute<InsertResult>(
-        `
-          INSERT INTO crm_customer_addresses (
-            customer_id,
-            label,
-            address,
-            maps_url,
-            is_primary
-          )
-          VALUES (?, ?, ?, ?, 1)
-        `,
-        [customerId, addressLabel || 'Alamat Instalasi', customerAddress, mapsUrl || null],
-      )
+      const customerAddressInsertPayload = await buildCustomerAddressInsertPayload({
+        customerId,
+        label: addressLabel || 'Alamat Instalasi',
+        address: customerAddress,
+        mapsUrl: mapsUrl || null,
+      })
+
+      if (customerAddressInsertPayload) {
+        await runReviewDbExecute<InsertResult>(
+          `
+            INSERT INTO crm_customer_addresses (
+              ${customerAddressInsertPayload.columns.join(',\n              ')}
+            )
+            VALUES (${customerAddressInsertPayload.placeholders.join(', ')})
+          `,
+          customerAddressInsertPayload.values,
+        )
+      }
     }
 
     const serviceNo = await generateServiceNo()
     const subscriptionMonthlyPrice =
       monthlyPriceValue !== null ? monthlyPriceValue : Number(selectedPackage.price ?? 0)
 
+    const subscriptionInsertPayload = await buildSubscriptionInsertPayload({
+      customerId,
+      orderId: salesOrder.id,
+      packageId: selectedPackage.id,
+      serviceNo,
+      activatedAt,
+      monthlyPrice: subscriptionMonthlyPrice,
+    })
     const subscriptionInsert = await runReviewDbExecute<InsertResult>(
       `
         INSERT INTO service_subscriptions (
-          customer_id,
-          order_id,
-          package_id,
-          service_no,
-          status,
-          activated_at,
-          terminated_at,
-          monthly_price
+          ${subscriptionInsertPayload.columns.join(',\n          ')}
         )
-        VALUES (?, ?, ?, ?, 'ACTIVE', ?, NULL, ?)
+        VALUES (${subscriptionInsertPayload.placeholders.join(', ')})
       `,
-      [customerId, salesOrder.id, selectedPackage.id, serviceNo, activatedAt, subscriptionMonthlyPrice],
+      subscriptionInsertPayload.values,
     )
 
     const subscriptionId = Number(subscriptionInsert.insertId ?? 0)
@@ -334,54 +672,59 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Subscription gagal dibuat di review DB.' }, { status: 500 })
     }
 
+    const salesOrderUpdatePayload = await buildSalesOrderUpdatePayload({
+      customerId,
+      packageId: selectedPackage.id,
+    })
     await runReviewDbExecute<InsertResult>(
       `
         UPDATE sales_orders
         SET
-          customer_id = ?,
-          package_id = ?,
-          status = 'COMPLETED',
-          updated_at = CURRENT_TIMESTAMP
+          ${salesOrderUpdatePayload.assignments.join(',\n          ')}
         WHERE id = ?
       `,
-      [customerId, selectedPackage.id, salesOrder.id],
+      [...salesOrderUpdatePayload.values, salesOrder.id],
     )
 
-    const [workOrder] = await runReviewDbQuery<ReviewWorkOrderRow>(
-      `
-        SELECT
-          id,
-          work_order_no AS workOrderNo,
-          status
-        FROM service_work_orders
-        WHERE sales_order_id = ?
-          AND work_type = 'INSTALLATION'
-        ORDER BY COALESCE(scheduled_at, created_at) DESC, id DESC
-        LIMIT 1
-      `,
-      [salesOrder.id],
-    )
+    const workOrderQueryParts = await getWorkOrderQueryParts()
+    const [workOrder] = workOrderQueryParts
+      ? await runReviewDbQuery<ReviewWorkOrderRow>(
+          `
+            SELECT
+              id,
+              ${workOrderQueryParts.workOrderNoExpression} AS workOrderNo,
+              ${workOrderQueryParts.statusExpression} AS status
+            FROM service_work_orders
+            WHERE sales_order_id = ?
+              ${workOrderQueryParts.workTypeFilter}
+            ORDER BY ${workOrderQueryParts.orderByExpression}
+            LIMIT 1
+          `,
+          [salesOrder.id],
+        )
+      : [null]
 
     if (workOrder) {
       const appendedNote = `[Activation] ${session.displayName} (${session.username})${
         notesRaw ? ` - ${notesRaw}` : ''
       }`
-      await runReviewDbExecute<InsertResult>(
-        `
-          UPDATE service_work_orders
-          SET
-            subscription_id = ?,
-            status = 'COMPLETED',
-            completed_at = ?,
-            notes = CASE
-              WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
-              ELSE CONCAT(notes, '\n', ?)
-            END,
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `,
-        [subscriptionId, activatedAt, appendedNote, appendedNote, workOrder.id],
-      )
+      const workOrderUpdatePayload = await buildWorkOrderUpdatePayload({
+        subscriptionId,
+        completedAt: activatedAt,
+        note: appendedNote,
+      })
+
+      if (workOrderUpdatePayload) {
+        await runReviewDbExecute<InsertResult>(
+          `
+            UPDATE service_work_orders
+            SET
+              ${workOrderUpdatePayload.assignments.join(',\n              ')}
+            WHERE id = ?
+          `,
+          [...workOrderUpdatePayload.values, workOrder.id],
+        )
+      }
     }
 
     return Response.json({

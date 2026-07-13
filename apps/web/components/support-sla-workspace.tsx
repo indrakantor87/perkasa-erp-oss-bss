@@ -1,11 +1,16 @@
 'use client'
 
 import Link from 'next/link'
+import { SupportActionPanelContainer } from '@/components/support-action-panel-container'
+import { SupportActionPanelIntro } from '@/components/support-action-panel-intro'
+import { SupportActionPanelSlot } from '@/components/support-action-panel-slot'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { SupportSlaForm } from '@/components/support-sla-form'
 import { SupportSlaQueuePanel } from '@/components/support-sla-queue-panel'
-import { getSupportActionAnchorId } from '@/lib/support-action-links'
-import { canUseSupportAction } from '@/lib/support-lanes'
+import { SupportWorkspaceHelperNote } from '@/components/support-workspace-helper-note'
+import { canAccessPath } from '@/lib/access-control'
+import { buildSupportLaneActionHref, buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
+import { canAccessSupportLane, canUseSupportAction } from '@/lib/support-lanes'
 import type {
   AppRole,
   DataSourceSnapshot,
@@ -44,6 +49,14 @@ export function SupportSlaWorkspace({
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
   const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
+  const canOpenTicketLane = canAccessSupportLane(role, 'tt')
+  const canOpenSupervisorWorkspace = canAccessPath(role, '/customers/cs-admin')
+  const canOpenBillingDecision = canAccessPath(role, '/billing')
+  const ttProgressHref = buildSupportLaneActionHref('tt', 'ticket-progress', { focus: 'OPEN_TICKETS' })
+  const ttEscalationHref = buildSupportLaneActionHref('tt', 'ticket-escalate', { focus: 'OPEN_TICKETS' })
+  const ttPrimaryHref = canUseSupportAction({ role, actionKey: 'ticket-progress', canCreate, canUpdate, canApprove })
+    ? ttProgressHref
+    : buildSupportLaneHref('tt', { focus: 'OPEN_TICKETS' })
 
   const troubleTypeSuggestions = Array.from(
     new Set(
@@ -60,6 +73,9 @@ export function SupportSlaWorkspace({
         ),
     ),
   )
+  const slaRows = reviewSections
+    .filter((section) => section.title.toUpperCase().includes('SLA'))
+    .flatMap((section) => section.rows)
 
   const actionLinks = [
     {
@@ -72,13 +88,13 @@ export function SupportSlaWorkspace({
       key: 'ticket-progress',
       label: 'Update Progress',
       description: 'Buka tindak lanjut ticket yang terkait dengan SLA.',
-      href: '/support/tt?focus=OPEN_TICKETS',
+      href: ttProgressHref,
     },
     {
       key: 'ticket-escalate',
       label: 'Eskalasi TT',
       description: 'Naikkan kasus yang rawan overdue.',
-      href: '/support/tt?focus=OPEN_TICKETS',
+      href: ttEscalationHref,
     },
   ] satisfies SupportActionLink[]
 
@@ -102,25 +118,32 @@ export function SupportSlaWorkspace({
               SLA Trouble Ticket
             </h2>
             <p className="mt-1 text-sm leading-5 text-mute">
-              Rule SLA, ticket aktif, dan kontrol eskalasi dalam layar kerja yang ringkas.
+              Lane kontrol durasi layanan untuk rule SLA, ticket berisiko, dan keputusan eskalasi.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href="/support/tt?focus=OPEN_TICKETS"
-              className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
-            >
-              Buka TT Aktif
-            </Link>
-            <Link
-              href="/customers/cs-admin?queue=Queue+Risiko+Tinggi"
-              className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
-            >
-              Supervisor CS
-            </Link>
+            {canOpenTicketLane ? (
+              <Link
+                href={ttPrimaryHref}
+                className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
+              >
+                {canUseSupportAction({ role, actionKey: 'ticket-progress', canCreate, canUpdate, canApprove })
+                  ? 'Update TT Aktif'
+                  : 'Buka TT Aktif'}
+              </Link>
+            ) : null}
+            {canOpenSupervisorWorkspace ? (
+              <Link
+                href="/customers/cs-admin?queue=Queue+Risiko+Tinggi"
+                className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
+              >
+                Supervisor CS
+              </Link>
+            ) : null}
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
+          <span className="badge border-slate-200 bg-white text-slate-600">{slaRows.length} aturan SLA</span>
           <span className="badge border-slate-200 bg-white text-slate-600">{troubleTypeSuggestions.length} tipe trouble</span>
           {!reviewDbReady ? (
             <span className="badge border-amber-200 bg-amber-50 text-amber-700">Review DB belum aktif</span>
@@ -128,30 +151,40 @@ export function SupportSlaWorkspace({
         </div>
       </section>
 
+      <SupportWorkspaceHelperNote
+        title="Pastikan rule SLA mencerminkan realita lapangan sebelum backlog ticket menjadi overdue."
+        detail="Lane ini dipakai untuk menjaga target durasi per tipe trouble tetap sehat. Perbarui rule SLA lebih dulu, lalu dorong progress atau eskalasi ticket yang terlihat paling berisiko dari panel yang sama."
+        badges={[
+          { label: `${slaRows.length} aturan SLA`, tone: 'neutral' },
+          { label: `${troubleTypeSuggestions.length} tipe trouble`, tone: 'info' },
+          { label: 'Fokus: overdue & risiko', tone: 'warning' },
+        ]}
+      />
+
       <DataSourceStatus source={source} />
 
       <section className="rounded-xl border border-line bg-slate-50 p-3">
         <form action="/support/sla" className="flex flex-col gap-3 xl:flex-row xl:items-end">
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus Antrian</span>
             <select
               name="focus"
               defaultValue={supportPrefill?.focus ?? ''}
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
               <option value="">Semua SLA</option>
-              <option value="SLA_OVERDUE">SLA Overdue</option>
+              <option value="SLA_OVERDUE">SLA Terlewati</option>
               <option value="OVERDUE_RATE">Rasio Overdue</option>
             </select>
           </label>
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Type</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Tipe Trouble</span>
             <select
               name="type"
               defaultValue={supportPrefill?.type ?? ''}
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             >
-              <option value="">Semua Type</option>
+              <option value="">Semua Tipe</option>
               {troubleTypeSuggestions.map((type) => (
                 <option key={type} value={type}>
                   {type}
@@ -160,20 +193,20 @@ export function SupportSlaWorkspace({
             </select>
           </label>
           <label className="flex flex-[1.2] flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Customer</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Pelanggan</span>
             <input
               name="customer"
               defaultValue={supportPrefill?.customer ?? ''}
-              placeholder="Nama customer / service"
+              placeholder="Nama pelanggan / layanan"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
           <label className="flex flex-[1.2] flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Konteks</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Layanan / Konteks</span>
             <input
               name="service"
               defaultValue={supportPrefill?.service ?? ''}
-              placeholder="User / detail ticket / service"
+              placeholder="User, detail ticket, atau layanan"
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
@@ -208,35 +241,43 @@ export function SupportSlaWorkspace({
         </section>
       ) : null}
 
-      <SupportSlaQueuePanel sections={reviewSections} actionLinks={visibleActionLinks} />
+      <SupportSlaQueuePanel
+        sections={reviewSections}
+        actionLinks={visibleActionLinks}
+        role={role}
+        canOpenBillingDecision={canOpenBillingDecision}
+      />
 
       {canUseSupportAction({ role, actionKey: 'sla-manage', canCreate, canUpdate, canApprove }) ? (
         <section className="space-y-4">
-          <div>
-            <p className="section-title">Aksi SLA</p>
-            <h3 className="mt-2 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-              Form pengaturan SLA
-            </h3>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
-              Default layar tetap fokus ke tabel SLA. Buka panel ini hanya saat aturan perlu diubah.
-            </p>
-          </div>
-          <details className="group rounded-2xl border border-line bg-white p-4">
-            <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-              Buka panel aksi SLA
-            </summary>
-            <p className="mt-2 text-sm text-mute">
-              Berisi pengaturan durasi SLA per tipe trouble.
-            </p>
-            <div id={getSupportActionAnchorId('sla-manage')} className="mt-4 scroll-mt-24">
+          <SupportActionPanelIntro
+            laneLabel="SLA"
+            detail="Default workspace tetap fokus ke tabel SLA. Buka panel ini hanya saat rule durasi perlu diperbarui agar risiko overdue tetap terkendali."
+            reviewDbReady={reviewDbReady}
+          />
+          <SupportActionPanelContainer
+            title="Buka panel aksi lane SLA"
+            description="Panel ini berisi form write-side untuk pengaturan durasi SLA per tipe trouble."
+            actionIds={[getSupportActionAnchorId('sla-manage')]}
+            itemCount={1}
+            defaultOpen={Boolean(supportPrefill?.type)}
+          >
+            <div className="mt-4 grid gap-4 xl:grid-cols-2">
+              <SupportActionPanelSlot
+                id={getSupportActionAnchorId('sla-manage')}
+                title="Kelola SLA trouble ticket"
+                description="Gunakan form ini untuk memperbarui durasi SLA per tipe trouble saat kebutuhan lapangan atau target layanan berubah."
+                defaultOpen={Boolean(supportPrefill?.type)}
+              >
               <SupportSlaForm
                 canApprove={canApprove}
                 reviewDbReady={reviewDbReady}
                 typeSuggestions={troubleTypeSuggestions}
                 initialTroubleType={supportPrefill?.type}
               />
+              </SupportActionPanelSlot>
             </div>
-          </details>
+          </SupportActionPanelContainer>
         </section>
       ) : null}
     </div>

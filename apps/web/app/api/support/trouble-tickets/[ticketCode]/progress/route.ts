@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { ensureSupportTroubleTicketProgressTable } from '@/lib/services/support-ticket-progress-service'
 
 const allowedStatuses = new Set(['OPEN', 'ON_PROGRESS', 'FOLLOW_UP'])
@@ -35,6 +35,61 @@ async function getTroubleTicketByCode(ticketCode: string) {
   )
 
   return row ?? null
+}
+
+async function buildProgressLogInsertPayload(params: {
+  ticketId: number
+  progressStatus: string
+  ownerName: string
+  progressNotes: string
+  followUpAt: Date | null
+  actorLabel: string
+}) {
+  const [
+    hasTroubleTicketId,
+    hasProgressStatus,
+    hasOwnerName,
+    hasProgressNotes,
+    hasFollowUpAt,
+    hasUpdatedBy,
+  ] = await Promise.all([
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'trouble_ticket_id'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'progress_status'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'owner_name'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'progress_notes'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'follow_up_at'),
+    hasReviewDbColumn('support_trouble_ticket_progress_logs', 'updated_by'),
+  ])
+
+  if (!hasTroubleTicketId || !hasProgressStatus) {
+    return null
+  }
+
+  const columns = ['trouble_ticket_id', 'progress_status']
+  const values: unknown[] = [params.ticketId, params.progressStatus]
+
+  if (hasOwnerName) {
+    columns.push('owner_name')
+    values.push(params.ownerName)
+  }
+  if (hasProgressNotes) {
+    columns.push('progress_notes')
+    values.push(params.progressNotes)
+  }
+  if (hasFollowUpAt) {
+    columns.push('follow_up_at')
+    values.push(params.followUpAt)
+  }
+  if (hasUpdatedBy) {
+    columns.push('updated_by')
+    values.push(params.actorLabel)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
 }
 
 export async function POST(
@@ -122,20 +177,26 @@ export async function POST(
       [progressStatus, noteText, noteText, ticket.id],
     )
 
-    await runReviewDbExecute(
-      `
-        INSERT INTO support_trouble_ticket_progress_logs (
-          trouble_ticket_id,
-          progress_status,
-          owner_name,
-          progress_notes,
-          follow_up_at,
-          updated_by
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-      `,
-      [ticket.id, progressStatus, ownerName, progressNotes, followUpAt, actorLabel],
-    )
+    const progressLogPayload = await buildProgressLogInsertPayload({
+      ticketId: ticket.id,
+      progressStatus,
+      ownerName,
+      progressNotes,
+      followUpAt,
+      actorLabel,
+    })
+
+    if (progressLogPayload) {
+      await runReviewDbExecute(
+        `
+          INSERT INTO support_trouble_ticket_progress_logs (
+            ${progressLogPayload.columns.join(',\n            ')}
+          )
+          VALUES (${progressLogPayload.placeholders.join(', ')})
+        `,
+        progressLogPayload.values,
+      )
+    }
 
     return Response.json({
       message: `Progress trouble ticket ${ticket.ticketCode} untuk ${ticket.customerName} berhasil diperbarui.`,

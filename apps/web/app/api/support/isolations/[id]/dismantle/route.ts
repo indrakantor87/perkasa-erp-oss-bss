@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 import {
   buildSupportDismantleTransferNote,
   ensureSupportDismantleQueueTable,
@@ -29,18 +29,42 @@ function normalizeRequiredText(value: unknown) {
 }
 
 async function getIsolationById(id: string) {
+  const [
+    hasCustomerName,
+    hasStatus,
+    hasCustomerAddress,
+    hasCustomerPhone,
+    hasMarketingName,
+    hasRadboxName,
+    hasCloseNote,
+    hasArchivedAt,
+  ] = await Promise.all([
+    hasReviewDbColumn('support_isolations', 'customer_name'),
+    hasReviewDbColumn('support_isolations', 'status'),
+    hasReviewDbColumn('support_isolations', 'customer_address'),
+    hasReviewDbColumn('support_isolations', 'customer_phone'),
+    hasReviewDbColumn('support_isolations', 'marketing_name'),
+    hasReviewDbColumn('support_isolations', 'radbox_name'),
+    hasReviewDbColumn('support_isolations', 'close_note'),
+    hasReviewDbColumn('support_isolations', 'archived_at'),
+  ])
+
+  if (!hasCustomerName || !hasStatus) {
+    throw new Error('Schema inti support_isolations belum siap. Kolom customer_name dan status wajib tersedia.')
+  }
+
   const [row] = await runReviewDbQuery<ReviewIsolationRow>(
     `
       SELECT
         id,
         customer_name AS customerName,
-        customer_address AS customerAddress,
-        customer_phone AS customerPhone,
-        marketing_name AS marketingName,
-        radbox_name AS radboxName,
+        ${hasCustomerAddress ? 'customer_address' : 'NULL'} AS customerAddress,
+        ${hasCustomerPhone ? 'customer_phone' : 'NULL'} AS customerPhone,
+        ${hasMarketingName ? 'marketing_name' : 'NULL'} AS marketingName,
+        ${hasRadboxName ? 'radbox_name' : 'NULL'} AS radboxName,
         status,
-        close_note AS closeNote,
-        archived_at AS archivedAt
+        ${hasCloseNote ? 'close_note' : 'NULL'} AS closeNote,
+        ${hasArchivedAt ? 'archived_at' : 'NULL'} AS archivedAt
       FROM support_isolations
       WHERE id = ?
       LIMIT 1
@@ -49,6 +73,40 @@ async function getIsolationById(id: string) {
   )
 
   return row ?? null
+}
+
+async function buildDismantleQueueInsertPayload(params: {
+  isolationId: string
+  transferNote: string
+  username: string
+}) {
+  const [hasIsolationId, hasTransferNote, hasTransferredByUsername] = await Promise.all([
+    hasReviewDbColumn('support_dismantle_queue', 'isolation_id'),
+    hasReviewDbColumn('support_dismantle_queue', 'transfer_note'),
+    hasReviewDbColumn('support_dismantle_queue', 'transferred_by_username'),
+  ])
+
+  if (!hasIsolationId) {
+    throw new Error('Schema inti support_dismantle_queue belum siap. Kolom isolation_id wajib tersedia.')
+  }
+
+  const columns = ['isolation_id']
+  const values: unknown[] = [params.isolationId]
+
+  if (hasTransferNote) {
+    columns.push('transfer_note')
+    values.push(params.transferNote)
+  }
+  if (hasTransferredByUsername) {
+    columns.push('transferred_by_username')
+    values.push(params.username)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
 }
 
 export async function POST(
@@ -93,6 +151,9 @@ export async function POST(
     if (isolation.archivedAt) {
       return Response.json({ message: `Isolir ${isolation.id} sudah masuk histori dismantle.` }, { status: 409 })
     }
+    if (isolation.status.trim().toUpperCase() === 'CLOSED') {
+      return Response.json({ message: `Isolir ${isolation.id} sudah closed dan tidak bisa dipindah ke dismantle.` }, { status: 409 })
+    }
 
     const existingQueue = await runReviewDbQuery<ReviewDismantleQueueRow>(
       `
@@ -108,22 +169,21 @@ export async function POST(
     }
 
     const normalizedTransferNote = buildSupportDismantleTransferNote(session, transferNote)
+    const queueInsertPayload = await buildDismantleQueueInsertPayload({
+      isolationId: isolation.id,
+      transferNote: normalizedTransferNote,
+      username: session.username,
+    })
 
     await runReviewDbTransaction(async (connection) => {
       await connection.query(
         `
           INSERT INTO support_dismantle_queue (
-            isolation_id,
-            transfer_note,
-            transferred_by_username
+            ${queueInsertPayload.columns.join(',\n            ')}
           )
-          VALUES (?, ?, ?)
+          VALUES (${queueInsertPayload.placeholders.join(', ')})
         `,
-        [
-          isolation.id,
-          normalizedTransferNote,
-          session.username,
-        ],
+        queueInsertPayload.values,
       )
     })
 

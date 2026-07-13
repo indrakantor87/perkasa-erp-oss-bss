@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 const allowedWorkTypes = new Set(['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'])
 const allowedStatuses = new Set(['OPEN', 'SCHEDULED', 'ON_PROGRESS'])
@@ -54,6 +54,168 @@ function resolveNextOrderStatus(workOrderStatus: string) {
   return 'READY_INSTALL'
 }
 
+async function getSalesOrderQueryParts() {
+  const [
+    hasSalesOrderId,
+    hasSalesOrderOrderNo,
+    hasSalesOrderStatus,
+    hasSalesOrderLeadId,
+    hasSalesOrderCustomerId,
+    hasSalesLeadId,
+    hasSalesLeadCustomerName,
+    hasCustomerId,
+    hasCustomerFullName,
+  ] = await Promise.all([
+    hasReviewDbColumn('sales_orders', 'id'),
+    hasReviewDbColumn('sales_orders', 'order_no'),
+    hasReviewDbColumn('sales_orders', 'status'),
+    hasReviewDbColumn('sales_orders', 'lead_id'),
+    hasReviewDbColumn('sales_orders', 'customer_id'),
+    hasReviewDbColumn('sales_leads', 'id'),
+    hasReviewDbColumn('sales_leads', 'customer_name'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+  ])
+
+  if (!hasSalesOrderId || !hasSalesOrderOrderNo || !hasSalesOrderStatus) {
+    throw new Error('Schema inti sales_orders belum siap. Kolom id, order_no, dan status wajib tersedia.')
+  }
+
+  const canJoinLead = hasSalesOrderLeadId && hasSalesLeadId
+  const canJoinCustomer = hasSalesOrderCustomerId && hasCustomerId
+
+  return {
+    salesLeadJoin: canJoinLead
+      ? `
+        LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id`
+      : '',
+    customerJoin: canJoinCustomer
+      ? `
+        LEFT JOIN crm_customers c
+          ON c.id = so.customer_id`
+      : '',
+    customerNameExpression: canJoinLead && hasSalesLeadCustomerName
+      ? `COALESCE(sl.customer_name, ${canJoinCustomer && hasCustomerFullName ? 'c.full_name' : "'Customer belum terpetakan'"})`
+      : canJoinCustomer && hasCustomerFullName
+        ? `COALESCE(c.full_name, 'Customer belum terpetakan')`
+        : `'Customer belum terpetakan'`,
+  }
+}
+
+async function buildWorkOrderInsertPayload(params: {
+  salesOrderId: number
+  workOrderNo: string
+  workType: string
+  status: string
+  technicianName: string | null
+  scheduledAt: Date | null
+  notes: string
+}) {
+  const [
+    hasSalesOrderId,
+    hasSubscriptionId,
+    hasWorkOrderNo,
+    hasWorkType,
+    hasStatus,
+    hasTechnicianName,
+    hasScheduledAt,
+    hasStartedAt,
+    hasCompletedAt,
+    hasNotes,
+  ] = await Promise.all([
+    hasReviewDbColumn('service_work_orders', 'sales_order_id'),
+    hasReviewDbColumn('service_work_orders', 'subscription_id'),
+    hasReviewDbColumn('service_work_orders', 'work_order_no'),
+    hasReviewDbColumn('service_work_orders', 'work_type'),
+    hasReviewDbColumn('service_work_orders', 'status'),
+    hasReviewDbColumn('service_work_orders', 'technician_name'),
+    hasReviewDbColumn('service_work_orders', 'scheduled_at'),
+    hasReviewDbColumn('service_work_orders', 'started_at'),
+    hasReviewDbColumn('service_work_orders', 'completed_at'),
+    hasReviewDbColumn('service_work_orders', 'notes'),
+  ])
+
+  if (!hasSalesOrderId || !hasWorkOrderNo || !hasStatus) {
+    throw new Error('Schema inti service_work_orders belum siap. Kolom sales_order_id, work_order_no, dan status wajib tersedia.')
+  }
+
+  const columns = ['sales_order_id', 'work_order_no', 'status']
+  const values: unknown[] = [params.salesOrderId, params.workOrderNo, params.status]
+
+  if (hasSubscriptionId) {
+    columns.push('subscription_id')
+    values.push(null)
+  }
+  if (hasWorkType) {
+    columns.push('work_type')
+    values.push(params.workType)
+  }
+  if (hasTechnicianName) {
+    columns.push('technician_name')
+    values.push(params.technicianName)
+  }
+  if (hasScheduledAt) {
+    columns.push('scheduled_at')
+    values.push(params.scheduledAt)
+  }
+  if (hasStartedAt) {
+    columns.push('started_at')
+    values.push(null)
+  }
+  if (hasCompletedAt) {
+    columns.push('completed_at')
+    values.push(null)
+  }
+  if (hasNotes) {
+    columns.push('notes')
+    values.push(params.notes)
+  }
+
+  return {
+    columns,
+    placeholders: columns.map(() => '?'),
+    values,
+  }
+}
+
+async function buildSalesOrderUpdatePayload(params: {
+  nextOrderStatus: string
+  technicianName: string | null
+  scheduledAt: Date | null
+}) {
+  const [hasStatus, hasTechnicianName, hasScheduledInstallationAt, hasUpdatedAt] = await Promise.all([
+    hasReviewDbColumn('sales_orders', 'status'),
+    hasReviewDbColumn('sales_orders', 'teknisi_name'),
+    hasReviewDbColumn('sales_orders', 'scheduled_installation_at'),
+    hasReviewDbColumn('sales_orders', 'updated_at'),
+  ])
+
+  if (!hasStatus) {
+    throw new Error('Schema inti sales_orders belum siap. Kolom status wajib tersedia.')
+  }
+
+  const assignments = ['status = ?']
+  const values: unknown[] = [params.nextOrderStatus]
+
+  if (hasTechnicianName) {
+    assignments.push('teknisi_name = COALESCE(?, teknisi_name)')
+    values.push(params.technicianName)
+  }
+  if (hasScheduledInstallationAt) {
+    assignments.push('scheduled_installation_at = COALESCE(?, scheduled_installation_at)')
+    values.push(params.scheduledAt)
+  }
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  return {
+    assignments,
+    values,
+  }
+}
+
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) {
@@ -98,18 +260,17 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Status work order tidak valid.' }, { status: 400 })
     }
 
+    const salesOrderQueryParts = await getSalesOrderQueryParts()
     const [salesOrder] = await runReviewDbQuery<ReviewSalesOrderRow>(
       `
         SELECT
           so.id,
           so.order_no AS orderNo,
           so.status AS orderStatus,
-          COALESCE(sl.customer_name, c.full_name, 'Customer belum terpetakan') AS customerName
+          ${salesOrderQueryParts.customerNameExpression} AS customerName
         FROM sales_orders so
-        LEFT JOIN sales_leads sl
-          ON sl.id = so.lead_id
-        LEFT JOIN crm_customers c
-          ON c.id = so.customer_id
+        ${salesOrderQueryParts.salesLeadJoin}
+        ${salesOrderQueryParts.customerJoin}
         WHERE so.id = ?
         LIMIT 1
       `,
@@ -128,45 +289,39 @@ export async function POST(request: Request) {
     const notes = `[Review Work Order] ${session.displayName} (${session.username})${
       notesRaw ? ` - ${notesRaw}` : ''
     }`
+    const workOrderInsertPayload = await buildWorkOrderInsertPayload({
+      salesOrderId: salesOrder.id,
+      workOrderNo,
+      workType,
+      status,
+      technicianName: technicianName || null,
+      scheduledAt,
+      notes,
+    })
 
     await runReviewDbExecute<ExecuteResult>(
       `
         INSERT INTO service_work_orders (
-          sales_order_id,
-          subscription_id,
-          work_order_no,
-          work_type,
-          status,
-          technician_name,
-          scheduled_at,
-          started_at,
-          completed_at,
-          notes
+          ${workOrderInsertPayload.columns.join(',\n          ')}
         )
-        VALUES (?, NULL, ?, ?, ?, ?, ?, NULL, NULL, ?)
+        VALUES (${workOrderInsertPayload.placeholders.join(', ')})
       `,
-      [
-        salesOrder.id,
-        workOrderNo,
-        workType,
-        status,
-        technicianName || null,
-        scheduledAt,
-        notes,
-      ]
+      workOrderInsertPayload.values
     )
 
+    const salesOrderUpdatePayload = await buildSalesOrderUpdatePayload({
+      nextOrderStatus: resolveNextOrderStatus(status),
+      technicianName: technicianName || null,
+      scheduledAt,
+    })
     await runReviewDbExecute<ExecuteResult>(
       `
         UPDATE sales_orders
         SET
-          status = ?,
-          teknisi_name = COALESCE(?, teknisi_name),
-          scheduled_installation_at = COALESCE(?, scheduled_installation_at),
-          updated_at = CURRENT_TIMESTAMP
+          ${salesOrderUpdatePayload.assignments.join(',\n          ')}
         WHERE id = ?
       `,
-      [resolveNextOrderStatus(status), technicianName || null, scheduledAt, salesOrder.id]
+      [...salesOrderUpdatePayload.values, salesOrder.id]
     )
 
     return Response.json({

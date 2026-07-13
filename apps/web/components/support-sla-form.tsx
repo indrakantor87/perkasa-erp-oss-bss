@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { SupportFormContextNote } from '@/components/support-form-context-note'
 
 type SupportSlaFormProps = {
   canApprove: boolean
@@ -74,7 +75,7 @@ export function SupportSlaForm({
 
   return (
     <section className="panel p-6">
-      <p className="section-title">SLA Support</p>
+      <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
         Kelola SLA trouble ticket
       </h3>
@@ -85,6 +86,22 @@ export function SupportSlaForm({
             ? 'Mode review database belum aktif, jadi pengaturan SLA dinonaktifkan agar tidak menulis ke mock.'
             : 'Form ini membuat atau memperbarui SLA per tipe ticket pada tabel support_trouble_ticket_sla.'}
       </p>
+      <SupportFormContextNote
+        items={[
+          {
+            label: 'Tujuan',
+            value: 'Menjaga target durasi penanganan per tipe gangguan tetap selaras dengan realita operasional.',
+          },
+          {
+            label: 'Sumber',
+            value: 'Daftar tipe diambil dari ticket dan rule SLA yang sedang aktif pada workspace support.',
+          },
+          {
+            label: 'Hasil',
+            value: 'Ticket berikutnya langsung memakai durasi SLA yang baru tanpa perlu ubah data manual di belakang layar.',
+          },
+        ]}
+      />
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
         <label className="flex flex-col gap-2 text-sm text-slate-700">
