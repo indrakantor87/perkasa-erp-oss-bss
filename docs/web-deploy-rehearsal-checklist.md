@@ -78,13 +78,13 @@ Isi catatan berikut setiap kali latihan:
 | Item | Hasil |
 |---|---|
 | tanggal rehearsal | `2026-07-13` |
-| commit yang diuji | `bd0b6e3 (release: 0.65.94)` |
+| commit yang diuji | `32d8657 (release: 0.65.98)` |
 | durasi `npm install` | `N/A (tidak dijalankan di lokal)` |
 | durasi `npm run build` | `compile 32.8s; TypeScript 29.9s; static pages 1.7s` |
 | durasi boot PM2 | `N/A (pakai node standalone; Ready in 0ms)` |
 | hasil health check | `pass (NODE_ENV=production; PORT=3011; verify-health lulus)` |
 | hasil smoke browser | `N/A (belum diuji browser pada mode standalone)` |
-| isu yang ditemukan | `N/A` |
+| isu yang ditemukan | `batch 0.65.97-0.65.98 menambah hardening auth hybrid, sanitasi kredensial bootstrap, dan validator placeholder secret; belum mengganti hasil rehearsal teknis inti` |
 | keputusan | `siap untuk lanjut rehearsal server (PM2 + Nginx)` |
 
 ## Kriteria Rehearsal Berhasil

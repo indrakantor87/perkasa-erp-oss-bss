@@ -258,6 +258,21 @@ Dokumen ini dipakai untuk:
 2. memutuskan blocker mana yang harus dikerjakan sebelum UAT berikutnya
 3. menjaga agar integrasi ke divisi lain tidak dimulai sebelum fondasi `Pemasaran dan Pelayanan` cukup stabil
 
+## Bukti UAT Review DB 2026-07-13
+
+| Role | Username UAT | Landing Aktual | Hasil | Bukti Positif | Blocker / Catatan |
+|---|---|---|---|---|---|
+| `DISMANTLE_OPERATOR` | `dismantle` | `/support/dismantle` | `pass` | login berhasil, sidebar fokus, queue aktif dan histori dismantle terbaca | bukti write-side `close/reopen` masih perlu diformalisasi |
+| `CS_OPERATOR` | `cstest` | `/dashboard/worklist` | `pass` | login berhasil, `List Kerja` tampil sebagai workspace utama, domain `sales/customers/support/inventory` terbuka | bukti write-side end-to-end masih perlu diperdalam |
+| `CS_ADMIN` | `admincs.sample` | `/customers/cs-admin` | `partial` | login berhasil, workspace supervisor dan bucket utama tampil | data supervisor masih fallback karena query review DB mengembalikan `Column 'status' in field list is ambiguous` |
+| `SALES_MARKETING` | `chalis@perkasa.net.id` | `/sales` | `partial` | login berhasil, landing sales dan sidebar sesuai role | CTA `Import Center` sebelumnya misleading; sudah dihapus dari shell sales pada batch menu audit ini |
+
+### Temuan Guard Menu dari UAT
+
+1. `CS_ADMIN` tidak lagi boleh melihat shortcut `Buka Billing` pada workspace supervisor karena bertentangan dengan RBAC dasar.
+2. `SALES_MARKETING` tidak lagi diarahkan ke `Import Center` dari shell sales karena route tersebut memang hanya untuk `SUPER_ADMIN`.
+3. Workspace khusus `CS & Admin CS`, `Digital Creator`, `Teknisi *`, `Legal`, `Kantor`, dan `Toko` kini dipersempit ke role target agar sidebar tidak misleading saat UAT role lain dijalankan.
+
 ## Versioning
 
 Dokumen ini dirilis pada:

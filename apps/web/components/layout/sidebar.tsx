@@ -56,6 +56,7 @@ type SidebarGroup = {
 type SidebarNavItem = (typeof navigationItems)[number] & {
   key: string
   requiredPath: string
+  allowedRoles?: AppRole[]
   assignHrefs?: string[]
   matchPrefixes?: string[]
   excludePrefixes?: string[]
@@ -75,6 +76,7 @@ function buildSidebarNavItem(
     title?: string
     description?: string
     requiredPath?: string
+    allowedRoles?: AppRole[]
     assignHrefs?: string[]
     matchPrefixes?: string[]
     excludePrefixes?: string[]
@@ -94,6 +96,7 @@ function buildSidebarNavItem(
     title: options?.title ?? base.title,
     description: options?.description ?? base.description,
     requiredPath: options?.requiredPath ?? base.href,
+    allowedRoles: options?.allowedRoles,
     assignHrefs: options?.assignHrefs,
     matchPrefixes: options?.matchPrefixes,
     excludePrefixes: options?.excludePrefixes,
@@ -134,9 +137,10 @@ const sidebarCoreGroups: SidebarGroup[] = [
       buildSidebarNavItem('/customers', {
         key: 'customers-cs-admin',
         title: 'CS & Admin CS',
-        description: 'Port ODP, approval CS, dan dismantle dibaca dalam satu workspace pelayanan',
+        description: 'Workspace supervisor untuk approval, koreksi, restore, dan backlog risiko CS',
         href: '/customers/cs-admin',
         matchPrefixes: ['/customers/cs-admin', '/support/dismantle'],
+        allowedRoles: ['SUPER_ADMIN', 'CS_ADMIN'],
         assignHrefs: ['/customers/cs-admin', '/support/dismantle'],
       }),
       buildSidebarNavItem('/sales', {
@@ -145,6 +149,7 @@ const sidebarCoreGroups: SidebarGroup[] = [
         description: 'Campaign, lead digital, content calendar, dan analytics Creator Digital',
         href: '/sales/digital-creator',
         requiredPath: '/sales/digital-creator',
+        allowedRoles: ['SUPER_ADMIN', 'DIGITAL_CREATOR'],
         assignHrefs: [
           '/sales/digital-creator',
           '/sales/campaigns',
@@ -194,6 +199,7 @@ const sidebarCoreGroups: SidebarGroup[] = [
         title: 'Legal',
         description: 'Workspace dokumen, administrasi, dan tindak lanjut legal',
         href: '/inventory/legal',
+        allowedRoles: ['SUPER_ADMIN'],
         matchPrefixes: ['/inventory/legal'],
       }),
     ],
@@ -207,6 +213,7 @@ const sidebarCoreGroups: SidebarGroup[] = [
         title: 'Teknisi PSB',
         description: 'Instalasi baru, kesiapan material, dan tindak lanjut lapangan PSB',
         href: '/support/teknisi-psb',
+        allowedRoles: ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
         matchPrefixes: ['/support/teknisi-psb'],
       }),
       buildSidebarNavItem('/support', {
@@ -214,6 +221,7 @@ const sidebarCoreGroups: SidebarGroup[] = [
         title: 'Teknisi Expan',
         description: 'Ekspan jaringan, ODP, port, dan kesiapan jalur lapangan',
         href: '/support/teknisi-expan',
+        allowedRoles: ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
         matchPrefixes: ['/support/teknisi-expan'],
       }),
       buildSidebarNavItem('/support', {
@@ -221,6 +229,7 @@ const sidebarCoreGroups: SidebarGroup[] = [
         title: 'Teknisi Jointer',
         description: 'Sambungan jaringan, kualitas joint, dan follow up teknis backbone',
         href: '/support/teknisi-jointer',
+        allowedRoles: ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
         matchPrefixes: ['/support/teknisi-jointer'],
       }),
     ],
@@ -234,6 +243,7 @@ const sidebarCoreGroups: SidebarGroup[] = [
         title: 'Kantor',
         description: 'Workspace operasional kantor untuk stok aktif dan ritme kerja harian',
         href: '/inventory/kantor',
+        allowedRoles: ['SUPER_ADMIN'],
         matchPrefixes: ['/inventory/kantor'],
       }),
       buildSidebarNavItem('/inventory', {
@@ -241,6 +251,7 @@ const sidebarCoreGroups: SidebarGroup[] = [
         title: 'Toko',
         description: 'Workspace toko untuk stok display, pergerakan barang, dan tindak lanjut',
         href: '/inventory/toko',
+        allowedRoles: ['SUPER_ADMIN'],
         matchPrefixes: ['/inventory/toko'],
       }),
     ],
@@ -248,7 +259,7 @@ const sidebarCoreGroups: SidebarGroup[] = [
   },
 ]
 
-function groupSidebarItems(items: typeof navigationItems, allowedPrefixes: string[]): Array<{
+function groupSidebarItems(items: typeof navigationItems, allowedPrefixes: string[], role: AppRole | null): Array<{
   title: string
   items: SidebarNavItem[]
   emptyHint?: string
@@ -257,7 +268,8 @@ function groupSidebarItems(items: typeof navigationItems, allowedPrefixes: strin
     ...group,
     items:
       group.items?.filter((item) =>
-        allowedPrefixes.some((prefix) => matchesPrefix(item.requiredPath, prefix)),
+        allowedPrefixes.some((prefix) => matchesPrefix(item.requiredPath, prefix)) &&
+        (!item.allowedRoles || (role != null && item.allowedRoles.includes(role))),
       ) ??
       items.filter((item) => group.hrefs?.includes(item.href)).map(mapNavigationItemToSidebarNavItem),
   }))
@@ -457,7 +469,7 @@ export function Sidebar({
   const sortedItems = sortByPreferredOrder({ items: allowedItems, role: session?.role ?? null })
   const coreItems = sortedItems.filter((item) => !item.href.startsWith('/settings'))
   const settingsItems = sortedItems.filter((item) => item.href.startsWith('/settings'))
-  const groupedCoreItems = groupSidebarItems(coreItems, allowedPrefixes)
+  const groupedCoreItems = groupSidebarItems(coreItems, allowedPrefixes, session?.role ?? null)
   const settingsSidebarItems = settingsItems.map(mapNavigationItemToSidebarNavItem)
   const mobileQuickItems = groupedCoreItems.flatMap((group) => group.items)
   const [collapsed, setCollapsed] = useState(false)

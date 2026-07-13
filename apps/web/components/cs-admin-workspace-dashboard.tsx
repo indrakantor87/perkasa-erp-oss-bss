@@ -169,12 +169,6 @@ export function CsAdminWorkspaceDashboard({
           >
             Buka SLA Kritis
           </Link>
-          <Link
-            href="/billing"
-            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-          >
-            Buka Billing
-          </Link>
         </div>
       </section>
 

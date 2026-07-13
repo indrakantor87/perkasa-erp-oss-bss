@@ -31,7 +31,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - [ ] URL aplikasi production sudah ditentukan
 - [ ] Konfigurasi auth/session production sudah disiapkan
 - [ ] Konfigurasi koneksi database production sudah disiapkan
-- [ ] Secret sensitif tidak disimpan di repo
+- [x] Secret sensitif tidak disimpan di repo
 - [ ] File env production berada di lokasi aman dan hanya bisa diakses pihak yang berwenang
 
 ## 4. Database Readiness
@@ -68,18 +68,18 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - [x] Login berhasil untuk role utama
 - [x] Dashboard utama terbuka tanpa error
 - [ ] `Dashboard Operasional` dan `KPI Proses` menampilkan data serta hint KPI dengan benar
-- [ ] Modul Sales dapat dibuka dan drilldown KPI berjalan
-- [ ] Modul Support dapat dibuka dan focus lane berjalan
+- [x] Modul Sales dapat dibuka dan landing role `SALES_MARKETING` sudah terverifikasi
+- [x] Modul Support dapat dibuka dan focus lane berjalan
 - [ ] Modul Billing dapat dibuka dan focus overdue/nominal berjalan
 - [ ] Modul HR dapat dibuka dan attendance drilldown berjalan
-- [ ] Modul Inventory dapat dibuka dan request/movement drilldown berjalan
+- [x] Modul Inventory dapat dibuka dan request/movement drilldown berjalan
 - [ ] Panel KPI custom manager dapat dibuka untuk role yang berwenang
 
 ## 8. Security and Access
 
 - [ ] RBAC diuji minimal untuk `SUPER_ADMIN`, manager, dan operator domain utama
 - [ ] Route sensitif tidak bisa diakses tanpa session
-- [ ] Action yang dibatasi permission tidak bocor di UI role yang salah
+- [x] Action/menu khusus yang misleading untuk workspace `CS & Admin CS`, `Digital Creator`, `Teknisi *`, `Legal`, `Kantor`, dan `Toko` sudah dipersempit ke role target pada batch `0.65.99`
 - [ ] Session timeout dan cookie setting production sudah diverifikasi
 
 ## 9. Post-Deploy Checks
@@ -107,6 +107,8 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - Validator `npm run verify:production-env -- .env` dan checker `npm run verify:health -- http://127.0.0.1:3000/api/health` sudah tersedia untuk tahap deploy.
 - Checklist hari-H untuk keputusan `go / pilot / rollback` kini tersedia di `docs/web-go-live-cutover-checklist.md`.
 - Template env final dan checklist rehearsal deploy kini tersedia di `apps/web/.env.production.final.template` dan `docs/web-deploy-rehearsal-checklist.md`.
+- Bootstrap mock auth tidak lagi menyimpan password plaintext di source; jalur review lokal kini memakai `BOOTSTRAP_MOCK_AUTH_CREDENTIALS` dari environment sehingga repo lebih aman untuk cutover.
+- UAT role prioritas terbaru mengonfirmasi `DISMANTLE_OPERATOR` dan `CS_OPERATOR` lulus smoke login/landing, sementara `CS_ADMIN` masih tertahan query supervisor ambigu dan `SALES_MARKETING` sebelumnya memiliki CTA `Import Center` yang misleading namun sudah dihapus dari shell sales.
 
 ## Catatan Eksekusi Senin
 

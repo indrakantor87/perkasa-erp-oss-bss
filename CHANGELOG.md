@@ -52,6 +52,21 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Smoke test auth kini membuat kredensial bootstrap dinamis saat runtime, sehingga repo tidak kembali menyimpan password tetap hanya demi kebutuhan verifikasi test: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
 - Versioning diselaraskan ke `0.65.98` untuk menandai batch sanitasi residual kredensial bootstrap.
 
+## [0.65.99] - 2026-07-13
+
+### Fixed
+
+- Sidebar dan route workspace khusus kini fail-closed ke role target agar menu tidak misleading: `CS & Admin CS` hanya untuk `SUPER_ADMIN/CS_ADMIN`, `Digital Creator` hanya untuk `SUPER_ADMIN/DIGITAL_CREATOR`, `Teknisi *` hanya untuk `SUPER_ADMIN/FIELD_TECHNICIAN`, serta `Legal`, `Kantor`, dan `Toko` ditahan ke `SUPER_ADMIN`: [organization-workspace-access.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/organization-workspace-access.ts), [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/customers/cs-admin/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/sales/digital-creator/page.tsx)
+- Workspace supervisor `CS_ADMIN` tidak lagi menampilkan shortcut `Buka Billing` yang bertentangan dengan RBAC dasar: [cs-admin-workspace-dashboard.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/cs-admin-workspace-dashboard.tsx)
+- Shell sales tidak lagi menampilkan CTA `Buka Import Center` untuk role marketing karena route `/import` memang terjaga untuk `SUPER_ADMIN`; CTA utama kini diarahkan ke `List Kerja`: [mock-domains.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/mock-domains.ts)
+- Validator env production kini mengenali placeholder `replace-with-strong-random-secret`, sehingga template env tidak bisa lolos false-green saat secret belum diganti: [verify-production-env.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/verify-production-env.mjs)
+
+### Improved
+
+- Checklist readiness, rehearsal, cutover, dan UAT diselaraskan dengan hardening repo sampai `0.65.99`, termasuk bukti UAT role prioritas (`DISMANTLE_OPERATOR`, `CS_OPERATOR`, `CS_ADMIN`, `SALES_MARKETING`) dan snapshot blocker aktual menuju `GO`: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md), [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md), [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md)
+- Katalog menu per role/divisi diperbarui agar mencerminkan sidebar aktual dan default landing yang benar, lalu dilengkapi artefak audit menu baru untuk menandai area yang sudah oke, misleading, dan masih perlu dibenahi: [web-role-division-menu-feature-catalog.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-division-menu-feature-catalog.md), [web-role-menu-audit-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-menu-audit-2026-07-13.md)
+- Versioning diselaraskan ke `0.65.99` untuk menandai batch audit menu per role, sinkronisasi readiness/cutover, dan pengetatan guard workspace khusus.
+
 ## [0.65.95] - 2026-07-13
 
 ### Improved

@@ -8,7 +8,7 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
     title: 'Penjualan dan Order Acquisition',
     description:
       'Shell awal untuk lead, coverage, survey, order, dan status delivery supaya alur home broadband sampai corporate bisa ditempatkan dalam satu modul.',
-    primaryAction: { label: 'Buka Import Center', href: '/import' },
+    primaryAction: { label: 'Buka List Kerja', href: '/dashboard/worklist' },
     secondaryAction: { label: 'Lihat Dashboard', href: '/dashboard' },
     summaries: [
       { label: 'Lead Review', value: '184' },

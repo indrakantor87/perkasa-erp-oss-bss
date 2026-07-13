@@ -54,6 +54,18 @@ Sebelum mulai, isi peran berikut:
 | PIC Validasi Sales-CS | login marketing/CS dan cek flow dasar lintas domain | `................` |
 | PIC Keputusan | putuskan `go / no-go / rollback` final | `................` |
 
+## Snapshot Readiness Sebelum Hari-H
+
+Status teknis repo per `0.65.99`:
+
+- `npm run check`, `npm run test:smoke`, `npm run build`, `verify:production-env`, dan `verify:health` sudah tersedia dan dipakai sebagai baseline readiness.
+- Sidebar/workspace khusus kini dipersempit ke role target agar audit menu tidak misleading.
+- UAT browser terbaru:
+  - `DISMANTLE_OPERATOR`: `pass` pada login dan landing lane dismantle
+  - `CS_OPERATOR`: `pass` pada login dan landing `List Kerja`
+  - `CS_ADMIN`: `partial` karena query supervisor masih fallback `ambiguous status`
+  - `SALES_MARKETING`: `partial`, tetapi CTA misleading `Import Center` sudah dibersihkan
+
 ## T-1 Hari Minggu Malam
 
 Checklist ini harus selesai sebelum tidur:

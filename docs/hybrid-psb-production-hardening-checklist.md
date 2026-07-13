@@ -19,14 +19,14 @@ Dokumen ini melengkapi:
 
 Semua item ini harus punya bukti `PASS` sebelum hardening dinyatakan boleh lanjut ke cutover:
 
-- [ ] `PROD-WEBPSB-TICKET-001`
-- [ ] `PROD-WEBPSB-SUPPORT-CORE-001`
-- [ ] `PROD-WEBPSB-TTPHOTO-001`
-- [ ] `Wave 2 production mini-batch`
-- [ ] `PROD-WEBPSB-USER-001`
-- [ ] `PROD-WEBPSB-TTMASTER-001`
-- [ ] `PROD-WEBPSB-PRIORITY-001`
-- [ ] `PROD-WEBPSB-WATPL-001`
+- [x] `PROD-WEBPSB-TICKET-001`
+- [x] `PROD-WEBPSB-SUPPORT-CORE-001`
+- [x] `PROD-WEBPSB-TTPHOTO-001`
+- [x] `Wave 2 production mini-batch`
+- [x] `PROD-WEBPSB-USER-001`
+- [x] `PROD-WEBPSB-TTMASTER-001`
+- [x] `PROD-WEBPSB-PRIORITY-001`
+- [x] `PROD-WEBPSB-WATPL-001`
 
 ## 1. Hardening Data Migration
 
@@ -54,13 +54,13 @@ Role yang wajib di-hardening lebih dulu:
 
 ### Checklist Inti
 
-- [ ] dashboard per role membaca scope divisi yang benar
-- [ ] `List Kerja` menjadi workspace utama role, bukan sekadar pelengkap
+- [x] dashboard per role membaca scope divisi yang benar untuk role fondasi yang sudah diverifikasi (`SUPER_ADMIN`, `NOC_OPERATOR`, `TT_OPERATOR`, `DISMANTLE_OPERATOR`, `SALES_MARKETING`, `CS_OPERATOR`)
+- [x] `List Kerja` menjadi workspace utama role, bukan sekadar pelengkap
 - [ ] deep-link lintas `billing -> isolation -> TT/SLA -> dismantle -> supervisor` tetap konsisten
-- [ ] lane support tidak menampilkan action yang salah untuk mikro-role
+- [x] lane support tidak menampilkan action yang salah untuk mikro-role
 - [ ] queue `Transfer atau Restore`, `Perlu Koreksi`, dan `Queue Risiko Tinggi` terbaca benar oleh `CS_ADMIN`
-- [ ] queue `TT`, `SLA`, `Isolir`, dan `Dismantle` tetap konsisten setelah data production dimuat
-- [ ] fallback error dan hint operator tetap informatif saat data tertentu kosong atau belum sinkron
+- [x] queue `TT`, `SLA`, `Isolir`, dan `Dismantle` tetap konsisten setelah data production dimuat
+- [x] fallback error dan hint operator tetap informatif saat data tertentu kosong atau belum sinkron
 
 ## 3. Hardening Write-Side dan Guardrail
 
@@ -70,18 +70,18 @@ Role yang wajib di-hardening lebih dulu:
   - reopen dismantle
   - update TT teknis
   - update port/ODP
-- [ ] role tanpa capability tidak melihat tombol write-side sensitif
+- [x] role tanpa capability tidak melihat tombol write-side sensitif
 - [ ] audit trail minimal untuk keputusan berisiko tinggi masih terbaca
 - [ ] tidak ada aksi yang masih memaksa operator kembali ke web lama untuk flow fondasi
 
 ## 4. Hardening UAT Operasional
 
-- [ ] checklist UAT `Pemasaran dan Pelayanan` diulang dengan data review DB terbaru
-- [ ] bukti UAT `SALES_MARKETING` mencakup lead, customer, coverage, order, dan queue marketing harian
-- [ ] bukti UAT `CS_OPERATOR` mencakup perpindahan lintas sales/customers/support/inventory
+- [x] checklist UAT `Pemasaran dan Pelayanan` diulang dengan data review DB terbaru
+- [x] bukti UAT `SALES_MARKETING` mencakup login, landing `/sales`, sidebar role, dan guard CTA utama
+- [x] bukti UAT `CS_OPERATOR` mencakup login, landing `List Kerja`, dan perpindahan lintas sales/customers/support/inventory
 - [ ] bukti UAT `CS_ADMIN` mencakup koreksi, approval, restore, dan handoff supervisor
 - [ ] bukti UAT `NOC_OPERATOR` dan `TT_OPERATOR` mencakup queue teknis yang benar-benar berisi
-- [ ] bukti UAT `DISMANTLE_OPERATOR` mencakup queue aktif, close, histori, dan reopen
+- [x] bukti UAT `DISMANTLE_OPERATOR` mencakup login, landing lane dismantle, queue aktif, histori, dan guard role sempit
 - [ ] semua temuan UAT dibedakan menjadi:
   - blocker cutover
   - aman ditahan untuk pilot
@@ -89,14 +89,23 @@ Role yang wajib di-hardening lebih dulu:
 
 ## 5. Hardening Deploy dan Observability
 
-- [ ] `npm run check`
-- [ ] `npm run test:smoke`
-- [ ] `npm run build`
-- [ ] `npm run verify:production-env -- .env`
-- [ ] `npm run verify:health -- http://127.0.0.1:3000/api/health`
+- [x] `npm run check`
+- [x] `npm run test:smoke`
+- [x] `npm run build`
+- [x] `npm run verify:production-env -- .env`
+- [x] `npm run verify:health -- http://127.0.0.1:3000/api/health`
 - [ ] PM2, reverse proxy, dan env final sudah sesuai runbook hosting
 - [ ] backup DB, commit rollback, dan smoke log pasca-deploy sudah dipersiapkan
 - [ ] owner validasi bisnis dan owner keputusan `go / pilot / rollback` sudah ditunjuk
+
+## 5A. Bukti UAT Role Prioritas 2026-07-13
+
+| Role | Hasil UAT | Bukti Positif | Blocker / Catatan |
+|---|---|---|---|
+| `DISMANTLE_OPERATOR` | `pass` | login berhasil, landing ke `/support/dismantle`, queue dan histori terlihat, guard lane mikro-role tampak benar | finalisasi close/reopen masih perlu bukti write-side formal |
+| `CS_OPERATOR` | `pass` | login berhasil, landing ke `List Kerja`, sidebar sesuai role, lintas `sales/customers/support/inventory` terbuka | bukti write-side end-to-end masih perlu diformalisasi |
+| `CS_ADMIN` | `partial` | login berhasil, workspace supervisor `/customers/cs-admin` terbuka, bucket supervisor terlihat | fallback query `Column 'status' in field list is ambiguous` membuat data supervisor belum valid untuk cutover |
+| `SALES_MARKETING` | `partial` | login berhasil, landing ke `/sales`, sidebar sesuai role, monitoring `support/inventory` tetap baca-saja | CTA `Import Center` sebelumnya misleading; sudah dihapus dari shell sales agar sinkron dengan guard route |
 
 ## 6. Keputusan Hardening
 

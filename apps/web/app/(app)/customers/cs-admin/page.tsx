@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { CsAdminWorkspaceDashboard } from '@/components/cs-admin-workspace-dashboard'
 import { requireSession } from '@/lib/auth'
-import { canAccessPath } from '@/lib/access-control-server'
+import { canAccessOrganizationWorkspace } from '@/lib/organization-workspace-access'
 import { getWorklistBucketsData } from '@/lib/services/worklist-service'
 
 function resolveSearchParam(value: string | string[] | undefined) {
@@ -19,7 +19,7 @@ export default async function CsAdminWorkspacePage({
   }>
 }) {
   const session = await requireSession()
-  if (!canAccessPath(session.role, '/customers/cs-admin')) {
+  if (!canAccessOrganizationWorkspace(session.role, 'cs-admin')) {
     redirect('/dashboard')
   }
 

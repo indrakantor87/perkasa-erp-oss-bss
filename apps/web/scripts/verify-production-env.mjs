@@ -46,6 +46,7 @@ function isPlaceholderSecret(secret) {
   return (
     value === '' ||
     value === 'replace-with-long-random-secret' ||
+    value === 'replace-with-strong-random-secret' ||
     value.includes('dev-secret') ||
     value.includes('example')
   )

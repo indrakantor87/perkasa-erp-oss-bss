@@ -48,6 +48,7 @@ Inventaris ini disusun dari implementasi aktif berikut:
 | Menu | Route | Grup Sidebar | Fungsi Ringkas | Role Yang Saat Ini Bisa Melihat |
 |---|---|---|---|---|
 | Dashboard | `/dashboard` | Menu Utama | KPI, alert silang domain, tindakan berikutnya, approval, shortcut, audit | Semua role |
+| List Kerja | `/dashboard/worklist` | Menu Utama | Queue lintas domain untuk tindak lanjut harian dan approval | Semua role |
 | Daily Activity | `/dashboard/daily-activity` | Menu Utama | Plan pagi, closing sore, approval, performa, kalender, export | Semua role |
 | Import Center | `/import` | Menu Utama | Batch review, upload file sumber, validasi, transform, row review | `SUPER_ADMIN` |
 | Penjualan | `/sales` | Menu Utama | Lead, coverage, survey, sales order, work order, aktivasi | `SUPER_ADMIN`, `SALES_MARKETING`, `CS_OPERATOR`, `CS_ADMIN`, `DIGITAL_CREATOR` |
@@ -56,6 +57,14 @@ Inventaris ini disusun dari implementasi aktif berikut:
 | Inventory | `/inventory` | Menu Utama | Item, stock movement, ODP, port, device assignment, request, loan | `SUPER_ADMIN`, `SALES_MARKETING`, `CS_OPERATOR`, `CS_ADMIN`, `NOC_OPERATOR`, `FIELD_TECHNICIAN` |
 | HR | `/hr` | Menu Utama | Employee, attendance, loan, payroll, face review, geofence | `SUPER_ADMIN` |
 | Billing | `/billing` | Menu Utama | Invoice, payment, collection, suspend, reconnect, write-off | `SUPER_ADMIN` |
+| CS & Admin CS | `/customers/cs-admin` | Pemasaran dan Pelayanan | Workspace supervisor untuk approval, koreksi, restore, dan backlog risiko CS | `SUPER_ADMIN`, `CS_ADMIN` |
+| Digital Creator | `/sales/digital-creator` | Pemasaran dan Pelayanan | Workspace funnel creator, campaign, digital lead, calendar, analytics | `SUPER_ADMIN`, `DIGITAL_CREATOR` |
+| Teknisi PSB | `/support/teknisi-psb` | Teknisi & Ekspan | Workspace instalasi dan tindak lapangan PSB | `SUPER_ADMIN`, `FIELD_TECHNICIAN` |
+| Teknisi Expan | `/support/teknisi-expan` | Teknisi & Ekspan | Workspace ekspan jaringan dan kesiapan jalur | `SUPER_ADMIN`, `FIELD_TECHNICIAN` |
+| Teknisi Jointer | `/support/teknisi-jointer` | Teknisi & Ekspan | Workspace joint backbone dan follow up teknis sambungan | `SUPER_ADMIN`, `FIELD_TECHNICIAN` |
+| Legal | `/inventory/legal` | General Affair | Workspace legal dan dokumen operasional | `SUPER_ADMIN` |
+| Kantor | `/inventory/kantor` | Operasional | Workspace stok dan ritme operasional kantor | `SUPER_ADMIN` |
+| Toko | `/inventory/toko` | Operasional | Workspace stok display dan ritme operasional toko | `SUPER_ADMIN` |
 | Akses | `/settings/access` | Pengaturan | Matrix permission dan admin permission master | `SUPER_ADMIN` |
 | User Internal | `/settings/users` | Pengaturan | Direktori user internal, create/edit/reset/deactivate/reactivate, audit | `SUPER_ADMIN` |
 
@@ -63,15 +72,15 @@ Inventaris ini disusun dari implementasi aktif berikut:
 
 | Role | Divisi | Sub-divisi | Default Landing | Menu Yang Tampil | Pola Hak Akses |
 |---|---|---|---|---|---|
-| `SUPER_ADMIN` | Lintas Divisi | Kontrol Global | `/dashboard` | Dashboard, Daily Activity, Import Center, Penjualan, Customer, Support, Inventory, HR, Billing, Akses, User Internal | lihat, buat, ubah, approve, export, manage lintas domain |
-| `SALES_MARKETING` | Pemasaran dan Pelayanan | Penjualan | `/dashboard` | Dashboard, Daily Activity, Penjualan, Customer, Support, Inventory | tulis di `sales` dan `customers`, baca di `support` dan `inventory` |
-| `CS_OPERATOR` | Pemasaran dan Pelayanan | CS | `/dashboard` | Dashboard, Daily Activity, Penjualan, Customer, Support, Inventory | tulis di `sales` dan `support`, update terbatas di `customers` dan `inventory` |
-| `CS_ADMIN` | Pemasaran dan Pelayanan | Admin CS | `/dashboard` | Dashboard, Daily Activity, Penjualan, Customer, Support, Inventory | supervisor CS: approve di `sales`, `customers`, `support`, `inventory` terbatas |
-| `NOC_OPERATOR` | Pemasaran dan Pelayanan | NOC | `/dashboard` | Dashboard, Daily Activity, Support, Inventory | tulis di `support`, update dan export di `inventory` |
-| `FIELD_TECHNICIAN` | Teknis dan Expan | Teknisi PSB / Teknisi Jalur & Expan / Teknisi Jointer | `/dashboard` | Dashboard, Daily Activity, Inventory, Support | update lapangan di `support` dan `inventory`, tanpa approval |
-| `TT_OPERATOR` | Pemasaran dan Pelayanan | Troubleshoots | `/dashboard` | Dashboard, Daily Activity, Support | create/update di `support` dengan scope sempit TT |
-| `DIGITAL_CREATOR` | Pemasaran dan Pelayanan | Creator Digital | `/dashboard` | Dashboard, Daily Activity, Penjualan | create/update/export di `sales` untuk lead dan aktivitas marketing digital |
-| `DISMANTLE_OPERATOR` | Pemasaran dan Pelayanan | Dismantle | `/dashboard` | Dashboard, Daily Activity, Support | update di `support` untuk flow dismantle dan tindak lapangan terkait |
+| `SUPER_ADMIN` | Lintas Divisi | Kontrol Global | `/dashboard` | Dashboard, List Kerja, Daily Activity, Import Center, Penjualan, Customer, Support, Inventory, HR, Billing, CS & Admin CS, Digital Creator, Teknisi PSB, Teknisi Expan, Teknisi Jointer, Legal, Kantor, Toko, Akses, User Internal | lihat, buat, ubah, approve, export, manage lintas domain |
+| `SALES_MARKETING` | Pemasaran dan Pelayanan | Penjualan | `/sales` | Dashboard, List Kerja, Daily Activity, Penjualan, Customer, Support, Inventory | tulis di `sales` dan `customers`, baca di `support` dan `inventory` |
+| `CS_OPERATOR` | Pemasaran dan Pelayanan | CS | `/dashboard/worklist` | Dashboard, List Kerja, Daily Activity, Penjualan, Customer, Support, Inventory | tulis di `sales` dan `support`, update terbatas di `customers` dan `inventory` |
+| `CS_ADMIN` | Pemasaran dan Pelayanan | Admin CS | `/customers/cs-admin` | Dashboard, List Kerja, Daily Activity, Penjualan, Customer, Support, Inventory, CS & Admin CS | supervisor CS: approve di `sales`, `customers`, `support`, `inventory` terbatas |
+| `NOC_OPERATOR` | Pemasaran dan Pelayanan | NOC | `/support/tt` | Dashboard, List Kerja, Daily Activity, Support, Inventory | tulis di `support`, update dan export di `inventory` |
+| `FIELD_TECHNICIAN` | Teknis dan Expan | Teknisi PSB / Teknisi Jalur & Expan / Teknisi Jointer | `/dashboard/worklist` | Dashboard, List Kerja, Daily Activity, Inventory, Support, Teknisi PSB, Teknisi Expan, Teknisi Jointer | update lapangan di `support` dan `inventory`, tanpa approval |
+| `TT_OPERATOR` | Pemasaran dan Pelayanan | Troubleshoots | `/support/tt` | Dashboard, List Kerja, Daily Activity, Support | create/update di `support` dengan scope sempit TT |
+| `DIGITAL_CREATOR` | Pemasaran dan Pelayanan | Creator Digital | `/sales/digital-creator` | Dashboard, List Kerja, Daily Activity, Penjualan, Digital Creator | create/update/export di `sales` untuk lead dan aktivitas marketing digital |
+| `DISMANTLE_OPERATOR` | Pemasaran dan Pelayanan | Dismantle | `/support/dismantle` | Dashboard, List Kerja, Daily Activity, Support | update di `support` untuk flow dismantle dan tindak lapangan terkait |
 
 ## Katalog Kolom Per Menu
 
