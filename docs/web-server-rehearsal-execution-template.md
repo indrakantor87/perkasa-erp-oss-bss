@@ -35,14 +35,16 @@ Dokumen ini melengkapi:
 | 4 | smoke test | `npm run test:smoke` | `........` | `........` | `pass / fail` | `................` |
 | 5 | build | `npm run build` | `........` | `........` | `pass / fail` | `................` |
 | 6 | start / restart PM2 | `pm2 startOrReload ecosystem.config.cjs --only perkasa-erp-web` | `........` | `........` | `pass / fail` | `................` |
-| 7 | runtime validator | `npm run verify:server-runtime -- --pm2-app perkasa-erp-web --health-url http://127.0.0.1:3000/api/health --domain <domain> --output docs/web-server-runtime-check.json` | `........` | `........` | `pass / fail` | `................` |
-| 8 | runtime report | `npm run render:server-runtime-report -- --input docs/web-server-runtime-check.json --output docs/web-server-runtime-report.md` | `........` | `........` | `pass / fail` | `................` |
-| 9 | evidence collector | `npm run collect:go-live-evidence -- --type rehearsal --server "$(hostname)" --domain <domain> --health-url http://127.0.0.1:3000/api/health --rollback-commit <rollback-commit> --output docs/web-go-live-evidence-generated.md` | `........` | `........` | `pass / fail` | `................` |
+| 7 | reverse proxy validator | `npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name <domain> --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --reload-command "sudo systemctl reload nginx" --output docs/web-reverse-proxy-check.json` | `........` | `........` | `pass / fail` | `................` |
+| 8 | runtime validator | `npm run verify:server-runtime -- --pm2-app perkasa-erp-web --health-url http://127.0.0.1:3000/api/health --domain <domain> --output docs/web-server-runtime-check.json` | `........` | `........` | `pass / fail` | `................` |
+| 9 | runtime report | `npm run render:server-runtime-report -- --input docs/web-server-runtime-check.json --output docs/web-server-runtime-report.md` | `........` | `........` | `pass / fail` | `................` |
+| 10 | evidence collector | `npm run collect:go-live-evidence -- --type rehearsal --server "$(hostname)" --domain <domain> --health-url http://127.0.0.1:3000/api/health --rollback-commit <rollback-commit> --output docs/web-go-live-evidence-generated.md` | `........` | `........` | `pass / fail` | `................` |
 
 ## Artefak Yang Harus Tersedia
 
 | Artefak | Lokasi | Status | Catatan |
 |---|---|---|---|
+| reverse proxy JSON | `docs/web-reverse-proxy-check.json` | `ada / tidak` | `................` |
 | runtime JSON | `docs/web-server-runtime-check.json` | `ada / tidak` | `................` |
 | runtime report markdown | `docs/web-server-runtime-report.md` | `ada / tidak` | `................` |
 | evidence markdown | `docs/web-go-live-evidence-generated.md` | `ada / tidak` | `................` |
@@ -57,6 +59,7 @@ Dokumen ini melengkapi:
 | env | `pass / fail` | `................` |
 | build | `pass / fail` | `................` |
 | PM2 | `pass / fail` | `................` |
+| reverse proxy | `pass / fail` | `................` |
 | health | `pass / fail` | `................` |
 | localhost `/login` | `pass / fail` | `................` |
 | domain `/login` | `pass / fail` | `................` |

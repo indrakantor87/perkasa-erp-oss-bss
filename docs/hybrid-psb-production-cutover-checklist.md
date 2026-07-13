@@ -72,6 +72,7 @@ Catatan:
 - [ ] `npm run build`
 - [ ] PM2 atau process manager aktif `online`
 - [ ] reverse proxy aktif
+- [ ] `npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name <domain-final> --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --reload-command "sudo systemctl reload nginx" --output docs/web-reverse-proxy-check.json`
 - [ ] `npm run verify:health -- http://127.0.0.1:3000/api/health`
 
 ### 2. Validasi Data Minimum
@@ -180,6 +181,7 @@ Rollback harus langsung dijalankan jika muncul:
 8. output `/api/health`
 9. catatan keputusan `GO / PILOT / ROLLBACK`
 10. bukti backup dan rollback dari [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md)
+11. output `docs/web-reverse-proxy-check.json`
 
 ## Pasca-Keputusan
 

@@ -162,6 +162,24 @@ Checklist cepat:
 1. `server_name` sudah diganti ke domain final
 2. `proxy_pass` tetap ke `127.0.0.1:3000`
 3. `nginx -t` lulus
+4. jika ingin bukti JSON reverse proxy, jalankan helper berikut:
+
+```bash
+cd "$APP_DIR"
+npm run verify:reverse-proxy -- \
+  --config /etc/nginx/sites-available/perkasa-erp-web.conf \
+  --server-name "$DOMAIN" \
+  --expected-upstream http://127.0.0.1:3000 \
+  --test-command "sudo nginx -t" \
+  --reload-command "sudo systemctl reload nginx" \
+  --output docs/web-reverse-proxy-check.json
+```
+
+Checklist cepat helper:
+
+1. file `docs/web-reverse-proxy-check.json` berhasil dibuat
+2. `server_name`, `proxy_pass`, dan header proxy inti terbaca `pass`
+3. `syntaxTest` dan `reload` terbaca `pass`
 
 ## 6. Health Check Teknis
 
@@ -177,6 +195,7 @@ Checklist cepat:
 1. `verify:health` lulus
 2. login page merespons dari localhost
 3. login page merespons dari domain final
+4. bila helper reverse proxy dipakai, hasil JSON dilampirkan ke evidence hari-H
 
 Jika ingin validasi runtime sekaligus dalam satu command:
 
@@ -246,7 +265,7 @@ Checklist cepat:
 
 1. file output berhasil dibuat
 2. status `git`, `PM2`, `health`, dan probe `/login` terisi
-3. hasil otomatis tetap dilengkapi dengan screenshot browser dan sign-off PIC
+3. hasil otomatis tetap dilengkapi dengan screenshot browser, output `web-reverse-proxy-check.json`, dan sign-off PIC
 
 ## 7. Smoke Browser Minimum
 

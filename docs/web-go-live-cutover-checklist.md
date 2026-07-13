@@ -118,6 +118,7 @@ Catatan commit:
 
 - start/restart PM2 dengan `ecosystem.config.cjs`
 - aktifkan Nginx/reload config
+- jalankan `npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name <domain-final> --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --reload-command "sudo systemctl reload nginx" --output docs/web-reverse-proxy-check.json`
 - jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`
 - jalankan `npm run verify:server-runtime -- --pm2-app perkasa-erp-web --health-url http://127.0.0.1:3000/api/health --domain <domain-final> --output docs/web-server-runtime-check.json`
 - jalankan `npm run render:server-runtime-report -- --input docs/web-server-runtime-check.json --output docs/web-server-runtime-report.md`
@@ -146,8 +147,10 @@ Semua poin ini harus lulus sebelum validasi bisnis:
 - `npm run verify:production-env -- .env` lulus
 - `npm run build` lulus
 - PM2 status `online`
+- `npm run verify:reverse-proxy -- ...` lulus
 - `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus
 - `npm run verify:server-runtime -- ...` lulus
+- `docs/web-reverse-proxy-check.json` berhasil dibuat
 - `docs/web-server-runtime-report.md` berhasil dibuat
 - bila rehearsal memakai env sementara, file `.env.rehearsal.local` sudah dihapus kembali setelah selesai
 - `docs/web-go-live-evidence-generated.md` berhasil dibuat bila helper collector dipakai
@@ -254,6 +257,7 @@ Saat validasi, simpan bukti minimum:
 5. screenshot `/api/health` atau output `verify:health`
 6. catatan timestamp keputusan `GO / PILOT / ROLLBACK`
 7. bukti backup dan rollback plan dari [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md)
+8. output `docs/web-reverse-proxy-check.json`
 
 Gunakan template siap-isi berikut agar bukti teknis, validasi per role, dan sign-off PIC tercatat dalam satu dokumen:
 

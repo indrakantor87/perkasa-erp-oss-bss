@@ -16,6 +16,7 @@ Dokumen ini melengkapi:
 Catatan:
 
 - Untuk snapshot teknis awal, gunakan `npm run collect:go-live-evidence` lalu tempel/ringkas hasilnya ke template ini.
+- Untuk bukti reverse proxy yang lebih tegas, jalankan `npm run verify:reverse-proxy` dan lampirkan output JSON-nya.
 - Untuk validasi runtime yang lebih mudah dibaca, jalankan `npm run render:server-runtime-report` setelah `verify:server-runtime` lalu lampirkan report markdown-nya.
 
 ## Metadata Eksekusi
@@ -91,6 +92,7 @@ Catatan:
 |---|---|
 | `nginx -t` | `pass / fail` |
 | reload Nginx | `pass / fail` |
+| output `web-reverse-proxy-check.json` | `................` |
 | `verify:server-runtime` | `pass / fail` |
 | localhost `/login` | `pass / fail` |
 | domain `/login` | `pass / fail` |

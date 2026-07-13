@@ -33,6 +33,7 @@ npm run test:smoke
 npm run build
 pm2 start ecosystem.config.cjs
 pm2 status
+npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name "$DOMAIN" --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --reload-command "sudo systemctl reload nginx" --output docs/web-reverse-proxy-check.json
 npm run verify:health -- http://127.0.0.1:3000/api/health
 npm run verify:server-runtime -- --pm2-app perkasa-erp-web --health-url http://127.0.0.1:3000/api/health --domain "$DOMAIN" --output docs/web-server-runtime-check.json
 npm run render:server-runtime-report -- --input docs/web-server-runtime-check.json --output docs/web-server-runtime-report.md
@@ -60,8 +61,10 @@ rm -f .env.rehearsal.local
 - `npm run test:smoke` lulus
 - `npm run build` lulus
 - PM2 status `online` (server)
+- `npm run verify:reverse-proxy -- ...` lulus (server)
 - `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus (server)
 - `npm run verify:server-runtime -- ...` lulus (server)
+- `docs/web-reverse-proxy-check.json` berhasil dibuat
 - `docs/web-server-runtime-report.md` berhasil dibuat
 - `docs/web-go-live-evidence-generated.md` berhasil dibuat
 - halaman login terbuka dari browser (server)

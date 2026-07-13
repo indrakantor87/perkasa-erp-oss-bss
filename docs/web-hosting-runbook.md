@@ -13,6 +13,7 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - PM2 config: `apps/web/ecosystem.config.cjs`
 - Env validator: `apps/web/scripts/verify-production-env.mjs`
 - Health verifier: `apps/web/scripts/verify-health.mjs`
+- Reverse proxy verifier: `apps/web/scripts/verify-reverse-proxy.mjs`
 - Runtime verifier: `apps/web/scripts/verify-server-runtime.mjs`
 - Runtime report renderer: `apps/web/scripts/render-server-runtime-report.mjs`
 - Rehearsal env helper: `apps/web/scripts/prepare-production-rehearsal-env.mjs`
@@ -55,8 +56,9 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 10. Jalankan `pm2 start ecosystem.config.cjs`.
 11. Simpan config PM2 dengan `pm2 save`.
 12. Arahkan Nginx ke port app (`3000`) memakai `docs/nginx/perkasa-erp-web.conf`.
-13. Jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`.
-14. Verifikasi domain final.
+13. Jalankan `npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name <domain-final> --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --reload-command "sudo systemctl reload nginx" --output docs/web-reverse-proxy-check.json`.
+14. Jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`.
+15. Verifikasi domain final.
 
 ## Command Operasional PM2
 
@@ -74,6 +76,7 @@ pm2 save
 ```bash
 cd /path/to/perkasa-erp-oss-bss/apps/web
 npm run verify:production-env -- .env
+npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name <domain-final> --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --reload-command "sudo systemctl reload nginx" --output docs/web-reverse-proxy-check.json
 npm run verify:health -- http://127.0.0.1:3000/api/health
 npm run prepare:production-rehearsal-env -- --source .env --target .env.rehearsal.local --port 3011
 npm run rehearse:production -- .env --port 3011
@@ -115,6 +118,7 @@ Gunakan helper ini hanya untuk rehearsal. Production final tetap wajib memakai `
 
 ## Verifikasi Pasca Deploy
 
+- `npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name <domain-final> --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --reload-command "sudo systemctl reload nginx" --output docs/web-reverse-proxy-check.json`
 - `npm run verify:health -- http://127.0.0.1:3000/api/health`
 - `npm run verify:server-runtime -- --pm2-app perkasa-erp-web --health-url http://127.0.0.1:3000/api/health --domain <domain-final> --output docs/web-server-runtime-check.json`
 - `npm run render:server-runtime-report -- --input docs/web-server-runtime-check.json --output docs/web-server-runtime-report.md`
@@ -134,7 +138,8 @@ Gunakan helper ini hanya untuk rehearsal. Production final tetap wajib memakai `
 5. Jalankan `pm2 restart perkasa-erp-web`.
 6. Jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`.
 7. Ulangi login admin.
-8. Catat hasil rollback, timestamp, dan health pasca-rollback ke template backup/rollback.
+8. Jalankan ulang `npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name <domain-final> --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --skip-reload --output docs/web-reverse-proxy-check.json`.
+9. Catat hasil rollback, timestamp, health pasca-rollback, dan output reverse proxy ke template backup/rollback.
 
 ## Catatan Penting
 

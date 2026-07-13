@@ -60,7 +60,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - [x] Script install, build, start, dan restart service sudah jelas
 - [x] Command start production dikunci ke mode standalone (`node .next/standalone/server.js`)
 - [x] Health check endpoint atau halaman verifikasi pasca-deploy sudah ditentukan (`/api/health`)
-- [x] Validator env production dan script health verification sudah tersedia
+- [x] Validator env production, script reverse proxy verification, dan script health verification sudah tersedia
 - [x] Rollback plan sudah disiapkan jika deploy gagal
 - [ ] PIC deploy dan PIC validasi bisnis sudah ditentukan
 
@@ -105,6 +105,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - Helper `npm run prepare:production-rehearsal-env -- --source .env --target .env.rehearsal.local --port 3011` kini tersedia agar rehearsal bisa memakai secret sementara yang valid tanpa mengubah `.env` utama.
 - Helper `npm run collect:go-live-evidence -- ...` kini tersedia untuk mengumpulkan snapshot teknis server-side ke file markdown sebelum PIC melengkapi screenshot dan sign-off.
 - Helper `npm run verify:server-runtime -- ...` kini tersedia untuk memberi status tegas `pass/fail` pada PM2, `verify:health`, dan probe `/login` localhost/domain sebelum evidence hari-H dikumpulkan.
+- Helper `npm run verify:reverse-proxy -- ...` kini tersedia untuk membuktikan file config Nginx aktif memakai `server_name` yang benar, `proxy_pass` ke `127.0.0.1:3000`, header proxy inti tersedia, serta `nginx -t` dan reload dapat direkam ke JSON.
 - Helper `npm run render:server-runtime-report -- ...` dan template [web-server-rehearsal-execution-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-rehearsal-execution-template.md) kini tersedia agar hasil runtime JSON langsung berubah menjadi report markdown yang siap dibaca PIC deploy.
 - Template [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md) kini tersedia agar bukti backup DB, backup env, dan rollback pasca-failover tidak lagi hanya berupa catatan lepas.
 - Smoke browser `admin.perkasa` dan `support.ops` berhasil login, masuk dashboard, dan logout tanpa lagi terkena redirect `0.0.0.0`.

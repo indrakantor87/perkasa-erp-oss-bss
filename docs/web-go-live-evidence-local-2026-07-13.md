@@ -44,6 +44,7 @@ UAT role prioritas yang sudah benar-benar dijalankan di instance lokal.
 | helper evidence server-side | `siap` |
 | template rehearsal server | `siap` |
 | template backup / rollback | `siap` |
+| helper reverse proxy | `siap` |
 
 ### Health Lokal
 
@@ -86,7 +87,7 @@ mutation proof terkontrol dengan evidence before/after:
 |---|---|
 | blocker utama | tidak ada blocker role fondasi pada instance lokal; fokus tersisa bergeser ke eksekusi cutover infra production (`PM2`, `Nginx`, backup DB, PIC keputusan) |
 | minor | beberapa area cutover infra production masih menunggu eksekusi nyata di host target (`PM2`, `Nginx`, backup DB, PIC keputusan) |
-| minor | rehearsal server-side kini punya jalur env sementara yang aman melalui helper `prepare:production-rehearsal-env`, snapshot bukti otomatis melalui `collect:go-live-evidence`, report markdown lewat `render:server-runtime-report`, serta template backup/rollback, tetapi eksekusi penuh di server nyata masih perlu bukti hari-H |
+| minor | rehearsal server-side kini punya jalur env sementara yang aman melalui helper `prepare:production-rehearsal-env`, snapshot bukti otomatis melalui `collect:go-live-evidence`, validasi runtime lewat `verify:server-runtime`, validasi reverse proxy lewat `verify:reverse-proxy`, report markdown lewat `render:server-runtime-report`, serta template backup/rollback, tetapi eksekusi penuh di server nyata masih perlu bukti hari-H |
 | workaround | evidence reset auth lokal tersedia bila password seed review DB perlu disejajarkan ulang tanpa melemahkan auth aplikasi |
 | backlog pasca-go-live | role di luar scope fondasi seperti `DIGITAL_CREATOR` dan business `Toko` tetap dicatat sebagai gelombang berikutnya |
 

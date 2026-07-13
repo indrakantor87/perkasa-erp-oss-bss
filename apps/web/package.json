@@ -1,6 +1,6 @@
 {
   "name": "perkasa-erp-oss-bss-web",
-  "version": "0.66.18",
+  "version": "0.66.19",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,6 +10,7 @@
     "test:smoke": "tsx tests/mock-data.test.ts",
     "verify:production-env": "node ./scripts/verify-production-env.mjs",
     "verify:health": "node ./scripts/verify-health.mjs",
+    "verify:reverse-proxy": "node ./scripts/verify-reverse-proxy.mjs",
     "verify:server-runtime": "node ./scripts/verify-server-runtime.mjs",
     "render:server-runtime-report": "node ./scripts/render-server-runtime-report.mjs",
     "prepare:production-rehearsal-env": "node ./scripts/prepare-production-rehearsal-env.mjs",

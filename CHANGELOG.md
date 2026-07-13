@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.19] - 2026-07-13
+
+### Improved
+
+- Ditambahkan helper `npm run verify:reverse-proxy` untuk membuktikan config reverse proxy/Nginx di server memakai `server_name` yang benar, `proxy_pass` ke `127.0.0.1:3000`, header proxy inti lengkap, serta merekam hasil `nginx -t` dan reload ke JSON yang siap dilampirkan sebagai evidence: [verify-reverse-proxy.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/verify-reverse-proxy.mjs), [package.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/package.json)
+- Runbook hosting, command sheet server-side, checklist rehearsal/cutover, template evidence, dan snapshot lokal kini menautkan helper reverse proxy agar gap `Nginx` pada rehearsal server-side tidak lagi hanya berupa checklist manual: [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md), [web-deploy-rehearsal-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-deploy-rehearsal-checklist.md), [web-server-rehearsal-execution-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-rehearsal-execution-template.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md), [hybrid-psb-production-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-cutover-checklist.md), [web-go-live-evidence-local-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-local-2026-07-13.md)
+- Versioning diselaraskan ke `0.66.19` untuk menandai penutupan gap bukti reverse proxy di paket production rehearsal/go-live.
+
 ## [0.66.18] - 2026-07-13
 
 ### Improved
