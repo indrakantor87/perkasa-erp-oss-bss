@@ -32,12 +32,17 @@ Cutover hybrid hanya boleh lanjut bila hasil minimum berikut sudah tercatat:
 ## T-3 Sampai T-1
 
 - [ ] freeze scope migration dan web ditetapkan
-- [ ] commit kandidat release terakhir sudah tercatat
-- [ ] commit rollback stabil sudah tercatat
+- [x] commit kandidat release terakhir sudah tercatat
+- [x] commit rollback stabil sudah tercatat
 - [ ] dokumen readiness, hardening, dan cutover sudah dibaca ulang
 - [ ] backup database target dan backup file env sudah disiapkan
 - [x] akun validasi untuk `SUPER_ADMIN`, `NOC_OPERATOR`, `TT_OPERATOR`, `DISMANTLE_OPERATOR`, `SALES_MARKETING`, `CS_OPERATOR`, dan `CS_ADMIN` dipastikan aktif
 - [ ] PIC deploy, PIC DB, PIC validasi support, PIC validasi sales/CS, dan PIC keputusan sudah ditunjuk
+
+Catatan commit saat ini:
+
+- kandidat release lokal terbaru: `32dc210` (`Close local readiness to 100 percent`)
+- rollback stabil sebelumnya: `11baf11` (`Close NOC operator blocker`)
 
 ## Freeze Batch Migration
 

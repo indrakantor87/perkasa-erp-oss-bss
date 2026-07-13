@@ -83,6 +83,11 @@ Checklist ini harus selesai sebelum tidur:
 - commit rollback stabil sudah dicatat
 - akun uji per role sudah dikonfirmasi masih valid
 
+Catatan commit saat dokumen ini diperbarui:
+
+- kandidat release lokal terbaru: `32dc210` (`Close local readiness to 100 percent`)
+- rollback stabil sebelumnya: `11baf11` (`Close NOC operator blocker`)
+
 ## Timeline Hari-H
 
 ### 08:00 - 08:30

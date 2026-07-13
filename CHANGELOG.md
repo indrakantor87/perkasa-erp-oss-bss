@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.13] - 2026-07-13
+
+### Improved
+
+- Dokumen cutover production kini mencatat commit kandidat rilis dan rollback stabil yang nyata, sehingga paket hari-H tidak lagi bergantung pada ingatan manual operator: [hybrid-psb-production-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-cutover-checklist.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+- Snapshot evidence lokal kini menunjuk commit kandidat terbaru `32dc210`, selaras dengan status worktree bersih setelah fondasi operasional lokal ditutup ke `100%`: [web-go-live-evidence-local-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-local-2026-07-13.md)
+- Versioning diselaraskan ke `0.66.13`.
+
 ## [0.66.12] - 2026-07-13
 
 ### Improved
