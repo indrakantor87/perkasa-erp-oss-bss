@@ -19,6 +19,7 @@ Runbook ini dipakai untuk menyiapkan dan menjalankan jalur production `Wave 1B T
 - transform production: [xampp_review_transform_wave1b_ticket_production.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_wave1b_ticket_production.sql)
 - review query: [xampp_review_wave1b_ticket_production_review_queries.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1b_ticket_production_review_queries.sql)
 - assertion query: [xampp_review_wave1b_ticket_production_assertions.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1b_ticket_production_assertions.sql)
+- audit rerun tahap 2: [xampp_review_wave1b_ticket_stage2_rerun_audit.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1b_ticket_stage2_rerun_audit.sql)
 - runner Windows: [run-review-wave1b-ticket-production.ps1](file:///d:/trae_projects/perkasa-erp-oss-bss/scripts/run-review-wave1b-ticket-production.ps1)
 
 ## Input JSON
@@ -110,6 +111,19 @@ File assertion query:
 
 ```text
 database/xampp_review_wave1b_ticket_production_assertions.sql
+```
+
+Jika tahap 2 / transform ticket tanpa sengaja dijalankan ulang dan muncul dugaan
+duplikat, audit dulu dengan:
+
+```text
+database/xampp_review_wave1b_ticket_stage2_rerun_audit.sql
+```
+
+Panduan interpretasi dan recovery tersedia di:
+
+```text
+docs/hybrid-wave1b-ticket-stage2-rerun-recovery.md
 ```
 
 ## Acceptance Minimum

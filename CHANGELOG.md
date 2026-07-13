@@ -108,6 +108,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.25] - 2026-07-13
+
+### Improved
+
+- Ditambahkan audit read-only [xampp_review_wave1b_ticket_stage2_rerun_audit.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1b_ticket_stage2_rerun_audit.sql) untuk memeriksa collision target customer/order/subscription/work order, duplicate final record, dan downstream reference ketika `Wave 1B Ticket` atau `transform tahap 2` terlanjur dijalankan ganda.
+- Ditambahkan panduan [hybrid-wave1b-ticket-stage2-rerun-recovery.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave1b-ticket-stage2-rerun-recovery.md) agar tim bisa membedakan antara duplikat UI/metadata, duplicate final yang masih aman, dan duplicate final yang butuh cleanup terarah sebelum lanjut hosting.
+- Runbook `Wave 1B Ticket production` dan snapshot readiness production kini menautkan jalur audit rerun tahap 2 supaya recovery tidak lagi mengandalkan hapus manual buta: [hybrid-wave-1b-psb-ticket-production-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-wave-1b-psb-ticket-production-runbook.md), [hybrid-psb-production-readiness-2026-07-11.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-readiness-2026-07-11.md)
+- Versioning diselaraskan ke `0.66.25` untuk menandai paket audit/recovery rerun tahap 2.
+
 ## [0.66.24] - 2026-07-13
 
 ### Improved

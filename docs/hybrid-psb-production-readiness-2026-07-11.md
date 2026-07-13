@@ -13,6 +13,7 @@ Dokumen ini merangkum status readiness hybrid migration `Web PSB` setelah jalur 
   - UAT lintas divisi dan validasi alur operator riil masih perlu dipadatkan ke checklist cutover
   - beberapa perubahan UI/domain workspace di repo masih berjalan paralel, sehingga commit migration harus tetap terisolasi
   - deploy, rollback, backup, dan guardrail pasca-go-live masih perlu difinalkan per lingkungan
+  - bila `transform tahap 2` atau jalur `Wave 1B Ticket` pernah terpicu ganda secara manual, perlu audit rerun sebelum menyimpulkan adanya duplikat final
 
 ## Jalur Production yang Sudah Tervalidasi Nyata
 
