@@ -56,7 +56,7 @@ Sebelum mulai, isi peran berikut:
 
 ## Snapshot Readiness Sebelum Hari-H
 
-Status teknis repo per `0.66.15`:
+Status teknis repo per batch readiness terbaru:
 
 - `npm run check`, `npm run test:smoke`, `npm run build`, `verify:production-env`, dan `verify:health` sudah tersedia dan dipakai sebagai baseline readiness.
 - Sidebar/workspace khusus kini dipersempit ke role target agar audit menu tidak misleading.
@@ -79,15 +79,15 @@ Checklist ini harus selesai sebelum tidur:
 - branch `main` sudah memuat commit kandidat rilis terakhir
 - `docs/web-hosting-readiness-checklist.md` sudah dibaca ulang
 - `.env` production final sudah disiapkan di server
-- backup database sebelum cutover sudah disiapkan
+- backup database sebelum cutover sudah disiapkan dan dicatat di [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md)
 - domain, reverse proxy, dan PM2 config sudah siap
 - commit rollback stabil sudah dicatat
 - akun uji per role sudah dikonfirmasi masih valid
 
-Catatan commit saat dokumen ini diperbarui:
+Catatan commit:
 
-- kandidat release lokal terbaru: `975cbfe` (`Harden production rehearsal package`)
-- rollback stabil sebelumnya: `32dc210` (`Close local readiness to 100 percent`)
+- isi `commit deploy` dari hasil `git log -1 --oneline` pada kandidat terakhir yang benar-benar akan dipasang
+- isi `commit rollback` dari kandidat stabil sebelumnya yang sudah disepakati PIC deploy
 
 ## Timeline Hari-H
 
@@ -101,6 +101,7 @@ Catatan commit saat dokumen ini diperbarui:
 ### 08:30 - 09:00
 
 - backup database final
+- isi template [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md)
 - verifikasi akses SSH/server
 - salin `.env` production ke `apps/web/.env`
 - jalankan `npm run verify:production-env -- .env`
@@ -252,6 +253,7 @@ Saat validasi, simpan bukti minimum:
 4. screenshot landing `support`
 5. screenshot `/api/health` atau output `verify:health`
 6. catatan timestamp keputusan `GO / PILOT / ROLLBACK`
+7. bukti backup dan rollback plan dari [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md)
 
 Gunakan template siap-isi berikut agar bukti teknis, validasi per role, dan sign-off PIC tercatat dalam satu dokumen:
 

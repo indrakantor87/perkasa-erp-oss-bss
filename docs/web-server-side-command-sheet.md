@@ -22,19 +22,43 @@ export APP_DIR=/path/to/perkasa-erp-oss-bss/apps/web
 export DOMAIN=erp.example.com
 export HEALTH_URL=http://127.0.0.1:3000/api/health
 export ROLLBACK_COMMIT=<isi-commit-stabil>
+export BACKUP_DIR=/var/backups/perkasa-erp
 ```
 
-Catatan kandidat saat dokumen ini diperbarui:
+Isi nilai commit dari hasil:
 
-1. kandidat release saat ini: `975cbfe`
-2. kandidat aplikasi fondasi lokal 100%: `32dc210`
-3. rollback stabil: `11baf11`
+```bash
+cd "$APP_DIR"
+git log -1 --oneline
+git rev-parse --short HEAD
+```
 
 Pastikan:
 
 1. file env production nyata sudah siap di server
 2. PM2 dan Nginx sudah terpasang
 3. database target bisa diakses dari server
+
+## 2A. Backup DB dan Env
+
+```bash
+cd "$APP_DIR"
+mkdir -p "$BACKUP_DIR"
+date +"%Y%m%d-%H%M%S"
+cp .env "$BACKUP_DIR/.env.$(date +"%Y%m%d-%H%M%S").bak"
+# ganti placeholder sesuai environment server:
+mysqldump --single-transaction --quick --routines --triggers \
+  --host <db-host> --port <db-port> --user <db-user> --password \
+  <db-name> > "$BACKUP_DIR/db-$(date +"%Y%m%d-%H%M%S").sql"
+ls -lh "$BACKUP_DIR"
+```
+
+Checklist cepat:
+
+1. backup DB berhasil dibuat
+2. backup `.env` berhasil dibuat
+3. nama file backup dan timestamp dicatat
+4. hasilnya ditempel ke [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md)
 
 ## 1. Validasi Kandidat Rilis
 
@@ -264,6 +288,10 @@ Rollback trigger utama:
 2. `/api/health` gagal
 3. dashboard blank/crash
 4. queue support teknis kosong total tanpa sebab
+
+Setelah rollback dieksekusi, isi juga:
+
+- [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md)
 
 ## 9. Catatan Eksekusi
 

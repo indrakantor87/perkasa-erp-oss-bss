@@ -15,7 +15,7 @@ UAT role prioritas yang sudah benar-benar dijalankan di instance lokal.
 | tipe kegiatan | `snapshot lokal pra-go-live` |
 | host | `localhost:3000` |
 | branch | `main` |
-| commit kandidat saat snapshot | `975cbfe` |
+| commit kandidat saat snapshot | `lihat commit kandidat terakhir yang dipilih saat rehearsal / hari-H` |
 | status repo | `working tree bersih` |
 | sumber data | `Review DB` |
 
@@ -38,11 +38,12 @@ UAT role prioritas yang sudah benar-benar dijalankan di instance lokal.
 | Item | Hasil |
 |---|---|
 | `git status --short` | kosong |
-| `git log -1 --oneline` | `975cbfe Harden production rehearsal package` |
+| `git log -1 --oneline` | `isi dari hasil kandidat terakhir saat rehearsal / hari-H` |
 | branch aktif | `main` |
 | working tree bersih | `ya` |
 | helper evidence server-side | `siap` |
 | template rehearsal server | `siap` |
+| template backup / rollback | `siap` |
 
 ### Health Lokal
 
@@ -84,8 +85,8 @@ mutation proof terkontrol dengan evidence before/after:
 | Kategori | Isi |
 |---|---|
 | blocker utama | tidak ada blocker role fondasi pada instance lokal; fokus tersisa bergeser ke eksekusi cutover infra production (`PM2`, `Nginx`, backup DB, PIC keputusan) |
-| minor | beberapa area cutover infra production masih berupa checklist operasional hari-H (`PM2`, `Nginx`, backup DB, PIC keputusan) |
-| minor | rehearsal server-side kini punya jalur env sementara yang aman melalui helper `prepare:production-rehearsal-env`, snapshot bukti otomatis melalui `collect:go-live-evidence`, dan report markdown lewat `render:server-runtime-report`, tetapi eksekusi penuh di server nyata masih perlu bukti hari-H |
+| minor | beberapa area cutover infra production masih menunggu eksekusi nyata di host target (`PM2`, `Nginx`, backup DB, PIC keputusan) |
+| minor | rehearsal server-side kini punya jalur env sementara yang aman melalui helper `prepare:production-rehearsal-env`, snapshot bukti otomatis melalui `collect:go-live-evidence`, report markdown lewat `render:server-runtime-report`, serta template backup/rollback, tetapi eksekusi penuh di server nyata masih perlu bukti hari-H |
 | workaround | evidence reset auth lokal tersedia bila password seed review DB perlu disejajarkan ulang tanpa melemahkan auth aplikasi |
 | backlog pasca-go-live | role di luar scope fondasi seperti `DIGITAL_CREATOR` dan business `Toko` tetap dicatat sebagai gelombang berikutnya |
 

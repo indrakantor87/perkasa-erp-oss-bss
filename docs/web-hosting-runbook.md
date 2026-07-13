@@ -23,6 +23,7 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - Checklist hari-H: `docs/web-go-live-cutover-checklist.md`
 - Checklist rehearsal: `docs/web-deploy-rehearsal-checklist.md`
 - Command sheet server-side: `docs/web-server-side-command-sheet.md`
+- Template backup/rollback: `docs/web-backup-rollback-proof-template.md`
 
 ## Prasyarat Server
 
@@ -43,17 +44,19 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 ## Langkah Deploy
 
 1. Masuk ke folder project dan pastikan branch/commit kandidat rilis sudah benar.
-2. Salin env production ke `apps/web/.env`.
-3. Jalankan `npm install` di `apps/web`.
-4. Jalankan `npm run verify:production-env -- .env`.
-5. Jalankan `npm run check`.
-6. Jalankan `npm run test:smoke`.
-7. Jalankan `npm run build`.
-8. Jalankan `pm2 start ecosystem.config.cjs`.
-9. Simpan config PM2 dengan `pm2 save`.
-10. Arahkan Nginx ke port app (`3000`) memakai `docs/nginx/perkasa-erp-web.conf`.
-11. Jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`.
-12. Verifikasi domain final.
+2. Catat `commit deploy` dan `commit rollback` dari `git log -1 --oneline` / release sebelumnya.
+3. Buat backup DB dan backup `.env` terlebih dahulu, lalu isi [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md).
+4. Salin env production ke `apps/web/.env`.
+5. Jalankan `npm install` di `apps/web`.
+6. Jalankan `npm run verify:production-env -- .env`.
+7. Jalankan `npm run check`.
+8. Jalankan `npm run test:smoke`.
+9. Jalankan `npm run build`.
+10. Jalankan `pm2 start ecosystem.config.cjs`.
+11. Simpan config PM2 dengan `pm2 save`.
+12. Arahkan Nginx ke port app (`3000`) memakai `docs/nginx/perkasa-erp-web.conf`.
+13. Jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`.
+14. Verifikasi domain final.
 
 ## Command Operasional PM2
 
@@ -124,13 +127,14 @@ Gunakan helper ini hanya untuk rehearsal. Production final tetap wajib memakai `
 
 ## Rollback Plan
 
-1. Siapkan minimal satu commit kandidat stabil sebelum deploy.
+1. Siapkan minimal satu commit kandidat stabil sebelum deploy dan tulis di [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md).
 2. Jika deploy gagal, `git checkout <commit-stabil>`.
 3. Jalankan ulang `npm install` bila lockfile/dependency berubah.
 4. Jalankan `npm run build`.
 5. Jalankan `pm2 restart perkasa-erp-web`.
 6. Jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`.
 7. Ulangi login admin.
+8. Catat hasil rollback, timestamp, dan health pasca-rollback ke template backup/rollback.
 
 ## Catatan Penting
 

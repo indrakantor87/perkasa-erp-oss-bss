@@ -35,14 +35,14 @@ Cutover hybrid hanya boleh lanjut bila hasil minimum berikut sudah tercatat:
 - [x] commit kandidat release terakhir sudah tercatat
 - [x] commit rollback stabil sudah tercatat
 - [ ] dokumen readiness, hardening, dan cutover sudah dibaca ulang
-- [ ] backup database target dan backup file env sudah disiapkan
+- [ ] backup database target dan backup file env sudah disiapkan serta dicatat di [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md)
 - [x] akun validasi untuk `SUPER_ADMIN`, `NOC_OPERATOR`, `TT_OPERATOR`, `DISMANTLE_OPERATOR`, `SALES_MARKETING`, `CS_OPERATOR`, dan `CS_ADMIN` dipastikan aktif
 - [ ] PIC deploy, PIC DB, PIC validasi support, PIC validasi sales/CS, dan PIC keputusan sudah ditunjuk
 
 Catatan commit saat ini:
 
-- kandidat release lokal terbaru: `975cbfe` (`Harden production rehearsal package`)
-- rollback stabil sebelumnya: `32dc210` (`Close local readiness to 100 percent`)
+- isi `commit deploy` dari kandidat terakhir yang benar-benar akan dipasang saat cutover
+- isi `commit rollback` dari kandidat stabil sebelumnya yang disepakati PIC deploy
 
 ## Freeze Batch Migration
 
@@ -179,6 +179,7 @@ Rollback harus langsung dijalankan jika muncul:
 7. screenshot dashboard supervisor `CS_ADMIN`
 8. output `/api/health`
 9. catatan keputusan `GO / PILOT / ROLLBACK`
+10. bukti backup dan rollback dari [web-backup-rollback-proof-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-backup-rollback-proof-template.md)
 
 ## Pasca-Keputusan
 
