@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.07] - 2026-07-13
+
+### Improved
+
+- Mutation proof terkontrol untuk `update TT teknis` (progress/escalate/close) sudah dijalankan pada review DB untuk tiket `PV/PKN/07.2026/01`, lengkap dengan evidence before/after JSON: [tt-progress-PV-PKN-07.2026-01.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/docs/proofs/tt-progress-PV-PKN-07.2026-01.json), [tt-escalate-PV-PKN-07.2026-01.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/docs/proofs/tt-escalate-PV-PKN-07.2026-01.json), [tt-close-PV-PKN-07.2026-01.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/docs/proofs/tt-close-PV-PKN-07.2026-01.json)
+- Dokumen proof support dan checklist hardening kini menandai `update TT teknis` sebagai `pass`, sehingga gap write-side support berikutnya tinggal `update port/ODP`: [web-support-write-side-proof-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-support-write-side-proof-2026-07-13.md), [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md)
+- Versioning diselaraskan ke `0.66.07`.
+
 ## [0.66.06] - 2026-07-13
 
 ### Improved

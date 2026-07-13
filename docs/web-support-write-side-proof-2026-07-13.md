@@ -15,6 +15,8 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 | `restore isolir` | `support update` | wajib `review-db`, wajib ada `status`, menolak data tidak ada / sudah closed / sudah restore | catatan restore dinormalisasi dengan actor web | code review + smoke proof RBAC + mutation proof aktual | `pass` |
 | `transfer ke dismantle` | `CS_ADMIN` approver atau `DISMANTLE_OPERATOR` | wajib `review-db`, wajib ada `customer_name/status`, menolak archived / closed / duplicate queue | transfer note terstruktur dengan actor web | code review + smoke proof RBAC/note + mutation proof aktual | `pass` |
 | `reopen dismantle` | `CS_ADMIN` approver atau `DISMANTLE_OPERATOR` | wajib `review-db`, wajib ada `status`, menolak histori tidak ada / isolation tidak ada / queue aktif duplikat | reopen note terstruktur dengan actor web | code review + smoke proof RBAC/note + mutation proof aktual | `pass` |
+| `update TT teknis` | `support update` | wajib `review-db` non-fallback, wajib punya ticket target | progress/escalate/close menambah audit note berbasis actor web | helper proof + mutation proof aktual | `pass` |
+| `update port/ODP` | `inventory update` | wajib `review-db` non-fallback, wajib punya ODP + port target | assign/status menambah audit note berbasis actor web | helper proof tersedia, mutation proof aktual menyusul | `pending` |
 
 ## Bukti Route Aktual
 
@@ -77,6 +79,9 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 | `restore isolir` | `support_isolations.id = 271` (`Tika Sri Lestari`) | `cstest` | `status=OPEN`, `restoration_date=NULL`, `close_note=NULL` | `status=CLOSED`, `restoration_date=2026-07-13 07:52:59`, `close_note` terisi note restore | `pass` |
 | `transfer ke dismantle` | `support_isolations.id = 272` (`Nur Azizah`) | `admincs.sample` | belum ada queue dismantle | `support_dismantle_queue.id = 66`, `transferred_by_username=admincs.sample`, `transfer_note` terisi | `pass` |
 | `reopen dismantle` | `support_dismantle_history.id = 321` (`YUNI SUSANTI`) | `admincs.sample` | histori ada, queue aktif belum ada, isolir masih `CLOSED`/`archived` | histori terhapus, isolir kembali `OPEN`, queue aktif baru `id = 68`, `transfer_note` dan `reopened_note` terisi | `pass` |
+| `update TT teknis (progress)` | `ticketCode = PV/PKN/07.2026/01` (`Banjarsari`) | `tt.review` | `status=OPEN`, `latestProgressLog=NULL` | `status=ON_PROGRESS`, progress log tercatat, `notes` bertambah | `pass` |
+| `update TT teknis (escalate)` | `ticketCode = PV/PKN/07.2026/01` (`Banjarsari`) | `tt.review` | `latestEscalationLog=NULL` | `latestEscalationLog` terisi (`NOC`, `MANUAL`), `notes` bertambah | `pass` |
+| `update TT teknis (close)` | `ticketCode = PV/PKN/07.2026/01` (`Banjarsari`) | `tt.review` | `status=ON_PROGRESS`, `closed_at=NULL` | `status=CLOSED`, `resolution_action=MAINTENANCE`, `closed_at` terisi | `pass` |
 
 ## Hardening Reopen Tambahan
 
@@ -86,7 +91,6 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 ## Yang Masih Belum Final
 
 - Mutation proof terkontrol untuk tiga flow prioritas sudah tersedia, tetapi bukti write-side support secara keseluruhan masih belum final untuk:
-  - `update TT teknis`
   - `update port/ODP`
 - Evidence hari-H tetap perlu menyalin hasil yang relevan ke template go-live sesuai host/commit deploy aktual.
 
