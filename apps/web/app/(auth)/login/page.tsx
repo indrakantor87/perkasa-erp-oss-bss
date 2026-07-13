@@ -7,9 +7,9 @@ import { isBootstrapMockAuthEnabled } from '@/lib/auth-session'
 function getLoginErrorMessage(error: string | undefined) {
   switch (error) {
     case 'invalid_credentials':
-      return 'Username atau password tidak cocok dengan akun review.'
+      return 'Username atau password tidak cocok dengan akun yang aktif.'
     case 'auth_unavailable':
-      return 'Layanan autentikasi review sedang tidak tersedia. Periksa koneksi review DB atau aktifkan jalur review lokal yang sesuai.'
+      return 'Layanan login belum bisa dijangkau. Periksa koneksi review DB atau aktifkan jalur login lokal yang memang sedang dipakai.'
     case 'auth_required':
       return 'Silakan login terlebih dulu untuk membuka modul aplikasi.'
     default:
@@ -36,9 +36,9 @@ export default async function LoginPage({
   const authModeDescription =
     dataSource.effectiveMode === 'review-db' && !dataSource.isFallback
       ? bootstrapMockAuthEnabled
-        ? 'Login memakai auth_users dari review DB. Mock auth hanya aktif bila dipaksa eksplisit untuk kebutuhan review lokal.'
-        : 'Login sekarang hanya menerima akun auth_users dari review DB. Bootstrap mock auth dinonaktifkan untuk mencegah fallback diam-diam.'
-      : 'Login masih bisa memakai bootstrap mock auth karena aplikasi sedang berjalan pada mode mock / fallback lokal.'
+        ? 'Login utama memakai akun review DB. Jalur mock hanya dipakai jika sengaja diaktifkan untuk review lokal.'
+        : 'Login hanya menerima akun review DB yang aktif. Jalur mock sedang dimatikan agar pembacaan hasil lebih jujur.'
+      : 'Aplikasi sedang memakai mode lokal / fallback. Login bisa memakai akun bootstrap mock yang sengaja diisi pada environment lokal.'
 
   return (
     <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
@@ -80,11 +80,10 @@ export default async function LoginPage({
             <div>
               <p className="section-title">Autentikasi</p>
               <h2 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
-                Masuk ke shell aplikasi
+                Masuk ke aplikasi
               </h2>
               <p className="mt-3 text-sm leading-6 text-mute">
-                Form ini sekarang memakai mode auth hybrid agar login, cookie session, guard
-                halaman, dan transisi auth internal bisa direview tanpa memutus akses bootstrap.
+                Gunakan akun review DB yang aktif untuk masuk ke modul kerja. Jika sedang review lokal tanpa review DB, aktifkan jalur mock secara sadar dari environment lokal.
               </p>
             </div>
 
@@ -129,18 +128,15 @@ export default async function LoginPage({
 
             <div className="mt-6 rounded-2xl border border-line bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
-                Bootstrap Mock Auth
+                Catatan Login Lokal
               </p>
               <div className="mt-4 rounded-2xl border border-line bg-white px-4 py-3 text-sm leading-6 text-slate-700">
                 {bootstrapMockAuthEnabled ? (
                   <>
-                    Kredensial bootstrap tidak lagi ditampilkan di UI atau disimpan tetap di source.
-                    Gunakan akun review DB yang aktif, atau aktifkan `ALLOW_BOOTSTRAP_MOCK_AUTH=1`
-                    dan isi `BOOTSTRAP_MOCK_AUTH_CREDENTIALS` hanya untuk kebutuhan review lokal yang
-                    terkontrol.
+                    Password tidak ditampilkan di UI dan tidak disimpan plaintext di repo. Untuk review lokal, isi kredensial mock lewat `ALLOW_BOOTSTRAP_MOCK_AUTH=1` dan `BOOTSTRAP_MOCK_AUTH_CREDENTIALS`, lalu restart server.
                   </>
                 ) : (
-                  <>Bootstrap mock auth sedang nonaktif. Login hanya menerima akun yang tersedia di `auth_users`.</>
+                  <>Jalur mock sedang nonaktif. Login hanya menerima akun yang tersedia di `auth_users` review DB.</>
                 )}
               </div>
             </div>

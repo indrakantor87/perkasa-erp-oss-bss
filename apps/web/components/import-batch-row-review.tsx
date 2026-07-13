@@ -109,6 +109,10 @@ export function ImportBatchRowReview({ rows }: ImportBatchRowReviewProps) {
 
   return (
     <div className="space-y-4 p-4 md:p-6">
+      <div className="rounded-2xl border border-line bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+        Tabel ini menampilkan sampel row terbaru yang sudah dimuat pada halaman detail batch, bukan seluruh isi batch. Filter hanya berlaku untuk sampel yang sedang tampil.
+      </div>
+
       <div className="grid gap-3 md:grid-cols-12">
         <label className="md:col-span-6 flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Cari</span>

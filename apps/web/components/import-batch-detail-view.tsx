@@ -100,9 +100,12 @@ export function ImportBatchDetailView({
             <p className="mt-3 text-sm font-semibold text-slate-950">{detail.scope}</p>
           </article>
           <article className="rounded-2xl border border-line bg-slate-50 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Valid row</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Siap Transform</p>
             <p className="mt-3 text-sm font-semibold text-slate-950">
               {batch.validRows.toLocaleString('id-ID')} dari {batch.totalRows.toLocaleString('id-ID')}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-mute">
+              Angka ini dipakai sebelum batch final. Pada batch `IMPORTED`, nilainya bisa `0` karena row sukses sudah masuk status final.
             </p>
           </article>
           <article className="rounded-2xl border border-line bg-slate-50 p-5">
@@ -113,37 +116,37 @@ export function ImportBatchDetailView({
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <article className="rounded-2xl border border-line bg-slate-50 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Row Final</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Sudah Masuk Final</p>
             <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
               {rowSummary.imported.toLocaleString('id-ID')}
             </p>
             <p className="mt-2 text-sm leading-6 text-mute">
-              Imported ke target final dari total {batch.totalRows.toLocaleString('id-ID')} row staging.
+              Row yang sudah berhasil masuk ke tabel final dari total {batch.totalRows.toLocaleString('id-ID')} row staging.
             </p>
           </article>
           <article className="rounded-2xl border border-line bg-slate-50 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Butuh Tindak Lanjut</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Belum Final</p>
             <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
               {unresolvedRows.toLocaleString('id-ID')}
             </p>
             <p className="mt-2 text-sm leading-6 text-mute">
-              Row berstatus `VALID`, `MAPPED`, atau `PENDING` yang belum final.
+              Row yang masih menunggu validasi, mapping, atau transform lanjutan.
             </p>
           </article>
           <article className="rounded-2xl border border-line bg-slate-50 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Invalid / Skipped</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Perlu Review / Dilewati</p>
             <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
               {(rowSummary.invalid + rowSummary.skipped).toLocaleString('id-ID')}
             </p>
             <p className="mt-2 text-sm leading-6 text-mute">
-              {rowSummary.invalid.toLocaleString('id-ID')} invalid dan {rowSummary.skipped.toLocaleString('id-ID')} skipped.
+              {rowSummary.invalid.toLocaleString('id-ID')} row perlu review dan {rowSummary.skipped.toLocaleString('id-ID')} row sengaja dilewati.
             </p>
           </article>
           <article className="rounded-2xl border border-line bg-slate-50 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Finalisasi Batch</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Progres Finalisasi</p>
             <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">{completionRate}%</p>
             <p className="mt-2 text-sm leading-6 text-mute">
-              {finalizedRows.toLocaleString('id-ID')} row sudah final (`IMPORTED`, `INVALID`, atau `SKIPPED`).
+              {finalizedRows.toLocaleString('id-ID')} row sudah punya keputusan akhir, baik masuk final maupun ditandai exception.
             </p>
           </article>
         </div>
@@ -176,7 +179,7 @@ export function ImportBatchDetailView({
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-4">
-                  <span className="font-semibold text-slate-950">Masih valid, belum final</span>
+                  <span className="font-semibold text-slate-950">Siap transform, belum final</span>
                   <span className="text-mute">{rowSummary.valid.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="h-2 rounded-full bg-white">
@@ -188,7 +191,7 @@ export function ImportBatchDetailView({
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-4">
-                  <span className="font-semibold text-slate-950">Masih mapped / pending</span>
+                  <span className="font-semibold text-slate-950">Masih menunggu mapping / proses</span>
                   <span className="text-mute">
                     {(rowSummary.mapped + rowSummary.pending).toLocaleString('id-ID')}
                   </span>
@@ -346,6 +349,9 @@ export function ImportBatchDetailView({
           <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
             Review hasil mapping dan target final
           </h3>
+          <p className="mt-3 text-sm leading-6 text-mute">
+            Panel ini menampilkan sampel row terbaru untuk review cepat. Jika batch sangat besar, exception tertentu bisa tidak muncul di sampel ini dan perlu dicek lewat query detail.
+          </p>
         </div>
         <ImportBatchRowReview rows={detail.rows} />
       </section>

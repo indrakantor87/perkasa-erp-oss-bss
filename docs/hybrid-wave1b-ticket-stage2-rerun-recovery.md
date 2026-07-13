@@ -35,7 +35,14 @@ Tetapi cara perbaikannya harus dibedakan menjadi dua:
 
 ## Langkah 1: Audit Dulu
 
-Jalankan:
+Jika memakai **phpMyAdmin**:
+
+1. pilih database `erp_isp_review`
+2. buka tab `SQL`
+3. copy-paste isi file [xampp_review_wave1b_ticket_stage2_rerun_audit.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_wave1b_ticket_stage2_rerun_audit.sql)
+4. jalankan seluruh isi file sekaligus
+
+Jika memakai **MySQL CLI**, jalankan:
 
 ```sql
 SOURCE database/xampp_review_wave1b_ticket_stage2_rerun_audit.sql;
@@ -43,14 +50,24 @@ SOURCE database/xampp_review_wave1b_ticket_stage2_rerun_audit.sql;
 
 Fokus baca hasil pada section berikut:
 
-1. `same_batch_code_history`
-2. `customer_target_collisions_in_batch`
-3. `order_target_collisions_in_batch`
-4. `duplicate_final_customers_linked_to_batch`
-5. `duplicate_final_orders_linked_to_batch`
-6. `duplicate_final_subscriptions_linked_to_batch`
-7. `duplicate_final_work_orders_linked_to_batch`
-8. `downstream_reference_counts_for_batch_targets`
+1. `latest_batch`
+2. `batch_invalid_rows`
+3. `same_batch_code_history`
+4. `customer_target_collisions_in_batch`
+5. `order_target_collisions_in_batch`
+6. `duplicate_final_customers_linked_to_batch`
+7. `duplicate_final_orders_linked_to_batch`
+8. `duplicate_final_subscriptions_linked_to_batch`
+9. `duplicate_final_work_orders_linked_to_batch`
+10. `known_invalid_package_exceptions`
+11. `downstream_reference_counts_for_batch_targets`
+12. `audit_summary`
+
+Catatan:
+
+- `batch_invalid_rows` membantu melihat row exception secara langsung tanpa harus menebak dari UI
+- `known_invalid_package_exceptions` membantu memastikan invalid yang tersisa memang hanya paket production yang sudah diketahui
+- `audit_summary` memberi kesimpulan cepat apakah batch cenderung aman, perlu review manual, atau ada indikasi collision
 
 ## Interpretasi Hasil
 
@@ -61,6 +78,7 @@ Jika:
 - collision query kosong
 - duplicate final query kosong
 - downstream reference count tidak menunjukkan anomali
+- `audit_summary.audit_status = audit_ok`
 
 maka kemungkinan besar yang terjadi hanya:
 
@@ -84,6 +102,7 @@ Jika:
 
 - order, subscription, atau work order juga ganda
 - dan downstream reference masih `0`
+- atau `audit_summary.audit_status = possible_collision`
 
 maka jalur paling aman adalah:
 
@@ -130,8 +149,9 @@ Karena Anda menyebut duplikat muncul setelah `double` menjalankan tahap 2, rekom
 
 1. **jangan lanjut cleanup manual buta**
 2. jalankan audit SQL di atas
-3. lihat apakah duplikat hanya ada di customer, atau sudah sampai order/subscription
-4. bila Anda kirim hasil section audit itu, cleanup bisa ditentukan dengan jauh lebih presisi
+3. baca `batch_invalid_rows` untuk memastikan invalid tersisa memang karena exception paket yang diketahui
+4. lihat apakah duplikat hanya ada di customer, atau sudah sampai order/subscription
+5. bila Anda kirim hasil section audit itu, cleanup bisa ditentukan dengan jauh lebih presisi
 
 ## Pencegahan Ke Depan
 

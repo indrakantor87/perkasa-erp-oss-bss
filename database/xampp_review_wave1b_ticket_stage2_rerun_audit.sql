@@ -1,4 +1,6 @@
-USE erp_isp_review;
+-- Audit read-only untuk rerun tahap 2 batch Wave 1B Ticket production.
+-- File ini aman dipakai langsung di phpMyAdmin tab SQL atau client MySQL.
+-- Jalankan saat database aktif sudah mengarah ke `erp_isp_review`.
 
 SET @ticket_batch_id = (
   SELECT id
@@ -12,6 +14,23 @@ SELECT 'latest_batch' AS audit_section;
 SELECT id, batch_code, import_status, total_rows, valid_rows, invalid_rows, duplicate_rows, updated_at
 FROM staging_import_batches
 WHERE id = @ticket_batch_id;
+
+SELECT 'batch_invalid_rows' AS audit_section;
+SELECT
+  'order' AS source_table,
+  id,
+  legacy_id,
+  legacy_customer_id,
+  legacy_package_name,
+  mapped_package_code,
+  order_no,
+  normalized_key,
+  import_status,
+  validation_notes
+FROM staging_legacy_order_records
+WHERE batch_id = @ticket_batch_id
+  AND import_status = 'INVALID'
+ORDER BY id ASC;
 
 SELECT 'same_batch_code_history' AS audit_section;
 SELECT id, batch_code, import_status, total_rows, valid_rows, invalid_rows, duplicate_rows, created_at, updated_at
@@ -119,6 +138,17 @@ GROUP BY COALESCE(NULLIF(TRIM(so.legacy_id), ''), CONCAT('wo-staging:', so.id))
 HAVING COUNT(DISTINCT wo.id) > 1
 ORDER BY final_work_order_count DESC, business_key ASC;
 
+SELECT 'known_invalid_package_exceptions' AS audit_section;
+SELECT
+  COALESCE(NULLIF(TRIM(legacy_package_name), ''), '#') AS legacy_package_name,
+  COUNT(*) AS invalid_rows,
+  GROUP_CONCAT(legacy_id ORDER BY legacy_id SEPARATOR ', ') AS legacy_ids
+FROM staging_legacy_order_records
+WHERE batch_id = @ticket_batch_id
+  AND import_status = 'INVALID'
+GROUP BY COALESCE(NULLIF(TRIM(legacy_package_name), ''), '#')
+ORDER BY invalid_rows DESC, legacy_package_name ASC;
+
 SELECT 'downstream_reference_counts_for_batch_targets' AS audit_section;
 SELECT
   (SELECT COUNT(*)
@@ -139,7 +169,9 @@ SELECT
    )) AS support_isolation_refs,
   (SELECT COUNT(*)
    FROM support_dismantle_history dh
-   WHERE dh.subscription_id IN (
+   JOIN support_isolations si
+     ON si.id = dh.isolation_id
+   WHERE si.subscription_id IN (
      SELECT DISTINCT target_subscription_id
      FROM staging_legacy_order_records
      WHERE batch_id = @ticket_batch_id
@@ -169,3 +201,56 @@ SELECT
      WHERE batch_id = @ticket_batch_id
        AND target_subscription_id IS NOT NULL
    )) AS device_assignment_refs;
+
+SELECT 'audit_summary' AS audit_section;
+SELECT
+  CASE
+    WHEN @ticket_batch_id IS NULL THEN 'batch_not_found'
+    WHEN EXISTS (
+      SELECT 1
+      FROM staging_legacy_order_records so
+      WHERE so.batch_id = @ticket_batch_id
+        AND so.import_status = 'INVALID'
+        AND COALESCE(NULLIF(TRIM(so.legacy_package_name), ''), '#') NOT IN ('PAKET CAFÉ', 'PAKET CAF??', 'PAKET KBB', '-', '#')
+    ) THEN 'needs_manual_review'
+    WHEN EXISTS (
+      SELECT 1
+      FROM staging_legacy_order_records so
+      WHERE so.batch_id = @ticket_batch_id
+        AND (
+          so.target_order_id IS NOT NULL
+          OR so.target_subscription_id IS NOT NULL
+          OR so.target_work_order_id IS NOT NULL
+        )
+      GROUP BY COALESCE(NULLIF(TRIM(so.legacy_id), ''), COALESCE(NULLIF(TRIM(so.order_no), ''), CONCAT('order-staging:', so.id)))
+      HAVING COUNT(DISTINCT so.target_order_id) > 1
+        OR COUNT(DISTINCT so.target_subscription_id) > 1
+        OR COUNT(DISTINCT so.target_work_order_id) > 1
+    ) THEN 'possible_collision'
+    ELSE 'audit_ok'
+  END AS audit_status,
+  CASE
+    WHEN @ticket_batch_id IS NULL THEN 'Batch PROD-WEBPSB-TICKET-001 tidak ditemukan pada staging_import_batches.'
+    WHEN EXISTS (
+      SELECT 1
+      FROM staging_legacy_order_records so
+      WHERE so.batch_id = @ticket_batch_id
+        AND so.import_status = 'INVALID'
+        AND COALESCE(NULLIF(TRIM(so.legacy_package_name), ''), '#') NOT IN ('PAKET CAFÉ', 'PAKET CAF??', 'PAKET KBB', '-', '#')
+    ) THEN 'Ada row INVALID di luar daftar exception paket yang sudah diketahui. Perlu review manual sebelum menyimpulkan batch aman.'
+    WHEN EXISTS (
+      SELECT 1
+      FROM staging_legacy_order_records so
+      WHERE so.batch_id = @ticket_batch_id
+        AND (
+          so.target_order_id IS NOT NULL
+          OR so.target_subscription_id IS NOT NULL
+          OR so.target_work_order_id IS NOT NULL
+        )
+      GROUP BY COALESCE(NULLIF(TRIM(so.legacy_id), ''), COALESCE(NULLIF(TRIM(so.order_no), ''), CONCAT('order-staging:', so.id)))
+      HAVING COUNT(DISTINCT so.target_order_id) > 1
+        OR COUNT(DISTINCT so.target_subscription_id) > 1
+        OR COUNT(DISTINCT so.target_work_order_id) > 1
+    ) THEN 'Ada indikasi collision target pada staging order. Lanjutkan baca section collision dan downstream reference sebelum cleanup.'
+    ELSE 'Tidak ada collision target yang terlihat dan invalid tersisa hanya exception paket yang sudah diketahui. Batch cenderung aman tanpa cleanup final.'
+  END AS audit_message;

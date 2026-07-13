@@ -277,20 +277,19 @@ export function HrAttendanceForm({
       </p>
 
       <div className="mt-6 rounded-2xl border border-line bg-slate-50 p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Roadmap Attendance</p>
-        <h4 className="mt-2 text-base font-semibold text-slate-950">Tahap berikutnya: kamera wajah dan radius lokasi</h4>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Status Attendance HR</p>
+        <h4 className="mt-2 text-base font-semibold text-slate-950">Yang sudah bisa dipakai sekarang dan yang masih tahap berikutnya</h4>
         <p className="mt-3 text-sm leading-6 text-mute">
-          Fondasi form saat ini sudah mulai mendukung capture lokasi browser untuk validasi radius check-in.
-          Requirement ERP berikutnya tetap akan menambahkan verifikasi kamera dengan pengenalan wajah.
+          Form saat ini sudah bisa mencatat attendance, mengambil lokasi browser, dan menyimpan referensi capture wajah. Pengenalan wajah otomatis penuh masih belum aktif pada fase ini.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">Face attendance: foundation ready</span>
-          <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">Radius attendance: foundation ready</span>
-          <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">Geofence titik kerja: foundation ready</span>
+          <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">Simpan attendance: siap</span>
+          <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">Capture lokasi browser: siap</span>
+          <span className="badge border-amber-200 bg-amber-50 text-amber-700">Pengenalan wajah otomatis: belum aktif</span>
         </div>
         {faceConfig ? (
           <div className="mt-4 rounded-2xl border border-emerald-200 bg-white p-4 text-sm text-slate-700">
-            <p className="font-semibold text-slate-950">Face attendance aktif: {faceConfig.verificationMode}</p>
+            <p className="font-semibold text-slate-950">Mode verifikasi wajah saat ini: {faceConfig.verificationMode}</p>
             <p className="mt-1">{faceConfig.isRequired ? 'Wajib saat check-in' : 'Masih opsional'}</p>
             <p className="mt-1 text-mute">{faceConfig.notes || 'Belum ada catatan tambahan.'}</p>
           </div>
@@ -390,7 +389,7 @@ export function HrAttendanceForm({
         <div className="rounded-2xl border border-line bg-slate-50 p-4 lg:col-span-2">
           <p className="text-sm font-semibold text-slate-950">Verifikasi wajah</p>
           <p className="mt-1 text-sm text-mute">
-            Fondasi saat ini menyimpan referensi capture/manual review wajah. Recognition engine penuh akan menyusul di fase berikutnya.
+            Bagian ini saat ini menyimpan referensi capture wajah atau catatan review manual. Matching wajah otomatis penuh belum diaktifkan.
           </p>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -425,7 +424,7 @@ export function HrAttendanceForm({
                 <div>
                   <p className="text-sm font-semibold text-slate-950">Kamera browser</p>
                   <p className="mt-1 text-sm text-mute">
-                    Capture ini masih tahap fondasi. Snapshot digunakan untuk membuat referensi verifikasi sebelum matching wajah penuh diaktifkan.
+                    Snapshot dipakai sebagai bukti capture dan referensi review. Ini belum melakukan pencocokan biometrik otomatis.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

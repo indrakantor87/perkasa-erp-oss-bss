@@ -1,6 +1,6 @@
 {
   "name": "perkasa-erp-oss-bss-web",
-  "version": "0.66.25",
+  "version": "0.66.26",
   "private": true,
   "scripts": {
     "dev": "next dev",

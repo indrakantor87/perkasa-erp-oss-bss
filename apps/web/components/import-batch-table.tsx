@@ -10,6 +10,31 @@ const statusTone: Record<ImportBatch['status'], string> = {
   FAILED: 'bg-rose-50 text-rose-700',
 }
 
+function buildBatchSummary(item: ImportBatch) {
+  const readyRows = Math.max(item.validRows, 0)
+  const invalidRows = Math.max(item.invalidRows, 0)
+  const importedRows = Math.max(item.totalRows - invalidRows, 0)
+
+  if (item.status === 'IMPORTED') {
+    return {
+      headline: `${importedRows.toLocaleString('id-ID')} final / ${invalidRows.toLocaleString('id-ID')} perlu review`,
+      detail: `${item.duplicateRows.toLocaleString('id-ID')} duplikat terdeteksi saat review`,
+    }
+  }
+
+  if (item.status === 'VALIDATED') {
+    return {
+      headline: `${readyRows.toLocaleString('id-ID')} siap transform / ${invalidRows.toLocaleString('id-ID')} perlu review`,
+      detail: `${item.duplicateRows.toLocaleString('id-ID')} duplikat terdeteksi saat review`,
+    }
+  }
+
+  return {
+    headline: `${readyRows.toLocaleString('id-ID')} siap / ${invalidRows.toLocaleString('id-ID')} perlu review`,
+    detail: `${item.duplicateRows.toLocaleString('id-ID')} duplikat terdeteksi saat review`,
+  }
+}
+
 export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
   return (
     <div className="panel overflow-hidden">
@@ -28,12 +53,15 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
               <th className="px-6 py-4 font-semibold">Sumber</th>
               <th className="px-6 py-4 font-semibold">Status</th>
               <th className="px-6 py-4 font-semibold">Baris</th>
-              <th className="px-6 py-4 font-semibold">Valid</th>
+              <th className="px-6 py-4 font-semibold">Ringkasan</th>
               <th className="px-6 py-4 font-semibold">Detail</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line bg-white">
-            {items.map((item) => (
+            {items.map((item) => {
+              const summary = buildBatchSummary(item)
+
+              return (
               <tr key={item.id}>
                 <td className="px-6 py-5">
                   <p className="font-semibold text-slate-950">{item.batchCode}</p>
@@ -51,10 +79,8 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
                 <td className="px-6 py-5 text-slate-700">{item.totalRows.toLocaleString('id-ID')}</td>
                 <td className="px-6 py-5 text-slate-700">
                   <div className="space-y-1">
-                    <p>
-                      {item.validRows.toLocaleString('id-ID')} valid / {item.invalidRows.toLocaleString('id-ID')} invalid
-                    </p>
-                    <p className="text-xs text-mute">{item.duplicateRows.toLocaleString('id-ID')} duplikat terdeteksi</p>
+                    <p>{summary.headline}</p>
+                    <p className="text-xs text-mute">{summary.detail}</p>
                   </div>
                 </td>
                 <td className="px-6 py-5">
@@ -63,13 +89,16 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
                   </Link>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
 
       <div className="space-y-4 p-4 md:hidden">
-        {items.map((item) => (
+        {items.map((item) => {
+          const summary = buildBatchSummary(item)
+
+          return (
           <article key={item.id} className="rounded-2xl border border-line bg-slate-50 p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -81,16 +110,14 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
             </div>
             <p className="mt-4 text-sm leading-6 text-mute">{item.note}</p>
             <div className="mt-4 flex items-center justify-between text-xs font-medium text-slate-600">
-              <span>
-                {item.totalRows.toLocaleString('id-ID')} row • {item.validRows.toLocaleString('id-ID')} valid •{' '}
-                {item.duplicateRows.toLocaleString('id-ID')} duplikat
-              </span>
+              <span>{summary.headline}</span>
               <Link href={`/import/${item.id}`} className="font-semibold text-blue-700">
                 Detail
               </Link>
             </div>
+            <p className="mt-2 text-xs text-mute">{summary.detail}</p>
           </article>
-        ))}
+        )})}
       </div>
     </div>
   )
