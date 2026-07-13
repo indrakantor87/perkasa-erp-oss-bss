@@ -5,6 +5,8 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 1. `restore isolir`
 2. `transfer ke dismantle`
 3. `reopen dismantle`
+4. `update TT teknis`
+5. `update port/ODP`
 
 ## Status Singkat
 
@@ -93,3 +95,43 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 1. lanjutkan mutation proof untuk `update TT teknis`
 2. lanjutkan mutation proof untuk `update port/ODP`
 3. salin hasil mutation proof support ini ke template [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md) saat rehearsal server-side atau hari-H
+
+## Appendiks: TT Teknis (Progress/Eskalasi/Close)
+
+### Route
+
+- Update Progress: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/[ticketCode]/progress/route.ts)
+- Eskalasi: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/[ticketCode]/escalate/route.ts)
+- Close: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/trouble-tickets/[ticketCode]/close/route.ts)
+
+### Helper Proof
+
+- Helper: [prove-tt-write-side.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/prove-tt-write-side.mjs)
+- Discover kandidat (contoh):
+  - `npm run prove:tt-write-side -- --discover --flow progress --env .env`
+  - `npm run prove:tt-write-side -- --discover --flow close --env .env`
+- Dry-run snapshot (tanpa mutasi):
+  - `npm run prove:tt-write-side -- --flow progress --ticket TT-XXXX --env .env`
+- Apply (mutasi terkontrol, wajib confirm host/db):
+  - `npm run prove:tt-write-side -- --apply --confirm-db erp_isp_review --flow progress --ticket TT-XXXX --progress-status ON_PROGRESS --owner-name "PIC" --progress-notes "Catatan uji" --username <user> --password <pass> --evidence-file docs/proofs/tt-progress-TT-XXXX.json`
+  - `npm run prove:tt-write-side -- --apply --confirm-db erp_isp_review --flow escalate --ticket TT-XXXX --escalation-target "NOC" --escalation-level MANUAL --escalation-reason "Uji eskalasi" --username <user> --password <pass> --evidence-file docs/proofs/tt-escalate-TT-XXXX.json`
+  - `npm run prove:tt-write-side -- --apply --confirm-db erp_isp_review --flow close --ticket TT-XXXX --resolution-action "RESOLVED" --close-notes "Uji close" --username <user> --password <pass> --evidence-file docs/proofs/tt-close-TT-XXXX.json`
+
+## Appendiks: Port/ODP (Assign/Status)
+
+### Route
+
+- Assign Port: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/odp-ports/assign/route.ts)
+- Update Status Port: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/inventory/odp-ports/status/route.ts)
+
+### Helper Proof
+
+- Helper: [prove-odp-write-side.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/prove-odp-write-side.mjs)
+- Discover kandidat:
+  - `npm run prove:odp-write-side -- --discover --flow assign --env .env`
+  - `npm run prove:odp-write-side -- --discover --flow status --env .env`
+- Dry-run snapshot (tanpa mutasi):
+  - `npm run prove:odp-write-side -- --flow assign --odp ODP-XXXX --port 1 --env .env`
+- Apply (mutasi terkontrol, wajib confirm host/db):
+  - `npm run prove:odp-write-side -- --apply --confirm-db erp_isp_review --flow assign --odp ODP-XXXX --port 1 --service-no SVC-XXXX --customer-code CUST-XXXX --notes "Uji assign" --username <user> --password <pass> --evidence-file docs/proofs/odp-assign-ODP-XXXX-1.json`
+  - `npm run prove:odp-write-side -- --apply --confirm-db erp_isp_review --flow status --odp ODP-XXXX --port 1 --port-status RESERVED --notes "Uji status" --username <user> --password <pass> --evidence-file docs/proofs/odp-status-ODP-XXXX-1.json`

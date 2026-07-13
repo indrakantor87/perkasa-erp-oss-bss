@@ -1,6 +1,6 @@
 {
   "name": "perkasa-erp-oss-bss-web",
-  "version": "0.66.04",
+  "version": "0.66.05",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,7 +11,9 @@
     "verify:production-env": "node ./scripts/verify-production-env.mjs",
     "verify:health": "node ./scripts/verify-health.mjs",
     "rehearse:production": "node ./scripts/rehearse-production.mjs",
-    "prove:support-write-side": "node ./scripts/prove-support-write-side.mjs"
+    "prove:support-write-side": "node ./scripts/prove-support-write-side.mjs",
+    "prove:tt-write-side": "node ./scripts/prove-tt-write-side.mjs",
+    "prove:odp-write-side": "node ./scripts/prove-odp-write-side.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.540.0",
