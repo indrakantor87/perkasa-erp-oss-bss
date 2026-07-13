@@ -191,15 +191,27 @@ export default async function DashboardPage({
         quickLinks={commandCenterLinks}
       />
       <section className="grid items-start gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="space-y-4">
+          <WorklistBoard items={worklist} viewAllHref={worklistHref} />
+          <ActivityFeed items={activities} />
+        </div>
+        <div className="space-y-4">
+          {canApproveDailyActivity ? <DailyActivityApprovalQueue queue={dailyActivityApprovalQueue} /> : null}
+          <RoleQueueGrid items={roleQueues} />
+          <DataSourceStatus source={source} />
+        </div>
+      </section>
+
+      <section className="grid items-start gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="panel p-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="section-title">Kontrol Lintas Domain</p>
+              <p className="section-title">Ringkasan Operasi</p>
               <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-                KPI utama kesehatan operasi
+                Angka cepat lintas domain
               </h2>
               <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">
-                Customer, order, support, inventory, HR, dan billing dibaca dari satu layar.
+                Dipakai untuk membaca kondisi umum operasi secara singkat, bukan untuk menggantikan tabel kerja utama.
               </p>
             </div>
             <span className="badge border-slate-200 bg-white text-slate-600">{metrics.length} KPI</span>
@@ -208,17 +220,7 @@ export default async function DashboardPage({
             <KpiGrid items={metrics} />
           </div>
         </div>
-        <RoleQueueGrid items={roleQueues} />
-      </section>
-      <DataSourceStatus source={source} />
-
-      <section className="grid items-start gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-4">
-          <WorklistBoard items={worklist} viewAllHref={worklistHref} />
-          <ActivityFeed items={activities} />
-        </div>
-        <div className="space-y-4">
-          {canApproveDailyActivity ? <DailyActivityApprovalQueue queue={dailyActivityApprovalQueue} /> : null}
           <section className="panel p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -227,7 +229,7 @@ export default async function DashboardPage({
                   Masuk ke modul yang relevan
                 </h2>
                 <p className="mt-1 text-sm leading-5 text-mute">
-                  Shortcut mengikuti RBAC role aktif agar dashboard tetap jadi pintu kerja tunggal.
+                  Shortcut mengikuti role aktif agar perpindahan dari ringkasan ke modul kerja tetap singkat.
                 </p>
               </div>
               <span className="badge border-slate-200 bg-white text-slate-600">
@@ -238,23 +240,30 @@ export default async function DashboardPage({
               <ModuleGrid items={visibleModuleCards} />
             </div>
           </section>
+          <section className="panel p-4">
+            <p className="section-title">Panduan Singkat</p>
+            <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
+              Urutan baca dashboard yang disarankan
+            </h2>
+            <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
+              <p>1. Buka list kerja untuk item yang perlu ditindak lebih dulu.</p>
+              <p>2. Cek queue, approval, atau aktivitas bila ada blocker lintas tim.</p>
+              <p>3. Pakai KPI dan shortcut hanya sebagai ringkasan cepat untuk pindah modul.</p>
+            </div>
+          </section>
         </div>
       </section>
 
       <details className="rounded-2xl border border-line bg-white p-4">
         <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-          Buka panel kontrol tambahan dashboard
+          Buka panel tambahan dashboard
         </summary>
         <p className="mt-2 text-sm text-mute">
-          Berisi struktur divisi, KPI manager, board operasional, alert lintas domain, dan next actions.
+          Berisi panel manajerial dan analitik yang tetap tersedia saat butuh konteks lebih detail.
         </p>
         <div className="mt-4 space-y-4">
-          <DivisionStructureBoard activeDivision={roleMeta.division} activeSubdivision={roleMeta.subdivision} />
-          <DashboardKpiManagerPanel
-            reviewDbReady={reviewDbReady}
-            managerScope={managerScope}
-            initialDefinitions={initialKpiDefinitions}
-          />
+          <DashboardNextActions items={dashboardNextActions} />
+          <CrossDomainAlerts items={dashboardAlerts} />
           <OperationalDivisionBoard
             cards={operationalCards}
             month={month}
@@ -263,8 +272,12 @@ export default async function DashboardPage({
             lockDivision={lockDivisionFilter}
           />
           <DashboardProcessKpis cards={operationalCards} month={month} year={year} />
-          <CrossDomainAlerts items={dashboardAlerts} />
-          <DashboardNextActions items={dashboardNextActions} />
+          <DivisionStructureBoard activeDivision={roleMeta.division} activeSubdivision={roleMeta.subdivision} />
+          <DashboardKpiManagerPanel
+            reviewDbReady={reviewDbReady}
+            managerScope={managerScope}
+            initialDefinitions={initialKpiDefinitions}
+          />
         </div>
       </details>
     </div>

@@ -16,7 +16,7 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
   {
     title: 'Dashboard',
     href: '/dashboard',
-    description: 'Ringkasan platform dan shortcut operasional',
+    description: 'Ringkasan singkat kesehatan operasi dan jalur masuk kerja',
     tone: 'bg-slate-950 text-white',
     icon: LayoutDashboard,
   },
@@ -37,7 +37,7 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
   {
     title: 'Import Center',
     href: '/import',
-    description: 'Batch staging, review, dan transform',
+    description: 'Audit batch import, exception, dan finalisasi data',
     tone: 'bg-blue-600 text-white',
     icon: SquareKanban,
   },
@@ -51,14 +51,14 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
   {
     title: 'Customer',
     href: '/customers',
-    description: 'Master layanan pelanggan untuk Billing dan CS',
+    description: 'Data pelanggan, layanan aktif, dan tindak lanjut CS',
     tone: 'bg-indigo-600 text-white',
     icon: Users,
   },
   {
     title: 'NOC & Troubleshoots',
     href: '/support',
-    description: 'Payung support teknis untuk NOC, Troubleshoots, ticket, dan kontrol SLA',
+    description: 'Lane kerja support teknis, TT, isolir, dismantle, dan SLA',
     tone: 'bg-amber-500 text-slate-950',
     icon: Wrench,
   },

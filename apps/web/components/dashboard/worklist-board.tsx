@@ -16,18 +16,21 @@ export function WorklistBoard({ items, viewAllHref }: { items: DashboardWorkItem
     <section className="panel p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="section-title">List Kerja Terpadu</p>
+          <p className="section-title">List Kerja Utama</p>
           <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-            Fokus operasional lintas domain
+            Item yang paling dekat untuk ditindak
           </h2>
+          <p className="mt-2 text-sm leading-6 text-mute">
+            Dashboard hanya menampilkan item paling penting terlebih dahulu agar operator tidak kehilangan fokus.
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="badge">Workspace aktif</span>
+          <span className="badge">{items.length} item</span>
           <Link
             href={viewAllHref}
             className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
           >
-            Lihat semua
+            Buka list kerja
           </Link>
         </div>
       </div>
@@ -50,7 +53,7 @@ export function WorklistBoard({ items, viewAllHref }: { items: DashboardWorkItem
                 <p className="text-sm font-medium text-slate-700">{item.subtitle}</p>
                 <p className="text-sm leading-6 text-mute">{item.detail}</p>
               </div>
-              <span className="text-sm font-semibold text-slate-700">Buka modul</span>
+              <span className="text-sm font-semibold text-slate-700">Tindak lanjuti</span>
             </div>
           </Link>
         ))}

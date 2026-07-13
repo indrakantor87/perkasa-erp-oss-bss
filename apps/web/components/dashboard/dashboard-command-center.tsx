@@ -31,14 +31,14 @@ export function DashboardCommandCenter({
 }) {
   const statusCards = [
     {
-      label: 'Queue prioritas',
+      label: 'Queue aktif',
       value: queueCount,
-      note: 'Lane kerja yang langsung bisa ditindak per role aktif.',
+      note: 'Lane kerja yang paling dekat untuk langsung dibuka.',
     },
     {
-      label: 'List kerja terpadu',
+      label: 'Item kerja',
       value: worklistCount,
-      note: 'Agenda lintas domain yang perlu ditutup operator hari ini.',
+      note: 'Agenda lintas domain yang perlu ditindak hari ini.',
     },
     {
       label: 'Shortcut modul',
@@ -48,7 +48,7 @@ export function DashboardCommandCenter({
     {
       label: 'Approval pending',
       value: approvalCount,
-      note: 'Antrian approval yang ikut memengaruhi ritme kerja harian.',
+      note: 'Approval yang ikut memengaruhi ritme kerja hari ini.',
     },
   ]
 
@@ -56,12 +56,13 @@ export function DashboardCommandCenter({
     <section className="panel p-4">
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <div>
-          <p className="section-title">Pusat Kendali ERP</p>
+          <p className="section-title">Ringkasan Kerja Hari Ini</p>
           <h1 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-            Dashboard kerja lintas modul
+            Mulai dari queue yang paling dekat dengan role aktif
           </h1>
           <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">
-            Monitor performa, buka worklist, dan masuk ke modul inti dari satu landing yang ringkas.
+            Dashboard ini dipakai sebagai ringkasan masuk kerja. Setelah itu operator bisa lanjut ke
+            list kerja, approval, atau modul inti tanpa perlu membaca terlalu banyak panel.
           </p>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -96,11 +97,12 @@ export function DashboardCommandCenter({
 
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-2">
           {statusCards.map((item) => (
-            <article key={item.label} className="rounded-md border border-line bg-slate-50 px-3 py-2 text-center">
+            <article key={item.label} className="rounded-xl border border-line bg-slate-50 px-3 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{item.label}</p>
               <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
                 {item.value.toLocaleString('id-ID')}
               </p>
+              <p className="mt-1 text-xs leading-5 text-slate-600">{item.note}</p>
             </article>
           ))}
         </div>

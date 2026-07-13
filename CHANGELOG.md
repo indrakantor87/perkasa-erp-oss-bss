@@ -27,6 +27,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.66.27] - 2026-07-14
+
+### Improved
+
+- Landing awal per role kini lebih work-first: `SUPER_ADMIN`, `SALES_MARKETING`, `CS_OPERATOR`, dan `DIGITAL_CREATOR` diarahkan ke `List Kerja`, sementara `FIELD_TECHNICIAN`, `TT_OPERATOR`, dan `DISMANTLE_OPERATOR` langsung masuk ke lane support yang paling relevan agar user tidak lagi tersangkut di dashboard generik: [access-control.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control.ts)
+- Shell navigasi kini lebih operasional: deskripsi menu diperjelas, topbar menghapus elemen generik yang tidak membantu (`search`/`notification` palsu), menampilkan `Fokus Kerja` per role, dan sidebar menaruh `Kerja Harian` di urutan teratas dengan quick link mobile yang lebih ringkas: [navigation.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/navigation.ts), [topbar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/topbar.tsx), [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx)
+- Dashboard utama kini menempatkan `List Kerja` sebagai fokus pertama, memindahkan KPI menjadi ringkasan sekunder, menambahkan panduan baca singkat, dan menaruh panel manajerial/analitik lanjutan ke dalam area tambahan agar layar awal terasa lebih ringan untuk operator harian: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/page.tsx), [dashboard-command-center.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/dashboard-command-center.tsx), [worklist-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/worklist-board.tsx)
+- Versioning diselaraskan ke `0.66.27` untuk menandai batch penyederhanaan landing role, shell, dan dashboard operasional.
+
 ## [0.65.96] - 2026-07-13
 
 ### Fixed

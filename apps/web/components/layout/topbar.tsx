@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { Bell, Search } from 'lucide-react'
 import { findNavigationItem } from '@/lib/navigation'
 import type { AppSession } from '@/lib/auth-session'
 import { getRoleMeta } from '@/lib/role-meta'
@@ -31,17 +30,23 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
             {activeItem.title}
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
-            App shell tunggal untuk migrasi data, monitoring operasional, dan modul bisnis ISP
-            dalam satu domain aplikasi.
+            {session && roleMeta
+              ? `Area kerja ${roleMeta.label} untuk ${roleMeta.scope.toLowerCase()}. Buka queue, tabel kerja, dan modul yang relevan dari sini.`
+              : 'Buka area kerja utama, queue prioritas, dan modul operasional dari satu shell yang lebih ringkas.'}
           </p>
         </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <label className="flex items-center gap-2 rounded-full border border-line bg-white px-4 py-3 text-sm text-mute">
-          <Search className="h-4 w-4" />
-          <span>Pencarian modul</span>
-        </label>
+        {session && roleMeta ? (
+          <div className="rounded-2xl border border-line bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus Kerja</p>
+            <p className="mt-1 font-medium text-slate-900">
+              {roleMeta.division} / {roleMeta.subdivision}
+            </p>
+            <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600">{roleMeta.scope}</p>
+          </div>
+        ) : null}
 
         <div className="flex items-center gap-3">
           {session ? (
@@ -59,7 +64,6 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
                 <p className="mt-1 truncate text-xs text-slate-500">
                   {roleMeta ? `${roleMeta.division} / ${roleMeta.subdivision}` : null}
                 </p>
-                <p className="mt-1 truncate text-xs text-slate-500">{roleMeta?.scope}</p>
               </div>
             </div>
           ) : null}
@@ -69,7 +73,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
               href="/import"
               className="rounded-full border border-line bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
             >
-              Review Batch
+              Buka Import
             </Link>
           ) : null}
           <form action="/api/auth/logout" method="post">
@@ -80,13 +84,6 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
               Keluar
             </button>
           </form>
-          <button
-            type="button"
-            className="flex h-12 w-12 items-center justify-center rounded-full border border-line bg-white text-slate-700 transition hover:border-slate-300"
-            aria-label="Notifikasi"
-          >
-            <Bell className="h-4 w-4" />
-          </button>
         </div>
       </div>
     </header>

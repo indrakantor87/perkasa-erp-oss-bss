@@ -34,14 +34,14 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
 }
 
 const baselineRoleLandingPaths: Record<AppRole, string> = {
-  SUPER_ADMIN: '/dashboard',
-  SALES_MARKETING: '/sales',
+  SUPER_ADMIN: '/dashboard/worklist',
+  SALES_MARKETING: '/dashboard/worklist',
   CS_OPERATOR: '/dashboard/worklist',
   CS_ADMIN: '/customers/cs-admin',
   NOC_OPERATOR: '/support/tt',
-  FIELD_TECHNICIAN: '/dashboard/worklist',
+  FIELD_TECHNICIAN: '/support/teknisi-psb',
   TT_OPERATOR: '/support/tt',
-  DIGITAL_CREATOR: '/sales/digital-creator',
+  DIGITAL_CREATOR: '/dashboard/worklist',
   DISMANTLE_OPERATOR: '/support/dismantle',
 }
 

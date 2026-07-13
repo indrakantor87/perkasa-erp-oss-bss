@@ -15,17 +15,17 @@ function matchesPrefix(pathname: string, prefix: string) {
 }
 
 const rolePreferredOrder: Partial<Record<AppRole, string[]>> = {
-  SALES_MARKETING: ['/dashboard', '/dashboard/worklist', '/sales', '/customers', '/support', '/billing', '/dashboard/daily-activity', '/import'],
-  CS_OPERATOR: ['/dashboard', '/dashboard/worklist', '/support', '/customers', '/inventory', '/billing', '/dashboard/daily-activity'],
-  CS_ADMIN: ['/dashboard', '/dashboard/worklist', '/support', '/customers', '/billing', '/inventory', '/dashboard/daily-activity'],
-  NOC_OPERATOR: ['/dashboard', '/dashboard/worklist', '/support', '/inventory', '/dashboard/daily-activity'],
-  TT_OPERATOR: ['/dashboard', '/dashboard/worklist', '/support', '/dashboard/daily-activity'],
-  DIGITAL_CREATOR: ['/dashboard', '/dashboard/worklist', '/sales', '/customers', '/dashboard/daily-activity'],
-  FIELD_TECHNICIAN: ['/dashboard', '/dashboard/worklist', '/inventory', '/support', '/dashboard/daily-activity'],
-  DISMANTLE_OPERATOR: ['/dashboard', '/dashboard/worklist', '/support', '/dashboard/daily-activity'],
+  SALES_MARKETING: ['/dashboard/worklist', '/sales', '/customers', '/support', '/dashboard/daily-activity', '/dashboard', '/import'],
+  CS_OPERATOR: ['/dashboard/worklist', '/support', '/customers', '/inventory', '/dashboard/daily-activity', '/dashboard', '/billing'],
+  CS_ADMIN: ['/customers/cs-admin', '/dashboard/worklist', '/support', '/customers', '/dashboard/daily-activity', '/dashboard', '/billing'],
+  NOC_OPERATOR: ['/support', '/dashboard/worklist', '/inventory', '/dashboard/daily-activity', '/dashboard'],
+  TT_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/daily-activity', '/dashboard'],
+  DIGITAL_CREATOR: ['/dashboard/worklist', '/sales', '/customers', '/dashboard/daily-activity', '/dashboard'],
+  FIELD_TECHNICIAN: ['/support', '/dashboard/worklist', '/inventory', '/dashboard/daily-activity', '/dashboard'],
+  DISMANTLE_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/daily-activity', '/dashboard'],
 }
 
-const controlCenterOrder = ['/dashboard', '/dashboard/daily-activity', '/import', '/dashboard/worklist']
+const controlCenterOrder = ['/dashboard/worklist', '/dashboard/daily-activity', '/dashboard', '/import']
 
 function sortByPreferredOrder(params: { items: typeof navigationItems; role: AppRole | null }) {
   const order = params.role ? rolePreferredOrder[params.role] ?? [] : []
@@ -116,7 +116,7 @@ function mapNavigationItemToSidebarNavItem(item: (typeof navigationItems)[number
 
 const sidebarCoreGroups: SidebarGroup[] = [
   {
-    title: 'Pusat Kendali',
+    title: 'Kerja Harian',
     hrefs: ['/dashboard', '/dashboard/worklist', '/dashboard/daily-activity', '/import'],
   },
   {
@@ -342,6 +342,7 @@ function SidebarBrand({
         {!collapsed ? (
           <p className="mt-2 text-sm leading-6 text-slate-400">
             Satu website operasional untuk migrasi data, kontrol divisi, dan modul bisnis ISP.
+            Masuk ke list kerja, queue, dan modul harian tanpa perlu menebak alur dari awal.
           </p>
         ) : null}
       </div>
@@ -429,7 +430,7 @@ function SidebarGroupSection({
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{title}</p>
         <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/70 px-4 py-4">
-          <p className="text-sm font-semibold text-slate-200">Menunggu integrasi menu</p>
+          <p className="text-sm font-semibold text-slate-200">Belum ada workspace aktif</p>
           {emptyHint ? <p className="mt-2 text-xs leading-5 text-slate-400">{emptyHint}</p> : null}
         </div>
       </div>
@@ -471,7 +472,7 @@ export function Sidebar({
   const settingsItems = sortedItems.filter((item) => item.href.startsWith('/settings'))
   const groupedCoreItems = groupSidebarItems(coreItems, allowedPrefixes, session?.role ?? null)
   const settingsSidebarItems = settingsItems.map(mapNavigationItemToSidebarNavItem)
-  const mobileQuickItems = groupedCoreItems.flatMap((group) => group.items)
+  const mobileQuickItems = groupedCoreItems.flatMap((group) => group.items).slice(0, 5)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -568,8 +569,8 @@ export function Sidebar({
             </div>
           ) : !collapsed ? (
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              Bootstrap ini disiapkan untuk membaca schema review MySQL XAMPP terlebih dulu, lalu
-              dipindah ke production setelah struktur valid.
+              Shell ini sedang dipakai sebagai basis kerja review DB. Fokus utamanya adalah memastikan
+              tim bisa langsung masuk ke queue dan modul harian tanpa bingung membaca status teknis.
             </p>
           ) : null}
         </div>
@@ -665,8 +666,7 @@ export function Sidebar({
                 </div>
               ) : (
                 <p className="mt-3 text-sm leading-6 text-slate-300">
-                  Bootstrap ini disiapkan untuk membaca schema review MySQL XAMPP terlebih dulu, lalu
-                  dipindah ke production setelah struktur valid.
+                  Shell ini dipakai untuk review DB dan uji alur harian sebelum masuk ke tahap hosting.
                 </p>
               )}
             </div>
