@@ -107,6 +107,7 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 ### Helper Proof
 
 - Helper: [prove-tt-write-side.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/prove-tt-write-side.mjs)
+- Credential login bisa diberikan via parameter `--username/--password` atau (lebih aman) simpan di env lokal `PROOF_USERNAME` dan `PROOF_PASSWORD` supaya tidak perlu ditulis di command history.
 - Discover kandidat (contoh):
   - `npm run prove:tt-write-side -- --discover --flow progress --env .env`
   - `npm run prove:tt-write-side -- --discover --flow close --env .env`
@@ -127,6 +128,7 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 ### Helper Proof
 
 - Helper: [prove-odp-write-side.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/prove-odp-write-side.mjs)
+- Credential login bisa diberikan via parameter `--username/--password` atau (lebih aman) simpan di env lokal `PROOF_USERNAME` dan `PROOF_PASSWORD` supaya tidak perlu ditulis di command history.
 - Discover kandidat:
   - `npm run prove:odp-write-side -- --discover --flow assign --env .env`
   - `npm run prove:odp-write-side -- --discover --flow status --env .env`

@@ -108,6 +108,13 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.06] - 2026-07-13
+
+### Improved
+
+- Helper mutation proof TT dan ODP kini dapat membaca credential login dari env lokal (`PROOF_USERNAME` / `PROOF_PASSWORD`) untuk mencegah password tercatat di command history/terminal log saat menjalankan mode `--apply`: [prove-tt-write-side.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/prove-tt-write-side.mjs), [prove-odp-write-side.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/prove-odp-write-side.mjs), [web-support-write-side-proof-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-support-write-side-proof-2026-07-13.md)
+- Versioning diselaraskan ke `0.66.06`.
+
 ## [0.66.05] - 2026-07-13
 
 ### Improved

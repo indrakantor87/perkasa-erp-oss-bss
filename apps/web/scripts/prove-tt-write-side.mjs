@@ -377,8 +377,12 @@ function resolveOptions() {
   const { envPath, env } = readEnvSource(args)
   const flow = pickArgValue(args, '--flow')
   const ticketCode = pickArgValue(args, '--ticket') || pickArgValue(args, '--ticket-code')
-  const username = pickArgValue(args, '--username')
-  const password = pickArgValue(args, '--password')
+  const username =
+    pickArgValue(args, '--username') ||
+    String(env.PROOF_USERNAME ?? process.env.PROOF_USERNAME ?? '').trim()
+  const password =
+    pickArgValue(args, '--password') ||
+    String(env.PROOF_PASSWORD ?? process.env.PROOF_PASSWORD ?? '').trim()
   const evidenceFile = pickArgValue(args, '--evidence-file')
   const baseUrl = pickArgValue(args, '--base-url') || 'http://127.0.0.1:3000'
   const discover = hasArg(args, '--discover')
@@ -481,7 +485,7 @@ async function main() {
     })
 
     if (!options.username || !options.password) {
-      throw new Error('Mode --apply wajib disertai --username dan --password.')
+      throw new Error('Mode --apply wajib disertai credential login. Isi --username/--password atau set PROOF_USERNAME/PROOF_PASSWORD pada env.')
     }
 
     flowConfig.requirePayload(options)
@@ -514,4 +518,3 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
 })
-
