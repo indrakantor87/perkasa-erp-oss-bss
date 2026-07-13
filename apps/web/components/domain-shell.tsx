@@ -52,6 +52,7 @@ import { SalesWorkOrderCreateForm } from '@/components/sales-work-order-create-f
 import { SupportDismantleCloseForm } from '@/components/support-dismantle-close-form'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
 import { SupportDismantleReopenForm } from '@/components/support-dismantle-reopen-form'
+import { SupportActionFormModal } from '@/components/support-action-form-modal'
 import { SupportLaneDetailPanel } from '@/components/support-lane-detail-panel'
 import { SupportIsolationForm } from '@/components/support-isolation-form'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
@@ -2553,10 +2554,6 @@ export function DomainShell({
     activeSupportWorkspace && content.key === 'support'
       ? supportForms.filter((item) => activeSupportWorkspace.actionKeys.includes(item.key))
       : supportForms
-  const secondarySupportForms =
-    activeSupportWorkspace && content.key === 'support' && supportPageMode === 'domain'
-      ? supportForms.filter((item) => !activeSupportWorkspace.actionKeys.includes(item.key))
-      : []
   const laneActionLinks: SupportActionLink[] =
     content.key === 'support' && activeSupportWorkspace
       ? activeSupportWorkspace.actionKeys
@@ -2566,6 +2563,15 @@ export function DomainShell({
             ...supportActionCopyMap[key],
             href: `#${getSupportActionAnchorId(key)}`,
           }))
+      : []
+  const supportActionModalItems =
+    content.key === 'support'
+      ? supportForms.map((item) => ({
+          key: item.key,
+          title: supportActionCopyMap[item.key].label,
+          description: supportActionCopyMap[item.key].description,
+          element: item.element,
+        }))
       : []
 
   return (
@@ -3598,43 +3604,14 @@ export function DomainShell({
               </div>
             </section>
           ) : null}
-          {primarySupportForms.length ? (
-            <section className="space-y-4">
-              {activeSupportLane ? (
-                <div>
-                  <p className="section-title">Aksi utama lane</p>
-                  <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-                    Form operasional yang diprioritaskan untuk lane aktif
-                  </h3>
-                </div>
-              ) : null}
-              <div className="grid gap-6 xl:grid-cols-2">
-                {primarySupportForms.map((item) => (
-                  <div key={item.key} id={getSupportActionAnchorId(item.key)} className="scroll-mt-24">
-                    {item.element}
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-          {secondarySupportForms.length ? (
-            <section className="space-y-4">
-              <div>
-                <p className="section-title">Aksi pendukung</p>
-                <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-                  Form support lain tetap tersedia untuk lintas proses
-                </h3>
-              </div>
-              <div className="grid gap-6 xl:grid-cols-2">
-                {secondarySupportForms.map((item) => (
-                  <div key={item.key} id={getSupportActionAnchorId(item.key)} className="scroll-mt-24">
-                    {item.element}
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
         </>
+      ) : null}
+
+      {supportActionModalItems.length ? (
+        <SupportActionFormModal
+          items={supportActionModalItems}
+          heading={activeSupportLane ? `Form aksi lane ${activeSupportLaneMeta?.shortLabel ?? activeSupportLane}` : 'Form aksi support'}
+        />
       ) : null}
 
     </div>

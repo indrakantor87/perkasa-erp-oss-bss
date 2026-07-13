@@ -1,10 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { SupportActionPanelContainer } from '@/components/support-action-panel-container'
-import { SupportActionPanelIntro } from '@/components/support-action-panel-intro'
-import { SupportActionPanelSlot } from '@/components/support-action-panel-slot'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { SupportActionFormModal } from '@/components/support-action-form-modal'
 import { SupportSlaForm } from '@/components/support-sla-form'
 import { SupportSlaQueuePanel } from '@/components/support-sla-queue-panel'
 import { SupportWorkspaceHelperNote } from '@/components/support-workspace-helper-note'
@@ -107,6 +105,23 @@ export function SupportSlaWorkspace({
       canApprove,
     }),
   )
+  const supportActionModalItems = canUseSupportAction({ role, actionKey: 'sla-manage', canCreate, canUpdate, canApprove })
+    ? [
+        {
+          key: 'sla-manage' as const,
+          title: 'Kelola SLA trouble ticket',
+          description: 'Gunakan form ini untuk memperbarui durasi SLA per tipe trouble saat kebutuhan lapangan atau target layanan berubah.',
+          element: (
+            <SupportSlaForm
+              canApprove={canApprove}
+              reviewDbReady={reviewDbReady}
+              typeSuggestions={troubleTypeSuggestions}
+              initialTroubleType={supportPrefill?.type}
+            />
+          ),
+        },
+      ]
+    : []
 
   return (
     <div className="space-y-4">
@@ -248,38 +263,7 @@ export function SupportSlaWorkspace({
         canOpenBillingDecision={canOpenBillingDecision}
       />
 
-      {canUseSupportAction({ role, actionKey: 'sla-manage', canCreate, canUpdate, canApprove }) ? (
-        <section className="space-y-4">
-          <SupportActionPanelIntro
-            laneLabel="SLA"
-            detail="Default workspace tetap fokus ke tabel SLA. Buka panel ini hanya saat rule durasi perlu diperbarui agar risiko overdue tetap terkendali."
-            reviewDbReady={reviewDbReady}
-          />
-          <SupportActionPanelContainer
-            title="Buka panel aksi lane SLA"
-            description="Panel ini berisi form write-side untuk pengaturan durasi SLA per tipe trouble."
-            actionIds={[getSupportActionAnchorId('sla-manage')]}
-            itemCount={1}
-            defaultOpen={Boolean(supportPrefill?.type)}
-          >
-            <div className="mt-4 grid gap-4 xl:grid-cols-2">
-              <SupportActionPanelSlot
-                id={getSupportActionAnchorId('sla-manage')}
-                title="Kelola SLA trouble ticket"
-                description="Gunakan form ini untuk memperbarui durasi SLA per tipe trouble saat kebutuhan lapangan atau target layanan berubah."
-                defaultOpen={Boolean(supportPrefill?.type)}
-              >
-              <SupportSlaForm
-                canApprove={canApprove}
-                reviewDbReady={reviewDbReady}
-                typeSuggestions={troubleTypeSuggestions}
-                initialTroubleType={supportPrefill?.type}
-              />
-              </SupportActionPanelSlot>
-            </div>
-          </SupportActionPanelContainer>
-        </section>
-      ) : null}
+      <SupportActionFormModal items={supportActionModalItems} heading="Form aksi lane SLA" />
     </div>
   )
 }

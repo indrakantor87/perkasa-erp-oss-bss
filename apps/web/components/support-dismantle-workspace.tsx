@@ -1,10 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { SupportActionPanelContainer } from '@/components/support-action-panel-container'
-import { SupportActionPanelIntro } from '@/components/support-action-panel-intro'
-import { SupportActionPanelSlot } from '@/components/support-action-panel-slot'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { SupportActionFormModal, type SupportActionModalItem } from '@/components/support-action-form-modal'
 import { SupportDismantleCloseForm } from '@/components/support-dismantle-close-form'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
 import { SupportDismantleQueuePanel } from '@/components/support-dismantle-queue-panel'
@@ -107,6 +105,67 @@ export function SupportDismantleWorkspace({
       canApprove,
     }),
   )
+  const supportActionModalItems: SupportActionModalItem[] = []
+  if (canUseSupportAction({ role, actionKey: 'dismantle-approve', canCreate, canUpdate, canApprove })) {
+    supportActionModalItems.push({
+      key: 'dismantle-approve',
+      title: 'Transfer dismantle',
+      description: 'Gunakan form ini untuk mendorong kandidat terminate dari isolir aktif ke antrean dismantle.',
+      element: (
+        <SupportDismantleForm
+          canProcess={canProcess}
+          reviewDbReady={reviewDbReady}
+          isolationSuggestions={supportIsolationSuggestions}
+          initialIsolationValue={supportPrefill?.isolation}
+        />
+      ),
+    })
+  }
+  if (canUseSupportAction({ role, actionKey: 'isolation-restore', canCreate, canUpdate, canApprove })) {
+    supportActionModalItems.push({
+      key: 'isolation-restore',
+      title: 'Kembali ke restore',
+      description: 'Pakai form ini saat keputusan terminate berubah dan kasus perlu dikembalikan ke jalur pemulihan billing.',
+      element: (
+        <SupportIsolationRestoreForm
+          canUpdate={canUpdate}
+          reviewDbReady={reviewDbReady}
+          isolationSuggestions={supportIsolationSuggestions}
+          initialIsolationValue={supportPrefill?.isolation}
+        />
+      ),
+    })
+  }
+  if (canUseSupportAction({ role, actionKey: 'dismantle-close', canCreate, canUpdate, canApprove })) {
+    supportActionModalItems.push({
+      key: 'dismantle-close',
+      title: 'Tutup ke histori',
+      description: 'Gunakan form ini untuk menutup antrean terminate aktif setelah bukti lapangan dan outcome sudah lengkap.',
+      element: (
+        <SupportDismantleCloseForm
+          canProcess={canProcess}
+          reviewDbReady={reviewDbReady}
+          dismantleSuggestions={supportDismantleQueueSuggestions}
+          initialDismantleValue={supportPrefill?.dismantle}
+        />
+      ),
+    })
+  }
+  if (canUseSupportAction({ role, actionKey: 'dismantle-reopen', canCreate, canUpdate, canApprove })) {
+    supportActionModalItems.push({
+      key: 'dismantle-reopen',
+      title: 'Reopen queue',
+      description: 'Pakai form ini untuk membuka kembali histori terminate yang memang perlu dikoreksi atau ditinjau ulang.',
+      element: (
+        <SupportDismantleReopenForm
+          canProcess={canProcess}
+          reviewDbReady={reviewDbReady}
+          historySuggestions={supportDismantleHistorySuggestions}
+          initialHistoryValue={supportPrefill?.dismantleHistory}
+        />
+      ),
+    })
+  }
 
   return (
     <div className="space-y-4">
@@ -245,88 +304,7 @@ export function SupportDismantleWorkspace({
         canApprove={canApprove}
       />
 
-      <section className="space-y-4">
-        <SupportActionPanelIntro
-          laneLabel="Dismantle"
-          detail="Default workspace tetap fokus ke antrean terminate dan histori penutupan. Buka panel ini hanya saat operator perlu menulis transfer, restore, close, atau reopen."
-          reviewDbReady={reviewDbReady}
-        />
-        <SupportActionPanelContainer
-          title="Buka panel aksi lane Dismantle"
-          description="Panel ini berisi form write-side untuk `Transfer Dismantle`, `Kembali ke Restore`, `Tutup ke Histori`, dan `Reopen Queue`."
-          actionIds={[
-            getSupportActionAnchorId('dismantle-approve'),
-            getSupportActionAnchorId('isolation-restore'),
-            getSupportActionAnchorId('dismantle-close'),
-            getSupportActionAnchorId('dismantle-reopen'),
-          ]}
-          itemCount={4}
-          defaultOpen={Boolean(supportPrefill?.isolation || supportPrefill?.dismantle || supportPrefill?.dismantleHistory)}
-        >
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            {canUseSupportAction({ role, actionKey: 'dismantle-approve', canCreate, canUpdate, canApprove }) ? (
-              <SupportActionPanelSlot
-                id={getSupportActionAnchorId('dismantle-approve')}
-                title="Transfer dismantle"
-                description="Gunakan form ini untuk mendorong kandidat terminate dari isolir aktif ke antrean dismantle."
-                defaultOpen={Boolean(supportPrefill?.isolation)}
-              >
-                <SupportDismantleForm
-                  canProcess={canProcess}
-                  reviewDbReady={reviewDbReady}
-                  isolationSuggestions={supportIsolationSuggestions}
-                  initialIsolationValue={supportPrefill?.isolation}
-                />
-              </SupportActionPanelSlot>
-            ) : null}
-            {canUseSupportAction({ role, actionKey: 'isolation-restore', canCreate, canUpdate, canApprove }) ? (
-              <SupportActionPanelSlot
-                id={getSupportActionAnchorId('isolation-restore')}
-                title="Kembali ke restore"
-                description="Pakai form ini saat keputusan terminate berubah dan kasus perlu dikembalikan ke jalur pemulihan billing."
-                defaultOpen={Boolean(supportPrefill?.isolation)}
-              >
-                <SupportIsolationRestoreForm
-                  canUpdate={canUpdate}
-                  reviewDbReady={reviewDbReady}
-                  isolationSuggestions={supportIsolationSuggestions}
-                  initialIsolationValue={supportPrefill?.isolation}
-                />
-              </SupportActionPanelSlot>
-            ) : null}
-            {canUseSupportAction({ role, actionKey: 'dismantle-close', canCreate, canUpdate, canApprove }) ? (
-              <SupportActionPanelSlot
-                id={getSupportActionAnchorId('dismantle-close')}
-                title="Tutup ke histori"
-                description="Gunakan form ini untuk menutup antrean terminate aktif setelah bukti lapangan dan outcome sudah lengkap."
-                defaultOpen={Boolean(supportPrefill?.dismantle)}
-              >
-                <SupportDismantleCloseForm
-                  canProcess={canProcess}
-                  reviewDbReady={reviewDbReady}
-                  dismantleSuggestions={supportDismantleQueueSuggestions}
-                  initialDismantleValue={supportPrefill?.dismantle}
-                />
-              </SupportActionPanelSlot>
-            ) : null}
-            {canUseSupportAction({ role, actionKey: 'dismantle-reopen', canCreate, canUpdate, canApprove }) ? (
-              <SupportActionPanelSlot
-                id={getSupportActionAnchorId('dismantle-reopen')}
-                title="Reopen queue"
-                description="Pakai form ini untuk membuka kembali histori terminate yang memang perlu dikoreksi atau ditinjau ulang."
-                defaultOpen={Boolean(supportPrefill?.dismantleHistory)}
-              >
-                <SupportDismantleReopenForm
-                  canProcess={canProcess}
-                  reviewDbReady={reviewDbReady}
-                  historySuggestions={supportDismantleHistorySuggestions}
-                  initialHistoryValue={supportPrefill?.dismantleHistory}
-                />
-              </SupportActionPanelSlot>
-            ) : null}
-          </div>
-        </SupportActionPanelContainer>
-      </section>
+      <SupportActionFormModal items={supportActionModalItems} heading="Form aksi lane dismantle" />
     </div>
   )
 }

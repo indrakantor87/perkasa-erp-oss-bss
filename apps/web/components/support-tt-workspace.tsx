@@ -2,9 +2,7 @@
 
 import Link from 'next/link'
 import { DataSourceStatus } from '@/components/data-source-status'
-import { SupportActionPanelContainer } from '@/components/support-action-panel-container'
-import { SupportActionPanelIntro } from '@/components/support-action-panel-intro'
-import { SupportActionPanelSlot } from '@/components/support-action-panel-slot'
+import { SupportActionFormModal, type SupportActionModalItem } from '@/components/support-action-form-modal'
 import { SupportSlaForm } from '@/components/support-sla-form'
 import { SupportTicketCloseForm } from '@/components/support-ticket-close-form'
 import { SupportTicketCreateForm } from '@/components/support-ticket-create-form'
@@ -190,6 +188,82 @@ export function SupportTroubleTicketWorkspace({
       canApprove,
     }),
   )
+  const supportActionModalItems: SupportActionModalItem[] = []
+  if (canUseSupportAction({ role, actionKey: 'ticket-create', canCreate, canUpdate, canApprove })) {
+    supportActionModalItems.push({
+      key: 'ticket-create',
+      title: 'Tambah trouble ticket',
+      description: 'Gunakan form ini untuk intake ticket baru sebelum kasus masuk ke jalur progress, eskalasi, atau close.',
+      element: (
+        <SupportTicketCreateForm
+          canCreate={canCreate}
+          reviewDbReady={reviewDbReady}
+          typeSuggestions={supportTypeSuggestions}
+          serviceSuggestions={supportServiceSuggestions}
+        />
+      ),
+    })
+  }
+  if (canUseSupportAction({ role, actionKey: 'ticket-progress', canCreate, canUpdate, canApprove })) {
+    supportActionModalItems.push({
+      key: 'ticket-progress',
+      title: 'Update progress ticket',
+      description: 'Pakai form ini saat ticket masih berjalan dan operator perlu memperbarui PIC, status kerja, atau follow-up.',
+      element: (
+        <SupportTicketProgressForm
+          canUpdate={canUpdate}
+          reviewDbReady={reviewDbReady}
+          ticketSuggestions={supportTicketSuggestions}
+          initialTicketCode={supportPrefill?.ticket}
+        />
+      ),
+    })
+  }
+  if (canUseSupportAction({ role, actionKey: 'ticket-escalate', canCreate, canUpdate, canApprove })) {
+    supportActionModalItems.push({
+      key: 'ticket-escalate',
+      title: 'Eskalasi ticket',
+      description: 'Gunakan form ini saat kasus tertahan, owner perlu bantuan lintas tim, atau risiko SLA mulai meningkat.',
+      element: (
+        <SupportTicketEscalateForm
+          canUpdate={canUpdate}
+          reviewDbReady={reviewDbReady}
+          ticketSuggestions={supportTicketEscalationSuggestions}
+          initialTicketCode={supportPrefill?.ticket}
+        />
+      ),
+    })
+  }
+  if (canUseSupportAction({ role, actionKey: 'ticket-close', canCreate, canUpdate, canApprove })) {
+    supportActionModalItems.push({
+      key: 'ticket-close',
+      title: 'Tutup ticket',
+      description: 'Pakai form ini hanya saat penyelesaian sudah siap dibukukan dan ticket benar-benar dapat keluar dari antrean aktif.',
+      element: (
+        <SupportTicketCloseForm
+          canUpdate={canUpdate}
+          reviewDbReady={reviewDbReady}
+          ticketSuggestions={supportTicketSuggestions}
+          initialTicketCode={supportPrefill?.ticket}
+        />
+      ),
+    })
+  }
+  if (canUseSupportAction({ role, actionKey: 'sla-manage', canCreate, canUpdate, canApprove })) {
+    supportActionModalItems.push({
+      key: 'sla-manage',
+      title: 'Kelola SLA trouble ticket',
+      description: 'Gunakan form ini untuk memperbarui rule durasi agar lane TT tetap selaras dengan kebutuhan operasional terbaru.',
+      element: (
+        <SupportSlaForm
+          canApprove={canApprove}
+          reviewDbReady={reviewDbReady}
+          typeSuggestions={supportTypeSuggestions}
+          initialTroubleType={supportPrefill?.type}
+        />
+      ),
+    })
+  }
 
   return (
     <div className="space-y-4">
@@ -349,108 +423,7 @@ export function SupportTroubleTicketWorkspace({
         canApprove={canApprove}
       />
 
-      <section className="space-y-4">
-        <SupportActionPanelIntro
-          laneLabel="TT"
-          detail="Default workspace tetap fokus ke tabel ticket. Buka panel ini hanya saat operator perlu menulis intake, progress, eskalasi, close, atau pengaturan SLA."
-          reviewDbReady={reviewDbReady}
-        />
-        <SupportActionPanelContainer
-          title="Buka panel aksi lane TT"
-          description="Panel ini berisi form write-side untuk `Tambah Ticket`, `Update Progress`, `Eskalasi`, `Tutup Ticket`, dan `Kelola SLA`."
-          actionIds={[
-            getSupportActionAnchorId('ticket-create'),
-            getSupportActionAnchorId('ticket-progress'),
-            getSupportActionAnchorId('ticket-escalate'),
-            getSupportActionAnchorId('ticket-close'),
-            getSupportActionAnchorId('sla-manage'),
-          ]}
-          itemCount={5}
-          defaultOpen={Boolean(supportPrefill?.ticket || supportPrefill?.type)}
-        >
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-          {canUseSupportAction({ role, actionKey: 'ticket-create', canCreate, canUpdate, canApprove }) ? (
-            <SupportActionPanelSlot
-              id={getSupportActionAnchorId('ticket-create')}
-              title="Tambah trouble ticket"
-              description="Gunakan form ini untuk intake ticket baru sebelum kasus masuk ke jalur progress, eskalasi, atau close."
-              collapsible
-            >
-                <SupportTicketCreateForm
-                  canCreate={canCreate}
-                  reviewDbReady={reviewDbReady}
-                  typeSuggestions={supportTypeSuggestions}
-                  serviceSuggestions={supportServiceSuggestions}
-                />
-            </SupportActionPanelSlot>
-          ) : null}
-          {canUseSupportAction({ role, actionKey: 'ticket-progress', canCreate, canUpdate, canApprove }) ? (
-            <SupportActionPanelSlot
-              id={getSupportActionAnchorId('ticket-progress')}
-              title="Update progress ticket"
-              description="Pakai form ini saat ticket masih berjalan dan operator perlu memperbarui PIC, status kerja, atau follow-up."
-              collapsible
-              defaultOpen={Boolean(supportPrefill?.ticket)}
-            >
-                <SupportTicketProgressForm
-                  canUpdate={canUpdate}
-                  reviewDbReady={reviewDbReady}
-                  ticketSuggestions={supportTicketSuggestions}
-                  initialTicketCode={supportPrefill?.ticket}
-                />
-            </SupportActionPanelSlot>
-          ) : null}
-          {canUseSupportAction({ role, actionKey: 'ticket-escalate', canCreate, canUpdate, canApprove }) ? (
-            <SupportActionPanelSlot
-              id={getSupportActionAnchorId('ticket-escalate')}
-              title="Eskalasi ticket"
-              description="Gunakan form ini saat kasus tertahan, owner perlu bantuan lintas tim, atau risiko SLA mulai meningkat."
-              collapsible
-              defaultOpen={Boolean(supportPrefill?.ticket)}
-            >
-                <SupportTicketEscalateForm
-                  canUpdate={canUpdate}
-                  reviewDbReady={reviewDbReady}
-                  ticketSuggestions={supportTicketEscalationSuggestions}
-                  initialTicketCode={supportPrefill?.ticket}
-                />
-            </SupportActionPanelSlot>
-          ) : null}
-          {canUseSupportAction({ role, actionKey: 'ticket-close', canCreate, canUpdate, canApprove }) ? (
-            <SupportActionPanelSlot
-              id={getSupportActionAnchorId('ticket-close')}
-              title="Tutup ticket"
-              description="Pakai form ini hanya saat penyelesaian sudah siap dibukukan dan ticket benar-benar dapat keluar dari antrean aktif."
-              collapsible
-              defaultOpen={Boolean(supportPrefill?.ticket)}
-            >
-                <SupportTicketCloseForm
-                  canUpdate={canUpdate}
-                  reviewDbReady={reviewDbReady}
-                  ticketSuggestions={supportTicketSuggestions}
-                  initialTicketCode={supportPrefill?.ticket}
-                />
-            </SupportActionPanelSlot>
-          ) : null}
-          {canUseSupportAction({ role, actionKey: 'sla-manage', canCreate, canUpdate, canApprove }) ? (
-            <SupportActionPanelSlot
-              id={getSupportActionAnchorId('sla-manage')}
-              title="Kelola SLA trouble ticket"
-              description="Gunakan form ini untuk memperbarui rule durasi agar lane TT tetap selaras dengan kebutuhan operasional terbaru."
-              collapsible
-              defaultOpen={Boolean(supportPrefill?.type)}
-            >
-                <SupportSlaForm
-                  canApprove={canApprove}
-                  reviewDbReady={reviewDbReady}
-                  typeSuggestions={supportTypeSuggestions}
-                  initialTroubleType={supportPrefill?.type}
-                />
-            </SupportActionPanelSlot>
-          ) : null}
-          </div>
-        </SupportActionPanelContainer>
-      </section>
+      <SupportActionFormModal items={supportActionModalItems} heading="Form aksi lane TT" />
     </div>
   )
 }

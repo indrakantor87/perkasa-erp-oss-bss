@@ -1,15 +1,13 @@
 import Link from 'next/link'
-import { SupportActionPanelContainer } from '@/components/support-action-panel-container'
-import { SupportActionPanelIntro } from '@/components/support-action-panel-intro'
-import { SupportActionPanelSlot } from '@/components/support-action-panel-slot'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { SupportActionFormModal, type SupportActionModalItem } from '@/components/support-action-form-modal'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
 import { SupportIsolationForm } from '@/components/support-isolation-form'
 import { SupportIsolationQueuePanel } from '@/components/support-isolation-queue-panel'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
 import { SupportWorkspaceHelperNote } from '@/components/support-workspace-helper-note'
 import { canAccessPath } from '@/lib/access-control'
-import { buildSupportActionHref, buildSupportLaneActionHref, buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
+import { buildSupportLaneActionHref, buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
 import { canAccessSupportLane, canProcessSupportDismantle, canUseSupportAction } from '@/lib/support-lanes'
 import type { AppRole, DataSourceSnapshot, DomainCapability, DomainPageContent, DomainReviewRow, SupportActionLink, SupportDrilldownContext } from '@/lib/types'
 
@@ -143,6 +141,53 @@ export function SupportIsolationWorkspace({
       canApprove,
     }),
   )
+  const supportActionModalItems: SupportActionModalItem[] = []
+  if (canCreate) {
+    supportActionModalItems.push({
+      key: 'isolation-create',
+      title: 'Tambah isolir',
+      description: 'Gunakan form ini untuk mencatat suspend aktif baru sebelum kasus masuk ke jalur restore atau terminate.',
+      element: (
+        <SupportIsolationForm
+          canCreate={canCreate}
+          reviewDbReady={reviewDbReady}
+          radboxSuggestions={supportRadboxSuggestions}
+          marketingSuggestions={supportMarketingSuggestions}
+          serviceSuggestions={supportServiceSuggestions}
+        />
+      ),
+    })
+  }
+  if (canUpdate) {
+    supportActionModalItems.push({
+      key: 'isolation-restore',
+      title: 'Restore billing',
+      description: 'Pakai form ini saat kasus isolir masih layak dipulihkan dan keputusan billing sudah mengizinkan pembukaan layanan.',
+      element: (
+        <SupportIsolationRestoreForm
+          canUpdate={canUpdate}
+          reviewDbReady={reviewDbReady}
+          isolationSuggestions={supportIsolationSuggestions}
+          initialIsolationValue={supportPrefill?.isolation}
+        />
+      ),
+    })
+  }
+  if (canProcessSupportDismantle(role, canApprove)) {
+    supportActionModalItems.push({
+      key: 'dismantle-approve',
+      title: 'Transfer dismantle',
+      description: 'Gunakan form ini saat kasus isolir harus keluar dari jalur restore dan diproses sebagai terminate permanen.',
+      element: (
+        <SupportDismantleForm
+          canProcess={canProcessSupportDismantle(role, canApprove)}
+          reviewDbReady={reviewDbReady}
+          isolationSuggestions={supportIsolationSuggestions}
+          initialIsolationValue={supportPrefill?.isolation}
+        />
+      ),
+    })
+  }
 
   return (
     <div className="space-y-4">
@@ -306,72 +351,7 @@ export function SupportIsolationWorkspace({
         canApprove={canApprove}
       />
 
-      <section className="space-y-4">
-        <SupportActionPanelIntro
-          laneLabel="Isolir"
-          detail="Default workspace tetap fokus ke backlog suspend aktif. Buka panel ini hanya saat operator perlu menulis kasus isolir baru, restore billing, atau transfer terminate."
-          reviewDbReady={reviewDbReady}
-        />
-        <SupportActionPanelContainer
-          title="Buka panel aksi lane Isolir"
-          description="Panel ini berisi form write-side untuk `Tambah Isolir`, `Restore Billing`, dan `Transfer Dismantle`."
-          actionIds={[
-            getSupportActionAnchorId('isolation-create'),
-            getSupportActionAnchorId('isolation-restore'),
-            getSupportActionAnchorId('dismantle-approve'),
-          ]}
-          itemCount={3}
-          defaultOpen={Boolean(supportPrefill?.isolation)}
-        >
-          <div className="mt-4 grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-            {canCreate ? (
-              <SupportActionPanelSlot
-                id={getSupportActionAnchorId('isolation-create')}
-                title="Tambah isolir"
-                description="Gunakan form ini untuk mencatat suspend aktif baru sebelum kasus masuk ke jalur restore atau terminate."
-              >
-                <SupportIsolationForm
-                  canCreate={canCreate}
-                  reviewDbReady={reviewDbReady}
-                  radboxSuggestions={supportRadboxSuggestions}
-                  marketingSuggestions={supportMarketingSuggestions}
-                  serviceSuggestions={supportServiceSuggestions}
-                />
-              </SupportActionPanelSlot>
-            ) : null}
-            {canUpdate ? (
-              <SupportActionPanelSlot
-                id={getSupportActionAnchorId('isolation-restore')}
-                title="Restore billing"
-                description="Pakai form ini saat kasus isolir masih layak dipulihkan dan keputusan billing sudah mengizinkan pembukaan layanan."
-                defaultOpen={Boolean(supportPrefill?.isolation)}
-              >
-                <SupportIsolationRestoreForm
-                  canUpdate={canUpdate}
-                  reviewDbReady={reviewDbReady}
-                  isolationSuggestions={supportIsolationSuggestions}
-                  initialIsolationValue={supportPrefill?.isolation}
-                />
-              </SupportActionPanelSlot>
-            ) : null}
-            {canProcessSupportDismantle(role, canApprove) ? (
-              <SupportActionPanelSlot
-                id={getSupportActionAnchorId('dismantle-approve')}
-                title="Transfer dismantle"
-                description="Gunakan form ini saat kasus isolir harus keluar dari jalur restore dan diproses sebagai terminate permanen."
-                defaultOpen={Boolean(supportPrefill?.isolation)}
-              >
-                <SupportDismantleForm
-                  canProcess={canProcessSupportDismantle(role, canApprove)}
-                  reviewDbReady={reviewDbReady}
-                  isolationSuggestions={supportIsolationSuggestions}
-                  initialIsolationValue={supportPrefill?.isolation}
-                />
-              </SupportActionPanelSlot>
-            ) : null}
-          </div>
-        </SupportActionPanelContainer>
-      </section>
+      <SupportActionFormModal items={supportActionModalItems} heading="Form aksi lane isolir" />
     </div>
   )
 }

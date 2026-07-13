@@ -10,6 +10,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.31] - 2026-07-14
+
+### Improved
+
+- Form write-side support yang sebelumnya dirender sebagai panel besar di bawah tabel kini dipindah ke modal aksi, sehingga user tidak perlu scroll ke bagian `Aksi utama lane` untuk membuka input, progress, close, restore, transfer, reopen, atau pengelolaan SLA: [support-action-form-modal.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-action-form-modal.tsx)
+- Workspace lane `TT`, `Isolir`, `Dismantle`, dan `SLA` sekarang memakai modal form yang dibuka dari aksi tabel atau shortcut lane aktif, sementara panel form besar di bawah dihapus agar ritme kerja benar-benar tetap menempel pada area queue: [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx), [support-isolation-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-isolation-workspace.tsx), [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx), [support-sla-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-sla-workspace.tsx)
+- `Support root shell` yang sebelumnya menampilkan blok `Form operasional yang diprioritaskan untuk lane aktif` di bawah sekarang ikut dialihkan ke modal form yang sama, sehingga hash action lama tetap kompatibel tetapi hasil akhirnya membuka popup, bukan mendorong user mencari form ke bawah halaman: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Versioning diselaraskan ke `0.66.31` untuk menandai batch pemindahan form lane support dari panel bawah ke popup operasional.
+
 ## [0.66.30] - 2026-07-14
 
 ### Improved
