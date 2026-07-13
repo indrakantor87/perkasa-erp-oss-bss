@@ -100,6 +100,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Checklist hardening kini menandai `restore / transfer / reopen` sebagai write action yang sudah diuji manual terkontrol, sehingga blocker write-side support bergeser ke `update TT teknis` dan `update port/ODP`: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md)
 - Versioning diselaraskan ke `0.66.02` untuk menandai penutupan mutation proof support prioritas dan hardening reopen lineage staging.
 
+## [0.66.03] - 2026-07-13
+
+### Improved
+
+- Menu organisasi yang sebelumnya hanya berisi landing/steps kini otomatis diarahkan ke halaman bertabel (table-first) agar tidak ada menu yang terasa “kosong” untuk operasional harian: `Legal`, `Kantor`, `Toko`, `Teknisi PSB`, `Teknisi Expan`, `Teknisi Jointer`, dan `Digital Creator`: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/inventory/legal/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/inventory/kantor/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/inventory/toko/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-psb/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-expan/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-jointer/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/sales/digital-creator/page.tsx)
+- `Digital Creator` workspace kini menjadikan tabel campaign sebagai primary action agar jalur kerja kreator langsung terlihat tanpa harus masuk ke landing kosong: [organization-workspaces.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/organization-workspaces.ts)
+- Versioning diselaraskan ke `0.66.03` untuk menandai batch table-first redirect pada menu organisasi.
+
 ## [0.65.95] - 2026-07-13
 
 ### Improved

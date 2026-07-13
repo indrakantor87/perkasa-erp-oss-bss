@@ -41,9 +41,9 @@ export const digitalCreatorWorkspace: OrganizationWorkspaceDefinition = {
   description:
     'Workspace ini sekarang menjadi pintu nyata untuk campaign, digital leads, content calendar, dan analytics agar funnel akuisisi digital tidak lagi menumpang sebagai fokus sementara di domain sales.',
   primaryAction: {
-    label: 'Buka Workspace Digital',
-    href: '/sales/digital-creator',
-    description: 'Masuk ke ringkasan funnel dan jalur kerja utama Creator Digital.',
+    label: 'Buka Campaign',
+    href: '/sales/campaigns',
+    description: 'Masuk langsung ke tabel campaign aktif agar jalur kerja Creator Digital segera terlihat.',
   },
   secondaryAction: {
     label: 'Buka Lead Digital',
