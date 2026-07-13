@@ -15,7 +15,7 @@ UAT role prioritas yang sudah benar-benar dijalankan di instance lokal.
 | tipe kegiatan | `snapshot lokal pra-go-live` |
 | host | `localhost:3000` |
 | branch | `main` |
-| commit kandidat saat snapshot | `ca8c4e7` |
+| commit kandidat saat snapshot | `batch 0.66.12 pada branch main` |
 | status repo | `working tree bersih` |
 | sumber data | `Review DB` |
 
@@ -28,8 +28,8 @@ UAT role prioritas yang sudah benar-benar dijalankan di instance lokal.
 | health lokal | `pass` | `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus |
 | auth hybrid | `pass` | fallback mock sudah diperketat; UI tidak lagi mengekspos password bootstrap |
 | write-side support prioritas | `pass` | seluruh flow prioritas sudah punya mutation proof before/after |
-| UAT role prioritas | `pass dengan catatan` | `TT_OPERATOR`, `NOC_OPERATOR`, `DISMANTLE_OPERATOR`, `CS_OPERATOR`, dan `CS_ADMIN` sudah positif; `SALES_MARKETING` tetap `partial` namun bukan blocker inti |
-| keputusan lokal | `pilot-ready kuat` | teknis lokal kuat dan blocker `NOC_OPERATOR` sudah tertutup; sisa catatan ada pada cutover infra production dan pengayaan bukti role non-inti |
+| UAT role prioritas | `pass` | `TT_OPERATOR`, `NOC_OPERATOR`, `DISMANTLE_OPERATOR`, `CS_OPERATOR`, `CS_ADMIN`, dan `SALES_MARKETING` seluruhnya sudah positif pada scope fondasi lokal |
+| keputusan lokal | `fondasi lokal 100%` | teknis lokal kuat, seluruh role fondasi sudah lulus, dan sisa pekerjaan bergeser penuh ke cutover infra production serta rehearsal server-side |
 
 ## Bukti Teknis
 
@@ -38,7 +38,7 @@ UAT role prioritas yang sudah benar-benar dijalankan di instance lokal.
 | Item | Hasil |
 |---|---|
 | `git status --short` | kosong |
-| `git log -1 --oneline` | `ca8c4e7 Update technical role UAT evidence` |
+| `git log -1 --oneline` | `lihat commit kandidat batch 0.66.12 terbaru pada branch main` |
 | branch aktif | `main` |
 | working tree bersih | `ya` |
 
@@ -74,8 +74,8 @@ mutation proof terkontrol dengan evidence before/after:
 | `TT_OPERATOR` | `pass` | login via `tt.review`, landing `/support/tt`, source `Review DB`, lane `Trouble Open` berisi `4` | screenshot lokal tersedia pada sesi UAT |
 | `NOC_OPERATOR` | `pass` | login `support.ops` berhasil, landing `/support/tt`, source `Review DB`, lane `Trouble Ticket` berisi `4`, dan menu `support/inventory` terbuka | password review DB lokal disejajarkan ulang secara terjaga; evidence reset tersimpan di [reset-review-auth-support-ops.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/docs/proofs/reset-review-auth-support-ops.json) |
 | `CS_OPERATOR` | `pass` | `List Kerja` menjadi landing utama dan lintas domain utama terbuka | proof write-side supervisor bukan scope role ini |
-| `CS_ADMIN` | `pass` | workspace supervisor terbuka, bucket risiko tinggi/approval/koreksi terbaca | bukti UAT approval formal masih bisa diperdalam |
-| `SALES_MARKETING` | `partial` | landing sales dan sidebar role sesuai, CTA misleading sudah dibersihkan | masih belum menjadi role penentu `GO` penuh |
+| `CS_ADMIN` | `pass` | login `cs.review` berhasil, workspace supervisor terbuka, bucket risiko tinggi/approval/koreksi terbaca, dan deep-link lintas domain berjalan | proof lokal supervisor tersedia di [cs-admin-supervisor-proof.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/docs/proofs/cs-admin-supervisor-proof.json) |
+| `SALES_MARKETING` | `pass` | login `chalis@perkasa.net.id` berhasil, landing sales stabil, create lead awal berhasil, dan monitoring `support/inventory` berjalan sesuai role | batasan write inventory tetap read-only sesuai RBAC |
 
 ## Temuan dan Risiko
 
@@ -91,7 +91,7 @@ mutation proof terkontrol dengan evidence before/after:
 | Opsi | Status | Alasan |
 |---|---|---|
 | `GO` | `belum` | cutover infra production belum dijalankan dan bukti server-side belum dikumpulkan |
-| `PILOT TERBATAS` | `layak kuat` | fondasi support dan CS sudah stabil, write-side prioritas sudah punya proof, dan role fondasi lokal kini lulus tanpa blocker auth |
+| `PILOT TERBATAS` | `siap kuat` | fondasi lokal sudah penuh, write-side prioritas sudah punya proof, dan seluruh role fondasi lulus tanpa blocker auth |
 | `TAHAN` | `opsional konservatif` | dipilih bila organisasi ingin menunggu rehearsal server-side lengkap meski blocker auth lokal sudah tertutup |
 
 ## Rekomendasi Lanjut

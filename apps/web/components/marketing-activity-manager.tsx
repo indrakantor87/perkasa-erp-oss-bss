@@ -371,8 +371,8 @@ export function MarketingActivityManager({
               Aktivitas Marketing
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-              Modul ini menyalin pola web-psb-perkasa untuk mencatat aktivitas harian marketing
-              per area, membaca produktivitas per marketing, dan menganalisis distribusi kunjungan area.
+              Modul ini membantu mencatat aktivitas harian marketing per area, membaca
+              produktivitas per marketing, dan menganalisis distribusi kunjungan area.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -718,7 +718,7 @@ export function MarketingActivityManager({
               Pembacaan parity dari baseline
             </h3>
             <ul className="mt-6 space-y-4 text-sm leading-6 text-mute">
-              <li>Aktivitas disimpan per tanggal dan per marketing agar ringkasan hari aktif dan hari kosong tetap terbaca seperti di sistem lama.</li>
+              <li>Aktivitas disimpan per tanggal dan per marketing agar ringkasan hari aktif dan hari kosong tetap terbaca konsisten dari waktu ke waktu.</li>
               <li>Satu aktivitas bisa mengaitkan sampai empat area coverage agar kunjungan gabungan tetap tercatat dalam satu entri kerja.</li>
               <li>Analisis area menghitung kunjungan unik per aktivitas sehingga distribusi coverage tidak bias karena duplikasi area yang sama.</li>
             </ul>

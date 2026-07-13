@@ -153,10 +153,10 @@ export function InventoryOdpCreateForm({ canCreate, reviewDbReady }: InventoryOd
         </label>
 
         <div className="rounded-2xl border border-line bg-slate-50 p-4 text-sm text-slate-700 lg:col-span-2">
-          <p className="font-semibold text-slate-950">Preview maps dan parity legacy</p>
+          <p className="font-semibold text-slate-950">Preview maps dan kesiapan ODP</p>
           <p className="mt-2 leading-6 text-mute">
-            ERP ini mulai menyiapkan parity ODP dari legacy dengan koordinat yang bisa dibuka ke
-            maps, lalu menjadi dasar untuk port ODP dan accessories/device assignment.
+            ERP ini menyiapkan data ODP dengan koordinat yang bisa dibuka ke maps, lalu
+            menjadi dasar untuk port ODP dan accessories/device assignment.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {mapsHref ? (

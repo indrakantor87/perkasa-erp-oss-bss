@@ -22,7 +22,7 @@ export function WorklistBoard({ items, viewAllHref }: { items: DashboardWorkItem
           </h2>
         </div>
         <div className="flex items-center gap-3">
-          <span className="badge">Baseline parity</span>
+          <span className="badge">Workspace aktif</span>
           <Link
             href={viewAllHref}
             className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"

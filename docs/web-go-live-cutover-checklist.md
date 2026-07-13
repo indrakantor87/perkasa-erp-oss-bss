@@ -56,19 +56,20 @@ Sebelum mulai, isi peran berikut:
 
 ## Snapshot Readiness Sebelum Hari-H
 
-Status teknis repo per `0.66.11`:
+Status teknis repo per `0.66.12`:
 
 - `npm run check`, `npm run test:smoke`, `npm run build`, `verify:production-env`, dan `verify:health` sudah tersedia dan dipakai sebagai baseline readiness.
 - Sidebar/workspace khusus kini dipersempit ke role target agar audit menu tidak misleading.
 - Flow write-side prioritas `restore isolir`, `transfer`, `reopen`, `TT teknis`, dan `port/ODP` sudah memiliki mutation proof terkontrol pada review DB.
 - Helper terjaga `reset:review-auth-password` tersedia untuk penyelarasan lokal `auth_users.password_hash` di review DB tanpa melemahkan auth aplikasi.
+- Proof lokal `prove:cs-admin-supervisor-flow` tersedia untuk mengisi bucket `Perlu Approval` dan `Perlu Koreksi` pada workspace supervisor tanpa suntikan manual data.
 - UAT browser terbaru:
   - `DISMANTLE_OPERATOR`: `pass` pada login dan landing lane dismantle
   - `CS_OPERATOR`: `pass` pada login dan landing `List Kerja`
-  - `CS_ADMIN`: `pass` untuk workspace supervisor dan bucket prioritas, tetapi bukti approval formal masih bisa diperdalam
+  - `CS_ADMIN`: `pass`, termasuk bucket `Perlu Approval`, `Perlu Koreksi`, `Transfer atau Restore`, `Queue Risiko Tinggi`, serta deep-link lintas domain
   - `TT_OPERATOR`: `pass`, source `Review DB`, dan lane `Trouble Open` tampil berisi
   - `NOC_OPERATOR`: `pass`, login `support.ops` berhasil, source `Review DB`, lane `Trouble Ticket` berisi (`4`), dan menu `support/inventory` terbuka
-  - `SALES_MARKETING`: `partial`, tetapi CTA misleading `Import Center` sudah dibersihkan
+  - `SALES_MARKETING`: `pass`, login `chalis@perkasa.net.id` berhasil, create lead awal berjalan, dan monitoring `support/inventory` terbuka sesuai role
 
 ## T-1 Hari Minggu Malam
 

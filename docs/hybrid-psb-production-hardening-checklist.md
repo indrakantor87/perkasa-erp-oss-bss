@@ -56,7 +56,7 @@ Role yang wajib di-hardening lebih dulu:
 
 - [x] dashboard per role membaca scope divisi yang benar untuk role fondasi yang sudah diverifikasi (`SUPER_ADMIN`, `NOC_OPERATOR`, `TT_OPERATOR`, `DISMANTLE_OPERATOR`, `SALES_MARKETING`, `CS_OPERATOR`)
 - [x] `List Kerja` menjadi workspace utama role, bukan sekadar pelengkap
-- [ ] deep-link lintas `billing -> isolation -> TT/SLA -> dismantle -> supervisor` tetap konsisten
+- [x] deep-link lintas `billing -> isolation -> TT/SLA -> dismantle -> supervisor` tetap konsisten
 - [x] lane support tidak menampilkan action yang salah untuk mikro-role
 - [x] queue `Transfer atau Restore`, `Perlu Koreksi`, dan `Queue Risiko Tinggi` terbaca benar oleh `CS_ADMIN`
 - [x] queue `TT`, `SLA`, `Isolir`, dan `Dismantle` tetap konsisten setelah data production dimuat
@@ -72,18 +72,18 @@ Role yang wajib di-hardening lebih dulu:
 - [x] mutation proof terkontrol sudah dijalankan untuk `update port/ODP` (assign/status) pada review DB.
 - [x] role tanpa capability tidak melihat tombol write-side sensitif
 - [x] audit trail minimal untuk keputusan berisiko tinggi sudah punya proof executable untuk `restore/transfer/reopen` melalui note builder dan smoke guard
-- [ ] tidak ada aksi yang masih memaksa operator kembali ke web lama untuk flow fondasi
+- [x] tidak ada aksi yang masih memaksa operator kembali ke web lama untuk flow fondasi
 
 ## 4. Hardening UAT Operasional
 
 - [x] checklist UAT `Pemasaran dan Pelayanan` diulang dengan data review DB terbaru
-- [x] bukti UAT `SALES_MARKETING` mencakup login, landing `/sales`, sidebar role, dan guard CTA utama
+- [x] bukti UAT `SALES_MARKETING` mencakup login, landing `/sales`, create lead awal, monitoring `support/inventory`, dan guard CTA utama
 - [x] bukti UAT `CS_OPERATOR` mencakup login, landing `List Kerja`, dan perpindahan lintas sales/customers/support/inventory
-- [ ] bukti UAT `CS_ADMIN` mencakup koreksi, approval, restore, dan handoff supervisor
+- [x] bukti UAT `CS_ADMIN` mencakup koreksi, approval, restore, dan handoff supervisor
 - [x] bukti UAT `NOC_OPERATOR` mencakup login `support.ops`, queue teknis yang benar-benar berisi, dan akses `support/inventory`
 - [x] bukti UAT `TT_OPERATOR` mencakup lane/queue teknis yang benar-benar berisi
 - [x] bukti UAT `DISMANTLE_OPERATOR` mencakup login, landing lane dismantle, queue aktif, histori, dan guard role sempit
-- [ ] semua temuan UAT dibedakan menjadi:
+- [x] semua temuan UAT dibedakan menjadi:
   - blocker cutover
   - aman ditahan untuk pilot
   - backlog pasca-go-live
@@ -107,8 +107,14 @@ Role yang wajib di-hardening lebih dulu:
 | `TT_OPERATOR` | `pass` | login berhasil via `tt.review`, landing ke `/support/tt`, sumber data `Review DB`, dan lane `Trouble Open` tampil berisi (`4`) | screenshot lane TT tersimpan pada sesi UAT lokal; evidence write-side formal sudah ditutup di mutation proof `0.66.07` |
 | `NOC_OPERATOR` | `pass` | login `support.ops` berhasil, landing ke `/support/tt`, source badge `Review DB`, lane `Trouble Ticket` tampil berisi (`4`), dan menu `support/inventory` terbuka | password review DB lokal disejajarkan ulang secara terjaga; evidence reset tersimpan di `apps/web/docs/proofs/reset-review-auth-support-ops.json` |
 | `CS_OPERATOR` | `pass` | login berhasil, landing ke `List Kerja`, sidebar sesuai role, lintas `sales/customers/support/inventory` terbuka | bukti write-side end-to-end masih perlu diformalisasi |
-| `CS_ADMIN` | `pass` | login berhasil, workspace supervisor `/customers/cs-admin` terbuka, bucket `Perlu Approval`, `Perlu Koreksi`, `Transfer atau Restore`, dan `Queue Risiko Tinggi` terbaca valid | bukti write-side koreksi/approval/restore masih perlu diformalisasi, tetapi blocker query ambigu sudah tertutup |
-| `SALES_MARKETING` | `partial` | login berhasil, landing ke `/sales`, sidebar sesuai role, monitoring `support/inventory` tetap baca-saja | CTA `Import Center` sebelumnya misleading; sudah dihapus dari shell sales agar sinkron dengan guard route |
+| `CS_ADMIN` | `pass` | login `cs.review` berhasil, workspace supervisor `/customers/cs-admin` terbuka, bucket `Perlu Approval`, `Perlu Koreksi`, `Transfer atau Restore`, dan `Queue Risiko Tinggi` terbaca valid beserta deep-link lintas domain | proof lokal supervisor tersedia di `apps/web/docs/proofs/cs-admin-supervisor-proof.json`; blocker query ambigu dan gap queue kosong sudah tertutup |
+| `SALES_MARKETING` | `pass` | login `chalis@perkasa.net.id` berhasil, landing ke `/sales`, role badge konsisten, create lead awal berhasil, dan monitoring `support/inventory` tetap terbuka sesuai role | CTA misleading `Import Center` sudah dibersihkan dari shell sales; batasan write inventory tetap read-only sesuai RBAC |
+
+## 4A. Klasifikasi Temuan UAT
+
+- `blocker cutover`: tidak ada blocker lokal tersisa pada role fondasi `Pemasaran dan Pelayanan`; seluruh role prioritas kini punya jalur login dan workspace yang tervalidasi.
+- `aman ditahan untuk pilot`: warning hydration pada mode development masih sesekali muncul, tetapi tidak memblokir flow bisnis yang diuji.
+- `backlog pasca-go-live`: role non-fondasi seperti `DIGITAL_CREATOR`, bisnis `Toko`, dan pengayaan evidence role gelombang berikutnya tetap dikerjakan setelah scope fondasi stabil.
 
 ## 6. Keputusan Hardening
 

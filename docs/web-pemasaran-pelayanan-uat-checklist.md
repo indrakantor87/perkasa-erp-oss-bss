@@ -266,8 +266,8 @@ Dokumen ini dipakai untuk:
 | `TT_OPERATOR` | `tt.review` | `/support/tt` | `pass` | login berhasil, source badge menunjukkan `Review DB`, dan lane `Trouble Open` tampil berisi (`4`) | screenshot lane TT tersimpan pada sesi UAT lokal; flow write-side progress/escalate/close sudah dibuktikan formal lewat mutation proof |
 | `DISMANTLE_OPERATOR` | `dismantle` | `/support/dismantle` | `pass` | login berhasil, sidebar fokus, queue aktif dan histori dismantle terbaca | bukti write-side `close/reopen` masih perlu diformalisasi |
 | `CS_OPERATOR` | `cstest` | `/dashboard/worklist` | `pass` | login berhasil, `List Kerja` tampil sebagai workspace utama, domain `sales/customers/support/inventory` terbuka | bukti write-side end-to-end masih perlu diperdalam |
-| `CS_ADMIN` | `admincs.sample` | `/customers/cs-admin` | `pass` | login berhasil, workspace supervisor tampil, bucket `Transfer atau Restore` dan `Queue Risiko Tinggi` terisi valid, serta teks ambiguous/fallback sudah hilang | bukti write-side supervisor masih perlu diformalisasi, tetapi blocker query review DB sudah tertutup |
-| `SALES_MARKETING` | `chalis@perkasa.net.id` | `/sales` | `partial` | login berhasil, landing sales dan sidebar sesuai role | CTA `Import Center` sebelumnya misleading; sudah dihapus dari shell sales pada batch menu audit ini |
+| `CS_ADMIN` | `cs.review` | `/customers/cs-admin` | `pass` | login berhasil, workspace supervisor tampil, bucket `Perlu Approval`, `Perlu Koreksi`, `Transfer atau Restore`, dan `Queue Risiko Tinggi` terisi valid, serta deep-link ke daily activity/customer/inventory/support berjalan | proof lokal supervisor tersimpan di `apps/web/docs/proofs/cs-admin-supervisor-proof.json`; blocker query review DB dan gap bucket kosong sudah tertutup |
+| `SALES_MARKETING` | `chalis@perkasa.net.id` | `/sales` | `pass` | login berhasil, landing sales dan sidebar sesuai role, create lead awal berhasil, serta monitoring `support/inventory` terbuka sesuai guard | CTA `Import Center` sebelumnya misleading; sudah dihapus dari shell sales pada batch menu audit ini |
 
 ### Temuan Guard Menu dari UAT
 

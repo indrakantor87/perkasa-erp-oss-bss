@@ -1,0 +1,24 @@
+{
+  "envPath": "D:\\trae_projects\\perkasa-erp-oss-bss\\apps\\web\\.env",
+  "database": "erp_isp_review",
+  "host": "127.0.0.1",
+  "apply": true,
+  "username": "chalis@perkasa.net.id",
+  "passwordSource": "cli",
+  "roleCode": "MARKETING",
+  "before": {
+    "id": 27,
+    "username": "chalis@perkasa.net.id",
+    "fullName": "Chalis",
+    "status": "ACTIVE"
+  },
+  "after": {
+    "id": 27,
+    "username": "chalis@perkasa.net.id",
+    "fullName": "Chalis",
+    "status": "ACTIVE",
+    "roleCode": "MARKETING"
+  },
+  "passwordHash": "[redacted]",
+  "timestamp": "2026-07-13T14:42:58.957Z"
+}

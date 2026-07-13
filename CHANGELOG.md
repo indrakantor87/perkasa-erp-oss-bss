@@ -108,6 +108,16 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.12] - 2026-07-13
+
+### Improved
+
+- Kesiapan fondasi operasional lokal ditutup ke `100%`: `SALES_MARKETING` kini `pass` dengan login akun review nyata, create lead awal, dan monitoring `support/inventory`, sedangkan `CS_ADMIN` kini `pass penuh` setelah bucket `Perlu Approval` dan `Perlu Koreksi` diisi lewat proof lokal supervisor: [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md), [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md)
+- Ditambahkan helper proof `prove:cs-admin-supervisor-flow` untuk membuat bukti lokal queue supervisor `CS_ADMIN` melalui API resmi aplikasi, lengkap dengan evidence JSON: [prove-cs-admin-supervisor-flow.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/prove-cs-admin-supervisor-flow.mjs), [cs-admin-supervisor-proof.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/docs/proofs/cs-admin-supervisor-proof.json)
+- Rantai handoff lintas divisi dari Billing ke isolir, TT, SLA, dismantle, dan supervisor CS terverifikasi penuh menggunakan akun `SUPER_ADMIN`, sekaligus UI operator-facing dibersihkan dari copy `web-psb-perkasa`/`legacy` yang menurunkan kepercayaan operasional: [billing-decision-handoff-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-decision-handoff-panel.tsx), [marketing-activity-manager.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/marketing-activity-manager.tsx), [inventory-odp-create-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-odp-create-form.tsx), [inventory-network-ops-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-network-ops-panel.tsx), [worklist-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dashboard/worklist-board.tsx)
+- Snapshot readiness lokal dan checklist go-live kini menandai seluruh role fondasi lokal `pass`; fokus berikutnya bergeser penuh ke cutover infra production dan rehearsal server-side: [web-go-live-evidence-local-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-local-2026-07-13.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+- Versioning diselaraskan ke `0.66.12`.
+
 ## [0.66.11] - 2026-07-13
 
 ### Improved

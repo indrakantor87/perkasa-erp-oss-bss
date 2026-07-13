@@ -157,7 +157,7 @@ export function InventoryNetworkOpsPanel({
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">Console Port ODP</p>
               <h4 className="mt-1 text-base font-semibold text-slate-950">Tabel ODP dan kapasitas port</h4>
-              <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">Fokus utama dibuat table-first seperti console legacy.</p>
+              <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">Fokus utama dibuat table-first agar operasional ODP dan port tetap cepat dibaca.</p>
             </div>
             <span className="badge border-slate-200 bg-slate-50 text-slate-700">{odpRows.length} ODP terbaca</span>
           </div>

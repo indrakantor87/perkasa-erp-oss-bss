@@ -1,0 +1,24 @@
+{
+  "envPath": "D:\\trae_projects\\perkasa-erp-oss-bss\\apps\\web\\.env",
+  "database": "erp_isp_review",
+  "host": "127.0.0.1",
+  "apply": true,
+  "username": "cs.review",
+  "passwordSource": "cli",
+  "roleCode": "ADMIN_CS",
+  "before": {
+    "id": 2,
+    "username": "cs.review",
+    "fullName": "Admin CS Review",
+    "status": "ACTIVE"
+  },
+  "after": {
+    "id": 2,
+    "username": "cs.review",
+    "fullName": "Admin CS Review",
+    "status": "ACTIVE",
+    "roleCode": "ADMIN_CS"
+  },
+  "passwordHash": "[redacted]",
+  "timestamp": "2026-07-13T14:42:51.887Z"
+}
