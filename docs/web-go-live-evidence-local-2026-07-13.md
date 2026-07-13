@@ -28,8 +28,8 @@ UAT role prioritas yang sudah benar-benar dijalankan di instance lokal.
 | health lokal | `pass` | `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus |
 | auth hybrid | `pass` | fallback mock sudah diperketat; UI tidak lagi mengekspos password bootstrap |
 | write-side support prioritas | `pass` | seluruh flow prioritas sudah punya mutation proof before/after |
-| UAT role prioritas | `partial` | `TT_OPERATOR`, `DISMANTLE_OPERATOR`, `CS_OPERATOR`, `CS_ADMIN` sudah positif; `NOC_OPERATOR` masih tertahan kredensial |
-| keputusan lokal | `pilot-ready dengan blocker` | teknis lokal kuat, tetapi `NOC_OPERATOR` belum bisa dinyatakan lulus penuh |
+| UAT role prioritas | `pass dengan catatan` | `TT_OPERATOR`, `NOC_OPERATOR`, `DISMANTLE_OPERATOR`, `CS_OPERATOR`, dan `CS_ADMIN` sudah positif; `SALES_MARKETING` tetap `partial` namun bukan blocker inti |
+| keputusan lokal | `pilot-ready kuat` | teknis lokal kuat dan blocker `NOC_OPERATOR` sudah tertutup; sisa catatan ada pada cutover infra production dan pengayaan bukti role non-inti |
 
 ## Bukti Teknis
 
@@ -72,7 +72,7 @@ mutation proof terkontrol dengan evidence before/after:
 |---|---|---|---|
 | `DISMANTLE_OPERATOR` | `pass` | login dan lane dismantle tampil, queue aktif dan histori terbaca | flow write-side sudah didukung mutation proof |
 | `TT_OPERATOR` | `pass` | login via `tt.review`, landing `/support/tt`, source `Review DB`, lane `Trouble Open` berisi `4` | screenshot lokal tersedia pada sesi UAT |
-| `NOC_OPERATOR` | `blocked` | akun `support.ops` terdeteksi ada pada seed review DB | login browser masih `invalid_credentials`, sehingga queue teknis belum bisa diverifikasi dari sesi role NOC |
+| `NOC_OPERATOR` | `pass` | login `support.ops` berhasil, landing `/support/tt`, source `Review DB`, lane `Trouble Ticket` berisi `4`, dan menu `support/inventory` terbuka | password review DB lokal disejajarkan ulang secara terjaga; evidence reset tersimpan di [reset-review-auth-support-ops.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/docs/proofs/reset-review-auth-support-ops.json) |
 | `CS_OPERATOR` | `pass` | `List Kerja` menjadi landing utama dan lintas domain utama terbuka | proof write-side supervisor bukan scope role ini |
 | `CS_ADMIN` | `pass` | workspace supervisor terbuka, bucket risiko tinggi/approval/koreksi terbaca | bukti UAT approval formal masih bisa diperdalam |
 | `SALES_MARKETING` | `partial` | landing sales dan sidebar role sesuai, CTA misleading sudah dibersihkan | masih belum menjadi role penentu `GO` penuh |
@@ -81,21 +81,21 @@ mutation proof terkontrol dengan evidence before/after:
 
 | Kategori | Isi |
 |---|---|
-| blocker utama | kredensial `NOC_OPERATOR` (`support.ops`) belum valid pada instance lokal, sehingga UAT browser role NOC belum bisa ditutup penuh |
+| blocker utama | tidak ada blocker role fondasi pada instance lokal; fokus tersisa bergeser ke eksekusi cutover infra production (`PM2`, `Nginx`, backup DB, PIC keputusan) |
 | minor | beberapa area cutover infra production masih berupa checklist operasional hari-H (`PM2`, `Nginx`, backup DB, PIC keputusan) |
-| workaround | gunakan paket evidence ini sebagai baseline `pilot-ready`, lalu tutup login NOC segera setelah password review DB valid tersedia |
+| workaround | evidence reset auth lokal tersedia bila password seed review DB perlu disejajarkan ulang tanpa melemahkan auth aplikasi |
 | backlog pasca-go-live | role di luar scope fondasi seperti `DIGITAL_CREATOR` dan business `Toko` tetap dicatat sebagai gelombang berikutnya |
 
 ## Keputusan Snapshot
 
 | Opsi | Status | Alasan |
 |---|---|---|
-| `GO` | `belum` | karena `NOC_OPERATOR` belum lulus browser UAT dan cutover infra production belum dijalankan |
-| `PILOT TERBATAS` | `layak dipertimbangkan` | fondasi support dan CS sudah jauh lebih stabil, write-side prioritas sudah punya proof, dan TT/dismantle/CS sudah menunjukkan hasil positif |
-| `TAHAN` | `masih valid bila disiplin` | dipilih jika password `support.ops` belum tersedia atau jika bukti deploy production belum lengkap |
+| `GO` | `belum` | cutover infra production belum dijalankan dan bukti server-side belum dikumpulkan |
+| `PILOT TERBATAS` | `layak kuat` | fondasi support dan CS sudah stabil, write-side prioritas sudah punya proof, dan role fondasi lokal kini lulus tanpa blocker auth |
+| `TAHAN` | `opsional konservatif` | dipilih bila organisasi ingin menunggu rehearsal server-side lengkap meski blocker auth lokal sudah tertutup |
 
 ## Rekomendasi Lanjut
 
-1. tutup blocker `NOC_OPERATOR` dengan kredensial review DB yang valid lalu ulang UAT browser role NOC
-2. salin ringkasan ini ke [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md) saat rehearsal server-side atau hari-H
-3. finalisasi checklist deploy production: `PM2`, `Nginx`, backup DB, rollback commit, dan PIC keputusan
+1. salin ringkasan ini ke [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md) saat rehearsal server-side atau hari-H
+2. finalisasi checklist deploy production: `PM2`, `Nginx`, backup DB, rollback commit, dan PIC keputusan
+3. lanjutkan pengayaan bukti role non-inti dan approval supervisor bila dibutuhkan sebelum `GO` penuh

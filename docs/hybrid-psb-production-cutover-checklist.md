@@ -36,7 +36,7 @@ Cutover hybrid hanya boleh lanjut bila hasil minimum berikut sudah tercatat:
 - [ ] commit rollback stabil sudah tercatat
 - [ ] dokumen readiness, hardening, dan cutover sudah dibaca ulang
 - [ ] backup database target dan backup file env sudah disiapkan
-- [ ] akun validasi untuk `SUPER_ADMIN`, `NOC_OPERATOR`, `TT_OPERATOR`, `DISMANTLE_OPERATOR`, `SALES_MARKETING`, `CS_OPERATOR`, dan `CS_ADMIN` dipastikan aktif
+- [x] akun validasi untuk `SUPER_ADMIN`, `NOC_OPERATOR`, `TT_OPERATOR`, `DISMANTLE_OPERATOR`, `SALES_MARKETING`, `CS_OPERATOR`, dan `CS_ADMIN` dipastikan aktif
 - [ ] PIC deploy, PIC DB, PIC validasi support, PIC validasi sales/CS, dan PIC keputusan sudah ditunjuk
 
 ## Freeze Batch Migration
@@ -82,11 +82,11 @@ Catatan:
 
 #### `NOC_OPERATOR`
 
-- [ ] login berhasil
-- [ ] dashboard `NOC` memakai scope yang benar
-- [ ] menu support dan inventory terbuka
-- [ ] queue teknis terbaca
-  Catatan: akun seed `support.ops` ada di review DB, tetapi UAT browser lokal 2026-07-13 masih tertahan `invalid_credentials`.
+- [x] login berhasil
+- [x] dashboard `NOC` memakai scope yang benar
+- [x] menu support dan inventory terbuka
+- [x] queue teknis terbaca
+  Catatan: akun `support.ops` sudah tervalidasi ulang pada review DB lokal; evidence reset auth terjaga tersimpan di `apps/web/docs/proofs/reset-review-auth-support-ops.json`.
 
 #### `TT_OPERATOR`
 

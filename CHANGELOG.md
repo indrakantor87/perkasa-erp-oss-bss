@@ -108,6 +108,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.11] - 2026-07-13
+
+### Improved
+
+- Blocker `NOC_OPERATOR` ditutup melalui helper terjaga `reset:review-auth-password`, penyelarasan ulang `support.ops` pada review DB, dan evidence lokal tanpa hash sensitif: [reset-review-auth-password.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/reset-review-auth-password.mjs), [reset-review-auth-support-ops.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/docs/proofs/reset-review-auth-support-ops.json)
+- UAT browser `NOC_OPERATOR` kini `pass`: login `support.ops` berhasil ke `/support/tt`, source badge `Review DB` tampil benar, lane `Trouble Ticket` berisi, dan menu `support/inventory` terbuka: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md), [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md), [hybrid-psb-production-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-cutover-checklist.md)
+- Snapshot readiness dan checklist go-live kini menandai fondasi lokal tanpa blocker auth role inti; fokus tersisa bergeser ke cutover infra production dan pengayaan evidence server-side: [web-go-live-evidence-local-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-local-2026-07-13.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+- Versioning diselaraskan ke `0.66.11`.
+
 ## [0.66.10] - 2026-07-13
 
 ### Improved
