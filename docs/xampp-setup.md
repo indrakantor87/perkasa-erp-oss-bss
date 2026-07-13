@@ -132,16 +132,15 @@ Checklist verifikasi:
 - Di halaman dashboard, panel status data source menunjukkan:
   - `effectiveMode: review-db`
   - `isFallback: false`
-- Login pakai akun review DB (dari seed):
-  - `admin.perkasa / Perkasa123!`
-  - `cs.review / CsReview123!`
-  - `support.ops / SupportOps123!`
+- Login pakai akun review DB (dari seed) dengan password yang Anda tetapkan sendiri saat menyiapkan `database/xampp_review_auth_seed.sql`.
+- Jangan menuliskan password review plaintext ke repo; simpan hanya di password vault/catatan operasional internal yang aman.
 
 Jika mode masih `mock` dan `isFallback: true`:
 
 - Pastikan MySQL XAMPP benar-benar running.
 - Pastikan `DATABASE_URL` benar (host/port/dbname).
 - Cek akses user MySQL dan password.
+- Jika memang butuh review lokal tanpa review DB, aktifkan `ALLOW_BOOTSTRAP_MOCK_AUTH=1` dan isi `BOOTSTRAP_MOCK_AUTH_CREDENTIALS` di `.env.local` secara lokal saja.
 
 ## 5) Bootstrap permission master (Settings Access)
 

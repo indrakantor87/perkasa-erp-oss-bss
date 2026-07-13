@@ -10,7 +10,7 @@ export type AppSession = {
 }
 
 type MockAuthUser = AppSession & {
-  password: string
+  passwordEnvKey: string
 }
 
 type ReviewAuthUserRow = {
@@ -35,58 +35,91 @@ function parseBooleanEnv(value: string | undefined) {
   return null
 }
 
+function parseBootstrapMockAuthCredentials() {
+  const raw = process.env.BOOTSTRAP_MOCK_AUTH_CREDENTIALS?.trim()
+  if (!raw) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    return Object.fromEntries(
+      Object.entries(parsed).flatMap(([username, password]) => {
+        const normalizedUsername = username.trim().toLowerCase()
+        const normalizedPassword = typeof password === 'string' ? password.trim() : ''
+        if (!normalizedUsername || !normalizedPassword) {
+          return []
+        }
+        return [[normalizedUsername, normalizedPassword]]
+      })
+    )
+  } catch {
+    return {}
+  }
+}
+
+function getBootstrapMockPassword(user: Pick<MockAuthUser, 'username' | 'passwordEnvKey'>) {
+  const directPassword = process.env[user.passwordEnvKey]?.trim()
+  if (directPassword) {
+    return directPassword
+  }
+
+  const credentialMap = parseBootstrapMockAuthCredentials()
+  return credentialMap[user.username] ?? null
+}
+
 export const mockAuthUsers: MockAuthUser[] = [
   {
     username: 'admin.perkasa',
-    password: 'Perkasa123!',
+    passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_ADMIN_PERKASA',
     displayName: 'Super Admin Perkasa',
     role: 'SUPER_ADMIN',
   },
   {
     username: 'marketing.review',
-    password: 'MarketingReview123!',
+    passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_MARKETING_REVIEW',
     displayName: 'Marketing Review',
     role: 'SALES_MARKETING',
   },
   {
     username: 'cs.operator',
-    password: 'CsOperator123!',
+    passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_CS_OPERATOR',
     displayName: 'Operator CS Review',
     role: 'CS_OPERATOR',
   },
   {
     username: 'cs.review',
-    password: 'CsReview123!',
+    passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_CS_REVIEW',
     displayName: 'Admin CS Review',
     role: 'CS_ADMIN',
   },
   {
     username: 'support.ops',
-    password: 'SupportOps123!',
+    passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_SUPPORT_OPS',
     displayName: 'Operator NOC Support',
     role: 'NOC_OPERATOR',
   },
   {
     username: 'tt.review',
-    password: 'TtReview123!',
+    passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_TT_REVIEW',
     displayName: 'TT Operator Review',
     role: 'TT_OPERATOR',
   },
   {
     username: 'dismantle.review',
-    password: 'DismantleReview123!',
+    passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_DISMANTLE_REVIEW',
     displayName: 'Dismantle Review',
     role: 'DISMANTLE_OPERATOR',
   },
   {
     username: 'creator.review',
-    password: 'CreatorReview123!',
+    passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_CREATOR_REVIEW',
     displayName: 'Creator Digital Review',
     role: 'DIGITAL_CREATOR',
   },
   {
     username: 'field.review',
-    password: 'FieldReview123!',
+    passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_FIELD_REVIEW',
     displayName: 'Field Technician Review',
     role: 'FIELD_TECHNICIAN',
   },
@@ -153,9 +186,14 @@ function comparePassword(candidate: string, storedHash: string) {
 
 export function authenticateMockUser(username: string, password: string): AppSession | null {
   const normalizedUsername = username.trim().toLowerCase()
-  const candidate = mockAuthUsers.find(
-    (user) => user.username === normalizedUsername && user.password === password
-  )
+  const candidate = mockAuthUsers.find((user) => {
+    if (user.username !== normalizedUsername) {
+      return false
+    }
+
+    const expectedPassword = getBootstrapMockPassword(user)
+    return expectedPassword != null && expectedPassword === password
+  })
 
   if (!candidate) {
     return null

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import {
   canAccessPath,
   canPerformAction,
@@ -26,6 +27,15 @@ import { getImportBatchDetail, getImportOverview } from '@/lib/services/import-s
 import { canAccessWorklistHref, getWorklistPageData, sanitizeWorklistItemForRole } from '@/lib/services/worklist-service'
 
 async function main() {
+  const adminBootstrapPassword = randomUUID()
+  const supportOpsBootstrapPassword = randomUUID()
+  const ttReviewBootstrapPassword = randomUUID()
+  process.env.BOOTSTRAP_MOCK_AUTH_CREDENTIALS = JSON.stringify({
+    'admin.perkasa': adminBootstrapPassword,
+    'support.ops': supportOpsBootstrapPassword,
+    'tt.review': ttReviewBootstrapPassword,
+  })
+
   assert.equal(dashboardSummary.customers, 10284)
   assert.ok(dashboardSummary.overdueInvoices > 0, 'Summary billing harus punya angka overdue.')
 
@@ -39,11 +49,11 @@ async function main() {
   assert.equal(domainPages.support.resource, 'support')
 
   assert.ok(mockAuthUsers.length >= 2, 'Akun review auth minimal harus tersedia dua.')
-  const session = authenticateMockUser('admin.perkasa', 'Perkasa123!')
+  const session = authenticateMockUser('admin.perkasa', adminBootstrapPassword)
   assert.ok(session, 'Login mock utama harus valid.')
   assert.equal(authenticateMockUser('admin.perkasa', 'salah'), null)
   delete process.env.ALLOW_BOOTSTRAP_MOCK_AUTH
-  const hybridMockLogin = await authenticateUser('admin.perkasa', 'Perkasa123!')
+  const hybridMockLogin = await authenticateUser('admin.perkasa', adminBootstrapPassword)
   assert.ok(hybridMockLogin.session, 'Hybrid auth harus tetap mengizinkan fallback mock.')
   assert.equal(hybridMockLogin.source, 'mock')
   const invalidHybridLogin = await authenticateUser('admin.perkasa', 'salah')
@@ -90,7 +100,7 @@ async function main() {
   process.env.DATABASE_URL = 'mysql://root:@127.0.0.1:1/perkasa_review'
   assert.equal(getDataSourceSnapshot().effectiveMode, 'review-db')
   assert.equal(isBootstrapMockAuthEnabled(), false)
-  const reviewReadyMockLogin = await authenticateUser('admin.perkasa', 'Perkasa123!')
+  const reviewReadyMockLogin = await authenticateUser('admin.perkasa', adminBootstrapPassword)
   assert.equal(reviewReadyMockLogin.session, null, 'Mock auth tidak boleh fallback diam-diam saat review DB aktif.')
   assert.equal(
     reviewReadyMockLogin.reason,
@@ -100,7 +110,7 @@ async function main() {
 
   process.env.ALLOW_BOOTSTRAP_MOCK_AUTH = '1'
   assert.equal(isBootstrapMockAuthEnabled(), true)
-  const explicitMockLogin = await authenticateUser('admin.perkasa', 'Perkasa123!')
+  const explicitMockLogin = await authenticateUser('admin.perkasa', adminBootstrapPassword)
   assert.ok(explicitMockLogin.session, 'Override eksplisit harus menghidupkan kembali bootstrap mock auth.')
   assert.equal(explicitMockLogin.source, 'mock')
   delete process.env.ALLOW_BOOTSTRAP_MOCK_AUTH
@@ -113,8 +123,8 @@ async function main() {
   assert.equal(dashboardData.worklist.length > 0, true)
   assert.equal((await getDashboardSummary()).source.effectiveMode, 'mock')
 
-  const nocSession = authenticateMockUser('support.ops', 'SupportOps123!')
-  const ttSession = authenticateMockUser('tt.review', 'TtReview123!')
+  const nocSession = authenticateMockUser('support.ops', supportOpsBootstrapPassword)
+  const ttSession = authenticateMockUser('tt.review', ttReviewBootstrapPassword)
   assert.ok(nocSession, 'Akun mock NOC harus valid.')
   assert.ok(ttSession, 'Akun mock TT harus valid.')
   const nocSlaWorklist = await getWorklistPageData(nocSession!, { queue: 'SLA Kritis' })

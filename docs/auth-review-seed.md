@@ -17,7 +17,7 @@ Mode login hybrid di `apps/web` sekarang memprioritaskan:
 
 saat `APP_DATA_MODE=review-db` aktif dan koneksi database tersedia.
 
-Tanpa seed user awal, jalur login review DB akan selalu jatuh ke fallback mock walaupun schema dan role master sudah siap.
+Tanpa seed user awal, jalur login review DB tidak akan punya akun nyata walaupun schema dan role master sudah siap.
 
 ## Akun Minimum yang Disiapkan
 
@@ -37,11 +37,13 @@ Tujuannya agar tiga role aplikasi bisa langsung diuji:
 
 Password disimpan sebagai `sha256:<hash>` agar tetap kompatibel dengan helper transisi auth pada `apps/web/lib/auth-session.ts`.
 
-Password review awal yang disiapkan:
+Tentukan sendiri password review awal di lingkungan seed Anda, lalu catat hanya pada password vault/operator note yang aman. Repo ini tidak lagi mendokumentasikan password plaintext.
 
-- `admin.perkasa` -> `Perkasa123!`
-- `cs.review` -> `CsReview123!`
-- `support.ops` -> `SupportOps123!`
+Contoh langkah aman:
+
+1. pilih password kuat yang berbeda untuk tiap akun
+2. ubah nilai hash pada `database/xampp_review_auth_seed.sql` sesuai password yang dipilih
+3. simpan pasangan username/password hanya pada catatan operasional internal yang tidak ikut ter-commit
 
 ## Urutan Eksekusi yang Benar
 
@@ -58,4 +60,5 @@ Password review awal yang disiapkan:
 
 - role `OPERATOR` ditambahkan ke core master seed agar role aplikasi web punya representasi langsung di review DB
 - akun `support.ops` memakai division `NOC` dan role `OPERATOR` supaya jalur pembatasan akses operator bisa direview
-- akun `admin.perkasa` sengaja dipertahankan konsisten dengan akun bootstrap mock agar transisi ke review DB lebih mulus saat user mulai mengetes mode nyata
+- akun `admin.perkasa` sengaja dipertahankan konsisten secara username dengan akun bootstrap mock agar transisi ke review DB lebih mulus saat user mulai mengetes mode nyata
+- bila perlu review lokal tanpa review DB, aktifkan `ALLOW_BOOTSTRAP_MOCK_AUTH=1` dan isi `BOOTSTRAP_MOCK_AUTH_CREDENTIALS` pada `.env.local` atau environment shell lokal; jangan commit password bootstrap ke repo

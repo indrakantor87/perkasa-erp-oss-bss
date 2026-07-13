@@ -134,9 +134,10 @@ export default async function LoginPage({
               <div className="mt-4 rounded-2xl border border-line bg-white px-4 py-3 text-sm leading-6 text-slate-700">
                 {bootstrapMockAuthEnabled ? (
                   <>
-                    Kredensial bootstrap tidak lagi ditampilkan di UI. Gunakan akun review DB yang
-                    aktif, atau aktifkan `ALLOW_BOOTSTRAP_MOCK_AUTH=1` hanya untuk kebutuhan review
-                    lokal yang terkontrol.
+                    Kredensial bootstrap tidak lagi ditampilkan di UI atau disimpan tetap di source.
+                    Gunakan akun review DB yang aktif, atau aktifkan `ALLOW_BOOTSTRAP_MOCK_AUTH=1`
+                    dan isi `BOOTSTRAP_MOCK_AUTH_CREDENTIALS` hanya untuk kebutuhan review lokal yang
+                    terkontrol.
                   </>
                 ) : (
                   <>Bootstrap mock auth sedang nonaktif. Login hanya menerima akun yang tersedia di `auth_users`.</>

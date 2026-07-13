@@ -42,6 +42,16 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Smoke coverage auth ditambah untuk mengunci empat perilaku penting: fallback mock tetap hidup pada mode lokal, fallback mati saat review DB aktif, error `unavailable` muncul saat review DB tidak bisa dijangkau, dan override eksplisit tetap bisa dipakai untuk review terkontrol: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
 - Versioning diselaraskan ke `0.65.97` untuk menandai batch hardening auth hybrid dan sanitasi kredensial bootstrap.
 
+## [0.65.98] - 2026-07-13
+
+### Improved
+
+- Bootstrap mock auth tidak lagi menyimpan password plaintext di source code. Daftar akun mock tetap tersedia untuk review UI/service, tetapi password kini dibaca dari environment (`BOOTSTRAP_MOCK_AUTH_CREDENTIALS` atau env key per-user) saat runtime lokal: [auth-session.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/auth-session.ts)
+- Template environment diperluas agar reviewer lokal bisa mengisi kredensial bootstrap secara sadar tanpa membawanya ke repo, sementara template production menegaskan nilai ini harus tetap kosong: [.env.example](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/.env.example), [.env.production.example](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/.env.production.example)
+- Dokumen setup auth/XAMPP dan README diperbarui agar password review/bootstrap tidak lagi ditulis plaintext dan operator diarahkan memakai catatan internal yang aman atau env lokal terkontrol: [auth-review-seed.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/auth-review-seed.md), [xampp-setup.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/xampp-setup.md), [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/README.md)
+- Smoke test auth kini membuat kredensial bootstrap dinamis saat runtime, sehingga repo tidak kembali menyimpan password tetap hanya demi kebutuhan verifikasi test: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- Versioning diselaraskan ke `0.65.98` untuk menandai batch sanitasi residual kredensial bootstrap.
+
 ## [0.65.95] - 2026-07-13
 
 ### Improved

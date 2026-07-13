@@ -90,6 +90,7 @@ Untuk hosting, gunakan template [`.env.production.example`](file:///d:/trae_proj
 - `APP_DATA_MODE=review-db` akan menandai service layer untuk mode review database.
 - Jika `APP_DATA_MODE=review-db` tetapi `DATABASE_URL` belum diisi, aplikasi akan fallback ke `mock` dan menampilkan status fallback di UI.
 - `AUTH_SESSION_SECRET` wajib diisi pada environment production agar session cookie tidak memakai secret default development.
+- Untuk bootstrap mock auth lokal yang terkontrol, isi `BOOTSTRAP_MOCK_AUTH_CREDENTIALS` di `.env.local` dan jangan commit password tersebut ke repo.
 
 ## Health Check
 
