@@ -1,0 +1,6 @@
+export const CAMPAIGN_STATUSES = ['ACTIVE', 'PAUSED', 'COMPLETED'] as const
+export const DIGITAL_LEAD_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST'] as const
+export const DIGITAL_SOURCES = ['INSTAGRAM', 'FACEBOOK', 'TIKTOK', 'WEBSITE', 'REFERENSI'] as const
+export const CONTENT_TYPES = ['POST', 'REEL', 'VIDEO', 'STORY', 'CAROUSEL'] as const
+export const CONTENT_STATUSES = ['DRAFT', 'SCHEDULED', 'PUBLISHED'] as const
+export const DIGITAL_PLATFORMS = ['INSTAGRAM', 'FACEBOOK', 'TIKTOK', 'YOUTUBE', 'WEBSITE'] as const

@@ -1,7 +1,17 @@
+import 'server-only'
+
 import type { AppRole } from '@/lib/types'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import type { AppSession } from '@/lib/auth-session'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  CAMPAIGN_STATUSES,
+  CONTENT_STATUSES,
+  CONTENT_TYPES,
+  DIGITAL_LEAD_STATUSES,
+  DIGITAL_PLATFORMS,
+  DIGITAL_SOURCES,
+} from '@/lib/services/digital-creator-constants'
 
 type ExecuteResult = {
   insertId?: number
@@ -180,12 +190,14 @@ export type DigitalAnalyticsSummary = {
 
 export type DigitalCreatorMutationInput = Record<string, unknown>
 
-export const CAMPAIGN_STATUSES = ['ACTIVE', 'PAUSED', 'COMPLETED'] as const
-export const DIGITAL_LEAD_STATUSES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST'] as const
-export const DIGITAL_SOURCES = ['INSTAGRAM', 'FACEBOOK', 'TIKTOK', 'WEBSITE', 'REFERENSI'] as const
-export const CONTENT_TYPES = ['POST', 'REEL', 'VIDEO', 'STORY', 'CAROUSEL'] as const
-export const CONTENT_STATUSES = ['DRAFT', 'SCHEDULED', 'PUBLISHED'] as const
-export const DIGITAL_PLATFORMS = ['INSTAGRAM', 'FACEBOOK', 'TIKTOK', 'YOUTUBE', 'WEBSITE'] as const
+export {
+  CAMPAIGN_STATUSES,
+  CONTENT_STATUSES,
+  CONTENT_TYPES,
+  DIGITAL_LEAD_STATUSES,
+  DIGITAL_PLATFORMS,
+  DIGITAL_SOURCES,
+}
 
 function toIsoDateTime(value: string | Date | null | undefined) {
   if (!value) return ''

@@ -17,7 +17,7 @@ import {
   DIGITAL_LEAD_STATUSES,
   DIGITAL_PLATFORMS,
   DIGITAL_SOURCES,
-} from '@/lib/services/digital-creator-service'
+} from '@/lib/services/digital-creator-constants'
 
 type SimpleOption = {
   id: number

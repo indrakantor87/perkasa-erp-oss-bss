@@ -23,6 +23,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.92] - 2026-07-13
+
+### Fixed
+
+- Build production tidak lagi gagal karena modul server (`mysql2` via `review-db`) ikut ter-bundle ke komponen client; konstanta Digital Creator dipisah ke modul khusus dan `digital-creator-service` ditandai `server-only` untuk mencegah import lintas boundary: [digital-creator-manager.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/digital-creator-manager.tsx), [digital-creator-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/digital-creator-service.ts), [digital-creator-constants.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/digital-creator-constants.ts)
+- Build production tidak lagi bergantung pada fetch Google Fonts (yang bisa gagal di CI/offline) karena layout memakai system font stack untuk `--font-body` dan `--font-heading`: [layout.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/layout.tsx)
+- Versioning diselaraskan ke `0.65.92` untuk menandai batch hardening hosting/build.
+
 ## [0.65.91] - 2026-07-13
 
 ### Improved

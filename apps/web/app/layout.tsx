@@ -1,17 +1,11 @@
 import type { Metadata } from 'next'
-import { Plus_Jakarta_Sans, Sora } from 'next/font/google'
 import type { ReactNode } from 'react'
 import './globals.css'
 
-const bodyFont = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-body',
-})
-
-const headingFont = Sora({
-  subsets: ['latin'],
-  variable: '--font-heading',
-})
+const FONT_STACK_BODY =
+  "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'"
+const FONT_STACK_HEADING =
+  "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'"
 
 export const metadata: Metadata = {
   title: 'Perkasa ERP OSS BSS',
@@ -26,7 +20,13 @@ export default async function RootLayout({
   return (
     <html lang="id">
       <body
-        className={`${bodyFont.variable} ${headingFont.variable} font-[family-name:var(--font-body)] antialiased`}
+        style={
+          {
+            ['--font-body']: FONT_STACK_BODY,
+            ['--font-heading']: FONT_STACK_HEADING,
+          } as Record<string, string>
+        }
+        className="font-[family-name:var(--font-body)] antialiased"
       >
         {children}
       </body>
