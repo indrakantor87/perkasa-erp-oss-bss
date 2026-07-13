@@ -32,7 +32,11 @@ npm run build
 pm2 start ecosystem.config.cjs
 pm2 status
 npm run verify:health -- http://127.0.0.1:3000/api/health
+npm run rehearse:production -- .env --port 3011
 ```
+
+> `npm run rehearse:production` adalah helper otomatis untuk preflight lokal / server uji.
+> Script ini tidak menggantikan validasi PM2, Nginx, dan browser, tetapi menutup rangkaian check-smoke-build-standalone-health dalam satu command.
 
 ## Checklist Teknis
 

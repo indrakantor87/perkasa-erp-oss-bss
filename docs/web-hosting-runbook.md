@@ -13,6 +13,7 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - PM2 config: `apps/web/ecosystem.config.cjs`
 - Env validator: `apps/web/scripts/verify-production-env.mjs`
 - Health verifier: `apps/web/scripts/verify-health.mjs`
+- Rehearsal helper: `apps/web/scripts/rehearse-production.mjs`
 - Health check: `/api/health`
 - Checklist final: `docs/web-hosting-readiness-checklist.md`
 - Checklist hari-H: `docs/web-go-live-cutover-checklist.md`
@@ -66,7 +67,26 @@ pm2 save
 cd /path/to/perkasa-erp-oss-bss/apps/web
 npm run verify:production-env -- .env
 npm run verify:health -- http://127.0.0.1:3000/api/health
+npm run rehearse:production -- .env --port 3011
 ```
+
+## Command Rehearsal Otomatis
+
+Gunakan command berikut bila ingin mengulang preflight production secara end-to-end tanpa menjalankan tiap langkah manual:
+
+```bash
+cd /path/to/perkasa-erp-oss-bss/apps/web
+npm run rehearse:production -- .env --port 3011
+```
+
+Script ini akan menjalankan:
+
+1. `verify:production-env`
+2. `npm run check`
+3. `npm run test:smoke`
+4. `npm run build`
+5. start `node .next/standalone/server.js` dalam mode production
+6. `verify:health` ke port rehearsal
 
 ## Contoh Nginx
 

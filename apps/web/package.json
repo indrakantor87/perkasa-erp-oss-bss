@@ -1,6 +1,6 @@
 {
   "name": "perkasa-erp-oss-bss-web",
-  "version": "0.65.94",
+  "version": "0.65.95",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,8 @@
     "check": "tsc --noEmit",
     "test:smoke": "tsx tests/mock-data.test.ts",
     "verify:production-env": "node ./scripts/verify-production-env.mjs",
-    "verify:health": "node ./scripts/verify-health.mjs"
+    "verify:health": "node ./scripts/verify-health.mjs",
+    "rehearse:production": "node ./scripts/rehearse-production.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.540.0",
