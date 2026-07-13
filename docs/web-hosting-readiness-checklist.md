@@ -101,6 +101,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 
 - `npm run start` berhasil menyalakan server standalone lokal dan endpoint `/api/health` merespons normal.
 - Rehearsal lokal juga memverifikasi mode `NODE_ENV=production` untuk standalone server dan memastikan `verify-health` tetap lulus saat `AUTH_SESSION_SECRET` terisi, sehingga health benar-benar merepresentasikan readiness hosting production.
+- Helper `npm run prepare:production-rehearsal-env -- --source .env --target .env.rehearsal.local --port 3011` kini tersedia agar rehearsal bisa memakai secret sementara yang valid tanpa mengubah `.env` utama.
 - Smoke browser `admin.perkasa` dan `support.ops` berhasil login, masuk dashboard, dan logout tanpa lagi terkena redirect `0.0.0.0`.
 - Scope dashboard KPI untuk role `NOC` sudah kembali sinkron ke `Pemasaran dan Pelayanan / NOC`, tidak jatuh ke default `Penjualan`.
 - Runbook hosting, PM2 config, dan contoh reverse proxy kini tersedia di `docs/web-hosting-runbook.md` dan `apps/web/ecosystem.config.cjs`.
@@ -108,7 +109,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - Checklist hari-H untuk keputusan `go / pilot / rollback` kini tersedia di `docs/web-go-live-cutover-checklist.md`.
 - Template env final dan checklist rehearsal deploy kini tersedia di `apps/web/.env.production.final.template` dan `docs/web-deploy-rehearsal-checklist.md`.
 - Bootstrap mock auth tidak lagi menyimpan password plaintext di source; jalur review lokal kini memakai `BOOTSTRAP_MOCK_AUTH_CREDENTIALS` dari environment sehingga repo lebih aman untuk cutover.
-- UAT role prioritas terbaru mengonfirmasi `DISMANTLE_OPERATOR`, `CS_OPERATOR`, dan `CS_ADMIN` lulus smoke login/landing; blocker query supervisor ambigu untuk `CS_ADMIN` sudah tertutup, sedangkan `SALES_MARKETING` tetap `partial` setelah CTA `Import Center` yang misleading dihapus dari shell sales.
+- UAT role prioritas terbaru mengonfirmasi `DISMANTLE_OPERATOR`, `CS_OPERATOR`, `CS_ADMIN`, `NOC_OPERATOR`, `TT_OPERATOR`, dan `SALES_MARKETING` lulus pada scope fondasi lokal; blocker query supervisor ambigu untuk `CS_ADMIN` dan blocker auth `NOC_OPERATOR` sudah tertutup.
 
 ## Catatan Eksekusi Senin
 

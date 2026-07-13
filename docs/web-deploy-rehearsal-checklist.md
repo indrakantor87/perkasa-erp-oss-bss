@@ -19,6 +19,7 @@ Dokumen ini melengkapi:
 - siapkan file `.env` dari [`.env.production.final.template`](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/.env.production.final.template)
 - siapkan koneksi database target uji
 - siapkan domain/subdomain sementara bila ada
+- jika belum ingin menyentuh `.env` utama, siapkan env sementara dengan `npm run prepare:production-rehearsal-env`
 
 ## Command Rehearsal
 
@@ -33,6 +34,15 @@ pm2 start ecosystem.config.cjs
 pm2 status
 npm run verify:health -- http://127.0.0.1:3000/api/health
 npm run rehearse:production -- .env --port 3011
+```
+
+Alternatif rehearsal aman tanpa mengubah `.env` utama:
+
+```bash
+cd /path/to/perkasa-erp-oss-bss/apps/web
+npm run prepare:production-rehearsal-env -- --source .env --target .env.rehearsal.local --port 3011
+npm run rehearse:production -- .env.rehearsal.local --port 3011
+rm -f .env.rehearsal.local
 ```
 
 > `npm run rehearse:production` adalah helper otomatis untuk preflight lokal / server uji.
@@ -78,14 +88,14 @@ Isi catatan berikut setiap kali latihan:
 | Item | Hasil |
 |---|---|
 | tanggal rehearsal | `2026-07-13` |
-| commit yang diuji | `32d8657 (release: 0.65.98)` |
+| commit yang diuji | `bfcbb15 (production cutover candidate)` |
 | durasi `npm install` | `N/A (tidak dijalankan di lokal)` |
 | durasi `npm run build` | `compile 32.8s; TypeScript 29.9s; static pages 1.7s` |
 | durasi boot PM2 | `N/A (pakai node standalone; Ready in 0ms)` |
 | hasil health check | `pass (NODE_ENV=production; PORT=3011; verify-health lulus)` |
 | hasil smoke browser | `N/A (belum diuji browser pada mode standalone)` |
-| isu yang ditemukan | `batch 0.65.97-0.65.98 menambah hardening auth hybrid, sanitasi kredensial bootstrap, dan validator placeholder secret; belum mengganti hasil rehearsal teknis inti` |
-| keputusan | `siap untuk lanjut rehearsal server (PM2 + Nginx)` |
+| isu yang ditemukan | `env rehearsal perlu AUTH_SESSION_SECRET valid; helper prepare-production-rehearsal-env kini tersedia agar rehearsal tidak mengubah env utama` |
+| keputusan | `siap untuk lanjut rehearsal server (PM2 + Nginx) dengan jalur env sementara yang lebih aman` |
 
 ## Kriteria Rehearsal Berhasil
 

@@ -65,6 +65,7 @@ Dokumen ini melengkapi:
 | `AUTH_SESSION_SECRET` terisi | `ya / tidak` |
 | `DATABASE_URL` mengarah ke target benar | `ya / tidak` |
 | `PORT=3000` | `ya / tidak` |
+| helper env rehearsal dipakai | `ya / tidak` |
 | `verify:production-env` | `pass / fail` |
 
 ### 3. Build dan Runtime

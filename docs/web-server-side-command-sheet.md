@@ -24,6 +24,12 @@ export HEALTH_URL=http://127.0.0.1:3000/api/health
 export ROLLBACK_COMMIT=<isi-commit-stabil>
 ```
 
+Catatan kandidat saat dokumen ini diperbarui:
+
+1. kandidat release saat ini: `bfcbb15`
+2. kandidat aplikasi fondasi lokal 100%: `32dc210`
+3. rollback stabil: `11baf11`
+
 Pastikan:
 
 1. file env production nyata sudah siap di server
@@ -84,6 +90,21 @@ Catatan:
 1. command rehearsal otomatis cocok untuk preflight tambahan
 2. PM2 dan Nginx tetap harus diverifikasi manual
 
+Jika ingin rehearsal aman tanpa mengubah `.env` utama:
+
+```bash
+cd "$APP_DIR"
+npm run prepare:production-rehearsal-env -- --source .env --target .env.rehearsal.local --port 3011
+npm run rehearse:production -- .env.rehearsal.local --port 3011
+rm -f .env.rehearsal.local
+```
+
+Checklist cepat:
+
+1. file `.env.rehearsal.local` hanya dipakai sementara untuk rehearsal
+2. `AUTH_SESSION_SECRET` generated tidak dipakai untuk production final
+3. `.env` utama tetap dipertahankan untuk PM2 / deploy asli
+
 ## 4. Start PM2
 
 ```bash
@@ -132,6 +153,23 @@ Checklist cepat:
 1. `verify:health` lulus
 2. login page merespons dari localhost
 3. login page merespons dari domain final
+
+## 6A. Kumpulkan Bukti Cepat
+
+```bash
+cd "$APP_DIR"
+git status --short
+git log -1 --oneline
+pm2 status
+pm2 logs perkasa-erp-web --lines 50
+curl -s "$HEALTH_URL"
+curl -I "https://$DOMAIN/login"
+```
+
+Simpan hasilnya ke dokumen:
+
+1. [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
+2. [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
 
 ## 7. Smoke Browser Minimum
 

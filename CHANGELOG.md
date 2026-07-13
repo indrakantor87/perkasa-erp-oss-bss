@@ -108,6 +108,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.14] - 2026-07-13
+
+### Improved
+
+- Ditambahkan helper `prepare:production-rehearsal-env` untuk membuat env rehearsal sementara dengan `AUTH_SESSION_SECRET` valid tanpa menyentuh `.env` utama, sehingga PIC deploy bisa menjalankan preflight production lebih aman: [prepare-production-rehearsal-env.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/prepare-production-rehearsal-env.mjs), [package.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/package.json)
+- Runbook hosting, command sheet server-side, checklist rehearsal, template evidence, dan checklist go-live kini memakai jalur yang sama untuk rehearsal aman dan pengumpulan bukti teknis hari-H: [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md), [web-deploy-rehearsal-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-deploy-rehearsal-checklist.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+- Catatan readiness hosting diperbarui agar sinkron dengan status lokal terbaru, termasuk `SALES_MARKETING` yang sudah `pass` dan fokus tersisa yang kini murni berada pada eksekusi server-side: [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md), [web-go-live-evidence-local-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-local-2026-07-13.md)
+- Versioning diselaraskan ke `0.66.14`.
+
 ## [0.66.13] - 2026-07-13
 
 ### Improved

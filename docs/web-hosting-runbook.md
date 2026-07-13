@@ -13,6 +13,7 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - PM2 config: `apps/web/ecosystem.config.cjs`
 - Env validator: `apps/web/scripts/verify-production-env.mjs`
 - Health verifier: `apps/web/scripts/verify-health.mjs`
+- Rehearsal env helper: `apps/web/scripts/prepare-production-rehearsal-env.mjs`
 - Rehearsal helper: `apps/web/scripts/rehearse-production.mjs`
 - Health check: `/api/health`
 - Checklist final: `docs/web-hosting-readiness-checklist.md`
@@ -68,6 +69,7 @@ pm2 save
 cd /path/to/perkasa-erp-oss-bss/apps/web
 npm run verify:production-env -- .env
 npm run verify:health -- http://127.0.0.1:3000/api/health
+npm run prepare:production-rehearsal-env -- --source .env --target .env.rehearsal.local --port 3011
 npm run rehearse:production -- .env --port 3011
 ```
 
@@ -88,6 +90,17 @@ Script ini akan menjalankan:
 4. `npm run build`
 5. start `node .next/standalone/server.js` dalam mode production
 6. `verify:health` ke port rehearsal
+
+Jika `.env` utama belum memiliki `AUTH_SESSION_SECRET` yang aman untuk rehearsal lokal, buat env sementara:
+
+```bash
+cd /path/to/perkasa-erp-oss-bss/apps/web
+npm run prepare:production-rehearsal-env -- --source .env --target .env.rehearsal.local --port 3011
+npm run rehearse:production -- .env.rehearsal.local --port 3011
+rm -f .env.rehearsal.local
+```
+
+Gunakan helper ini hanya untuk rehearsal. Production final tetap wajib memakai `.env` nyata yang dikelola operator server.
 
 ## Contoh Nginx
 

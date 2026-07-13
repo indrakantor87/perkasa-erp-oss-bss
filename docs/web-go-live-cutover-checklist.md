@@ -56,13 +56,14 @@ Sebelum mulai, isi peran berikut:
 
 ## Snapshot Readiness Sebelum Hari-H
 
-Status teknis repo per `0.66.12`:
+Status teknis repo per `0.66.13`:
 
 - `npm run check`, `npm run test:smoke`, `npm run build`, `verify:production-env`, dan `verify:health` sudah tersedia dan dipakai sebagai baseline readiness.
 - Sidebar/workspace khusus kini dipersempit ke role target agar audit menu tidak misleading.
 - Flow write-side prioritas `restore isolir`, `transfer`, `reopen`, `TT teknis`, dan `port/ODP` sudah memiliki mutation proof terkontrol pada review DB.
 - Helper terjaga `reset:review-auth-password` tersedia untuk penyelarasan lokal `auth_users.password_hash` di review DB tanpa melemahkan auth aplikasi.
 - Proof lokal `prove:cs-admin-supervisor-flow` tersedia untuk mengisi bucket `Perlu Approval` dan `Perlu Koreksi` pada workspace supervisor tanpa suntikan manual data.
+- Helper `prepare:production-rehearsal-env` tersedia untuk membuat env rehearsal sementara dengan `AUTH_SESSION_SECRET` valid tanpa menyentuh `.env` utama.
 - UAT browser terbaru:
   - `DISMANTLE_OPERATOR`: `pass` pada login dan landing lane dismantle
   - `CS_OPERATOR`: `pass` pada login dan landing `List Kerja`
@@ -103,6 +104,7 @@ Catatan commit saat dokumen ini diperbarui:
 - verifikasi akses SSH/server
 - salin `.env` production ke `apps/web/.env`
 - jalankan `npm run verify:production-env -- .env`
+  Jika perlu rehearsal aman tanpa mengubah `.env` utama: `npm run prepare:production-rehearsal-env -- --source .env --target .env.rehearsal.local --port 3011`
 
 ### 09:00 - 09:30
 
@@ -141,6 +143,7 @@ Semua poin ini harus lulus sebelum validasi bisnis:
 - `npm run build` lulus
 - PM2 status `online`
 - `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus
+- bila rehearsal memakai env sementara, file `.env.rehearsal.local` sudah dihapus kembali setelah selesai
 - domain final membuka halaman login
 - login tidak lagi melempar redirect host salah
 - logout kembali ke `/login`
