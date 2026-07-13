@@ -53,6 +53,7 @@ rm -f .env.rehearsal.local
 > `npm run rehearse:production` adalah helper otomatis untuk preflight lokal / server uji.
 > Script ini tidak menggantikan validasi PM2, Nginx, dan browser, tetapi menutup rangkaian check-smoke-build-standalone-health dalam satu command.
 > Untuk paket bukti server-side yang lebih ringkas, gunakan `npm run capture:server-proof-pack -- ...` setelah PM2 aktif.
+> Tambahkan `--stamp` dan `--output-dir docs/go-live` agar setiap rehearsal menghasilkan bundle artefak yang terpisah.
 
 ## Checklist Teknis
 

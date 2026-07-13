@@ -240,6 +240,8 @@ npm run capture:server-proof-pack -- \
   --domain "$DOMAIN" \
   --rollback-commit "$ROLLBACK_COMMIT" \
   --health-url "$HEALTH_URL" \
+  --stamp "$(date +"%Y%m%d-%H%M%S")" \
+  --output-dir docs/go-live \
   --reverse-proxy-config /etc/nginx/sites-available/perkasa-erp-web.conf \
   --reverse-proxy-server-name "$DOMAIN" \
   --reverse-proxy-upstream http://127.0.0.1:3000 \
@@ -249,11 +251,12 @@ npm run capture:server-proof-pack -- \
 
 Checklist cepat helper orkestrasi:
 
-1. `docs/web-reverse-proxy-check.json` berhasil dibuat
-2. `docs/web-server-runtime-check.json` berhasil dibuat
-3. `docs/web-server-runtime-report.md` berhasil dibuat
-4. `docs/web-go-live-evidence-generated.md` berhasil dibuat
-5. exit command `0` bila seluruh langkah lulus
+1. file output bisa dipisah dengan `--stamp` dan `--output-dir` agar tidak menimpa rehearsal / hari-H sebelumnya
+2. `docs/go-live/web-reverse-proxy-check.<stamp>.json` berhasil dibuat
+3. `docs/go-live/web-server-runtime-check.<stamp>.json` berhasil dibuat
+4. `docs/go-live/web-server-runtime-report.<stamp>.md` berhasil dibuat
+5. `docs/go-live/web-go-live-evidence-generated.<stamp>.md` berhasil dibuat
+6. exit command `0` bila seluruh langkah lulus
 
 ## 6A. Kumpulkan Bukti Cepat
 

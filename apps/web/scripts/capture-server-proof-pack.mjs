@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import path from 'node:path'
 
 function pickArgValue(args, key) {
   const withEquals = args.find((value) => value.startsWith(`${key}=`))
@@ -26,6 +27,12 @@ function appendFlag(target, enabled, flag) {
   if (enabled) {
     target.push(flag)
   }
+}
+
+function buildOutputPath(outputDir, defaultName, explicitPath, stamp) {
+  if (explicitPath) return explicitPath
+  const stampedName = stamp ? defaultName.replace(/(\.[^.]+)$/, `.${stamp}$1`) : defaultName
+  return path.posix.join(outputDir, stampedName)
 }
 
 function runNodeScript(scriptPath, scriptArgs) {
@@ -78,11 +85,33 @@ async function main() {
   const reverseProxyUpstream = pickArgValue(args, '--reverse-proxy-upstream') || 'http://127.0.0.1:3000'
   const reverseProxyTestCommand = pickArgValue(args, '--reverse-proxy-test-command') || 'nginx -t'
   const reverseProxyReloadCommand = pickArgValue(args, '--reverse-proxy-reload-command')
-  const reverseProxyOutput = pickArgValue(args, '--reverse-proxy-output') || 'docs/web-reverse-proxy-check.json'
+  const outputDir = pickArgValue(args, '--output-dir') || 'docs'
+  const stamp = pickArgValue(args, '--stamp')
+  const reverseProxyOutput = buildOutputPath(
+    outputDir,
+    'web-reverse-proxy-check.json',
+    pickArgValue(args, '--reverse-proxy-output'),
+    stamp
+  )
 
-  const runtimeOutput = pickArgValue(args, '--runtime-output') || 'docs/web-server-runtime-check.json'
-  const runtimeReportOutput = pickArgValue(args, '--runtime-report-output') || 'docs/web-server-runtime-report.md'
-  const evidenceOutput = pickArgValue(args, '--evidence-output') || 'docs/web-go-live-evidence-generated.md'
+  const runtimeOutput = buildOutputPath(
+    outputDir,
+    'web-server-runtime-check.json',
+    pickArgValue(args, '--runtime-output'),
+    stamp
+  )
+  const runtimeReportOutput = buildOutputPath(
+    outputDir,
+    'web-server-runtime-report.md',
+    pickArgValue(args, '--runtime-report-output'),
+    stamp
+  )
+  const evidenceOutput = buildOutputPath(
+    outputDir,
+    'web-go-live-evidence-generated.md',
+    pickArgValue(args, '--evidence-output'),
+    stamp
+  )
 
   const skipSyntaxTest = hasArg(args, '--skip-syntax-test')
   const skipReload = hasArg(args, '--skip-reload')

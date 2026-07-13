@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.22] - 2026-07-13
+
+### Improved
+
+- `capture:server-proof-pack` kini mendukung `--stamp` dan `--output-dir`, sehingga paket bukti server-side dapat menghasilkan artefak bertimestamp seperti `web-reverse-proxy-check.<stamp>.json` dan `web-go-live-evidence-generated.<stamp>.md` tanpa menimpa rehearsal / hari-H sebelumnya: [capture-server-proof-pack.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/capture-server-proof-pack.mjs)
+- Command sheet, runbook hosting, checklist rehearsal/cutover, template evidence, dan checklist readiness kini mengarahkan operator memakai output bertimestamp di `docs/go-live/` agar jejak audit lebih rapi: [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md), [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-deploy-rehearsal-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-deploy-rehearsal-checklist.md), [web-server-rehearsal-execution-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-rehearsal-execution-template.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- Versioning diselaraskan ke `0.66.22` untuk menandai output proof-pack bertimestamp.
+
 ## [0.66.21] - 2026-07-13
 
 ### Improved
