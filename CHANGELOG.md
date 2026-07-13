@@ -78,6 +78,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Bukti UAT dan dokumen readiness diperbarui untuk menandai bahwa smoke login/landing `CS_ADMIN` kini sudah valid kembali, sementara blocker yang tersisa bergeser ke pembuktian write-side supervisor, bukan lagi query supervisor yang rusak: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md), [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md), [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
 - Versioning diselaraskan ke `0.66.00` untuk menandai penutupan blocker readiness `CS_ADMIN`.
 
+## [0.66.01] - 2026-07-13
+
+### Improved
+
+- Smoke proof write-side support ditambahkan agar guard dan audit trail untuk `restore isolir`, `transfer ke dismantle`, dan `reopen dismantle` bisa diverifikasi ulang tanpa melakukan mutasi review DB sembarangan: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- Artefak bukti baru merangkum guard role, guard state/schema, format audit note, dan gap manual mutation proof untuk flow write-side support prioritas: [web-support-write-side-proof-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-support-write-side-proof-2026-07-13.md)
+- Checklist hardening dan template evidence go-live kini menautkan bukti write-side support secara eksplisit, sementara audit menu role ikut diselaraskan agar tidak lagi menyebut blocker query `CS_ADMIN` yang sudah tertutup: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-role-menu-audit-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-menu-audit-2026-07-13.md)
+- Versioning diselaraskan ke `0.66.01` untuk menandai batch proof write-side support dan sinkronisasi evidencenya.
+
 ## [0.65.95] - 2026-07-13
 
 ### Improved

@@ -13,7 +13,7 @@ Dokumen ini merangkum audit sidebar/menu aktual berbasis implementasi dan UAT br
 | `SUPER_ADMIN` | dashboard, list kerja, daily activity, import, seluruh domain, settings, workspace khusus | `oke` | tetap menjadi role kontrol lintas domain |
 | `SALES_MARKETING` | dashboard, list kerja, daily activity, sales, customer, support, inventory | `perlu dibenahi ringan` | CTA `Import Center` di shell sales sudah dibersihkan |
 | `CS_OPERATOR` | dashboard, list kerja, daily activity, sales, customer, support, inventory | `oke` | smoke UAT login/landing sudah lulus |
-| `CS_ADMIN` | dashboard, list kerja, daily activity, sales, customer, support, inventory, workspace supervisor | `perlu dibenahi` | query supervisor masih fallback, jadi pembacaan queue belum final |
+| `CS_ADMIN` | dashboard, list kerja, daily activity, sales, customer, support, inventory, workspace supervisor | `oke dengan catatan` | query supervisor sudah pulih; sisa gap utama ada pada bukti write-side supervisor |
 | `NOC_OPERATOR` | dashboard, list kerja, daily activity, support, inventory | `oke` | fokus teknis relatif bersih |
 | `FIELD_TECHNICIAN` | dashboard, list kerja, daily activity, support, inventory, teknisi psb/expan/jointer | `oke` | workspace khusus kini hanya tampil ke role target |
 | `TT_OPERATOR` | dashboard, list kerja, daily activity, support | `oke` | role mikro cukup sempit |
@@ -43,7 +43,6 @@ Dokumen ini merangkum audit sidebar/menu aktual berbasis implementasi dan UAT br
 
 ## Masih Perlu Dibenahi
 
-- `CS_ADMIN` masih tertahan blocker query supervisor review DB: `Column 'status' in field list is ambiguous`.
 - Bukti write-side/high-risk flow belum lengkap untuk:
   - restore isolir
   - transfer ke dismantle
@@ -54,7 +53,6 @@ Dokumen ini merangkum audit sidebar/menu aktual berbasis implementasi dan UAT br
 
 ## Rekomendasi Lanjut
 
-1. selesaikan query supervisor `CS_ADMIN` agar bucket approval/koreksi/restore valid dari review DB
-2. formalkan bukti write-side per role di checklist UAT/hardening
-3. pertahankan prinsip fail-closed untuk workspace khusus lain yang nanti ditambahkan
-
+1. formalkan mutation proof untuk `restore isolir`, `transfer ke dismantle`, dan `reopen dismantle`
+2. pertahankan prinsip fail-closed untuk workspace khusus lain yang nanti ditambahkan
+3. lanjutkan bukti write-side untuk `update TT teknis` dan `update port/ODP`

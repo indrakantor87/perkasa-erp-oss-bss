@@ -99,6 +99,7 @@ Dokumen ini melengkapi:
 | screenshot dashboard NOC / support | `................` |
 | screenshot landing support | `................` |
 | output `verify:health` | `................` |
+| bukti write-side support | `lihat web-support-write-side-proof-2026-07-13.md / catatan mutation proof hari-H` |
 
 ## Validasi Per Role
 
@@ -142,6 +143,7 @@ Dokumen ini melengkapi:
 | flow support dismantle terbuka | `pass / fail` | `................` |
 | queue / riwayat terbaca | `pass / fail` | `................` |
 | guard role sesuai | `pass / fail` | `................` |
+| bukti `close / reopen` tersedia | `pass / partial / fail` | `................` |
 
 ### `SALES_MARKETING`
 
@@ -169,6 +171,7 @@ Dokumen ini melengkapi:
 | dashboard supervisor terbuka | `pass / fail` | `................` |
 | domain lintas utama terbuka | `pass / fail` | `................` |
 | queue supervisor terbaca | `pass / fail` | `................` |
+| bukti `restore / transfer / reopen` supervisor | `pass / partial / fail` | `................` |
 
 ## Temuan, Risiko, dan Tindakan
 

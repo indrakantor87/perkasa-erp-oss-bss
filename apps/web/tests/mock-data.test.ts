@@ -19,7 +19,21 @@ import {
 import { dashboardSummary } from '@/lib/mock-dashboard'
 import { domainPages } from '@/lib/mock-domains'
 import { getBatchDetail, getImportBatch, importBatches, transformStages } from '@/lib/mock-import'
-import { buildSupportLaneReviewSummary, getSupportLanePath, getSupportLaneSections, normalizeSupportLane } from '@/lib/support-lanes'
+import {
+  buildSupportLaneReviewSummary,
+  canProcessSupportDismantle,
+  canUseSupportAction,
+  getSupportLanePath,
+  getSupportLaneSections,
+  normalizeSupportLane,
+} from '@/lib/support-lanes'
+import {
+  SUPPORT_DISMANTLE_METADATA_PREFIXES,
+  buildSupportDismantleCloseNote,
+  buildSupportDismantleReopenNote,
+  buildSupportDismantleTransferNote,
+  parseStructuredSupportNote,
+} from '@/lib/services/support-dismantle-service'
 import { buildDashboardNextActions, getDashboardPageData, getDashboardSummary } from '@/lib/services/dashboard-service'
 import { getAuthUsersPageData } from '@/lib/services/auth-user-service'
 import { getDomainPageData } from '@/lib/services/domain-service'
@@ -86,6 +100,99 @@ async function main() {
   assert.equal(canPerformAction('NOC_OPERATOR', 'billing', 'view'), false)
   assert.equal(canPerformAction('SALES_MARKETING', 'sales', 'create'), true)
   assert.equal(getPermissionSummary('SUPER_ADMIN').manageCount > 0, true)
+  assert.equal(
+    canUseSupportAction({
+      role: 'CS_OPERATOR',
+      actionKey: 'isolation-restore',
+      canCreate: canPerformAction('CS_OPERATOR', 'support', 'create'),
+      canUpdate: canPerformAction('CS_OPERATOR', 'support', 'update'),
+      canApprove: canPerformAction('CS_OPERATOR', 'support', 'approve'),
+    }),
+    true,
+    'CS Operator harus tetap bisa menjalankan restore isolir.',
+  )
+  assert.equal(
+    canUseSupportAction({
+      role: 'CS_OPERATOR',
+      actionKey: 'dismantle-close',
+      canCreate: canPerformAction('CS_OPERATOR', 'support', 'create'),
+      canUpdate: canPerformAction('CS_OPERATOR', 'support', 'update'),
+      canApprove: canPerformAction('CS_OPERATOR', 'support', 'approve'),
+    }),
+    false,
+    'CS Operator tidak boleh menutup dismantle tanpa capability approve.',
+  )
+  assert.equal(
+    canUseSupportAction({
+      role: 'CS_ADMIN',
+      actionKey: 'dismantle-reopen',
+      canCreate: canPerformAction('CS_ADMIN', 'support', 'create'),
+      canUpdate: canPerformAction('CS_ADMIN', 'support', 'update'),
+      canApprove: canPerformAction('CS_ADMIN', 'support', 'approve'),
+    }),
+    true,
+    'CS Admin harus bisa reopen dismantle karena punya capability approve.',
+  )
+  assert.equal(
+    canUseSupportAction({
+      role: 'DISMANTLE_OPERATOR',
+      actionKey: 'dismantle-close',
+      canCreate: canPerformAction('DISMANTLE_OPERATOR', 'support', 'create'),
+      canUpdate: canPerformAction('DISMANTLE_OPERATOR', 'support', 'update'),
+      canApprove: canPerformAction('DISMANTLE_OPERATOR', 'support', 'approve'),
+    }),
+    true,
+    'Dismantle Operator harus bisa menutup dismantle walau bukan approver umum.',
+  )
+  assert.equal(
+    canProcessSupportDismantle('CS_ADMIN', canPerformAction('CS_ADMIN', 'support', 'approve')),
+    true,
+    'CS Admin harus bisa memproses flow dismantle.',
+  )
+  assert.equal(
+    canProcessSupportDismantle('CS_OPERATOR', canPerformAction('CS_OPERATOR', 'support', 'approve')),
+    false,
+    'CS Operator tidak boleh memproses flow dismantle yang butuh capability sempit.',
+  )
+  assert.equal(
+    canProcessSupportDismantle(
+      'DISMANTLE_OPERATOR',
+      canPerformAction('DISMANTLE_OPERATOR', 'support', 'approve'),
+    ),
+    true,
+    'Dismantle Operator harus lolos gate proses dismantle walau capability approve umum tidak aktif.',
+  )
+
+  const transferAuditNote = buildSupportDismantleTransferNote(session!, '  pelanggan meminta terminasi resmi ')
+  assert.match(transferAuditNote, /^\[Transferred to dismantle queue\]/)
+  assert.match(transferAuditNote, /pelanggan meminta terminasi resmi$/)
+
+  const reopenAuditNote = buildSupportDismantleReopenNote(session!, '  perlu dibuka ulang setelah verifikasi billing ')
+  assert.match(reopenAuditNote, /^\[Reopened via dismantle\]/)
+  assert.match(reopenAuditNote, /perlu dibuka ulang setelah verifikasi billing$/)
+
+  const closeAuditNote = buildSupportDismantleCloseNote(session!, {
+    closeNote: '  perangkat sudah diambil ',
+    fieldPic: '  Budi  ',
+    deviceStatus: '  Aman ',
+    pickupStatus: '  Sudah pickup ',
+    closeOutcome: '  Terminasi selesai ',
+    billingDisposition: '  Final invoice tetap berjalan ',
+  })
+  const parsedCloseAuditNote = parseStructuredSupportNote(closeAuditNote)
+  assert.equal(parsedCloseAuditNote.summary, '[Dismantled via web] perangkat sudah diambil')
+  assert.equal(
+    parsedCloseAuditNote.metadata.get(SUPPORT_DISMANTLE_METADATA_PREFIXES.actor),
+    'Super Admin Perkasa (admin.perkasa)',
+  )
+  assert.equal(parsedCloseAuditNote.metadata.get(SUPPORT_DISMANTLE_METADATA_PREFIXES.fieldPic), 'Budi')
+  assert.equal(parsedCloseAuditNote.metadata.get(SUPPORT_DISMANTLE_METADATA_PREFIXES.deviceStatus), 'Aman')
+  assert.equal(parsedCloseAuditNote.metadata.get(SUPPORT_DISMANTLE_METADATA_PREFIXES.pickupStatus), 'Sudah pickup')
+  assert.equal(parsedCloseAuditNote.metadata.get(SUPPORT_DISMANTLE_METADATA_PREFIXES.closeOutcome), 'Terminasi selesai')
+  assert.equal(
+    parsedCloseAuditNote.metadata.get(SUPPORT_DISMANTLE_METADATA_PREFIXES.billingDisposition),
+    'Final invoice tetap berjalan',
+  )
 
   delete process.env.APP_DATA_MODE
   delete process.env.DATABASE_URL

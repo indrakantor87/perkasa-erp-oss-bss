@@ -58,7 +58,7 @@ Role yang wajib di-hardening lebih dulu:
 - [x] `List Kerja` menjadi workspace utama role, bukan sekadar pelengkap
 - [ ] deep-link lintas `billing -> isolation -> TT/SLA -> dismantle -> supervisor` tetap konsisten
 - [x] lane support tidak menampilkan action yang salah untuk mikro-role
-- [ ] queue `Transfer atau Restore`, `Perlu Koreksi`, dan `Queue Risiko Tinggi` terbaca benar oleh `CS_ADMIN`
+- [x] queue `Transfer atau Restore`, `Perlu Koreksi`, dan `Queue Risiko Tinggi` terbaca benar oleh `CS_ADMIN`
 - [x] queue `TT`, `SLA`, `Isolir`, dan `Dismantle` tetap konsisten setelah data production dimuat
 - [x] fallback error dan hint operator tetap informatif saat data tertentu kosong atau belum sinkron
 
@@ -71,7 +71,7 @@ Role yang wajib di-hardening lebih dulu:
   - update TT teknis
   - update port/ODP
 - [x] role tanpa capability tidak melihat tombol write-side sensitif
-- [ ] audit trail minimal untuk keputusan berisiko tinggi masih terbaca
+- [x] audit trail minimal untuk keputusan berisiko tinggi sudah punya proof executable untuk `restore/transfer/reopen` melalui note builder dan smoke guard
 - [ ] tidak ada aksi yang masih memaksa operator kembali ke web lama untuk flow fondasi
 
 ## 4. Hardening UAT Operasional
@@ -135,3 +135,4 @@ Sebelum pindah ke cutover, pastikan artefak ini sudah ada dan terbarui:
 2. [hybrid-psb-production-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-cutover-checklist.md)
 3. [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md)
 4. [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+5. [web-support-write-side-proof-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-support-write-side-proof-2026-07-13.md)
