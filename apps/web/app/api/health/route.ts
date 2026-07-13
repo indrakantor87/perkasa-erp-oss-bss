@@ -8,6 +8,10 @@ function isAuthSecretConfigured() {
   return Boolean(process.env.AUTH_SESSION_SECRET?.trim())
 }
 
+function isProductionEnv() {
+  return (process.env.NODE_ENV ?? 'development') === 'production'
+}
+
 async function getReviewDbHealth() {
   try {
     const [row] = await runReviewDbQuery<{ ping: number }>('SELECT 1 AS ping', [])
@@ -57,25 +61,63 @@ async function getReviewDbHealth() {
 export async function GET() {
   const dataSource = getDataSourceSnapshot()
   const authReady = isAuthSecretConfigured()
+  const env = process.env.NODE_ENV ?? 'development'
+  const productionEnv = isProductionEnv()
   const shouldCheckReviewDb = dataSource.effectiveMode === 'review-db' && !dataSource.isFallback
   const reviewDb = shouldCheckReviewDb ? await getReviewDbHealth() : null
-  const isOk = !shouldCheckReviewDb || Boolean(reviewDb?.ready)
+  const authRequired = productionEnv
+  const authOk = !authRequired || authReady
+  const dataSourceRequired = productionEnv
+  const dataSourceOk = !dataSourceRequired || (dataSource.effectiveMode === 'review-db' && !dataSource.isFallback)
+  const reviewDbRequired = productionEnv && dataSourceOk
+  const reviewDbOk = !reviewDbRequired || Boolean(reviewDb?.ready)
+  const warnings: string[] = []
+
+  if (!authReady) {
+    warnings.push(
+      productionEnv
+        ? 'AUTH_SESSION_SECRET belum terisi. Health production harus gagal sampai session secret siap.'
+        : 'AUTH_SESSION_SECRET belum terisi. Development masih diizinkan memakai fallback secret.',
+    )
+  }
+
+  if (dataSource.effectiveMode !== 'review-db' || dataSource.isFallback) {
+    warnings.push(
+      productionEnv
+        ? 'Data source masih mock/fallback. Hosting production harus memakai review-db non-fallback.'
+        : 'Data source masih mock/fallback. Ini aman untuk dev, tetapi tidak valid untuk cutover production.',
+    )
+  }
+
+  const isOk = authOk && dataSourceOk && reviewDbOk
 
   return NextResponse.json(
     {
       ok: isOk,
       app: 'perkasa-erp-oss-bss-web',
-      env: process.env.NODE_ENV ?? 'development',
+      env,
       timestamp: new Date().toISOString(),
       uptimeSeconds: Math.round(process.uptime()),
       auth: {
         sessionSecretConfigured: authReady,
+        required: authRequired,
+        ready: authOk,
       },
       dataSource: {
         configuredMode: dataSource.configuredMode,
         effectiveMode: dataSource.effectiveMode,
         isFallback: dataSource.isFallback,
         label: dataSource.label,
+        required: dataSourceRequired,
+        ready: dataSourceOk,
+      },
+      deployment: {
+        env,
+        authReady: authOk,
+        dataSourceReady: dataSourceOk,
+        reviewDbReady: reviewDbOk,
+        ready: isOk,
+        warnings,
       },
       reviewDb,
     },

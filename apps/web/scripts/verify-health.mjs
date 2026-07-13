@@ -19,11 +19,27 @@ async function main() {
 
   const effectiveMode = payload?.dataSource?.effectiveMode
   const isFallback = Boolean(payload?.dataSource?.isFallback)
+  const env = String(payload?.env ?? '').trim().toLowerCase()
+  const auth = payload?.auth
+  const deployment = payload?.deployment
   const reviewDb = payload?.reviewDb
   if (effectiveMode === 'review-db' && !isFallback) {
     if (!reviewDb?.ready) {
       const details = reviewDb?.missingColumns?.length ? `Missing: ${reviewDb.missingColumns.join(', ')}` : ''
       throw new Error(`Review DB belum ready. ${details}`.trim())
+    }
+  }
+
+  if (env === 'production') {
+    if (!auth?.sessionSecretConfigured) {
+      throw new Error('Health production belum ready: AUTH_SESSION_SECRET belum terkonfigurasi.')
+    }
+    if (effectiveMode !== 'review-db' || isFallback) {
+      throw new Error('Health production belum ready: data source harus review-db non-fallback.')
+    }
+    if (!deployment?.ready) {
+      const warnings = Array.isArray(deployment?.warnings) ? deployment.warnings.join(' | ') : ''
+      throw new Error(`Health production belum ready. ${warnings}`.trim())
     }
   }
 

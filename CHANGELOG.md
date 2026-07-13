@@ -23,6 +23,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.94] - 2026-07-13
+
+### Improved
+
+- Endpoint `/api/health` kini membedakan readiness development vs production secara eksplisit. Pada production, health akan gagal jika `AUTH_SESSION_SECRET` belum siap atau aplikasi masih berjalan pada data source mock/fallback, sehingga status tidak lagi “hijau” saat syarat cutover inti belum terpenuhi: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/health/route.ts)
+- Payload health kini menyertakan status `auth.ready`, `dataSource.ready`, dan blok `deployment` berisi readiness serta warning yang lebih jelas, sehingga operator deployment lebih mudah membaca alasan hosting belum siap.
+- Script `verify-health` kini memaksa `AUTH_SESSION_SECRET` dan mode `review-db` non-fallback pada environment production, tetapi tetap permisif di development agar alur lokal tidak terganggu: [verify-health.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/verify-health.mjs)
+- Versioning diselaraskan ke `0.65.94` untuk menandai batch hardening readiness health production.
+
 ## [0.65.92] - 2026-07-13
 
 ### Fixed
