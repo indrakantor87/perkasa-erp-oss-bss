@@ -18,6 +18,10 @@ type ReviewDismantleQueueRow = {
   id: number
 }
 
+type ReviewDbInsertResult = {
+  insertId?: number
+}
+
 type ReviewIsolationReopenStateRow = {
   id: number
   status: string
@@ -164,6 +168,34 @@ async function buildDismantleQueueInsertPayload(params: {
   }
 }
 
+async function buildStagingHistoryRelinkPayload(queueId: number) {
+  const [hasTargetHistoryId, hasTargetQueueId, hasUpdatedAt] = await Promise.all([
+    hasReviewDbColumn('staging_legacy_support_records', 'target_dismantle_history_id'),
+    hasReviewDbColumn('staging_legacy_support_records', 'target_dismantle_queue_id'),
+    hasReviewDbColumn('staging_legacy_support_records', 'updated_at'),
+  ])
+
+  if (!hasTargetHistoryId) {
+    return null
+  }
+
+  const assignments = ['target_dismantle_history_id = NULL']
+  const values: unknown[] = []
+
+  if (hasTargetQueueId) {
+    assignments.push('target_dismantle_queue_id = ?')
+    values.push(queueId)
+  }
+  if (hasUpdatedAt) {
+    assignments.push('updated_at = CURRENT_TIMESTAMP')
+  }
+
+  return {
+    assignments,
+    values,
+  }
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -256,7 +288,7 @@ export async function POST(
         [...isolationReopenPayload.values, history.isolationId],
       )
 
-      await connection.query(
+      const [insertResult] = await connection.query(
         `
           INSERT INTO support_dismantle_queue (
             ${queueInsertPayload.columns.join(',\n            ')}
@@ -265,6 +297,23 @@ export async function POST(
         `,
         queueInsertPayload.values,
       )
+      const queueId = Number((insertResult as ReviewDbInsertResult | undefined)?.insertId ?? 0)
+      if (!Number.isFinite(queueId) || queueId <= 0) {
+        throw new Error('Queue dismantle hasil reopen tidak berhasil dibuat.')
+      }
+
+      const stagingRelinkPayload = await buildStagingHistoryRelinkPayload(queueId)
+      if (stagingRelinkPayload) {
+        await connection.query(
+          `
+            UPDATE staging_legacy_support_records
+            SET
+              ${stagingRelinkPayload.assignments.join(',\n              ')}
+            WHERE target_dismantle_history_id = ?
+          `,
+          [...stagingRelinkPayload.values, history.historyId],
+        )
+      }
 
       await connection.query(
         `

@@ -10,9 +10,9 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 
 | Flow | Guard Role | Guard State/Schema | Audit Note | Bukti Eksekusi Saat Ini | Status |
 |---|---|---|---|---|---|
-| `restore isolir` | `support update` | wajib `review-db`, wajib ada `status`, menolak data tidak ada / sudah closed / sudah restore | catatan restore dinormalisasi dengan actor web | code review + smoke proof RBAC | `partial` |
-| `transfer ke dismantle` | `CS_ADMIN` approver atau `DISMANTLE_OPERATOR` | wajib `review-db`, wajib ada `customer_name/status`, menolak archived / closed / duplicate queue | transfer note terstruktur dengan actor web | code review + smoke proof RBAC/note | `partial` |
-| `reopen dismantle` | `CS_ADMIN` approver atau `DISMANTLE_OPERATOR` | wajib `review-db`, wajib ada `status`, menolak histori tidak ada / isolation tidak ada / queue aktif duplikat | reopen note terstruktur dengan actor web | code review + smoke proof RBAC/note | `partial` |
+| `restore isolir` | `support update` | wajib `review-db`, wajib ada `status`, menolak data tidak ada / sudah closed / sudah restore | catatan restore dinormalisasi dengan actor web | code review + smoke proof RBAC + mutation proof aktual | `pass` |
+| `transfer ke dismantle` | `CS_ADMIN` approver atau `DISMANTLE_OPERATOR` | wajib `review-db`, wajib ada `customer_name/status`, menolak archived / closed / duplicate queue | transfer note terstruktur dengan actor web | code review + smoke proof RBAC/note + mutation proof aktual | `pass` |
+| `reopen dismantle` | `CS_ADMIN` approver atau `DISMANTLE_OPERATOR` | wajib `review-db`, wajib ada `status`, menolak histori tidak ada / isolation tidak ada / queue aktif duplikat | reopen note terstruktur dengan actor web | code review + smoke proof RBAC/note + mutation proof aktual | `pass` |
 
 ## Bukti Route Aktual
 
@@ -65,17 +65,31 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
   - gate `canProcessSupportDismantle()` hanya meloloskan approver yang benar atau `DISMANTLE_OPERATOR`
   - transfer/close/reopen note tetap terstruktur dan menyimpan metadata actor, field PIC, device status, pickup status, outcome, dan billing disposition
 
+## Bukti Mutasi Terkontrol
+
+- Helper proof terkontrol tersedia di [prove-support-write-side.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/prove-support-write-side.mjs) dan hanya bisa menulis bila `--apply` dipakai bersama `--confirm-db` atau `--confirm-host`.
+- Bukti aktual yang sudah dijalankan pada review DB `erp_isp_review`:
+
+| Flow | Kandidat | Aktor Web | Before | After | Hasil |
+|---|---|---|---|---|---|
+| `restore isolir` | `support_isolations.id = 271` (`Tika Sri Lestari`) | `cstest` | `status=OPEN`, `restoration_date=NULL`, `close_note=NULL` | `status=CLOSED`, `restoration_date=2026-07-13 07:52:59`, `close_note` terisi note restore | `pass` |
+| `transfer ke dismantle` | `support_isolations.id = 272` (`Nur Azizah`) | `admincs.sample` | belum ada queue dismantle | `support_dismantle_queue.id = 66`, `transferred_by_username=admincs.sample`, `transfer_note` terisi | `pass` |
+| `reopen dismantle` | `support_dismantle_history.id = 321` (`YUNI SUSANTI`) | `admincs.sample` | histori ada, queue aktif belum ada, isolir masih `CLOSED`/`archived` | histori terhapus, isolir kembali `OPEN`, queue aktif baru `id = 68`, `transfer_note` dan `reopened_note` terisi | `pass` |
+
+## Hardening Reopen Tambahan
+
+- Mutation proof pertama untuk `reopen dismantle` sempat gagal karena `staging_legacy_support_records.target_dismantle_history_id` masih mengarah ke histori yang hendak dihapus.
+- Route `reopen` kini merelink lineage staging ke `target_dismantle_queue_id` yang baru sebelum menghapus histori lama, sehingga foreign key tetap konsisten pada review DB nyata: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle-history/[id]/reopen/route.ts)
+
 ## Yang Masih Belum Final
 
-- Bukti mutasi manual terkontrol pada review DB masih belum diformalisasi untuk:
-  - satu contoh `restore isolir`
-  - satu contoh `transfer ke dismantle`
-  - satu contoh `reopen dismantle`
-- Bukti tersebut sengaja belum dipaksa pada batch ini agar tidak menulis data review DB tanpa guard operasional yang jelas.
+- Mutation proof terkontrol untuk tiga flow prioritas sudah tersedia, tetapi bukti write-side support secara keseluruhan masih belum final untuk:
+  - `update TT teknis`
+  - `update port/ODP`
+- Evidence hari-H tetap perlu menyalin hasil yang relevan ke template go-live sesuai host/commit deploy aktual.
 
 ## Rekomendasi Lanjut
 
-1. jalankan mutation proof terkontrol pada data kandidat uji yang sudah dipilih PIC
-2. simpan sebelum/sesudah record untuk `support_isolations`, `support_dismantle_queue`, dan `support_dismantle_history`
-3. lampirkan hasilnya ke template [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
-
+1. lanjutkan mutation proof untuk `update TT teknis`
+2. lanjutkan mutation proof untuk `update port/ODP`
+3. salin hasil mutation proof support ini ke template [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md) saat rehearsal server-side atau hari-H

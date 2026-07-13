@@ -87,6 +87,19 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Checklist hardening dan template evidence go-live kini menautkan bukti write-side support secara eksplisit, sementara audit menu role ikut diselaraskan agar tidak lagi menyebut blocker query `CS_ADMIN` yang sudah tertutup: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-role-menu-audit-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-menu-audit-2026-07-13.md)
 - Versioning diselaraskan ke `0.66.01` untuk menandai batch proof write-side support dan sinkronisasi evidencenya.
 
+## [0.66.02] - 2026-07-13
+
+### Fixed
+
+- Route `reopen dismantle` kini merelink lineage `staging_legacy_support_records` dari `target_dismantle_history_id` ke `target_dismantle_queue_id` baru sebelum menghapus histori, sehingga foreign key review DB tidak lagi memblokir reopen nyata pada data production review: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle-history/[id]/reopen/route.ts)
+
+### Improved
+
+- Helper proof terkontrol ditambahkan untuk discovery kandidat, snapshot before/after, dan apply mode yang dipagari `--confirm-db/--confirm-host`, sehingga mutation proof support bisa dijalankan ulang tanpa raw SQL ad-hoc: [prove-support-write-side.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/prove-support-write-side.mjs), [package.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/package.json)
+- Mutation proof aktual sudah berhasil dijalankan untuk tiga flow support prioritas pada review DB: `restore isolir` (`271`), `transfer ke dismantle` (`272`), dan `reopen dismantle` (`321`), lengkap dengan before/after evidence yang kini diringkas di dokumen proof support: [web-support-write-side-proof-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-support-write-side-proof-2026-07-13.md)
+- Checklist hardening kini menandai `restore / transfer / reopen` sebagai write action yang sudah diuji manual terkontrol, sehingga blocker write-side support bergeser ke `update TT teknis` dan `update port/ODP`: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md)
+- Versioning diselaraskan ke `0.66.02` untuk menandai penutupan mutation proof support prioritas dan hardening reopen lineage staging.
+
 ## [0.65.95] - 2026-07-13
 
 ### Improved

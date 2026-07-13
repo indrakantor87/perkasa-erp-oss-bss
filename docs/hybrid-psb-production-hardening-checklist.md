@@ -64,10 +64,11 @@ Role yang wajib di-hardening lebih dulu:
 
 ## 3. Hardening Write-Side dan Guardrail
 
-- [ ] write action penting minimal sudah diuji manual:
+- [x] write action penting minimal sudah diuji manual untuk:
   - restore isolir
   - transfer ke dismantle
   - reopen dismantle
+- [ ] write action penting berikut masih perlu mutation proof:
   - update TT teknis
   - update port/ODP
 - [x] role tanpa capability tidak melihat tombol write-side sensitif
