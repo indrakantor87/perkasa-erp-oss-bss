@@ -120,7 +120,9 @@ Catatan commit:
 
 - start/restart PM2 dengan `ecosystem.config.cjs`
 - aktifkan Nginx/reload config
-- jalankan `npm run capture:server-proof-pack -- --type hari-H --server "$(hostname)" --domain <domain-final> --rollback-commit <commit-rollback> --health-url http://127.0.0.1:3000/api/health --stamp "$(date +"%Y%m%d-%H%M%S")" --output-dir docs/go-live --reverse-proxy-config /etc/nginx/sites-available/perkasa-erp-web.conf --reverse-proxy-server-name <domain-final> --reverse-proxy-upstream http://127.0.0.1:3000 --reverse-proxy-test-command "sudo nginx -t" --reverse-proxy-reload-command "sudo systemctl reload nginx"`
+- tetapkan `PROOF_STAMP=$(date +"%Y%m%d-%H%M%S")`
+- jalankan `npm run capture:server-proof-pack -- --type hari-H --server "$(hostname)" --domain <domain-final> --rollback-commit <commit-rollback> --health-url http://127.0.0.1:3000/api/health --stamp "$PROOF_STAMP" --output-dir docs/go-live --reverse-proxy-config /etc/nginx/sites-available/perkasa-erp-web.conf --reverse-proxy-server-name <domain-final> --reverse-proxy-upstream http://127.0.0.1:3000 --reverse-proxy-test-command "sudo nginx -t" --reverse-proxy-reload-command "sudo systemctl reload nginx"`
+- jalankan `npm run evaluate:server-readiness -- --proof-dir docs/go-live --stamp "$PROOF_STAMP"`
 - jalankan `npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name <domain-final> --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --reload-command "sudo systemctl reload nginx" --output docs/web-reverse-proxy-check.json`
 - jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`
 - jalankan `npm run verify:server-runtime -- --pm2-app perkasa-erp-web --health-url http://127.0.0.1:3000/api/health --domain <domain-final> --output docs/web-server-runtime-check.json`
@@ -153,10 +155,12 @@ Semua poin ini harus lulus sebelum validasi bisnis:
 - `npm run verify:reverse-proxy -- ...` lulus
 - `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus
 - `npm run verify:server-runtime -- ...` lulus
-- `docs/web-reverse-proxy-check.json` berhasil dibuat
-- `docs/web-server-runtime-report.md` berhasil dibuat
+- `docs/go-live/web-reverse-proxy-check.<stamp>.json` berhasil dibuat
+- `docs/go-live/web-server-runtime-report.<stamp>.md` berhasil dibuat
+- `docs/go-live/web-server-technical-decision.<stamp>.md` berhasil dibuat
+- hasil `evaluate:server-readiness` tidak `rollback-recommended`
 - bila rehearsal memakai env sementara, file `.env.rehearsal.local` sudah dihapus kembali setelah selesai
-- `docs/web-go-live-evidence-generated.md` berhasil dibuat bila helper collector dipakai
+- `docs/go-live/web-go-live-evidence-generated.<stamp>.md` berhasil dibuat bila helper collector dipakai
 - domain final membuka halaman login
 - login tidak lagi melempar redirect host salah
 - logout kembali ke `/login`

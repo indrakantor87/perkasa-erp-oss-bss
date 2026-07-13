@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.24] - 2026-07-13
+
+### Improved
+
+- Ditambahkan helper [evaluate-server-readiness.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/evaluate-server-readiness.mjs) dan script `npm run evaluate:server-readiness` untuk membaca bundle proof-pack bertimestamp di `docs/go-live/` lalu mengeluarkan keputusan teknis `ready`, `partial`, atau `rollback-recommended` beserta alasan dan warning.
+- Handoff operator, command sheet server-side, runbook hosting, checklist hari-H, checklist rehearsal, template evidence, dan checklist readiness kini memasukkan langkah evaluator keputusan teknis agar urutan operasional menjadi `proof pack -> evaluate -> sign-off`: [web-server-operator-handoff.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-operator-handoff.md), [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md), [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md), [web-deploy-rehearsal-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-deploy-rehearsal-checklist.md), [web-server-rehearsal-execution-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-rehearsal-execution-template.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- Versioning diselaraskan ke `0.66.24` untuk menandai evaluator keputusan teknis server-side.
+
 ## [0.66.23] - 2026-07-13
 
 ### Improved

@@ -24,6 +24,7 @@ export DOMAIN=erp.example.com
 export HEALTH_URL=http://127.0.0.1:3000/api/health
 export ROLLBACK_COMMIT=<isi-commit-stabil>
 export BACKUP_DIR=/var/backups/perkasa-erp
+export PROOF_STAMP=$(date +"%Y%m%d-%H%M%S")
 ```
 
 Isi nilai commit dari hasil:
@@ -241,23 +242,29 @@ npm run capture:server-proof-pack -- \
   --domain "$DOMAIN" \
   --rollback-commit "$ROLLBACK_COMMIT" \
   --health-url "$HEALTH_URL" \
-  --stamp "$(date +"%Y%m%d-%H%M%S")" \
+  --stamp "$PROOF_STAMP" \
   --output-dir docs/go-live \
   --reverse-proxy-config /etc/nginx/sites-available/perkasa-erp-web.conf \
   --reverse-proxy-server-name "$DOMAIN" \
   --reverse-proxy-upstream http://127.0.0.1:3000 \
   --reverse-proxy-test-command "sudo nginx -t" \
   --reverse-proxy-reload-command "sudo systemctl reload nginx"
+
+npm run evaluate:server-readiness -- \
+  --proof-dir docs/go-live \
+  --stamp "$PROOF_STAMP"
 ```
 
 Checklist cepat helper orkestrasi:
 
-1. file output bisa dipisah dengan `--stamp` dan `--output-dir` agar tidak menimpa rehearsal / hari-H sebelumnya
+1. simpan stamp ke variabel shell yang sama, misalnya `PROOF_STAMP=$(date +"%Y%m%d-%H%M%S")`, agar evaluator membaca bundle yang sama
 2. `docs/go-live/web-reverse-proxy-check.<stamp>.json` berhasil dibuat
 3. `docs/go-live/web-server-runtime-check.<stamp>.json` berhasil dibuat
 4. `docs/go-live/web-server-runtime-report.<stamp>.md` berhasil dibuat
 5. `docs/go-live/web-go-live-evidence-generated.<stamp>.md` berhasil dibuat
-6. exit command `0` bila seluruh langkah lulus
+6. `docs/go-live/web-server-technical-decision.<stamp>.json` berhasil dibuat
+7. `docs/go-live/web-server-technical-decision.<stamp>.md` berhasil dibuat
+8. hasil evaluasi terbaca `ready`, `partial`, atau `rollback-recommended`
 
 ## 6A. Kumpulkan Bukti Cepat
 

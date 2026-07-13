@@ -63,6 +63,10 @@ npm run capture:server-proof-pack -- \
   --reverse-proxy-upstream http://127.0.0.1:3000 \
   --reverse-proxy-test-command "sudo nginx -t" \
   --reverse-proxy-reload-command "sudo systemctl reload nginx"
+
+npm run evaluate:server-readiness -- \
+  --proof-dir docs/go-live \
+  --stamp "$PROOF_STAMP"
 ```
 
 ## Output Wajib
@@ -73,6 +77,8 @@ Setelah command utama selesai, cek file berikut:
 2. `docs/go-live/web-server-runtime-check.$PROOF_STAMP.json`
 3. `docs/go-live/web-server-runtime-report.$PROOF_STAMP.md`
 4. `docs/go-live/web-go-live-evidence-generated.$PROOF_STAMP.md`
+5. `docs/go-live/web-server-technical-decision.$PROOF_STAMP.json`
+6. `docs/go-live/web-server-technical-decision.$PROOF_STAMP.md`
 
 Jika salah satu file tidak terbentuk, status teknis dianggap belum lengkap.
 
@@ -102,6 +108,7 @@ Simpan screenshot:
 | `npm run build` lulus | `pass / fail` | `................` |
 | PM2 `online` | `pass / fail` | `................` |
 | `capture:server-proof-pack` exit `0` | `pass / fail` | `................` |
+| `evaluate:server-readiness` = `ready / partial / rollback-recommended` | `pass / fail` | `................` |
 | domain `/login` terbuka | `pass / fail` | `................` |
 | login admin lulus | `pass / fail` | `................` |
 | login support lulus | `pass / fail` | `................` |

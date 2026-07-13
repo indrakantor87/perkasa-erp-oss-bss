@@ -54,6 +54,7 @@ rm -f .env.rehearsal.local
 > Script ini tidak menggantikan validasi PM2, Nginx, dan browser, tetapi menutup rangkaian check-smoke-build-standalone-health dalam satu command.
 > Untuk paket bukti server-side yang lebih ringkas, gunakan `npm run capture:server-proof-pack -- ...` setelah PM2 aktif.
 > Tambahkan `--stamp` dan `--output-dir docs/go-live` agar setiap rehearsal menghasilkan bundle artefak yang terpisah.
+> Setelah bundle terbentuk, jalankan `npm run evaluate:server-readiness -- --proof-dir docs/go-live --stamp <stamp>` untuk membaca keputusan teknis final sebelum sign-off.
 
 ## Checklist Teknis
 

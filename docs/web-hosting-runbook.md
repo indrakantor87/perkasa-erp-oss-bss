@@ -15,6 +15,7 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - Health verifier: `apps/web/scripts/verify-health.mjs`
 - Reverse proxy verifier: `apps/web/scripts/verify-reverse-proxy.mjs`
 - Runtime verifier: `apps/web/scripts/verify-server-runtime.mjs`
+- Technical decision evaluator: `apps/web/scripts/evaluate-server-readiness.mjs`
 - Server proof pack orchestrator: `apps/web/scripts/capture-server-proof-pack.mjs`
 - Runtime report renderer: `apps/web/scripts/render-server-runtime-report.mjs`
 - Rehearsal env helper: `apps/web/scripts/prepare-production-rehearsal-env.mjs`
@@ -120,7 +121,9 @@ Gunakan helper ini hanya untuk rehearsal. Production final tetap wajib memakai `
 
 ## Verifikasi Pasca Deploy
 
-- `npm run capture:server-proof-pack -- --type hari-H --server "$(hostname)" --domain <domain-final> --rollback-commit <commit-rollback> --health-url http://127.0.0.1:3000/api/health --stamp "$(date +"%Y%m%d-%H%M%S")" --output-dir docs/go-live --reverse-proxy-config /etc/nginx/sites-available/perkasa-erp-web.conf --reverse-proxy-server-name <domain-final> --reverse-proxy-upstream http://127.0.0.1:3000 --reverse-proxy-test-command "sudo nginx -t" --reverse-proxy-reload-command "sudo systemctl reload nginx"`
+- `PROOF_STAMP=$(date +"%Y%m%d-%H%M%S")`
+- `npm run capture:server-proof-pack -- --type hari-H --server "$(hostname)" --domain <domain-final> --rollback-commit <commit-rollback> --health-url http://127.0.0.1:3000/api/health --stamp "$PROOF_STAMP" --output-dir docs/go-live --reverse-proxy-config /etc/nginx/sites-available/perkasa-erp-web.conf --reverse-proxy-server-name <domain-final> --reverse-proxy-upstream http://127.0.0.1:3000 --reverse-proxy-test-command "sudo nginx -t" --reverse-proxy-reload-command "sudo systemctl reload nginx"`
+- `npm run evaluate:server-readiness -- --proof-dir docs/go-live --stamp "$PROOF_STAMP"`
 - `npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name <domain-final> --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --reload-command "sudo systemctl reload nginx" --output docs/web-reverse-proxy-check.json`
 - `npm run verify:health -- http://127.0.0.1:3000/api/health`
 - `npm run verify:server-runtime -- --pm2-app perkasa-erp-web --health-url http://127.0.0.1:3000/api/health --domain <domain-final> --output docs/web-server-runtime-check.json`
@@ -135,6 +138,7 @@ Gunakan helper ini hanya untuk rehearsal. Production final tetap wajib memakai `
 Catatan:
 
 - `capture:server-proof-pack` adalah jalur tercepat untuk mengumpulkan paket bukti server-side karena ia menjalankan `verify:reverse-proxy`, `verify:server-runtime`, `render:server-runtime-report`, dan `collect:go-live-evidence` secara berurutan.
+- `evaluate:server-readiness` membaca bundle proof-pack dan menghasilkan keputusan teknis `ready`, `partial`, atau `rollback-recommended` sebelum sign-off PIC.
 - Gunakan `--stamp` dan `--output-dir docs/go-live` agar artefak rehearsal / hari-H tersimpan terpisah dan tidak saling menimpa.
 - Jika `docs/web-reverse-proxy-check.json` dan `docs/web-server-runtime-check.json` sudah dibuat di lokasi default, `collect:go-live-evidence` akan otomatis menyerap keduanya ke markdown evidence.
 - Untuk PIC operator host nyata yang hanya butuh lembar singkat, gunakan [web-server-operator-handoff.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-operator-handoff.md).
