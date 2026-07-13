@@ -108,6 +108,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.16] - 2026-07-13
+
+### Improved
+
+- Ditambahkan helper `verify:server-runtime` untuk memberi status `pass/fail` pada runtime server-side, mencakup PM2, `verify:health`, dan probe `/login` localhost maupun domain sebelum keputusan hari-H diambil: [verify-server-runtime.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/verify-server-runtime.mjs), [package.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/package.json)
+- Command sheet, runbook, checklist go-live, dan template evidence kini memasukkan langkah `verify:server-runtime` dan artefak `web-server-runtime-check.json` agar validasi runtime server tidak lagi murni manual: [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md), [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- Helper runtime diverifikasi dalam mode aman lokal untuk memastikan output JSON dan exit behavior siap dipakai pada server nyata.
+- Versioning diselaraskan ke `0.66.16`.
+
 ## [0.66.15] - 2026-07-13
 
 ### Improved

@@ -154,6 +154,24 @@ Checklist cepat:
 2. login page merespons dari localhost
 3. login page merespons dari domain final
 
+Jika ingin validasi runtime sekaligus dalam satu command:
+
+```bash
+cd "$APP_DIR"
+npm run verify:server-runtime -- \
+  --pm2-app perkasa-erp-web \
+  --health-url "$HEALTH_URL" \
+  --domain "$DOMAIN" \
+  --output docs/web-server-runtime-check.json
+```
+
+Checklist cepat:
+
+1. status PM2 terbaca `pass`
+2. `verify:health` terbaca `pass`
+3. probe `localhost /login` dan `domain /login` terbaca `pass`
+4. file `docs/web-server-runtime-check.json` berhasil dibuat bila output diaktifkan
+
 ## 6A. Kumpulkan Bukti Cepat
 
 ```bash

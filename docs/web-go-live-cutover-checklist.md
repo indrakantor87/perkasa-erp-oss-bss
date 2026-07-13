@@ -118,6 +118,7 @@ Catatan commit saat dokumen ini diperbarui:
 - start/restart PM2 dengan `ecosystem.config.cjs`
 - aktifkan Nginx/reload config
 - jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`
+- jalankan `npm run verify:server-runtime -- --pm2-app perkasa-erp-web --health-url http://127.0.0.1:3000/api/health --domain <domain-final> --output docs/web-server-runtime-check.json`
 - jalankan `npm run collect:go-live-evidence -- --type hari-H --server "$(hostname)" --domain <domain-final> --health-url http://127.0.0.1:3000/api/health --rollback-commit <commit-rollback> --output docs/web-go-live-evidence-generated.md`
 - cek domain final dari browser
 
@@ -144,6 +145,7 @@ Semua poin ini harus lulus sebelum validasi bisnis:
 - `npm run build` lulus
 - PM2 status `online`
 - `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus
+- `npm run verify:server-runtime -- ...` lulus
 - bila rehearsal memakai env sementara, file `.env.rehearsal.local` sudah dihapus kembali setelah selesai
 - `docs/web-go-live-evidence-generated.md` berhasil dibuat bila helper collector dipakai
 - domain final membuka halaman login

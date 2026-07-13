@@ -90,6 +90,7 @@ Catatan:
 |---|---|
 | `nginx -t` | `pass / fail` |
 | reload Nginx | `pass / fail` |
+| `verify:server-runtime` | `pass / fail` |
 | localhost `/login` | `pass / fail` |
 | domain `/login` | `pass / fail` |
 | `verify:health` | `pass / fail` |
@@ -103,6 +104,7 @@ Catatan:
 | screenshot dashboard admin | `................` |
 | screenshot dashboard NOC / support | `................` |
 | screenshot landing support | `................` |
+| output `web-server-runtime-check.json` | `................` |
 | output `verify:health` | `................` |
 | bukti write-side support | `lihat web-support-write-side-proof-2026-07-13.md / catatan mutation proof hari-H` |
 
