@@ -10,6 +10,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.28] - 2026-07-14
+
+### Improved
+
+- Tabel `List Kerja` kini menempelkan tombol `Aksi cepat` langsung pada setiap baris, baik desktop maupun mobile, sehingga operator bisa membuka konteks kerja tanpa harus pindah halaman lebih dulu: [worklist-table.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-table.tsx)
+- Popup `Aksi cepat` baru menampilkan konteks inti item kerja seperti alasan muncul, langkah berikut, PIC/target, blocker, konteks kasus, aksi rekomendasi, shortcut lanjutan, dan CTA utama ke modul terkait agar ritme kerja terasa lebih table-first: [worklist-table.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-table.tsx)
+- Popup tersebut juga menyediakan form draft tindak lanjut cepat di browser untuk memilih status kerja, menulis catatan operator, lalu menyalin ringkasan sebelum pindah ke modul utama; alurnya sengaja jujur ditandai sebagai helper sesi browser dan belum mengklaim penyimpanan backend: [worklist-table.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-table.tsx)
+- Versioning diselaraskan ke `0.66.28` untuk menandai batch popup aksi cepat pada tabel kerja.
+
 ### Fixed
 
 - transform tahap 3 tidak lagi memakai `JSON_TABLE` pada parsing `photo_list_text`, sehingga tetap kompatibel dengan MariaDB lokal saat tahap 4 mengeksekusi stage 1-4 berurutan: [xampp_review_transform_stage_3.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_3.sql)
