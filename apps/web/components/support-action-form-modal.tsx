@@ -16,6 +16,15 @@ function normalizeHash(value: string) {
   return value.replace(/^#/, '').trim()
 }
 
+function resolveNormalizedHash(href: string) {
+  try {
+    const url = new URL(href, window.location.href)
+    return normalizeHash(url.hash)
+  } catch {
+    return normalizeHash(href)
+  }
+}
+
 export function SupportActionFormModal({
   items,
   heading = 'Form aksi support',
@@ -41,6 +50,44 @@ export function SupportActionFormModal({
     syncFromHash()
     window.addEventListener('hashchange', syncFromHash)
     return () => window.removeEventListener('hashchange', syncFromHash)
+  }, [itemMap])
+
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) {
+        return
+      }
+
+      const anchor = target.closest('a[href]')
+      if (!(anchor instanceof HTMLAnchorElement)) {
+        return
+      }
+
+      const rawHref = anchor.getAttribute('href')?.trim()
+      if (!rawHref) {
+        return
+      }
+
+      const normalizedHash = resolveNormalizedHash(rawHref)
+      if (!itemMap.has(normalizedHash)) {
+        return
+      }
+
+      const resolvedUrl = new URL(rawHref, window.location.href)
+      const samePath = resolvedUrl.pathname === window.location.pathname
+      const sameSearch = resolvedUrl.search === window.location.search
+      if (!samePath || !sameSearch) {
+        return
+      }
+
+      event.preventDefault()
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${normalizedHash}`)
+      setActiveHash(normalizedHash)
+    }
+
+    document.addEventListener('click', handleDocumentClick)
+    return () => document.removeEventListener('click', handleDocumentClick)
   }, [itemMap])
 
   const activeItem = activeHash ? itemMap.get(activeHash) ?? null : null

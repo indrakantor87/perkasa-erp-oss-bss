@@ -10,6 +10,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.33] - 2026-07-14
+
+### Fixed
+
+- CTA support yang memakai hash `#support-action-*` kini benar-benar membuka popup form pada halaman aktif, bukan hanya mengubah URL hash tanpa memunculkan modal. Perbaikan dipusatkan di host modal agar berlaku merata untuk lane `TT`, `Isolir`, `Dismantle`, `SLA`, dan shell support yang memakai pola CTA yang sama: [support-action-form-modal.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-action-form-modal.tsx)
+- Audit runtime browser menegaskan bahwa CTA utama `Tambah Ticket`, `Update Progress`, `Eskalasi`, dan `Tutup Ticket` di lane `Trouble Ticket` sekarang aktif membuka popup, sehingga pola CTA ke popup kembali konsisten dengan `Aksi cepat` di tabel.
+- CTA lintas lane yang memang dirancang sebagai navigasi tetap dibiarkan sebagai navigasi, misalnya `Kontrol SLA Terkait` dan `Buka TT Aktif`, sehingga audit membedakan dengan jelas mana tombol popup dan mana tombol pindah lane.
+- Versioning diselaraskan ke `0.66.33` untuk menandai batch audit dan perbaikan aktivasi CTA popup support.
+
 ## [0.66.32] - 2026-07-14
 
 ### Improved
