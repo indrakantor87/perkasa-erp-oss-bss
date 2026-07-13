@@ -12,6 +12,7 @@ Dokumen ini melengkapi:
 2. [web-deploy-rehearsal-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-deploy-rehearsal-checklist.md)
 3. [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
 4. [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
+5. [web-server-operator-handoff.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-operator-handoff.md)
 
 ## Sebelum Mulai
 

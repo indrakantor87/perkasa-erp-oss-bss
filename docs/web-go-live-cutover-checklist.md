@@ -16,6 +16,7 @@ Dokumen ini melengkapi:
 4. [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md)
 5. [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md)
 6. [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
+7. [web-server-operator-handoff.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-operator-handoff.md)
 
 ## Scope Hari-H
 
@@ -97,6 +98,7 @@ Catatan commit:
 - konfirmasi semua PIC online
 - umumkan freeze perubahan aplikasi selama proses go-live
 - pastikan tidak ada commit baru yang masuk di luar scope deploy
+- bagikan [web-server-operator-handoff.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-operator-handoff.md) ke PIC deploy sebagai lembar eksekusi singkat
 
 ### 08:30 - 09:00
 

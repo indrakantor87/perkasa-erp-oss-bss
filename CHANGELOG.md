@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.23] - 2026-07-13
+
+### Improved
+
+- Ditambahkan lembar [web-server-operator-handoff.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-operator-handoff.md) sebagai handoff paling ringkas untuk operator host nyata, berisi input wajib, command utama, output artefak, browser minimum, rollback cepat, dan sign-off final dalam satu dokumen.
+- Command sheet server-side, runbook hosting, checklist hari-H, template evidence, dan checklist readiness kini menautkan handoff operator tersebut agar PIC deploy tidak perlu membuka terlalu banyak dokumen saat rehearsal / cutover nyata: [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md), [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- Versioning diselaraskan ke `0.66.23` untuk menandai paket handoff operator host nyata.
+
 ## [0.66.22] - 2026-07-13
 
 ### Improved

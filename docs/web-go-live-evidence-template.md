@@ -12,6 +12,7 @@ Dokumen ini melengkapi:
 1. [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
 2. [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md)
 3. [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md)
+4. [web-server-operator-handoff.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-operator-handoff.md)
 
 Catatan:
 

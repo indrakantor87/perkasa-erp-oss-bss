@@ -25,6 +25,7 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - Checklist hari-H: `docs/web-go-live-cutover-checklist.md`
 - Checklist rehearsal: `docs/web-deploy-rehearsal-checklist.md`
 - Command sheet server-side: `docs/web-server-side-command-sheet.md`
+- Handoff operator server: `docs/web-server-operator-handoff.md`
 - Template backup/rollback: `docs/web-backup-rollback-proof-template.md`
 
 ## Prasyarat Server
@@ -136,6 +137,7 @@ Catatan:
 - `capture:server-proof-pack` adalah jalur tercepat untuk mengumpulkan paket bukti server-side karena ia menjalankan `verify:reverse-proxy`, `verify:server-runtime`, `render:server-runtime-report`, dan `collect:go-live-evidence` secara berurutan.
 - Gunakan `--stamp` dan `--output-dir docs/go-live` agar artefak rehearsal / hari-H tersimpan terpisah dan tidak saling menimpa.
 - Jika `docs/web-reverse-proxy-check.json` dan `docs/web-server-runtime-check.json` sudah dibuat di lokasi default, `collect:go-live-evidence` akan otomatis menyerap keduanya ke markdown evidence.
+- Untuk PIC operator host nyata yang hanya butuh lembar singkat, gunakan [web-server-operator-handoff.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-operator-handoff.md).
 
 ## Rollback Plan
 
