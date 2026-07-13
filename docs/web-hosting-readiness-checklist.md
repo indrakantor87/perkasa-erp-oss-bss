@@ -21,7 +21,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 
 - [x] `npm run check` lulus di `apps/web`
 - [x] `npm run test:smoke` lulus di `apps/web`
-- [ ] `npm run build` lulus di `apps/web`
+- [x] `npm run build` lulus di `apps/web`
 - [ ] Tidak ada diagnostics TypeScript/lint blocker pada file inti
 - [x] Dashboard utama, domain pages, auth, dan KPI custom sudah diverifikasi manual
 
@@ -100,6 +100,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 ## Catatan Verifikasi Saat Ini
 
 - `npm run start` berhasil menyalakan server standalone lokal dan endpoint `/api/health` merespons normal.
+- Rehearsal lokal juga memverifikasi mode `NODE_ENV=production` untuk standalone server dan memastikan `verify-health` tetap lulus saat `AUTH_SESSION_SECRET` terisi, sehingga health benar-benar merepresentasikan readiness hosting production.
 - Smoke browser `admin.perkasa` dan `support.ops` berhasil login, masuk dashboard, dan logout tanpa lagi terkena redirect `0.0.0.0`.
 - Scope dashboard KPI untuk role `NOC` sudah kembali sinkron ke `Pemasaran dan Pelayanan / NOC`, tidak jatuh ke default `Penjualan`.
 - Runbook hosting, PM2 config, dan contoh reverse proxy kini tersedia di `docs/web-hosting-runbook.md` dan `apps/web/ecosystem.config.cjs`.

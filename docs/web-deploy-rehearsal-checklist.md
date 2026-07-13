@@ -36,14 +36,14 @@ npm run verify:health -- http://127.0.0.1:3000/api/health
 
 ## Checklist Teknis
 
-- `npm install` selesai tanpa error
-- `npm run verify:production-env -- .env` lulus
+- `npm install` selesai tanpa error (server)
+- `npm run verify:production-env -- .env` lulus (server)
 - `npm run check` lulus
 - `npm run test:smoke` lulus
 - `npm run build` lulus
-- PM2 status `online`
-- `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus
-- halaman login terbuka dari browser
+- PM2 status `online` (server)
+- `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus (server)
+- halaman login terbuka dari browser (server)
 
 ## Checklist Browser Minimum
 
@@ -68,6 +68,20 @@ Isi catatan berikut setiap kali latihan:
 | hasil smoke browser | `pass / partial / fail` |
 | isu yang ditemukan | `................` |
 | keputusan | `siap / perlu perbaikan` |
+
+### Catatan Rehearsal Lokal (Windows)
+
+| Item | Hasil |
+|---|---|
+| tanggal rehearsal | `2026-07-13` |
+| commit yang diuji | `bd0b6e3 (release: 0.65.94)` |
+| durasi `npm install` | `N/A (tidak dijalankan di lokal)` |
+| durasi `npm run build` | `compile 32.8s; TypeScript 29.9s; static pages 1.7s` |
+| durasi boot PM2 | `N/A (pakai node standalone; Ready in 0ms)` |
+| hasil health check | `pass (NODE_ENV=production; PORT=3011; verify-health lulus)` |
+| hasil smoke browser | `N/A (belum diuji browser pada mode standalone)` |
+| isu yang ditemukan | `N/A` |
+| keputusan | `siap untuk lanjut rehearsal server (PM2 + Nginx)` |
 
 ## Kriteria Rehearsal Berhasil
 
