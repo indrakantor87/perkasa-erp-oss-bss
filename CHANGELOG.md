@@ -10,6 +10,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.29] - 2026-07-14
+
+### Improved
+
+- Popup `Aksi cepat` untuk item `WorklistItem` kini diekstrak menjadi komponen reusable sehingga pola yang sama bisa dipakai lintas tabel operasional tanpa duplikasi logika draft, shortcut, dan CTA: [worklist-quick-action-modal.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-quick-action-modal.tsx), [worklist-table.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/worklist/worklist-table.tsx)
+- `Workspace Supervisor CS` sekarang menempelkan tombol `Aksi cepat` langsung di tabel queue aktif, baik desktop maupun mobile, sehingga supervisor bisa membuka konteks item dan draft tindak lanjut tanpa harus berpindah dulu ke panel detail atau modul lain: [cs-admin-workspace-dashboard.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/cs-admin-workspace-dashboard.tsx)
+- Judul popup untuk supervisor dibedakan menjadi konteks queue supervisor agar alur kerja lintas approval, koreksi, transfer, dan risiko tinggi terasa lebih natural tetapi tetap memakai struktur pop-up yang sama dengan `List Kerja`: [cs-admin-workspace-dashboard.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/cs-admin-workspace-dashboard.tsx)
+- Versioning diselaraskan ke `0.66.29` untuk menandai batch lanjutan popup aksi cepat lintas tabel operasional.
+
 ## [0.66.28] - 2026-07-14
 
 ### Improved

@@ -1,8 +1,10 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { WorklistDetailPanel } from '@/components/worklist/worklist-detail-panel'
+import { WorklistQuickActionModal } from '@/components/worklist/worklist-quick-action-modal'
 import { getRoleMeta } from '@/lib/role-meta'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
 import type { WorklistBucketData } from '@/lib/services/worklist-service'
@@ -83,6 +85,7 @@ export function CsAdminWorkspaceDashboard({
   const criticalCount = buckets.reduce((total, bucket) => total + bucket.summary.criticalCount, 0)
   const waitingCount = buckets.reduce((total, bucket) => total + bucket.summary.waitingCount, 0)
   const approvalCount = buckets.find((bucket) => bucket.queue === 'Perlu Approval')?.totalCount ?? 0
+  const [quickActionItem, setQuickActionItem] = useState<WorklistItem | null>(null)
 
   return (
     <div className="space-y-6">
@@ -268,6 +271,13 @@ export function CsAdminWorkspaceDashboard({
                               >
                                 Lihat detail
                               </Link>
+                              <button
+                                type="button"
+                                onClick={() => setQuickActionItem(item)}
+                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white hover:text-slate-950"
+                              >
+                                Aksi cepat
+                              </button>
                               <Link
                                 href={item.href}
                                 className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
@@ -308,6 +318,13 @@ export function CsAdminWorkspaceDashboard({
                         >
                           Lihat detail
                         </Link>
+                        <button
+                          type="button"
+                          onClick={() => setQuickActionItem(item)}
+                          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white hover:text-slate-950"
+                        >
+                          Aksi cepat
+                        </button>
                         <Link
                           href={item.href}
                           className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
@@ -329,6 +346,12 @@ export function CsAdminWorkspaceDashboard({
 
         <WorklistDetailPanel item={selectedItem} />
       </section>
+
+      <WorklistQuickActionModal
+        item={quickActionItem}
+        onClose={() => setQuickActionItem(null)}
+        title="Aksi cepat supervisor dari tabel queue"
+      />
     </div>
   )
 }
