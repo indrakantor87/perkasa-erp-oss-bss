@@ -13,6 +13,10 @@ Dokumen ini melengkapi:
 2. [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md)
 3. [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md)
 
+Catatan:
+
+- Untuk snapshot teknis awal, gunakan `npm run collect:go-live-evidence` lalu tempel/ringkas hasilnya ke template ini.
+
 ## Metadata Eksekusi
 
 | Item | Isi |

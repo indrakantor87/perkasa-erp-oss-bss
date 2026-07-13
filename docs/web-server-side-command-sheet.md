@@ -171,6 +171,25 @@ Simpan hasilnya ke dokumen:
 1. [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
 2. [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
 
+Jika ingin snapshot teknis otomatis dalam satu file:
+
+```bash
+cd "$APP_DIR"
+npm run collect:go-live-evidence -- \
+  --type hari-H \
+  --server "$(hostname)" \
+  --domain "$DOMAIN" \
+  --health-url "$HEALTH_URL" \
+  --rollback-commit "$ROLLBACK_COMMIT" \
+  --output docs/web-go-live-evidence-generated.md
+```
+
+Checklist cepat:
+
+1. file output berhasil dibuat
+2. status `git`, `PM2`, `health`, dan probe `/login` terisi
+3. hasil otomatis tetap dilengkapi dengan screenshot browser dan sign-off PIC
+
 ## 7. Smoke Browser Minimum
 
 Urutan validasi minimum:

@@ -14,6 +14,7 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - Env validator: `apps/web/scripts/verify-production-env.mjs`
 - Health verifier: `apps/web/scripts/verify-health.mjs`
 - Rehearsal env helper: `apps/web/scripts/prepare-production-rehearsal-env.mjs`
+- Evidence collector: `apps/web/scripts/collect-go-live-evidence.mjs`
 - Rehearsal helper: `apps/web/scripts/rehearse-production.mjs`
 - Health check: `/api/health`
 - Checklist final: `docs/web-hosting-readiness-checklist.md`
@@ -110,6 +111,7 @@ Gunakan helper ini hanya untuk rehearsal. Production final tetap wajib memakai `
 ## Verifikasi Pasca Deploy
 
 - `npm run verify:health -- http://127.0.0.1:3000/api/health`
+- `npm run collect:go-live-evidence -- --type hari-H --server "$(hostname)" --domain <domain-final> --health-url http://127.0.0.1:3000/api/health --rollback-commit <commit-rollback> --output docs/web-go-live-evidence-generated.md`
 - Login `admin.perkasa` berhasil
 - Login `support.ops` berhasil
 - Dashboard terbuka

@@ -108,6 +108,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.15] - 2026-07-13
+
+### Improved
+
+- Ditambahkan helper `collect:go-live-evidence` untuk mengumpulkan snapshot teknis server-side ke file markdown, mencakup kandidat rilis, status PM2, hasil `verify-health`, serta probe `/login` lokal/domain: [collect-go-live-evidence.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/collect-go-live-evidence.mjs), [package.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/package.json)
+- Command sheet, runbook hosting, checklist go-live, dan template evidence kini mengarahkan PIC deploy memakai helper collector ini agar bukti teknis hari-H lebih konsisten dan cepat dibaca: [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md), [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- Helper collector sudah diuji dalam mode aman lokal untuk menghasilkan file evidence tanpa menyentuh server production, sehingga jalur eksekusi hari-H lebih siap dipakai.
+- Versioning diselaraskan ke `0.66.15`.
+
 ## [0.66.14] - 2026-07-13
 
 ### Improved

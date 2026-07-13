@@ -41,6 +41,7 @@ UAT role prioritas yang sudah benar-benar dijalankan di instance lokal.
 | `git log -1 --oneline` | `975cbfe Harden production rehearsal package` |
 | branch aktif | `main` |
 | working tree bersih | `ya` |
+| helper evidence server-side | `siap` |
 
 ### Health Lokal
 
@@ -83,7 +84,7 @@ mutation proof terkontrol dengan evidence before/after:
 |---|---|
 | blocker utama | tidak ada blocker role fondasi pada instance lokal; fokus tersisa bergeser ke eksekusi cutover infra production (`PM2`, `Nginx`, backup DB, PIC keputusan) |
 | minor | beberapa area cutover infra production masih berupa checklist operasional hari-H (`PM2`, `Nginx`, backup DB, PIC keputusan) |
-| minor | rehearsal server-side kini punya jalur env sementara yang aman melalui helper `prepare:production-rehearsal-env`, tetapi eksekusi penuh di server nyata masih perlu bukti hari-H |
+| minor | rehearsal server-side kini punya jalur env sementara yang aman melalui helper `prepare:production-rehearsal-env` dan snapshot bukti otomatis melalui `collect:go-live-evidence`, tetapi eksekusi penuh di server nyata masih perlu bukti hari-H |
 | workaround | evidence reset auth lokal tersedia bila password seed review DB perlu disejajarkan ulang tanpa melemahkan auth aplikasi |
 | backlog pasca-go-live | role di luar scope fondasi seperti `DIGITAL_CREATOR` dan business `Toko` tetap dicatat sebagai gelombang berikutnya |
 

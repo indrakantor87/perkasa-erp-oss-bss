@@ -56,7 +56,7 @@ Sebelum mulai, isi peran berikut:
 
 ## Snapshot Readiness Sebelum Hari-H
 
-Status teknis repo per `0.66.13`:
+Status teknis repo per `0.66.15`:
 
 - `npm run check`, `npm run test:smoke`, `npm run build`, `verify:production-env`, dan `verify:health` sudah tersedia dan dipakai sebagai baseline readiness.
 - Sidebar/workspace khusus kini dipersempit ke role target agar audit menu tidak misleading.
@@ -118,6 +118,7 @@ Catatan commit saat dokumen ini diperbarui:
 - start/restart PM2 dengan `ecosystem.config.cjs`
 - aktifkan Nginx/reload config
 - jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`
+- jalankan `npm run collect:go-live-evidence -- --type hari-H --server "$(hostname)" --domain <domain-final> --health-url http://127.0.0.1:3000/api/health --rollback-commit <commit-rollback> --output docs/web-go-live-evidence-generated.md`
 - cek domain final dari browser
 
 ### 10:00 - 11:00
@@ -144,6 +145,7 @@ Semua poin ini harus lulus sebelum validasi bisnis:
 - PM2 status `online`
 - `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus
 - bila rehearsal memakai env sementara, file `.env.rehearsal.local` sudah dihapus kembali setelah selesai
+- `docs/web-go-live-evidence-generated.md` berhasil dibuat bila helper collector dipakai
 - domain final membuka halaman login
 - login tidak lagi melempar redirect host salah
 - logout kembali ke `/login`
