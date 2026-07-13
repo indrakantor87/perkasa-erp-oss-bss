@@ -31,6 +31,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Build production tidak lagi bergantung pada fetch Google Fonts (yang bisa gagal di CI/offline) karena layout memakai system font stack untuk `--font-body` dan `--font-heading`: [layout.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/layout.tsx)
 - Versioning diselaraskan ke `0.65.92` untuk menandai batch hardening hosting/build.
 
+## [0.65.93] - 2026-07-13
+
+### Improved
+
+- Pengembangan via `127.0.0.1` tidak lagi memblokir resource dev Next.js (HMR/webpack-hmr) karena host tersebut sudah di-whitelist pada `allowedDevOrigins`, mengurangi error `ERR_CONNECTION_*`/refresh saat preview memakai `127.0.0.1`: [next.config.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/next.config.ts)
+- `next-env.d.ts` mengikuti output type generator terbaru dari Next.js (`.next/types/routes.d.ts`) agar konsisten setelah build.
+- Versioning diselaraskan ke `0.65.93` untuk menandai batch hardening dev ergonomics.
+
 ## [0.65.91] - 2026-07-13
 
 ### Improved
