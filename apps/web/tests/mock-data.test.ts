@@ -11,6 +11,7 @@ import {
   authenticateUser,
   authenticateMockUser,
   createSessionToken,
+  isBootstrapMockAuthEnabled,
   mockAuthUsers,
   parseSessionToken,
 } from '@/lib/auth-session'
@@ -41,6 +42,7 @@ async function main() {
   const session = authenticateMockUser('admin.perkasa', 'Perkasa123!')
   assert.ok(session, 'Login mock utama harus valid.')
   assert.equal(authenticateMockUser('admin.perkasa', 'salah'), null)
+  delete process.env.ALLOW_BOOTSTRAP_MOCK_AUTH
   const hybridMockLogin = await authenticateUser('admin.perkasa', 'Perkasa123!')
   assert.ok(hybridMockLogin.session, 'Hybrid auth harus tetap mengizinkan fallback mock.')
   assert.equal(hybridMockLogin.source, 'mock')
@@ -87,6 +89,21 @@ async function main() {
   process.env.APP_DATA_MODE = 'review-db'
   process.env.DATABASE_URL = 'mysql://root:@127.0.0.1:1/perkasa_review'
   assert.equal(getDataSourceSnapshot().effectiveMode, 'review-db')
+  assert.equal(isBootstrapMockAuthEnabled(), false)
+  const reviewReadyMockLogin = await authenticateUser('admin.perkasa', 'Perkasa123!')
+  assert.equal(reviewReadyMockLogin.session, null, 'Mock auth tidak boleh fallback diam-diam saat review DB aktif.')
+  assert.equal(
+    reviewReadyMockLogin.reason,
+    'unavailable',
+    'Saat review DB dikonfigurasi tetapi koneksi gagal, login harus memberi sinyal auth unavailable.'
+  )
+
+  process.env.ALLOW_BOOTSTRAP_MOCK_AUTH = '1'
+  assert.equal(isBootstrapMockAuthEnabled(), true)
+  const explicitMockLogin = await authenticateUser('admin.perkasa', 'Perkasa123!')
+  assert.ok(explicitMockLogin.session, 'Override eksplisit harus menghidupkan kembali bootstrap mock auth.')
+  assert.equal(explicitMockLogin.source, 'mock')
+  delete process.env.ALLOW_BOOTSTRAP_MOCK_AUTH
 
   const dashboardData = await getDashboardPageData(session!)
   assert.equal(dashboardData.summary.customers, 10284)

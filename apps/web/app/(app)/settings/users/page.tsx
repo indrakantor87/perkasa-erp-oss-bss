@@ -36,8 +36,9 @@ export default async function UserSettingsPage() {
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
               Halaman ini menampilkan daftar akun yang akan menjadi fondasi auth internal lintas
-              modul. Saat review DB belum siap, tabel akan fallback ke akun bootstrap mock agar
-              jalur review tetap hidup.
+              modul. Saat review DB belum siap atau mode fallback lokal masih aktif, tabel dapat
+              menampilkan akun bootstrap mock agar jalur review tetap hidup tanpa mengekspos
+              kredensial di UI.
             </p>
           </div>
 

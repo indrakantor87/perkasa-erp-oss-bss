@@ -2,13 +2,14 @@ import { redirect } from 'next/navigation'
 import { getDefaultLandingPath } from '@/lib/access-control-server'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { mockAuthUsers } from '@/lib/auth-session'
-import { getRoleMeta } from '@/lib/role-meta'
+import { isBootstrapMockAuthEnabled } from '@/lib/auth-session'
 
 function getLoginErrorMessage(error: string | undefined) {
   switch (error) {
     case 'invalid_credentials':
       return 'Username atau password tidak cocok dengan akun review.'
+    case 'auth_unavailable':
+      return 'Layanan autentikasi review sedang tidak tersedia. Periksa koneksi review DB atau aktifkan jalur review lokal yang sesuai.'
     case 'auth_required':
       return 'Silakan login terlebih dulu untuk membuka modul aplikasi.'
     default:
@@ -31,10 +32,13 @@ export default async function LoginPage({
   const errorCode = Array.isArray(errorValue) ? errorValue[0] : errorValue
   const errorMessage = getLoginErrorMessage(errorCode)
   const dataSource = getDataSourceSnapshot()
+  const bootstrapMockAuthEnabled = isBootstrapMockAuthEnabled()
   const authModeDescription =
     dataSource.effectiveMode === 'review-db' && !dataSource.isFallback
-      ? 'Login sekarang memprioritaskan auth_users dari review DB, lalu fallback ke akun bootstrap mock bila user review belum tersedia.'
-      : 'Login masih memakai akun bootstrap mock sambil menunggu review DB auth siap penuh.'
+      ? bootstrapMockAuthEnabled
+        ? 'Login memakai auth_users dari review DB. Mock auth hanya aktif bila dipaksa eksplisit untuk kebutuhan review lokal.'
+        : 'Login sekarang hanya menerima akun auth_users dari review DB. Bootstrap mock auth dinonaktifkan untuk mencegah fallback diam-diam.'
+      : 'Login masih bisa memakai bootstrap mock auth karena aplikasi sedang berjalan pada mode mock / fallback lokal.'
 
   return (
     <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
@@ -100,7 +104,7 @@ export default async function LoginPage({
                 <input
                   type="text"
                   name="username"
-                  placeholder="admin.perkasa"
+                  placeholder="username atau email auth_users"
                   className="w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
                 />
               </label>
@@ -125,25 +129,18 @@ export default async function LoginPage({
 
             <div className="mt-6 rounded-2xl border border-line bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
-                Akun bootstrap mock
+                Bootstrap Mock Auth
               </p>
-              <div className="mt-4 space-y-3">
-                {mockAuthUsers.map((user) => (
-                  (() => {
-                    const roleMeta = getRoleMeta(user.role)
-                    return (
-                  <div
-                    key={user.username}
-                    className="flex flex-col gap-1 rounded-2xl border border-line bg-white px-4 py-3 text-sm text-slate-700"
-                  >
-                    <span className="font-semibold text-slate-950">{user.displayName}</span>
-                    <span className={`badge w-fit border-transparent ${roleMeta.tone}`}>{roleMeta.label}</span>
-                    <span>Username: {user.username}</span>
-                    <span>Password: {user.password}</span>
-                  </div>
-                    )
-                  })()
-                ))}
+              <div className="mt-4 rounded-2xl border border-line bg-white px-4 py-3 text-sm leading-6 text-slate-700">
+                {bootstrapMockAuthEnabled ? (
+                  <>
+                    Kredensial bootstrap tidak lagi ditampilkan di UI. Gunakan akun review DB yang
+                    aktif, atau aktifkan `ALLOW_BOOTSTRAP_MOCK_AUTH=1` hanya untuk kebutuhan review
+                    lokal yang terkontrol.
+                  </>
+                ) : (
+                  <>Bootstrap mock auth sedang nonaktif. Login hanya menerima akun yang tersedia di `auth_users`.</>
+                )}
               </div>
             </div>
           </div>

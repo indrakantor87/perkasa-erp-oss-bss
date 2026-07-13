@@ -31,6 +31,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Verifikasi ulang menunjukkan helper tetap berjalan normal melalui tahap `verify:production-env`, `check`, `test:smoke`, dan masuk ke fase `build` tanpa warning shell Windows.
 - Versioning diselaraskan ke `0.65.96` untuk menandai batch hardening runner rehearsal Windows.
 
+## [0.65.97] - 2026-07-13
+
+### Fixed
+
+- Flow `authenticateUser()` tidak lagi fallback diam-diam ke bootstrap mock saat `review-db` sudah aktif non-fallback; mock auth kini hanya hidup di mode mock/fallback lokal atau bila dipaksa eksplisit lewat `ALLOW_BOOTSTRAP_MOCK_AUTH=1`, dan production selalu menolaknya: [auth-session.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/auth-session.ts)
+- Route login sekarang membedakan kegagalan kredensial vs layanan auth review yang sedang tidak tersedia, sehingga masalah koneksi `auth_users`/review DB saat cutover tidak lagi tersamarkan sebagai `invalid_credentials`: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/auth/login/route.ts), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(auth)/login/page.tsx)
+- Halaman login tidak lagi menampilkan username/password bootstrap di UI, dan narasi mode auth diperjelas agar operator tahu kapan login benar-benar bergantung pada `auth_users` review DB: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(auth)/login/page.tsx)
+- Copy pada settings user diselaraskan dengan perilaku auth baru agar fallback mock tetap diposisikan sebagai jalur review lokal tanpa mengekspos kredensial: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/settings/users/page.tsx)
+- Smoke coverage auth ditambah untuk mengunci empat perilaku penting: fallback mock tetap hidup pada mode lokal, fallback mati saat review DB aktif, error `unavailable` muncul saat review DB tidak bisa dijangkau, dan override eksplisit tetap bisa dipakai untuk review terkontrol: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+- Versioning diselaraskan ke `0.65.97` untuk menandai batch hardening auth hybrid dan sanitasi kredensial bootstrap.
+
 ## [0.65.95] - 2026-07-13
 
 ### Improved

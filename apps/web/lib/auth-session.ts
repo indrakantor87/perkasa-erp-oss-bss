@@ -27,6 +27,14 @@ type AuthAttemptResult =
 
 const DEFAULT_AUTH_SECRET = 'perkasa-erp-oss-bss-dev-secret'
 
+function parseBooleanEnv(value: string | undefined) {
+  const normalized = String(value ?? '').trim().toLowerCase()
+  if (!normalized) return null
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false
+  return null
+}
+
 export const mockAuthUsers: MockAuthUser[] = [
   {
     username: 'admin.perkasa',
@@ -83,6 +91,20 @@ export const mockAuthUsers: MockAuthUser[] = [
     role: 'FIELD_TECHNICIAN',
   },
 ]
+
+export function isBootstrapMockAuthEnabled() {
+  if (process.env.NODE_ENV === 'production') {
+    return false
+  }
+
+  const override = parseBooleanEnv(process.env.ALLOW_BOOTSTRAP_MOCK_AUTH)
+  if (override !== null) {
+    return override
+  }
+
+  const source = getDataSourceSnapshot()
+  return source.effectiveMode !== 'review-db' || source.isFallback
+}
 
 function getAuthSecret() {
   const configuredSecret = process.env.AUTH_SESSION_SECRET?.trim()
@@ -202,6 +224,10 @@ export async function authenticateUser(username: string, password: string): Prom
     return reviewAttempt
   }
   if (reviewAttempt.reason === 'invalid_password' || reviewAttempt.reason === 'inactive') {
+    return reviewAttempt
+  }
+
+  if (!isBootstrapMockAuthEnabled()) {
     return reviewAttempt
   }
 

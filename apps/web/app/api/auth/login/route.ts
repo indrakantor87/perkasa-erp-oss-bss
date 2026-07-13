@@ -12,7 +12,8 @@ export async function POST(request: Request) {
   const session = authResult.session
 
   if (!session) {
-    return NextResponse.redirect(buildRequestUrl(request, '/login?error=invalid_credentials'))
+    const errorCode = authResult.reason === 'unavailable' ? 'auth_unavailable' : 'invalid_credentials'
+    return NextResponse.redirect(buildRequestUrl(request, `/login?error=${errorCode}`))
   }
 
   const response = NextResponse.redirect(buildRequestUrl(request, getDefaultLandingPath(session.role)))
