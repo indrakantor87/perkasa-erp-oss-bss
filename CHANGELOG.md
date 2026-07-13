@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.08] - 2026-07-13
+
+### Improved
+
+- Mutation proof terkontrol untuk `update port/ODP` sudah dijalankan pada review DB untuk `TRKL/07 - 15` port `8` (assign → revert ke `AVAILABLE` dengan `clearMapping`), lengkap dengan evidence before/after JSON: [odp-assign-TRKL-07-15-8.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/docs/proofs/odp-assign-TRKL-07-15-8.json), [odp-status-TRKL-07-15-8.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/docs/proofs/odp-status-TRKL-07-15-8.json)
+- Checklist hardening dan dokumen proof support kini menandai `update port/ODP` sebagai `pass`, sehingga seluruh flow write-side support prioritas sudah memiliki bukti mutasi terkontrol: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md), [web-support-write-side-proof-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-support-write-side-proof-2026-07-13.md)
+- Versioning diselaraskan ke `0.66.08`.
+
 ## [0.66.07] - 2026-07-13
 
 ### Improved

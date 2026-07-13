@@ -69,8 +69,7 @@ Role yang wajib di-hardening lebih dulu:
   - transfer ke dismantle
   - reopen dismantle
 - [x] mutation proof terkontrol sudah dijalankan untuk `update TT teknis` (progress/escalate/close) pada review DB.
-- [ ] write action penting berikut masih perlu mutation proof:
-  - update port/ODP
+- [x] mutation proof terkontrol sudah dijalankan untuk `update port/ODP` (assign/status) pada review DB.
 - [x] role tanpa capability tidak melihat tombol write-side sensitif
 - [x] audit trail minimal untuk keputusan berisiko tinggi sudah punya proof executable untuk `restore/transfer/reopen` melalui note builder dan smoke guard
 - [ ] tidak ada aksi yang masih memaksa operator kembali ke web lama untuk flow fondasi

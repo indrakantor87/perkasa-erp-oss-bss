@@ -16,7 +16,7 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 | `transfer ke dismantle` | `CS_ADMIN` approver atau `DISMANTLE_OPERATOR` | wajib `review-db`, wajib ada `customer_name/status`, menolak archived / closed / duplicate queue | transfer note terstruktur dengan actor web | code review + smoke proof RBAC/note + mutation proof aktual | `pass` |
 | `reopen dismantle` | `CS_ADMIN` approver atau `DISMANTLE_OPERATOR` | wajib `review-db`, wajib ada `status`, menolak histori tidak ada / isolation tidak ada / queue aktif duplikat | reopen note terstruktur dengan actor web | code review + smoke proof RBAC/note + mutation proof aktual | `pass` |
 | `update TT teknis` | `support update` | wajib `review-db` non-fallback, wajib punya ticket target | progress/escalate/close menambah audit note berbasis actor web | helper proof + mutation proof aktual | `pass` |
-| `update port/ODP` | `inventory update` | wajib `review-db` non-fallback, wajib punya ODP + port target | assign/status menambah audit note berbasis actor web | helper proof tersedia, mutation proof aktual menyusul | `pending` |
+| `update port/ODP` | `inventory update` | wajib `review-db` non-fallback, wajib punya ODP + port target | assign/status menambah audit note berbasis actor web | helper proof + mutation proof aktual | `pass` |
 
 ## Bukti Route Aktual
 
@@ -82,6 +82,8 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 | `update TT teknis (progress)` | `ticketCode = PV/PKN/07.2026/01` (`Banjarsari`) | `tt.review` | `status=OPEN`, `latestProgressLog=NULL` | `status=ON_PROGRESS`, progress log tercatat, `notes` bertambah | `pass` |
 | `update TT teknis (escalate)` | `ticketCode = PV/PKN/07.2026/01` (`Banjarsari`) | `tt.review` | `latestEscalationLog=NULL` | `latestEscalationLog` terisi (`NOC`, `MANUAL`), `notes` bertambah | `pass` |
 | `update TT teknis (close)` | `ticketCode = PV/PKN/07.2026/01` (`Banjarsari`) | `tt.review` | `status=ON_PROGRESS`, `closed_at=NULL` | `status=CLOSED`, `resolution_action=MAINTENANCE`, `closed_at` terisi | `pass` |
+| `update port/ODP (assign)` | `odpCode = TRKL/07 - 15`, `portNo = 8` | `field.review` | `port_status=AVAILABLE`, `installed_at=NULL`, `active_ports=0` | `port_status=USED`, `installed_at` terisi, `active_ports=1` | `pass` |
+| `update port/ODP (status)` | `odpCode = TRKL/07 - 15`, `portNo = 8` | `field.review` | `port_status=USED`, `installed_at` terisi | `port_status=AVAILABLE`, mapping dibersihkan (`installed_at=NULL`), `active_ports=0` | `pass` |
 
 ## Hardening Reopen Tambahan
 
@@ -90,15 +92,12 @@ Dokumen ini merangkum bukti yang sudah tersedia untuk flow write-side support be
 
 ## Yang Masih Belum Final
 
-- Mutation proof terkontrol untuk tiga flow prioritas sudah tersedia, tetapi bukti write-side support secara keseluruhan masih belum final untuk:
-  - `update port/ODP`
+- Semua flow write-side support yang diprioritaskan dalam fase ini sudah memiliki mutation proof terkontrol (evidence before/after).
 - Evidence hari-H tetap perlu menyalin hasil yang relevan ke template go-live sesuai host/commit deploy aktual.
 
 ## Rekomendasi Lanjut
 
-1. lanjutkan mutation proof untuk `update TT teknis`
-2. lanjutkan mutation proof untuk `update port/ODP`
-3. salin hasil mutation proof support ini ke template [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md) saat rehearsal server-side atau hari-H
+1. salin hasil mutation proof support ini ke template [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md) saat rehearsal server-side atau hari-H
 
 ## Appendiks: TT Teknis (Progress/Eskalasi/Close)
 
