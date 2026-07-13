@@ -18,6 +18,7 @@ Dokumen ini menjadi panduan eksekusi hosting untuk web ERP agar proses deploy Se
 - Checklist final: `docs/web-hosting-readiness-checklist.md`
 - Checklist hari-H: `docs/web-go-live-cutover-checklist.md`
 - Checklist rehearsal: `docs/web-deploy-rehearsal-checklist.md`
+- Command sheet server-side: `docs/web-server-side-command-sheet.md`
 
 ## Prasyarat Server
 
