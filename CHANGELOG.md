@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.10] - 2026-07-13
+
+### Improved
+
+- Ditambahkan snapshot evidence lokal pra-go-live yang merangkum status repo, hasil health lokal, write-side proof prioritas, dan posisi role fondasi untuk keputusan `GO / PILOT / TAHAN`: [web-go-live-evidence-local-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-local-2026-07-13.md)
+- Checklist go-live Senin kini memakai snapshot readiness terbaru `0.66.09`, termasuk status `TT_OPERATOR` yang sudah `pass`, `CS_ADMIN` yang sudah pulih dari blocker query ambigu, dan `NOC_OPERATOR` yang tersisa sebagai blocker kredensial: [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+- Versioning diselaraskan ke `0.66.10`.
+
 ## [0.66.09] - 2026-07-13
 
 ### Improved
