@@ -23,6 +23,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - transform tahap 2 kini juga mengimpor `staging_legacy_user_records` ke `auth_users` dan langsung menghubungkan `target_user_id`, sehingga row seperti `USR-001` tidak lagi tertinggal dalam status `VALID`: [xampp_review_transform_stage_2.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_transform_stage_2.sql)
 - panel aksi batch import kini memberi rekomendasi langkah berikutnya berdasarkan status batch dan row yang masih belum final, sehingga operator tidak perlu menebak apakah harus validasi atau menjalankan tahap 01-04 tertentu: [import-batch-action-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/import-batch-action-panel.tsx)
 
+## [0.65.96] - 2026-07-13
+
+### Fixed
+
+- Helper `rehearse:production` di Windows tidak lagi mengandalkan `shell=true` untuk memanggil `npm`, sehingga warning `DEP0190` hilang dari output rehearsal dan runner command menjadi lebih aman untuk dipakai berulang pada mesin Windows: [rehearse-production.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/rehearse-production.mjs)
+- Verifikasi ulang menunjukkan helper tetap berjalan normal melalui tahap `verify:production-env`, `check`, `test:smoke`, dan masuk ke fase `build` tanpa warning shell Windows.
+- Versioning diselaraskan ke `0.65.96` untuk menandai batch hardening runner rehearsal Windows.
+
 ## [0.65.95] - 2026-07-13
 
 ### Improved

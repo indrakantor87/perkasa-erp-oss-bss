@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process'
 
 const NODE_BIN = process.execPath
 const IS_WINDOWS = process.platform === 'win32'
+const COMSPEC = process.env.ComSpec || 'cmd.exe'
 
 function parseEnvFile(filePath) {
   const contents = fs.readFileSync(filePath, 'utf8')
@@ -63,7 +64,7 @@ function runCommand(command, args, options = {}) {
     const child = spawn(command, args, {
       cwd: process.cwd(),
       stdio: 'inherit',
-      shell: IS_WINDOWS,
+      shell: false,
       ...options,
     })
 
@@ -76,6 +77,14 @@ function runCommand(command, args, options = {}) {
       reject(new Error(`Command gagal (${code ?? 'unknown'}): ${command} ${args.join(' ')}`))
     })
   })
+}
+
+function runNpmCommand(args, options = {}) {
+  if (!IS_WINDOWS) {
+    return runCommand('npm', args, options)
+  }
+
+  return runCommand(COMSPEC, ['/d', '/s', '/c', `npm ${args.join(' ')}`], options)
 }
 
 async function waitForHealth(url, timeoutMs = 30_000) {
@@ -106,10 +115,10 @@ async function main() {
   console.log(`Rehearsal production memakai env: ${envPath}`)
   console.log(`Port rehearsal: ${port}`)
 
-  await runCommand('node', ['./scripts/verify-production-env.mjs', envPath])
-  await runCommand('npm', ['run', 'check'])
-  await runCommand('npm', ['run', 'test:smoke'])
-  await runCommand('npm', ['run', 'build'], {
+  await runCommand(NODE_BIN, ['./scripts/verify-production-env.mjs', envPath])
+  await runNpmCommand(['run', 'check'])
+  await runNpmCommand(['run', 'test:smoke'])
+  await runNpmCommand(['run', 'build'], {
     env: {
       ...process.env,
       CI: '1',
@@ -142,7 +151,7 @@ async function main() {
 
   try {
     await waitForHealth(healthUrl)
-    await runCommand('node', ['./scripts/verify-health.mjs', healthUrl])
+    await runCommand(NODE_BIN, ['./scripts/verify-health.mjs', healthUrl])
     console.log('\nRehearsal production selesai dengan status PASS.')
   } finally {
     stopServer()
