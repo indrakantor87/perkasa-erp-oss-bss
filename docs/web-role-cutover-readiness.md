@@ -120,8 +120,8 @@ Catatan:
 | menu | menu lintas sales-customers-support-inventory sudah tersedia | kuat |
 | write-side | approval, koreksi, restore, dan keputusan backlog risiko sudah mulai nyata | sedang |
 | perspektif data | dashboard supervisor, queue `Perlu Approval`, `Perlu Koreksi`, `Transfer atau Restore`, dan `Queue Risiko Tinggi` sudah tampak | kuat |
-| blocker | audit dan bukti UAT untuk aksi supervisor berisiko masih perlu diperdalam | sedang |
-| keputusan | cukup kuat sebagai supervisor awal, tetapi belum layak pilot bisnis tanpa bukti UAT yang lebih tegas | `PARTIAL` |
+| blocker | bukti write-side supervisor berisiko masih perlu diformalisasi, tetapi blocker query ambigu sudah tertutup | sedang |
+| keputusan | cukup kuat sebagai supervisor awal; siap naik bila bukti write-side koreksi/approval/restore sudah lengkap | `PARTIAL` |
 
 Catatan:
 

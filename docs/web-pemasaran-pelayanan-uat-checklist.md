@@ -264,7 +264,7 @@ Dokumen ini dipakai untuk:
 |---|---|---|---|---|---|
 | `DISMANTLE_OPERATOR` | `dismantle` | `/support/dismantle` | `pass` | login berhasil, sidebar fokus, queue aktif dan histori dismantle terbaca | bukti write-side `close/reopen` masih perlu diformalisasi |
 | `CS_OPERATOR` | `cstest` | `/dashboard/worklist` | `pass` | login berhasil, `List Kerja` tampil sebagai workspace utama, domain `sales/customers/support/inventory` terbuka | bukti write-side end-to-end masih perlu diperdalam |
-| `CS_ADMIN` | `admincs.sample` | `/customers/cs-admin` | `partial` | login berhasil, workspace supervisor dan bucket utama tampil | data supervisor masih fallback karena query review DB mengembalikan `Column 'status' in field list is ambiguous` |
+| `CS_ADMIN` | `admincs.sample` | `/customers/cs-admin` | `pass` | login berhasil, workspace supervisor tampil, bucket `Transfer atau Restore` dan `Queue Risiko Tinggi` terisi valid, serta teks ambiguous/fallback sudah hilang | bukti write-side supervisor masih perlu diformalisasi, tetapi blocker query review DB sudah tertutup |
 | `SALES_MARKETING` | `chalis@perkasa.net.id` | `/sales` | `partial` | login berhasil, landing sales dan sidebar sesuai role | CTA `Import Center` sebelumnya misleading; sudah dihapus dari shell sales pada batch menu audit ini |
 
 ### Temuan Guard Menu dari UAT
@@ -277,4 +277,4 @@ Dokumen ini dipakai untuk:
 
 Dokumen ini dirilis pada:
 
-- `0.64.66` untuk checklist UAT yang diselaraskan dengan implementasi `List Kerja`, queue supervisor `CS_ADMIN`, dan workspace awal `DIGITAL_CREATOR`
+- `0.66.00` untuk checklist UAT yang diselaraskan dengan audit menu per role, bucket supervisor `CS_ADMIN` yang sudah valid kembali, dan sinkronisasi readiness menuju go-live

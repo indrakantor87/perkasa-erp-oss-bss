@@ -108,7 +108,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - Checklist hari-H untuk keputusan `go / pilot / rollback` kini tersedia di `docs/web-go-live-cutover-checklist.md`.
 - Template env final dan checklist rehearsal deploy kini tersedia di `apps/web/.env.production.final.template` dan `docs/web-deploy-rehearsal-checklist.md`.
 - Bootstrap mock auth tidak lagi menyimpan password plaintext di source; jalur review lokal kini memakai `BOOTSTRAP_MOCK_AUTH_CREDENTIALS` dari environment sehingga repo lebih aman untuk cutover.
-- UAT role prioritas terbaru mengonfirmasi `DISMANTLE_OPERATOR` dan `CS_OPERATOR` lulus smoke login/landing, sementara `CS_ADMIN` masih tertahan query supervisor ambigu dan `SALES_MARKETING` sebelumnya memiliki CTA `Import Center` yang misleading namun sudah dihapus dari shell sales.
+- UAT role prioritas terbaru mengonfirmasi `DISMANTLE_OPERATOR`, `CS_OPERATOR`, dan `CS_ADMIN` lulus smoke login/landing; blocker query supervisor ambigu untuk `CS_ADMIN` sudah tertutup, sedangkan `SALES_MARKETING` tetap `partial` setelah CTA `Import Center` yang misleading dihapus dari shell sales.
 
 ## Catatan Eksekusi Senin
 

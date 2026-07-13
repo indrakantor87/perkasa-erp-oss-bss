@@ -67,6 +67,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Katalog menu per role/divisi diperbarui agar mencerminkan sidebar aktual dan default landing yang benar, lalu dilengkapi artefak audit menu baru untuk menandai area yang sudah oke, misleading, dan masih perlu dibenahi: [web-role-division-menu-feature-catalog.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-division-menu-feature-catalog.md), [web-role-menu-audit-2026-07-13.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-menu-audit-2026-07-13.md)
 - Versioning diselaraskan ke `0.65.99` untuk menandai batch audit menu per role, sinkronisasi readiness/cutover, dan pengetatan guard workspace khusus.
 
+## [0.66.00] - 2026-07-13
+
+### Fixed
+
+- Query supervisor `CS_ADMIN` tidak lagi memakai `status` ambigu pada high-risk support ticket, sehingga landing `/customers/cs-admin` kembali membaca bucket supervisor dari review DB tanpa jatuh ke fallback `Column 'status' in field list is ambiguous`: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Improved
+
+- Bukti UAT dan dokumen readiness diperbarui untuk menandai bahwa smoke login/landing `CS_ADMIN` kini sudah valid kembali, sementara blocker yang tersisa bergeser ke pembuktian write-side supervisor, bukan lagi query supervisor yang rusak: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md), [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md), [web-role-cutover-readiness.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-role-cutover-readiness.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- Versioning diselaraskan ke `0.66.00` untuk menandai penutupan blocker readiness `CS_ADMIN`.
+
 ## [0.65.95] - 2026-07-13
 
 ### Improved

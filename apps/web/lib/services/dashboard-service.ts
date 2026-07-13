@@ -3392,14 +3392,14 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           ticket_code AS ticketCode,
           customer_name AS customerName,
           ${supportTicketServiceQueryParts.serviceNoExpression} AS serviceNo,
-          status,
+          support_trouble_tickets.status AS status,
           type AS ticketType,
           CAST(opened_at AS CHAR) AS openedAt,
           TIMESTAMPDIFF(HOUR, opened_at, CURRENT_TIMESTAMP) AS agingHours
         FROM support_trouble_tickets
         ${supportTicketServiceQueryParts.serviceSubscriptionJoin}
         WHERE closed_at IS NULL
-          AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+          AND COALESCE(UPPER(TRIM(support_trouble_tickets.status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
           AND opened_at <= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)
         ORDER BY agingHours DESC, opened_at ASC
         LIMIT 1

@@ -104,7 +104,7 @@ Role yang wajib di-hardening lebih dulu:
 |---|---|---|---|
 | `DISMANTLE_OPERATOR` | `pass` | login berhasil, landing ke `/support/dismantle`, queue dan histori terlihat, guard lane mikro-role tampak benar | finalisasi close/reopen masih perlu bukti write-side formal |
 | `CS_OPERATOR` | `pass` | login berhasil, landing ke `List Kerja`, sidebar sesuai role, lintas `sales/customers/support/inventory` terbuka | bukti write-side end-to-end masih perlu diformalisasi |
-| `CS_ADMIN` | `partial` | login berhasil, workspace supervisor `/customers/cs-admin` terbuka, bucket supervisor terlihat | fallback query `Column 'status' in field list is ambiguous` membuat data supervisor belum valid untuk cutover |
+| `CS_ADMIN` | `pass` | login berhasil, workspace supervisor `/customers/cs-admin` terbuka, bucket `Perlu Approval`, `Perlu Koreksi`, `Transfer atau Restore`, dan `Queue Risiko Tinggi` terbaca valid | bukti write-side koreksi/approval/restore masih perlu diformalisasi, tetapi blocker query ambigu sudah tertutup |
 | `SALES_MARKETING` | `partial` | login berhasil, landing ke `/sales`, sidebar sesuai role, monitoring `support/inventory` tetap baca-saja | CTA `Import Center` sebelumnya misleading; sudah dihapus dari shell sales agar sinkron dengan guard route |
 
 ## 6. Keputusan Hardening
