@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.09] - 2026-07-13
+
+### Improved
+
+- Bukti UAT role teknis diperbarui: `TT_OPERATOR` kini tercatat `pass` dengan lane `Trouble Open` yang berisi pada `Review DB`, sedangkan `NOC_OPERATOR` ditandai `blocked` karena kredensial `support.ops` yang tersedia di review DB belum bisa dipakai login pada instance lokal saat UAT browser: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md), [web-pemasaran-pelayanan-uat-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-pemasaran-pelayanan-uat-checklist.md), [hybrid-psb-production-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-cutover-checklist.md)
+- Checklist cutover kini menandai validasi `TT_OPERATOR` sebagai lulus dan menyisakan `NOC_OPERATOR` sebagai blocker kredensial yang harus ditutup sebelum pilot teknis dianggap lengkap: [hybrid-psb-production-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-cutover-checklist.md)
+- Versioning diselaraskan ke `0.66.09`.
+
 ## [0.66.08] - 2026-07-13
 
 ### Improved

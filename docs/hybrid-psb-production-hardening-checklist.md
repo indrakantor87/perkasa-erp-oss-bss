@@ -80,7 +80,8 @@ Role yang wajib di-hardening lebih dulu:
 - [x] bukti UAT `SALES_MARKETING` mencakup login, landing `/sales`, sidebar role, dan guard CTA utama
 - [x] bukti UAT `CS_OPERATOR` mencakup login, landing `List Kerja`, dan perpindahan lintas sales/customers/support/inventory
 - [ ] bukti UAT `CS_ADMIN` mencakup koreksi, approval, restore, dan handoff supervisor
-- [ ] bukti UAT `NOC_OPERATOR` dan `TT_OPERATOR` mencakup queue teknis yang benar-benar berisi
+- [ ] bukti UAT `NOC_OPERATOR` mencakup queue teknis yang benar-benar berisi (tertahan kredensial review DB `support.ops`)
+- [x] bukti UAT `TT_OPERATOR` mencakup lane/queue teknis yang benar-benar berisi
 - [x] bukti UAT `DISMANTLE_OPERATOR` mencakup login, landing lane dismantle, queue aktif, histori, dan guard role sempit
 - [ ] semua temuan UAT dibedakan menjadi:
   - blocker cutover
@@ -103,6 +104,8 @@ Role yang wajib di-hardening lebih dulu:
 | Role | Hasil UAT | Bukti Positif | Blocker / Catatan |
 |---|---|---|---|
 | `DISMANTLE_OPERATOR` | `pass` | login berhasil, landing ke `/support/dismantle`, queue dan histori terlihat, guard lane mikro-role tampak benar | finalisasi close/reopen masih perlu bukti write-side formal |
+| `TT_OPERATOR` | `pass` | login berhasil via `tt.review`, landing ke `/support/tt`, sumber data `Review DB`, dan lane `Trouble Open` tampil berisi (`4`) | screenshot lane TT tersimpan pada sesi UAT lokal; evidence write-side formal sudah ditutup di mutation proof `0.66.07` |
+| `NOC_OPERATOR` | `blocked` | seed review DB untuk `support.ops` terdeteksi aktif | login browser tertahan `invalid_credentials`, sehingga queue teknis belum bisa difoto dari sesi role NOC sampai password review DB valid tersedia |
 | `CS_OPERATOR` | `pass` | login berhasil, landing ke `List Kerja`, sidebar sesuai role, lintas `sales/customers/support/inventory` terbuka | bukti write-side end-to-end masih perlu diformalisasi |
 | `CS_ADMIN` | `pass` | login berhasil, workspace supervisor `/customers/cs-admin` terbuka, bucket `Perlu Approval`, `Perlu Koreksi`, `Transfer atau Restore`, dan `Queue Risiko Tinggi` terbaca valid | bukti write-side koreksi/approval/restore masih perlu diformalisasi, tetapi blocker query ambigu sudah tertutup |
 | `SALES_MARKETING` | `partial` | login berhasil, landing ke `/sales`, sidebar sesuai role, monitoring `support/inventory` tetap baca-saja | CTA `Import Center` sebelumnya misleading; sudah dihapus dari shell sales agar sinkron dengan guard route |

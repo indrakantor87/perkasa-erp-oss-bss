@@ -86,12 +86,13 @@ Catatan:
 - [ ] dashboard `NOC` memakai scope yang benar
 - [ ] menu support dan inventory terbuka
 - [ ] queue teknis terbaca
+  Catatan: akun seed `support.ops` ada di review DB, tetapi UAT browser lokal 2026-07-13 masih tertahan `invalid_credentials`.
 
 #### `TT_OPERATOR`
 
-- [ ] login berhasil
-- [ ] lane TT tampil dengan data nyata
-- [ ] action TT dasar tersedia sesuai role
+- [x] login berhasil
+- [x] lane TT tampil dengan data nyata
+- [x] action TT dasar tersedia sesuai role
 
 #### `DISMANTLE_OPERATOR`
 

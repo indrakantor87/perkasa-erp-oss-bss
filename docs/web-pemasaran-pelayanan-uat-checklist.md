@@ -262,6 +262,8 @@ Dokumen ini dipakai untuk:
 
 | Role | Username UAT | Landing Aktual | Hasil | Bukti Positif | Blocker / Catatan |
 |---|---|---|---|---|---|
+| `NOC_OPERATOR` | `support.ops` | `/support/tt` (target role) | `blocked` | akun seed review DB `support.ops` terdeteksi aktif pada `auth_users` | login browser tertahan `invalid_credentials`, sehingga queue teknis NOC belum bisa diverifikasi dari sesi role asli sampai password review DB yang benar tersedia |
+| `TT_OPERATOR` | `tt.review` | `/support/tt` | `pass` | login berhasil, source badge menunjukkan `Review DB`, dan lane `Trouble Open` tampil berisi (`4`) | screenshot lane TT tersimpan pada sesi UAT lokal; flow write-side progress/escalate/close sudah dibuktikan formal lewat mutation proof |
 | `DISMANTLE_OPERATOR` | `dismantle` | `/support/dismantle` | `pass` | login berhasil, sidebar fokus, queue aktif dan histori dismantle terbaca | bukti write-side `close/reopen` masih perlu diformalisasi |
 | `CS_OPERATOR` | `cstest` | `/dashboard/worklist` | `pass` | login berhasil, `List Kerja` tampil sebagai workspace utama, domain `sales/customers/support/inventory` terbuka | bukti write-side end-to-end masih perlu diperdalam |
 | `CS_ADMIN` | `admincs.sample` | `/customers/cs-admin` | `pass` | login berhasil, workspace supervisor tampil, bucket `Transfer atau Restore` dan `Queue Risiko Tinggi` terisi valid, serta teks ambiguous/fallback sudah hilang | bukti write-side supervisor masih perlu diformalisasi, tetapi blocker query review DB sudah tertutup |
