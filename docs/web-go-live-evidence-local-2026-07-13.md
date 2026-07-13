@@ -15,7 +15,7 @@ UAT role prioritas yang sudah benar-benar dijalankan di instance lokal.
 | tipe kegiatan | `snapshot lokal pra-go-live` |
 | host | `localhost:3000` |
 | branch | `main` |
-| commit kandidat saat snapshot | `32dc210` |
+| commit kandidat saat snapshot | `975cbfe` |
 | status repo | `working tree bersih` |
 | sumber data | `Review DB` |
 
@@ -38,7 +38,7 @@ UAT role prioritas yang sudah benar-benar dijalankan di instance lokal.
 | Item | Hasil |
 |---|---|
 | `git status --short` | kosong |
-| `git log -1 --oneline` | `32dc210 Close local readiness to 100 percent` |
+| `git log -1 --oneline` | `975cbfe Harden production rehearsal package` |
 | branch aktif | `main` |
 | working tree bersih | `ya` |
 

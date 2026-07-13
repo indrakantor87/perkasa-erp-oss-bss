@@ -26,7 +26,7 @@ export ROLLBACK_COMMIT=<isi-commit-stabil>
 
 Catatan kandidat saat dokumen ini diperbarui:
 
-1. kandidat release saat ini: `bfcbb15`
+1. kandidat release saat ini: `975cbfe`
 2. kandidat aplikasi fondasi lokal 100%: `32dc210`
 3. rollback stabil: `11baf11`
 

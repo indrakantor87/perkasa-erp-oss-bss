@@ -86,8 +86,8 @@ Checklist ini harus selesai sebelum tidur:
 
 Catatan commit saat dokumen ini diperbarui:
 
-- kandidat release lokal terbaru: `32dc210` (`Close local readiness to 100 percent`)
-- rollback stabil sebelumnya: `11baf11` (`Close NOC operator blocker`)
+- kandidat release lokal terbaru: `975cbfe` (`Harden production rehearsal package`)
+- rollback stabil sebelumnya: `32dc210` (`Close local readiness to 100 percent`)
 
 ## Timeline Hari-H
 
