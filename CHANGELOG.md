@@ -10,6 +10,16 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.32] - 2026-07-14
+
+### Improved
+
+- Lane `Trouble Ticket` kini dirapikan agar lebih mirip board laporan CS harian: ringkasan angka utama dipindah ke kartu atas yang langsung terbaca untuk `Trouble Open`, `Preventive Open`, `Siap Close`, `Overdue`, dan indikator `Ticket Berulang` berbasis pengulangan layanan/pelanggan aktif: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Filter TT kini dibentuk seperti board operasional, dengan area info lane dan shortcut aksi langsung di bar yang sama sehingga CS tidak perlu berpindah fokus dari filter ke tabel untuk mulai input atau follow-up ticket: [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx)
+- Tabel TT dirapikan menjadi lebih padat dan lebih mudah di-scan dengan susunan yang lebih dekat ke format laporan grup CS, termasuk kolom tindakan terakhir, open/update, target SLA, durasi aktif, dan keterangan antrian agar operator lebih cepat membaca kondisi ticket sebelum membuka popup aksi: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- `Support shell` disesuaikan agar lane TT baru tetap konsisten baik saat dibuka dari workspace khusus maupun dari shell support umum: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Versioning diselaraskan ke `0.66.32` untuk menandai batch perapihan board Trouble Ticket ala laporan CS.
+
 ## [0.66.31] - 2026-07-14
 
 ### Improved

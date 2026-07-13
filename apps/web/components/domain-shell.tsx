@@ -2573,6 +2573,10 @@ export function DomainShell({
           element: item.element,
         }))
       : []
+  const supportPreventiveOpenCount =
+    content.key === 'support'
+      ? Number(content.summaries.find((item) => item.label.toLowerCase().includes('preventive open'))?.value.replace(/\D/g, '') ?? '0') || 0
+      : 0
 
   return (
     <div className="space-y-6">
@@ -3528,10 +3532,10 @@ export function DomainShell({
           {supportPageMode === 'lane' && activeSupportLane === 'tt' ? (
             <SupportTroubleTicketQueuePanel
               sections={visibleSections}
-              actionLinks={laneActionLinks}
               role={role}
               canUpdate={canUpdate}
               canApprove={canApprove}
+              preventiveOpenCount={supportPreventiveOpenCount}
             />
           ) : null}
           {supportPageMode === 'lane' && activeSupportLane === 'isolations' ? (

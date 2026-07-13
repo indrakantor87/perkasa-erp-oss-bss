@@ -85,6 +85,8 @@ export function SupportTroubleTicketWorkspace({
 }) {
   const reviewSections = content.reviewSections ?? []
   const troubleRows = getSupportLaneSections(reviewSections, 'tt').flatMap((section) => section.rows)
+  const preventiveOpenCount =
+    Number(content.summaries.find((item) => item.label.toLowerCase().includes('preventive open'))?.value.replace(/\D/g, '') ?? '0') || 0
 
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
@@ -307,19 +309,20 @@ export function SupportTroubleTicketWorkspace({
       </section>
 
       <SupportWorkspaceHelperNote
-        title="Prioritaskan follow-up ticket aktif sebelum menutup atau menaikkan eskalasi."
-        detail="Gunakan lane ini untuk menjaga ticket tetap bergerak: update progress saat kasus masih berjalan, eskalasi saat owner atau SLA membutuhkan bantuan lintas tim, lalu close hanya ketika bukti penyelesaian sudah cukup."
+        title="Gunakan lane ini seperti board laporan CS: lihat angka dulu, saring ticket, lalu tindak dari tabel."
+        detail="Urutannya dibuat lebih praktis untuk operasional harian. Ringkasan di atas membantu membaca beban hari ini, filter dipakai untuk menyempitkan kasus, lalu aksi utama tetap dibuka dari tabel tanpa perlu mencari form ke bawah."
         badges={[
-          { label: `${troubleRows.length} ticket aktif`, tone: 'neutral' },
+          { label: `${troubleRows.length} trouble open`, tone: 'neutral' },
+          { label: `${preventiveOpenCount} preventive open`, tone: 'info' },
           { label: `${readyCloseCount} siap close`, tone: 'success' },
-          { label: `${supportTypeSuggestions.length} tipe trouble`, tone: 'info' },
         ]}
       />
 
       <DataSourceStatus source={source} />
 
-      <section className="rounded-xl border border-line bg-slate-50 p-3">
-        <form action="/support/tt" className="flex flex-col gap-3 xl:flex-row xl:items-end">
+      <section className="rounded-2xl border border-line bg-slate-50 p-3">
+        <form action="/support/tt" className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
           <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
             <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus Antrian</span>
             <select
@@ -381,19 +384,42 @@ export function SupportTroubleTicketWorkspace({
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
             />
           </label>
-          <div className="flex flex-wrap gap-2 xl:justify-end">
-            <button
-              type="submit"
-              className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              Terapkan
-            </button>
-            <Link
-              href="/support/tt"
-              className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-            >
-              Reset
-            </Link>
+          </div>
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+              Seluruh board TT difokuskan untuk lane NOC & Troubleshoots. Gunakan filter di sini, lalu aksi `input`, `progress`, `close`, dan `eskalasi` langsung dari tabel.
+            </div>
+            <div className="flex flex-wrap gap-2 xl:justify-end">
+              {visibleActionLinks.map((action) => (
+                <Link
+                  key={action.key}
+                  href={action.href}
+                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+                >
+                  {action.label}
+                </Link>
+              ))}
+              {canOpenSlaLane ? (
+                <Link
+                  href={slaControlHref}
+                  className="rounded-md border border-slate-950 bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Kontrol SLA
+                </Link>
+              ) : null}
+              <button
+                type="submit"
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Terapkan
+              </button>
+              <Link
+                href="/support/tt"
+                className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+              >
+                Reset
+              </Link>
+            </div>
           </div>
         </form>
       </section>
@@ -417,10 +443,10 @@ export function SupportTroubleTicketWorkspace({
 
       <SupportTroubleTicketQueuePanel
         sections={reviewSections}
-        actionLinks={visibleActionLinks}
         role={role}
         canUpdate={canUpdate}
         canApprove={canApprove}
+        preventiveOpenCount={preventiveOpenCount}
       />
 
       <SupportActionFormModal items={supportActionModalItems} heading="Form aksi lane TT" />

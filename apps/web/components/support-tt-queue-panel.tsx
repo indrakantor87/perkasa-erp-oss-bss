@@ -63,6 +63,52 @@ function getPriorityRank(priority: string) {
   return 5
 }
 
+function formatCompactDateTime(value: string) {
+  const normalized = String(value ?? '').trim()
+  if (!normalized || normalized === '-') {
+    return '-'
+  }
+
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) {
+    return normalized
+  }
+
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(parsed)
+}
+
+function formatTicketAging(openedAt: string, referenceValue?: string) {
+  const opened = new Date(openedAt)
+  if (Number.isNaN(opened.getTime())) {
+    return '-'
+  }
+
+  const reference = referenceValue && referenceValue !== '-' ? new Date(referenceValue) : new Date()
+  if (Number.isNaN(reference.getTime())) {
+    return '-'
+  }
+
+  const diffMs = Math.max(0, reference.getTime() - opened.getTime())
+  const totalMinutes = Math.floor(diffMs / 60000)
+  const days = Math.floor(totalMinutes / (60 * 24))
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
+  const minutes = totalMinutes % 60
+
+  if (days > 0) {
+    return `${days}H ${hours}J`
+  }
+  if (hours > 0) {
+    return `${hours}J ${minutes}M`
+  }
+  return `${minutes}M`
+}
+
 function getSectionPriorityRank(section: DomainReviewSection) {
   if (!section.rows.length) {
     return Number.MAX_SAFE_INTEGER
@@ -95,17 +141,31 @@ function buildOperationalTicketStats(rows: DomainReviewRow[]) {
   let escalationCount = 0
   let readyCloseCount = 0
   let priorityOneCount = 0
+  let recurringTicketCount = 0
+  const repeatMap = new Map<string, number>()
 
   for (const row of rows) {
     const queueReason = pickMeta(row.meta, 'Queue Reason: ').trim().toUpperCase()
     const slaState = pickMeta(row.meta, 'SLA State: ').trim().toUpperCase()
     const queuePriority = pickMeta(row.meta, 'Queue Priority: ').trim().toUpperCase()
+    const repeatKey = [pickMeta(row.meta, 'Service No: '), pickMeta(row.meta, 'Customer User: '), row.secondary]
+      .map((item) => item.trim())
+      .find((item) => item && item !== '-')
 
     if (queueReason === 'READY_CLOSE') readyCloseCount += 1
     if (queueReason.includes('ESCALATION')) escalationCount += 1
     if (queueReason.includes('OVERDUE') || slaState === 'OVERDUE') overdueCount += 1
     if (queueReason.includes('TODAY') || slaState === 'DUE_TODAY') dueTodayCount += 1
     if (queuePriority === 'P1') priorityOneCount += 1
+    if (repeatKey) {
+      repeatMap.set(repeatKey, (repeatMap.get(repeatKey) ?? 0) + 1)
+    }
+  }
+
+  for (const count of repeatMap.values()) {
+    if (count > 1) {
+      recurringTicketCount += count
+    }
   }
 
   return {
@@ -114,7 +174,26 @@ function buildOperationalTicketStats(rows: DomainReviewRow[]) {
     escalationCount,
     readyCloseCount,
     priorityOneCount,
+    recurringTicketCount,
   }
+}
+
+function getQueueRowClass(queueReason: string, priority: string, slaState: string) {
+  const normalizedReason = queueReason.trim().toUpperCase()
+  const normalizedPriority = priority.trim().toUpperCase()
+  const normalizedSla = slaState.trim().toUpperCase()
+
+  if (normalizedReason === 'ESCALATION_PENDING' || normalizedSla === 'OVERDUE' || normalizedPriority === 'P1') {
+    return 'bg-rose-50/60'
+  }
+  if (normalizedReason === 'READY_CLOSE') {
+    return 'bg-emerald-50/60'
+  }
+  if (normalizedReason.includes('TODAY') || normalizedSla === 'DUE_TODAY') {
+    return 'bg-amber-50/60'
+  }
+
+  return 'bg-white'
 }
 
 function getQueueReasonActionCopy(reason: string) {
@@ -324,16 +403,16 @@ function buildTroubleTicketQuickActionPayload(params: {
 
 export function SupportTroubleTicketQueuePanel({
   sections,
-  actionLinks = [],
   role,
   canUpdate = true,
   canApprove = true,
+  preventiveOpenCount = 0,
 }: {
   sections: DomainReviewSection[]
-  actionLinks?: SupportActionLink[]
   role: AppRole
   canUpdate?: boolean
   canApprove?: boolean
+  preventiveOpenCount?: number
 }) {
   const ttSections = getSupportLaneSections(sections, 'tt')
     .sort((left, right) => {
@@ -351,7 +430,6 @@ export function SupportTroubleTicketQueuePanel({
   const visibleSections = ttSections.filter((section) => section.rows.length > 0)
   const allRows = visibleSections.flatMap((section) => section.rows)
   const totalTickets = allRows.length
-  const summary = buildTicketSummary(allRows)
   const operationalStats = buildOperationalTicketStats(allRows)
   const canOpenSlaLane = canAccessSupportLane(role, 'sla')
   const canOpenSupervisorWorkspace = canAccessPath(role, '/customers/cs-admin')
@@ -380,32 +458,32 @@ export function SupportTroubleTicketQueuePanel({
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-5">
-        <article className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-700">Trouble Open</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-orange-950">{totalTickets}</p>
+        <article className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700">Trouble Open</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-rose-950">{totalTickets}</p>
         </article>
-        <article className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">P1 / Prioritas</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-sky-950">
-            {operationalStats.priorityOneCount}
+        <article className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Preventive Open</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-sky-950">
+            {preventiveOpenCount}
           </p>
         </article>
-        <article className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-center">
+        <article className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Siap Close</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-emerald-950">
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-emerald-950">
             {operationalStats.readyCloseCount}
           </p>
         </article>
-        <article className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Jatuh Tempo Hari Ini</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-amber-950">
-            {operationalStats.dueTodayCount}
+        <article className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-3 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-700">Overdue</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-orange-950">
+            {operationalStats.overdueCount}
           </p>
         </article>
-        <article className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700">Overdue / Eskalasi</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-rose-950">
-            {operationalStats.overdueCount + operationalStats.escalationCount}
+        <article className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-3 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-700">Ticket Berulang</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-violet-950">
+            {operationalStats.recurringTicketCount}
           </p>
         </article>
       </div>
@@ -413,15 +491,6 @@ export function SupportTroubleTicketQueuePanel({
       <div className="mt-3 rounded-xl border border-line bg-slate-50 p-2.5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
-            {actionLinks.map((action) => (
-              <Link
-                key={action.key}
-                href={action.href}
-                className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-              >
-                {action.label}
-              </Link>
-            ))}
             {canOpenSlaLane ? (
               <Link
                 href="/support/sla?focus=SLA_OVERDUE"
@@ -440,7 +509,7 @@ export function SupportTroubleTicketQueuePanel({
             ) : null}
           </div>
           <div className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600">
-            {summary.statusItems.map((item) => `${item.status}: ${item.count}`).join(' • ') || 'Semua ticket aktif terbaca.'}
+            P1: {operationalStats.priorityOneCount} • Due today: {operationalStats.dueTodayCount} • Eskalasi: {operationalStats.escalationCount}
           </div>
         </div>
       </div>
@@ -458,15 +527,18 @@ export function SupportTroubleTicketQueuePanel({
         <>
           <div className="mt-3 hidden overflow-hidden rounded-xl border border-line bg-white lg:block">
             <div className="overflow-x-auto">
-              <table className="min-w-[1120px] w-full divide-y divide-slate-200 text-sm">
+              <table className="min-w-[1440px] w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-100/90">
                   <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                     <th className="px-3 py-3">ID Ticket</th>
                     <th className="px-3 py-3">Pelanggan</th>
                     <th className="px-3 py-3">User / Layanan</th>
                     <th className="px-3 py-3">Gangguan</th>
-                    <th className="px-3 py-3">Prioritas / SLA</th>
-                    <th className="px-3 py-3">PIC / Follow-up</th>
+                    <th className="px-3 py-3">Tindakan / PIC</th>
+                    <th className="px-3 py-3">Open</th>
+                    <th className="px-3 py-3">Target / SLA</th>
+                    <th className="px-3 py-3">Durasi</th>
+                    <th className="px-3 py-3">Keterangan</th>
                     <th className="px-3 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -477,9 +549,12 @@ export function SupportTroubleTicketQueuePanel({
                     const slaDue = pickMeta(row.meta, 'SLA Due: ')
                     const slaState = pickMeta(row.meta, 'SLA State: ')
                     const customerUser = pickMeta(row.meta, 'Customer User: ')
+                    const serviceNo = pickMeta(row.meta, 'Service No: ')
+                    const customerCode = pickMeta(row.meta, 'Customer Code: ')
                     const owner = pickMeta(row.meta, 'PIC: ')
                     const followUp = pickMeta(row.meta, 'Next Follow Up: ')
                     const progressUpdated = pickMeta(row.meta, 'Progress Updated: ')
+                    const latestProgress = pickMeta(row.meta, 'Latest Progress: ')
                     const queuePriority = pickMeta(row.meta, 'Queue Priority: ')
                     const queueReason = pickMeta(row.meta, 'Queue Reason: ')
                     const rowActions = getRowActionItems({
@@ -489,24 +564,30 @@ export function SupportTroubleTicketQueuePanel({
                       canUpdate,
                       canApprove,
                     })
-                    const recommendedActionKey = getRecommendedRowActionKey(queueReason)
+                    const aging = formatTicketAging(opened, progressUpdated !== '-' ? progressUpdated : undefined)
+                    const looksRecurring = operationalStats.recurringTicketCount > 0 && [serviceNo, customerUser, row.secondary].filter((item) => item && item !== '-').length > 0
 
                     return (
-                      <tr key={row.id} className="align-top">
+                      <tr key={row.id} className={`align-top ${getQueueRowClass(queueReason, queuePriority, slaState)}`}>
                         <td className="px-3 py-3.5">
                           <div className="space-y-1.5">
                             <p className="font-semibold text-slate-950">{row.primary}</p>
                             <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
-                            <p className="text-xs text-slate-500">{opened}</p>
+                            <p className="text-xs text-slate-500">{getQueueReasonLabel(queueReason)}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
                           <div className="space-y-1">
                             <p className="font-medium text-slate-900">{row.secondary}</p>
-                            <p className="text-xs text-slate-500">{getQueueReasonLabel(queueReason)}</p>
+                            <p className="text-xs text-slate-500">{customerCode}</p>
                           </div>
                         </td>
-                        <td className="px-3 py-3.5 text-sm text-slate-600">{customerUser}</td>
+                        <td className="px-3 py-3.5">
+                          <div className="space-y-1 text-sm text-slate-600">
+                            <p>{customerUser}</p>
+                            <p className="text-xs text-slate-500">{serviceNo}</p>
+                          </div>
+                        </td>
                         <td className="px-3 py-3.5">
                           <div className="space-y-1.5">
                             <span className="badge border-slate-200 bg-white text-slate-600">{type}</span>
@@ -514,17 +595,37 @@ export function SupportTroubleTicketQueuePanel({
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="flex max-w-[220px] flex-wrap gap-1.5">
-                            <span className={`badge ${getPriorityTone(queuePriority)}`}>{queuePriority}</span>
-                            <span className={`badge ${getSlaTone(slaState)}`}>{slaState}</span>
-                            <span className="badge border-slate-200 bg-white text-slate-600">{slaDue}</span>
+                          <div className="space-y-1 text-sm text-slate-600">
+                            <p className="font-medium text-slate-900">{latestProgress !== '-' ? latestProgress : getQueueReasonActionCopy(queueReason)}</p>
+                            <p className="text-xs text-slate-500">PIC: {owner}</p>
+                            <p className="text-xs text-slate-500">Follow-up: {formatCompactDateTime(followUp)}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
                           <div className="space-y-1 text-sm text-slate-600">
-                            <p>{owner}</p>
-                            <p className="text-xs text-slate-500">Follow-up: {followUp}</p>
-                            <p className="text-xs text-slate-500">Update terakhir: {progressUpdated}</p>
+                            <p>{formatCompactDateTime(opened)}</p>
+                            <p className="text-xs text-slate-500">Update: {formatCompactDateTime(progressUpdated)}</p>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <div className="flex max-w-[220px] flex-wrap gap-1.5">
+                            <span className={`badge ${getPriorityTone(queuePriority)}`}>{queuePriority}</span>
+                            <span className={`badge ${getSlaTone(slaState)}`}>{slaState}</span>
+                            <span className="badge border-slate-200 bg-white text-slate-600">{formatCompactDateTime(slaDue)}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <div className="space-y-1 text-sm text-slate-600">
+                            <p className="font-medium text-slate-900">{aging}</p>
+                            <p className="text-xs text-slate-500">{queueReason === 'READY_CLOSE' ? 'Siap ditutup' : 'Masih aktif'}</p>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <div className="flex max-w-[220px] flex-wrap gap-1.5">
+                            <span className="badge border-slate-200 bg-white text-slate-600">{getQueueReasonLabel(queueReason)}</span>
+                            {looksRecurring ? (
+                              <span className="badge border-violet-200 bg-violet-50 text-violet-700">Perlu cek berulang</span>
+                            ) : null}
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
@@ -569,6 +670,8 @@ export function SupportTroubleTicketQueuePanel({
               const opened = pickMeta(row.meta, 'Opened: ')
               const slaState = pickMeta(row.meta, 'SLA State: ')
               const customerUser = pickMeta(row.meta, 'Customer User: ')
+              const serviceNo = pickMeta(row.meta, 'Service No: ')
+              const latestProgress = pickMeta(row.meta, 'Latest Progress: ')
               const followUp = pickMeta(row.meta, 'Next Follow Up: ')
               const queuePriority = pickMeta(row.meta, 'Queue Priority: ')
               const queueReason = pickMeta(row.meta, 'Queue Reason: ')
@@ -579,7 +682,8 @@ export function SupportTroubleTicketQueuePanel({
                 canUpdate,
                 canApprove,
               })
-              const recommendedActionKey = getRecommendedRowActionKey(queueReason)
+              const openedLabel = formatCompactDateTime(opened)
+              const followUpLabel = formatCompactDateTime(followUp)
 
               return (
                 <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-4">
@@ -598,8 +702,10 @@ export function SupportTroubleTicketQueuePanel({
                   <p className="mt-3 text-sm leading-5 text-mute">{row.detail}</p>
                   <div className="mt-3 space-y-1 text-sm text-slate-600">
                     <p>User: {customerUser}</p>
-                    <p>Dibuka: {opened}</p>
-                    <p>Follow-up: {followUp}</p>
+                    <p>Layanan: {serviceNo}</p>
+                    <p>Dibuka: {openedLabel}</p>
+                    <p>Follow-up: {followUpLabel}</p>
+                    <p>Tindakan: {latestProgress !== '-' ? latestProgress : getQueueReasonActionCopy(queueReason)}</p>
                     <p>Antrian: {getQueueReasonLabel(queueReason)}</p>
                   </div>
                   {(canUpdate || canApprove) && rowActions.length ? (
