@@ -52,6 +52,7 @@ rm -f .env.rehearsal.local
 
 > `npm run rehearse:production` adalah helper otomatis untuk preflight lokal / server uji.
 > Script ini tidak menggantikan validasi PM2, Nginx, dan browser, tetapi menutup rangkaian check-smoke-build-standalone-health dalam satu command.
+> Untuk paket bukti server-side yang lebih ringkas, gunakan `npm run capture:server-proof-pack -- ...` setelah PM2 aktif.
 
 ## Checklist Teknis
 
@@ -68,6 +69,7 @@ rm -f .env.rehearsal.local
 - `docs/web-server-runtime-report.md` berhasil dibuat
 - `docs/web-go-live-evidence-generated.md` berhasil dibuat
 - halaman login terbuka dari browser (server)
+- atau satu command `capture:server-proof-pack` lulus dengan seluruh artefak output tersedia
 
 ## Checklist Browser Minimum
 

@@ -16,6 +16,7 @@ Dokumen ini melengkapi:
 Catatan:
 
 - Untuk snapshot teknis awal, gunakan `npm run collect:go-live-evidence` lalu tempel/ringkas hasilnya ke template ini.
+- Untuk jalur tercepat di server, gunakan `npm run capture:server-proof-pack -- ...` agar `verify:reverse-proxy`, `verify:server-runtime`, `render:server-runtime-report`, dan `collect:go-live-evidence` berjalan berurutan.
 - Untuk bukti reverse proxy yang lebih tegas, jalankan `npm run verify:reverse-proxy` dan lampirkan output JSON-nya.
 - Untuk validasi runtime yang lebih mudah dibaca, jalankan `npm run render:server-runtime-report` setelah `verify:server-runtime` lalu lampirkan report markdown-nya.
 - Jika file default `docs/web-reverse-proxy-check.json` dan `docs/web-server-runtime-check.json` sudah ada, `collect:go-live-evidence` otomatis akan menyerap ringkasan keduanya ke evidence markdown.

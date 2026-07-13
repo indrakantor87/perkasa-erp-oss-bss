@@ -127,6 +127,7 @@ async function main() {
   const pm2App = pickArgValue(args, '--pm2-app') || 'perkasa-erp-web'
   const reverseProxyJsonArg = pickEvidenceSource(args, '--reverse-proxy-json', ['docs/web-reverse-proxy-check.json'])
   const runtimeJsonArg = pickEvidenceSource(args, '--runtime-json', ['docs/web-server-runtime-check.json'])
+  const skipPm2 = hasArg(args, '--skip-pm2')
   const skipHealth = hasArg(args, '--skip-health')
   const skipLocalLogin = hasArg(args, '--skip-local-login')
   const skipDomainLogin = hasArg(args, '--skip-domain-login') || !domain
@@ -135,7 +136,9 @@ async function main() {
   const gitStatus = runCommand('git', ['status', '--short'])
   const gitLog = runCommand('git', ['log', '-1', '--oneline'])
   const gitBranch = runCommand('git', ['rev-parse', '--abbrev-ref', 'HEAD'])
-  const pm2Status = runCommand('pm2', ['status', pm2App, '--no-color'])
+  const pm2Status = skipPm2
+    ? { ok: false, stdout: '', stderr: 'dilewati', code: -1 }
+    : runCommand('pm2', ['status', pm2App, '--no-color'])
 
   let health = {
     ok: false,
@@ -203,7 +206,13 @@ async function main() {
     '| Area | Status | Catatan Singkat |',
     '|---|---|---|',
     `| kandidat rilis | \`${workingTreeClean ? 'pass' : 'fail'}\` | working tree ${workingTreeClean ? 'bersih' : 'tidak bersih'} |`,
-    `| PM2 | \`${pm2Status.ok ? (pm2Online ? 'pass' : 'partial') : 'fail'}\` | ${pm2Status.ok ? `app \`${pm2App}\` ${pm2Online ? 'terbaca online' : 'belum terbaca online'}` : 'pm2 belum tersedia / command gagal'} |`,
+    `| PM2 | \`${skipPm2 ? 'skipped' : pm2Status.ok ? (pm2Online ? 'pass' : 'partial') : 'fail'}\` | ${
+      skipPm2
+        ? 'dilewati sesuai argumen'
+        : pm2Status.ok
+          ? `app \`${pm2App}\` ${pm2Online ? 'terbaca online' : 'belum terbaca online'}`
+          : 'pm2 belum tersedia / command gagal'
+    } |`,
     `| reverse proxy | \`${reverseProxyEvidence ? (reverseProxyPass ? 'pass' : 'fail') : 'skipped'}\` | ${reverseProxyNote} |`,
     `| health check | \`${skipHealth ? 'skipped' : toPassFail(health.ok)}\` | ${skipHealth ? 'dilewati sesuai argumen' : health.ok ? 'verify-health lulus' : 'verify-health gagal'} |`,
     `| runtime JSON | \`${runtimeEvidence ? (runtimePass ? 'pass' : 'fail') : 'skipped'}\` | ${runtimeNote} |`,
@@ -227,8 +236,8 @@ async function main() {
     '',
     '### 2. PM2',
     '',
-    `- Status app \`${pm2App}\`: \`${pm2Status.ok ? (pm2Online ? 'online' : 'belum online') : 'command gagal / belum tersedia'}\``,
-    `- Output PM2:${formatCodeBlock(pm2Status.ok ? pm2Status.stdout : pm2Status.stderr)}`,
+    `- Status app \`${pm2App}\`: \`${skipPm2 ? 'skipped' : pm2Status.ok ? (pm2Online ? 'online' : 'belum online') : 'command gagal / belum tersedia'}\``,
+    `- Output PM2:${formatCodeBlock(skipPm2 ? 'dilewati sesuai argumen' : pm2Status.ok ? pm2Status.stdout : pm2Status.stderr)}`,
     '',
     '### 3. Reverse Proxy',
     '',

@@ -118,6 +118,7 @@ Catatan commit:
 
 - start/restart PM2 dengan `ecosystem.config.cjs`
 - aktifkan Nginx/reload config
+- jalankan `npm run capture:server-proof-pack -- --type hari-H --server "$(hostname)" --domain <domain-final> --rollback-commit <commit-rollback> --health-url http://127.0.0.1:3000/api/health --reverse-proxy-config /etc/nginx/sites-available/perkasa-erp-web.conf --reverse-proxy-server-name <domain-final> --reverse-proxy-upstream http://127.0.0.1:3000 --reverse-proxy-test-command "sudo nginx -t" --reverse-proxy-reload-command "sudo systemctl reload nginx"`
 - jalankan `npm run verify:reverse-proxy -- --config /etc/nginx/sites-available/perkasa-erp-web.conf --server-name <domain-final> --expected-upstream http://127.0.0.1:3000 --test-command "sudo nginx -t" --reload-command "sudo systemctl reload nginx" --output docs/web-reverse-proxy-check.json`
 - jalankan `npm run verify:health -- http://127.0.0.1:3000/api/health`
 - jalankan `npm run verify:server-runtime -- --pm2-app perkasa-erp-web --health-url http://127.0.0.1:3000/api/health --domain <domain-final> --output docs/web-server-runtime-check.json`

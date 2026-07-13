@@ -230,6 +230,31 @@ Checklist cepat:
 2. ringkasan `PM2`, `health`, dan probe login terbaca jelas
 3. report markdown ditempel atau dilampirkan ke evidence hari-H
 
+Jika ingin satu rangkaian bukti server-side sekaligus:
+
+```bash
+cd "$APP_DIR"
+npm run capture:server-proof-pack -- \
+  --type hari-H \
+  --server "$(hostname)" \
+  --domain "$DOMAIN" \
+  --rollback-commit "$ROLLBACK_COMMIT" \
+  --health-url "$HEALTH_URL" \
+  --reverse-proxy-config /etc/nginx/sites-available/perkasa-erp-web.conf \
+  --reverse-proxy-server-name "$DOMAIN" \
+  --reverse-proxy-upstream http://127.0.0.1:3000 \
+  --reverse-proxy-test-command "sudo nginx -t" \
+  --reverse-proxy-reload-command "sudo systemctl reload nginx"
+```
+
+Checklist cepat helper orkestrasi:
+
+1. `docs/web-reverse-proxy-check.json` berhasil dibuat
+2. `docs/web-server-runtime-check.json` berhasil dibuat
+3. `docs/web-server-runtime-report.md` berhasil dibuat
+4. `docs/web-go-live-evidence-generated.md` berhasil dibuat
+5. exit command `0` bila seluruh langkah lulus
+
 ## 6A. Kumpulkan Bukti Cepat
 
 ```bash

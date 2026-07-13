@@ -108,6 +108,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.21] - 2026-07-13
+
+### Improved
+
+- Ditambahkan helper `npm run capture:server-proof-pack` untuk menjalankan paket bukti server-side secara berurutan: `verify:reverse-proxy`, `verify:server-runtime`, `render:server-runtime-report`, lalu `collect:go-live-evidence`, sehingga operator host target punya satu command utama yang lebih sulit melenceng urutannya: [capture-server-proof-pack.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/capture-server-proof-pack.mjs), [package.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/package.json)
+- Command sheet, runbook hosting, checklist rehearsal/cutover, template evidence, dan checklist readiness kini menempatkan helper orkestrasi ini sebagai jalur cepat server-side dengan langkah manual tetap tersedia sebagai fallback: [web-server-side-command-sheet.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-side-command-sheet.md), [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-deploy-rehearsal-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-deploy-rehearsal-checklist.md), [web-server-rehearsal-execution-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-rehearsal-execution-template.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md)
+- Versioning diselaraskan ke `0.66.21` untuk menandai orkestrasi paket bukti server-side.
+
 ## [0.66.20] - 2026-07-13
 
 ### Improved
