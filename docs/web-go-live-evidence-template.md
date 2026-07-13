@@ -16,6 +16,7 @@ Dokumen ini melengkapi:
 Catatan:
 
 - Untuk snapshot teknis awal, gunakan `npm run collect:go-live-evidence` lalu tempel/ringkas hasilnya ke template ini.
+- Untuk validasi runtime yang lebih mudah dibaca, jalankan `npm run render:server-runtime-report` setelah `verify:server-runtime` lalu lampirkan report markdown-nya.
 
 ## Metadata Eksekusi
 
@@ -105,6 +106,7 @@ Catatan:
 | screenshot dashboard NOC / support | `................` |
 | screenshot landing support | `................` |
 | output `web-server-runtime-check.json` | `................` |
+| output `web-server-runtime-report.md` | `................` |
 | output `verify:health` | `................` |
 | bukti write-side support | `lihat web-support-write-side-proof-2026-07-13.md / catatan mutation proof hari-H` |
 

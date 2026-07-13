@@ -108,6 +108,16 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
 - Versioning diselaraskan ke `0.66.04`.
 
+## [0.66.17] - 2026-07-13
+
+### Improved
+
+- Ditambahkan helper `render:server-runtime-report` untuk mengubah output JSON dari `verify:server-runtime` menjadi report markdown yang siap ditempel ke evidence rehearsal / hari-H: [render-server-runtime-report.mjs](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/scripts/render-server-runtime-report.mjs), [package.json](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/package.json)
+- Ditambahkan worksheet [web-server-rehearsal-execution-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-rehearsal-execution-template.md) agar PIC deploy dapat mencatat urutan command, durasi, artefak, dan keputusan rehearsal server secara real-time.
+- Checklist rehearsal, cutover, runbook hosting, readiness hosting, dan template evidence kini memasukkan alur `verify:server-runtime -> render:server-runtime-report -> collect:go-live-evidence` sehingga bukti server-side lebih siap dibaca dan diaudit: [web-deploy-rehearsal-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-deploy-rehearsal-checklist.md), [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md), [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md), [web-hosting-readiness-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-readiness-checklist.md), [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
+- Renderer runtime sudah diverifikasi dalam mode aman lokal untuk memastikan report markdown benar-benar terbentuk sebelum dipakai di server nyata.
+- Versioning diselaraskan ke `0.66.17`.
+
 ## [0.66.16] - 2026-07-13
 
 ### Improved

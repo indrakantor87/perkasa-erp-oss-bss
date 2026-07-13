@@ -172,6 +172,21 @@ Checklist cepat:
 3. probe `localhost /login` dan `domain /login` terbaca `pass`
 4. file `docs/web-server-runtime-check.json` berhasil dibuat bila output diaktifkan
 
+Jika ingin report markdown yang siap ditempel ke evidence:
+
+```bash
+cd "$APP_DIR"
+npm run render:server-runtime-report -- \
+  --input docs/web-server-runtime-check.json \
+  --output docs/web-server-runtime-report.md
+```
+
+Checklist cepat:
+
+1. file `docs/web-server-runtime-report.md` berhasil dibuat
+2. ringkasan `PM2`, `health`, dan probe login terbaca jelas
+3. report markdown ditempel atau dilampirkan ke evidence hari-H
+
 ## 6A. Kumpulkan Bukti Cepat
 
 ```bash
@@ -188,6 +203,7 @@ Simpan hasilnya ke dokumen:
 
 1. [web-go-live-evidence-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-evidence-template.md)
 2. [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+3. [web-server-rehearsal-execution-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-rehearsal-execution-template.md)
 
 Jika ingin snapshot teknis otomatis dalam satu file:
 

@@ -104,6 +104,7 @@ Dokumen ini dipakai sebagai checklist final sebelum mulai hosting web ERP pada h
 - Helper `npm run prepare:production-rehearsal-env -- --source .env --target .env.rehearsal.local --port 3011` kini tersedia agar rehearsal bisa memakai secret sementara yang valid tanpa mengubah `.env` utama.
 - Helper `npm run collect:go-live-evidence -- ...` kini tersedia untuk mengumpulkan snapshot teknis server-side ke file markdown sebelum PIC melengkapi screenshot dan sign-off.
 - Helper `npm run verify:server-runtime -- ...` kini tersedia untuk memberi status tegas `pass/fail` pada PM2, `verify:health`, dan probe `/login` localhost/domain sebelum evidence hari-H dikumpulkan.
+- Helper `npm run render:server-runtime-report -- ...` dan template [web-server-rehearsal-execution-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-rehearsal-execution-template.md) kini tersedia agar hasil runtime JSON langsung berubah menjadi report markdown yang siap dibaca PIC deploy.
 - Smoke browser `admin.perkasa` dan `support.ops` berhasil login, masuk dashboard, dan logout tanpa lagi terkena redirect `0.0.0.0`.
 - Scope dashboard KPI untuk role `NOC` sudah kembali sinkron ke `Pemasaran dan Pelayanan / NOC`, tidak jatuh ke default `Penjualan`.
 - Runbook hosting, PM2 config, dan contoh reverse proxy kini tersedia di `docs/web-hosting-runbook.md` dan `apps/web/ecosystem.config.cjs`.

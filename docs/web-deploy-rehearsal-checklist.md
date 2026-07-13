@@ -12,6 +12,7 @@ Dokumen ini melengkapi:
 
 1. [web-hosting-runbook.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-hosting-runbook.md)
 2. [web-go-live-cutover-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-go-live-cutover-checklist.md)
+3. [web-server-rehearsal-execution-template.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-server-rehearsal-execution-template.md)
 
 ## Persiapan
 
@@ -33,6 +34,9 @@ npm run build
 pm2 start ecosystem.config.cjs
 pm2 status
 npm run verify:health -- http://127.0.0.1:3000/api/health
+npm run verify:server-runtime -- --pm2-app perkasa-erp-web --health-url http://127.0.0.1:3000/api/health --domain "$DOMAIN" --output docs/web-server-runtime-check.json
+npm run render:server-runtime-report -- --input docs/web-server-runtime-check.json --output docs/web-server-runtime-report.md
+npm run collect:go-live-evidence -- --type rehearsal --server "$(hostname)" --domain "$DOMAIN" --health-url http://127.0.0.1:3000/api/health --rollback-commit "$ROLLBACK_COMMIT" --output docs/web-go-live-evidence-generated.md
 npm run rehearse:production -- .env --port 3011
 ```
 
@@ -57,6 +61,9 @@ rm -f .env.rehearsal.local
 - `npm run build` lulus
 - PM2 status `online` (server)
 - `npm run verify:health -- http://127.0.0.1:3000/api/health` lulus (server)
+- `npm run verify:server-runtime -- ...` lulus (server)
+- `docs/web-server-runtime-report.md` berhasil dibuat
+- `docs/web-go-live-evidence-generated.md` berhasil dibuat
 - halaman login terbuka dari browser (server)
 
 ## Checklist Browser Minimum
