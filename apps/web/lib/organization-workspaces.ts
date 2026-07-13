@@ -387,7 +387,7 @@ export const tokoWorkspace: OrganizationWorkspaceDefinition = {
   eyebrow: 'Operasional',
   title: 'Toko',
   description:
-    'Workspace toko memusatkan stok display, pergerakan barang, dan tindak lanjut operasional ringan tanpa harus membuka semua domain sekaligus.',
+    'Workspace toko diposisikan sebagai business berbeda di luar scope bisnis ISP pada fase ini. Implementasi tabel kerja menyusul setelah proses Toko tervalidasi.',
   primaryAction: {
     label: 'Mutasi & Stok Toko',
     href: '/inventory?focus=MONTHLY_MOVEMENTS',

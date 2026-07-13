@@ -100,6 +100,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 - Checklist hardening kini menandai `restore / transfer / reopen` sebagai write action yang sudah diuji manual terkontrol, sehingga blocker write-side support bergeser ke `update TT teknis` dan `update port/ODP`: [hybrid-psb-production-hardening-checklist.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/hybrid-psb-production-hardening-checklist.md)
 - Versioning diselaraskan ke `0.66.02` untuk menandai penutupan mutation proof support prioritas dan hardening reopen lineage staging.
 
+## [0.66.04] - 2026-07-13
+
+### Improved
+
+- Menu `Operasional > Toko` kini ditandai sebagai business di luar scope ISP (fase ini) dan menampilkan placeholder “Workspace Toko belum tersedia” beserta tabel kerja dummy agar statusnya eksplisit sambil menunggu definisi proses yang valid: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/inventory/toko/page.tsx), [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx), [organization-workspaces.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/organization-workspaces.ts)
+- Domain workspace kini menampilkan empty-state “Tabel kerja” bila section review belum tersedia, sehingga menu domain tidak lagi terasa tanpa tabel kerja saat data/query belum siap: [domain-shell.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/domain-shell.tsx)
+- Versioning diselaraskan ke `0.66.04`.
+
 ## [0.66.03] - 2026-07-13
 
 ### Improved

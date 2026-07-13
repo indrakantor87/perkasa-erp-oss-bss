@@ -248,8 +248,8 @@ const sidebarCoreGroups: SidebarGroup[] = [
       }),
       buildSidebarNavItem('/inventory', {
         key: 'inventory-toko',
-        title: 'Toko',
-        description: 'Workspace toko untuk stok display, pergerakan barang, dan tindak lanjut',
+        title: 'Toko (Segera)',
+        description: 'Business di luar ISP. Tabel kerja menyusul setelah proses Toko sudah tervalidasi.',
         href: '/inventory/toko',
         allowedRoles: ['SUPER_ADMIN'],
         matchPrefixes: ['/inventory/toko'],

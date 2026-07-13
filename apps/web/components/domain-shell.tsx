@@ -2845,7 +2845,56 @@ export function DomainShell({
             )
           })}
         </section>
-      ) : null}
+      ) : (
+        <section className="panel p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="section-title">Tabel kerja</p>
+              <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+                Belum ada tabel kerja yang siap ditampilkan
+              </h3>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
+                Saat ini belum ada section review yang tersedia untuk domain ini. Biasanya karena sumber data belum siap,
+                belum ada data yang lolos filter, atau domain belum terintegrasi penuh untuk role ini.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={headerPrimaryAction.href}
+                className="inline-flex rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                {headerPrimaryAction.label}
+              </Link>
+              <Link
+                href="/import"
+                className="inline-flex rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Buka Import Center
+              </Link>
+            </div>
+          </div>
+          <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200">
+            <table className="min-w-[1080px] w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <th className="px-4 py-3">Item</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Ringkasan</th>
+                  <th className="px-4 py-3">Metadata</th>
+                  <th className="px-4 py-3">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">
+                    Tidak ada section tabel kerja untuk domain ini.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className="grid gap-4 md:grid-cols-3">
         {content.summaries.map((item) => (
