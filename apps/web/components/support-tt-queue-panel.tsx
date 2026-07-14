@@ -26,6 +26,11 @@ function getRowTone(status: string) {
   return 'border-slate-200 bg-white text-slate-700'
 }
 
+function normalizeCellValue(value: string) {
+  const normalized = String(value ?? '').trim()
+  return normalized && normalized !== '-' ? normalized : 'Belum ada'
+}
+
 function getSlaTone(state: string) {
   const normalized = state.trim().toUpperCase()
   if (normalized === 'OVERDUE') {
@@ -231,6 +236,17 @@ function getRowActionButtonClass(isPrimary: boolean) {
   }
 
   return 'rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50'
+}
+
+function getTypeTone(type: string) {
+  const normalized = type.trim().toUpperCase()
+  if (normalized === 'EMERGENCY') {
+    return 'border-rose-200 bg-rose-50 text-rose-700'
+  }
+  if (normalized === 'PREVENTIVE') {
+    return 'border-sky-200 bg-sky-50 text-sky-700'
+  }
+  return 'border-slate-200 bg-slate-50 text-slate-600'
 }
 
 function getRecommendedRowActionKey(reason: string) {
@@ -570,70 +586,105 @@ export function SupportTroubleTicketQueuePanel({
                     return (
                       <tr key={row.id} className={`align-top ${getQueueRowClass(queueReason, queuePriority, slaState)}`}>
                         <td className="px-3 py-3.5">
-                          <div className="space-y-1.5">
-                            <p className="font-semibold text-slate-950">{row.primary}</p>
-                            <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
-                            <p className="text-xs text-slate-500">{getQueueReasonLabel(queueReason)}</p>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3.5">
-                          <div className="space-y-1">
-                            <p className="font-medium text-slate-900">{row.secondary}</p>
-                            <p className="text-xs text-slate-500">{customerCode}</p>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3.5">
-                          <div className="space-y-1 text-sm text-slate-600">
-                            <p>{customerUser}</p>
-                            <p className="text-xs text-slate-500">{serviceNo}</p>
+                          <div className="space-y-2">
+                            <p className="font-mono text-[13px] font-semibold leading-5 text-slate-950">{row.primary}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
+                              <span className="badge border-slate-200 bg-white text-slate-600">{getQueueReasonLabel(queueReason)}</span>
+                            </div>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
                           <div className="space-y-1.5">
-                            <span className="badge border-slate-200 bg-white text-slate-600">{type}</span>
-                            <p className="max-w-sm text-sm leading-5 text-mute">{row.detail}</p>
+                            <p className="font-medium leading-5 text-slate-900">{row.secondary}</p>
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Kode customer</p>
+                              <p className="mt-0.5 text-xs text-slate-500">{normalizeCellValue(customerCode)}</p>
+                            </div>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="space-y-1 text-sm text-slate-600">
-                            <p className="font-medium text-slate-900">{latestProgress !== '-' ? latestProgress : getQueueReasonActionCopy(queueReason)}</p>
-                            <p className="text-xs text-slate-500">PIC: {owner}</p>
-                            <p className="text-xs text-slate-500">Follow-up: {formatCompactDateTime(followUp)}</p>
+                          <div className="space-y-2">
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">User</p>
+                              <p className="mt-0.5 break-all text-sm leading-5 text-slate-700">{normalizeCellValue(customerUser)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Layanan</p>
+                              <p className="mt-0.5 font-mono text-xs text-slate-500">{normalizeCellValue(serviceNo)}</p>
+                            </div>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="space-y-1 text-sm text-slate-600">
-                            <p>{formatCompactDateTime(opened)}</p>
-                            <p className="text-xs text-slate-500">Update: {formatCompactDateTime(progressUpdated)}</p>
+                          <div className="space-y-2">
+                            <span className={`badge ${getTypeTone(type)}`}>{type}</span>
+                            <p className="max-w-[260px] text-sm leading-5 text-slate-700">{row.detail}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="flex max-w-[220px] flex-wrap gap-1.5">
-                            <span className={`badge ${getPriorityTone(queuePriority)}`}>{queuePriority}</span>
-                            <span className={`badge ${getSlaTone(slaState)}`}>{slaState}</span>
-                            <span className="badge border-slate-200 bg-white text-slate-600">{formatCompactDateTime(slaDue)}</span>
+                          <div className="space-y-2">
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Aksi berikutnya</p>
+                              <p className="mt-0.5 max-w-[240px] text-sm font-medium leading-5 text-slate-900">
+                                {latestProgress !== '-' ? latestProgress : getQueueReasonActionCopy(queueReason)}
+                              </p>
+                            </div>
+                            <div className="space-y-1 text-xs text-slate-500">
+                              <p>PIC: {normalizeCellValue(owner)}</p>
+                              <p>Follow-up: {formatCompactDateTime(followUp)}</p>
+                            </div>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="space-y-1 text-sm text-slate-600">
-                            <p className="font-medium text-slate-900">{aging}</p>
+                          <div className="space-y-2">
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Dibuka</p>
+                              <p className="mt-0.5 text-sm text-slate-700">{formatCompactDateTime(opened)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Update terakhir</p>
+                              <p className="mt-0.5 text-xs text-slate-500">{formatCompactDateTime(progressUpdated)}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap gap-1.5">
+                              <span className={`badge ${getPriorityTone(queuePriority)}`}>{queuePriority}</span>
+                              <span className={`badge ${getSlaTone(slaState)}`}>{slaState}</span>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Target SLA</p>
+                              <p className="mt-0.5 text-xs text-slate-500">{formatCompactDateTime(slaDue)}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <div className="space-y-2">
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Durasi aktif</p>
+                              <p className="mt-0.5 text-sm font-medium text-slate-900">{aging}</p>
+                            </div>
                             <p className="text-xs text-slate-500">{queueReason === 'READY_CLOSE' ? 'Siap ditutup' : 'Masih aktif'}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="flex max-w-[220px] flex-wrap gap-1.5">
-                            <span className="badge border-slate-200 bg-white text-slate-600">{getQueueReasonLabel(queueReason)}</span>
+                          <div className="space-y-2">
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Catatan</p>
+                              <p className="mt-0.5 text-sm leading-5 text-slate-700">{getQueueReasonLabel(queueReason)}</p>
+                            </div>
                             {looksRecurring ? (
-                              <span className="badge border-violet-200 bg-violet-50 text-violet-700">Perlu cek berulang</span>
+                              <span className="badge border-violet-200 bg-violet-50 text-violet-700">Cek ticket berulang</span>
                             ) : null}
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
                           {(canUpdate || canApprove) && rowActions.length ? (
-                            <div className="flex flex-col items-end gap-1.5">
-                              <span className="badge border-slate-200 bg-white text-slate-600">
+                            <div className="flex flex-col items-end gap-2">
+                              <p className="max-w-[140px] text-right text-[11px] font-medium leading-4 text-slate-500">
                                 {getQueueReasonActionCopy(queueReason)}
-                              </span>
+                              </p>
                               <button
                                 type="button"
                                 onClick={() =>
@@ -697,16 +748,40 @@ export function SupportTroubleTicketQueuePanel({
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className={`badge ${getPriorityTone(queuePriority)}`}>{queuePriority}</span>
                     <span className={`badge ${getSlaTone(slaState)}`}>{slaState}</span>
-                    <span className="badge border-slate-200 bg-white text-slate-600">{type}</span>
+                    <span className={`badge ${getTypeTone(type)}`}>{type}</span>
                   </div>
-                  <p className="mt-3 text-sm leading-5 text-mute">{row.detail}</p>
-                  <div className="mt-3 space-y-1 text-sm text-slate-600">
-                    <p>User: {customerUser}</p>
-                    <p>Layanan: {serviceNo}</p>
-                    <p>Dibuka: {openedLabel}</p>
-                    <p>Follow-up: {followUpLabel}</p>
-                    <p>Tindakan: {latestProgress !== '-' ? latestProgress : getQueueReasonActionCopy(queueReason)}</p>
-                    <p>Antrian: {getQueueReasonLabel(queueReason)}</p>
+                  <p className="mt-3 text-sm leading-5 text-slate-700">{row.detail}</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">User</p>
+                        <p className="mt-0.5 break-all text-sm text-slate-700">{normalizeCellValue(customerUser)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Layanan</p>
+                        <p className="mt-0.5 font-mono text-xs text-slate-500">{normalizeCellValue(serviceNo)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Dibuka</p>
+                        <p className="mt-0.5 text-sm text-slate-700">{openedLabel}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Follow-up</p>
+                        <p className="mt-0.5 text-sm text-slate-700">{followUpLabel}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Aksi berikutnya</p>
+                        <p className="mt-0.5 text-sm font-medium leading-5 text-slate-900">
+                          {latestProgress !== '-' ? latestProgress : getQueueReasonActionCopy(queueReason)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Queue</p>
+                        <p className="mt-0.5 text-sm text-slate-700">{getQueueReasonLabel(queueReason)}</p>
+                      </div>
+                    </div>
                   </div>
                   {(canUpdate || canApprove) && rowActions.length ? (
                     <div className="mt-4 flex flex-wrap gap-2">

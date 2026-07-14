@@ -10,6 +10,15 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.34] - 2026-07-14
+
+### Improved
+
+- Teks dalam tabel `Trouble Ticket` dirapikan agar lebih mudah dipindai: hierarki antara nilai utama dan metadata pendukung diperjelas, badge tidak lagi bertumpuk tanpa peran, dan sel yang berisi banyak konteks kini dibagi ke blok informasi yang lebih konsisten: [support-tt-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-queue-panel.tsx)
+- Area `User / Layanan`, `Tindakan / PIC`, `Open`, `Target / SLA`, `Durasi`, dan `Keterangan` kini memakai label kecil yang lebih tenang dengan isi utama yang lebih dominan, sehingga tabel terasa lebih operasional dan tidak lagi tampak seperti tumpukan teks yang setara.
+- Kartu mobile `Trouble Ticket` juga dirapikan dengan pemisahan metadata ke dua grup agar informasi tidak menumpuk vertikal dalam satu blok panjang.
+- Versioning diselaraskan ke `0.66.34` untuk menandai batch perapihan keterbacaan teks pada tabel Trouble Ticket.
+
 ## [0.66.33] - 2026-07-14
 
 ### Fixed
