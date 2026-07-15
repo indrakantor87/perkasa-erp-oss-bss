@@ -1,5 +1,5 @@
 import type { AppSession } from '@/lib/auth-session'
-import { runReviewDbExecute } from '@/lib/review-db'
+import { hasReviewDbColumn, invalidateReviewDbColumnCache, runReviewDbExecute } from '@/lib/review-db'
 
 type ExecuteResult = {
   affectedRows?: number
@@ -23,6 +23,24 @@ export const SUPPORT_DISMANTLE_METADATA_PREFIXES = {
   billingDisposition: 'Billing Disposition: ',
 } as const
 
+async function ensureSupportDismantleQueueColumn(
+  columnName: string,
+  definitionSql: string,
+  afterColumn: string,
+) {
+  if (await hasReviewDbColumn('support_dismantle_queue', columnName)) {
+    return
+  }
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE support_dismantle_queue
+      ADD COLUMN ${definitionSql} AFTER ${afterColumn}
+    `,
+  )
+  invalidateReviewDbColumnCache('support_dismantle_queue', columnName)
+}
+
 export async function ensureSupportDismantleQueueTable() {
   await runReviewDbExecute<ExecuteResult>(
     `
@@ -42,39 +60,22 @@ export async function ensureSupportDismantleQueueTable() {
     `,
   )
 
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE support_dismantle_queue
-      ADD COLUMN IF NOT EXISTS transfer_note TEXT NULL AFTER isolation_id
-    `,
+  await ensureSupportDismantleQueueColumn('transfer_note', 'transfer_note TEXT NULL', 'isolation_id')
+  await ensureSupportDismantleQueueColumn(
+    'transferred_by_username',
+    "transferred_by_username VARCHAR(120) NOT NULL DEFAULT 'system'",
+    'transfer_note',
   )
-
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE support_dismantle_queue
-      ADD COLUMN IF NOT EXISTS transferred_by_username VARCHAR(120) NOT NULL DEFAULT 'system' AFTER transfer_note
-    `,
+  await ensureSupportDismantleQueueColumn(
+    'transferred_at',
+    'transferred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    'transferred_by_username',
   )
-
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE support_dismantle_queue
-      ADD COLUMN IF NOT EXISTS transferred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER transferred_by_username
-    `,
-  )
-
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE support_dismantle_queue
-      ADD COLUMN IF NOT EXISTS reopened_note TEXT NULL AFTER transferred_at
-    `,
-  )
-
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE support_dismantle_queue
-      ADD COLUMN IF NOT EXISTS updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER reopened_note
-    `,
+  await ensureSupportDismantleQueueColumn('reopened_note', 'reopened_note TEXT NULL', 'transferred_at')
+  await ensureSupportDismantleQueueColumn(
+    'updated_at',
+    'updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+    'reopened_note',
   )
 }
 
