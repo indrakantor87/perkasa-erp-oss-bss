@@ -5,11 +5,23 @@ import { primeAccessControlCache } from '@/lib/access-control-server'
 
 export const AUTH_COOKIE_NAME = 'perkasa_session'
 
+function resolveSecureCookieSetting() {
+  const override = process.env.AUTH_COOKIE_SECURE?.trim().toLowerCase()
+  if (override === 'true' || override === '1' || override === 'yes' || override === 'on') {
+    return true
+  }
+  if (override === 'false' || override === '0' || override === 'no' || override === 'off') {
+    return false
+  }
+
+  return process.env.NODE_ENV === 'production'
+}
+
 function getCookieOptions(maxAge = 60 * 60 * 12) {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
+    secure: resolveSecureCookieSetting(),
     path: '/',
     maxAge,
   }
