@@ -14,22 +14,33 @@ Panduan ini menyiapkan `perkasa-erp-oss-bss` agar bisa dideploy ke Coolify memak
 
 - Exposed port container: `3000`
 - Public port di Coolify: biarkan otomatis
-- Health check path: `/`
+- Health check path: `/api/health`
+- Container start command: default dari `Dockerfile`
 
 ## Required Environment Variables
 
-Ambil baseline dari `apps/web/.env.example`.
+Ambil baseline dari `apps/web/.env.production.example`.
 
 - `APP_DATA_MODE=review-db`
 - `AUTH_SESSION_SECRET=<secret-production-yang-kuat>`
 - `DATABASE_URL=<mysql-connection-string-production>`
-- `REVIEW_DB_CONNECT_TIMEOUT_MS=1500`
+- `REVIEW_DB_CONNECT_TIMEOUT_MS=3000`
+- `PORT=3000`
 
 ## Optional Environment Variables
 
 - `BOOTSTRAP_MOCK_AUTH_CREDENTIALS=`
   - Kosongkan untuk production.
   - Jangan dipakai pada environment live kecuali benar-benar untuk mode review terbatas.
+
+## Coolify Form Reference
+
+- Application Type: `Dockerfile`
+- Port Exposes: `3000`
+- Health Check Path: `/api/health`
+- Docker Build Location: `./Dockerfile`
+- Base Directory / Build Context: repository root `.`
+- Branch: `main`
 
 ## Deploy Steps
 
@@ -38,8 +49,9 @@ Ambil baseline dari `apps/web/.env.example`.
 3. Pilih branch `main`.
 4. Pilih build pack `Dockerfile`.
 5. Set `Dockerfile Location` ke `./Dockerfile`.
-6. Isi environment variables production.
-7. Deploy pertama.
+6. Set health check ke `/api/health`.
+7. Isi environment variables production mengikuti `apps/web/.env.production.example`.
+8. Deploy pertama.
 
 ## Notes
 
@@ -49,9 +61,27 @@ Ambil baseline dari `apps/web/.env.example`.
   - `npm run build`
   - menjalankan `node server.js` dari hasil standalone build
 - Jika nanti butuh domain custom atau reverse proxy rules, konfigurasi itu dilakukan di level Coolify, bukan di repo ini.
+- Health endpoint production akan gagal (`503`) bila:
+  - `AUTH_SESSION_SECRET` belum valid
+  - mode data masih fallback/mock
+  - review DB belum siap
+
+## Pre-Deploy Env Checklist
+
+- `AUTH_SESSION_SECRET` harus secret acak yang kuat, bukan placeholder.
+- `DATABASE_URL` harus menunjuk MySQL production/review yang benar.
+- `APP_DATA_MODE` harus `review-db`.
+- `BOOTSTRAP_MOCK_AUTH_CREDENTIALS` harus tetap kosong di production.
+- Jika perlu, validasi file env lebih dulu dengan:
+
+```bash
+cd apps/web
+node ./scripts/verify-production-env.mjs .env.production
+```
 
 ## After First Deploy
 
+- Buka `/api/health` dan pastikan `ok: true`.
 - Verifikasi login/session cookie berjalan normal.
 - Verifikasi koneksi MySQL production dari `DATABASE_URL`.
 - Cek route utama:
@@ -59,7 +89,9 @@ Ambil baseline dari `apps/web/.env.example`.
   - `/inventory`
   - `/support`
   - `/billing`
-- Kalau dibutuhkan, langkah berikutnya adalah menambahkan:
-  - health endpoint khusus
-  - checklist go-live env production
-  - proof script pasca deploy
+- Kalau domain sudah siap, jalankan verifikasi runtime:
+
+```bash
+cd apps/web
+node ./scripts/verify-server-runtime.mjs --health-url https://<domain-anda>/api/health --skip-pm2 --skip-local-login
+```

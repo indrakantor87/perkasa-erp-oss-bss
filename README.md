@@ -96,3 +96,9 @@ Project ini memakai:
 - changelog format `Keep a Changelog`
 
 Versi aktif saat ini ada di file `VERSION`.
+
+## Deploy Production
+
+- Baseline deploy Coolify tersedia di [coolify-deploy.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/coolify-deploy.md).
+- Baseline environment production web tersedia di [`.env.production.example`](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/.env.production.example).
+- Health check production memakai endpoint [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/health/route.ts).
