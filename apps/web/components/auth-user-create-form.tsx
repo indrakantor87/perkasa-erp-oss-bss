@@ -15,6 +15,34 @@ type AuthUserCreateFormProps = {
 
 const statusOptions = ['ACTIVE', 'INACTIVE'] as const
 
+const roleDivisionMap: Record<string, string> = {
+  PENJUALAN: 'PEMASARAN_PELAYANAN',
+  CS: 'PEMASARAN_PELAYANAN',
+  CREATOR_DIGITAL: 'PEMASARAN_PELAYANAN',
+  NOC: 'PEMASARAN_PELAYANAN',
+  TROUBLESHOOTS: 'PEMASARAN_PELAYANAN',
+  FINANCE: 'FINANCE_HR',
+  HR: 'FINANCE_HR',
+  GA: 'GENERAL_AFFAIR',
+  TEKNISI_PSB: 'TEKNIS_EKSPAN',
+  DISMANTLE: 'TEKNIS_EKSPAN',
+  OWNER: 'OPERASIONAL',
+  SUPER_ADMIN: 'OPERASIONAL',
+  ADMIN: 'OPERASIONAL',
+}
+
+function getDefaultDivisionId(
+  roleRef: string,
+  roleOptions: AuthUserLookupOption[],
+  divisionOptions: AuthUserLookupOption[]
+) {
+  const roleCode =
+    roleOptions.find((option) => option.id === roleRef)?.code?.trim().toUpperCase() ?? roleRef.trim().toUpperCase()
+  const divisionCode = roleDivisionMap[roleCode]
+  if (!divisionCode) return ''
+  return divisionOptions.find((option) => option.code.trim().toUpperCase() === divisionCode)?.id ?? ''
+}
+
 export function AuthUserCreateForm({
   canManage,
   reviewDbReady,
@@ -27,8 +55,9 @@ export function AuthUserCreateForm({
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [roleId, setRoleId] = useState(roleOptions[0]?.id ?? '')
-  const [divisionId, setDivisionId] = useState('')
+  const initialRoleId = roleOptions[0]?.id ?? ''
+  const [roleId, setRoleId] = useState(initialRoleId)
+  const [divisionId, setDivisionId] = useState(getDefaultDivisionId(initialRoleId, roleOptions, divisionOptions))
   const [branchId, setBranchId] = useState(branchOptions[0]?.id ?? '')
   const [status, setStatus] = useState<(typeof statusOptions)[number]>('ACTIVE')
   const [submitting, setSubmitting] = useState(false)
@@ -79,7 +108,8 @@ export function AuthUserCreateForm({
       setUsername('')
       setEmail('')
       setPassword('')
-      setDivisionId('')
+      setRoleId(initialRoleId)
+      setDivisionId(getDefaultDivisionId(initialRoleId, roleOptions, divisionOptions))
       setStatus('ACTIVE')
       router.refresh()
     } finally {
@@ -155,7 +185,11 @@ export function AuthUserCreateForm({
           <span className="font-semibold text-slate-950">Role Database</span>
           <select
             value={roleId}
-            onChange={(event) => setRoleId(event.target.value)}
+            onChange={(event) => {
+              const nextRoleId = event.target.value
+              setRoleId(nextRoleId)
+              setDivisionId(getDefaultDivisionId(nextRoleId, roleOptions, divisionOptions))
+            }}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
             disabled={isDisabled}
             required

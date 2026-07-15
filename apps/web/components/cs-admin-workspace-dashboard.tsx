@@ -47,6 +47,42 @@ const priorityTone: Record<WorklistItem['priority'], string> = {
   rendah: 'bg-emerald-50 text-emerald-700',
 }
 
+function getStatusTone(status: string) {
+  const normalized = String(status ?? '').trim().toUpperCase()
+  if (normalized.includes('READY') || normalized.includes('CLOSE') || normalized.includes('DONE')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800'
+  }
+  if (normalized.includes('REVIEW') || normalized.includes('WAIT') || normalized.includes('MONITOR')) {
+    return 'border-amber-200 bg-amber-50 text-amber-800'
+  }
+  if (normalized.includes('OVERDUE') || normalized.includes('FAILED') || normalized.includes('BLOCK')) {
+    return 'border-rose-200 bg-rose-50 text-rose-800'
+  }
+  if (normalized.includes('OPEN') || normalized.includes('PENDING')) {
+    return 'border-sky-200 bg-sky-50 text-sky-800'
+  }
+  return 'border-slate-200 bg-slate-50 text-slate-700'
+}
+
+function getDomainTone(domain: string) {
+  const normalized = String(domain ?? '').trim().toLowerCase()
+  if (normalized === 'support') return 'border-sky-200 bg-sky-50 text-sky-700'
+  if (normalized === 'customers') return 'border-violet-200 bg-violet-50 text-violet-700'
+  if (normalized === 'inventory') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  if (normalized === 'daily activity') return 'border-amber-200 bg-amber-50 text-amber-700'
+  if (normalized === 'billing') return 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700'
+  return 'border-slate-200 bg-slate-50 text-slate-700'
+}
+
+function buildAdminMetaItems(item: WorklistItem) {
+  return [
+    item.owner ? `PIC: ${item.owner}` : null,
+    item.dueLabel ? `Target: ${item.dueLabel}` : null,
+    item.handoffLinks?.length ? `Handoff: ${item.handoffLinks.length}` : null,
+    item.prefillToken ? `Token: ${item.prefillToken}` : null,
+  ].filter(Boolean) as string[]
+}
+
 function buildWorkspaceHref(params: { queue?: string; selected?: string }) {
   const searchParams = new URLSearchParams()
   if (params.queue) searchParams.set('queue', params.queue)
@@ -99,8 +135,8 @@ export function CsAdminWorkspaceDashboard({
               Queue hidup untuk approval, koreksi, transfer, dan risiko tinggi
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-              Halaman ini menggantikan landing statis `CS & Admin CS` dengan pembacaan supervisor yang langsung
-              menarik antrean lintas customer, support, inventory, dan daily activity dari scope role aktif.
+              Workspace ini membaca antrean supervisor secara langsung agar approval, koreksi, transfer,
+              dan risiko lintas customer, support, inventory, serta daily activity bisa diputus lebih cepat.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -231,56 +267,99 @@ export function CsAdminWorkspaceDashboard({
 
           {activeBucket && activeBucket.items.length ? (
             <>
+              <div className="mt-6 grid gap-3 md:grid-cols-3">
+                <article className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Item Aktif</p>
+                  <p className="mt-1 text-lg font-semibold text-slate-950">{activeBucket.totalCount}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">Backlog aktif yang sedang dibaca supervisor pada queue ini.</p>
+                </article>
+                <article className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">Kritikal</p>
+                  <p className="mt-1 text-lg font-semibold text-rose-900">{activeBucket.summary.criticalCount}</p>
+                  <p className="mt-1 text-xs leading-5 text-rose-700">Item yang berpotensi menahan keputusan, SLA, atau handoff.</p>
+                </article>
+                <article className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Menunggu</p>
+                  <p className="mt-1 text-lg font-semibold text-amber-900">{activeBucket.summary.waitingCount}</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-700">Kasus yang masih perlu validasi, monitoring, atau keputusan supervisor.</p>
+                </article>
+              </div>
+
               <div className="mt-6 hidden overflow-hidden rounded-3xl border border-slate-200 xl:block">
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      <th className="px-4 py-3">Prioritas</th>
-                      <th className="px-4 py-3">Domain</th>
-                      <th className="px-4 py-3">Judul</th>
+                      <th className="px-4 py-3">Item</th>
                       <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Tindak Lanjut</th>
+                      <th className="px-4 py-3">Ringkasan</th>
+                      <th className="px-4 py-3">Metadata</th>
+                      <th className="px-4 py-3">Arah</th>
+                      <th className="px-4 py-3">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {activeBucket.items.map((item) => {
                       const active = item.id === selectedItem?.id
                       const selectHref = buildWorkspaceHref({ queue: activeBucket.queue, selected: item.id })
+                      const metaItems = buildAdminMetaItems(item)
 
                       return (
                         <tr key={item.id} className={active ? 'bg-slate-50' : ''}>
-                          <td className="px-4 py-4 align-top">
-                            <span className={`badge ${priorityTone[item.priority]}`}>{item.priority}</span>
-                          </td>
-                          <td className="px-4 py-4 align-top text-sm font-medium text-slate-700">{item.domain}</td>
-                          <td className="px-4 py-4 align-top">
+                          <td className="px-4 py-3 align-top">
                             <Link href={selectHref} className="block space-y-1 hover:opacity-90">
-                              <p className="text-sm font-semibold text-slate-950">{item.title}</p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`badge ${getDomainTone(item.domain)}`}>{item.domain}</span>
+                                <span className={`badge ${priorityTone[item.priority]}`}>{item.priority}</span>
+                              </div>
+                              <p className="pt-1 text-sm font-semibold text-slate-950">{item.title}</p>
                               <p className="text-sm text-slate-600">{item.subtitle}</p>
-                              <p className="text-sm leading-6 text-mute">{item.detail}</p>
                             </Link>
                           </td>
-                          <td className="px-4 py-4 align-top">
-                            <span className="badge border-transparent bg-slate-950 text-white">{item.status}</span>
+                          <td className="px-4 py-3 align-top">
+                            <div className="space-y-2">
+                              <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
+                              <p className="text-xs leading-5 text-slate-500">{item.dueLabel || 'Belum ada target eksplisit'}</p>
+                            </div>
                           </td>
-                          <td className="px-4 py-4 align-top">
-                            <div className="flex flex-col gap-2">
-                              <Link
-                                href={selectHref}
-                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-                              >
-                                Lihat detail
-                              </Link>
+                          <td className="px-4 py-3 align-top">
+                            <div className="space-y-2">
+                              <p className="text-sm leading-6 text-slate-700 line-clamp-2">{item.detail}</p>
+                              <p className="text-xs leading-5 text-slate-500 line-clamp-2">
+                                {item.nextAction || item.reason || 'Supervisor membaca konteks lalu memutuskan tindak lanjut berikutnya.'}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <div className="flex flex-wrap gap-2">
+                              {metaItems.length ? (
+                                metaItems.map((meta) => (
+                                  <span key={`${item.id}-${meta}`} className="badge border-slate-200 bg-slate-50 text-slate-600">
+                                    {meta}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-xs leading-5 text-slate-500">Belum ada metadata admin tambahan.</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold text-slate-950">{item.actionLabel}</p>
+                              <p className="text-xs leading-5 text-slate-500">{item.reason || 'Buka detail untuk melihat alasan lengkap item masuk ke queue supervisor.'}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <div className="flex flex-wrap items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => setQuickActionItem(item)}
-                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white hover:text-slate-950"
+                                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
                               >
                                 Aksi cepat
                               </button>
                               <Link
                                 href={item.href}
-                                className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                                className="inline-flex items-center justify-center rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                               >
                                 {item.actionLabel}
                               </Link>
@@ -301,33 +380,39 @@ export function CsAdminWorkspaceDashboard({
                   return (
                     <article
                       key={item.id}
-                      className={`rounded-3xl border p-5 ${active ? 'border-slate-950 bg-slate-50' : 'border-slate-200 bg-white'}`}
+                      className={`rounded-3xl border p-4 ${active ? 'border-slate-950 bg-slate-50' : 'border-slate-200 bg-white'}`}
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="badge border-slate-200 bg-white text-slate-600">{item.domain}</span>
+                        <span className={`badge ${getDomainTone(item.domain)}`}>{item.domain}</span>
                         <span className={`badge ${priorityTone[item.priority]}`}>{item.priority}</span>
-                        <span className="badge border-transparent bg-slate-950 text-white">{item.status}</span>
+                        <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
                       </div>
-                      <p className="mt-4 text-base font-semibold text-slate-950">{item.title}</p>
+                      <Link href={selectHref} className="mt-4 block text-base font-semibold text-slate-950 hover:opacity-90">
+                        {item.title}
+                      </Link>
                       <p className="mt-1 text-sm font-medium text-slate-700">{item.subtitle}</p>
-                      <p className="mt-3 text-sm leading-6 text-mute">{item.detail}</p>
+                      <p className="mt-2 text-sm leading-6 text-mute line-clamp-3">{item.detail}</p>
+                      <p className="mt-2 text-xs leading-5 text-slate-500 line-clamp-2">
+                        {item.nextAction || item.reason || 'Baca detail item lalu tentukan approval, koreksi, transfer, atau handoff berikutnya.'}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {buildAdminMetaItems(item).map((meta) => (
+                          <span key={`${item.id}-${meta}`} className="badge border-slate-200 bg-slate-50 text-slate-600">
+                            {meta}
+                          </span>
+                        ))}
+                      </div>
                       <div className="mt-4 flex flex-wrap gap-3">
-                        <Link
-                          href={selectHref}
-                          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-                        >
-                          Lihat detail
-                        </Link>
                         <button
                           type="button"
                           onClick={() => setQuickActionItem(item)}
-                          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white hover:text-slate-950"
+                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
                         >
                           Aksi cepat
                         </button>
                         <Link
                           href={item.href}
-                          className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                          className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                         >
                           {item.actionLabel}
                         </Link>

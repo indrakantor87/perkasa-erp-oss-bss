@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 const allowedMovementTypes = new Set(['IN', 'OUT', 'ADJUSTMENT'])
 
@@ -9,6 +9,8 @@ type ItemRow = {
   id: number
   itemCode: string
   itemName: string
+  rackCode: string | null
+  rackBarcode: string | null
   currentStock: number
 }
 
@@ -30,6 +32,10 @@ function resolveNextStock(currentStock: number, qty: number, movementType: strin
   if (movementType === 'IN') return currentStock + qty
   if (movementType === 'OUT') return currentStock - qty
   return qty
+}
+
+function requiresInventoryPickupScan(role: string) {
+  return !['OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(String(role).trim().toUpperCase())
 }
 
 export async function POST(request: Request) {
@@ -57,6 +63,7 @@ export async function POST(request: Request) {
       qty?: unknown
       unitPrice?: unknown
       notes?: unknown
+      scannedRackBarcode?: unknown
     }
 
     const itemCode = String(payload.itemCode ?? '').trim()
@@ -65,6 +72,7 @@ export async function POST(request: Request) {
     const qty = Number.parseInt(String(payload.qty ?? '0').trim() || '0', 10)
     const unitPrice = normalizePrice(payload.unitPrice)
     const notes = String(payload.notes ?? '').trim()
+    const scannedRackBarcode = String(payload.scannedRackBarcode ?? '').trim().toUpperCase()
 
     if (!itemCode) {
       return Response.json({ message: 'Item inventory wajib dipilih.' }, { status: 400 })
@@ -79,12 +87,19 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Harga satuan tidak valid.' }, { status: 400 })
     }
 
+    const [hasRackCode, hasRackBarcode] = await Promise.all([
+      hasReviewDbColumn('inventory_items', 'rack_code'),
+      hasReviewDbColumn('inventory_items', 'rack_barcode'),
+    ])
+
     const [item] = await runReviewDbQuery<ItemRow>(
       `
         SELECT
           id,
           item_code AS itemCode,
           item_name AS itemName,
+          ${hasRackCode ? 'rack_code' : 'NULL'} AS rackCode,
+          ${hasRackBarcode ? 'rack_barcode' : 'NULL'} AS rackBarcode,
           current_stock AS currentStock
         FROM inventory_items
         WHERE UPPER(item_code) = UPPER(?)
@@ -94,6 +109,29 @@ export async function POST(request: Request) {
     )
     if (!item) {
       return Response.json({ message: 'Item inventory tidak ditemukan di review DB.' }, { status: 404 })
+    }
+    if (movementType === 'OUT' && requiresInventoryPickupScan(session.role)) {
+      if (!scannedRackBarcode) {
+        return Response.json(
+          { message: 'Scan barcode rak wajib dilakukan sebelum movement OUT disimpan.' },
+          { status: 400 },
+        )
+      }
+      const expectedRackBarcode = String(item.rackBarcode || item.rackCode || '').trim().toUpperCase()
+      if (!expectedRackBarcode) {
+        return Response.json(
+          { message: `Item ${item.itemCode} belum memiliki barcode rak. Lengkapi dulu data rak di item inventory.` },
+          { status: 400 },
+        )
+      }
+      if (scannedRackBarcode !== expectedRackBarcode) {
+        return Response.json(
+          {
+            message: `Barcode rak tidak cocok. Form memilih ${item.itemCode} di rak ${item.rackCode || '-'}, tetapi barcode yang terbaca ${scannedRackBarcode}.`,
+          },
+          { status: 400 },
+        )
+      }
     }
 
     const nextStock = resolveNextStock(item.currentStock, qty, movementType)

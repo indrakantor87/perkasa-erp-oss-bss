@@ -28,6 +28,34 @@ type EditableUserState = {
   newPassword: string
 }
 
+const roleDivisionMap: Record<string, string> = {
+  PENJUALAN: 'PEMASARAN_PELAYANAN',
+  CS: 'PEMASARAN_PELAYANAN',
+  CREATOR_DIGITAL: 'PEMASARAN_PELAYANAN',
+  NOC: 'PEMASARAN_PELAYANAN',
+  TROUBLESHOOTS: 'PEMASARAN_PELAYANAN',
+  FINANCE: 'FINANCE_HR',
+  HR: 'FINANCE_HR',
+  GA: 'GENERAL_AFFAIR',
+  TEKNISI_PSB: 'TEKNIS_EKSPAN',
+  DISMANTLE: 'TEKNIS_EKSPAN',
+  OWNER: 'OPERASIONAL',
+  SUPER_ADMIN: 'OPERASIONAL',
+  ADMIN: 'OPERASIONAL',
+}
+
+function getDefaultDivisionId(
+  roleRef: string,
+  roleOptions: AuthUserLookupOption[],
+  divisionOptions: AuthUserLookupOption[]
+) {
+  const roleCode =
+    roleOptions.find((option) => option.id === roleRef)?.code?.trim().toUpperCase() ?? roleRef.trim().toUpperCase()
+  const divisionCode = roleDivisionMap[roleCode]
+  if (!divisionCode) return ''
+  return divisionOptions.find((option) => option.code.trim().toUpperCase() === divisionCode)?.id ?? ''
+}
+
 function createInitialState(user: AuthUserListItem): EditableUserState {
   return {
     fullName: user.fullName,
@@ -52,6 +80,7 @@ export function AuthUserManagementTable({
   const [openUserId, setOpenUserId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, EditableUserState>>({})
   const [submittingUserId, setSubmittingUserId] = useState<string | null>(null)
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<Record<string, { tone: 'success' | 'error'; message: string }>>(
     {}
   )
@@ -139,6 +168,51 @@ export function AuthUserManagementTable({
     }
   }
 
+  async function handleDelete(user: AuthUserListItem) {
+    if (!canManage || !reviewDbReady || user.source !== 'review-db') {
+      return
+    }
+    if (!window.confirm(`Hapus user ${user.fullName} (${user.username}) dari auth internal?`)) {
+      return
+    }
+
+    setDeletingUserId(user.id)
+    setFeedback((current) => {
+      const next = { ...current }
+      delete next[user.id]
+      return next
+    })
+
+    try {
+      const response = await fetch(`/api/settings/users/${user.id}`, {
+        method: 'DELETE',
+      })
+
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null
+
+      if (!response.ok) {
+        setFeedback((current) => ({
+          ...current,
+          [user.id]: {
+            tone: 'error',
+            message: payload?.message || 'User internal gagal dihapus.',
+          },
+        }))
+        return
+      }
+
+      setOpenUserId((current) => (current === user.id ? null : current))
+      setDrafts((current) => {
+        const next = { ...current }
+        delete next[user.id]
+        return next
+      })
+      router.refresh()
+    } finally {
+      setDeletingUserId(null)
+    }
+  }
+
   return (
     <section className="panel overflow-hidden">
       <div className="border-b border-line px-6 py-5">
@@ -168,6 +242,7 @@ export function AuthUserManagementTable({
                 const isOpen = openUserId === user.id
                 const draft = getDraft(user)
                 const message = feedback[user.id]
+                const isBusy = submittingUserId === user.id || deletingUserId === user.id
 
                 return (
                   <Fragment key={user.id}>
@@ -227,7 +302,7 @@ export function AuthUserManagementTable({
                                     updateDraft(user, { fullName: event.target.value })
                                   }
                                   className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={submittingUserId === user.id}
+                                  disabled={isBusy}
                                 />
                               </label>
 
@@ -237,7 +312,7 @@ export function AuthUserManagementTable({
                                   value={draft.email}
                                   onChange={(event) => updateDraft(user, { email: event.target.value })}
                                   className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={submittingUserId === user.id}
+                                  disabled={isBusy}
                                 />
                               </label>
 
@@ -247,7 +322,7 @@ export function AuthUserManagementTable({
                                   value={draft.status}
                                   onChange={(event) => updateDraft(user, { status: event.target.value })}
                                   className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={submittingUserId === user.id}
+                                  disabled={isBusy}
                                 >
                                   <option value="ACTIVE">ACTIVE</option>
                                   <option value="INACTIVE">INACTIVE</option>
@@ -258,9 +333,15 @@ export function AuthUserManagementTable({
                                 <span className="font-semibold text-slate-950">Role</span>
                                 <select
                                   value={draft.roleId}
-                                  onChange={(event) => updateDraft(user, { roleId: event.target.value })}
+                                  onChange={(event) => {
+                                    const nextRoleId = event.target.value
+                                    updateDraft(user, {
+                                      roleId: nextRoleId,
+                                      divisionId: getDefaultDivisionId(nextRoleId, roleOptions, divisionOptions),
+                                    })
+                                  }}
                                   className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={submittingUserId === user.id}
+                                  disabled={isBusy}
                                 >
                                   <option value="">Pilih role</option>
                                   {roleOptions.map((option) => (
@@ -277,7 +358,7 @@ export function AuthUserManagementTable({
                                   value={draft.divisionId}
                                   onChange={(event) => updateDraft(user, { divisionId: event.target.value })}
                                   className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={submittingUserId === user.id}
+                                  disabled={isBusy}
                                 >
                                   <option value="">Semua Divisi</option>
                                   {divisionOptions.map((option) => (
@@ -294,7 +375,7 @@ export function AuthUserManagementTable({
                                   value={draft.branchId}
                                   onChange={(event) => updateDraft(user, { branchId: event.target.value })}
                                   className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={submittingUserId === user.id}
+                                  disabled={isBusy}
                                 >
                                   <option value="">Tanpa Cabang</option>
                                   {branchOptions.map((option) => (
@@ -316,21 +397,31 @@ export function AuthUserManagementTable({
                                 }
                                 placeholder="Kosongkan jika tidak diubah"
                                 className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                disabled={submittingUserId === user.id}
+                                disabled={isBusy}
                               />
                             </label>
 
-                            <div className="flex flex-col gap-3 text-sm text-mute sm:flex-row sm:items-center sm:justify-between">
-                              <span>
-                                Username tetap dikunci agar identitas login tidak berubah sembarangan.
+                            <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-mute">
+                              <span className="min-w-0 flex-1">
+                                Username tetap dikunci agar identitas login tidak berubah sembarangan. Jika akun tidak dipakai lagi, hapus user langsung dari sini.
                               </span>
-                              <button
-                                type="submit"
-                                disabled={submittingUserId === user.id}
-                                className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-                              >
-                                {submittingUserId === user.id ? 'Menyimpan...' : 'Simpan Perubahan'}
-                              </button>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(user)}
+                                  disabled={isBusy}
+                                  className="whitespace-nowrap rounded-full border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                                >
+                                  {deletingUserId === user.id ? 'Menghapus...' : 'Hapus User'}
+                                </button>
+                                <button
+                                  type="submit"
+                                  disabled={isBusy}
+                                  className="whitespace-nowrap rounded-full bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                                >
+                                  {submittingUserId === user.id ? 'Menyimpan...' : 'Simpan Perubahan'}
+                                </button>
+                              </div>
                             </div>
 
                             {message ? (

@@ -2,14 +2,20 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  getOrderStatusOptions,
+  normalizeSalesServiceType,
+  resolveLeadTypeGuardrailForOrder,
+} from '@/lib/sales-workflow'
 
 const allowedOrderTypes = new Set(['NEW_INSTALL', 'UPGRADE', 'DOWNGRADE', 'RELOCATION', 'TERMINATION'])
-const allowedOrderStatuses = new Set(['REGISTERED', 'SURVEY_PENDING', 'READY_INSTALL', 'ON_PROCESS'])
 
 type ReviewLeadRow = {
   id: number
   customerName: string
   marketingName: string | null
+  leadType: string
+  leadStatus: string
 }
 
 type OrderNoRow = {
@@ -76,7 +82,7 @@ export async function POST(request: Request) {
 
     const leadId = Number(payload.leadId)
     const orderType = String(payload.orderType ?? '').trim().toUpperCase()
-    const status = String(payload.status ?? '').trim().toUpperCase()
+    const statusRaw = String(payload.status ?? '').trim().toUpperCase()
     const scheduledInstallationAtRaw = String(payload.scheduledInstallationAt ?? '').trim()
     const marketingName = String(payload.marketingName ?? '').trim()
     const teknisiName = String(payload.teknisiName ?? '').trim()
@@ -88,16 +94,15 @@ export async function POST(request: Request) {
     if (!allowedOrderTypes.has(orderType)) {
       return Response.json({ message: 'Order type tidak valid.' }, { status: 400 })
     }
-    if (!allowedOrderStatuses.has(status)) {
-      return Response.json({ message: 'Status order tidak valid.' }, { status: 400 })
-    }
 
     const [lead] = await runReviewDbQuery<ReviewLeadRow>(
       `
         SELECT
           id,
           customer_name AS customerName,
-          marketing_name AS marketingName
+          marketing_name AS marketingName,
+          lead_type AS leadType,
+          status AS leadStatus
         FROM sales_leads
         WHERE id = ?
         LIMIT 1
@@ -106,6 +111,25 @@ export async function POST(request: Request) {
     )
     if (!lead) {
       return Response.json({ message: 'Lead sumber tidak ditemukan di review DB.' }, { status: 404 })
+    }
+
+    const normalizedLeadType = normalizeSalesServiceType(lead.leadType)
+    if (!normalizedLeadType) {
+      return Response.json({ message: 'Lead type sumber tidak valid.' }, { status: 400 })
+    }
+
+    const guardrail = resolveLeadTypeGuardrailForOrder(normalizedLeadType, lead.leadStatus)
+    if (!guardrail.ok) {
+      return Response.json({ message: guardrail.message }, { status: 400 })
+    }
+
+    const allowedStatuses = new Set(getOrderStatusOptions(normalizedLeadType))
+    const status = statusRaw || (normalizedLeadType === 'CORPORATE' ? 'CONTRACT_SIGNED' : 'REGISTERED')
+    if (!allowedStatuses.has(status)) {
+      return Response.json(
+        { message: `Status order tidak valid untuk tipe ${normalizedLeadType}.` },
+        { status: 400 },
+      )
     }
 
     const scheduledInstallationAt = scheduledInstallationAtRaw ? new Date(scheduledInstallationAtRaw) : null

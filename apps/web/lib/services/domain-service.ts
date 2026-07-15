@@ -2,6 +2,7 @@ import { canPerformAction } from '@/lib/access-control'
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { domainPages } from '@/lib/mock-domains'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
+import { getServerUiLanguage } from '@/lib/ui-language-server'
 import { getHrAttendanceFaceConfig } from '@/lib/services/hr-attendance-face-service'
 import { getRecentHrEmployeeFaceReferenceItems } from '@/lib/services/hr-attendance-face-service'
 import { getRecentHrEmployeeFaceReferenceHistoryItems } from '@/lib/services/hr-attendance-face-service'
@@ -31,6 +32,7 @@ import {
   getPreferredSupportLane,
   getSupportLaneSections,
 } from '@/lib/support-lanes'
+import type { AppSession } from '@/lib/auth-session'
 import type {
   AccessAction,
   AppRole,
@@ -53,6 +55,44 @@ const capabilityLabels: Record<AccessAction, string> = {
 }
 
 const capabilityOrder: AccessAction[] = ['view', 'create', 'update', 'approve', 'export', 'manage']
+
+type BranchScope = {
+  mode: 'GLOBAL' | 'BRANCH_SET' | 'BRANCH_ONLY'
+  branchIds: number[]
+}
+
+function resolveBranchScope(session: AppSession): BranchScope {
+  if (session.role === 'SUPER_ADMIN' || session.role === 'OWNER') {
+    return { mode: 'GLOBAL', branchIds: [] }
+  }
+
+  if (session.role === 'ADMIN') {
+    const branchIds = Array.isArray(session.branchIds)
+      ? session.branchIds.filter((value) => Number.isFinite(value) && value > 0)
+      : []
+    const fallback = session.branchId && Number.isFinite(session.branchId) && session.branchId > 0 ? [session.branchId] : []
+    return { mode: 'BRANCH_SET', branchIds: branchIds.length > 0 ? branchIds : fallback }
+  }
+
+  if (session.branchId && Number.isFinite(session.branchId) && session.branchId > 0) {
+    return { mode: 'BRANCH_ONLY', branchIds: [session.branchId] }
+  }
+
+  return { mode: 'BRANCH_ONLY', branchIds: [] }
+}
+
+function buildBranchWhere(scope: BranchScope, columnRef: string) {
+  if (scope.mode === 'GLOBAL') {
+    return { clause: '', values: [] as unknown[] }
+  }
+  if (scope.branchIds.length === 0) {
+    return { clause: 'AND 1 = 0', values: [] as unknown[] }
+  }
+  if (scope.branchIds.length === 1) {
+    return { clause: `AND ${columnRef} = ?`, values: [scope.branchIds[0]] as unknown[] }
+  }
+  return { clause: `AND ${columnRef} IN (?)`, values: [scope.branchIds] as unknown[] }
+}
 
 type DomainStatsRow = {
   salesLeads: number
@@ -82,10 +122,12 @@ type ReviewDbSupportTicketRow = {
   customerUser: string | null
   serviceNo: string | null
   customerCode: string | null
+  customerPhone: string | null
   ticketType: string
   status: string
   notes: string | null
   openedAt: string | Date
+  closedAt: string | Date | null
   slaDurationDays: number | null
   slaDueAt: string | Date | null
   progressStatus: string | null
@@ -283,6 +325,34 @@ type SalesReadSchema = {
   packageId: boolean
   packageName: boolean
   packageSpeedLabel: boolean
+  quotationId: boolean
+  quotationNo: boolean
+  quotationLeadId: boolean
+  quotationStatus: boolean
+  quotationMonthlyPrice: boolean
+  quotationInstallationFee: boolean
+  quotationContractMonths: boolean
+  quotationCreatedAt: boolean
+  contractId: boolean
+  contractNo: boolean
+  contractQuotationId: boolean
+  contractLeadId: boolean
+  contractStatus: boolean
+  contractSignedAt: boolean
+  corporateDeliveryId: boolean
+  corporateDeliveryContractId: boolean
+  corporateDeliveryMilestoneCode: boolean
+  corporateDeliveryMilestoneName: boolean
+  corporateDeliveryStatus: boolean
+  corporateDeliveryOwnerName: boolean
+  corporateDeliveryPlannedAt: boolean
+  corporateDeliveryCompletedAt: boolean
+  corporateAcceptanceId: boolean
+  corporateAcceptanceContractId: boolean
+  corporateAcceptanceNo: boolean
+  corporateAcceptanceStatus: boolean
+  corporateAcceptanceTestedAt: boolean
+  corporateAcceptanceAcceptedAt: boolean
 }
 
 type InventoryReadSchema = {
@@ -291,6 +361,8 @@ type InventoryReadSchema = {
   itemName: boolean
   itemCategoryId: boolean
   itemUnitId: boolean
+  itemRackCode: boolean
+  itemRackBarcode: boolean
   itemCurrentStock: boolean
   itemMinimumStock: boolean
   itemStatus: boolean
@@ -552,6 +624,8 @@ type ReviewDbInventoryItemRow = {
   itemName: string
   categoryCode: string | null
   unitCode: string | null
+  rackCode: string | null
+  rackBarcode: string | null
   currentStock: number
   minimumStock: number
   status: string
@@ -1179,7 +1253,7 @@ async function getReviewDbDomainStats() {
   return row
 }
 
-async function getReviewDbSupportSections(params?: {
+async function getReviewDbSupportSections(session: AppSession, params?: {
   lane?: SupportLaneKey | null
   focus?: string
 }): Promise<DomainReviewSection[]> {
@@ -1187,6 +1261,7 @@ async function getReviewDbSupportSections(params?: {
   const focus = String(params?.focus ?? '')
     .trim()
     .toUpperCase()
+  const branchScope = resolveBranchScope(session)
   const wantTickets = !lane || lane === 'tt' || lane === 'sla'
   const wantIsolations = !lane || lane === 'isolations'
   const wantSla = !lane || lane === 'sla'
@@ -1198,6 +1273,23 @@ async function getReviewDbSupportSections(params?: {
       AND stt.opened_at < DATE_ADD(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01'), INTERVAL 1 MONTH)
     `
       : ''
+  const [hasCustomerBranchId, hasTicketBranchId, hasIsolationBranchId] = await Promise.all([
+    hasReviewDbColumn('crm_customers', 'branch_id'),
+    hasReviewDbColumn('support_trouble_tickets', 'branch_id'),
+    hasReviewDbColumn('support_isolations', 'branch_id'),
+  ])
+
+  const ticketBranchWhere = hasTicketBranchId
+    ? buildBranchWhere(branchScope, 'stt.branch_id')
+    : hasCustomerBranchId
+      ? buildBranchWhere(branchScope, 'c.branch_id')
+      : { clause: '', values: [] as unknown[] }
+  const isolationBranchWhere = hasIsolationBranchId
+    ? buildBranchWhere(branchScope, 'si.branch_id')
+    : hasCustomerBranchId
+      ? buildBranchWhere(branchScope, 'c.branch_id')
+      : { clause: '', values: [] as unknown[] }
+
   if (wantIsolations || wantDismantle) {
     await ensureSupportDismantleQueueTable()
   }
@@ -1262,10 +1354,12 @@ async function getReviewDbSupportSections(params?: {
       customer_user AS customerUser,
       ss.service_no AS serviceNo,
       c.customer_code AS customerCode,
+      c.phone AS customerPhone,
       type AS ticketType,
       stt.status AS status,
       stt.notes AS notes,
       stt.opened_at AS openedAt,
+      stt.closed_at AS closedAt,
       sla.duration_days AS slaDurationDays,
       CASE
         WHEN sla.duration_days IS NULL THEN NULL
@@ -1327,6 +1421,7 @@ async function getReviewDbSupportSections(params?: {
     WHERE stt.closed_at IS NULL
       AND COALESCE(UPPER(TRIM(stt.status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
       ${ticketMonthFilter}
+      ${ticketBranchWhere.clause}
     ORDER BY
       CASE
         WHEN sla.duration_days IS NULL THEN 1
@@ -1342,7 +1437,7 @@ async function getReviewDbSupportSections(params?: {
       stt.opened_at DESC,
       stt.id DESC
     LIMIT 5
-  `)
+  `, ticketBranchWhere.values)
     },
   })
 
@@ -1374,9 +1469,10 @@ async function getReviewDbSupportSections(params?: {
       ON dq.isolation_id = si.id
     WHERE si.status = 'OPEN'
       ${isolationArchivedFilter}
+      ${isolationBranchWhere.clause}
     ORDER BY ${supportNonTicketReadSchema.isolationDate ? 'si.isolation_date' : 'si.id'} DESC, si.id DESC
     LIMIT 5
-  `)
+  `, isolationBranchWhere.values)
     },
   })
 
@@ -1543,7 +1639,9 @@ async function getReviewDbSupportSections(params?: {
         `Customer User: ${item.customerUser || '-'}`,
         `Service No: ${item.serviceNo || '-'}`,
         `Customer Code: ${item.customerCode || '-'}`,
+        `Phone: ${item.customerPhone || '-'}`,
         `Opened: ${formatDateTime(item.openedAt)}`,
+        `Closed: ${formatDateTime(item.closedAt)}`,
         `SLA Days: ${item.slaDurationDays ?? '-'}`,
         `SLA Due: ${formatDateTime(item.slaDueAt)}`,
         `SLA State: ${slaState}`,
@@ -2146,6 +2244,34 @@ async function getSalesReadSchema(): Promise<SalesReadSchema> {
     packageId,
     packageName,
     packageSpeedLabel,
+    quotationId,
+    quotationNo,
+    quotationLeadId,
+    quotationStatus,
+    quotationMonthlyPrice,
+    quotationInstallationFee,
+    quotationContractMonths,
+    quotationCreatedAt,
+    contractId,
+    contractNo,
+    contractQuotationId,
+    contractLeadId,
+    contractStatus,
+    contractSignedAt,
+    corporateDeliveryId,
+    corporateDeliveryContractId,
+    corporateDeliveryMilestoneCode,
+    corporateDeliveryMilestoneName,
+    corporateDeliveryStatus,
+    corporateDeliveryOwnerName,
+    corporateDeliveryPlannedAt,
+    corporateDeliveryCompletedAt,
+    corporateAcceptanceId,
+    corporateAcceptanceContractId,
+    corporateAcceptanceNo,
+    corporateAcceptanceStatus,
+    corporateAcceptanceTestedAt,
+    corporateAcceptanceAcceptedAt,
   ] = await Promise.all([
     hasReviewDbColumn('sales_leads', 'id'),
     hasReviewDbColumn('sales_leads', 'customer_name'),
@@ -2205,6 +2331,34 @@ async function getSalesReadSchema(): Promise<SalesReadSchema> {
     hasReviewDbColumn('sales_packages', 'id'),
     hasReviewDbColumn('sales_packages', 'name'),
     hasReviewDbColumn('sales_packages', 'speed_label'),
+    hasReviewDbColumn('sales_quotations', 'id'),
+    hasReviewDbColumn('sales_quotations', 'quotation_no'),
+    hasReviewDbColumn('sales_quotations', 'lead_id'),
+    hasReviewDbColumn('sales_quotations', 'status'),
+    hasReviewDbColumn('sales_quotations', 'monthly_price'),
+    hasReviewDbColumn('sales_quotations', 'installation_fee'),
+    hasReviewDbColumn('sales_quotations', 'contract_months'),
+    hasReviewDbColumn('sales_quotations', 'created_at'),
+    hasReviewDbColumn('sales_contracts', 'id'),
+    hasReviewDbColumn('sales_contracts', 'contract_no'),
+    hasReviewDbColumn('sales_contracts', 'quotation_id'),
+    hasReviewDbColumn('sales_contracts', 'lead_id'),
+    hasReviewDbColumn('sales_contracts', 'status'),
+    hasReviewDbColumn('sales_contracts', 'signed_at'),
+    hasReviewDbColumn('sales_corporate_deliveries', 'id'),
+    hasReviewDbColumn('sales_corporate_deliveries', 'contract_id'),
+    hasReviewDbColumn('sales_corporate_deliveries', 'milestone_code'),
+    hasReviewDbColumn('sales_corporate_deliveries', 'milestone_name'),
+    hasReviewDbColumn('sales_corporate_deliveries', 'status'),
+    hasReviewDbColumn('sales_corporate_deliveries', 'owner_name'),
+    hasReviewDbColumn('sales_corporate_deliveries', 'planned_at'),
+    hasReviewDbColumn('sales_corporate_deliveries', 'completed_at'),
+    hasReviewDbColumn('sales_corporate_acceptances', 'id'),
+    hasReviewDbColumn('sales_corporate_acceptances', 'contract_id'),
+    hasReviewDbColumn('sales_corporate_acceptances', 'acceptance_no'),
+    hasReviewDbColumn('sales_corporate_acceptances', 'status'),
+    hasReviewDbColumn('sales_corporate_acceptances', 'tested_at'),
+    hasReviewDbColumn('sales_corporate_acceptances', 'accepted_at'),
   ])
 
   return {
@@ -2266,6 +2420,34 @@ async function getSalesReadSchema(): Promise<SalesReadSchema> {
     packageId,
     packageName,
     packageSpeedLabel,
+    quotationId,
+    quotationNo,
+    quotationLeadId,
+    quotationStatus,
+    quotationMonthlyPrice,
+    quotationInstallationFee,
+    quotationContractMonths,
+    quotationCreatedAt,
+    contractId,
+    contractNo,
+    contractQuotationId,
+    contractLeadId,
+    contractStatus,
+    contractSignedAt,
+    corporateDeliveryId,
+    corporateDeliveryContractId,
+    corporateDeliveryMilestoneCode,
+    corporateDeliveryMilestoneName,
+    corporateDeliveryStatus,
+    corporateDeliveryOwnerName,
+    corporateDeliveryPlannedAt,
+    corporateDeliveryCompletedAt,
+    corporateAcceptanceId,
+    corporateAcceptanceContractId,
+    corporateAcceptanceNo,
+    corporateAcceptanceStatus,
+    corporateAcceptanceTestedAt,
+    corporateAcceptanceAcceptedAt,
   }
 }
 
@@ -2276,6 +2458,8 @@ async function getInventoryReadSchema(): Promise<InventoryReadSchema> {
     itemName,
     itemCategoryId,
     itemUnitId,
+    itemRackCode,
+    itemRackBarcode,
     itemCurrentStock,
     itemMinimumStock,
     itemStatus,
@@ -2360,6 +2544,8 @@ async function getInventoryReadSchema(): Promise<InventoryReadSchema> {
     hasReviewDbColumn('inventory_items', 'item_name'),
     hasReviewDbColumn('inventory_items', 'category_id'),
     hasReviewDbColumn('inventory_items', 'unit_id'),
+    hasReviewDbColumn('inventory_items', 'rack_code'),
+    hasReviewDbColumn('inventory_items', 'rack_barcode'),
     hasReviewDbColumn('inventory_items', 'current_stock'),
     hasReviewDbColumn('inventory_items', 'minimum_stock'),
     hasReviewDbColumn('inventory_items', 'status'),
@@ -2446,6 +2632,8 @@ async function getInventoryReadSchema(): Promise<InventoryReadSchema> {
     itemName,
     itemCategoryId,
     itemUnitId,
+    itemRackCode,
+    itemRackBarcode,
     itemCurrentStock,
     itemMinimumStock,
     itemStatus,
@@ -2527,15 +2715,26 @@ async function getInventoryReadSchema(): Promise<InventoryReadSchema> {
   }
 }
 
-async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
+async function getReviewDbBillingSections(session: AppSession, filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
   const focus = String(filters?.focus ?? '')
     .trim()
     .toUpperCase()
+  const branchScope = resolveBranchScope(session)
   const period = resolveSqlPeriodRange(filters)
   const billingSchema = await getBillingReadSchema()
   const billingSubscriptionParts = getBillingSubscriptionQueryParts(billingSchema)
   const billingInvoiceParts = getBillingInvoiceQueryParts(billingSchema)
   const billingActionParts = getBillingActionQueryParts(billingSchema)
+
+  const [hasCustomerBranchId] = await Promise.all([hasReviewDbColumn('crm_customers', 'branch_id')])
+  const subscriptionBranchWhere =
+    billingSubscriptionParts.customerJoin && hasCustomerBranchId
+      ? buildBranchWhere(branchScope, 'c.branch_id')
+      : { clause: '', values: [] as unknown[] }
+  const invoiceBranchWhere =
+    billingInvoiceParts.customerJoin && hasCustomerBranchId
+      ? buildBranchWhere(branchScope, 'c.branch_id')
+      : { clause: '', values: [] as unknown[] }
 
   const subscriptionsReadyResult = await runSafeDomainSectionQuery<ReviewDbBillingReadySubscriptionRow>({
     sectionLabel: 'billing-ready-subscriptions',
@@ -2563,6 +2762,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         ${billingSubscriptionParts.customerJoin}
         ${billingSubscriptionParts.packageJoin}
         WHERE ss.status = 'ACTIVE'
+          ${subscriptionBranchWhere.clause}
           AND COALESCE(ss.monthly_price, 0) > 0
           AND NOT EXISTS (
             SELECT 1
@@ -2575,7 +2775,7 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
           )
         ORDER BY ${billingSubscriptionParts.orderByExpression}
         LIMIT 5
-      `),
+      `, subscriptionBranchWhere.values),
   })
   const subscriptionsReady = subscriptionsReadyResult.rows
 
@@ -2657,11 +2857,12 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
           WHERE 1 = 1
             ${invoiceFocusWhere}
             ${invoicePeriodWhere}
+            ${invoiceBranchWhere.clause}
             ${billingInvoiceParts.collectionOpenFilter}
           ${invoiceOrderBy}
           LIMIT ${invoiceLimit}
         `,
-        invoiceValues,
+        [...invoiceValues, ...invoiceBranchWhere.values],
       ),
   })
   const invoices = invoicesResult.rows
@@ -2691,9 +2892,11 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         FROM billing_invoices bi
         ${billingInvoiceParts.subscriptionJoin}
         ${billingInvoiceParts.customerJoin}
+        WHERE 1 = 1
+          ${invoiceBranchWhere.clause}
         ORDER BY ${billingInvoiceParts.latestOrderByExpression}
         LIMIT 5
-      `),
+      `, invoiceBranchWhere.values),
   })
   const latestInvoices = latestInvoicesResult.rows
 
@@ -2713,9 +2916,10 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         ${billingInvoiceParts.subscriptionJoin}
         ${billingInvoiceParts.customerJoin}
         WHERE bi.invoice_status = 'CANCELLED'
+          ${invoiceBranchWhere.clause}
         ORDER BY ${billingInvoiceParts.updatedOrderByExpression}
         LIMIT 5
-      `),
+      `, invoiceBranchWhere.values),
   })
   const cancelledInvoices = cancelledInvoicesResult.rows
 
@@ -2744,10 +2948,11 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
         FROM billing_invoices bi
         ${billingInvoiceParts.subscriptionJoin}
         ${billingInvoiceParts.customerJoin}
-        WHERE ${suspendedWhereParts.join('\n       OR ')}
+        WHERE (${suspendedWhereParts.join('\n       OR ')})
+          ${invoiceBranchWhere.clause}
         ORDER BY ${billingInvoiceParts.updatedOrderByExpression}
         LIMIT 5
-      `),
+      `, invoiceBranchWhere.values),
   })
   const suspendedInvoices = suspendedInvoicesResult.rows
 
@@ -3582,10 +3787,11 @@ async function getReviewDbBillingSections(filters?: DomainReviewDrilldownFilters
   ].filter((section) => section.rows.length > 0)
 }
 
-async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
+async function getReviewDbSalesSections(session: AppSession, filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
   const focus = String(filters?.focus ?? '')
     .trim()
     .toUpperCase()
+  const branchScope = resolveBranchScope(session)
   const period = resolveSqlPeriodRange(filters)
   const digitalSourcePlaceholders = DIGITAL_SALES_SOURCES.map(() => '?').join(', ')
   const salesSchema = await getSalesReadSchema()
@@ -3601,6 +3807,11 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
 
   const leadValues: unknown[] = []
   const leadWhereParts: string[] = []
+  const leadBranchWhere = buildBranchWhere(branchScope, 'branch_id')
+  if (leadBranchWhere.clause) {
+    leadWhereParts.push(leadBranchWhere.clause.replace(/^AND\s+/i, ''))
+    leadValues.push(...leadBranchWhere.values)
+  }
   if (focus === 'ACTIVE_LEADS') {
     leadWhereParts.push(`COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')`)
   }
@@ -3639,6 +3850,8 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
   })
   const leads = leadsResult.rows
 
+  const coverageBranchWhere = buildBranchWhere(branchScope, 'branch_id')
+
   const coveragesResult = await runSafeDomainSectionQuery<ReviewDbSalesCoverageRow>({
     sectionLabel: 'sales-coverages',
     enabled: salesSchema.coverageId && salesSchema.coverageAreaCode && salesSchema.coverageAreaName && salesSchema.coverageStatus,
@@ -3655,9 +3868,11 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
           coverage_status AS coverageStatus,
           ${salesSchema.coverageNotes ? 'notes' : 'NULL'} AS notes
         FROM sales_covered_areas
+        WHERE 1 = 1
+          ${coverageBranchWhere.clause}
         ORDER BY ${salesSchema.coverageUpdatedAt ? 'updated_at DESC,' : ''} id DESC
         LIMIT 5
-      `),
+      `, coverageBranchWhere.values),
   })
   const coverages = coveragesResult.rows
 
@@ -3712,6 +3927,11 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
       ? 'so.request_date'
       : 'NULL'
 
+  const canApplyFlowBranchFilter = canJoinSurveyLead || canJoinSurveyCustomer || canJoinLeadCustomer || canJoinOrderCustomer
+  const surveyBranchIdExpression = canJoinSurveyLead ? 'sl.branch_id' : canJoinSurveyCustomer ? 'c.branch_id' : 'NULL'
+  const orderBranchIdExpression = canJoinLeadCustomer ? 'sl.branch_id' : canJoinOrderCustomer ? 'c.branch_id' : 'NULL'
+  const flowBranchWhere = canApplyFlowBranchFilter ? buildBranchWhere(branchScope, 'branchId') : { clause: '', values: [] as unknown[] }
+
   let flowsQuery = `
     SELECT *
     FROM (
@@ -3723,7 +3943,8 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
         ss.survey_status AS status,
         ${salesSchema.surveyFeasibilityStatus ? 'ss.feasibility_status' : 'NULL'} AS detailLine,
         ${surveyDateExpression} AS detailDate,
-        ${surveyMarketingExpression} AS marketingName
+        ${surveyMarketingExpression} AS marketingName,
+        ${surveyBranchIdExpression} AS branchId
       FROM sales_surveys ss
       ${surveyLeadJoin}
       ${surveyCustomerJoin}
@@ -3737,13 +3958,15 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
         so.status AS status,
         ${salesSchema.orderType ? 'so.order_type' : 'NULL'} AS detailLine,
         ${orderDateExpression} AS detailDate,
-        ${orderMarketingExpression} AS marketingName
+        ${orderMarketingExpression} AS marketingName,
+        ${orderBranchIdExpression} AS branchId
       FROM sales_orders so
       ${orderLeadJoin}
       ${orderCustomerJoin}
       WHERE COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')
     ) sales_flow
     WHERE detailDate IS NOT NULL
+      ${flowBranchWhere.clause}
     ORDER BY detailDate DESC, flowCode DESC
     LIMIT 5
   `
@@ -3841,7 +4064,7 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
     enabled:
       (salesSchema.surveyId && salesSchema.surveyNo && salesSchema.surveyStatus) ||
       (salesSchema.orderId && salesSchema.orderNo && salesSchema.orderStatus),
-    query: () => runReviewDbQuery<ReviewDbSalesFlowRow>(flowsQuery, flowValues),
+    query: () => runReviewDbQuery<ReviewDbSalesFlowRow>(flowsQuery, [...flowValues, ...flowBranchWhere.values]),
   })
   const flows = flowsResult.rows
 
@@ -4017,11 +4240,191 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
   })
   const activations = activationsResult.rows
 
-  return [
-    {
-      title: 'Lead Terbaru',
-      description: 'Lead terbaru dari tabel sales_leads untuk memantau funnel awal akuisisi pelanggan.',
-      rows: leads.map((item) => ({
+  type ReviewDbSalesQuotationRow = {
+    quotationId: number
+    quotationNo: string
+    status: string
+    monthlyPrice: number
+    installationFee: number
+    contractMonths: number
+    customerName: string
+    leadId: number
+    createdAt: string | null
+  }
+
+  const quotationsResult = await runSafeDomainSectionQuery<ReviewDbSalesQuotationRow>({
+    sectionLabel: 'sales-quotations',
+    enabled: salesSchema.quotationId && salesSchema.quotationNo && salesSchema.quotationStatus && salesSchema.quotationLeadId,
+    query: () =>
+      runReviewDbQuery<ReviewDbSalesQuotationRow>(`
+        SELECT
+          q.id AS quotationId,
+          q.quotation_no AS quotationNo,
+          q.status,
+          COALESCE(q.monthly_price, 0) AS monthlyPrice,
+          COALESCE(q.installation_fee, 0) AS installationFee,
+          COALESCE(q.contract_months, 12) AS contractMonths,
+          ${salesSchema.leadCustomerName ? 'sl.customer_name' : "'Customer belum terpetakan'"} AS customerName,
+          q.lead_id AS leadId,
+          ${salesSchema.quotationCreatedAt ? 'q.created_at' : 'NULL'} AS createdAt
+        FROM sales_quotations q
+        LEFT JOIN sales_leads sl
+          ON sl.id = q.lead_id
+        ORDER BY ${salesSchema.quotationCreatedAt ? 'q.created_at DESC,' : ''} q.id DESC
+        LIMIT 5
+      `),
+  })
+  const quotations = quotationsResult.rows
+
+  type ReviewDbSalesContractRow = {
+    contractId: number
+    contractNo: string
+    status: string
+    signedAt: string | null
+    quotationNo: string | null
+    customerName: string
+    leadId: number
+  }
+
+  const contractsResult = await runSafeDomainSectionQuery<ReviewDbSalesContractRow>({
+    sectionLabel: 'sales-contracts',
+    enabled: salesSchema.contractId && salesSchema.contractNo && salesSchema.contractStatus && salesSchema.contractLeadId,
+    query: () =>
+      runReviewDbQuery<ReviewDbSalesContractRow>(`
+        SELECT
+          c.id AS contractId,
+          c.contract_no AS contractNo,
+          c.status,
+          ${salesSchema.contractSignedAt ? 'c.signed_at' : 'NULL'} AS signedAt,
+          ${salesSchema.quotationNo ? 'q.quotation_no' : 'NULL'} AS quotationNo,
+          ${salesSchema.leadCustomerName ? 'sl.customer_name' : "'Customer belum terpetakan'"} AS customerName,
+          c.lead_id AS leadId
+        FROM sales_contracts c
+        LEFT JOIN sales_quotations q
+          ON q.id = c.quotation_id
+        LEFT JOIN sales_leads sl
+          ON sl.id = c.lead_id
+        ORDER BY ${salesSchema.contractSignedAt ? 'c.signed_at DESC,' : ''} c.id DESC
+        LIMIT 5
+      `),
+  })
+  const contracts = contractsResult.rows
+
+  type ReviewDbSalesCorporateDeliveryRow = {
+    deliveryId: number
+    contractId: number
+    milestoneCode: string
+    milestoneName: string
+    status: string
+    ownerName: string | null
+    plannedAt: string | null
+    completedAt: string | null
+    contractNo: string | null
+    customerName: string
+  }
+
+  const corporateDeliveriesResult = await runSafeDomainSectionQuery<ReviewDbSalesCorporateDeliveryRow>({
+    sectionLabel: 'sales-corporate-deliveries',
+    enabled:
+      salesSchema.corporateDeliveryId &&
+      salesSchema.corporateDeliveryContractId &&
+      salesSchema.corporateDeliveryMilestoneCode &&
+      salesSchema.corporateDeliveryMilestoneName &&
+      salesSchema.corporateDeliveryStatus,
+    query: () =>
+      runReviewDbQuery<ReviewDbSalesCorporateDeliveryRow>(`
+        SELECT
+          d.id AS deliveryId,
+          d.contract_id AS contractId,
+          d.milestone_code AS milestoneCode,
+          d.milestone_name AS milestoneName,
+          d.status,
+          ${salesSchema.corporateDeliveryOwnerName ? 'd.owner_name' : 'NULL'} AS ownerName,
+          ${salesSchema.corporateDeliveryPlannedAt ? 'd.planned_at' : 'NULL'} AS plannedAt,
+          ${salesSchema.corporateDeliveryCompletedAt ? 'd.completed_at' : 'NULL'} AS completedAt,
+          ${salesSchema.contractNo ? 'c.contract_no' : 'NULL'} AS contractNo,
+          ${salesSchema.leadCustomerName ? 'sl.customer_name' : "'Customer belum terpetakan'"} AS customerName
+        FROM sales_corporate_deliveries d
+        LEFT JOIN sales_contracts c
+          ON c.id = d.contract_id
+        LEFT JOIN sales_leads sl
+          ON sl.id = c.lead_id
+        ORDER BY ${
+          salesSchema.corporateDeliveryCompletedAt && salesSchema.corporateDeliveryPlannedAt
+            ? 'COALESCE(d.completed_at, d.planned_at) DESC,'
+            : salesSchema.corporateDeliveryCompletedAt
+              ? 'd.completed_at DESC,'
+              : salesSchema.corporateDeliveryPlannedAt
+                ? 'd.planned_at DESC,'
+                : ''
+        } d.id DESC
+        LIMIT 5
+      `),
+  })
+  const corporateDeliveries = corporateDeliveriesResult.rows
+
+  type ReviewDbSalesCorporateAcceptanceRow = {
+    acceptanceId: number
+    contractId: number
+    acceptanceNo: string
+    status: string
+    testedAt: string | null
+    acceptedAt: string | null
+    contractNo: string | null
+    customerName: string
+  }
+
+  const corporateAcceptancesResult = await runSafeDomainSectionQuery<ReviewDbSalesCorporateAcceptanceRow>({
+    sectionLabel: 'sales-corporate-acceptances',
+    enabled:
+      salesSchema.corporateAcceptanceId &&
+      salesSchema.corporateAcceptanceContractId &&
+      salesSchema.corporateAcceptanceNo &&
+      salesSchema.corporateAcceptanceStatus,
+    query: () =>
+      runReviewDbQuery<ReviewDbSalesCorporateAcceptanceRow>(`
+        SELECT
+          a.id AS acceptanceId,
+          a.contract_id AS contractId,
+          a.acceptance_no AS acceptanceNo,
+          a.status,
+          ${salesSchema.corporateAcceptanceTestedAt ? 'a.tested_at' : 'NULL'} AS testedAt,
+          ${salesSchema.corporateAcceptanceAcceptedAt ? 'a.accepted_at' : 'NULL'} AS acceptedAt,
+          ${salesSchema.contractNo ? 'c.contract_no' : 'NULL'} AS contractNo,
+          ${salesSchema.leadCustomerName ? 'sl.customer_name' : "'Customer belum terpetakan'"} AS customerName
+        FROM sales_corporate_acceptances a
+        LEFT JOIN sales_contracts c
+          ON c.id = a.contract_id
+        LEFT JOIN sales_leads sl
+          ON sl.id = c.lead_id
+        ORDER BY ${
+          salesSchema.corporateAcceptanceAcceptedAt && salesSchema.corporateAcceptanceTestedAt
+            ? 'COALESCE(a.accepted_at, a.tested_at) DESC,'
+            : salesSchema.corporateAcceptanceAcceptedAt
+              ? 'a.accepted_at DESC,'
+              : salesSchema.corporateAcceptanceTestedAt
+                ? 'a.tested_at DESC,'
+                : ''
+        } a.id DESC
+        LIMIT 5
+      `),
+  })
+  const corporateAcceptances = corporateAcceptancesResult.rows
+
+  const leadTypeSections = [
+    { key: 'HOME', title: 'Lead Home Terbaru' },
+    { key: 'CORPORATE', title: 'Lead Corporate Terbaru' },
+    { key: 'RESELLER', title: 'Lead Reseller Terbaru' },
+  ] as const
+  const leadSections: DomainReviewSection[] = []
+  leadTypeSections.forEach((leadType) => {
+    const rows = leads.filter((item) => String(item.leadType ?? '').trim().toUpperCase() === leadType.key)
+    if (!rows.length) return
+
+    leadSections.push({
+      title: leadType.title,
+      description: `Lead terbaru untuk flow ${leadType.key} dari tabel sales_leads agar funnel akuisisi tiap segmen tidak tercampur.`,
+      rows: rows.map((item) => ({
         id: `LEAD-${item.leadId}`,
         primary: item.customerName,
         secondary: item.leadType,
@@ -4033,7 +4436,90 @@ async function getReviewDbSalesSections(filters?: DomainReviewDrilldownFilters):
           `Phone: ${item.phone || '-'}`,
         ],
       })),
-    },
+    })
+  })
+
+  return [
+    ...leadSections,
+    ...(quotations.length
+      ? [
+          {
+            title: 'Quotation Corporate Terbaru',
+            description: 'Quotation corporate terbaru untuk memproses approval internal sebelum kontrak disahkan.',
+            rows: quotations.map((item) => ({
+              id: `QTN-${item.quotationId}`,
+              primary: item.quotationNo,
+              secondary: item.customerName,
+              status: item.status,
+              detail: `Harga bulanan ${formatCurrency(item.monthlyPrice)} dengan biaya instalasi ${formatCurrency(item.installationFee)} dan durasi ${item.contractMonths} bulan.`,
+              meta: [
+                `Lead ID: ${item.leadId}`,
+                `Created: ${formatDateTime(item.createdAt)}`,
+              ],
+            })),
+          },
+        ]
+      : []),
+    ...(contracts.length
+      ? [
+          {
+            title: 'Kontrak Corporate Terbaru',
+            description: 'Kontrak corporate terbaru yang sudah ditandatangani sebagai guardrail sebelum delivery dimulai.',
+            rows: contracts.map((item) => ({
+              id: `CTR-${item.contractId}`,
+              primary: item.contractNo,
+              secondary: item.customerName,
+              status: item.status,
+              detail: `Kontrak dibuat dari quotation ${item.quotationNo || '-'} dan siap masuk ke delivery corporate.`,
+              meta: [
+                `Lead ID: ${item.leadId}`,
+                `Signed: ${formatDateTime(item.signedAt)}`,
+              ],
+            })),
+          },
+        ]
+      : []),
+    ...(corporateDeliveries.length
+      ? [
+          {
+            title: 'Delivery Corporate Terbaru',
+            description: 'Milestone delivery corporate terbaru agar jalur implementasi dedicated tidak bercampur dengan instalasi home.',
+            rows: corporateDeliveries.map((item) => ({
+              id: `CDL-${item.deliveryId}`,
+              primary: item.milestoneCode,
+              secondary: item.customerName,
+              status: item.status,
+              detail: `Milestone ${item.milestoneName} untuk kontrak ${item.contractNo || '-'} dijadwalkan ${formatDateTime(item.plannedAt)}.`,
+              meta: [
+                `Contract: ${item.contractNo || '-'}`,
+                `Owner: ${item.ownerName || '-'}`,
+                `Planned: ${formatDateTime(item.plannedAt)}`,
+                `Completed: ${formatDateTime(item.completedAt)}`,
+              ],
+            })),
+          },
+        ]
+      : []),
+    ...(corporateAcceptances.length
+      ? [
+          {
+            title: 'Acceptance Corporate Terbaru',
+            description: 'Acceptance testing dan UAT corporate terbaru untuk memastikan aktivasi hanya terjadi setelah hasilnya jelas.',
+            rows: corporateAcceptances.map((item) => ({
+              id: `UAT-${item.acceptanceId}`,
+              primary: item.acceptanceNo,
+              secondary: item.customerName,
+              status: item.status,
+              detail: `Acceptance untuk kontrak ${item.contractNo || '-'} memiliki checkpoint testing ${formatDateTime(item.testedAt)}.`,
+              meta: [
+                `Contract: ${item.contractNo || '-'}`,
+                `Tested: ${formatDateTime(item.testedAt)}`,
+                `Accepted: ${formatDateTime(item.acceptedAt)}`,
+              ],
+            })),
+          },
+        ]
+      : []),
     {
       title: 'Coverage Terbaru',
       description: 'Master coverage area terbaru dari review DB untuk menghubungkan lead dengan kesiapan area layanan.',
@@ -4176,6 +4662,8 @@ async function getReviewDbInventorySections(filters?: DomainReviewDrilldownFilte
           ii.item_name AS itemName,
           ${canJoinItemCategory && inventorySchema.categoryCode ? 'ic.code' : 'NULL'} AS categoryCode,
           ${canJoinItemUnit && inventorySchema.unitCode ? 'iu.code' : 'NULL'} AS unitCode,
+          ${inventorySchema.itemRackCode ? 'ii.rack_code' : 'NULL'} AS rackCode,
+          ${inventorySchema.itemRackBarcode ? 'ii.rack_barcode' : 'NULL'} AS rackBarcode,
           ii.current_stock AS currentStock,
           ii.minimum_stock AS minimumStock,
           ii.status
@@ -4595,6 +5083,8 @@ async function getReviewDbInventorySections(filters?: DomainReviewDrilldownFilte
         meta: [
           `Category: ${item.categoryCode || '-'}`,
           `Unit: ${item.unitCode || '-'}`,
+          `Rack: ${item.rackCode || '-'}`,
+          `Rack Barcode: ${item.rackBarcode || item.rackCode || item.itemCode}`,
           `Current Stock: ${formatNumber(item.currentStock)}`,
           `Minimum: ${formatNumber(item.minimumStock)}`,
         ],
@@ -5694,20 +6184,21 @@ function filterReviewSectionsForDomain(
     .filter((section): section is DomainReviewSection => Boolean(section))
 }
 
-function buildSupportFocus(
+async function buildSupportFocus(
   content: DomainPageContent,
   role: AppRole,
   selectedLane: SupportLaneKey | null,
-): DomainSupportFocus | undefined {
+): Promise<DomainSupportFocus | undefined> {
   if (content.key !== 'support') {
     return undefined
   }
 
   const sections = content.reviewSections ?? []
+  const language = await getServerUiLanguage()
   const defaultLane = getPreferredSupportLane(role)
   const resolvedSelectedLane = selectedLane && canAccessSupportLane(role, selectedLane) ? selectedLane : null
   const activeLane = getActiveSupportLane(role, resolvedSelectedLane)
-  const lanes = buildSupportLaneSnapshots(role, sections)
+  const lanes = buildSupportLaneSnapshots(role, sections, language)
   const visibleSections = resolvedSelectedLane ? getSupportLaneSections(sections, activeLane) : sections
 
   return {
@@ -5715,7 +6206,7 @@ function buildSupportFocus(
     selectedLane: resolvedSelectedLane,
     activeLane,
     lanes,
-    activeWorkspace: buildSupportLaneWorkspace(role, activeLane, lanes),
+    activeWorkspace: buildSupportLaneWorkspace(role, activeLane, lanes, language),
     visibleSections,
     reviewSummary: buildSupportLaneReviewSummary(visibleSections),
   }
@@ -5723,7 +6214,7 @@ function buildSupportFocus(
 
 export async function getDomainPageData(
   domain: DomainKey,
-  role: AppRole,
+  session: AppSession,
   options?: {
     supportLane?: SupportLaneKey | null
     focus?: string
@@ -5743,8 +6234,8 @@ export async function getDomainPageData(
     return {
       source,
       content,
-      capabilities: buildCapabilities(role, domain),
-      supportFocus: buildSupportFocus(content, role, selectedSupportLane),
+      capabilities: buildCapabilities(session.role, domain),
+      supportFocus: await buildSupportFocus(content, session.role, selectedSupportLane),
     }
   }
 
@@ -5752,7 +6243,7 @@ export async function getDomainPageData(
     const stats = await getReviewDbDomainStats()
     const salesSections =
       domain === 'sales'
-        ? filterReviewSectionsForDomain(domain, await getReviewDbSalesSections({
+        ? filterReviewSectionsForDomain(domain, await getReviewDbSalesSections(session, {
             focus: options?.focus,
             month: options?.month,
             year: options?.year,
@@ -5764,7 +6255,7 @@ export async function getDomainPageData(
         : []
     const supportSections =
       domain === 'support'
-        ? await getReviewDbSupportSections({
+        ? await getReviewDbSupportSections(session, {
             lane: selectedSupportLane,
             focus: options?.focus,
           })
@@ -5772,7 +6263,7 @@ export async function getDomainPageData(
     const customerSections = domain === 'customers' ? await getReviewDbCustomerSections() : []
     const billingSections =
       domain === 'billing'
-        ? filterReviewSectionsForDomain(domain, await getReviewDbBillingSections({
+        ? filterReviewSectionsForDomain(domain, await getReviewDbBillingSections(session, {
             focus: options?.focus,
             month: options?.month,
             year: options?.year,
@@ -5827,15 +6318,15 @@ export async function getDomainPageData(
     return {
       source,
       content: nextContent,
-      capabilities: buildCapabilities(role, domain),
-      supportFocus: buildSupportFocus(nextContent, role, selectedSupportLane),
+      capabilities: buildCapabilities(session.role, domain),
+      supportFocus: await buildSupportFocus(nextContent, session.role, selectedSupportLane),
     }
   } catch (error) {
     return {
       source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
       content,
-      capabilities: buildCapabilities(role, domain),
-      supportFocus: buildSupportFocus(content, role, selectedSupportLane),
+      capabilities: buildCapabilities(session.role, domain),
+      supportFocus: await buildSupportFocus(content, session.role, selectedSupportLane),
     }
   }
 }

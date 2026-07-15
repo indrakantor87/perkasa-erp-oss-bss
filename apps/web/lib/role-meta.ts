@@ -1,4 +1,5 @@
 import type { AppRole } from '@/lib/types'
+import { translateUiText, type UiLanguage } from '@/lib/ui-language'
 
 type RoleMeta = {
   label: string
@@ -10,6 +11,14 @@ type RoleMeta = {
 }
 
 const roleMetaMap: Record<AppRole, RoleMeta> = {
+  OWNER: {
+    label: 'Owner',
+    shortLabel: 'Owner',
+    tone: 'bg-slate-800 text-white',
+    scope: 'Ringkasan performa lintas divisi dengan akses baca (read-only).',
+    division: 'Lintas Divisi',
+    subdivision: 'Owner',
+  },
   SUPER_ADMIN: {
     label: 'Super Admin',
     shortLabel: 'Admin Global',
@@ -17,6 +26,46 @@ const roleMetaMap: Record<AppRole, RoleMeta> = {
     scope: 'Akses penuh lintas domain, user, dan permission.',
     division: 'Lintas Divisi',
     subdivision: 'Kontrol Global',
+  },
+  ADMIN: {
+    label: 'Admin',
+    shortLabel: 'Admin',
+    tone: 'bg-slate-900 text-white',
+    scope: 'Kontrol operasional lintas divisi sesuai scope cabang yang diberikan.',
+    division: 'Lintas Divisi',
+    subdivision: 'Admin Operasional',
+  },
+  FINANCE: {
+    label: 'Finance',
+    shortLabel: 'Finance',
+    tone: 'bg-emerald-700 text-white',
+    scope: 'Billing, collection, monitoring suspend, dan ringkasan PSB terkait cabang.',
+    division: 'Finance & Billing',
+    subdivision: 'Finance',
+  },
+  HR: {
+    label: 'HR',
+    shortLabel: 'HR',
+    tone: 'bg-indigo-700 text-white',
+    scope: 'Absensi, payroll, dan operasional SDM sesuai cabang.',
+    division: 'Finance & HR',
+    subdivision: 'HR',
+  },
+  GA: {
+    label: 'GA',
+    shortLabel: 'GA',
+    tone: 'bg-sky-700 text-white',
+    scope: 'Inventory, aset, dan kebutuhan operasional umum sesuai cabang.',
+    division: 'Operasional',
+    subdivision: 'GA',
+  },
+  PENJUALAN: {
+    label: 'Penjualan',
+    shortLabel: 'Sales',
+    tone: 'bg-sky-600 text-white',
+    scope: 'Input PSB, list PSB, dan monitoring operasional terkait penjualan sesuai cabang.',
+    division: 'Pemasaran dan Pelayanan',
+    subdivision: 'Penjualan',
   },
   SALES_MARKETING: {
     label: 'Sales Marketing',
@@ -84,6 +133,19 @@ const roleMetaMap: Record<AppRole, RoleMeta> = {
   },
 }
 
-export function getRoleMeta(role: AppRole) {
-  return roleMetaMap[role]
+export function getRoleMeta(role: AppRole, language: UiLanguage = 'id') {
+  const roleMeta = roleMetaMap[role]
+
+  if (language === 'id') {
+    return roleMeta
+  }
+
+  return {
+    ...roleMeta,
+    label: translateUiText(roleMeta.label, language),
+    shortLabel: translateUiText(roleMeta.shortLabel, language),
+    scope: translateUiText(roleMeta.scope, language),
+    division: translateUiText(roleMeta.division, language),
+    subdivision: translateUiText(roleMeta.subdivision, language),
+  }
 }

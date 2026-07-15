@@ -7,18 +7,20 @@ INSERT INTO mapping_legacy_roles (source_system, legacy_role_value, target_role_
 VALUES
   ('WEB_PSB', 'ADMIN', 'ADMIN', 'normalisasi role admin umum'),
   ('WEB_PSB', 'SUPERADMIN', 'SUPER_ADMIN', 'normalisasi role legacy tingkat tertinggi'),
-  ('WEB_PSB', 'ADMIN_CS', 'ADMIN_CS', 'role CS operasional'),
-  ('WEB_PSB', 'admin_cs', 'ADMIN_CS', 'variasi lowercase dari ADMIN_CS'),
+  ('WEB_PSB', 'OWNER', 'OWNER', 'role owner dashboard'),
+  ('WEB_PSB', 'ADMIN_CS', 'CS', 'admin CS legacy diarahkan ke role CS'),
+  ('WEB_PSB', 'admin_cs', 'CS', 'variasi lowercase dari ADMIN_CS'),
   ('WEB_PSB', 'NOC', 'NOC', 'role teknis NOC'),
-  ('WEB_PSB', 'SALES', 'SALES', 'role penjualan'),
-  ('WEB_PSB', 'MARKETING', 'SALES', 'marketing diarahkan ke domain sales'),
-  ('WEB_PSB', 'HR', 'HR_GA', 'HR lama diarahkan ke HR_GA'),
+  ('WEB_PSB', 'SALES', 'PENJUALAN', 'sales legacy diarahkan ke role penjualan'),
+  ('WEB_PSB', 'MARKETING', 'PENJUALAN', 'marketing diarahkan ke domain penjualan'),
+  ('WEB_PSB', 'HR', 'HR', 'HR lama diarahkan ke role HR'),
+  ('WEB_PSB', 'GA', 'GA', 'GA memakai role khusus GA'),
   ('FINANCE', 'ADMIN', 'ADMIN', 'admin finance umum'),
-  ('FINANCE', 'HR', 'HR_GA', 'HR finance diarahkan ke HR_GA'),
-  ('FINANCE', 'GA', 'HR_GA', 'GA disatukan ke domain HR_GA'),
+  ('FINANCE', 'HR', 'HR', 'HR finance diarahkan ke HR'),
+  ('FINANCE', 'GA', 'GA', 'GA memakai role khusus GA'),
   ('FINANCE', 'FINANCE', 'FINANCE', 'role finance utama'),
   ('GA', 'admin', 'ADMIN', 'admin aplikasi GA'),
-  ('GA', 'operator', 'WAREHOUSE', 'operator GA diarahkan ke warehouse')
+  ('GA', 'operator', 'GA', 'operator GA diarahkan ke role GA')
 ON DUPLICATE KEY UPDATE
   target_role_code = VALUES(target_role_code),
   notes = VALUES(notes),

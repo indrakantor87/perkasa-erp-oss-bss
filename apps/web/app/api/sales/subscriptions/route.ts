@@ -15,6 +15,12 @@ type ReviewSalesOrderRow = {
   address: string | null
 }
 
+type ReviewCorporateAcceptanceRow = {
+  id: number
+  acceptanceNo: string
+  status: string
+}
+
 type ReviewPackageRow = {
   id: number
   code: string
@@ -538,6 +544,49 @@ export async function POST(request: Request) {
     )
     if (!salesOrder) {
       return Response.json({ message: 'Sales order sumber tidak ditemukan di review DB.' }, { status: 404 })
+    }
+
+    if (String(salesOrder.leadType ?? '').trim().toUpperCase() === 'CORPORATE') {
+      const acceptanceSchemaReady = await Promise.all([
+        hasReviewDbColumn('sales_corporate_acceptances', 'id'),
+        hasReviewDbColumn('sales_corporate_acceptances', 'sales_order_id'),
+        hasReviewDbColumn('sales_corporate_acceptances', 'acceptance_no'),
+        hasReviewDbColumn('sales_corporate_acceptances', 'status'),
+      ]).then((items) => items.every(Boolean))
+
+      if (!acceptanceSchemaReady) {
+        return Response.json(
+          {
+            message:
+              'Guardrail corporate aktif: schema acceptance/UAT belum siap. Jalankan schema SQL terbaru sebelum aktivasi corporate.',
+          },
+          { status: 503 },
+        )
+      }
+
+      const [acceptance] = await runReviewDbQuery<ReviewCorporateAcceptanceRow>(
+        `
+          SELECT
+            id,
+            acceptance_no AS acceptanceNo,
+            status
+          FROM sales_corporate_acceptances
+          WHERE sales_order_id = ?
+          ORDER BY id DESC
+          LIMIT 1
+        `,
+        [salesOrder.id],
+      )
+
+      if (!acceptance || String(acceptance.status ?? '').trim().toUpperCase() !== 'ACCEPTED') {
+        return Response.json(
+          {
+            message:
+              'Guardrail CORPORATE: aktivasi hanya boleh dilakukan setelah testing/UAT acceptance berstatus ACCEPTED.',
+          },
+          { status: 400 },
+        )
+      }
     }
 
     const hasSubscriptionOrderId = await hasReviewDbColumn('service_subscriptions', 'order_id')

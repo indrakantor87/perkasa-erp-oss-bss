@@ -18,7 +18,7 @@ const config: Config = {
         accentSoft: 'var(--color-accent-soft)',
       },
       boxShadow: {
-        panel: '0 24px 80px rgba(15, 23, 42, 0.18)',
+        panel: 'var(--shadow-panel)',
       },
       borderRadius: {
         xl2: '1.5rem',

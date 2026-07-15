@@ -3,11 +3,16 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
 
 type InventoryStockMovementFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   itemSuggestions: string[]
+  rackSuggestions: string[]
+  requireScan: boolean
+  initialItemValue?: string
+  embedded?: boolean
 }
 
 const movementTypeOptions = ['IN', 'OUT', 'ADJUSTMENT'] as const
@@ -20,9 +25,14 @@ export function InventoryStockMovementForm({
   canCreate,
   reviewDbReady,
   itemSuggestions,
+  rackSuggestions,
+  requireScan,
+  initialItemValue,
+  embedded = false,
 }: InventoryStockMovementFormProps) {
   const router = useRouter()
-  const [itemValue, setItemValue] = useState(itemSuggestions[0] ?? '')
+  const [itemValue, setItemValue] = useState(initialItemValue || itemSuggestions[0] || '')
+  const [scanValue, setScanValue] = useState('')
   const [movementType, setMovementType] = useState<(typeof movementTypeOptions)[number]>('IN')
   const [referenceNo, setReferenceNo] = useState('')
   const [qty, setQty] = useState('1')
@@ -45,6 +55,25 @@ export function InventoryStockMovementForm({
       })
       return
     }
+    const scannedRackBarcode = extractItemCode(scanValue)
+    if (requireScan && movementType === 'OUT') {
+      if (!scannedRackBarcode) {
+        setFeedback({
+          tone: 'error',
+          message: 'Scan barcode rak wajib dilakukan sebelum movement OUT disimpan.',
+        })
+        return
+      }
+      const matchedRack = rackSuggestions.find((item) => item.split('|')[0]?.trim().toUpperCase() === scannedRackBarcode.toUpperCase())
+      const matchedItemCode = matchedRack?.split('|')[1]?.trim() ?? ''
+      if (matchedItemCode.toUpperCase() !== itemCode.toUpperCase()) {
+        setFeedback({
+          tone: 'error',
+          message: `Barcode rak tidak cocok. Form memilih ${itemCode}, tetapi barcode rak terbaca untuk ${matchedItemCode || 'item lain'}.`,
+        })
+        return
+      }
+    }
 
     setSubmitting(true)
     setFeedback(null)
@@ -62,6 +91,7 @@ export function InventoryStockMovementForm({
           qty,
           unitPrice,
           notes,
+          scannedRackBarcode: requireScan && movementType === 'OUT' ? scannedRackBarcode : '',
         }),
       })
 
@@ -83,6 +113,7 @@ export function InventoryStockMovementForm({
       setQty('1')
       setUnitPrice('')
       setNotes('')
+      setScanValue('')
       router.refresh()
     } finally {
       setSubmitting(false)
@@ -90,12 +121,12 @@ export function InventoryStockMovementForm({
   }
 
   return (
-    <section className="panel p-6">
+    <section className={embedded ? 'space-y-4' : 'panel p-6'}>
       <p className="section-title">Write Action Inventory</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+      <h3 className={`font-[family-name:var(--font-heading)] font-semibold tracking-tight text-slate-950 ${embedded ? 'text-xl' : 'mt-2 text-2xl'}`}>
         Catat stock movement
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
+      <p className={`${embedded ? '' : 'mt-3'} text-sm leading-6 text-mute`}>
         {!canCreate
           ? 'Role aktif belum memiliki izin create pada domain Inventory.'
           : !reviewDbReady
@@ -103,7 +134,22 @@ export function InventoryStockMovementForm({
             : 'Form ini mencatat pergerakan stok masuk, keluar, atau adjustment agar item inventory yang sudah dibuat langsung punya histori operasional.'}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+      <form onSubmit={handleSubmit} className={`${embedded ? '' : 'mt-6'} grid gap-4 lg:grid-cols-2`}>
+        <div className="lg:col-span-2">
+          <InventoryItemScanAssist
+            itemSuggestions={rackSuggestions}
+            disabled={isDisabled}
+            onResolved={(value) => {
+              setScanValue(value)
+            }}
+          />
+          {requireScan ? (
+            <div className="mt-2 text-sm text-mute">
+              Scan barcode rak diwajibkan saat movement `OUT`. Movement `IN` dan `ADJUSTMENT` tetap bisa tanpa scan.
+            </div>
+          ) : null}
+        </div>
+
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Item Inventory</span>
           <input

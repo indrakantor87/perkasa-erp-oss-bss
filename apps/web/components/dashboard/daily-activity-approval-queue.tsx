@@ -190,74 +190,168 @@ export function DailyActivityApprovalQueue({ queue }: DailyActivityApprovalQueue
             </div>
           </div>
 
-          {queue.pendingItems.map((item) => (
-            <article key={item.activityId} className="rounded-2xl border border-line bg-white p-5">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-950">{item.taskTitle}</p>
-                  <p className="mt-1 text-sm text-mute">
-                    {item.activityCode} • {formatActivityDate(item.activityDate)} • {item.plannedBy}
-                  </p>
-                  <p className="mt-2 text-sm text-mute">
-                    {item.divisionName || 'Tanpa divisi'}
-                    {item.subdivisionName ? ` / ${item.subdivisionName}` : ''} • {item.executionStatus}
-                  </p>
-                </div>
-                <span className="badge border-amber-200 bg-amber-50 text-amber-700">PENDING APPROVAL</span>
-              </div>
+          <div className="hidden overflow-hidden rounded-3xl border border-line bg-white xl:block">
+            <table className="min-w-full divide-y divide-line">
+              <thead className="bg-slate-50">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <th className="w-16 px-4 py-3">Pilih</th>
+                  <th className="px-4 py-3">Aktivitas</th>
+                  <th className="px-4 py-3">Org</th>
+                  <th className="px-4 py-3">Catatan</th>
+                  <th className="px-4 py-3">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line bg-white">
+                {queue.pendingItems.map((item) => {
+                  const selected = selectedIds.includes(item.activityId)
+                  return (
+                    <tr key={item.activityId} className={selected ? 'bg-slate-50' : ''}>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={(event) => {
+                            const checked = event.target.checked
+                            setSelectedIds((prev) =>
+                              checked
+                                ? Array.from(new Set([...prev, item.activityId]))
+                                : prev.filter((id) => id !== item.activityId),
+                            )
+                          }}
+                          className="h-5 w-5 rounded border-line text-slate-950"
+                          disabled={submittingBulk || submittingId !== null}
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="badge border-amber-200 bg-amber-50 text-amber-700">PENDING</span>
+                          <span className="badge border-slate-200 bg-white text-slate-600">{item.executionStatus}</span>
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-slate-950 line-clamp-1">{item.taskTitle}</p>
+                        <p className="mt-1 text-sm text-mute line-clamp-1">
+                          {item.activityCode} • {formatActivityDate(item.activityDate)} • {item.plannedBy}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <p className="text-sm font-semibold text-slate-950 line-clamp-1">{item.divisionName || 'Tanpa divisi'}</p>
+                        <p className="mt-1 text-sm text-mute line-clamp-1">{item.subdivisionName || '-'}</p>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          value={rejectNotes[item.activityId] ?? ''}
+                          onChange={(event) =>
+                            setRejectNotes((prev) => ({
+                              ...prev,
+                              [item.activityId]: event.target.value,
+                            }))
+                          }
+                          className="w-full rounded-2xl border border-line bg-white px-4 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                          placeholder="Wajib diisi jika reject"
+                          disabled={submittingBulk || submittingId === item.activityId}
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => submitApproval(item.activityId, 'APPROVED')}
+                            disabled={submittingBulk || submittingId !== null}
+                            className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                          >
+                            {submittingId === item.activityId ? 'Memproses...' : 'Approve'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => submitApproval(item.activityId, 'REJECTED')}
+                            disabled={submittingBulk || submittingId !== null}
+                            className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
 
-              <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                <label className="flex items-center gap-3 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(item.activityId)}
-                    onChange={(event) => {
-                      const checked = event.target.checked
-                      setSelectedIds((prev) =>
-                        checked ? Array.from(new Set([...prev, item.activityId])) : prev.filter((id) => id !== item.activityId),
-                      )
-                    }}
-                    className="h-5 w-5 rounded border-line text-slate-950"
-                    disabled={submittingBulk || submittingId !== null}
-                  />
-                  <span className="font-semibold text-slate-950">Pilih</span>
-                </label>
-                <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
-                  <span className="font-semibold text-slate-950">Catatan reject (opsional saat approve)</span>
-                  <input
-                    value={rejectNotes[item.activityId] ?? ''}
-                    onChange={(event) =>
-                      setRejectNotes((prev) => ({
-                        ...prev,
-                        [item.activityId]: event.target.value,
-                      }))
-                    }
-                    className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                    placeholder="Wajib diisi jika reject"
-                    disabled={submittingBulk || submittingId === item.activityId}
-                  />
-                </label>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:col-span-3 lg:self-end">
-                  <button
-                    type="button"
-                    onClick={() => submitApproval(item.activityId, 'APPROVED')}
-                    disabled={submittingBulk || submittingId !== null}
-                    className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    {submittingId === item.activityId ? 'Memproses...' : 'Approve'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => submitApproval(item.activityId, 'REJECTED')}
-                    disabled={submittingBulk || submittingId !== null}
-                    className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
-                  >
-                    Reject
-                  </button>
+          <div className="grid gap-3 xl:hidden">
+            {queue.pendingItems.map((item) => (
+              <article key={item.activityId} className="rounded-2xl border border-line bg-white p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="badge border-amber-200 bg-amber-50 text-amber-700">PENDING</span>
+                      <span className="badge border-slate-200 bg-white text-slate-600">{item.executionStatus}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-950">{item.taskTitle}</p>
+                    <p className="text-sm text-mute">
+                      {item.activityCode} • {formatActivityDate(item.activityDate)} • {item.plannedBy}
+                    </p>
+                    <p className="text-sm text-mute">
+                      {item.divisionName || 'Tanpa divisi'}
+                      {item.subdivisionName ? ` / ${item.subdivisionName}` : ''}
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-3 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(item.activityId)}
+                      onChange={(event) => {
+                        const checked = event.target.checked
+                        setSelectedIds((prev) =>
+                          checked
+                            ? Array.from(new Set([...prev, item.activityId]))
+                            : prev.filter((id) => id !== item.activityId),
+                        )
+                      }}
+                      className="h-5 w-5 rounded border-line text-slate-950"
+                      disabled={submittingBulk || submittingId !== null}
+                    />
+                    <span className="font-semibold text-slate-950">Pilih</span>
+                  </label>
                 </div>
-              </div>
-            </article>
-          ))}
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <label className="flex flex-col gap-2 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-950">Catatan reject</span>
+                    <input
+                      value={rejectNotes[item.activityId] ?? ''}
+                      onChange={(event) =>
+                        setRejectNotes((prev) => ({
+                          ...prev,
+                          [item.activityId]: event.target.value,
+                        }))
+                      }
+                      className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                      placeholder="Wajib diisi jika reject"
+                      disabled={submittingBulk || submittingId === item.activityId}
+                    />
+                  </label>
+                  <div className="flex flex-col justify-end gap-2 sm:items-end">
+                    <button
+                      type="button"
+                      onClick={() => submitApproval(item.activityId, 'APPROVED')}
+                      disabled={submittingBulk || submittingId !== null}
+                      className="w-full rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
+                    >
+                      {submittingId === item.activityId ? 'Memproses...' : 'Approve'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => submitApproval(item.activityId, 'REJECTED')}
+                      disabled={submittingBulk || submittingId !== null}
+                      className="w-full rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 sm:w-auto"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       ) : null}
 

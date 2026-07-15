@@ -1,11 +1,9 @@
 import Link from 'next/link'
-import { DataSourceStatus } from '@/components/data-source-status'
 import { SupportActionFormModal, type SupportActionModalItem } from '@/components/support-action-form-modal'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
 import { SupportIsolationForm } from '@/components/support-isolation-form'
 import { SupportIsolationQueuePanel } from '@/components/support-isolation-queue-panel'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
-import { SupportWorkspaceHelperNote } from '@/components/support-workspace-helper-note'
 import { canAccessPath } from '@/lib/access-control'
 import { buildSupportLaneActionHref, buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
 import { canAccessSupportLane, canProcessSupportDismantle, canUseSupportAction } from '@/lib/support-lanes'
@@ -191,164 +189,49 @@ export function SupportIsolationWorkspace({
 
   return (
     <div className="space-y-4">
-      <section className="panel p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">{content.eyebrow}</p>
+        <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="section-title">{content.eyebrow}</p>
-            <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
+            <h2 className="font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">
               Monitoring Isolir Pelanggan
             </h2>
-            <p className="mt-1 text-sm leading-5 text-mute">
-              Lane keputusan suspend aktif untuk restore billing atau transfer terminate.
-            </p>
+            <p className="mt-1 text-sm leading-5 text-slate-200">Daftar pelanggan yang status layanannya sedang diisolir.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {canOpenBillingDecision ? (
-              <Link href="/billing" className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
-                Buka Billing Decision
+              <Link href="/billing" className="rounded-md bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-950">
+                Billing Decision
               </Link>
             ) : null}
             {canOpenDismantleLane ? (
               <Link
                 href={dismantleTransferHref}
-                className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
+                className="rounded-md border border-slate-500 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
               >
-                {canProcessSupportDismantle(role, canApprove) ? 'Transfer Dismantle' : 'Queue Dismantle'}
+                {canProcessSupportDismantle(role, canApprove) ? 'Queue Dismantle' : 'Buka Dismantle'}
               </Link>
             ) : null}
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
-          <span className="badge border-slate-200 bg-white text-slate-600">{summary.total} isolir</span>
-          <span className="badge border-sky-200 bg-sky-50 text-sky-700">Restore: {summary.restoreCount}</span>
-          <span className="badge border-rose-200 bg-rose-50 text-rose-700">Terminate: {summary.terminateCount}</span>
-          {summary.marketingCount ? (
-            <span className="badge border-slate-200 bg-white text-slate-600">{summary.marketingCount} marketing terlibat</span>
-          ) : null}
+          <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{summary.total} data</span>
+          <span className="badge border-red-500/60 bg-red-500/10 text-red-100">Open {summary.restoreCount}</span>
+          <span className="badge border-blue-500/60 bg-blue-500/10 text-blue-100">On Progress {summary.terminateCount}</span>
           {!reviewDbReady ? (
-            <span className="badge border-amber-200 bg-amber-50 text-amber-700">Review DB belum aktif</span>
+            <span className="badge border-amber-500/60 bg-amber-500/10 text-amber-100">Review DB belum aktif</span>
           ) : null}
         </div>
       </section>
-
-      <SupportWorkspaceHelperNote
-        title="Pisahkan cepat kasus yang masih layak dipulihkan dari kasus yang harus diteruskan ke terminate."
-        detail="Gunakan lane ini sebagai gerbang keputusan. Restore tetap berada di jalur billing, sedangkan kasus yang tidak layak dibuka kembali harus segera dipindahkan ke dismantle agar tidak menggantung di backlog isolir."
-        badges={[
-          { label: `${summary.total} backlog isolir`, tone: 'neutral' },
-          { label: `${summary.restoreCount} jalur restore`, tone: 'info' },
-          { label: `${summary.terminateCount} jalur terminate`, tone: 'danger' },
-        ]}
-      />
-
-      {summary.topStatuses.length ? (
-        <section className="rounded-xl border border-line bg-white p-3">
-          <div className="flex flex-wrap gap-2">
-            <span className="badge border-slate-200 bg-white text-slate-600">Status dominan:</span>
-            {summary.topStatuses.map(([status, count]) => (
-              <span key={status} className="badge border-slate-200 bg-white text-slate-600">
-                {status}: {count}
-              </span>
-            ))}
-            {canOpenSlaLane ? (
-              <Link
-                href={buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })}
-                className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:opacity-90"
-              >
-                Kontrol SLA Terkait
-              </Link>
-            ) : null}
-            {canOpenSupervisorWorkspace ? (
-              <Link
-                href="/customers/cs-admin?queue=Transfer+atau+Restore"
-                className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:opacity-90"
-              >
-                Buka Supervisor CS
-              </Link>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-
-      <DataSourceStatus source={source} />
-
-      <section className="rounded-xl border border-line bg-slate-50 p-3">
-        <form action="/support/isolations" className="flex flex-col gap-3 xl:flex-row xl:items-end">
-          <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus Antrian</span>
-            <select
-              name="focus"
-              defaultValue={supportPrefill?.focus ?? ''}
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              <option value="">Semua Isolir</option>
-              <option value="ACTIVE_ISOLATIONS">Isolir Aktif</option>
-            </select>
-          </label>
-          <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Status Kerja</span>
-            <input
-              name="status"
-              defaultValue={supportPrefill?.status ?? ''}
-              placeholder="ACTIVE, PENDING, atau status lain"
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            />
-          </label>
-          <label className="flex flex-[1.2] flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Pelanggan</span>
-            <input
-              name="customer"
-              defaultValue={supportPrefill?.customer ?? ''}
-              placeholder="Nama pelanggan / kode pelanggan"
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            />
-          </label>
-          <label className="flex flex-[1.2] flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Layanan / Konteks</span>
-            <input
-              name="service"
-              defaultValue={supportPrefill?.service ?? ''}
-              placeholder="Radbox, layanan, atau catatan kasus"
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            />
-          </label>
-          <div className="flex flex-wrap gap-2 xl:justify-end">
-            <button type="submit" className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">
-              Terapkan
-            </button>
-            <Link
-              href="/support/isolations"
-              className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-            >
-              Reset
-            </Link>
-          </div>
-        </form>
-      </section>
-
-      {supportDrilldown ? (
-        <section className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-sky-900">{supportDrilldown.label}</p>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-800">{supportDrilldown.detail}</p>
-            </div>
-            <Link
-              href={supportDrilldown.clearHref}
-              className="rounded-md border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-sky-800 transition hover:border-sky-300 hover:bg-sky-100"
-            >
-              Reset Fokus
-            </Link>
-          </div>
-        </section>
-      ) : null}
 
       <SupportIsolationQueuePanel
         sections={reviewSections}
         actionLinks={visibleActionLinks}
         role={role}
+        canCreate={canCreate}
         canUpdate={canUpdate}
         canApprove={canApprove}
+        supportDrilldown={supportDrilldown ?? null}
       />
 
       <SupportActionFormModal items={supportActionModalItems} heading="Form aksi lane isolir" />

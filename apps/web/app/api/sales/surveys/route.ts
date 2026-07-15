@@ -12,6 +12,7 @@ type ReviewLeadRow = {
   customerName: string
   leadType: string
   address: string | null
+  branchId: number | null
 }
 
 type SurveyNoRow = {
@@ -56,10 +57,11 @@ async function generateSurveyNo() {
 }
 
 async function getSalesLeadQueryParts() {
-  const [hasCustomerName, hasLeadType, hasAddress] = await Promise.all([
+  const [hasCustomerName, hasLeadType, hasAddress, hasBranchId] = await Promise.all([
     hasReviewDbColumn('sales_leads', 'customer_name'),
     hasReviewDbColumn('sales_leads', 'lead_type'),
     hasReviewDbColumn('sales_leads', 'address'),
+    hasReviewDbColumn('sales_leads', 'branch_id'),
   ])
 
   if (!hasCustomerName || !hasLeadType) {
@@ -68,10 +70,12 @@ async function getSalesLeadQueryParts() {
 
   return {
     addressExpression: hasAddress ? 'address' : 'NULL',
+    branchIdExpression: hasBranchId ? 'branch_id' : 'NULL',
   }
 }
 
 async function buildSalesSurveyInsertPayload(params: {
+  branchId: number | null
   leadId: number
   surveyNo: string
   surveyType: string
@@ -83,6 +87,7 @@ async function buildSalesSurveyInsertPayload(params: {
   customerRequestNotes: string | null
 }) {
   const [
+    hasBranchId,
     hasLeadId,
     hasCustomerId,
     hasCoveredAreaId,
@@ -98,6 +103,7 @@ async function buildSalesSurveyInsertPayload(params: {
     hasTechnicalNotes,
     hasCustomerRequestNotes,
   ] = await Promise.all([
+    hasReviewDbColumn('sales_surveys', 'branch_id'),
     hasReviewDbColumn('sales_surveys', 'lead_id'),
     hasReviewDbColumn('sales_surveys', 'customer_id'),
     hasReviewDbColumn('sales_surveys', 'covered_area_id'),
@@ -121,6 +127,10 @@ async function buildSalesSurveyInsertPayload(params: {
   const columns = ['lead_id', 'survey_no', 'survey_status']
   const values: unknown[] = [params.leadId, params.surveyNo, params.surveyStatus]
 
+  if (hasBranchId) {
+    columns.unshift('branch_id')
+    values.unshift(params.branchId)
+  }
   if (hasCustomerId) {
     columns.push('customer_id')
     values.push(null)
@@ -249,7 +259,8 @@ export async function POST(request: Request) {
           id,
           customer_name AS customerName,
           lead_type AS leadType,
-          ${salesLeadQueryParts.addressExpression} AS address
+          ${salesLeadQueryParts.addressExpression} AS address,
+          ${salesLeadQueryParts.branchIdExpression} AS branchId
         FROM sales_leads
         WHERE id = ?
         LIMIT 1
@@ -258,6 +269,20 @@ export async function POST(request: Request) {
     )
     if (!lead) {
       return Response.json({ message: 'Lead sumber tidak ditemukan di review DB.' }, { status: 404 })
+    }
+    const normalizedLeadBranchId = Number(lead.branchId)
+    const leadBranchId =
+      Number.isFinite(normalizedLeadBranchId) && normalizedLeadBranchId > 0 ? normalizedLeadBranchId : null
+    if (session.role !== 'SUPER_ADMIN' && session.role !== 'OWNER') {
+      const allowedBranchIds =
+        session.role === 'ADMIN'
+          ? (session.branchIds ?? []).filter((value) => Number.isFinite(value) && value > 0)
+          : session.branchId && Number.isFinite(session.branchId) && session.branchId > 0
+            ? [session.branchId]
+            : []
+      if (!leadBranchId || !allowedBranchIds.includes(leadBranchId)) {
+        return Response.json({ message: 'Lead sumber tidak berada dalam scope cabang user.' }, { status: 403 })
+      }
     }
 
     const surveyType = surveyTypeRaw || mapLeadTypeToSurveyType(lead.leadType)
@@ -275,6 +300,7 @@ export async function POST(request: Request) {
       technicalNotesRaw ? ` - ${technicalNotesRaw}` : ''
     }`
     const salesSurveyInsertPayload = await buildSalesSurveyInsertPayload({
+      branchId: leadBranchId ?? session.branchId ?? null,
       leadId: lead.id,
       surveyNo,
       surveyType,

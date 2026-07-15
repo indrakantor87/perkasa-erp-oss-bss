@@ -1,6 +1,10 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
+import 'leaflet/dist/leaflet.css'
+import 'leaflet.markercluster/dist/MarkerCluster.css'
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import './globals.css'
+import { getServerUiTheme } from '@/lib/ui-theme-server'
 
 const FONT_STACK_BODY =
   "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'"
@@ -17,8 +21,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: ReactNode
 }>) {
+  const initialTheme = await getServerUiTheme()
+
   return (
-    <html lang="id">
+    <html lang="id" data-theme={initialTheme} suppressHydrationWarning>
       <body
         style={
           {

@@ -3,12 +3,15 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import { useEffect, useState } from 'react'
 import type { AppSession } from '@/lib/auth-session'
+import { useUiLanguage } from '@/components/layout/ui-language'
 import { navigationItems } from '@/lib/navigation'
-import { DASHBOARD_DIVISION_CLUSTERS } from '@/lib/dashboard-division-structure'
 import { getRoleMeta } from '@/lib/role-meta'
+import { canAccessSupportLane, getSupportLanePath } from '@/lib/support-lanes'
 import type { AppRole } from '@/lib/types'
+import { translateUiText } from '@/lib/ui-language'
 
 function matchesPrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -46,13 +49,6 @@ function sortByPreferredOrder(params: { items: typeof navigationItems; role: App
   })
 }
 
-type SidebarGroup = {
-  title: string
-  items?: SidebarNavItem[]
-  hrefs?: string[]
-  emptyHint?: string
-}
-
 type SidebarNavItem = (typeof navigationItems)[number] & {
   key: string
   requiredPath: string
@@ -62,6 +58,8 @@ type SidebarNavItem = (typeof navigationItems)[number] & {
   excludePrefixes?: string[]
   matchFocusPrefix?: string
   excludeFocusPrefix?: string
+  matchQueryParams?: Record<string, string | string[]>
+  children?: SidebarNavItem[]
 }
 
 function getNavigationItemByHref(href: string) {
@@ -82,6 +80,8 @@ function buildSidebarNavItem(
     excludePrefixes?: string[]
     matchFocusPrefix?: string
     excludeFocusPrefix?: string
+    matchQueryParams?: Record<string, string | string[]>
+    children?: SidebarNavItem[]
   },
 ): SidebarNavItem {
   const base = getNavigationItemByHref(href)
@@ -97,11 +97,13 @@ function buildSidebarNavItem(
     description: options?.description ?? base.description,
     requiredPath: options?.requiredPath ?? base.href,
     allowedRoles: options?.allowedRoles,
-    assignHrefs: options?.assignHrefs,
+    assignHrefs: options?.assignHrefs ?? [options?.href ?? base.href],
     matchPrefixes: options?.matchPrefixes,
     excludePrefixes: options?.excludePrefixes,
     matchFocusPrefix: options?.matchFocusPrefix,
     excludeFocusPrefix: options?.excludeFocusPrefix,
+    matchQueryParams: options?.matchQueryParams,
+    children: options?.children,
   }
 }
 
@@ -114,181 +116,676 @@ function mapNavigationItemToSidebarNavItem(item: (typeof navigationItems)[number
   }
 }
 
-const sidebarCoreGroups: SidebarGroup[] = [
-  {
-    title: 'Kerja Harian',
-    hrefs: ['/dashboard', '/dashboard/worklist', '/dashboard/daily-activity', '/import'],
-  },
-  {
-    title: 'Pemasaran dan Pelayanan',
-    items: [
-      buildSidebarNavItem('/support', {
-        key: 'support-noc-tt',
-        title: 'NOC & Troubleshoots',
-        description: 'Queue teknis NOC, TT, monitoring ticket, dan kontrol SLA operasional',
-        excludePrefixes: ['/support/isolations', '/support/dismantle'],
-      }),
-      buildSidebarNavItem('/sales', {
-        key: 'sales-main',
-        title: 'Penjualan',
-        description: 'Lead, survey, order, dan aktivasi komersial',
-        excludeFocusPrefix: 'DIGITAL_',
-      }),
-      buildSidebarNavItem('/customers', {
-        key: 'customers-cs-admin',
-        title: 'CS & Admin CS',
-        description: 'Workspace supervisor untuk approval, koreksi, restore, dan backlog risiko CS',
-        href: '/customers/cs-admin',
-        matchPrefixes: ['/customers/cs-admin', '/support/dismantle'],
-        allowedRoles: ['SUPER_ADMIN', 'CS_ADMIN'],
-        assignHrefs: ['/customers/cs-admin', '/support/dismantle'],
-      }),
-      buildSidebarNavItem('/sales', {
-        key: 'sales-digital-creator',
-        title: 'Digital Creator',
-        description: 'Campaign, lead digital, content calendar, dan analytics Creator Digital',
-        href: '/sales/digital-creator',
-        requiredPath: '/sales/digital-creator',
-        allowedRoles: ['SUPER_ADMIN', 'DIGITAL_CREATOR'],
-        assignHrefs: [
-          '/sales/digital-creator',
-          '/sales/campaigns',
-          '/sales/digital-leads',
-          '/sales/content-calendar',
-          '/sales/content-analytics',
-        ],
-        matchPrefixes: [
-          '/sales/digital-creator',
-          '/sales/campaigns',
-          '/sales/digital-leads',
-          '/sales/content-calendar',
-          '/sales/content-analytics',
-        ],
-      }),
-    ],
-    emptyHint: DASHBOARD_DIVISION_CLUSTERS[0]?.items.map((item) => item.label).join(', '),
-  },
-  {
-    title: 'Finance dan HR',
-    items: [
-      buildSidebarNavItem('/billing', {
-        key: 'billing-main',
-        title: 'Billing',
-        description: 'Invoice, customer, isolir, payment, dan collection',
-        matchPrefixes: ['/billing', '/customers', '/support/isolations'],
-        assignHrefs: ['/billing', '/customers', '/support/isolations'],
-      }),
-      buildSidebarNavItem('/hr', {
-        key: 'hr-main',
-        title: 'HR',
-        description: 'Employee, attendance, payroll, dan pinjaman karyawan',
-      }),
-    ],
-    emptyHint: DASHBOARD_DIVISION_CLUSTERS[2]?.items.map((item) => item.label).join(', '),
-  },
-  {
-    title: 'General Affair',
-    items: [
-      buildSidebarNavItem('/inventory', {
-        key: 'inventory-main',
-        title: 'Inventory',
-        description: 'Stok, ODP, assignment perangkat, dan request gudang',
-      }),
-      buildSidebarNavItem('/inventory', {
-        key: 'inventory-legal',
-        title: 'Legal',
-        description: 'Workspace dokumen, administrasi, dan tindak lanjut legal',
-        href: '/inventory/legal',
-        allowedRoles: ['SUPER_ADMIN'],
-        matchPrefixes: ['/inventory/legal'],
-      }),
-    ],
-    emptyHint: DASHBOARD_DIVISION_CLUSTERS[3]?.items.map((item) => item.label).join(', '),
-  },
-  {
-    title: 'Teknisi & Ekspan',
-    items: [
-      buildSidebarNavItem('/support', {
-        key: 'support-teknisi-psb',
-        title: 'Teknisi PSB',
-        description: 'Instalasi baru, kesiapan material, dan tindak lanjut lapangan PSB',
-        href: '/support/teknisi-psb',
-        allowedRoles: ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
-        matchPrefixes: ['/support/teknisi-psb'],
-      }),
-      buildSidebarNavItem('/support', {
-        key: 'support-teknisi-expan',
-        title: 'Teknisi Expan',
-        description: 'Ekspan jaringan, ODP, port, dan kesiapan jalur lapangan',
-        href: '/support/teknisi-expan',
-        allowedRoles: ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
-        matchPrefixes: ['/support/teknisi-expan'],
-      }),
-      buildSidebarNavItem('/support', {
-        key: 'support-teknisi-jointer',
-        title: 'Teknisi Jointer',
-        description: 'Sambungan jaringan, kualitas joint, dan follow up teknis backbone',
-        href: '/support/teknisi-jointer',
-        allowedRoles: ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
-        matchPrefixes: ['/support/teknisi-jointer'],
-      }),
-    ],
-    emptyHint: DASHBOARD_DIVISION_CLUSTERS[1]?.items.map((item) => item.label).join(', '),
-  },
-  {
-    title: 'Operasional',
-    items: [
-      buildSidebarNavItem('/inventory', {
-        key: 'inventory-kantor',
-        title: 'Kantor',
-        description: 'Workspace operasional kantor untuk stok aktif dan ritme kerja harian',
-        href: '/inventory/kantor',
-        allowedRoles: ['SUPER_ADMIN'],
-        matchPrefixes: ['/inventory/kantor'],
-      }),
-      buildSidebarNavItem('/inventory', {
-        key: 'inventory-toko',
-        title: 'Toko (Segera)',
-        description: 'Business di luar ISP. Tabel kerja menyusul setelah proses Toko sudah tervalidasi.',
-        href: '/inventory/toko',
-        allowedRoles: ['SUPER_ADMIN'],
-        matchPrefixes: ['/inventory/toko'],
-      }),
-    ],
-    emptyHint: DASHBOARD_DIVISION_CLUSTERS[4]?.items.map((item) => item.label).join(', '),
-  },
-]
-
-function groupSidebarItems(items: typeof navigationItems, allowedPrefixes: string[], role: AppRole | null): Array<{
+type SidebarSectionData = {
   title: string
   items: SidebarNavItem[]
-  emptyHint?: string
-}> {
-  const grouped = sidebarCoreGroups.map((group) => ({
-    ...group,
-    items:
-      group.items?.filter((item) =>
-        allowedPrefixes.some((prefix) => matchesPrefix(item.requiredPath, prefix)) &&
-        (!item.allowedRoles || (role != null && item.allowedRoles.includes(role))),
-      ) ??
-      items.filter((item) => group.hrefs?.includes(item.href)).map(mapNavigationItemToSidebarNavItem),
-  }))
-
-  const assignedBaseHrefs = new Set(
-    grouped.flatMap((group) =>
-      group.items.flatMap((item) => (item.assignHrefs ?? [item.href]).map((href) => href.split('?')[0] ?? href)),
-    ),
-  )
-  const remainingItems = items.filter((item) => !assignedBaseHrefs.has(item.href))
-
-  if (remainingItems.length) {
-    grouped[0]?.items.push(...remainingItems.map(mapNavigationItemToSidebarNavItem))
-  }
-
-  return grouped
 }
 
-function isSidebarItemActive(item: SidebarNavItem, pathname: string, focus: string) {
+type SuperAdminSidebarMode = 'compact' | 'full'
+
+function buildSalesMainItem(role: AppRole | null) {
+  return buildSidebarNavItem('/sales', {
+    key: 'sales-main',
+    title: 'Penjualan',
+    description: 'Lead, survey, order, dan aktivasi komersial',
+    excludeFocusPrefix: 'DIGITAL_',
+    children: buildSalesSubmenuItems(role),
+  })
+}
+
+function buildSalesSubmenuItems(role: AppRole | null) {
+  if (!role) {
+    return []
+  }
+
+  const items: SidebarNavItem[] = [
+    buildSidebarNavItem('/sales', {
+      key: 'sales-sub-workspace',
+      title: 'Workspace Sales',
+      description: 'Ringkasan lead, survey, order, dan progres aktivasi.',
+      href: '/sales',
+      matchPrefixes: ['/sales'],
+      excludePrefixes: [
+        '/sales/digital-creator',
+        '/sales/campaigns',
+        '/sales/digital-leads',
+        '/sales/content-calendar',
+        '/sales/content-analytics',
+        '/sales/marketing-activities',
+      ],
+    }),
+  ]
+
+  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING'].includes(role)) {
+    items.push(
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-marketing-activities',
+        title: 'Aktivitas Marketing',
+        description: 'Agenda canvassing, covered area, dan ritme aktivitas marketing.',
+        href: '/sales/marketing-activities',
+        matchPrefixes: ['/sales/marketing-activities'],
+      }),
+    )
+  }
+
+  return items
+}
+
+function buildSupportMainItem(role: AppRole | null) {
+  return buildSidebarNavItem('/support', {
+    key: 'support-noc-tt',
+    title: 'Support Teknis',
+    description: 'Queue teknis, TT, monitoring ticket, dan kontrol SLA operasional',
+    excludePrefixes: ['/support/isolations', '/support/dismantle'],
+    children: buildSupportSubmenuItems(role),
+  })
+}
+
+function buildSupportSubmenuItems(role: AppRole | null) {
+  if (!role) {
+    return []
+  }
+
+  const supportLaneItems: Array<{
+    lane: 'tt' | 'isolations' | 'dismantle' | 'sla'
+    key: string
+    title: string
+    description: string
+  }> = [
+    {
+      lane: 'tt',
+      key: 'support-sub-tt',
+      title: 'Trouble Ticket',
+      description: 'Queue ticket open, progress, ready close, dan tindak lanjut teknis.',
+    },
+    {
+      lane: 'isolations',
+      key: 'support-sub-isolations',
+      title: 'Isolir',
+      description: 'Monitoring pelanggan suspend, restore, dan sinkron support-billing.',
+    },
+    {
+      lane: 'dismantle',
+      key: 'support-sub-dismantle',
+      title: 'Dismantle',
+      description: 'Queue pembongkaran perangkat dan tindak lanjut terminasi lapangan.',
+    },
+    {
+      lane: 'sla',
+      key: 'support-sub-sla',
+      title: 'Kontrol SLA',
+      description: 'Pantau overdue, kedisiplinan progres, dan ticket yang perlu eskalasi.',
+    },
+  ]
+
+  return supportLaneItems
+    .filter((item) => canAccessSupportLane(role, item.lane))
+    .map((item) =>
+      buildSidebarNavItem('/support', {
+        key: item.key,
+        title: item.title,
+        description: item.description,
+        href: getSupportLanePath(item.lane),
+        matchPrefixes: [getSupportLanePath(item.lane)],
+      }),
+    )
+}
+
+function buildCsAdminItem() {
+  return buildSidebarNavItem('/customers', {
+    key: 'customers-cs-admin',
+    title: 'CS & Admin CS',
+    description: 'Approval, koreksi, restore, dan backlog risiko CS',
+    href: '/customers/cs-admin',
+    matchPrefixes: ['/customers/cs-admin', '/support/dismantle'],
+    allowedRoles: ['SUPER_ADMIN', 'CS_ADMIN'],
+    assignHrefs: ['/customers/cs-admin', '/support/dismantle'],
+  })
+}
+
+function buildCustomersMainItem(role: AppRole | null) {
+  const children = buildCustomersSubmenuItems(role)
+  return buildSidebarNavItem('/customers', {
+    key: 'customers-main',
+    title: 'Customer',
+    description: 'Data pelanggan, langganan aktif, dan tindak lanjut layanan.',
+    children: children.length > 1 ? children : undefined,
+  })
+}
+
+function buildCustomersSubmenuItems(role: AppRole | null) {
+  if (role !== 'SUPER_ADMIN') {
+    return []
+  }
+
+  return [
+    buildSidebarNavItem('/customers', {
+      key: 'customers-sub-workspace',
+      title: 'Workspace Customer',
+      description: 'Data pelanggan, layanan aktif, dan tindak lanjut operasional CS.',
+      href: '/customers',
+      matchPrefixes: ['/customers'],
+      excludePrefixes: ['/customers/cs-admin'],
+    }),
+    buildSidebarNavItem('/customers', {
+      key: 'customers-sub-cs-admin',
+      title: 'CS & Admin CS',
+      description: 'Approval, koreksi, restore, dan backlog risiko customer service.',
+      href: '/customers/cs-admin',
+      matchPrefixes: ['/customers/cs-admin'],
+    }),
+  ]
+}
+
+function buildDigitalCreatorItem() {
+  return buildSidebarNavItem('/sales', {
+    key: 'sales-digital-creator',
+    title: 'Digital Creator',
+    description: 'Campaign, lead digital, konten, dan analytics creator',
+    href: '/sales/digital-creator',
+    requiredPath: '/sales/digital-creator',
+    allowedRoles: ['SUPER_ADMIN', 'DIGITAL_CREATOR'],
+    assignHrefs: [
+      '/sales/digital-creator',
+      '/sales/campaigns',
+      '/sales/digital-leads',
+      '/sales/content-calendar',
+      '/sales/content-analytics',
+    ],
+    matchPrefixes: [
+      '/sales/digital-creator',
+      '/sales/campaigns',
+      '/sales/digital-leads',
+      '/sales/content-calendar',
+      '/sales/content-analytics',
+    ],
+    children: buildDigitalCreatorSubmenuItems(),
+  })
+}
+
+function buildDigitalCreatorSubmenuItems() {
+  return [
+    buildSidebarNavItem('/sales', {
+      key: 'sales-sub-digital-creator-home',
+      title: 'Workspace Creator',
+      description: 'Landing workspace campaign, lead digital, dan aktivitas konten.',
+      href: '/sales/digital-creator',
+      matchPrefixes: ['/sales/digital-creator'],
+    }),
+    buildSidebarNavItem('/sales', {
+      key: 'sales-sub-campaigns',
+      title: 'Campaign',
+      description: 'Kelola campaign dan jalur akuisisi digital.',
+      href: '/sales/campaigns',
+      matchPrefixes: ['/sales/campaigns'],
+    }),
+    buildSidebarNavItem('/sales', {
+      key: 'sales-sub-digital-leads',
+      title: 'Lead Digital',
+      description: 'Monitor lead masuk, funnel, dan tindak lanjut digital sales.',
+      href: '/sales/digital-leads',
+      matchPrefixes: ['/sales/digital-leads'],
+    }),
+    buildSidebarNavItem('/sales', {
+      key: 'sales-sub-content-calendar',
+      title: 'Kalender Konten',
+      description: 'Atur jadwal produksi dan publikasi konten marketing.',
+      href: '/sales/content-calendar',
+      matchPrefixes: ['/sales/content-calendar'],
+    }),
+    buildSidebarNavItem('/sales', {
+      key: 'sales-sub-content-analytics',
+      title: 'Analytics Konten',
+      description: 'Pantau performa konten, reach, dan engagement.',
+      href: '/sales/content-analytics',
+      matchPrefixes: ['/sales/content-analytics'],
+    }),
+  ]
+}
+
+function buildBillingMainItem(role: AppRole | null) {
+  return buildSidebarNavItem('/billing', {
+    key: 'billing-main',
+    title: 'Billing',
+    description: 'Invoice, payment, collection, dan kontrol suspend',
+    matchPrefixes: ['/billing', '/customers', '/support/isolations'],
+    assignHrefs: ['/billing', '/customers', '/support/isolations'],
+    children: buildBillingSubmenuItems(role),
+  })
+}
+
+function buildBillingSubmenuItems(role: AppRole | null) {
+  if (!role) {
+    return []
+  }
+
+  const items: SidebarNavItem[] = [
+    buildSidebarNavItem('/billing', {
+      key: 'billing-sub-workspace',
+      title: 'Workspace Billing',
+      description: 'Invoice, payment, collection, dan kontrol operasional billing.',
+      href: '/billing',
+      matchPrefixes: ['/billing'],
+    }),
+  ]
+
+  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'FINANCE'].includes(role)) {
+    items.push(
+      buildSidebarNavItem('/customers', {
+        key: 'billing-sub-customers',
+        title: 'Customer Billing',
+        description: 'Data pelanggan dan langganan untuk tindak lanjut invoice serta tagihan.',
+        href: '/customers',
+        matchPrefixes: ['/customers'],
+      }),
+      buildSidebarNavItem('/support', {
+        key: 'billing-sub-isolations',
+        title: 'Isolir Pelanggan',
+        description: 'Monitoring suspend aktif yang terkait penagihan dan restore.',
+        href: '/support/isolations',
+        matchPrefixes: ['/support/isolations'],
+      }),
+    )
+  }
+
+  return items
+}
+
+function buildHrMainItem() {
+  return buildSidebarNavItem('/hr', {
+    key: 'hr-main',
+    title: 'HR',
+    description: 'Employee, attendance, payroll, dan pinjaman karyawan',
+  })
+}
+
+function buildInventoryMainItem(role: AppRole | null) {
+  return buildSidebarNavItem('/inventory', {
+    key: 'inventory-main',
+    title: 'Inventory',
+    description: 'Ringkasan stok, request, pinjaman, rack, dan network inventory',
+    excludePrefixes: ['/inventory/legal', '/inventory/kantor', '/inventory/toko'],
+    children: buildInventorySubmenuItems(role),
+  })
+}
+
+function buildInventorySubmenuItems(role: AppRole | null) {
+  const canCreate = role != null && ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'GA', 'CS_ADMIN'].includes(role)
+  const canUpdate =
+    role != null &&
+    ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'GA', 'CS_ADMIN', 'CS_OPERATOR', 'NOC_OPERATOR', 'FIELD_TECHNICIAN'].includes(role)
+
+  const items: SidebarNavItem[] = []
+
+  if (role === 'FIELD_TECHNICIAN') {
+    items.push(
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-request-technician',
+        title: 'Request Barang',
+        description: 'Ajukan request barang untuk kebutuhan lapangan.',
+        href: '/inventory/requests?inventoryAction=item-request',
+        matchPrefixes: ['/inventory/requests'],
+      }),
+    )
+
+    return items
+  }
+
+  if (canUpdate) {
+    items.push(
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-request',
+        title: 'Request Barang',
+        description: 'Antrean request teknisi dan proses pengambilan barang.',
+        href: '/inventory/requests',
+        matchPrefixes: ['/inventory/requests'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-rack-layout',
+        title: 'Penataan Rak',
+        description: 'Kelola rak, barcode rak, dan struktur lokasi barang.',
+        href: '/inventory/racks',
+        matchPrefixes: ['/inventory/racks'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-loans',
+        title: 'Pinjaman',
+        description: 'Pinjamkan barang dan proses pengembalian dalam satu workspace.',
+        href: '/inventory/loans',
+        matchPrefixes: ['/inventory/loans'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-network',
+        title: 'Network & ODP',
+        description: 'Kelola ODP, port, assignment, dan return perangkat.',
+        href: '/inventory/network',
+        matchPrefixes: ['/inventory/network'],
+      }),
+    )
+  }
+
+  if (canCreate) {
+    items.push(
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-receipt',
+        title: 'Barang Masuk',
+        description: 'Fokus ke receipt stok gudang.',
+        href: '/inventory/receipts',
+        matchPrefixes: ['/inventory/receipts'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-stock-movement',
+        title: 'Stock Movement',
+        description: 'Barang keluar dan adjustment stok.',
+        href: '/inventory/movements',
+        matchPrefixes: ['/inventory/movements'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-items',
+        title: 'Item Master',
+        description: 'Master item inventory, barcode item, dan data stok dasar.',
+        href: '/inventory/items',
+        matchPrefixes: ['/inventory/items'],
+      }),
+    )
+  }
+
+  return items
+}
+
+function buildInventoryLegalItem() {
+  return buildSidebarNavItem('/inventory', {
+    key: 'inventory-legal',
+    title: 'Legal',
+    description: 'Dokumen, administrasi, dan tindak lanjut legal',
+    href: '/inventory/legal',
+    allowedRoles: ['SUPER_ADMIN'],
+    matchPrefixes: ['/inventory/legal'],
+  })
+}
+
+function buildInventoryKantorItem() {
+  return buildSidebarNavItem('/inventory', {
+    key: 'inventory-kantor',
+    title: 'Kantor',
+    description: 'Operasional kantor untuk stok aktif dan ritme kerja harian',
+    href: '/inventory/kantor',
+    allowedRoles: ['SUPER_ADMIN'],
+    matchPrefixes: ['/inventory/kantor'],
+  })
+}
+
+function buildInventoryTokoItem() {
+  return buildSidebarNavItem('/inventory', {
+    key: 'inventory-toko',
+    title: 'Toko (Segera)',
+    description: 'Business di luar ISP yang disiapkan bertahap',
+    href: '/inventory/toko',
+    allowedRoles: ['SUPER_ADMIN'],
+    matchPrefixes: ['/inventory/toko'],
+  })
+}
+
+function buildTeknisiLapanganItem() {
+  return buildSidebarNavItem('/support', {
+    key: 'support-teknisi-lapangan',
+    title: 'Teknisi Lapangan',
+    description: 'PSB, expan, jointer, dan tindak lanjut lapangan',
+    href: '/support/teknisi-psb',
+    requiredPath: '/support/teknisi-psb',
+    allowedRoles: ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
+    assignHrefs: ['/support/teknisi-psb', '/support/teknisi-expan', '/support/teknisi-jointer'],
+    matchPrefixes: ['/support/teknisi-psb', '/support/teknisi-expan', '/support/teknisi-jointer'],
+    children: buildTeknisiLapanganSubmenuItems(),
+  })
+}
+
+function buildTeknisiLapanganSubmenuItems() {
+  return [
+    buildSidebarNavItem('/support', {
+      key: 'support-sub-teknisi-psb',
+      title: 'PSB',
+      description: 'Pekerjaan pasang baru dan aktivasi pelanggan baru.',
+      href: '/support/teknisi-psb',
+      matchPrefixes: ['/support/teknisi-psb'],
+    }),
+    buildSidebarNavItem('/support', {
+      key: 'support-sub-teknisi-expan',
+      title: 'Expan',
+      description: 'Ekspansi jaringan dan tindak lanjut teknis area baru.',
+      href: '/support/teknisi-expan',
+      matchPrefixes: ['/support/teknisi-expan'],
+    }),
+    buildSidebarNavItem('/support', {
+      key: 'support-sub-teknisi-jointer',
+      title: 'Jointer',
+      description: 'Pekerjaan jointing dan penyambungan jaringan fiber.',
+      href: '/support/teknisi-jointer',
+      matchPrefixes: ['/support/teknisi-jointer'],
+    }),
+  ]
+}
+
+function buildTroubleTicketItem() {
+  return buildSidebarNavItem('/support', {
+    key: 'support-tt-only',
+    title: 'Trouble Ticket',
+    description: 'Queue TT open, progress, dan close',
+    href: '/support/tt',
+    requiredPath: '/support/tt',
+    allowedRoles: ['SUPER_ADMIN', 'TT_OPERATOR'],
+    assignHrefs: ['/support/tt'],
+    matchPrefixes: ['/support/tt'],
+  })
+}
+
+function buildDismantleItem() {
+  return buildSidebarNavItem('/support', {
+    key: 'support-dismantle-only',
+    title: 'Dismantle',
+    description: 'Queue pembongkaran perangkat dan tindak lanjut lapangan',
+    href: '/support/dismantle',
+    requiredPath: '/support/dismantle',
+    allowedRoles: ['SUPER_ADMIN', 'DISMANTLE_OPERATOR'],
+    assignHrefs: ['/support/dismantle'],
+    matchPrefixes: ['/support/dismantle'],
+  })
+}
+
+function filterCustomItems(items: SidebarNavItem[], allowedPrefixes: string[], role: AppRole | null) {
+  return items.filter(
+    (item) =>
+      allowedPrefixes.some((prefix) => matchesPrefix(item.requiredPath, prefix)) &&
+      (!item.allowedRoles || (role != null && item.allowedRoles.includes(role))),
+  )
+}
+
+function dedupeSidebarItems(items: SidebarNavItem[]) {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    if (seen.has(item.key)) return false
+    seen.add(item.key)
+    return true
+  })
+}
+
+function getPrimaryNavHrefs(role: AppRole | null) {
+  const base = ['/dashboard', '/dashboard/worklist', '/dashboard/daily-activity']
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+    return [...base, '/import']
+  }
+  return base
+}
+
+function getSuperAdminPrimaryHrefs(mode: SuperAdminSidebarMode) {
+  if (mode === 'compact') {
+    return ['/dashboard/worklist', '/dashboard/daily-activity', '/dashboard', '/import']
+  }
+  return ['/dashboard', '/dashboard/worklist', '/dashboard/daily-activity', '/import']
+}
+
+function getWorkspaceCustomItems(role: AppRole | null) {
+  switch (role) {
+    case 'SUPER_ADMIN':
+      return [
+        buildCsAdminItem(),
+        buildSupportMainItem(role),
+        buildSalesMainItem(role),
+        buildBillingMainItem(role),
+        buildInventoryMainItem(role),
+        buildHrMainItem(),
+      ]
+    case 'ADMIN':
+      return [
+        buildSalesMainItem(role),
+        buildCustomersMainItem(role),
+        buildSupportMainItem(role),
+        buildBillingMainItem(role),
+        buildInventoryMainItem(role),
+      ]
+    case 'OWNER':
+      return [
+        buildSalesMainItem(role),
+        buildCustomersMainItem(role),
+        buildSupportMainItem(role),
+        buildBillingMainItem(role),
+        buildInventoryMainItem(role),
+      ]
+    case 'FINANCE':
+      return [buildBillingMainItem(role)]
+    case 'HR':
+      return [buildHrMainItem()]
+    case 'GA':
+      return [buildInventoryMainItem(role)]
+    case 'PENJUALAN':
+    case 'SALES_MARKETING':
+      return [buildSalesMainItem(role)]
+    case 'CS_OPERATOR':
+      return [buildCustomersMainItem(role)]
+    case 'CS_ADMIN':
+      return [buildCsAdminItem()]
+    case 'NOC_OPERATOR':
+      return [buildSupportMainItem(role)]
+    case 'FIELD_TECHNICIAN':
+      return [buildTeknisiLapanganItem()]
+    case 'TT_OPERATOR':
+      return [buildTroubleTicketItem()]
+    case 'DIGITAL_CREATOR':
+      return [buildDigitalCreatorItem()]
+    case 'DISMANTLE_OPERATOR':
+      return [buildDismantleItem()]
+    default:
+      return []
+  }
+}
+
+function getSuperAdminCompactWorkspaceItems() {
+  return [
+    buildCsAdminItem(),
+    buildSupportMainItem('SUPER_ADMIN'),
+    buildSalesMainItem('SUPER_ADMIN'),
+    buildBillingMainItem('SUPER_ADMIN'),
+  ]
+}
+
+function getSupportingCustomItems(role: AppRole | null) {
+  switch (role) {
+    case 'SUPER_ADMIN':
+      return [
+        buildCustomersMainItem(role),
+        buildDigitalCreatorItem(),
+        buildTeknisiLapanganItem(),
+        buildInventoryLegalItem(),
+        buildInventoryKantorItem(),
+      ]
+    case 'ADMIN':
+    case 'OWNER':
+      return []
+    case 'PENJUALAN':
+    case 'SALES_MARKETING':
+      return [buildCustomersMainItem(role)]
+    case 'NOC_OPERATOR':
+      return [buildInventoryMainItem(role)]
+    default:
+      return []
+  }
+}
+
+function buildSidebarSections(params: {
+  allowedItems: typeof navigationItems
+  allowedPrefixes: string[]
+  role: AppRole | null
+  superAdminMode: SuperAdminSidebarMode
+}) {
+  const sortedItems = sortByPreferredOrder({ items: params.allowedItems, role: params.role })
+  const coreItems = sortedItems.filter((item) => !item.href.startsWith('/settings'))
+  const settingsItems = sortedItems
+    .filter((item) => item.href.startsWith('/settings'))
+    .map(mapNavigationItemToSidebarNavItem)
+
+  const primaryHrefs = new Set(
+    params.role === 'SUPER_ADMIN'
+      ? getSuperAdminPrimaryHrefs(params.superAdminMode)
+      : getPrimaryNavHrefs(params.role),
+  )
+  const primaryItems = coreItems
+    .filter((item) => primaryHrefs.has(item.href))
+    .map(mapNavigationItemToSidebarNavItem)
+
+  const rawWorkspaceItems =
+    params.role === 'SUPER_ADMIN' && params.superAdminMode === 'compact'
+      ? getSuperAdminCompactWorkspaceItems()
+      : getWorkspaceCustomItems(params.role)
+
+  const workspaceItems = dedupeSidebarItems(
+    filterCustomItems(rawWorkspaceItems, params.allowedPrefixes, params.role),
+  )
+
+  const supportingCustomItems =
+    params.role === 'SUPER_ADMIN' && params.superAdminMode === 'compact'
+      ? []
+      : dedupeSidebarItems(filterCustomItems(getSupportingCustomItems(params.role), params.allowedPrefixes, params.role))
+
+  const assignedBaseHrefs = new Set(
+    [...primaryItems, ...workspaceItems, ...supportingCustomItems].flatMap((item) =>
+      (item.assignHrefs ?? [item.href]).map((href) => href.split('?')[0] ?? href),
+    ),
+  )
+
+  const supportingBaseItems =
+    params.role === 'SUPER_ADMIN' && params.superAdminMode === 'compact'
+      ? []
+      : coreItems.filter((item) => !assignedBaseHrefs.has(item.href)).map(mapNavigationItemToSidebarNavItem)
+
+  const primaryTitle =
+    params.role === 'SUPER_ADMIN' ? 'Control Center' : 'Utama'
+  const workspaceTitle =
+    params.role === 'SUPER_ADMIN'
+      ? params.superAdminMode === 'compact'
+        ? 'Operasional Inti'
+        : 'Lintas Divisi'
+      : 'Workspace'
+  const supportingTitle =
+    params.role === 'SUPER_ADMIN' ? 'Pengawasan' : 'Pendukung'
+
+  const sections: SidebarSectionData[] = [
+    { title: primaryTitle, items: primaryItems },
+    { title: workspaceTitle, items: workspaceItems },
+    { title: supportingTitle, items: dedupeSidebarItems([...supportingCustomItems, ...supportingBaseItems]) },
+  ]
+
+  return {
+    coreSections: sections.filter((section) => section.items.length > 0),
+    settingsItems,
+  }
+}
+
+function isSidebarItemActive(
+  item: SidebarNavItem,
+  pathname: string,
+  focus: string,
+  currentQueryParams?: URLSearchParams,
+) {
   const matchPrefixes = item.matchPrefixes ?? [item.href.split('?')[0] ?? item.href]
   const matchesPath = matchPrefixes.some((prefix) => matchesPrefix(pathname, prefix))
   if (!matchesPath) return false
@@ -305,44 +802,60 @@ function isSidebarItemActive(item: SidebarNavItem, pathname: string, focus: stri
     return false
   }
 
+  if (item.matchQueryParams && currentQueryParams) {
+    const matchesQuery = Object.entries(item.matchQueryParams).every(([key, value]) => {
+      const currentValue = String(currentQueryParams.get(key) ?? '').trim().toLowerCase()
+      const expectedValues = Array.isArray(value) ? value : [value]
+      return expectedValues.map((item) => item.trim().toLowerCase()).includes(currentValue)
+    })
+
+    if (!matchesQuery) {
+      return false
+    }
+  }
+
   return true
 }
 
 function SidebarBrand({
   collapsed,
+  language,
   onNavigate,
 }: {
   collapsed: boolean
+  language: 'id' | 'en'
   onNavigate?: () => void
 }) {
   return (
     <Link
       href="/dashboard"
-      className={collapsed ? 'flex flex-col items-center gap-3' : 'space-y-3'}
+      className={collapsed ? 'flex flex-col items-center gap-2.5' : 'space-y-2'}
       onClick={onNavigate}
     >
       <div
         className={`overflow-hidden border border-slate-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.24)] ${
-          collapsed ? 'flex h-14 w-14 items-center justify-center rounded-2xl p-2' : 'max-w-[13rem] rounded-2xl px-2 py-0.5'
+          collapsed ? 'flex h-12 w-12 items-center justify-center rounded-2xl p-2' : 'max-w-[11.5rem] rounded-2xl px-2 py-0.5'
         }`}
       >
         <Image
           src="/branding/perkasa-networks-original.png"
           alt="Perkasa Networks"
-          width={collapsed ? 40 : 200}
-          height={collapsed ? 40 : 74}
+          width={collapsed ? 34 : 176}
+          height={collapsed ? 34 : 64}
           priority
-          className={collapsed ? 'h-10 w-10 object-contain' : 'h-auto w-full object-contain'}
+          className={collapsed ? 'h-8 w-8 object-contain' : 'h-auto w-full object-contain'}
         />
       </div>
       <div className={collapsed ? 'text-center' : ''}>
-        <p className="font-[family-name:var(--font-heading)] text-2xl font-semibold">
+        <p className="font-[family-name:var(--font-heading)] text-xl font-semibold leading-tight">
           {collapsed ? 'ERP' : 'ERP OSS BSS'}
         </p>
         {!collapsed ? (
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            Satu website operasional untuk migrasi data, kontrol divisi, dan modul bisnis ISP.
-            Masuk ke list kerja, queue, dan modul harian tanpa perlu menebak alur dari awal.
+          <p className="mt-1 text-xs leading-5 text-slate-400">
+            {translateUiText(
+              'Masuk ke queue, list kerja, dan modul harian tanpa perlu menebak alur dari awal.',
+              language,
+            )}
           </p>
         ) : null}
       </div>
@@ -355,97 +868,216 @@ function SidebarSection({
   items,
   pathname,
   focus,
+  currentQueryParams,
   collapsed,
+  language,
+  expandedItems = {},
+  onToggleExpanded = () => {},
   onNavigate,
 }: {
   title: string
   items: SidebarNavItem[]
   pathname: string
   focus: string
+  currentQueryParams: URLSearchParams
   collapsed: boolean
+  language: 'id' | 'en'
+  expandedItems: Record<string, boolean>
+  onToggleExpanded: (key: string, nextExpanded: boolean) => void
   onNavigate?: () => void
 }) {
   if (!items.length) return null
+  const isWorkspaceSection =
+    title === 'Workspace' || title === 'Operasional Inti' || title === 'Lintas Divisi'
+  const sectionTitleClass = isWorkspaceSection
+    ? 'text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-200'
+    : 'text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500'
+  const sectionBadgeClass = isWorkspaceSection
+    ? 'border border-slate-700 bg-slate-800 text-slate-200'
+    : 'border border-slate-800 bg-slate-900 text-slate-400'
 
   return (
-    <div className="space-y-2">
-      {!collapsed ? <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{title}</p> : null}
+    <div className={collapsed ? 'space-y-2' : 'space-y-1.5'}>
+      {!collapsed ? (
+        <div className="flex items-center justify-between gap-3 px-1">
+          <p className={sectionTitleClass}>{translateUiText(title, language)}</p>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${sectionBadgeClass}`}>
+            {items.length}
+          </span>
+        </div>
+      ) : null}
       {items.map((item) => {
-        const active = isSidebarItemActive(item, pathname, focus)
+        const active = isSidebarItemActive(item, pathname, focus, currentQueryParams)
+        const activeChild =
+          item.children?.some((child) => isSidebarItemActive(child, pathname, focus, currentQueryParams)) ?? false
+        const hasChildren = Boolean(item.children?.length)
+        const expanded = hasChildren ? (expandedItems[item.key] ?? (active || activeChild)) : false
         const Icon = item.icon
+        const itemHighlighted = active || activeChild
+        const showDescription =
+          !collapsed && (active || activeChild || (!hasChildren && isWorkspaceSection))
+        const itemTitle = translateUiText(item.title, language)
+        const itemDescription = translateUiText(item.description, language)
+
+        const handleItemClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
+          if (!hasChildren || collapsed) {
+            onNavigate?.()
+            return
+          }
+
+          if (active || activeChild) {
+            event.preventDefault()
+            onToggleExpanded(item.key, !expanded)
+            return
+          }
+
+          onToggleExpanded(item.key, true)
+          onNavigate?.()
+        }
 
         return (
-          <Link
-            key={item.key}
-            href={item.href}
-            onClick={onNavigate}
-            title={item.title}
-            className={`block rounded-2xl border transition ${
-              collapsed ? 'px-3 py-3' : 'px-4 py-4'
-            } ${
-              active
-                ? 'border-slate-600 bg-slate-900 shadow-lg'
-                : 'border-slate-900 bg-slate-950 hover:border-slate-800 hover:bg-slate-900'
-            }`}
-          >
-            <div className={`flex ${collapsed ? 'justify-center' : 'items-start gap-3'}`}>
-              <span className={`rounded-xl p-2 ${item.tone}`}>
-                <Icon className="h-4 w-4" />
-              </span>
-              {!collapsed ? (
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold">{item.title}</p>
-                  <p className="text-xs leading-5 text-slate-400">{item.description}</p>
-                </div>
+          <div key={item.key} className="space-y-1.5">
+            <Link
+              href={item.href}
+              onClick={handleItemClick}
+              title={itemTitle}
+              className={`relative block overflow-hidden rounded-2xl border transition ${
+                collapsed ? 'px-3 py-3' : 'px-3.5 py-2.5'
+              } ${
+                active
+                  ? 'border-slate-600 bg-slate-900 shadow-[0_10px_24px_rgba(15,23,42,0.24)]'
+                  : activeChild
+                    ? 'border-slate-800 bg-slate-900/60 shadow-[0_8px_18px_rgba(15,23,42,0.16)]'
+                  : 'border-slate-900 bg-slate-950 hover:border-slate-800 hover:bg-slate-900'
+              }`}
+            >
+              {itemHighlighted ? (
+                <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-white/90" aria-hidden="true" />
               ) : null}
-            </div>
-          </Link>
+              <div className={`flex ${collapsed ? 'justify-center' : 'items-center gap-3'}`}>
+                <span className={`shrink-0 rounded-xl ${collapsed ? 'p-2' : 'p-1.5'} ${item.tone}`}>
+                  <Icon className="h-4 w-4" />
+                </span>
+                {!collapsed ? (
+                  <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="truncate text-sm font-semibold text-slate-100">{itemTitle}</p>
+                      {showDescription ? (
+                        <p className="truncate text-[11px] leading-4 text-slate-400">{itemDescription}</p>
+                      ) : null}
+                    </div>
+                    {hasChildren ? (
+                      <span className="mt-0.5 shrink-0 text-slate-400">
+                        {expanded ? 'v' : '>'}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </Link>
+
+            {!collapsed && item.children?.length && expanded ? (
+              <div
+                className={`ml-4 space-y-1 border-l pl-3 ${
+                  itemHighlighted ? 'border-slate-700' : 'border-slate-900'
+                }`}
+              >
+                {item.children.map((child) => {
+                  const childActive = isSidebarItemActive(child, pathname, focus, currentQueryParams)
+                  const childTitle = translateUiText(child.title, language)
+                  const childDescription = translateUiText(child.description, language)
+
+                  return (
+                    <Link
+                      key={child.key}
+                      href={child.href}
+                      onClick={onNavigate}
+                      title={childTitle}
+                      className={`block rounded-xl border px-3 py-1.5 text-sm transition ${
+                        childActive
+                          ? 'border-slate-800 bg-slate-900 font-semibold text-white'
+                          : 'border-transparent text-slate-400 hover:border-slate-900 hover:bg-slate-900 hover:text-slate-200'
+                      }`}
+                    >
+                      <p className="truncate">{childTitle}</p>
+                      {childActive ? (
+                        <p className="truncate text-[11px] leading-4 text-slate-500">{childDescription}</p>
+                      ) : null}
+                    </Link>
+                  )
+                })}
+              </div>
+            ) : null}
+          </div>
         )
       })}
     </div>
   )
 }
 
-function SidebarGroupSection({
-  title,
-  items,
-  emptyHint,
-  pathname,
-  focus,
+function SuperAdminModeSwitch({
+  mode,
   collapsed,
-  onNavigate,
+  language,
+  onChange,
 }: {
-  title: string
-  items: SidebarNavItem[]
-  emptyHint?: string
-  pathname: string
-  focus: string
+  mode: SuperAdminSidebarMode
   collapsed: boolean
-  onNavigate?: () => void
+  language: 'id' | 'en'
+  onChange: (mode: SuperAdminSidebarMode) => void
 }) {
-  if (items.length === 0) {
-    if (collapsed) return null
-
+  if (collapsed) {
     return (
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{title}</p>
-        <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/70 px-4 py-4">
-          <p className="text-sm font-semibold text-slate-200">Belum ada workspace aktif</p>
-          {emptyHint ? <p className="mt-2 text-xs leading-5 text-slate-400">{emptyHint}</p> : null}
-        </div>
+      <div className="mt-4 flex justify-center">
+        <button
+          type="button"
+          onClick={() => onChange(mode === 'compact' ? 'full' : 'compact')}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300 transition hover:border-slate-700 hover:text-white"
+          aria-label={
+            mode === 'compact'
+              ? translateUiText('Mode Kontrol', language)
+              : translateUiText('Mode Harian', language)
+          }
+          title={
+            mode === 'compact'
+              ? translateUiText('Mode Harian', language)
+              : translateUiText('Mode Kontrol', language)
+          }
+        >
+          {mode === 'compact' ? 'H' : 'K'}
+        </button>
       </div>
     )
   }
 
   return (
-    <SidebarSection
-      title={title}
-      items={items}
-      pathname={pathname}
-      focus={focus}
-      collapsed={collapsed}
-      onNavigate={onNavigate}
-    />
+    <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-1">
+      <div className="flex items-center gap-1">
+        {([
+          ['compact', 'Mode Harian'],
+          ['full', 'Mode Kontrol'],
+        ] as const).map(([value, label]) => {
+          const active = mode === value
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onChange(value)}
+              className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                active ? 'bg-white text-slate-950' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {translateUiText(label, language)}
+            </button>
+          )
+        })}
+      </div>
+      <p className="px-3 pb-2 pt-2 text-[11px] leading-4 text-slate-400">
+        {mode === 'compact'
+          ? translateUiText('Fokus ke queue cepat, daily activity, dan workspace inti.', language)
+          : translateUiText('Tampilkan area lintas divisi dan menu pengawasan yang lebih lengkap.', language)}
+      </p>
+    </div>
   )
 }
 
@@ -456,30 +1088,44 @@ export function Sidebar({
   session: AppSession | null
   allowedPrefixes: string[]
 }) {
+  const { language } = useUiLanguage()
   const pathname = usePathname()
+  const currentQueryParams =
+    typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)
   const focus =
-    typeof window === 'undefined'
-      ? ''
-      : String(new URLSearchParams(window.location.search).get('focus') ?? '')
-          .trim()
-          .toUpperCase()
-  const roleMeta = session ? getRoleMeta(session.role) : null
+    String(currentQueryParams.get('focus') ?? '')
+      .trim()
+      .toUpperCase()
+  const roleMeta = session ? getRoleMeta(session.role, language) : null
+  const isSuperAdmin = session?.role === 'SUPER_ADMIN'
   const allowedItems = navigationItems.filter((item) =>
     allowedPrefixes.some((prefix) => matchesPrefix(item.href, prefix))
   )
-  const sortedItems = sortByPreferredOrder({ items: allowedItems, role: session?.role ?? null })
-  const coreItems = sortedItems.filter((item) => !item.href.startsWith('/settings'))
-  const settingsItems = sortedItems.filter((item) => item.href.startsWith('/settings'))
-  const groupedCoreItems = groupSidebarItems(coreItems, allowedPrefixes, session?.role ?? null)
-  const settingsSidebarItems = settingsItems.map(mapNavigationItemToSidebarNavItem)
-  const mobileQuickItems = groupedCoreItems.flatMap((group) => group.items).slice(0, 5)
+  const [superAdminMode, setSuperAdminMode] = useState<SuperAdminSidebarMode>('compact')
+  const { coreSections, settingsItems } = buildSidebarSections({
+    allowedItems,
+    allowedPrefixes,
+    role: session?.role ?? null,
+    superAdminMode,
+  })
+  const mobileQuickItems = coreSections.flatMap((section) => section.items).slice(0, 5)
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const stored = window.localStorage.getItem('perkasa.sidebar.collapsed')
     if (stored === '1') {
       setCollapsed(true)
+    }
+    const storedExpandedItems = window.localStorage.getItem('perkasa.sidebar.expanded-items')
+    if (storedExpandedItems) {
+      try {
+        const parsed = JSON.parse(storedExpandedItems) as Record<string, boolean>
+        if (parsed && typeof parsed === 'object') {
+          setExpandedItems(parsed)
+        }
+      } catch {}
     }
   }, [])
 
@@ -488,24 +1134,50 @@ export function Sidebar({
   }, [collapsed])
 
   useEffect(() => {
+    window.localStorage.setItem('perkasa.sidebar.expanded-items', JSON.stringify(expandedItems))
+  }, [expandedItems])
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem('perkasa.sidebar.superadmin-mode')
+    if (stored === 'full' || stored === 'compact') {
+      setSuperAdminMode(stored)
+    }
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem('perkasa.sidebar.superadmin-mode', superAdminMode)
+  }, [superAdminMode])
+
+  useEffect(() => {
     setMobileOpen(false)
   }, [pathname])
+
+  const handleToggleExpanded = (key: string, nextExpanded: boolean) => {
+    setExpandedItems(nextExpanded ? { [key]: true } : { [key]: false })
+  }
 
   const desktopWidthClass = collapsed ? 'w-24 px-3' : 'w-80 px-6'
 
   return (
     <>
-      <aside className={`hidden flex-col border-r border-slate-800 bg-slate-950 py-8 text-slate-100 transition-all duration-200 lg:flex ${desktopWidthClass}`}>
+      <aside
+        className={`hidden flex-col py-8 transition-all duration-200 lg:flex ${desktopWidthClass}`}
+        style={{
+          borderRight: '1px solid var(--color-sidebar-line)',
+          backgroundColor: 'var(--color-sidebar)',
+          color: 'var(--color-sidebar-ink)',
+        }}
+      >
         <div className={`flex ${collapsed ? 'justify-center' : 'items-start justify-between gap-4'}`}>
-          <SidebarBrand collapsed={collapsed} />
+          <SidebarBrand collapsed={collapsed} language={language} />
 
           {!collapsed ? (
             <button
               type="button"
               onClick={() => setCollapsed(true)}
               className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-slate-300 transition hover:border-slate-700 hover:text-white"
-              aria-label="Minimalkan sidebar"
-              title="Minimalkan sidebar"
+              aria-label={translateUiText('Minimalkan sidebar', language)}
+              title={translateUiText('Minimalkan sidebar', language)}
             >
               <span aria-hidden="true" className="text-lg leading-none">
                 <span>{'<'}</span>
@@ -520,8 +1192,8 @@ export function Sidebar({
               type="button"
               onClick={() => setCollapsed(false)}
               className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-slate-300 transition hover:border-slate-700 hover:text-white"
-              aria-label="Tampilkan sidebar"
-              title="Tampilkan sidebar"
+              aria-label={translateUiText('Tampilkan sidebar', language)}
+              title={translateUiText('Tampilkan sidebar', language)}
             >
               <span aria-hidden="true" className="text-lg leading-none">
                 <span>{'>'}</span>
@@ -530,75 +1202,91 @@ export function Sidebar({
           </div>
         ) : null}
 
+        {isSuperAdmin ? (
+          <SuperAdminModeSwitch
+            mode={superAdminMode}
+            collapsed={collapsed}
+            language={language}
+            onChange={setSuperAdminMode}
+          />
+        ) : null}
+
         <nav className="mt-10 space-y-6">
-          {groupedCoreItems.map((group) => (
-            <SidebarGroupSection
-              key={group.title}
-              title={group.title}
-              items={group.items}
-              emptyHint={group.emptyHint}
+          {coreSections.map((section) => (
+            <SidebarSection
+              key={section.title}
+              title={section.title}
+              items={section.items}
               pathname={pathname}
               focus={focus}
+              currentQueryParams={currentQueryParams}
               collapsed={collapsed}
+              language={language}
+              expandedItems={expandedItems}
+              onToggleExpanded={handleToggleExpanded}
             />
           ))}
           <SidebarSection
             title="Pengaturan"
-            items={settingsSidebarItems}
+            items={settingsItems}
             pathname={pathname}
             focus={focus}
+            currentQueryParams={currentQueryParams}
             collapsed={collapsed}
+            language={language}
+            expandedItems={expandedItems}
+            onToggleExpanded={handleToggleExpanded}
           />
         </nav>
 
-        <div className={`mt-auto rounded-2xl border border-slate-800 bg-slate-900 ${collapsed ? 'p-3' : 'p-5'}`}>
-          <p className={`text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 ${collapsed ? 'text-center' : ''}`}>
-            {session ? 'Role Aktif' : 'Review DB'}
+        <div className={`mt-auto rounded-2xl border border-slate-800 bg-slate-900 ${collapsed ? 'p-3' : 'p-4'}`}>
+          <p className={`text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 ${collapsed ? 'text-center' : ''}`}>
+            {session ? translateUiText('Role Aktif', language) : 'Review DB'}
           </p>
           {session && roleMeta ? (
-            <div className={`mt-3 ${collapsed ? 'space-y-2 text-center' : 'space-y-3'}`}>
+            <div className={`mt-3 ${collapsed ? 'space-y-2 text-center' : 'space-y-2.5'}`}>
               <span className={`badge border-transparent ${roleMeta.tone}`}>{collapsed ? roleMeta.shortLabel : roleMeta.label}</span>
               {!collapsed ? (
-                <>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    {roleMeta.division} / {roleMeta.subdivision}
-                  </p>
-                  <p className="text-sm leading-6 text-slate-300">{roleMeta.scope}</p>
-                </>
+                <p className="truncate text-xs uppercase tracking-[0.18em] text-slate-500">
+                  {roleMeta.division} / {roleMeta.subdivision}
+                </p>
               ) : null}
             </div>
           ) : !collapsed ? (
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Shell ini sedang dipakai sebagai basis kerja review DB. Fokus utamanya adalah memastikan
-              tim bisa langsung masuk ke queue dan modul harian tanpa bingung membaca status teknis.
+            <p className="mt-3 text-xs leading-5 text-slate-300">
+              {translateUiText('Shell review DB untuk uji alur harian sebelum hosting.', language)}
             </p>
           ) : null}
         </div>
       </aside>
 
-      <nav className="sticky top-0 z-30 border-b border-line bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
+      <nav
+        className="sticky top-0 z-30 border-b border-line px-4 py-3 backdrop-blur lg:hidden"
+        style={{ backgroundColor: 'var(--color-topbar)' }}
+      >
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700"
-            aria-label="Tampilkan menu"
+            className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink"
+            aria-label={translateUiText('Tampilkan menu', language)}
           >
-            Menu
+            {translateUiText('Menu', language)}
           </button>
           <div className="flex gap-3 overflow-x-auto pb-1">
           {mobileQuickItems.map((item) => {
-            const active = isSidebarItemActive(item, pathname, focus)
+            const active = isSidebarItemActive(item, pathname, focus, currentQueryParams)
 
             return (
               <Link
                 key={item.key}
                 href={item.href}
                 className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
-                  active ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-600'
+                    active ? 'bg-panel text-surface' : 'text-mute'
                 }`}
+                style={active ? undefined : { backgroundColor: 'var(--color-card-subtle)' }}
               >
-                {item.title}
+                {translateUiText(item.title, language)}
               </Link>
             )
           })}
@@ -612,16 +1300,23 @@ export function Sidebar({
             type="button"
             className="absolute inset-0 bg-slate-950/60"
             onClick={() => setMobileOpen(false)}
-            aria-label="Tutup menu"
+            aria-label={translateUiText('Tutup menu', language)}
           />
-          <aside className="relative flex h-full w-80 max-w-[88vw] flex-col border-r border-slate-800 bg-slate-950 px-6 py-6 text-slate-100 shadow-2xl">
+          <aside
+            className="relative flex h-full w-80 max-w-[88vw] flex-col px-6 py-6 shadow-2xl"
+            style={{
+              borderRight: '1px solid var(--color-sidebar-line)',
+              backgroundColor: 'var(--color-sidebar)',
+              color: 'var(--color-sidebar-ink)',
+            }}
+          >
             <div className="flex items-start justify-between gap-4">
-              <SidebarBrand collapsed={false} onNavigate={() => setMobileOpen(false)} />
+              <SidebarBrand collapsed={false} language={language} onNavigate={() => setMobileOpen(false)} />
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-slate-300"
-                aria-label="Tutup menu"
+                aria-label={translateUiText('Tutup menu', language)}
               >
                 <span aria-hidden="true" className="text-lg leading-none">
                   x
@@ -629,32 +1324,48 @@ export function Sidebar({
               </button>
             </div>
 
+            {isSuperAdmin ? (
+              <SuperAdminModeSwitch
+                mode={superAdminMode}
+                collapsed={false}
+                language={language}
+                onChange={setSuperAdminMode}
+              />
+            ) : null}
+
             <nav className="mt-8 space-y-6 overflow-y-auto pr-1">
-              {groupedCoreItems.map((group) => (
-                <SidebarGroupSection
-                  key={group.title}
-                  title={group.title}
-                  items={group.items}
-                  emptyHint={group.emptyHint}
+              {coreSections.map((section) => (
+                <SidebarSection
+                  key={section.title}
+                  title={section.title}
+                  items={section.items}
                   pathname={pathname}
                   focus={focus}
+                  currentQueryParams={currentQueryParams}
                   collapsed={false}
+                  language={language}
+                  expandedItems={expandedItems}
+                  onToggleExpanded={handleToggleExpanded}
                   onNavigate={() => setMobileOpen(false)}
                 />
               ))}
               <SidebarSection
                 title="Pengaturan"
-                items={settingsSidebarItems}
+                items={settingsItems}
                 pathname={pathname}
                 focus={focus}
+                currentQueryParams={currentQueryParams}
                 collapsed={false}
+                language={language}
+                expandedItems={expandedItems}
+                onToggleExpanded={handleToggleExpanded}
                 onNavigate={() => setMobileOpen(false)}
               />
             </nav>
 
             <div className="mt-auto rounded-2xl border border-slate-800 bg-slate-900 p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                {session ? 'Role Aktif' : 'Review DB'}
+                {session ? translateUiText('Role Aktif', language) : 'Review DB'}
               </p>
               {session && roleMeta ? (
                 <div className="mt-3 space-y-3">
@@ -666,7 +1377,10 @@ export function Sidebar({
                 </div>
               ) : (
                 <p className="mt-3 text-sm leading-6 text-slate-300">
-                  Shell ini dipakai untuk review DB dan uji alur harian sebelum masuk ke tahap hosting.
+                  {translateUiText(
+                    'Shell ini dipakai untuk review DB dan uji alur harian sebelum masuk ke tahap hosting.',
+                    language,
+                  )}
                 </p>
               )}
             </div>

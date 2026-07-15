@@ -1,3 +1,5 @@
+import { InventoryStockMovementForm } from '@/components/inventory-stock-movement-form'
+import { InventoryStockReceiptForm } from '@/components/inventory-stock-receipt-form'
 import type { DomainReviewSection } from '@/lib/types'
 
 function pickMeta(meta: string[], prefix: string) {
@@ -6,8 +8,20 @@ function pickMeta(meta: string[], prefix: string) {
 
 export function InventoryStockReceiptPanel({
   sections,
+  canCreate,
+  reviewDbReady,
+  itemSuggestions,
+  rackSuggestions,
+  requireScan,
+  initialItemValue,
 }: {
   sections: DomainReviewSection[]
+  canCreate: boolean
+  reviewDbReady: boolean
+  itemSuggestions: string[]
+  rackSuggestions: string[]
+  requireScan: boolean
+  initialItemValue?: string
 }) {
   const movementSection =
     sections.find((section) => section.title.toUpperCase().includes('STOCK MOVEMENT')) ?? null
@@ -30,13 +44,13 @@ export function InventoryStockReceiptPanel({
     <section className="panel p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="section-title">Ringkasan Barang Masuk</p>
+          <p className="section-title">Stock & Movement</p>
           <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-            Penerimaan stok terbaru yang mudah dipantau
+            Barang masuk dan movement stok dalam satu workspace
           </h3>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-            Panel ini memisahkan arus barang masuk dari movement lain, sehingga gudang bisa langsung
-            memeriksa penerimaan stok tanpa membaca `OUT` atau `ADJUSTMENT`.
+            Workspace ini menyatukan pencatatan barang masuk dan stock movement agar gudang tidak
+            berpindah konteks saat mengelola arus stok harian.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -44,6 +58,32 @@ export function InventoryStockReceiptPanel({
           <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">{totalQty} qty masuk</span>
         </div>
       </div>
+
+      <article className="mt-6 rounded-2xl border border-line bg-slate-50 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi Workspace</p>
+        <div className="mt-4 grid gap-4 xl:grid-cols-2">
+          <div id="inventory-action-stock-receipt" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4">
+            <InventoryStockReceiptForm
+              canCreate={canCreate}
+              reviewDbReady={reviewDbReady}
+              itemSuggestions={itemSuggestions}
+              initialItemValue={initialItemValue}
+              embedded
+            />
+          </div>
+          <div id="inventory-action-stock-movement" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4">
+            <InventoryStockMovementForm
+              canCreate={canCreate}
+              reviewDbReady={reviewDbReady}
+              itemSuggestions={itemSuggestions}
+              rackSuggestions={rackSuggestions}
+              requireScan={requireScan}
+              initialItemValue={initialItemValue}
+              embedded
+            />
+          </div>
+        </div>
+      </article>
 
       <div className="mt-6 space-y-3">
         {inboundRows.map((row) => {

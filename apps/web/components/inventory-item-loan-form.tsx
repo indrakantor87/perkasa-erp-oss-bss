@@ -3,11 +3,16 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
 
 type InventoryItemLoanFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   itemSuggestions: string[]
+  rackSuggestions: string[]
+  requireScan: boolean
+  initialItemValue?: string
+  embedded?: boolean
 }
 
 function extractItemCode(value: string) {
@@ -18,9 +23,14 @@ export function InventoryItemLoanForm({
   canCreate,
   reviewDbReady,
   itemSuggestions,
+  rackSuggestions,
+  requireScan,
+  initialItemValue,
+  embedded = false,
 }: InventoryItemLoanFormProps) {
   const router = useRouter()
-  const [itemValue, setItemValue] = useState(itemSuggestions[0] ?? '')
+  const [itemValue, setItemValue] = useState(initialItemValue || itemSuggestions[0] || '')
+  const [scanValue, setScanValue] = useState('')
   const [qty, setQty] = useState('1')
   const [borrowerName, setBorrowerName] = useState('')
   const [borrowerDivision, setBorrowerDivision] = useState('Teknisi')
@@ -44,6 +54,25 @@ export function InventoryItemLoanForm({
       })
       return
     }
+    const scannedRackBarcode = extractItemCode(scanValue)
+    if (requireScan) {
+      if (!scannedRackBarcode) {
+        setFeedback({
+          tone: 'error',
+          message: 'Scan barcode rak wajib dilakukan sebelum pinjaman barang disimpan.',
+        })
+        return
+      }
+      const matchedRack = rackSuggestions.find((item) => item.split('|')[0]?.trim().toUpperCase() === scannedRackBarcode.toUpperCase())
+      const matchedItemCode = matchedRack?.split('|')[1]?.trim() ?? ''
+      if (matchedItemCode.toUpperCase() !== itemCode.toUpperCase()) {
+        setFeedback({
+          tone: 'error',
+          message: `Barcode rak tidak cocok. Form memilih ${itemCode}, tetapi barcode rak terbaca untuk ${matchedItemCode || 'item lain'}.`,
+        })
+        return
+      }
+    }
 
     setSubmitting(true)
     setFeedback(null)
@@ -60,6 +89,7 @@ export function InventoryItemLoanForm({
           borrowerSubdivision,
           dueAt,
           loanNotes,
+          scannedRackBarcode: requireScan ? scannedRackBarcode : '',
         }),
       })
 
@@ -82,6 +112,7 @@ export function InventoryItemLoanForm({
       setBorrowerSubdivision('')
       setDueAt('')
       setLoanNotes('')
+      setScanValue('')
       router.refresh()
     } finally {
       setSubmitting(false)
@@ -89,12 +120,12 @@ export function InventoryItemLoanForm({
   }
 
   return (
-    <section className="panel p-6">
+    <section className={embedded ? 'space-y-4' : 'panel p-6'}>
       <p className="section-title">Pinjaman Inventory</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+      <h3 className={`font-[family-name:var(--font-heading)] font-semibold tracking-tight text-slate-950 ${embedded ? 'text-xl' : 'mt-2 text-2xl'}`}>
         Pinjamkan barang yang wajib kembali
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
+      <p className={`${embedded ? '' : 'mt-3'} text-sm leading-6 text-mute`}>
         {!canCreate
           ? 'Role aktif belum memiliki izin create pada domain Inventory.'
           : !reviewDbReady
@@ -102,7 +133,22 @@ export function InventoryItemLoanForm({
             : 'Gunakan alur ini untuk barang yang sifatnya dipinjam: stok langsung berkurang saat barang diserahkan, lalu wajib dipulihkan kembali saat pengembalian diproses.'}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+      <form onSubmit={handleSubmit} className={`${embedded ? '' : 'mt-6'} grid gap-4 lg:grid-cols-2`}>
+        <div className="lg:col-span-2">
+          <InventoryItemScanAssist
+            itemSuggestions={rackSuggestions}
+            disabled={isDisabled}
+            onResolved={(value) => {
+              setScanValue(value)
+            }}
+          />
+          {requireScan ? (
+            <div className="mt-2 text-sm text-mute">
+              Untuk role ini, scan barcode rak wajib sebelum barang dipinjamkan keluar dari GA.
+            </div>
+          ) : null}
+        </div>
+
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Item inventory</span>
           <input

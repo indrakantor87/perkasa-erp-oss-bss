@@ -6,6 +6,8 @@ import { canAccessPath, canPerformAction, getPermissionMatrix, getPermissionSumm
 import { requireSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getRoleMeta } from '@/lib/role-meta'
+import { translateUiText } from '@/lib/ui-language'
+import { getServerUiLanguage } from '@/lib/ui-language-server'
 
 export default async function AccessSettingsPage() {
   const session = await requireSession()
@@ -18,20 +20,23 @@ export default async function AccessSettingsPage() {
   const source = getDataSourceSnapshot()
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
   const canManage = canPerformAction(session.role, 'access_settings', 'manage')
-  const roleMeta = getRoleMeta(session.role)
+  const language = await getServerUiLanguage()
+  const roleMeta = getRoleMeta(session.role, language)
 
   return (
     <div className="space-y-6">
       <section className="panel p-6">
-        <p className="section-title">Access Control</p>
+        <p className="section-title">{translateUiText('Access Control', language)}</p>
         <div className="mt-3 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
-              Role, permission, dan matrix akses
+              {translateUiText('Role, permission, dan matrix akses', language)}
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-              Halaman ini merangkum jalur akses per role agar fondasi satu website tetap bisa
-              dibatasi secara tegas tanpa memecah aplikasi per divisi.
+              {translateUiText(
+                'Halaman ini merangkum jalur akses per role agar fondasi satu website tetap bisa dibatasi secara tegas tanpa memecah aplikasi per divisi.',
+                language,
+              )}
             </p>
           </div>
 
@@ -41,7 +46,7 @@ export default async function AccessSettingsPage() {
               href="/dashboard"
               className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700"
             >
-              Kembali ke dashboard
+              {translateUiText('Kembali ke dashboard', language)}
             </Link>
           </div>
         </div>
@@ -49,13 +54,17 @@ export default async function AccessSettingsPage() {
 
       <section className="grid gap-4 md:grid-cols-3">
         <article className="panel p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Resource aktif</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+            {translateUiText('Resource aktif', language)}
+          </p>
           <p className="mt-4 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
             {summary.resourceCount}
           </p>
         </article>
         <article className="panel p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Akses approval</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+            {translateUiText('Akses approval', language)}
+          </p>
           <p className="mt-4 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
             {summary.approvalCount}
           </p>

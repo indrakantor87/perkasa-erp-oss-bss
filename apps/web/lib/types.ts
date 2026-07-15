@@ -1,5 +1,11 @@
 export const APP_ROLES = [
+  'OWNER',
   'SUPER_ADMIN',
+  'ADMIN',
+  'FINANCE',
+  'HR',
+  'GA',
+  'PENJUALAN',
   'SALES_MARKETING',
   'CS_OPERATOR',
   'CS_ADMIN',
@@ -433,6 +439,7 @@ export type DomainFormPrefill = {
   order?: string
   invoice?: string
   service?: string
+  itemCode?: string
   request?: string
   employee?: string
   attendance?: string

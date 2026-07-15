@@ -9,9 +9,10 @@ import { buildGoogleMapsHref } from '@/lib/map-links'
 type InventoryOdpCreateFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
+  embedded?: boolean
 }
 
-export function InventoryOdpCreateForm({ canCreate, reviewDbReady }: InventoryOdpCreateFormProps) {
+export function InventoryOdpCreateForm({ canCreate, reviewDbReady, embedded = false }: InventoryOdpCreateFormProps) {
   const router = useRouter()
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
@@ -81,12 +82,12 @@ export function InventoryOdpCreateForm({ canCreate, reviewDbReady }: InventoryOd
   }
 
   return (
-    <section className="panel p-6">
+    <section className={embedded ? 'space-y-4' : 'panel p-6'}>
       <p className="section-title">Write Action Inventory</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+      <h3 className={`font-[family-name:var(--font-heading)] font-semibold tracking-tight text-slate-950 ${embedded ? 'text-xl' : 'mt-2 text-2xl'}`}>
         Tambah ODP
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
+      <p className={`${embedded ? '' : 'mt-3'} text-sm leading-6 text-mute`}>
         {!canCreate
           ? 'Role aktif belum memiliki izin create pada domain Inventory.'
           : !reviewDbReady
@@ -94,7 +95,7 @@ export function InventoryOdpCreateForm({ canCreate, reviewDbReady }: InventoryOd
             : 'Form ini membuat master ODP dan bisa sekaligus generate port default agar assignment layanan lebih cepat disiapkan.'}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+      <form onSubmit={handleSubmit} className={`${embedded ? '' : 'mt-6'} grid gap-4 lg:grid-cols-2`}>
         <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Kode ODP</span>
           <input

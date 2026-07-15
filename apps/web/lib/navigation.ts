@@ -49,6 +49,13 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
     icon: BriefcaseBusiness,
   },
   {
+    title: 'CS & Admin CS',
+    href: '/customers/cs-admin',
+    description: 'Workspace supervisor untuk approval, koreksi, transfer, dan backlog risiko CS',
+    tone: 'bg-indigo-700 text-white',
+    icon: Users,
+  },
+  {
     title: 'Customer',
     href: '/customers',
     description: 'Data pelanggan, layanan aktif, dan tindak lanjut CS',

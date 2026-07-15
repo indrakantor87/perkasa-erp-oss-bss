@@ -30,11 +30,24 @@ declare module 'next/navigation' {
 
 declare module 'next/server' {
   export const NextResponse: any
+  export type NextRequest = any
+  export type NextProxy = any
+  export type ProxyConfig = any
+  export type NextFetchEvent = any
 }
 
 declare module 'lucide-react' {
   export const Bell: any
+  export const Camera: any
   export const Search: any
+  export const Download: any
+  export const Link2: any
+  export const Upload: any
+  export const Pencil: any
+  export const Plus: any
+  export const ScanLine: any
+  export const Trash2: any
+  export const Map: any
   export const BadgeDollarSign: any
   export const BriefcaseBusiness: any
   export const ClipboardList: any
@@ -45,5 +58,10 @@ declare module 'lucide-react' {
   export const Warehouse: any
   export const Wrench: any
   export type LucideIcon = any
+}
+
+declare module 'qrcode' {
+  const QRCode: any
+  export default QRCode
 }
 

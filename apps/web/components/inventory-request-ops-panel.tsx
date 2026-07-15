@@ -1,3 +1,5 @@
+import { InventoryItemRequestForm } from '@/components/inventory-item-request-form'
+import { InventoryRequestStatusForm } from '@/components/inventory-request-status-form'
 import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
 
 function findSection(sections: DomainReviewSection[], keyword: string) {
@@ -38,8 +40,26 @@ function buildCountMap(rows: DomainReviewRow[], prefix?: string) {
 
 export function InventoryRequestOpsPanel({
   sections,
+  canRequestCreate,
+  canProcessRequest,
+  reviewDbReady,
+  itemSuggestions,
+  requestSuggestions,
+  rackSuggestions,
+  requireScan,
+  initialItemValue,
+  initialRequestValue,
 }: {
   sections: DomainReviewSection[]
+  canRequestCreate: boolean
+  canProcessRequest: boolean
+  reviewDbReady: boolean
+  itemSuggestions: string[]
+  requestSuggestions: string[]
+  rackSuggestions: string[]
+  requireScan: boolean
+  initialItemValue?: string
+  initialRequestValue?: string
 }) {
   const requestSection = findSection(sections, 'REQUEST INVENTORY')
 
@@ -78,6 +98,35 @@ export function InventoryRequestOpsPanel({
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        <article className="rounded-2xl border border-line bg-slate-50 p-5 xl:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi Workspace</p>
+          <div className={`mt-4 grid gap-4 ${canRequestCreate && canProcessRequest ? 'xl:grid-cols-2' : 'xl:grid-cols-1'}`}>
+            {canRequestCreate ? (
+            <div id="inventory-action-item-request" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4">
+              <InventoryItemRequestForm
+                canCreate={canRequestCreate}
+                reviewDbReady={reviewDbReady}
+                itemSuggestions={itemSuggestions}
+                initialItemValue={initialItemValue}
+                embedded
+              />
+            </div>
+            ) : null}
+            {canProcessRequest ? (
+            <div id="inventory-action-request-status" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4">
+              <InventoryRequestStatusForm
+                canCreate={canProcessRequest}
+                reviewDbReady={reviewDbReady}
+                requestSuggestions={requestSuggestions}
+                rackSuggestions={rackSuggestions}
+                requireScan={requireScan}
+                initialRequestValue={initialRequestValue}
+                embedded
+              />
+            </div>
+            ) : null}
+          </div>
+        </article>
         <article className="rounded-2xl border border-line bg-slate-50 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Distribusi Queue</p>
           <div className="mt-4 space-y-4">

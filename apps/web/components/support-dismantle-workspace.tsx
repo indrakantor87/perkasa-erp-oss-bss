@@ -1,14 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { DataSourceStatus } from '@/components/data-source-status'
 import { SupportActionFormModal, type SupportActionModalItem } from '@/components/support-action-form-modal'
 import { SupportDismantleCloseForm } from '@/components/support-dismantle-close-form'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
 import { SupportDismantleQueuePanel } from '@/components/support-dismantle-queue-panel'
 import { SupportDismantleReopenForm } from '@/components/support-dismantle-reopen-form'
 import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
-import { SupportWorkspaceHelperNote } from '@/components/support-workspace-helper-note'
 import { canAccessPath } from '@/lib/access-control'
 import { buildSupportLaneActionHref, buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
 import { canAccessSupportLane, canProcessSupportDismantle, canUseSupportAction } from '@/lib/support-lanes'
@@ -169,139 +167,46 @@ export function SupportDismantleWorkspace({
 
   return (
     <div className="space-y-4">
-      <section className="panel p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">{content.eyebrow}</p>
+        <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="section-title">{content.eyebrow}</p>
-            <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-              Dismantle
-            </h2>
-            <p className="mt-1 text-sm leading-5 text-mute">
-              Lane terminate untuk queue aktif, penutupan histori, dan reopen saat keputusan berubah.
+            <h2 className="font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">Dismantle Perangkat</h2>
+            <p className="mt-1 text-sm leading-5 text-slate-200">
+              Pantau ticket dismantle aktif tanpa menarik otomatis seluruh data isolir bulanan ke menu ini.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {canOpenIsolationLane ? (
-              <Link
-                href={isolationRecoveryHref}
-                className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
-              >
-                {canUseSupportAction({ role, actionKey: 'isolation-restore', canCreate, canUpdate, canApprove })
-                  ? 'Buka Restore'
-                  : 'Kembali ke Isolir'}
+              <Link href={isolationRecoveryHref} className="rounded-md bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-950">
+                {canUseSupportAction({ role, actionKey: 'isolation-restore', canCreate, canUpdate, canApprove }) ? 'Kembali ke Isolir' : 'Buka Isolir'}
               </Link>
             ) : null}
             {canOpenBillingDecision ? (
-              <Link
-                href="/billing"
-                className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
-              >
+              <Link href="/billing" className="rounded-md border border-slate-500 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
                 Sinkron Billing
               </Link>
             ) : null}
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
-          <span className="badge border-slate-200 bg-white text-slate-600">{supportDismantleQueueSuggestions.length} queue aktif</span>
-          <span className="badge border-slate-200 bg-white text-slate-600">{supportDismantleHistorySuggestions.length} histori penutupan</span>
-          <span className="badge border-slate-200 bg-white text-slate-600">{supportIsolationSuggestions.length} kandidat transfer</span>
-          {!reviewDbReady ? (
-            <span className="badge border-amber-200 bg-amber-50 text-amber-700">Review DB belum aktif</span>
-          ) : null}
+          <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">Total {supportIsolationSuggestions.length}</span>
+          <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">Sudah Ada Ticket {supportDismantleQueueSuggestions.length}</span>
+          <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">
+            Belum Ada Ticket {Math.max(supportIsolationSuggestions.length - supportDismantleQueueSuggestions.length, 0)}
+          </span>
+          {!reviewDbReady ? <span className="badge border-amber-500/60 bg-amber-500/10 text-amber-100">Review DB belum aktif</span> : null}
         </div>
       </section>
-
-      <SupportWorkspaceHelperNote
-        title="Dorong kasus terminate sampai final, lalu reopen hanya bila keputusan sebelumnya memang perlu dikoreksi."
-        detail="Lane ini memisahkan antrean aktif dari histori penutupan. Tutup kasus yang sudah lengkap bukti lapangannya, kembalikan ke restore bila keputusan billing berubah, dan reopen hanya untuk histori yang memang harus dibuka kembali."
-        badges={[
-          { label: `${supportDismantleQueueSuggestions.length} queue aktif`, tone: 'danger' },
-          { label: `${supportDismantleHistorySuggestions.length} histori penutupan`, tone: 'success' },
-          { label: `${supportIsolationSuggestions.length} kandidat transfer`, tone: 'warning' },
-        ]}
-      />
-
-      <DataSourceStatus source={source} />
-
-      <section className="rounded-xl border border-line bg-slate-50 p-3">
-        <form action="/support/dismantle" className="flex flex-col gap-3 xl:flex-row xl:items-end">
-          <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus Antrian</span>
-            <select
-              name="focus"
-              defaultValue={supportPrefill?.focus ?? ''}
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            >
-              <option value="">Semua Dismantle</option>
-              <option value="OPEN_QUEUE">Queue Aktif</option>
-              <option value="FIELD_FOLLOW_UP">Follow-up Lapangan</option>
-              <option value="MONTHLY_DISMANTLES">Close Periode Ini</option>
-            </select>
-          </label>
-          <label className="flex flex-1 flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Status Kerja</span>
-            <input
-              name="status"
-              defaultValue={supportPrefill?.status ?? ''}
-              placeholder="OPEN, PENDING, CLOSE, atau status lain"
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            />
-          </label>
-          <label className="flex flex-[1.2] flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Pelanggan</span>
-            <input
-              name="customer"
-              defaultValue={supportPrefill?.customer ?? ''}
-              placeholder="Nama pelanggan / kode pelanggan"
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            />
-          </label>
-          <label className="flex flex-[1.2] flex-col gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Cari Layanan / Konteks</span>
-            <input
-              name="service"
-              defaultValue={supportPrefill?.service ?? ''}
-              placeholder="Layanan, pickup, atau catatan kasus"
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-            />
-          </label>
-          <div className="flex flex-wrap gap-2 xl:justify-end">
-            <button type="submit" className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">
-              Terapkan
-            </button>
-            <Link
-              href="/support/dismantle"
-              className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-            >
-              Reset
-            </Link>
-          </div>
-        </form>
-      </section>
-
-      {supportDrilldown ? (
-        <section className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-sky-900">{supportDrilldown.label}</p>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-800">{supportDrilldown.detail}</p>
-            </div>
-            <Link
-              href={supportDrilldown.clearHref}
-              className="rounded-md border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-sky-800 transition hover:border-sky-300 hover:bg-sky-100"
-            >
-              Reset Fokus
-            </Link>
-          </div>
-        </section>
-      ) : null}
 
       <SupportDismantleQueuePanel
         sections={reviewSections}
         actionLinks={visibleActionLinks}
         role={role}
+        canCreate={canCreate}
         canUpdate={canUpdate}
         canApprove={canApprove}
+        supportDrilldown={supportDrilldown ?? null}
       />
 
       <SupportActionFormModal items={supportActionModalItems} heading="Form aksi lane dismantle" />

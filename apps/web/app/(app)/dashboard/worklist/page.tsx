@@ -9,6 +9,7 @@ import { canAccessPath, canPerformAction } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { getRoleMeta } from '@/lib/role-meta'
 import { getWorklistPageData } from '@/lib/services/worklist-service'
+import { getServerUiLanguage } from '@/lib/ui-language-server'
 
 function resolveSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
@@ -46,7 +47,8 @@ export default async function DashboardWorklistPage({
   }
 
   const payload = await getWorklistPageData(session, state)
-  const roleMeta = getRoleMeta(session.role)
+  const language = await getServerUiLanguage()
+  const roleMeta = getRoleMeta(session.role, language)
   const readOnly =
     !canPerformAction(session.role, 'sales', 'update') &&
     !canPerformAction(session.role, 'customers', 'update') &&
@@ -69,6 +71,7 @@ export default async function DashboardWorklistPage({
         waitingCount={payload.summary.waitingCount}
         readyCloseCount={payload.summary.readyCloseCount}
         readOnly={readOnly}
+        language={language}
       />
       <WorklistFilters state={{ ...state, queue: payload.selectedQueue }} queueOptions={payload.queueOptions} />
       <WorklistTabs queueOptions={payload.queueOptions} state={{ ...state, queue: payload.selectedQueue }} />

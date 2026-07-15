@@ -13,34 +13,39 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO org_divisions (code, name)
 VALUES
-  ('PENJUALAN', 'Penjualan'),
-  ('CS', 'Customer Service'),
-  ('CS_ADMIN', 'CS & Admin CS'),
-  ('NOC', 'NOC'),
-  ('NOC_TROUBLESHOOTS', 'NOC & Troubleshoots'),
-  ('CREATOR_DIGITAL', 'Creator Digital'),
-  ('HR_GA', 'HR & GA'),
-  ('FINANCE', 'Finance'),
-  ('WAREHOUSE', 'Warehouse')
+  ('PEMASARAN_PELAYANAN', 'Pemasaran dan Pelayanan'),
+  ('FINANCE_HR', 'Finance & HR'),
+  ('GENERAL_AFFAIR', 'General Affair'),
+  ('TEKNIS_EKSPAN', 'Teknis & Ekspan'),
+  ('OPERASIONAL', 'Operasional'),
+  ('CS_ADMIN', 'CS & Admin CS (Legacy)'),
+  ('NOC_TROUBLESHOOTS', 'NOC & Troubleshoots (Legacy)'),
+  ('HR_GA', 'HR & GA (Legacy)'),
+  ('WAREHOUSE', 'Warehouse (Legacy)')
 ON DUPLICATE KEY UPDATE
   name = VALUES(name);
 
 INSERT INTO auth_roles (code, name)
 VALUES
+  ('OWNER', 'Owner'),
   ('SUPER_ADMIN', 'Super Admin'),
-  ('OPERATOR', 'Operator'),
   ('ADMIN', 'Admin'),
+  ('FINANCE', 'Finance'),
+  ('HR', 'HR'),
+  ('GA', 'GA'),
+  ('PENJUALAN', 'Penjualan'),
   ('CS', 'Customer Service'),
-  ('ADMIN_CS', 'Admin CS'),
   ('NOC', 'NOC'),
   ('TROUBLESHOOTS', 'Troubleshoots'),
-  ('MARKETING', 'Marketing'),
   ('CREATOR_DIGITAL', 'Creator Digital'),
   ('DISMANTLE', 'Dismantle'),
-  ('SALES', 'Sales'),
-  ('HR_GA', 'HR & GA'),
-  ('FINANCE', 'Finance'),
-  ('WAREHOUSE', 'Warehouse')
+  ('TEKNISI_PSB', 'Teknisi PSB'),
+  ('ADMIN_CS', 'Admin CS (Legacy)'),
+  ('MARKETING', 'Marketing (Legacy)'),
+  ('SALES', 'Sales (Legacy)'),
+  ('OPERATOR', 'Operator (Legacy)'),
+  ('HR_GA', 'HR & GA (Legacy)'),
+  ('WAREHOUSE', 'Warehouse (Legacy)')
 ON DUPLICATE KEY UPDATE
   name = VALUES(name);
 

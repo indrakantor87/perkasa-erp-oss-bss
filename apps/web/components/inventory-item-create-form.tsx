@@ -7,18 +7,21 @@ import { useRouter } from 'next/navigation'
 type InventoryItemCreateFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
+  embedded?: boolean
 }
 
 const categorySuggestionOptions = ['ROUTER', 'ONU', 'KABEL', 'AKSESORIS'] as const
 const unitSuggestionOptions = ['PCS', 'UNIT', 'METER', 'ROLL'] as const
 const statusOptions = ['ACTIVE', 'INACTIVE'] as const
 
-export function InventoryItemCreateForm({ canCreate, reviewDbReady }: InventoryItemCreateFormProps) {
+export function InventoryItemCreateForm({ canCreate, reviewDbReady, embedded = false }: InventoryItemCreateFormProps) {
   const router = useRouter()
   const [categoryCode, setCategoryCode] = useState<string>(categorySuggestionOptions[0])
   const [unitCode, setUnitCode] = useState<string>(unitSuggestionOptions[0])
   const [itemName, setItemName] = useState('')
   const [barcode, setBarcode] = useState('')
+  const [rackCode, setRackCode] = useState('')
+  const [rackBarcode, setRackBarcode] = useState('')
   const [defaultPrice, setDefaultPrice] = useState('')
   const [minimumStock, setMinimumStock] = useState('0')
   const [currentStock, setCurrentStock] = useState('0')
@@ -46,6 +49,8 @@ export function InventoryItemCreateForm({ canCreate, reviewDbReady }: InventoryI
           unitCode: unitCode.trim(),
           itemName,
           barcode,
+          rackCode,
+          rackBarcode,
           defaultPrice,
           minimumStock,
           currentStock,
@@ -70,6 +75,8 @@ export function InventoryItemCreateForm({ canCreate, reviewDbReady }: InventoryI
       setUnitCode(unitSuggestionOptions[0])
       setItemName('')
       setBarcode('')
+      setRackCode('')
+      setRackBarcode('')
       setDefaultPrice('')
       setMinimumStock('0')
       setCurrentStock('0')
@@ -81,20 +88,20 @@ export function InventoryItemCreateForm({ canCreate, reviewDbReady }: InventoryI
   }
 
   return (
-    <section className="panel p-6">
+    <section className={embedded ? 'space-y-4' : 'panel p-6'}>
       <p className="section-title">Write Action Inventory</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+      <h3 className={`font-[family-name:var(--font-heading)] font-semibold tracking-tight text-slate-950 ${embedded ? 'text-xl' : 'mt-2 text-2xl'}`}>
         Tambah item inventory
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
+      <p className={`${embedded ? '' : 'mt-3'} text-sm leading-6 text-mute`}>
         {!canCreate
           ? 'Role aktif belum memiliki izin create pada domain Inventory.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi write action inventory dinonaktifkan agar tidak menulis ke mock.'
-            : 'Form ini membuat item master inventory awal agar stok, pergerakan barang, dan assignment perangkat mulai bisa diuji dari web.'}
+            : 'Form ini membuat item master inventory awal agar stok, pergerakan barang, assignment perangkat, dan generate barcode operasional mulai bisa diuji dari web.'}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+      <form onSubmit={handleSubmit} className={`${embedded ? '' : 'mt-6'} grid gap-4 lg:grid-cols-2`}>
         <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Kategori</span>
           <input
@@ -144,12 +151,34 @@ export function InventoryItemCreateForm({ canCreate, reviewDbReady }: InventoryI
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Barcode</span>
+          <span className="font-semibold text-slate-950">Barcode Vendor / Serial</span>
           <input
             value={barcode}
             onChange={(event) => setBarcode(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            placeholder="Serial / barcode perangkat"
+            placeholder="Barcode pabrik / serial asli perangkat"
+            disabled={isDisabled}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Kode Rak</span>
+          <input
+            value={rackCode}
+            onChange={(event) => setRackCode(event.target.value.toUpperCase())}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="RAK-A1-ONU-01"
+            disabled={isDisabled}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Barcode Rak</span>
+          <input
+            value={rackBarcode}
+            onChange={(event) => setRackBarcode(event.target.value.toUpperCase())}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="Kosongkan jika barcode rak mengikuti kode rak"
             disabled={isDisabled}
           />
         </label>
@@ -207,7 +236,7 @@ export function InventoryItemCreateForm({ canCreate, reviewDbReady }: InventoryI
 
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Kategori dan satuan mengikuti master seed review DB, tetapi tetap bisa Anda sesuaikan lagi nanti.
+            Kategori dan satuan mengikuti master seed review DB. Setelah item tersimpan, QR dan Code128 operasional bisa diunduh dari panel barcode inventory.
           </div>
           <button
             type="submit"

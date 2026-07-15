@@ -590,6 +590,7 @@ export async function ensureDailyActivityTable() {
     `
       CREATE TABLE IF NOT EXISTS daily_activity_items (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        branch_id BIGINT UNSIGNED NULL,
         activity_code VARCHAR(40) NOT NULL,
         activity_date DATE NOT NULL,
         planned_username VARCHAR(120) NOT NULL,
@@ -620,10 +621,19 @@ export async function ensureDailyActivityTable() {
         PRIMARY KEY (id),
         UNIQUE KEY uq_daily_activity_items_code (activity_code),
         KEY idx_daily_activity_items_date (activity_date, execution_status),
+        KEY idx_daily_activity_items_branch (branch_id, activity_date),
         KEY idx_daily_activity_items_owner (planned_username, activity_date),
         KEY idx_daily_activity_items_scope (division_name, subdivision_name, planning_level),
-        KEY idx_daily_activity_items_approval (approval_status, activity_date, division_name, subdivision_name)
+        KEY idx_daily_activity_items_approval (approval_status, activity_date, division_name, subdivision_name),
+        CONSTRAINT fk_daily_activity_items_branch FOREIGN KEY (branch_id) REFERENCES org_branches(id)
       )
+    `,
+  )
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE daily_activity_items
+      ADD COLUMN IF NOT EXISTS branch_id BIGINT UNSIGNED NULL AFTER id
     `,
   )
 
@@ -832,6 +842,29 @@ export async function getDailyActivityPageData(
   try {
     await ensureDailyActivityTable()
 
+    const branchIds =
+      session.role === 'SUPER_ADMIN' || session.role === 'OWNER'
+        ? []
+        : session.role === 'ADMIN'
+          ? (session.branchIds ?? []).filter((value) => Number.isFinite(value) && value > 0)
+          : session.branchId && Number.isFinite(session.branchId) && session.branchId > 0
+            ? [session.branchId]
+            : []
+    const branchWhere =
+      session.role === 'SUPER_ADMIN' || session.role === 'OWNER'
+        ? ''
+        : branchIds.length === 0
+          ? 'AND 1 = 0'
+          : branchIds.length === 1
+            ? 'AND branch_id = ?'
+            : 'AND branch_id IN (?)'
+    const branchValues =
+      session.role === 'SUPER_ADMIN' || session.role === 'OWNER'
+        ? ([] as unknown[])
+        : branchIds.length === 1
+          ? ([branchIds[0]] as unknown[])
+          : ([branchIds] as unknown[])
+
     const rows = await runReviewDbQuery<DailyActivityDbRow>(
       `
         SELECT
@@ -860,8 +893,10 @@ export async function getDailyActivityPageData(
           CAST(closed_at AS CHAR) AS closedAt
         FROM daily_activity_items
         WHERE activity_date >= DATE_SUB(CURRENT_DATE, INTERVAL 370 DAY)
+          ${branchWhere}
         ORDER BY activity_date DESC, planned_at DESC, id DESC
       `,
+      branchValues,
     )
 
     return {

@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { extractLeadTypeFromSuggestion, getOrderStatusOptions } from '@/lib/sales-workflow'
 
 type SalesOrderCreateFormProps = {
   canCreate: boolean
@@ -13,7 +14,6 @@ type SalesOrderCreateFormProps = {
 }
 
 const orderTypeOptions = ['NEW_INSTALL', 'UPGRADE', 'DOWNGRADE', 'RELOCATION', 'TERMINATION'] as const
-const orderStatusOptions = ['REGISTERED', 'SURVEY_PENDING', 'READY_INSTALL', 'ON_PROCESS'] as const
 
 function extractLeadId(value: string) {
   const matched = value.trim().match(/^(\d+)/)
@@ -30,7 +30,7 @@ export function SalesOrderCreateForm({
   const router = useRouter()
   const [leadValue, setLeadValue] = useState(initialLeadValue?.trim() || leadSuggestions[0] || '')
   const [orderType, setOrderType] = useState<(typeof orderTypeOptions)[number]>('NEW_INSTALL')
-  const [status, setStatus] = useState<(typeof orderStatusOptions)[number]>('REGISTERED')
+  const [status, setStatus] = useState('REGISTERED')
   const [scheduledInstallationAt, setScheduledInstallationAt] = useState('')
   const [marketingName, setMarketingName] = useState(marketingSuggestions[0] ?? '')
   const [teknisiName, setTeknisiName] = useState('')
@@ -39,12 +39,20 @@ export function SalesOrderCreateForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+  const leadType = extractLeadTypeFromSuggestion(leadValue) ?? 'HOME'
+  const statusOptions = getOrderStatusOptions(leadType)
 
   useEffect(() => {
     if (initialLeadValue?.trim()) {
       setLeadValue(initialLeadValue.trim())
     }
   }, [initialLeadValue])
+
+  useEffect(() => {
+    if (!statusOptions.includes(status)) {
+      setStatus(statusOptions[0] ?? 'REGISTERED')
+    }
+  }, [status, statusOptions])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -156,11 +164,11 @@ export function SalesOrderCreateForm({
           <span className="font-semibold text-slate-950">Status Awal</span>
           <select
             value={status}
-            onChange={(event) => setStatus(event.target.value as (typeof orderStatusOptions)[number])}
+            onChange={(event) => setStatus(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
             disabled={isDisabled}
           >
-            {orderStatusOptions.map((item) => (
+            {statusOptions.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>

@@ -105,6 +105,7 @@ export async function POST(request: Request) {
     await runReviewDbExecute<ExecuteResult>(
       `
         INSERT INTO daily_activity_items (
+          branch_id,
           activity_code,
           activity_date,
           planned_username,
@@ -120,9 +121,10 @@ export async function POST(request: Request) {
           execution_status,
           planned_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PLANNED', CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PLANNED', CURRENT_TIMESTAMP)
       `,
       [
+        session.branchId ?? null,
         activityCode,
         activityDate,
         session.username,

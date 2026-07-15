@@ -28,7 +28,7 @@ UNION ALL
 SELECT
   (SELECT id FROM org_branches WHERE code = 'PATI' LIMIT 1),
   (SELECT id FROM org_divisions WHERE code = 'CS' LIMIT 1),
-  (SELECT id FROM auth_roles WHERE code = 'ADMIN_CS' LIMIT 1),
+  (SELECT id FROM auth_roles WHERE code = 'CS' LIMIT 1),
   'Admin CS Review',
   'cs.review',
   'cs.review@perkasa.local',
@@ -39,7 +39,7 @@ UNION ALL
 SELECT
   (SELECT id FROM org_branches WHERE code = 'PATI' LIMIT 1),
   (SELECT id FROM org_divisions WHERE code = 'NOC' LIMIT 1),
-  (SELECT id FROM auth_roles WHERE code = 'OPERATOR' LIMIT 1),
+  (SELECT id FROM auth_roles WHERE code = 'NOC' LIMIT 1),
   'Operator Support',
   'support.ops',
   'support.ops@perkasa.local',

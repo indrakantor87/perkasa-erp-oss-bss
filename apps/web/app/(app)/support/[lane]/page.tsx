@@ -293,7 +293,7 @@ export default async function SupportLanePage({
   const typeFilter = resolveSearchParam(resolvedSearchParams.type)
   const statusFilter = resolveSearchParam(resolvedSearchParams.status)
   const focusFilter = resolveSearchParam(resolvedSearchParams.focus)
-  const payload = await getDomainPageData('support', session.role, {
+  const payload = await getDomainPageData('support', session, {
     supportLane: normalizedLane as SupportLaneKey,
     focus: focusFilter,
   })

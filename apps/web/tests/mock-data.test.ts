@@ -74,14 +74,14 @@ async function main() {
   assert.equal(invalidHybridLogin.session, null)
   assert.deepEqual(parseSessionToken(createSessionToken(session!)), session)
   assert.equal(parseSessionToken('invalid.token.value'), null)
-  assert.equal(getDefaultLandingPath('SUPER_ADMIN'), '/dashboard')
-  assert.equal(getDefaultLandingPath('SALES_MARKETING'), '/sales')
+  assert.equal(getDefaultLandingPath('SUPER_ADMIN'), '/dashboard/worklist')
+  assert.equal(getDefaultLandingPath('SALES_MARKETING'), '/dashboard/worklist')
   assert.equal(getDefaultLandingPath('CS_OPERATOR'), '/dashboard/worklist')
   assert.equal(getDefaultLandingPath('CS_ADMIN'), '/customers/cs-admin')
   assert.equal(getDefaultLandingPath('NOC_OPERATOR'), '/support/tt')
-  assert.equal(getDefaultLandingPath('FIELD_TECHNICIAN'), '/dashboard/worklist')
+  assert.equal(getDefaultLandingPath('FIELD_TECHNICIAN'), '/support/teknisi-psb')
   assert.equal(getDefaultLandingPath('TT_OPERATOR'), '/support/tt')
-  assert.equal(getDefaultLandingPath('DIGITAL_CREATOR'), '/sales/digital-creator')
+  assert.equal(getDefaultLandingPath('DIGITAL_CREATOR'), '/dashboard/worklist')
   assert.equal(getDefaultLandingPath('DISMANTLE_OPERATOR'), '/support/dismantle')
   assert.equal(canAccessPath('CS_ADMIN', '/hr'), false)
   assert.equal(canAccessPath('SUPER_ADMIN', '/settings/users'), true)
@@ -471,7 +471,15 @@ async function main() {
   assert.equal((authUsersPage.auditItems.length ?? 0) > 0, true)
   assert.equal((authUsersPage.auditItems[0]?.targetUser.length ?? 0) > 0, true)
 
-  const supportDomain = await getDomainPageData('support', 'NOC_OPERATOR')
+  const buildTestSession = (role: Parameters<typeof getDefaultLandingPath>[0]) => ({
+    username: 'test.user',
+    displayName: 'Test User',
+    role,
+    branchId: 1,
+    branchIds: [1],
+  })
+
+  const supportDomain = await getDomainPageData('support', buildTestSession('NOC_OPERATOR'))
   assert.equal(supportDomain?.content.resource, 'support')
   assert.equal(supportDomain?.source.effectiveMode, 'mock')
   assert.equal(supportDomain?.capabilities.find((item) => item.action === 'create')?.enabled, true)
@@ -496,7 +504,7 @@ async function main() {
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'isolations')[0]?.title, 'Isolir Aktif')
   assert.equal(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'dismantle')[0]?.title, 'Histori Dismantle')
   assert.equal(buildSupportLaneReviewSummary(getSupportLaneSections(supportDomain?.content.reviewSections ?? [], 'tt')).dominantStatus.length > 0, true)
-  const focusedSupportDomain = await getDomainPageData('support', 'DISMANTLE_OPERATOR', {
+  const focusedSupportDomain = await getDomainPageData('support', buildTestSession('DISMANTLE_OPERATOR'), {
     supportLane: 'dismantle',
   })
   assert.equal(focusedSupportDomain?.supportFocus?.defaultLane, 'dismantle')
@@ -506,7 +514,7 @@ async function main() {
   assert.equal(focusedSupportDomain?.supportFocus?.visibleSections[0]?.title, 'Histori Dismantle')
   assert.equal(focusedSupportDomain?.supportFocus?.lanes[0]?.key, 'dismantle')
 
-  const salesDomain = await getDomainPageData('sales', 'SALES_MARKETING')
+  const salesDomain = await getDomainPageData('sales', buildTestSession('SALES_MARKETING'))
   assert.equal(salesDomain?.content.resource, 'sales')
   assert.equal((salesDomain?.content.reviewSections?.length ?? 0) >= 5, true)
   assert.equal(salesDomain?.content.reviewSections?.[1]?.title, 'Coverage Terbaru')
@@ -514,13 +522,13 @@ async function main() {
   assert.equal(salesDomain?.content.reviewSections?.[3]?.title, 'Work Order Aktif')
   assert.equal(salesDomain?.content.reviewSections?.[4]?.title, 'Subscription Aktivasi Terbaru')
 
-  const customerDomain = await getDomainPageData('customers', 'CS_ADMIN')
+  const customerDomain = await getDomainPageData('customers', buildTestSession('CS_ADMIN'))
   assert.equal(customerDomain?.content.resource, 'customers')
   assert.equal((customerDomain?.content.reviewSections?.length ?? 0) > 0, true)
   assert.equal(customerDomain?.content.reviewSections?.[1]?.rows.length, 3)
   assert.equal((customerDomain?.content.reviewSections?.[0]?.rows[0]?.status.length ?? 0) > 0, true)
 
-  const billingDomain = await getDomainPageData('billing', 'SUPER_ADMIN')
+  const billingDomain = await getDomainPageData('billing', buildTestSession('SUPER_ADMIN'))
   assert.equal(billingDomain?.capabilities.find((item) => item.action === 'export')?.enabled, true)
   assert.equal(billingDomain?.capabilities.find((item) => item.action === 'manage')?.enabled, false)
   assert.equal((billingDomain?.content.reviewSections?.length ?? 0) >= 6, true)
@@ -530,7 +538,7 @@ async function main() {
   assert.equal(billingDomain?.content.reviewSections?.[3]?.title, 'Invoice Dibatalkan Terbaru')
   assert.equal(billingDomain?.content.reviewSections?.[5]?.title, 'Payment Terbaru')
 
-  const inventoryDomain = await getDomainPageData('inventory', 'SUPER_ADMIN')
+  const inventoryDomain = await getDomainPageData('inventory', buildTestSession('SUPER_ADMIN'))
   assert.equal(inventoryDomain?.content.resource, 'inventory')
   assert.equal((inventoryDomain?.content.reviewSections?.length ?? 0) >= 7, true)
   assert.equal(inventoryDomain?.content.reviewSections?.[0]?.title, 'Item Inventory Terbaru')
@@ -541,7 +549,7 @@ async function main() {
   assert.equal(inventoryDomain?.content.reviewSections?.[5]?.title, 'Port Bermasalah')
   assert.equal(inventoryDomain?.content.reviewSections?.[6]?.title, 'Device Return Terbaru')
 
-  const hrDomain = await getDomainPageData('hr', 'SUPER_ADMIN')
+  const hrDomain = await getDomainPageData('hr', buildTestSession('SUPER_ADMIN'))
   assert.equal(hrDomain?.content.resource, 'hr')
   assert.equal((hrDomain?.content.reviewSections?.length ?? 0) >= 4, true)
   assert.equal(hrDomain?.content.reviewSections?.[0]?.title, 'Employee Terbaru')

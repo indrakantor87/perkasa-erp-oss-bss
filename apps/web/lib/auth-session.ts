@@ -7,6 +7,8 @@ export type AppSession = {
   username: string
   displayName: string
   role: AppRole
+  branchId: number | null
+  branchIds: number[]
 }
 
 type MockAuthUser = AppSession & {
@@ -14,11 +16,13 @@ type MockAuthUser = AppSession & {
 }
 
 type ReviewAuthUserRow = {
+  userId: number
   username: string
   fullName: string
   roleCode: string
   passwordHash: string
   status: string
+  branchId: number | null
 }
 
 type AuthAttemptResult =
@@ -74,54 +78,72 @@ export const mockAuthUsers: MockAuthUser[] = [
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_ADMIN_PERKASA',
     displayName: 'Super Admin Perkasa',
     role: 'SUPER_ADMIN',
+    branchId: 1,
+    branchIds: [1],
   },
   {
     username: 'marketing.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_MARKETING_REVIEW',
     displayName: 'Marketing Review',
     role: 'SALES_MARKETING',
+    branchId: 1,
+    branchIds: [1],
   },
   {
     username: 'cs.operator',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_CS_OPERATOR',
     displayName: 'Operator CS Review',
     role: 'CS_OPERATOR',
+    branchId: 1,
+    branchIds: [1],
   },
   {
     username: 'cs.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_CS_REVIEW',
     displayName: 'Admin CS Review',
     role: 'CS_ADMIN',
+    branchId: 1,
+    branchIds: [1],
   },
   {
     username: 'support.ops',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_SUPPORT_OPS',
     displayName: 'Operator NOC Support',
     role: 'NOC_OPERATOR',
+    branchId: 1,
+    branchIds: [1],
   },
   {
     username: 'tt.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_TT_REVIEW',
     displayName: 'TT Operator Review',
     role: 'TT_OPERATOR',
+    branchId: 1,
+    branchIds: [1],
   },
   {
     username: 'dismantle.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_DISMANTLE_REVIEW',
     displayName: 'Dismantle Review',
     role: 'DISMANTLE_OPERATOR',
+    branchId: 1,
+    branchIds: [1],
   },
   {
     username: 'creator.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_CREATOR_REVIEW',
     displayName: 'Creator Digital Review',
     role: 'DIGITAL_CREATOR',
+    branchId: 1,
+    branchIds: [1],
   },
   {
     username: 'field.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_FIELD_REVIEW',
     displayName: 'Field Technician Review',
     role: 'FIELD_TECHNICIAN',
+    branchId: 1,
+    branchIds: [1],
   },
 ]
 
@@ -158,13 +180,18 @@ function signPayload(payload: string) {
 
 function mapReviewRoleToAppRole(roleCode: string): AppRole {
   const normalized = roleCode.trim().toUpperCase()
+  if (normalized === 'OWNER') return 'OWNER'
   if (normalized === 'SUPER_ADMIN') return 'SUPER_ADMIN'
-  if (normalized === 'ADMIN') return 'SUPER_ADMIN'
-  if (normalized === 'MARKETING') return 'SALES_MARKETING'
+  if (normalized === 'ADMIN') return 'ADMIN'
+  if (normalized === 'FINANCE') return 'FINANCE'
+  if (normalized === 'HR') return 'HR'
+  if (normalized === 'GA') return 'GA'
+  if (normalized === 'PENJUALAN') return 'PENJUALAN'
+  if (normalized === 'MARKETING' || normalized === 'SALES') return 'PENJUALAN'
   if (normalized === 'CS') return 'CS_OPERATOR'
   if (normalized === 'ADMIN_CS') return 'CS_ADMIN'
   if (normalized === 'NOC') return 'NOC_OPERATOR'
-  if (normalized === 'TEKNISI') return 'FIELD_TECHNICIAN'
+  if (normalized === 'TEKNISI' || normalized === 'TEKNISI_PSB') return 'FIELD_TECHNICIAN'
   if (normalized === 'TROUBLESHOOTS') return 'TT_OPERATOR'
   if (normalized === 'CREATOR_DIGITAL') return 'DIGITAL_CREATOR'
   if (normalized === 'DISMANTLE') return 'DISMANTLE_OPERATOR'
@@ -203,6 +230,8 @@ export function authenticateMockUser(username: string, password: string): AppSes
     username: candidate.username,
     displayName: candidate.displayName,
     role: candidate.role,
+    branchId: candidate.branchId,
+    branchIds: candidate.branchIds,
   }
 }
 
@@ -217,11 +246,13 @@ async function authenticateReviewDbUser(username: string, password: string): Pro
     const users = await runReviewDbQuery<ReviewAuthUserRow>(
       `
         SELECT
+          au.id AS userId,
           au.username AS username,
           au.full_name AS fullName,
           ar.code AS roleCode,
           au.password_hash AS passwordHash,
-          au.status AS status
+          au.status AS status,
+          au.branch_id AS branchId
         FROM auth_users au
         JOIN auth_roles ar
           ON ar.id = au.role_id
@@ -243,11 +274,38 @@ async function authenticateReviewDbUser(username: string, password: string): Pro
       return { session: null, reason: 'invalid_password' }
     }
 
+    const resolvedRole = mapReviewRoleToAppRole(candidate.roleCode)
+    const resolvedBranchId = Number(candidate.branchId)
+    const baseBranchId = Number.isFinite(resolvedBranchId) && resolvedBranchId > 0 ? resolvedBranchId : null
+    const branchIds: number[] = []
+    if (baseBranchId) {
+      branchIds.push(baseBranchId)
+    }
+    if (resolvedRole === 'ADMIN') {
+      const rows = await runReviewDbQuery<{ branchId: number }>(
+        `
+          SELECT
+            branch_id AS branchId
+          FROM auth_user_branch_access
+          WHERE auth_user_id = ?
+        `,
+        [candidate.userId],
+      ).catch(() => [])
+      rows.forEach((row) => {
+        const branchId = Number(row.branchId)
+        if (Number.isFinite(branchId) && branchId > 0 && !branchIds.includes(branchId)) {
+          branchIds.push(branchId)
+        }
+      })
+    }
+
     return {
       session: {
         username: candidate.username,
         displayName: candidate.fullName,
-        role: mapReviewRoleToAppRole(candidate.roleCode),
+        role: resolvedRole,
+        branchId: baseBranchId,
+        branchIds,
       },
       source: 'review-db',
     }
@@ -310,7 +368,19 @@ export function parseSessionToken(token: string | undefined | null): AppSession 
       return null
     }
 
-    return parsed
+    const branchId = Number(parsed.branchId)
+    const normalizedBranchId = Number.isFinite(branchId) && branchId > 0 ? branchId : null
+    const normalizedBranchIds = Array.isArray(parsed.branchIds)
+      ? parsed.branchIds
+          .map((value) => Number(value))
+          .filter((value) => Number.isFinite(value) && value > 0)
+      : []
+
+    return {
+      ...parsed,
+      branchId: normalizedBranchId,
+      branchIds: normalizedBranchIds.length > 0 ? normalizedBranchIds : normalizedBranchId ? [normalizedBranchId] : [],
+    }
   } catch {
     return null
   }

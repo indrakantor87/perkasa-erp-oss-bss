@@ -11,6 +11,7 @@ function getDbPermissionSets() {
 }
 
 const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
+  OWNER: ['/dashboard', '/sales', '/customers', '/support', '/inventory', '/billing'],
   SUPER_ADMIN: [
     '/dashboard',
     '/import',
@@ -23,6 +24,11 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
     '/settings/access',
     '/settings/users',
   ],
+  ADMIN: ['/dashboard', '/import', '/sales', '/customers', '/support', '/inventory', '/billing'],
+  FINANCE: ['/dashboard', '/billing', '/sales', '/customers', '/support'],
+  HR: ['/dashboard', '/hr'],
+  GA: ['/dashboard', '/inventory', '/support'],
+  PENJUALAN: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
   SALES_MARKETING: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
   CS_OPERATOR: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
   CS_ADMIN: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
@@ -34,7 +40,13 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
 }
 
 const baselineRoleLandingPaths: Record<AppRole, string> = {
+  OWNER: '/dashboard/worklist',
   SUPER_ADMIN: '/dashboard/worklist',
+  ADMIN: '/dashboard/worklist',
+  FINANCE: '/billing',
+  HR: '/hr',
+  GA: '/inventory',
+  PENJUALAN: '/dashboard/worklist',
   SALES_MARKETING: '/dashboard/worklist',
   CS_OPERATOR: '/dashboard/worklist',
   CS_ADMIN: '/customers/cs-admin',
@@ -46,6 +58,15 @@ const baselineRoleLandingPaths: Record<AppRole, string> = {
 }
 
 const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
+  OWNER: [
+    { resource: 'dashboard', label: 'Dashboard Ringkas', actions: ['view', 'export'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view'] },
+    { resource: 'sales', label: 'Penjualan', actions: ['view'] },
+    { resource: 'customers', label: 'Customer & Subscription', actions: ['view'] },
+    { resource: 'support', label: 'Support', actions: ['view'] },
+    { resource: 'inventory', label: 'Inventory', actions: ['view'] },
+    { resource: 'billing', label: 'Billing', actions: ['view', 'export'] },
+  ],
   SUPER_ADMIN: [
     { resource: 'dashboard', label: 'Dashboard Global', actions: ['view', 'export', 'manage'] },
     { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update', 'approve', 'export'] },
@@ -58,6 +79,43 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
     { resource: 'billing', label: 'Billing', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'access_settings', label: 'Akses & Permission', actions: ['view', 'manage'] },
     { resource: 'user_settings', label: 'Manajemen User Internal', actions: ['view', 'manage'] },
+  ],
+  ADMIN: [
+    { resource: 'dashboard', label: 'Dashboard Admin', actions: ['view', 'export'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'import_center', label: 'Import Center', actions: ['view', 'create', 'approve', 'export'] },
+    { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'support', label: 'Support', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'inventory', label: 'Inventory', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'billing', label: 'Billing', actions: ['view', 'create', 'update', 'approve', 'export'] },
+  ],
+  FINANCE: [
+    { resource: 'dashboard', label: 'Dashboard Finance', actions: ['view', 'export'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update'] },
+    { resource: 'sales', label: 'Penjualan', actions: ['view'] },
+    { resource: 'customers', label: 'Customer & Subscription', actions: ['view'] },
+    { resource: 'support', label: 'Support', actions: ['view'] },
+    { resource: 'billing', label: 'Billing', actions: ['view', 'create', 'update', 'approve', 'export'] },
+  ],
+  HR: [
+    { resource: 'dashboard', label: 'Dashboard HR', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update', 'approve'] },
+    { resource: 'hr', label: 'HR', actions: ['view', 'create', 'update', 'approve', 'export'] },
+  ],
+  GA: [
+    { resource: 'dashboard', label: 'Dashboard GA', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update'] },
+    { resource: 'support', label: 'Support', actions: ['view'] },
+    { resource: 'inventory', label: 'Inventory', actions: ['view', 'create', 'update', 'export'] },
+  ],
+  PENJUALAN: [
+    { resource: 'dashboard', label: 'Dashboard Penjualan', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update'] },
+    { resource: 'sales', label: 'Penjualan', actions: ['view', 'create', 'update', 'export'] },
+    { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'create', 'update'] },
+    { resource: 'support', label: 'Support', actions: ['view'] },
+    { resource: 'inventory', label: 'Inventory', actions: ['view'] },
   ],
   SALES_MARKETING: [
     { resource: 'dashboard', label: 'Dashboard Marketing', actions: ['view'] },

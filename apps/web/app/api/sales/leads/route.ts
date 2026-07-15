@@ -2,9 +2,13 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute } from '@/lib/review-db'
+import {
+  getLeadStatusOptions,
+  normalizeSalesServiceType,
+  SALES_SERVICE_TYPES,
+} from '@/lib/sales-workflow'
 
-const allowedLeadTypes = new Set(['HOME', 'CORPORATE', 'RESELLER'])
-const allowedLeadStatuses = new Set(['NEW', 'FOLLOW_UP', 'COVERAGE_CHECK', 'SURVEY_REQUEST', 'QUALIFIED'])
+const allowedLeadTypes = new Set(SALES_SERVICE_TYPES)
 
 type ExecuteResult = {
   insertId?: number
@@ -41,7 +45,7 @@ export async function POST(request: Request) {
     }
 
     const customerName = String(payload.customerName ?? '').trim()
-    const leadType = String(payload.leadType ?? '').trim().toUpperCase()
+    const leadTypeRaw = String(payload.leadType ?? '').trim()
     const status = String(payload.status ?? '').trim().toUpperCase()
     const sourceLabel = String(payload.source ?? '').trim()
     const phone = String(payload.phone ?? '').trim()
@@ -52,11 +56,16 @@ export async function POST(request: Request) {
     if (!customerName) {
       return Response.json({ message: 'Nama customer / prospek wajib diisi.' }, { status: 400 })
     }
-    if (!allowedLeadTypes.has(leadType)) {
+    const leadType = normalizeSalesServiceType(leadTypeRaw)
+    if (!leadType || !allowedLeadTypes.has(leadType)) {
       return Response.json({ message: 'Lead type tidak valid.' }, { status: 400 })
     }
-    if (!allowedLeadStatuses.has(status)) {
-      return Response.json({ message: 'Status lead tidak valid.' }, { status: 400 })
+    const allowedStatuses = new Set(getLeadStatusOptions(leadType))
+    if (!allowedStatuses.has(status)) {
+      return Response.json(
+        { message: `Status lead tidak valid untuk tipe ${leadType}.` },
+        { status: 400 },
+      )
     }
 
     const notes = `[Review Lead] ${session.displayName} (${session.username})${
@@ -76,9 +85,10 @@ export async function POST(request: Request) {
           status,
           notes
         )
-        VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
+        session.branchId ?? null,
         sourceLabel || 'Manual Review',
         leadType,
         customerName,

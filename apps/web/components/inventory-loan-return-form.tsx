@@ -9,6 +9,7 @@ type InventoryLoanReturnFormProps = {
   reviewDbReady: boolean
   loanSuggestions: string[]
   initialLoanValue?: string
+  embedded?: boolean
 }
 
 function extractLoanId(value: string) {
@@ -20,6 +21,7 @@ export function InventoryLoanReturnForm({
   reviewDbReady,
   loanSuggestions,
   initialLoanValue,
+  embedded = false,
 }: InventoryLoanReturnFormProps) {
   const router = useRouter()
   const [loanValue, setLoanValue] = useState(initialLoanValue?.trim() || loanSuggestions[0] || '')
@@ -85,12 +87,12 @@ export function InventoryLoanReturnForm({
   }
 
   return (
-    <section className="panel p-6">
+    <section className={embedded ? 'space-y-4' : 'panel p-6'}>
       <p className="section-title">Pengembalian Inventory</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+      <h3 className={`font-[family-name:var(--font-heading)] font-semibold tracking-tight text-slate-950 ${embedded ? 'text-xl' : 'mt-2 text-2xl'}`}>
         Kembalikan barang pinjaman
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
+      <p className={`${embedded ? '' : 'mt-3'} text-sm leading-6 text-mute`}>
         {!canUpdate
           ? 'Role aktif belum memiliki izin update pada domain Inventory.'
           : !reviewDbReady
@@ -98,7 +100,7 @@ export function InventoryLoanReturnForm({
             : 'Gunakan alur ini saat barang pinjaman kembali ke gudang. Sistem otomatis mencatat movement `IN`, menambah stok, dan menutup pinjaman jika qty sudah kembali penuh.'}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+      <form onSubmit={handleSubmit} className={`${embedded ? '' : 'mt-6'} grid gap-4 lg:grid-cols-2`}>
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Pinjaman inventory</span>
           <input

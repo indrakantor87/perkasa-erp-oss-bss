@@ -53,40 +53,54 @@ export function DashboardCommandCenter({
   ]
 
   return (
-    <section className="panel p-4">
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <div>
-          <p className="section-title">Ringkasan Kerja Hari Ini</p>
-          <h1 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-            Mulai dari queue yang paling dekat dengan role aktif
+    <section className="panel overflow-hidden p-0">
+      <div className="grid gap-0 xl:grid-cols-[1.12fr_0.88fr]">
+        <div
+          className="px-5 py-5 md:px-6 md:py-6"
+          style={{
+            background:
+              'linear-gradient(135deg, color-mix(in srgb, var(--color-card-subtle) 88%, transparent 12%) 0%, color-mix(in srgb, var(--color-accent-soft) 72%, var(--color-surface) 28%) 48%, var(--color-surface) 100%)',
+          }}
+        >
+          <p className="section-title">Executive Dashboard</p>
+          <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-[var(--color-ink-strong)] md:text-3xl">
+            Dashboard profesional yang memadukan fokus role, sinyal prioritas, dan jalur aksi tercepat
           </h1>
-          <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">
-            Dashboard ini dipakai sebagai ringkasan masuk kerja. Setelah itu operator bisa lanjut ke
-            list kerja, approval, atau modul inti tanpa perlu membaca terlalu banyak panel.
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
+            Tampilan ini dirancang sebagai pintu masuk kerja harian untuk semua role. Gunakan area atas
+            untuk membaca konteks, lalu lanjut ke panel visual dan daftar kerja yang paling dekat dengan kebutuhan hari ini.
           </p>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <span className={`badge border-transparent ${roleTone}`}>{roleShortLabel}</span>
-            <span className="badge border-slate-200 bg-white text-slate-600">{roleLabel}</span>
-            <span className="badge border-slate-200 bg-white text-slate-600">
+            <span className="badge border-line bg-surface text-mute">{roleLabel}</span>
+            <span className="badge border-line bg-surface text-mute">
               {roleDivision} / {roleSubdivision}
             </span>
           </div>
 
-          <div className="mt-3 rounded-xl border border-line bg-slate-50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Fokus Role Aktif</p>
-            <p className="mt-1 text-sm leading-5 text-slate-700">{roleScope}</p>
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mute">Fokus Role Aktif</p>
+              <p className="mt-2 text-sm leading-6 text-ink">{roleScope}</p>
+            </div>
+            <div className="rounded-3xl border border-line bg-panel p-4 text-surface shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Arah Baca Dashboard</p>
+              <p className="mt-2 text-sm leading-6 text-slate-200">
+                Mulai dari visual prioritas, validasi list kerja, lalu masuk ke modul melalui quick action di bawah.
+              </p>
+            </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             {quickLinks.map((item) => (
               <Link
                 key={`${item.href}-${item.label}`}
                 href={item.href}
                 className={
                   item.tone === 'primary'
-                    ? 'rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800'
-                    : 'rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50'
+                    ? 'rounded-xl bg-panel px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-surface transition opacity-100 hover:opacity-90'
+                    : 'rounded-xl border border-line bg-surface px-4 py-2 text-xs font-medium uppercase tracking-[0.08em] text-ink transition hover:bg-[var(--color-card-subtle)]'
                 }
               >
                 {item.label}
@@ -95,16 +109,33 @@ export function DashboardCommandCenter({
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-2">
-          {statusCards.map((item) => (
-            <article key={item.label} className="rounded-xl border border-line bg-slate-50 px-3 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{item.label}</p>
-              <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-                {item.value.toLocaleString('id-ID')}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-slate-600">{item.note}</p>
-            </article>
-          ))}
+        <div
+          className="border-t px-5 py-5 text-surface xl:border-l xl:border-t-0"
+          style={{ borderColor: 'var(--color-sidebar-line)', backgroundColor: 'var(--color-sidebar)' }}
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Command Signal</p>
+              <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight">
+                Snapshot angka kerja cepat
+              </h2>
+            </div>
+            <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-200">
+              All role
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {statusCards.map((item) => (
+              <article key={item.label} className="rounded-3xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{item.label}</p>
+                <p className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-white">
+                  {item.value.toLocaleString('id-ID')}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-slate-300">{item.note}</p>
+              </article>
+            ))}
+          </div>
         </div>
       </div>
     </section>

@@ -1,13 +1,15 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 import { ensureInventoryLoanTable, generateInventoryLoanCode } from '@/lib/services/inventory-loan-service'
 
 type ItemRow = {
   id: number
   itemCode: string
   itemName: string
+  rackCode: string | null
+  rackBarcode: string | null
   currentStock: number
   status: string
 }
@@ -33,6 +35,10 @@ function parseDueAt(value: string) {
   }
 
   return trimmed
+}
+
+function requiresInventoryPickupScan(role: string) {
+  return !['OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(String(role).trim().toUpperCase())
 }
 
 export async function POST(request: Request) {
@@ -61,6 +67,7 @@ export async function POST(request: Request) {
       borrowerSubdivision?: unknown
       dueAt?: unknown
       loanNotes?: unknown
+      scannedRackBarcode?: unknown
     }
 
     const itemCode = extractItemCode(String(payload.itemCode ?? '').trim())
@@ -70,6 +77,7 @@ export async function POST(request: Request) {
     const borrowerSubdivision = String(payload.borrowerSubdivision ?? '').trim()
     const dueAt = parseDueAt(String(payload.dueAt ?? ''))
     const loanNotes = String(payload.loanNotes ?? '').trim()
+    const scannedRackBarcode = String(payload.scannedRackBarcode ?? '').trim().toUpperCase()
 
     if (!itemCode) {
       return Response.json({ message: 'Item inventory wajib dipilih.' }, { status: 400 })
@@ -84,6 +92,11 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Tanggal jatuh tempo pengembalian tidak valid.' }, { status: 400 })
     }
 
+    const [hasRackCode, hasRackBarcode] = await Promise.all([
+      hasReviewDbColumn('inventory_items', 'rack_code'),
+      hasReviewDbColumn('inventory_items', 'rack_barcode'),
+    ])
+
     await ensureInventoryLoanTable()
 
     const [item] = await runReviewDbQuery<ItemRow>(
@@ -92,6 +105,8 @@ export async function POST(request: Request) {
           id,
           item_code AS itemCode,
           item_name AS itemName,
+          ${hasRackCode ? 'rack_code' : 'NULL'} AS rackCode,
+          ${hasRackBarcode ? 'rack_barcode' : 'NULL'} AS rackBarcode,
           current_stock AS currentStock,
           status
         FROM inventory_items
@@ -109,6 +124,29 @@ export async function POST(request: Request) {
     }
     if (item.currentStock < qty) {
       return Response.json({ message: 'Stok item tidak cukup untuk dipinjamkan.' }, { status: 409 })
+    }
+    if (requiresInventoryPickupScan(session.role)) {
+      if (!scannedRackBarcode) {
+        return Response.json(
+          { message: 'Scan barcode rak wajib dilakukan sebelum pinjaman barang disimpan.' },
+          { status: 400 },
+        )
+      }
+      const expectedRackBarcode = String(item.rackBarcode || item.rackCode || '').trim().toUpperCase()
+      if (!expectedRackBarcode) {
+        return Response.json(
+          { message: `Item ${item.itemCode} belum memiliki barcode rak. Lengkapi dulu data rak di item inventory.` },
+          { status: 400 },
+        )
+      }
+      if (scannedRackBarcode !== expectedRackBarcode) {
+        return Response.json(
+          {
+            message: `Barcode rak tidak cocok. Form memilih ${item.itemCode} di rak ${item.rackCode || '-'}, tetapi barcode yang terbaca ${scannedRackBarcode}.`,
+          },
+          { status: 400 },
+        )
+      }
     }
 
     const loanCode = await generateInventoryLoanCode()

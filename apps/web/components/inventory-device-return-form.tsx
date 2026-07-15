@@ -8,6 +8,7 @@ type InventoryDeviceReturnFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   assignmentSuggestions: string[]
+  embedded?: boolean
 }
 
 const returnStatusOptions = ['RETURNED', 'DAMAGED', 'LOST'] as const
@@ -21,6 +22,7 @@ export function InventoryDeviceReturnForm({
   canCreate,
   reviewDbReady,
   assignmentSuggestions,
+  embedded = false,
 }: InventoryDeviceReturnFormProps) {
   const router = useRouter()
   const [assignmentValue, setAssignmentValue] = useState(assignmentSuggestions[0] ?? '')
@@ -82,12 +84,12 @@ export function InventoryDeviceReturnForm({
   }
 
   return (
-    <section className="panel p-6">
-      <p className="section-title">Write Action Inventory</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+    <section className={embedded ? 'space-y-4' : 'panel p-6'}>
+      <p className="section-title">{embedded ? 'Aksi Tabel Inventory' : 'Write Action Inventory'}</p>
+      <h3 className={`font-[family-name:var(--font-heading)] font-semibold tracking-tight text-slate-950 ${embedded ? 'text-xl' : 'mt-2 text-2xl'}`}>
         Return perangkat
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
+      <p className={`${embedded ? '' : 'mt-3'} text-sm leading-6 text-mute`}>
         {!canCreate
           ? 'Role aktif belum memiliki izin create pada domain Inventory.'
           : !reviewDbReady
@@ -95,7 +97,7 @@ export function InventoryDeviceReturnForm({
             : 'Form ini menutup assignment perangkat. Jika status RETURNED, stok akan otomatis bertambah dan movement IN dicatat.'}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+      <form onSubmit={handleSubmit} className={`${embedded ? '' : 'mt-6'} grid gap-4 lg:grid-cols-2`}>
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Assignment</span>
           <input
@@ -167,4 +169,3 @@ export function InventoryDeviceReturnForm({
     </section>
   )
 }
-

@@ -1,3 +1,5 @@
+import { InventoryItemLoanForm } from '@/components/inventory-item-loan-form'
+import { InventoryLoanReturnForm } from '@/components/inventory-loan-return-form'
 import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
 
 function findSection(sections: DomainReviewSection[], keyword: string) {
@@ -35,8 +37,26 @@ function buildCountMap(rows: DomainReviewRow[]) {
 
 export function InventoryLoanOpsPanel({
   sections,
+  canCreate,
+  canUpdate,
+  reviewDbReady,
+  itemSuggestions,
+  rackSuggestions,
+  loanSuggestions,
+  requireScan,
+  initialItemValue,
+  initialLoanValue,
 }: {
   sections: DomainReviewSection[]
+  canCreate: boolean
+  canUpdate: boolean
+  reviewDbReady: boolean
+  itemSuggestions: string[]
+  rackSuggestions: string[]
+  loanSuggestions: string[]
+  requireScan: boolean
+  initialItemValue?: string
+  initialLoanValue?: string
 }) {
   const loanSection = findSection(sections, 'PINJAMAN INVENTORY')
   if (!loanSection) {
@@ -78,6 +98,31 @@ export function InventoryLoanOpsPanel({
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <article className="rounded-2xl border border-line bg-slate-50 p-5 xl:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi Workspace</p>
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <div id="inventory-action-item-loan" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4">
+              <InventoryItemLoanForm
+                canCreate={canCreate}
+                reviewDbReady={reviewDbReady}
+                itemSuggestions={itemSuggestions}
+                rackSuggestions={rackSuggestions}
+                requireScan={requireScan}
+                initialItemValue={initialItemValue}
+                embedded
+              />
+            </div>
+            <div id="inventory-action-loan-return" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4">
+              <InventoryLoanReturnForm
+                canUpdate={canUpdate}
+                reviewDbReady={reviewDbReady}
+                loanSuggestions={loanSuggestions}
+                initialLoanValue={initialLoanValue}
+                embedded
+              />
+            </div>
+          </div>
+        </article>
         <article className="rounded-2xl border border-line bg-slate-50 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Ringkasan Status</p>
           <div className="mt-4 flex flex-wrap gap-2">

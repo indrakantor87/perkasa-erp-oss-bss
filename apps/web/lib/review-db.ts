@@ -17,6 +17,25 @@ declare global {
 
 const reviewDbColumnCache = new Map<string, boolean>()
 
+export function invalidateReviewDbColumnCache(tableName?: string, columnName?: string) {
+  if (!tableName) {
+    reviewDbColumnCache.clear()
+    return
+  }
+
+  const normalizedTable = tableName.toLowerCase()
+  if (columnName) {
+    reviewDbColumnCache.delete(`${normalizedTable}.${columnName.toLowerCase()}`)
+    return
+  }
+
+  for (const key of reviewDbColumnCache.keys()) {
+    if (key.startsWith(`${normalizedTable}.`)) {
+      reviewDbColumnCache.delete(key)
+    }
+  }
+}
+
 function getDatabaseConfig() {
   const databaseUrl = process.env.DATABASE_URL?.trim()
   if (!databaseUrl) {

@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { getLeadStatusOptions } from '@/lib/sales-workflow'
 
 type SalesLeadCreateFormProps = {
   canCreate: boolean
@@ -11,7 +12,6 @@ type SalesLeadCreateFormProps = {
 }
 
 const leadTypeOptions = ['HOME', 'CORPORATE', 'RESELLER'] as const
-const leadStatusOptions = ['NEW', 'FOLLOW_UP', 'COVERAGE_CHECK', 'SURVEY_REQUEST', 'QUALIFIED'] as const
 
 export function SalesLeadCreateForm({
   canCreate,
@@ -21,7 +21,7 @@ export function SalesLeadCreateForm({
   const router = useRouter()
   const [customerName, setCustomerName] = useState('')
   const [leadType, setLeadType] = useState<(typeof leadTypeOptions)[number]>('HOME')
-  const [status, setStatus] = useState<(typeof leadStatusOptions)[number]>('NEW')
+  const [status, setStatus] = useState('NEW')
   const [source, setSource] = useState('Manual Review')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
@@ -31,6 +31,7 @@ export function SalesLeadCreateForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+  const statusOptions = getLeadStatusOptions(leadType)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -114,7 +115,14 @@ export function SalesLeadCreateForm({
           <span className="font-semibold text-slate-950">Lead Type</span>
           <select
             value={leadType}
-            onChange={(event) => setLeadType(event.target.value as (typeof leadTypeOptions)[number])}
+            onChange={(event) => {
+              const nextLeadType = event.target.value as (typeof leadTypeOptions)[number]
+              setLeadType(nextLeadType)
+              const nextOptions = getLeadStatusOptions(nextLeadType)
+              if (!nextOptions.includes(status)) {
+                setStatus(nextOptions[0] ?? 'NEW')
+              }
+            }}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
             disabled={isDisabled}
           >
@@ -130,11 +138,11 @@ export function SalesLeadCreateForm({
           <span className="font-semibold text-slate-950">Status Awal</span>
           <select
             value={status}
-            onChange={(event) => setStatus(event.target.value as (typeof leadStatusOptions)[number])}
+            onChange={(event) => setStatus(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
             disabled={isDisabled}
           >
-            {leadStatusOptions.map((item) => (
+            {statusOptions.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>

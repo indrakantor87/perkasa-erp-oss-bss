@@ -12,6 +12,36 @@ function pickMeta(meta: string[], prefix: string) {
   return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? '-'
 }
 
+function getRecurringKey(row: DomainReviewRow) {
+  const serviceNo = pickMeta(row.meta, 'Service No: ').trim()
+  if (serviceNo && serviceNo !== '-' && serviceNo.toLowerCase() !== 'belum ada') return `SVC:${serviceNo}`
+
+  const customerUser = pickMeta(row.meta, 'Customer User: ').trim()
+  if (customerUser && customerUser !== '-' && customerUser.toLowerCase() !== 'belum ada') return `USR:${customerUser}`
+
+  const customerCode = pickMeta(row.meta, 'Customer Code: ').trim()
+  if (customerCode && customerCode !== '-' && customerCode.toLowerCase() !== 'belum ada') return `CUST:${customerCode}`
+
+  const customerName = row.secondary?.trim()
+  if (customerName && customerName !== '-' && customerName.toLowerCase() !== 'belum ada') return `NAME:${customerName}`
+
+  return null
+}
+
+function getCloseLabel(meta: string[]) {
+  const closed = pickMeta(meta, 'Closed: ')
+  if (closed !== '-') {
+    return formatCompactDateTime(closed)
+  }
+
+  const closeCandidate = pickMeta(meta, 'Close Candidate: ').trim().toUpperCase()
+  if (closeCandidate === 'YA') {
+    return 'Siap close'
+  }
+
+  return '-'
+}
+
 function getRowTone(status: string) {
   const normalized = status.trim().toUpperCase()
   if (normalized.includes('OPEN') || normalized === 'NEW') {
@@ -153,9 +183,7 @@ function buildOperationalTicketStats(rows: DomainReviewRow[]) {
     const queueReason = pickMeta(row.meta, 'Queue Reason: ').trim().toUpperCase()
     const slaState = pickMeta(row.meta, 'SLA State: ').trim().toUpperCase()
     const queuePriority = pickMeta(row.meta, 'Queue Priority: ').trim().toUpperCase()
-    const repeatKey = [pickMeta(row.meta, 'Service No: '), pickMeta(row.meta, 'Customer User: '), row.secondary]
-      .map((item) => item.trim())
-      .find((item) => item && item !== '-')
+    const repeatKey = getRecurringKey(row)
 
     if (queueReason === 'READY_CLOSE') readyCloseCount += 1
     if (queueReason.includes('ESCALATION')) escalationCount += 1
@@ -180,7 +208,90 @@ function buildOperationalTicketStats(rows: DomainReviewRow[]) {
     readyCloseCount,
     priorityOneCount,
     recurringTicketCount,
+    repeatMap,
   }
+}
+
+async function exportTroubleTicketExcel(rows: DomainReviewRow[], repeatMap: Map<string, number>) {
+  const xlsxModule = await import('xlsx')
+  const XLSX = (xlsxModule as unknown as { default?: any }).default ?? (xlsxModule as any)
+
+  const headers = [
+    'ID Ticket',
+    'Nama Pelanggan',
+    'User',
+    'No WA',
+    'Service No',
+    'Kode Customer',
+    'Type',
+    'Gangguan',
+    'Tindakan Terakhir',
+    'PIC',
+    'Open',
+    'Close',
+    'Target SLA',
+    'SLA State',
+    'Prioritas',
+    'Queue',
+    'Gangguan Berulang',
+  ]
+
+  const lines: string[][] = [headers]
+  for (const row of rows) {
+    const type = pickMeta(row.meta, 'Type: ')
+    const customerUser = pickMeta(row.meta, 'Customer User: ')
+    const phone = pickMeta(row.meta, 'Phone: ')
+    const serviceNo = pickMeta(row.meta, 'Service No: ')
+    const customerCode = pickMeta(row.meta, 'Customer Code: ')
+    const latestProgress = pickMeta(row.meta, 'Latest Progress: ')
+    const owner = pickMeta(row.meta, 'PIC: ')
+    const opened = pickMeta(row.meta, 'Opened: ')
+    const closeLabel = getCloseLabel(row.meta)
+    const slaDue = pickMeta(row.meta, 'SLA Due: ')
+    const slaState = pickMeta(row.meta, 'SLA State: ')
+    const priority = pickMeta(row.meta, 'Queue Priority: ')
+    const queueReason = getQueueReasonLabel(pickMeta(row.meta, 'Queue Reason: '))
+    const recurringKey = getRecurringKey(row)
+    const recurringCount = recurringKey ? repeatMap.get(recurringKey) ?? 0 : 0
+    lines.push(
+      [
+        row.primary,
+        row.secondary,
+        customerUser,
+        phone,
+        serviceNo,
+        customerCode,
+        type,
+        row.detail,
+        latestProgress !== '-' ? latestProgress : getQueueReasonActionCopy(pickMeta(row.meta, 'Queue Reason: ')),
+        owner,
+        opened,
+        closeLabel,
+        slaDue,
+        slaState,
+        priority,
+        queueReason,
+        recurringCount > 1 ? `Ya (${recurringCount})` : 'Tidak',
+      ].map((value) => String(value ?? '').trim()),
+    )
+  }
+
+  const worksheet = XLSX.utils.aoa_to_sheet(lines)
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Trouble Ticket')
+  const content = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
+  const blob = new Blob([content], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const filename = `trouble-ticket-${new Date().toISOString().slice(0, 10)}.xlsx`
+
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  setTimeout(() => URL.revokeObjectURL(link.href), 500)
 }
 
 function getQueueRowClass(queueReason: string, priority: string, slaState: string) {
@@ -454,6 +565,7 @@ export function SupportTroubleTicketQueuePanel({
     count: section.rows.length,
   }))
   const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   return (
     <section className="panel p-4">
@@ -523,6 +635,21 @@ export function SupportTroubleTicketQueuePanel({
                 Supervisor CS
               </Link>
             ) : null}
+            <button
+              type="button"
+              disabled={isExporting}
+              onClick={async () => {
+                try {
+                  setIsExporting(true)
+                  await exportTroubleTicketExcel(allRows, operationalStats.repeatMap)
+                } finally {
+                  setIsExporting(false)
+                }
+              }}
+              className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isExporting ? 'Menyiapkan...' : 'Export Excel'}
+            </button>
           </div>
           <div className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600">
             P1: {operationalStats.priorityOneCount} • Due today: {operationalStats.dueTodayCount} • Eskalasi: {operationalStats.escalationCount}
@@ -543,15 +670,17 @@ export function SupportTroubleTicketQueuePanel({
         <>
           <div className="mt-3 hidden overflow-hidden rounded-xl border border-line bg-white lg:block">
             <div className="overflow-x-auto">
-              <table className="min-w-[1440px] w-full divide-y divide-slate-200 text-sm">
+              <table className="min-w-[1640px] w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-100/90">
                   <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                     <th className="px-3 py-3">ID Ticket</th>
                     <th className="px-3 py-3">Pelanggan</th>
                     <th className="px-3 py-3">User / Layanan</th>
+                    <th className="px-3 py-3">No WA</th>
                     <th className="px-3 py-3">Gangguan</th>
                     <th className="px-3 py-3">Tindakan / PIC</th>
                     <th className="px-3 py-3">Open</th>
+                    <th className="px-3 py-3">Close</th>
                     <th className="px-3 py-3">Target / SLA</th>
                     <th className="px-3 py-3">Durasi</th>
                     <th className="px-3 py-3">Keterangan</th>
@@ -562,11 +691,13 @@ export function SupportTroubleTicketQueuePanel({
                   {allRows.map((row) => {
                     const type = pickMeta(row.meta, 'Type: ')
                     const opened = pickMeta(row.meta, 'Opened: ')
+                    const closeLabel = getCloseLabel(row.meta)
                     const slaDue = pickMeta(row.meta, 'SLA Due: ')
                     const slaState = pickMeta(row.meta, 'SLA State: ')
                     const customerUser = pickMeta(row.meta, 'Customer User: ')
                     const serviceNo = pickMeta(row.meta, 'Service No: ')
                     const customerCode = pickMeta(row.meta, 'Customer Code: ')
+                    const phone = pickMeta(row.meta, 'Phone: ')
                     const owner = pickMeta(row.meta, 'PIC: ')
                     const followUp = pickMeta(row.meta, 'Next Follow Up: ')
                     const progressUpdated = pickMeta(row.meta, 'Progress Updated: ')
@@ -581,7 +712,9 @@ export function SupportTroubleTicketQueuePanel({
                       canApprove,
                     })
                     const aging = formatTicketAging(opened, progressUpdated !== '-' ? progressUpdated : undefined)
-                    const looksRecurring = operationalStats.recurringTicketCount > 0 && [serviceNo, customerUser, row.secondary].filter((item) => item && item !== '-').length > 0
+                    const recurringKey = getRecurringKey(row)
+                    const recurringCount = recurringKey ? operationalStats.repeatMap.get(recurringKey) ?? 0 : 0
+                    const isRecurring = recurringCount > 1
 
                     return (
                       <tr key={row.id} className={`align-top ${getQueueRowClass(queueReason, queuePriority, slaState)}`}>
@@ -616,8 +749,21 @@ export function SupportTroubleTicketQueuePanel({
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">No WA</p>
+                            <p className="mt-0.5 font-mono text-sm text-slate-700">{normalizeCellValue(phone)}</p>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3.5">
                           <div className="space-y-2">
-                            <span className={`badge ${getTypeTone(type)}`}>{type}</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              <span className={`badge ${getTypeTone(type)}`}>{type}</span>
+                              {isRecurring ? (
+                                <span className="badge border-violet-200 bg-violet-50 text-violet-700">
+                                  Gangguan berulang x{recurringCount}
+                                </span>
+                              ) : null}
+                            </div>
                             <p className="max-w-[260px] text-sm leading-5 text-slate-700">{row.detail}</p>
                           </div>
                         </td>
@@ -648,6 +794,12 @@ export function SupportTroubleTicketQueuePanel({
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Close</p>
+                            <p className="mt-0.5 text-sm text-slate-700">{closeLabel}</p>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3.5">
                           <div className="space-y-2">
                             <div className="flex flex-wrap gap-1.5">
                               <span className={`badge ${getPriorityTone(queuePriority)}`}>{queuePriority}</span>
@@ -674,9 +826,6 @@ export function SupportTroubleTicketQueuePanel({
                               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Catatan</p>
                               <p className="mt-0.5 text-sm leading-5 text-slate-700">{getQueueReasonLabel(queueReason)}</p>
                             </div>
-                            {looksRecurring ? (
-                              <span className="badge border-violet-200 bg-violet-50 text-violet-700">Cek ticket berulang</span>
-                            ) : null}
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
@@ -722,6 +871,7 @@ export function SupportTroubleTicketQueuePanel({
               const slaState = pickMeta(row.meta, 'SLA State: ')
               const customerUser = pickMeta(row.meta, 'Customer User: ')
               const serviceNo = pickMeta(row.meta, 'Service No: ')
+              const phone = pickMeta(row.meta, 'Phone: ')
               const latestProgress = pickMeta(row.meta, 'Latest Progress: ')
               const followUp = pickMeta(row.meta, 'Next Follow Up: ')
               const queuePriority = pickMeta(row.meta, 'Queue Priority: ')
@@ -735,6 +885,10 @@ export function SupportTroubleTicketQueuePanel({
               })
               const openedLabel = formatCompactDateTime(opened)
               const followUpLabel = formatCompactDateTime(followUp)
+              const closeLabel = getCloseLabel(row.meta)
+              const recurringKey = getRecurringKey(row)
+              const recurringCount = recurringKey ? operationalStats.repeatMap.get(recurringKey) ?? 0 : 0
+              const isRecurring = recurringCount > 1
 
               return (
                 <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-4">
@@ -749,6 +903,11 @@ export function SupportTroubleTicketQueuePanel({
                     <span className={`badge ${getPriorityTone(queuePriority)}`}>{queuePriority}</span>
                     <span className={`badge ${getSlaTone(slaState)}`}>{slaState}</span>
                     <span className={`badge ${getTypeTone(type)}`}>{type}</span>
+                    {isRecurring ? (
+                      <span className="badge border-violet-200 bg-violet-50 text-violet-700">
+                        Gangguan berulang x{recurringCount}
+                      </span>
+                    ) : null}
                   </div>
                   <p className="mt-3 text-sm leading-5 text-slate-700">{row.detail}</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -760,6 +919,10 @@ export function SupportTroubleTicketQueuePanel({
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Layanan</p>
                         <p className="mt-0.5 font-mono text-xs text-slate-500">{normalizeCellValue(serviceNo)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">No WA</p>
+                        <p className="mt-0.5 font-mono text-sm text-slate-700">{normalizeCellValue(phone)}</p>
                       </div>
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Dibuka</p>
@@ -780,6 +943,10 @@ export function SupportTroubleTicketQueuePanel({
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Queue</p>
                         <p className="mt-0.5 text-sm text-slate-700">{getQueueReasonLabel(queueReason)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Close</p>
+                        <p className="mt-0.5 text-sm text-slate-700">{closeLabel}</p>
                       </div>
                     </div>
                   </div>

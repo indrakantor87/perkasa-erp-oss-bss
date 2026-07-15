@@ -13,6 +13,8 @@ type InventoryItemRequestFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   itemSuggestions: string[]
+  initialItemValue?: string
+  embedded?: boolean
 }
 
 function extractItemCode(value: string) {
@@ -23,9 +25,11 @@ export function InventoryItemRequestForm({
   canCreate,
   reviewDbReady,
   itemSuggestions,
+  initialItemValue,
+  embedded = false,
 }: InventoryItemRequestFormProps) {
   const router = useRouter()
-  const [itemValue, setItemValue] = useState(itemSuggestions[0] ?? '')
+  const [itemValue, setItemValue] = useState(initialItemValue || itemSuggestions[0] || '')
   const [qty, setQty] = useState('1')
   const [requestedSubdivision, setRequestedSubdivision] = useState<InventoryRequestSubdivision>(
     INVENTORY_REQUEST_SUBDIVISIONS[0],
@@ -92,12 +96,12 @@ export function InventoryItemRequestForm({
   }
 
   return (
-    <section className="panel p-6">
+    <section className={embedded ? 'space-y-4' : 'panel p-6'}>
       <p className="section-title">Marketplace Internal</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+      <h3 className={`font-[family-name:var(--font-heading)] font-semibold tracking-tight text-slate-950 ${embedded ? 'text-xl' : 'mt-2 text-2xl'}`}>
         Request kebutuhan teknisi
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
+      <p className={`${embedded ? '' : 'mt-3'} text-sm leading-6 text-mute`}>
         {!canCreate
           ? 'Role aktif belum memiliki izin create pada domain Inventory.'
           : !reviewDbReady
@@ -105,7 +109,7 @@ export function InventoryItemRequestForm({
             : 'Form ini meniru alur marketplace internal: teknisi memilih item, mengirim request, lalu Inventory memproses sampai selesai atau pending.'}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+      <form onSubmit={handleSubmit} className={`${embedded ? '' : 'mt-6'} grid gap-4 lg:grid-cols-2`}>
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Item yang dibutuhkan</span>
           <input

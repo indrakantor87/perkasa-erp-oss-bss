@@ -27,20 +27,25 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO auth_roles (code, name)
 VALUES
+  ('OWNER', 'Owner'),
   ('SUPER_ADMIN', 'Super Admin'),
-  ('OPERATOR', 'Operator'),
   ('ADMIN', 'Admin'),
+  ('FINANCE', 'Finance'),
+  ('HR', 'HR'),
+  ('GA', 'GA'),
+  ('PENJUALAN', 'Penjualan'),
   ('CS', 'Customer Service'),
-  ('ADMIN_CS', 'Admin CS'),
   ('NOC', 'NOC'),
   ('TROUBLESHOOTS', 'Troubleshoots'),
-  ('MARKETING', 'Marketing'),
   ('CREATOR_DIGITAL', 'Creator Digital'),
   ('DISMANTLE', 'Dismantle'),
-  ('SALES', 'Sales'),
-  ('HR_GA', 'HR & GA'),
-  ('FINANCE', 'Finance'),
-  ('WAREHOUSE', 'Warehouse')
+  ('TEKNISI_PSB', 'Teknisi PSB'),
+  ('ADMIN_CS', 'Admin CS (Legacy)'),
+  ('MARKETING', 'Marketing (Legacy)'),
+  ('SALES', 'Sales (Legacy)'),
+  ('OPERATOR', 'Operator (Legacy)'),
+  ('HR_GA', 'HR & GA (Legacy)'),
+  ('WAREHOUSE', 'Warehouse (Legacy)')
 ON DUPLICATE KEY UPDATE
   name = VALUES(name);
 
@@ -49,7 +54,7 @@ UPDATE staging_legacy_user_records su
 SET su.normalized_key = LOWER(NULLIF(TRIM(su.username), '')),
     su.mapped_role_code = CASE UPPER(TRIM(COALESCE(su.legacy_role, '')))
       WHEN 'ADMIN' THEN 'ADMIN'
-      WHEN 'MARKETING' THEN 'MARKETING'
+      WHEN 'MARKETING' THEN 'PENJUALAN'
       WHEN 'CS' THEN 'CS'
       WHEN 'NOC' THEN 'NOC'
       WHEN 'TROUBLESHOOTS' THEN 'TROUBLESHOOTS'
@@ -78,7 +83,7 @@ SET su.normalized_key = LOWER(NULLIF(TRIM(su.username), '')),
       WHEN NULLIF(TRIM(su.username), '') IS NULL THEN 'INVALID'
       WHEN CASE UPPER(TRIM(COALESCE(su.legacy_role, '')))
         WHEN 'ADMIN' THEN 'ADMIN'
-        WHEN 'MARKETING' THEN 'MARKETING'
+        WHEN 'MARKETING' THEN 'PENJUALAN'
         WHEN 'CS' THEN 'CS'
         WHEN 'NOC' THEN 'NOC'
         WHEN 'TROUBLESHOOTS' THEN 'TROUBLESHOOTS'

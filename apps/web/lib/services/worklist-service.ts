@@ -23,7 +23,13 @@ export type WorklistPageFilters = {
 }
 
 const WORKLIST_QUEUE_MAP: Record<AppRole, string[]> = {
+  OWNER: ['All', 'Lead Follow Up', 'Input dan Follow Up', 'Order dan Aktivasi', 'Isolir dan Dismantle', 'TT Teknis', 'Ticket Baru', 'ODP dan Port', 'Siap Dismantle', 'Import Review', 'Perlu Approval', 'Lainnya'],
   SUPER_ADMIN: ['All', 'Lead Follow Up', 'Input dan Follow Up', 'Order dan Aktivasi', 'Isolir dan Dismantle', 'TT Teknis', 'Ticket Baru', 'ODP dan Port', 'Siap Dismantle', 'Import Review', 'Perlu Approval', 'Lainnya'],
+  ADMIN: ['All', 'Lead Follow Up', 'Input dan Follow Up', 'Order dan Aktivasi', 'Isolir dan Dismantle', 'TT Teknis', 'Ticket Baru', 'ODP dan Port', 'Siap Dismantle', 'Import Review', 'Perlu Approval', 'Lainnya'],
+  FINANCE: ['Billing Overdue', 'Partial Payment', 'Monitoring Isolir', 'Lainnya'],
+  HR: ['Absensi Hari Ini', 'Loan Aktif', 'Payroll Periode', 'Lainnya'],
+  GA: ['ODP dan Port', 'Inventory Request', 'Movement Bulanan', 'Lainnya'],
+  PENJUALAN: ['Lead Follow Up', 'Customer Belum Lengkap', 'Coverage dan Survey', 'Order Siap Aktivasi', 'Monitoring Support/ODP', 'Lainnya'],
   SALES_MARKETING: ['Lead Follow Up', 'Customer Belum Lengkap', 'Coverage dan Survey', 'Order Siap Aktivasi', 'Monitoring Support/ODP', 'Lainnya'],
   CS_OPERATOR: ['Input dan Follow Up', 'Order dan Aktivasi', 'Isolir dan Dismantle', 'TT Dasar', 'ODP dan Port', 'Lainnya'],
   CS_ADMIN: ['Queue CS Tim', 'Perlu Approval', 'Perlu Koreksi', 'Transfer atau Restore', 'Queue Risiko Tinggi', 'Lainnya'],
@@ -35,7 +41,13 @@ const WORKLIST_QUEUE_MAP: Record<AppRole, string[]> = {
 }
 
 const ROLE_QUEUE_DEFAULT: Record<AppRole, string> = {
+  OWNER: 'All',
   SUPER_ADMIN: 'All',
+  ADMIN: 'All',
+  FINANCE: 'Billing Overdue',
+  HR: 'Absensi Hari Ini',
+  GA: 'ODP dan Port',
+  PENJUALAN: 'Lead Follow Up',
   SALES_MARKETING: 'Lead Follow Up',
   CS_OPERATOR: 'Input dan Follow Up',
   CS_ADMIN: 'Queue CS Tim',

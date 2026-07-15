@@ -2983,6 +2983,10 @@ async function getReviewDbDailyActivityApprovalQueue(session: AppSession): Promi
 async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkItem[]> {
   const role = session.role
   switch (role) {
+    default:
+      return []
+    case 'OWNER':
+    case 'ADMIN':
     case 'SUPER_ADMIN': {
       const rows = await runReviewDbQuery<ImportActivityRow>(`
         SELECT
@@ -3007,6 +3011,7 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         href: '/import',
       }))
     }
+    case 'PENJUALAN':
     case 'SALES_MARKETING': {
       const [customerCompletenessQueryParts, salesOrderQueryParts] = await Promise.all([
         getDashboardCustomerCompletenessQueryParts(),
@@ -3731,37 +3736,28 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           domain: 'Support',
           title: item.ticketCode,
           subtitle: item.customerName,
-          status: 'OVERDUE',
+          status: 'PENDING',
           priority: 'tinggi' as const,
           detail: `${item.ticketType} • Ticket sudah terbuka ${formatNumber(Number(item.agingHours ?? 0))} jam dan perlu keputusan supervisor.`,
-          href: buildSupportLaneActionHref('sla', 'sla-manage', {
+          href: buildSupportLaneActionHref('tt', 'ticket-progress', {
             ticket: item.ticketCode,
-            focus: 'SLA_OVERDUE',
+            focus: 'OPEN_TICKETS',
           }),
-          actionLabel: 'Kontrol SLA',
+          actionLabel: 'Update Ticket',
           owner: 'NOC / TT',
-          nextAction: 'Amankan SLA dulu, lalu tentukan apakah ticket cukup diprogress, perlu eskalasi, atau siap ditutup.',
+          nextAction: 'Perbarui progres ticket dulu, lalu tentukan apakah perlu eskalasi atau siap ditutup.',
           healthSignal: buildCaseHealthSignal({
-            label: 'Masih Tertahan SLA',
+            label: 'Ticket Kritis',
             detail:
-              'Kasus masih berada di jalur troubleshooting dan belum aman dipindah ke restore atau terminate sebelum tekanan SLA turun dan arah teknis lebih jelas.',
+              'Kasus masih berada di jalur troubleshooting dan perlu kontrol supervisor agar progres teknis, eskalasi, dan keputusan tindak lanjut tidak mandek.',
             tone: 'border-orange-200 bg-orange-50 text-orange-700',
           }),
           recommendedActions: buildCaseRecommendedActionMatrix({
             owner: 'NOC / TT',
             items: [
               {
-                label: 'Kontrol SLA Sekarang',
-                detail: 'Amankan batas layanan lebih dulu agar kasus tidak terus menumpuk di zona overdue.',
-                href: buildSupportLaneActionHref('sla', 'sla-manage', {
-                  ticket: item.ticketCode,
-                  focus: 'SLA_OVERDUE',
-                }),
-                tone: 'border-orange-200 bg-orange-50 text-orange-700',
-              },
-              {
                 label: 'Update Progress Ticket',
-                detail: 'Tuliskan progres teknis terbaru agar operator berikutnya tidak kehilangan konteks penanganan.',
+                detail: 'Tuliskan progres teknis terbaru agar supervisor membaca arah penanganan yang paling mutakhir.',
                 href: buildSupportLaneActionHref('tt', 'ticket-progress', {
                   ticket: item.ticketCode,
                   focus: 'OPEN_TICKETS',
@@ -3770,12 +3766,20 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
               },
               {
                 label: 'Eskalasi Bila Tetap Mandek',
-                detail: 'Naikkan ticket jika hambatan teknis belum terselesaikan setelah kontrol SLA dan update progres.',
+                detail: 'Naikkan ticket jika hambatan teknis belum terselesaikan setelah progress terbaru dicatat.',
                 href: buildSupportLaneActionHref('tt', 'ticket-escalate', {
                   ticket: item.ticketCode,
                   focus: 'OPEN_TICKETS',
                 }),
                 tone: 'border-slate-200 bg-slate-50 text-slate-700',
+              },
+              {
+                label: 'Pantau Dampak Layanan',
+                detail: 'Gunakan lane SLA hanya bila konteks SLA benar-benar perlu dikontrol setelah progres teknis dibaca ulang.',
+                href: buildSupportLaneHref('sla', {
+                  focus: 'OPEN_TICKETS',
+                }),
+                tone: 'border-orange-200 bg-orange-50 text-orange-700',
               },
             ],
           }),
@@ -3784,17 +3788,17 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
             items: [
               {
                 label: 'Target Hasil',
-                detail: 'Tekanan SLA turun dan ticket kembali berada di jalur progress yang bisa ditutup atau dipantau normal.',
+                detail: 'Ticket kembali berada di jalur progress yang jelas, punya keputusan teknis berikutnya, dan siap dipantau atau ditutup secara aman.',
                 tone: 'border-orange-200 bg-orange-50 text-orange-700',
               },
               {
                 label: 'Sinyal Berhasil',
-                detail: 'Ada progres teknis yang jelas, update ticket terbaru terbaca, dan kasus tidak lagi stagnan di zona overdue.',
+                detail: 'Ada progres teknis yang jelas, update ticket terbaru terbaca, dan supervisor tidak lagi melihat kasus ini sebagai backlog kritis tanpa arah.',
                 tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
               },
               {
                 label: 'Fallback',
-                detail: 'Jika SLA tetap menekan atau progres teknis mandek, eskalasi ticket agar supervisor tidak menunggu tanpa arah teknis.',
+                detail: 'Jika progres teknis tetap mandek, eskalasi ticket agar penanganan tidak berhenti di level operator.',
                 tone: 'border-slate-200 bg-slate-50 text-slate-700',
               },
             ],
@@ -3805,7 +3809,7 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
             owner: 'NOC / TT',
             billing: 'Pantau dampak',
             isolation: 'Cek bila perlu',
-            ttSla: 'Overdue',
+            ttSla: 'Perlu kontrol',
             dismantle: 'Belum prioritas',
           }),
           decisionTrail: buildCaseDecisionTrail({
@@ -3818,7 +3822,7 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
                 tone: 'border-sky-200 bg-sky-50 text-sky-700',
               },
               {
-                label: 'SLA masuk zona kritis',
+                label: 'Aging melewati ambang pantau',
                 detail: `Aging ${formatNumber(item.agingHours)} jam menandakan supervisor perlu mengontrol progres, eskalasi, atau penutupan.`,
                 tone: 'border-orange-200 bg-orange-50 text-orange-700',
               },
@@ -3839,7 +3843,7 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
                 tone: 'border-sky-200 bg-sky-50 text-sky-700',
               },
               {
-                label: 'Sinyal SLA kritis',
+                label: 'Sinyal aging kritis',
                 detail: `Aging ${formatNumber(item.agingHours)} jam menunjukkan kasus ini sudah melewati ambang pantau normal dan perlu kontrol supervisor.`,
                 tone: 'border-orange-200 bg-orange-50 text-orange-700',
               },
@@ -3937,33 +3941,28 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
       return [
         ...tickets.map((item) => {
           const agingHours = Number(item.agingHours ?? 0)
-          const isSlaCritical = agingHours >= 24
+          const isAgingCritical = agingHours >= 24
 
           return {
-            id: `${isSlaCritical ? 'tt-risk' : 'tt'}-${item.ticketCode}`,
+            id: `${isAgingCritical ? 'tt-risk' : 'tt'}-${item.ticketCode}`,
             domain: 'Support',
             title: item.ticketCode,
             subtitle: item.customerName,
-            status: isSlaCritical ? 'OVERDUE' : item.status,
+            status: item.status,
             priority: 'tinggi' as const,
-            detail: isSlaCritical
-              ? `${item.ticketType} • SLA overdue ${formatNumber(agingHours)} jam dan perlu kontrol NOC sekarang.`
+            detail: isAgingCritical
+              ? `${item.ticketType} • Ticket teknis aktif ${formatNumber(agingHours)} jam dan perlu kontrol NOC sekarang.`
               : `${item.ticketType} • Ticket teknis aktif ${formatNumber(agingHours)} jam sejak ${formatActivityTime(item.openedAt)}.`,
-            href: isSlaCritical
-              ? buildSupportLaneActionHref('sla', 'sla-manage', {
-                  ticket: item.ticketCode,
-                  focus: 'SLA_OVERDUE',
-                })
-              : buildSupportLaneActionHref('tt', 'ticket-progress', {
-                  ticket: item.ticketCode,
-                  focus: 'OPEN_TICKETS',
-                }),
-            actionLabel: isSlaCritical ? 'Kontrol SLA' : 'Update Ticket',
-            handoffLinks: isSlaCritical
+            href: buildSupportLaneActionHref('tt', 'ticket-progress', {
+              ticket: item.ticketCode,
+              focus: 'OPEN_TICKETS',
+            }),
+            actionLabel: 'Update Ticket',
+            handoffLinks: isAgingCritical
               ? [
                   {
-                    label: 'Update Progress TT',
-                    href: buildSupportLaneActionHref('tt', 'ticket-progress', {
+                    label: 'Eskalasi Ticket',
+                    href: buildSupportLaneActionHref('tt', 'ticket-escalate', {
                       ticket: item.ticketCode,
                       focus: 'OPEN_TICKETS',
                     }),
@@ -4016,19 +4015,19 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         const normalizedStatus = String(item.status ?? '').trim().toUpperCase()
         const isReadyClose = ['READY', 'DONE', 'COMPLETED'].includes(normalizedStatus)
         const isEscalationCandidate = normalizedStatus.includes('ESCALAT') || agingHours >= 18
-        const isOverdue = agingHours >= 24 && !isReadyClose
+        const needsUrgentProgress = agingHours >= 24 && !isReadyClose
 
         return {
           id: `tt-${item.ticketCode}`,
           domain: 'Support',
           title: item.ticketCode,
           subtitle: item.customerName,
-          status: isReadyClose ? 'READY' : isOverdue ? 'OVERDUE' : item.status,
+          status: isReadyClose ? 'READY' : item.status,
           priority: 'tinggi' as const,
           detail: isReadyClose
             ? `${item.ticketType} • Ticket siap close setelah progres terakhir tervalidasi.`
-            : isOverdue
-              ? `${item.ticketType} • Follow up overdue ${formatNumber(agingHours)} jam dan perlu update progress sekarang.`
+            : needsUrgentProgress
+              ? `${item.ticketType} • Ticket perlu update progress segera setelah aktif ${formatNumber(agingHours)} jam.`
               : isEscalationCandidate
                 ? `${item.ticketType} • Ticket siap eskalasi bila progres teknis masih mandek setelah ${formatNumber(agingHours)} jam.`
                 : `${item.ticketType} • Ticket baru perlu update awal sejak ${formatActivityTime(item.openedAt)}.`,

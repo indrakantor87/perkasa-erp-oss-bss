@@ -318,11 +318,14 @@ export default async function DomainPage({
     order?: string | string[]
     invoice?: string | string[]
     service?: string | string[]
+    itemCode?: string | string[]
     request?: string | string[]
     employee?: string | string[]
     attendance?: string | string[]
     loan?: string | string[]
     payroll?: string | string[]
+    inventoryView?: string | string[]
+    inventoryAction?: string | string[]
   }>
 }) {
   const session = await requireSession()
@@ -333,7 +336,7 @@ export default async function DomainPage({
     redirect('/dashboard')
   }
 
-  const payload = await getDomainPageData(domain as DomainKey, session.role, {
+  const payload = await getDomainPageData(domain as DomainKey, session, {
     supportLane: normalizeSupportLane(resolvedSearchParams.lane),
     focus: resolveSearchParam(resolvedSearchParams.focus),
     month: resolvePositiveIntegerParam(resolvedSearchParams.month),
@@ -349,6 +352,7 @@ export default async function DomainPage({
     order: resolveSearchParam(resolvedSearchParams.order),
     invoice: resolveSearchParam(resolvedSearchParams.invoice),
     service: resolveSearchParam(resolvedSearchParams.service),
+    itemCode: resolveSearchParam(resolvedSearchParams.itemCode),
     request: resolveSearchParam(resolvedSearchParams.request),
     employee: resolveSearchParam(resolvedSearchParams.employee),
     attendance: resolveSearchParam(resolvedSearchParams.attendance),
@@ -412,6 +416,8 @@ export default async function DomainPage({
         type: resolveSearchParam(resolvedSearchParams.type),
       }}
       domainPrefill={domainPrefill}
+      inventoryView={resolveSearchParam(resolvedSearchParams.inventoryView)}
+      inventoryAction={resolveSearchParam(resolvedSearchParams.inventoryAction)}
       domainDrilldown={
         resolvedDomainDrilldown
           ? {

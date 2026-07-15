@@ -27,22 +27,11 @@ import { HrLoanVoidForm } from '@/components/hr-loan-void-form'
 import { HrSalarySlipReleaseForm } from '@/components/hr-salary-slip-release-form'
 import { HrSalarySlipForm } from '@/components/hr-salary-slip-form'
 import { HrSalarySlipVoidForm } from '@/components/hr-salary-slip-void-form'
-import { InventoryDeviceAssignmentForm } from '@/components/inventory-device-assignment-form'
 import { InventoryNetworkOpsPanel } from '@/components/inventory-network-ops-panel'
-import { InventoryDeviceReturnForm } from '@/components/inventory-device-return-form'
-import { InventoryItemRequestForm } from '@/components/inventory-item-request-form'
-import { InventoryItemCreateForm } from '@/components/inventory-item-create-form'
-import { InventoryItemLoanForm } from '@/components/inventory-item-loan-form'
+import { InventoryItemBarcodePanel } from '@/components/inventory-item-barcode-panel'
 import { InventoryLoanOpsPanel } from '@/components/inventory-loan-ops-panel'
-import { InventoryLoanReturnForm } from '@/components/inventory-loan-return-form'
-import { InventoryOdpCreateForm } from '@/components/inventory-odp-create-form'
-import { InventoryOdpPortAssignForm } from '@/components/inventory-odp-port-assign-form'
-import { InventoryOdpPortStatusForm } from '@/components/inventory-odp-port-status-form'
 import { InventoryRequestOpsPanel } from '@/components/inventory-request-ops-panel'
-import { InventoryRequestStatusForm } from '@/components/inventory-request-status-form'
-import { InventoryStockReceiptForm } from '@/components/inventory-stock-receipt-form'
 import { InventoryStockReceiptPanel } from '@/components/inventory-stock-receipt-panel'
-import { InventoryStockMovementForm } from '@/components/inventory-stock-movement-form'
 import { SalesCoverageCreateForm } from '@/components/sales-coverage-create-form'
 import { SalesLeadCreateForm } from '@/components/sales-lead-create-form'
 import { SalesOrderCreateForm } from '@/components/sales-order-create-form'
@@ -71,6 +60,7 @@ import { DataSourceStatus } from '@/components/data-source-status'
 import { getRoleMeta } from '@/lib/role-meta'
 import { buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
 import { canProcessSupportDismantle, canUseSupportAction, getSupportLanePath } from '@/lib/support-lanes'
+import { extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
 import type {
   AppRole,
   CaseActionOutcomeSummary,
@@ -319,6 +309,7 @@ type InventoryActionKey =
   | 'stock-receipt'
   | 'item-loan'
   | 'loan-return'
+  | 'rack-layout'
   | 'item-create'
   | 'stock-movement'
   | 'odp-create'
@@ -395,6 +386,13 @@ function getInventorySectionAction(params: {
       key: 'device-return' as const,
       label: 'Return Perangkat',
       description: 'Tindak perangkat assignment yang sudah selesai dipakai di lapangan.',
+    }
+  }
+  if (title.includes('ITEM') && params.canUpdate && !params.isFieldTechnicianInventory) {
+    return {
+      key: 'rack-layout' as const,
+      label: 'Penataan Rak',
+      description: 'Rapikan lokasi rak per item dan siapkan barcode rak untuk pengambilan barang.',
     }
   }
   if (title.includes('ITEM') && params.canCreate && !params.isFieldTechnicianInventory) {
@@ -594,7 +592,10 @@ function getDomainReviewSectionAction(params: {
     return action
       ? {
           label: action.label,
-          href: `#${getInventoryActionAnchorId(action.key)}`,
+          href: getInventoryWorkspaceHref(
+            mapInventoryActionToWorkspaceView(action.key),
+            getInventoryActionAnchorId(action.key),
+          ),
         }
       : null
   }
@@ -672,7 +673,7 @@ function getReviewRowStatusTone(status: string) {
   if (normalized.includes('DONE') || normalized.includes('CLOSE') || normalized.includes('PAID') || normalized.includes('SUCCESS')) {
     return 'border-emerald-200 bg-emerald-50 text-emerald-700'
   }
-  return 'border-slate-200 bg-slate-50 text-slate-700'
+  return 'border-line bg-[var(--color-card-subtle)] text-mute'
 }
 
 function getReviewRowMetaHighlights(meta: string[]) {
@@ -684,6 +685,127 @@ type DomainReviewRowAction = {
   href: string
   secondaryLabel?: string
   secondaryHref?: string
+}
+
+type InventoryWorkspaceView = 'overview' | 'items' | 'requests' | 'movements' | 'network'
+
+function normalizeInventoryWorkspaceView(value: string | undefined): InventoryWorkspaceView {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase()
+
+  if (normalized === 'items' || normalized === 'requests' || normalized === 'movements' || normalized === 'network') {
+    return normalized
+  }
+
+  return 'overview'
+}
+
+function normalizeInventoryActionKey(value: string | undefined): InventoryActionKey | null {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase()
+  if (!normalized) {
+    return null
+  }
+
+  const allowed: InventoryActionKey[] = [
+    'item-request',
+    'request-status',
+    'stock-receipt',
+    'item-loan',
+    'loan-return',
+    'rack-layout',
+    'item-create',
+    'stock-movement',
+    'odp-create',
+    'odp-port-assign',
+    'odp-port-status',
+    'device-assignment',
+    'device-return',
+  ]
+
+  return allowed.includes(normalized as InventoryActionKey) ? (normalized as InventoryActionKey) : null
+}
+
+function isInventoryActionInScope(scope: InventoryActionKey, candidate: InventoryActionKey) {
+  if ((scope === 'item-request' || scope === 'request-status') && (candidate === 'item-request' || candidate === 'request-status')) {
+    return true
+  }
+  return scope === candidate
+}
+
+function getInventoryWorkspaceHref(view: InventoryWorkspaceView, anchorId?: string, params?: Record<string, string | undefined>) {
+  const searchParams = new URLSearchParams()
+  searchParams.set('inventoryView', view)
+
+  if (anchorId?.startsWith('inventory-action-')) {
+    const actionKey = anchorId.replace(/^inventory-action-/, '').trim()
+    if (actionKey) {
+      searchParams.set('inventoryAction', actionKey)
+    }
+  }
+
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    const normalized = String(value ?? '').trim()
+    if (normalized) {
+      searchParams.set(key, normalized)
+    }
+  })
+
+  const queryText = searchParams.toString()
+  return `${queryText ? `?${queryText}` : ''}${anchorId ? `#${anchorId}` : ''}`
+}
+
+function mapInventoryActionToWorkspaceView(key: InventoryActionKey): InventoryWorkspaceView {
+  switch (key) {
+    case 'item-create':
+    case 'rack-layout':
+      return 'items'
+    case 'item-request':
+    case 'request-status':
+      return 'requests'
+    case 'stock-receipt':
+    case 'item-loan':
+    case 'loan-return':
+    case 'stock-movement':
+      return 'movements'
+    case 'odp-create':
+    case 'odp-port-assign':
+    case 'odp-port-status':
+    case 'device-assignment':
+    case 'device-return':
+      return 'network'
+    default:
+      return 'overview'
+  }
+}
+
+function matchesInventoryWorkspaceView(title: string, view: InventoryWorkspaceView) {
+  if (view === 'overview') {
+    return true
+  }
+
+  const normalized = title.trim().toUpperCase()
+
+  if (view === 'items') {
+    return normalized.includes('ITEM')
+  }
+
+  if (view === 'requests') {
+    return normalized.includes('REQUEST')
+  }
+
+  if (view === 'movements') {
+    return normalized.includes('LOAN') || normalized.includes('STOCK')
+  }
+
+  return (
+    normalized.includes('ODP') ||
+    normalized.includes('PORT') ||
+    normalized.includes('ASSIGNMENT') ||
+    normalized.includes('DEVICE')
+  )
 }
 
 function buildBillingDecisionTrail(row: DomainReviewRow, sectionTitle: string): CaseDecisionTrail | null {
@@ -1294,45 +1416,78 @@ function getDomainReviewRowAction(params: {
     if (title.includes('REQUEST') && params.canProcessInventoryRequest) {
       return {
         label: 'Proses Request',
-        href: buildPrefillHref(getInventoryActionAnchorId('request-status'), {
+        href: getInventoryWorkspaceHref('requests', getInventoryActionAnchorId('request-status'), {
           request: extractEntityValueFromRowId(params.row.id, 'REQ') || params.row.primary,
         }),
       }
     }
     if (title.includes('REQUEST') && params.canRequestInventory) {
-      return { label: 'Ajukan Request', href: `#${getInventoryActionAnchorId('item-request')}` }
+      return {
+        label: 'Ajukan Request',
+        href: getInventoryWorkspaceHref('requests', getInventoryActionAnchorId('item-request')),
+      }
     }
     if ((title.includes('RETURN') || title.includes('DEVICE RETURN')) && params.canCreate && !params.isFieldTechnicianInventory) {
-      return { label: 'Return Perangkat', href: `#${getInventoryActionAnchorId('device-return')}` }
+      return {
+        label: 'Return Perangkat',
+        href: getInventoryWorkspaceHref('network', getInventoryActionAnchorId('device-return')),
+      }
     }
     if (title.includes('ASSIGNMENT') && params.canCreate && !params.isFieldTechnicianInventory) {
-      return { label: 'Assign Perangkat', href: `#${getInventoryActionAnchorId('device-assignment')}` }
+      return {
+        label: 'Assign Perangkat',
+        href: getInventoryWorkspaceHref('network', getInventoryActionAnchorId('device-assignment')),
+      }
     }
     if (title.includes('LOAN') && params.canUpdate && !params.isFieldTechnicianInventory) {
       return {
         label: 'Proses Pengembalian',
-        href: buildPrefillHref(getInventoryActionAnchorId('loan-return'), {
+        href: getInventoryWorkspaceHref('movements', getInventoryActionAnchorId('loan-return'), {
           loan: extractEntityValueFromRowId(params.row.id, 'LOAN') || params.row.primary,
         }),
       }
     }
     if (title.includes('LOAN') && params.canCreate && !params.isFieldTechnicianInventory) {
-      return { label: 'Pinjamkan Barang', href: `#${getInventoryActionAnchorId('item-loan')}` }
+      return {
+        label: 'Pinjamkan Barang',
+        href: getInventoryWorkspaceHref('movements', getInventoryActionAnchorId('item-loan')),
+      }
     }
     if (title.includes('PORT') && params.canUpdate && !params.isFieldTechnicianInventory) {
-      return { label: 'Atur Port', href: `#${getInventoryActionAnchorId('odp-port-status')}` }
+      return {
+        label: 'Atur Port',
+        href: getInventoryWorkspaceHref('network', getInventoryActionAnchorId('odp-port-status')),
+      }
     }
     if (title.includes('ODP') && params.canCreate && !params.isFieldTechnicianInventory) {
-      return { label: 'Kelola ODP', href: `#${getInventoryActionAnchorId('odp-create')}` }
+      return {
+        label: 'Kelola ODP',
+        href: getInventoryWorkspaceHref('network', getInventoryActionAnchorId('odp-create')),
+      }
     }
     if (title.includes('STOCK MOVEMENT') && params.canCreate && !params.isFieldTechnicianInventory) {
-      return { label: 'Gerakkan Stok', href: `#${getInventoryActionAnchorId('stock-movement')}` }
+      return {
+        label: 'Gerakkan Stok',
+        href: getInventoryWorkspaceHref('movements', getInventoryActionAnchorId('stock-movement')),
+      }
     }
     if ((title.includes('STOCK') || title.includes('RECEIPT')) && params.canCreate && !params.isFieldTechnicianInventory) {
-      return { label: 'Barang Masuk', href: `#${getInventoryActionAnchorId('stock-receipt')}` }
+      return {
+        label: 'Barang Masuk',
+        href: getInventoryWorkspaceHref('movements', getInventoryActionAnchorId('stock-receipt')),
+      }
+    }
+    if (title.includes('ITEM') && params.canUpdate && !params.isFieldTechnicianInventory) {
+      return {
+        label: 'Penataan Rak',
+        href: getInventoryWorkspaceHref('items', getInventoryActionAnchorId('rack-layout')),
+      }
     }
     if (title.includes('ITEM') && params.canCreate && !params.isFieldTechnicianInventory) {
-      return { label: 'Kelola Item', href: `#${getInventoryActionAnchorId('item-create')}` }
+      return {
+        label: 'Kelola Item',
+        href: getInventoryWorkspaceHref('items', getInventoryActionAnchorId('item-create')),
+      }
     }
   }
 
@@ -1543,6 +1698,9 @@ export function DomainShell({
   domainPrefill,
   domainDrilldown,
   supportDrilldown,
+  inventoryView,
+  inventoryAction,
+  hideInventoryWorkspaceTabs = false,
 }: {
   content: DomainPageContent
   source: DataSourceSnapshot
@@ -1561,6 +1719,9 @@ export function DomainShell({
     year?: number
   }
   supportDrilldown?: SupportDrilldownContext
+  inventoryView?: string
+  inventoryAction?: string
+  hideInventoryWorkspaceTabs?: boolean
 }) {
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
@@ -1570,6 +1731,12 @@ export function DomainShell({
   const canProcessInventoryRequest =
     content.key === 'inventory' ? role !== 'FIELD_TECHNICIAN' && (canApprove || canUpdate || canCreate) : false
   const isFieldTechnicianInventory = content.key === 'inventory' && role === 'FIELD_TECHNICIAN'
+  const requireInventoryPickupScan =
+    content.key === 'inventory' ? !['OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(role) : false
+  const activeInventoryView = content.key === 'inventory' ? normalizeInventoryWorkspaceView(inventoryView) : 'overview'
+  const activeInventoryAction = content.key === 'inventory' ? normalizeInventoryActionKey(inventoryAction) : null
+  const shouldShowInventoryAction = (key: InventoryActionKey) =>
+    !activeInventoryAction || isInventoryActionInScope(activeInventoryAction, key)
   const billingInvoiceSuggestions =
     content.key === 'billing'
       ? Array.from(
@@ -1746,6 +1913,18 @@ export function DomainShell({
           .flatMap((section) => section.rows)
           .map((row) => `${row.primary} | ${row.secondary}`)
       : []
+  const inventoryRackSuggestions =
+    content.key === 'inventory'
+      ? (content.reviewSections ?? [])
+          .filter((section) => section.title.toUpperCase().includes('ITEM'))
+          .flatMap((section) => section.rows)
+          .map((row) => {
+            const rack = row.meta.find((item) => item.startsWith('Rack: '))?.replace('Rack: ', '').trim() || '-'
+            const rackBarcode =
+              row.meta.find((item) => item.startsWith('Rack Barcode: '))?.replace('Rack Barcode: ', '').trim() || row.primary
+            return `${rackBarcode} | ${row.primary} | ${row.secondary} | ${rack}`
+          })
+      : []
   const inventoryOdpSuggestions =
     content.key === 'inventory'
       ? (content.reviewSections ?? [])
@@ -1773,7 +1952,9 @@ export function DomainShell({
             const requestId = row.id.replace(/^REQ-/, '').trim()
             const subdivision =
               row.meta.find((item) => item.startsWith('Sub-divisi: '))?.replace('Sub-divisi: ', '').trim() || '-'
-            return requestId ? `${requestId} | ${row.primary} | ${subdivision} | ${row.status}` : ''
+            const rackBarcode =
+              row.meta.find((item) => item.startsWith('Rack Barcode: '))?.replace('Rack Barcode: ', '').trim() || row.primary
+            return requestId ? `${requestId} | ${row.primary} | ${rackBarcode} | ${row.secondary} | ${subdivision} | ${row.status}` : ''
           })
           .filter(Boolean)
       : []
@@ -2140,6 +2321,9 @@ export function DomainShell({
   const salesLeadPrefillValue = resolveSuggestionByTokens(salesLeadSuggestions, domainPrefill?.lead)
   const salesOrderPrefillValue = resolveSuggestionByTokens(salesOrderSuggestions, domainPrefill?.order)
   const billingServicePrefillValue = resolveSuggestionByTokens(billingSubscriptionSuggestions, domainPrefill?.service)
+  const inventoryItemPrefillCode = extractInventoryItemCodeFromScan(String(domainPrefill?.itemCode ?? ''))
+  const inventoryItemPrefillValue =
+    resolveSuggestionByTokens(inventoryItemSuggestions, inventoryItemPrefillCode) || inventoryItemPrefillCode
   const billingInvoicePrefillValue = resolveSuggestionByTokens(
     Array.from(new Set([...billingInvoiceSuggestions, ...billingCollectionFollowUpSuggestions, ...billingReconnectContextSuggestions])),
     domainPrefill?.invoice,
@@ -2395,7 +2579,40 @@ export function DomainShell({
           })
           .filter((section) => section.rows.length > 0)
       : visibleReviewSectionsBase
-  const visibleSections = visibleReviewSections
+  const inventoryWorkspaceTabs =
+    content.key === 'inventory'
+      ? [
+          {
+            key: 'overview' as const,
+            label: 'Overview',
+            description: 'Buka ringkasan inventory lintas proses.',
+          },
+          {
+            key: 'items' as const,
+            label: 'Item & Rak',
+            description: 'Kelola item master, barcode, dan penataan rak.',
+          },
+          {
+            key: 'requests' as const,
+            label: 'Request',
+            description: 'Fokus ke permintaan barang dan proses pengambilan.',
+          },
+          {
+            key: 'movements' as const,
+            label: 'Movement & Loan',
+            description: 'Kontrol barang masuk, movement, pinjaman, dan return.',
+          },
+          {
+            key: 'network' as const,
+            label: 'Network & Device',
+            description: 'Kelola ODP, port, dan assignment perangkat layanan.',
+          },
+        ]
+      : []
+  const visibleSections =
+    content.key === 'inventory' && activeInventoryView !== 'overview'
+      ? visibleReviewSections.filter((section) => matchesInventoryWorkspaceView(section.title, activeInventoryView))
+      : visibleReviewSections
   const supportForms: Array<{
     key: SupportLaneActionKey
     lanes: SupportLaneKey[]
@@ -2590,8 +2807,8 @@ export function DomainShell({
               href={item.href}
               className={`rounded-full px-4 py-2 text-sm font-medium ${
                 item.key === content.key
-                  ? 'bg-slate-950 text-white'
-                  : 'border border-line bg-white text-slate-700'
+                  ? 'bg-panel text-surface'
+                  : 'border border-line bg-surface text-ink'
               }`}
             >
               {item.label}
@@ -2601,7 +2818,7 @@ export function DomainShell({
         <p className="section-title">{headerEyebrow}</p>
         <div className="mt-3 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
+            <h2 className="font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
               {headerTitle}
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{headerDescription}</p>
@@ -2610,13 +2827,13 @@ export function DomainShell({
           <div className="flex flex-wrap gap-3">
             <Link
               href={headerPrimaryAction.href}
-              className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white"
+              className="rounded-full bg-panel px-5 py-3 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
             >
               {headerPrimaryAction.label}
             </Link>
             <Link
               href={headerSecondaryAction.href}
-              className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700"
+              className="rounded-full border border-line bg-surface px-5 py-3 text-sm font-semibold text-ink transition hover:bg-[var(--color-card-subtle)]"
             >
               {headerSecondaryAction.label}
             </Link>
@@ -2633,7 +2850,7 @@ export function DomainShell({
             </div>
             <Link
               href={supportDrilldown.clearHref}
-              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-[var(--color-card-subtle)]"
             >
               Reset Fokus
             </Link>
@@ -2650,7 +2867,7 @@ export function DomainShell({
             </div>
             <Link
               href={domainDrilldown.clearHref}
-              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-[var(--color-card-subtle)]"
             >
               Reset Fokus
             </Link>
@@ -2676,14 +2893,14 @@ export function DomainShell({
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p className="section-title">{section.title}</p>
-                    <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+                    <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
                       Tabel kerja utama menu
                     </h3>
                     <p className="mt-3 text-sm leading-6 text-mute">{section.description}</p>
                     {section.summary?.length ? (
                       <div className="mt-4 flex flex-wrap gap-2">
                         {section.summary.map((item) => (
-                          <span key={`${section.title}-${item.label}`} className="badge border-slate-200 bg-white text-slate-600">
+                          <span key={`${section.title}-${item.label}`} className="badge border-line bg-surface text-mute">
                             {item.label}: {item.value}
                           </span>
                         ))}
@@ -2693,16 +2910,16 @@ export function DomainShell({
                   {sectionAction ? (
                     <Link
                       href={sectionAction.href}
-                      className="inline-flex rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                      className="inline-flex rounded-full border border-panel bg-panel px-4 py-2 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
                     >
                       {sectionAction.label}
                     </Link>
                   ) : null}
                 </div>
-                <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200">
-                  <table className="min-w-[1080px] w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-50">
-                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                <div className="mt-6 overflow-x-auto rounded-3xl border border-line">
+                  <table className="min-w-[1080px] w-full divide-y divide-line">
+                    <thead className="bg-[var(--color-card-subtle)]">
+                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-mute">
                         <th className="px-4 py-3">Item</th>
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3">Ringkasan</th>
@@ -2710,7 +2927,7 @@ export function DomainShell({
                         <th className="px-4 py-3">Aksi</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white">
+                    <tbody className="divide-y divide-line bg-surface">
                       {section.rows.length ? (
                         section.rows.map((row) => {
                           const rowAction = getDomainReviewRowAction({
@@ -2750,25 +2967,25 @@ export function DomainShell({
                               <tr className="align-top">
                                 <td className="px-4 py-4">
                                   <div className="min-w-[220px]">
-                                    <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
-                                    <p className="mt-1 text-sm text-slate-600">{row.secondary}</p>
+                                    <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{row.primary}</p>
+                                    <p className="mt-1 text-sm text-mute">{row.secondary}</p>
                                   </div>
                                 </td>
                                 <td className="px-4 py-4">
                                   <span className={`badge ${getReviewRowStatusTone(row.status)}`}>{row.status}</span>
                                 </td>
                                 <td className="px-4 py-4">
-                                  <p className="max-w-xl text-sm leading-6 text-slate-700">{row.detail}</p>
+                                  <p className="max-w-xl text-sm leading-6 text-mute">{row.detail}</p>
                                 </td>
                                 <td className="px-4 py-4">
                                   <div className="flex max-w-sm flex-wrap gap-2">
                                     {metaHighlights.map((item) => (
-                                      <span key={`${row.id}-${item}`} className="badge border-slate-200 bg-white text-slate-600">
+                                      <span key={`${row.id}-${item}`} className="badge border-line bg-surface text-mute">
                                         {item}
                                       </span>
                                     ))}
                                     {hiddenMetaCount > 0 ? (
-                                      <span className="badge border-dashed border-slate-300 bg-slate-50 text-slate-500">
+                                      <span className="badge border-dashed border-line bg-[var(--color-card-subtle)] text-mute">
                                         +{hiddenMetaCount} meta
                                       </span>
                                     ) : null}
@@ -2779,26 +2996,26 @@ export function DomainShell({
                                     <div className="flex min-w-[210px] flex-col gap-2">
                                       <Link
                                         href={rowAction.href}
-                                        className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                                        className="inline-flex items-center justify-center rounded-2xl bg-panel px-4 py-2 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
                                       >
                                         {rowAction.label}
                                       </Link>
                                       {rowAction.secondaryLabel && rowAction.secondaryHref ? (
                                         <Link
                                           href={rowAction.secondaryHref}
-                                          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                                          className="inline-flex items-center justify-center rounded-2xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-[var(--color-card-subtle)]"
                                         >
                                           {rowAction.secondaryLabel}
                                         </Link>
                                       ) : null}
                                     </div>
                                   ) : (
-                                    <span className="text-sm text-slate-400">Tidak ada aksi langsung</span>
+                                    <span className="text-sm text-mute">Tidak ada aksi langsung</span>
                                   )}
                                 </td>
                               </tr>
                               {hasBillingContext ? (
-                                <tr className="bg-slate-50">
+                                <tr className="bg-[var(--color-card-subtle)]">
                                   <td colSpan={5} className="px-4 py-4">
                                     <div className="grid gap-4 xl:grid-cols-2">
                                       {billingHealthSignal ? (
@@ -2843,7 +3060,7 @@ export function DomainShell({
                         })
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-4 py-6 text-sm text-slate-500">
+                          <td colSpan={5} className="px-4 py-6 text-sm text-mute">
                             Belum ada data review pada section ini.
                           </td>
                         </tr>
@@ -2860,7 +3077,7 @@ export function DomainShell({
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="section-title">Tabel kerja</p>
-              <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+              <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
                 Belum ada tabel kerja yang siap ditampilkan
               </h3>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
@@ -2871,22 +3088,22 @@ export function DomainShell({
             <div className="flex flex-wrap gap-3">
               <Link
                 href={headerPrimaryAction.href}
-                className="inline-flex rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="inline-flex rounded-full border border-panel bg-panel px-4 py-2 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
               >
                 {headerPrimaryAction.label}
               </Link>
               <Link
                 href="/import"
-                className="inline-flex rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                className="inline-flex rounded-full border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-[var(--color-card-subtle)]"
               >
                 Buka Import Center
               </Link>
             </div>
           </div>
-          <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200">
-            <table className="min-w-[1080px] w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+          <div className="mt-6 overflow-x-auto rounded-3xl border border-line">
+            <table className="min-w-[1080px] w-full divide-y divide-line">
+              <thead className="bg-[var(--color-card-subtle)]">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-mute">
                   <th className="px-4 py-3">Item</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Ringkasan</th>
@@ -2894,9 +3111,9 @@ export function DomainShell({
                   <th className="px-4 py-3">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
+              <tbody className="divide-y divide-line bg-surface">
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-mute">
                     Tidak ada section tabel kerja untuk domain ini.
                   </td>
                 </tr>
@@ -2910,7 +3127,7 @@ export function DomainShell({
         {content.summaries.map((item) => (
           <article key={item.label} className="panel p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">{item.label}</p>
-            <p className="mt-4 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
+            <p className="mt-4 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
               {item.value}
             </p>
           </article>
@@ -2920,14 +3137,14 @@ export function DomainShell({
       <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
         <div className="panel p-6">
           <p className="section-title">Alur utama menu</p>
-          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
             {domainBlueprint.focusTitle}
           </h3>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{domainBlueprint.focusDescription}</p>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {domainBlueprint.flows.map((item) => (
-              <article key={item.title} className="rounded-2xl border border-line bg-slate-50 p-5">
-                <p className="text-sm font-semibold text-slate-950">{item.title}</p>
+              <article key={item.title} className="rounded-2xl border border-line bg-[var(--color-card-subtle)] p-5">
+                <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{item.title}</p>
                 <p className="mt-3 text-sm leading-6 text-mute">{item.detail}</p>
               </article>
             ))}
@@ -2936,7 +3153,7 @@ export function DomainShell({
 
         <div className="panel p-6">
           <p className="section-title">Integrasi ERP</p>
-          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
             Menu ini terhubung langsung dengan proses domain lain
           </h3>
           <p className="mt-3 text-sm leading-6 text-mute">
@@ -2948,17 +3165,17 @@ export function DomainShell({
               <Link
                 key={`${content.key}-${item.label}`}
                 href={item.href}
-                className="block rounded-2xl border border-line bg-slate-50 p-5 transition hover:border-slate-300 hover:bg-white"
+                className="block rounded-2xl border border-line bg-[var(--color-card-subtle)] p-5 transition hover:bg-surface"
               >
                 <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm font-semibold text-slate-950">{item.label}</p>
-                  <span className="badge border-slate-200 bg-white text-slate-600">Terhubung</span>
+                  <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{item.label}</p>
+                  <span className="badge border-line bg-surface text-mute">Terhubung</span>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-mute">{item.description}</p>
               </Link>
             ))}
           </div>
-          <div className="mt-6 rounded-2xl border border-line bg-slate-50 p-5">
+          <div className="mt-6 rounded-2xl border border-line bg-[var(--color-card-subtle)] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Status landing</p>
             <p className="mt-3 text-sm leading-6 text-mute">
               {visibleSections.length} section review aktif dan {enabledCapabilities.length} aksi tersedia
@@ -2973,8 +3190,8 @@ export function DomainShell({
           <p className="section-title">Highlight domain</p>
           <div className="mt-6 space-y-4">
             {content.highlights.map((item) => (
-              <article key={item.title} className="rounded-2xl border border-line bg-slate-50 p-5">
-                <h3 className="text-sm font-semibold text-slate-950">{item.title}</h3>
+              <article key={item.title} className="rounded-2xl border border-line bg-[var(--color-card-subtle)] p-5">
+                <h3 className="text-sm font-semibold text-[var(--color-ink-strong)]">{item.title}</h3>
                 <p className="mt-3 text-sm leading-6 text-mute">{item.detail}</p>
               </article>
             ))}
@@ -2983,7 +3200,7 @@ export function DomainShell({
 
         <div className="panel p-6">
           <p className="section-title">Capability aktif</p>
-          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+          <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
             Role aktif membaca modul ini dengan permission yang terukur
           </h3>
           <p className="mt-4 text-sm leading-6 text-mute">
@@ -2997,14 +3214,14 @@ export function DomainShell({
                 className={`badge ${
                   item.enabled
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : 'border-slate-200 bg-slate-50 text-slate-400'
+                    : 'border-line bg-[var(--color-card-subtle)] text-mute'
                 }`}
               >
                 {item.label}
               </span>
             ))}
           </div>
-          <div className="mt-6 rounded-2xl border border-line bg-slate-50 p-5">
+          <div className="mt-6 rounded-2xl border border-line bg-[var(--color-card-subtle)] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Catatan</p>
             <p className="mt-3 text-sm leading-6 text-mute">
               {enabledCapabilities.length} aksi aktif tersedia untuk role ini. Semua modul tetap
@@ -3015,12 +3232,71 @@ export function DomainShell({
         </div>
       </section>
 
+      {content.key === 'inventory' && !hideInventoryWorkspaceTabs ? (
+        <section className="panel p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="section-title">Workspace Inventory</p>
+              <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
+                Pilih area kerja sesuai kebutuhan proses harian
+              </h3>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
+                Sub menu ini memecah inventory menjadi area kerja yang lebih fokus agar gudang, teknisi, dan operator tidak
+                perlu membaca seluruh halaman sekaligus.
+              </p>
+            </div>
+            <span className="badge border-line bg-surface text-mute">
+              View aktif: {inventoryWorkspaceTabs.find((item) => item.key === activeInventoryView)?.label || 'Overview'}
+            </span>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            {inventoryWorkspaceTabs.map((item) => {
+              const active = item.key === activeInventoryView
+              return (
+                <Link
+                  key={item.key}
+                  href={getInventoryWorkspaceHref(item.key)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    active
+                      ? 'bg-panel text-surface'
+                      : 'border border-line bg-surface text-ink hover:bg-[var(--color-card-subtle)]'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              )
+            })}
+          </div>
+          <div className="mt-4 grid gap-3 xl:grid-cols-5">
+            {inventoryWorkspaceTabs.map((item) => (
+              <article
+                key={`${item.key}-copy`}
+                className={`rounded-2xl border p-4 ${
+                  item.key === activeInventoryView ? 'border-panel bg-panel text-surface' : 'border-line bg-[var(--color-card-subtle)]'
+                }`}
+              >
+                <p
+                  className={`text-sm font-semibold ${
+                    item.key === activeInventoryView ? 'text-surface' : 'text-[var(--color-ink-strong)]'
+                  }`}
+                >
+                  {item.label}
+                </p>
+                <p className={`mt-2 text-sm leading-6 ${item.key === activeInventoryView ? 'text-slate-200' : 'text-mute'}`}>
+                  {item.description}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {content.key === 'sales' && salesSectionActions.length ? (
         <section className="panel p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="section-title">Aksi Sales Prioritas</p>
-              <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+              <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
                 Review penjualan langsung diarahkan ke langkah pipeline yang sesuai
               </h3>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
@@ -3028,16 +3304,16 @@ export function DomainShell({
                 tidak perlu menebak form mana yang paling relevan untuk role aktif.
               </p>
             </div>
-            <span className="badge border-slate-200 bg-white text-slate-600">{salesSectionActions.length} aksi tersedia</span>
+            <span className="badge border-line bg-surface text-mute">{salesSectionActions.length} aksi tersedia</span>
           </div>
           <div className="mt-6 grid gap-4 xl:grid-cols-2">
             {salesSectionActions.map((item) => (
-              <article key={item.key} className="rounded-2xl border border-line bg-slate-50 p-5">
-                <p className="text-sm font-semibold text-slate-950">{item.label}</p>
+              <article key={item.key} className="rounded-2xl border border-line bg-[var(--color-card-subtle)] p-5">
+                <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{item.label}</p>
                 <p className="mt-3 text-sm leading-6 text-mute">{item.description}</p>
                 <Link
                   href={`#${getSalesActionAnchorId(item.key)}`}
-                  className="mt-4 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  className="mt-4 inline-flex rounded-full bg-panel px-4 py-2 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
                 >
                   Buka Form
                 </Link>
@@ -3060,16 +3336,19 @@ export function DomainShell({
                 dari antrean request, pinjaman, stok masuk, item master, atau ODP.
               </p>
             </div>
-            <span className="badge border-slate-200 bg-white text-slate-600">{inventorySectionActions.length} aksi tersedia</span>
+            <span className="badge border-line bg-surface text-mute">{inventorySectionActions.length} aksi tersedia</span>
           </div>
           <div className="mt-6 grid gap-4 xl:grid-cols-2">
-            {inventorySectionActions.map((item) => (
-              <article key={item.key} className="rounded-2xl border border-line bg-slate-50 p-5">
-                <p className="text-sm font-semibold text-slate-950">{item.label}</p>
+            {inventorySectionActions
+              .filter((item) => activeInventoryView === 'overview' || mapInventoryActionToWorkspaceView(item.key) === activeInventoryView)
+              .filter((item) => activeInventoryView === 'overview' || shouldShowInventoryAction(item.key))
+              .map((item) => (
+              <article key={item.key} className="rounded-2xl border border-line bg-[var(--color-card-subtle)] p-5">
+                <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{item.label}</p>
                 <p className="mt-3 text-sm leading-6 text-mute">{item.description}</p>
                 <Link
-                  href={`#${getInventoryActionAnchorId(item.key)}`}
-                  className="mt-4 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  href={getInventoryWorkspaceHref(mapInventoryActionToWorkspaceView(item.key), getInventoryActionAnchorId(item.key))}
+                  className="mt-4 inline-flex rounded-full bg-panel px-4 py-2 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
                 >
                   Buka Form
                 </Link>
@@ -3092,16 +3371,16 @@ export function DomainShell({
                 membaca antrean yang memang sedang aktif di review domain.
               </p>
             </div>
-            <span className="badge border-slate-200 bg-white text-slate-600">{hrSectionActions.length} aksi tersedia</span>
+            <span className="badge border-line bg-surface text-mute">{hrSectionActions.length} aksi tersedia</span>
           </div>
           <div className="mt-6 grid gap-4 xl:grid-cols-2">
             {hrSectionActions.map((item) => (
-              <article key={item.key} className="rounded-2xl border border-line bg-slate-50 p-5">
-                <p className="text-sm font-semibold text-slate-950">{item.label}</p>
+              <article key={item.key} className="rounded-2xl border border-line bg-[var(--color-card-subtle)] p-5">
+                <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{item.label}</p>
                 <p className="mt-3 text-sm leading-6 text-mute">{item.description}</p>
                 <Link
                   href={`#${getHrActionAnchorId(item.key)}`}
-                  className="mt-4 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  className="mt-4 inline-flex rounded-full bg-panel px-4 py-2 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
                 >
                   Buka Form
                 </Link>
@@ -3132,12 +3411,12 @@ export function DomainShell({
               </div>
               <div className="mt-6 grid gap-4 xl:grid-cols-2">
                 {billingSectionActions.map((item) => (
-                  <article key={item.key} className="rounded-2xl border border-line bg-slate-50 p-5">
-                    <p className="text-sm font-semibold text-slate-950">{item.label}</p>
+                  <article key={item.key} className="rounded-2xl border border-line bg-[var(--color-card-subtle)] p-5">
+                    <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{item.label}</p>
                     <p className="mt-3 text-sm leading-6 text-mute">{item.description}</p>
                     <Link
                       href={`#${getBillingActionAnchorId(item.key)}`}
-                      className="mt-4 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                      className="mt-4 inline-flex rounded-full bg-panel px-4 py-2 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
                     >
                       Buka Form
                     </Link>
@@ -3287,118 +3566,69 @@ export function DomainShell({
 
       {content.key === 'inventory' ? (
         <>
-          <InventoryNetworkOpsPanel sections={visibleSections} />
-          <InventoryRequestOpsPanel sections={visibleSections} />
-          <InventoryLoanOpsPanel sections={visibleSections} />
-          <InventoryStockReceiptPanel sections={visibleSections} />
-          <section className="grid gap-6 xl:grid-cols-2">
-            <div id={getInventoryActionAnchorId('item-request')} className="scroll-mt-24">
-              <InventoryItemRequestForm
-                canCreate={canRequestInventory}
-                reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                itemSuggestions={inventoryItemSuggestions}
-              />
-            </div>
-            {canProcessInventoryRequest ? (
-              <div id={getInventoryActionAnchorId('request-status')} className="scroll-mt-24">
-                <InventoryRequestStatusForm
-                  canCreate={canProcessInventoryRequest}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  requestSuggestions={inventoryRequestSuggestions}
-                  initialRequestValue={inventoryRequestPrefillValue}
-                />
-              </div>
-            ) : null}
-            {!isFieldTechnicianInventory ? (
-              <div id={getInventoryActionAnchorId('stock-receipt')} className="scroll-mt-24">
-                <InventoryStockReceiptForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  itemSuggestions={inventoryItemSuggestions}
-                />
-              </div>
-            ) : null}
-            {!isFieldTechnicianInventory ? (
-              <div id={getInventoryActionAnchorId('item-loan')} className="scroll-mt-24">
-                <InventoryItemLoanForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  itemSuggestions={inventoryItemSuggestions}
-                />
-              </div>
-            ) : null}
-            {!isFieldTechnicianInventory ? (
-              <div id={getInventoryActionAnchorId('loan-return')} className="scroll-mt-24">
-                <InventoryLoanReturnForm
-                  canUpdate={canUpdate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  loanSuggestions={inventoryLoanSuggestions}
-                  initialLoanValue={inventoryLoanPrefillValue}
-                />
-              </div>
-            ) : null}
-            {!isFieldTechnicianInventory ? (
-              <div id={getInventoryActionAnchorId('item-create')} className="scroll-mt-24">
-                <InventoryItemCreateForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                />
-              </div>
-            ) : null}
-            {!isFieldTechnicianInventory ? (
-              <div id={getInventoryActionAnchorId('stock-movement')} className="scroll-mt-24">
-                <InventoryStockMovementForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  itemSuggestions={inventoryItemSuggestions}
-                />
-              </div>
-            ) : null}
-            {!isFieldTechnicianInventory ? (
-              <div id={getInventoryActionAnchorId('odp-create')} className="scroll-mt-24">
-                <InventoryOdpCreateForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                />
-              </div>
-            ) : null}
-            {!isFieldTechnicianInventory ? (
-              <div id={getInventoryActionAnchorId('odp-port-assign')} className="scroll-mt-24">
-                <InventoryOdpPortAssignForm
-                  canUpdate={canUpdate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  odpSuggestions={inventoryOdpSuggestions}
-                />
-              </div>
-            ) : null}
-            {!isFieldTechnicianInventory ? (
-              <div id={getInventoryActionAnchorId('odp-port-status')} className="scroll-mt-24">
-                <InventoryOdpPortStatusForm
-                  canUpdate={canUpdate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  odpSuggestions={inventoryOdpSuggestions}
-                />
-              </div>
-            ) : null}
-            {!isFieldTechnicianInventory ? (
-              <div id={getInventoryActionAnchorId('device-assignment')} className="scroll-mt-24">
-                <InventoryDeviceAssignmentForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  itemSuggestions={inventoryItemSuggestions}
-                />
-              </div>
-            ) : null}
-            {!isFieldTechnicianInventory ? (
-              <div id={getInventoryActionAnchorId('device-return')} className="scroll-mt-24">
-                <InventoryDeviceReturnForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  assignmentSuggestions={inventoryAssignmentSuggestions}
-                />
-              </div>
-            ) : null}
-          </section>
+          {shouldShowInventoryAction('odp-create') ||
+          shouldShowInventoryAction('odp-port-assign') ||
+          shouldShowInventoryAction('odp-port-status') ||
+          shouldShowInventoryAction('device-assignment') ||
+          shouldShowInventoryAction('device-return') ? (
+            <InventoryNetworkOpsPanel
+              sections={visibleSections}
+              canCreate={canCreate}
+              canUpdate={canUpdate}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              itemSuggestions={inventoryItemSuggestions}
+              odpSuggestions={inventoryOdpSuggestions}
+              assignmentSuggestions={inventoryAssignmentSuggestions}
+              showDeviceReturnForm={!isFieldTechnicianInventory && shouldShowInventoryAction('device-return')}
+            />
+          ) : null}
+          {shouldShowInventoryAction('item-request') || shouldShowInventoryAction('request-status') ? (
+            <InventoryRequestOpsPanel
+              sections={visibleSections}
+              canRequestCreate={canRequestInventory}
+              canProcessRequest={canProcessInventoryRequest}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              itemSuggestions={inventoryItemSuggestions}
+              requestSuggestions={inventoryRequestSuggestions}
+              rackSuggestions={inventoryRackSuggestions}
+              requireScan={requireInventoryPickupScan}
+              initialItemValue={inventoryItemPrefillValue}
+              initialRequestValue={inventoryRequestPrefillValue}
+            />
+          ) : null}
+          {shouldShowInventoryAction('item-loan') || shouldShowInventoryAction('loan-return') ? (
+            <InventoryLoanOpsPanel
+              sections={visibleSections}
+              canCreate={canCreate}
+              canUpdate={canUpdate}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              itemSuggestions={inventoryItemSuggestions}
+              rackSuggestions={inventoryRackSuggestions}
+              loanSuggestions={inventoryLoanSuggestions}
+              requireScan={requireInventoryPickupScan}
+              initialItemValue={inventoryItemPrefillValue}
+              initialLoanValue={inventoryLoanPrefillValue}
+            />
+          ) : null}
+          {shouldShowInventoryAction('stock-receipt') || shouldShowInventoryAction('stock-movement') ? (
+            <InventoryStockReceiptPanel
+              sections={visibleSections}
+              canCreate={canCreate}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              itemSuggestions={inventoryItemSuggestions}
+              rackSuggestions={inventoryRackSuggestions}
+              requireScan={requireInventoryPickupScan}
+              initialItemValue={inventoryItemPrefillValue}
+            />
+          ) : null}
+          {shouldShowInventoryAction('rack-layout') || shouldShowInventoryAction('item-create') ? (
+            <InventoryItemBarcodePanel
+              sections={visibleSections}
+              canCreate={canCreate}
+              canUpdate={canUpdate}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+            />
+          ) : null}
         </>
       ) : null}
 
@@ -3575,7 +3805,7 @@ export function DomainShell({
                   <p className="section-title">
                     {selectedSupportLane ? supportFocusCopy.eyebrow : `Default role: ${supportFocusCopy.eyebrow}`}
                   </p>
-                  <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+                  <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
                     {supportFocusCopy.title}
                   </h3>
                   <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">{supportFocusCopy.description}</p>
@@ -3583,11 +3813,11 @@ export function DomainShell({
                 <div className="flex flex-wrap gap-2">
                   <span className={`badge ${activeSupportLaneMeta.accent}`}>{activeSupportLaneMeta.shortLabel}</span>
                   <span className={`badge border-transparent ${supportRoleMeta.tone}`}>{supportRoleMeta.shortLabel}</span>
-                  {!selectedSupportLane ? <span className="badge border-slate-200 bg-white text-slate-600">workspace default</span> : null}
+                  {!selectedSupportLane ? <span className="badge border-line bg-surface text-mute">workspace default</span> : null}
                 </div>
               </div>
               <div className="mt-6 flex flex-wrap gap-2">
-                <Link href="/support" className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700">
+                <Link href="/support" className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink">
                   Semua lane
                 </Link>
                 {(supportFocus?.lanes ?? []).map((lane) => {
@@ -3597,8 +3827,8 @@ export function DomainShell({
                       href={getSupportLanePath(lane.key)}
                       className={`rounded-full px-4 py-2 text-sm font-medium ${
                         lane.key === activeSupportLane
-                          ? 'bg-slate-950 text-white'
-                          : 'border border-line bg-white text-slate-700'
+                          ? 'bg-panel text-surface'
+                          : 'border border-line bg-surface text-ink'
                       }`}
                     >
                       {lane.shortLabel}

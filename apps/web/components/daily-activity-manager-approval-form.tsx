@@ -270,46 +270,112 @@ export function DailyActivityManagerApprovalForm({
             </div>
           </div>
 
-          {pendingApprovals.slice(0, 12).map((item) => (
-            <article key={item.id} className="rounded-2xl border border-line bg-slate-50 p-5">
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-950">{item.taskTitle}</p>
-                  <p className="mt-1 text-sm text-mute">
-                    {item.activityCode} • {dailyActivityPlanningLevelLabels[item.planningLevel]} • {item.plannedBy}
-                  </p>
+          <div className="hidden overflow-hidden rounded-3xl border border-line bg-white xl:block">
+            <table className="min-w-full divide-y divide-line">
+              <thead className="bg-slate-50">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <th className="w-16 px-4 py-3">Pilih</th>
+                  <th className="px-4 py-3">Aktivitas</th>
+                  <th className="px-4 py-3">Org</th>
+                  <th className="px-4 py-3">Closing</th>
+                  <th className="px-4 py-3">Ditutup</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line bg-white">
+                {pendingApprovals.slice(0, 12).map((item) => {
+                  const selected = selectedIds.includes(item.id)
+                  return (
+                    <tr key={item.id} className={selected ? 'bg-slate-50' : ''}>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={(event) => {
+                            const checked = event.target.checked
+                            setSelectedIds((prev) =>
+                              checked ? Array.from(new Set([...prev, item.id])) : prev.filter((id) => id !== item.id),
+                            )
+                          }}
+                          className="h-5 w-5 rounded border-line text-slate-950"
+                          disabled={isDisabled}
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="badge border-amber-200 bg-amber-50 text-amber-700">PENDING</span>
+                          <span className="badge border-slate-200 bg-white text-slate-600">
+                            {dailyActivityPlanningLevelLabels[item.planningLevel]}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-slate-950 line-clamp-1">{item.taskTitle}</p>
+                        <p className="mt-1 text-sm text-mute line-clamp-1">
+                          {item.activityCode} • {item.plannedBy}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <p className="text-sm font-semibold text-slate-950 line-clamp-1">{item.divisionName || '-'}</p>
+                        <p className="mt-1 text-sm text-mute line-clamp-1">{item.subdivisionName || '-'}</p>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <span className="badge border-slate-200 bg-slate-50 text-slate-700">{item.executionStatus}</span>
+                      </td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-700">{formatDateTime(item.closedAt)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid gap-3 xl:hidden">
+            {pendingApprovals.slice(0, 12).map((item) => (
+              <article key={item.id} className="rounded-2xl border border-line bg-white p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="badge border-amber-200 bg-amber-50 text-amber-700">PENDING</span>
+                      <span className="badge border-slate-200 bg-white text-slate-600">
+                        {dailyActivityPlanningLevelLabels[item.planningLevel]}
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-950">{item.taskTitle}</p>
+                    <p className="text-sm text-mute">
+                      {item.activityCode} • {item.plannedBy}
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-3 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(item.id)}
+                      onChange={(event) => {
+                        const checked = event.target.checked
+                        setSelectedIds((prev) =>
+                          checked ? Array.from(new Set([...prev, item.id])) : prev.filter((id) => id !== item.id),
+                        )
+                      }}
+                      className="h-5 w-5 rounded border-line text-slate-950"
+                      disabled={isDisabled}
+                    />
+                    <span className="font-semibold text-slate-950">Pilih</span>
+                  </label>
                 </div>
-                <span className="badge border-amber-200 bg-amber-50 text-amber-700">PENDING APPROVAL</span>
-              </div>
-              <div className="mt-4 space-y-1 text-sm leading-6 text-mute">
-                <label className="flex items-center gap-3 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(item.id)}
-                    onChange={(event) => {
-                      const checked = event.target.checked
-                      setSelectedIds((prev) =>
-                        checked ? Array.from(new Set([...prev, item.id])) : prev.filter((id) => id !== item.id),
-                      )
-                    }}
-                    className="h-5 w-5 rounded border-line text-slate-950"
-                    disabled={isDisabled}
-                  />
-                  <span className="font-semibold text-slate-950">Pilih</span>
-                </label>
-                <p>
-                  <span className="font-semibold text-slate-700">Divisi:</span> {item.divisionName || '-'} /{' '}
-                  {item.subdivisionName || '-'}
-                </p>
-                <p>
-                  <span className="font-semibold text-slate-700">Status closing:</span> {item.executionStatus}
-                </p>
-                <p>
-                  <span className="font-semibold text-slate-700">Ditutup:</span> {formatDateTime(item.closedAt)}
-                </p>
-              </div>
-            </article>
-          ))}
+                <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-line bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Org</p>
+                    <p className="mt-2 font-semibold text-slate-950">
+                      {item.divisionName || '-'}
+                      {item.subdivisionName ? ` / ${item.subdivisionName}` : ''}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-line bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Closing</p>
+                    <p className="mt-2 font-semibold text-slate-950">{item.executionStatus}</p>
+                    <p className="mt-1 text-xs text-mute">{formatDateTime(item.closedAt)}</p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       ) : null}
 

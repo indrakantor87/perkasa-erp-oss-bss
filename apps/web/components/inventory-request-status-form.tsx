@@ -3,12 +3,16 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
 
 type InventoryRequestStatusFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
   requestSuggestions: string[]
+  rackSuggestions: string[]
+  requireScan: boolean
   initialRequestValue?: string
+  embedded?: boolean
 }
 
 const statusOptions = [
@@ -21,21 +25,39 @@ function extractRequestId(value: string) {
   return value.split('|')[0]?.trim() ?? ''
 }
 
+function extractRequestedItemCode(value: string) {
+  const tokens = value
+    .split('|')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  return tokens[1] ?? ''
+}
+
+function extractRackBarcode(value: string) {
+  return value.split('|')[0]?.trim() ?? ''
+}
+
 export function InventoryRequestStatusForm({
   canCreate,
   reviewDbReady,
   requestSuggestions,
+  rackSuggestions,
+  requireScan,
   initialRequestValue,
+  embedded = false,
 }: InventoryRequestStatusFormProps) {
   const router = useRouter()
   const [requestValue, setRequestValue] = useState(initialRequestValue?.trim() || requestSuggestions[0] || '')
   const [nextStatus, setNextStatus] = useState<(typeof statusOptions)[number]['value']>('ON_PROGRESS')
   const [pendingReason, setPendingReason] = useState('')
   const [processNotes, setProcessNotes] = useState('')
+  const [scanValue, setScanValue] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+  const scanRequired = requireScan && nextStatus === 'COMPLETED'
+  const expectedItemCode = extractRequestedItemCode(requestValue).trim()
 
   useEffect(() => {
     if (initialRequestValue?.trim()) {
@@ -56,6 +78,43 @@ export function InventoryRequestStatusForm({
       return
     }
 
+    if (scanRequired) {
+      const scannedRackBarcode = extractRackBarcode(scanValue).trim()
+      if (!scannedRackBarcode) {
+        setFeedback({
+          tone: 'error',
+          message: 'Scan barcode rak wajib dilakukan sebelum status diubah ke Selesai.',
+        })
+        return
+      }
+
+      if (!expectedItemCode) {
+        setFeedback({
+          tone: 'error',
+          message: 'Request ini belum memiliki referensi item yang bisa divalidasi.',
+        })
+        return
+      }
+
+      if (!rackSuggestions.some((item) => item.includes(`| ${expectedItemCode} |`))) {
+        setFeedback({
+          tone: 'error',
+          message: `Item ${expectedItemCode} belum memiliki barcode rak. Lengkapi dulu data rak di item inventory.`,
+        })
+        return
+      }
+
+      const matchedRack = rackSuggestions.find((item) => item.split('|')[0]?.trim().toUpperCase() === scannedRackBarcode.toUpperCase())
+      const matchedItemCode = matchedRack?.split('|')[1]?.trim() ?? ''
+      if (matchedItemCode.toUpperCase() !== expectedItemCode.toUpperCase()) {
+        setFeedback({
+          tone: 'error',
+          message: `Barcode rak tidak cocok. Request ini untuk item ${expectedItemCode}, tetapi barcode rak terbaca untuk ${matchedItemCode || 'item lain'}.`,
+        })
+        return
+      }
+    }
+
     setSubmitting(true)
     setFeedback(null)
 
@@ -70,6 +129,7 @@ export function InventoryRequestStatusForm({
           nextStatus,
           pendingReason,
           processNotes,
+          scannedRackBarcode: scanRequired ? extractRackBarcode(scanValue).trim() : '',
         }),
       })
 
@@ -89,6 +149,7 @@ export function InventoryRequestStatusForm({
       setNextStatus('ON_PROGRESS')
       setPendingReason('')
       setProcessNotes('')
+      setScanValue('')
       router.refresh()
     } finally {
       setSubmitting(false)
@@ -96,12 +157,12 @@ export function InventoryRequestStatusForm({
   }
 
   return (
-    <section className="panel p-6">
+    <section className={embedded ? 'space-y-4' : 'panel p-6'}>
       <p className="section-title">Processing Inventory</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+      <h3 className={`font-[family-name:var(--font-heading)] font-semibold tracking-tight text-slate-950 ${embedded ? 'text-xl' : 'mt-2 text-2xl'}`}>
         Ubah status request barang
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
+      <p className={`${embedded ? '' : 'mt-3'} text-sm leading-6 text-mute`}>
         {!canCreate
           ? 'Role aktif belum memiliki izin create pada domain Inventory.'
           : !reviewDbReady
@@ -109,7 +170,7 @@ export function InventoryRequestStatusForm({
             : 'Saat status diubah ke `Selesai`, sistem otomatis membuat stock movement keluar dan mengurangi stok item inventory.'}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+      <form onSubmit={handleSubmit} className={`${embedded ? '' : 'mt-6'} grid gap-4 lg:grid-cols-2`}>
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Request inventory</span>
           <input
@@ -117,7 +178,7 @@ export function InventoryRequestStatusForm({
             value={requestValue}
             onChange={(event) => setRequestValue(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            placeholder="12 | IREQ-202607-0001 | Teknisi PSB | REQUEST"
+            placeholder="12 | IREQ-202607-0001 | INV-202607-0001 | Tang Crimping | Teknisi PSB | REQUEST"
             required
             disabled={isDisabled}
           />
@@ -127,6 +188,23 @@ export function InventoryRequestStatusForm({
             ))}
           </datalist>
         </label>
+
+        {requireScan ? (
+          <div className="lg:col-span-2">
+            <InventoryItemScanAssist
+              itemSuggestions={rackSuggestions}
+              disabled={isDisabled || nextStatus !== 'COMPLETED'}
+              onResolved={(value) => setScanValue(value)}
+            />
+            <div className="mt-2 text-sm text-mute">
+              {nextStatus === 'COMPLETED'
+                ? expectedItemCode
+                  ? `Wajib scan barcode rak untuk item ${expectedItemCode} sebelum menandai request selesai.`
+                  : 'Wajib scan barcode rak sebelum menandai request selesai.'
+                : 'Scan barcode hanya dibutuhkan saat status diubah ke Selesai.'}
+            </div>
+          </div>
+        ) : null}
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Status berikutnya</span>

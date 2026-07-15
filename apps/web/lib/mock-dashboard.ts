@@ -123,12 +123,24 @@ function buildQueueItem(
 
 export function getMockRoleQueues(role: AppRole, summary: DashboardSummary): DashboardQueueItem[] {
   switch (role) {
+    case 'OWNER':
+    case 'ADMIN':
     case 'SUPER_ADMIN':
       return [
         buildQueueItem('Validasi Import', '/import', 3, 'Batch yang perlu direview sebelum transform.', 'bg-blue-50 text-blue-700'),
         buildQueueItem('TT Open', '/support', summary.troubleTickets, 'Ticket teknis aktif lintas divisi.', 'bg-amber-50 text-amber-700'),
         buildQueueItem('Invoice Overdue', '/billing', summary.overdueInvoices, 'Tagihan yang butuh tindak lanjut cepat.', 'bg-rose-50 text-rose-700'),
       ]
+    case 'FINANCE':
+      return [
+        buildQueueItem('Invoice Overdue', '/billing', summary.overdueInvoices, 'Tagihan yang butuh tindak lanjut cepat.', 'bg-rose-50 text-rose-700'),
+        buildQueueItem('Isolir Aktif', '/support', summary.isolations, 'Suspend aktif yang perlu sinkron billing.', 'bg-amber-50 text-amber-700'),
+      ]
+    case 'HR':
+      return [buildQueueItem('Absensi Hari Ini', '/hr', 18, 'Pantau absensi harian tim cabang.', 'bg-indigo-50 text-indigo-700')]
+    case 'GA':
+      return [buildQueueItem('ODP Operasional', '/inventory', Math.max(6, Math.round(summary.inventoryItems / 100)), 'ODP dan port untuk kontrol harian.', 'bg-emerald-50 text-emerald-700')]
+    case 'PENJUALAN':
     case 'SALES_MARKETING':
       return [
         buildQueueItem('Lead Follow Up', '/sales', summary.orders, 'Prospek dan order awal yang masih aktif.', 'bg-sky-50 text-sky-700'),
@@ -170,11 +182,14 @@ export function getMockRoleQueues(role: AppRole, summary: DashboardSummary): Das
         buildQueueItem('Queue Dismantle', '/support', Math.max(5, Math.round(summary.isolations / 3)), 'Daftar pelanggan yang masuk tindak lanjut dismantle.', 'bg-rose-50 text-rose-700'),
         buildQueueItem('Catatan Lapangan', '/support', 4, 'Ticket yang butuh update hasil kunjungan.', 'bg-amber-50 text-amber-700'),
       ]
+    default:
+      return []
   }
 }
 
 export function getMockWorklist(role: AppRole): DashboardWorkItem[] {
   switch (role) {
+    case 'PENJUALAN':
     case 'SALES_MARKETING':
       return [
         {
@@ -502,5 +517,7 @@ export function getMockWorklist(role: AppRole): DashboardWorkItem[] {
           href: '/settings/access',
         },
       ]
+    default:
+      return []
   }
 }

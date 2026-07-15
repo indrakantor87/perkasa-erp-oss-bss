@@ -8,6 +8,7 @@ type InventoryOdpPortStatusFormProps = {
   canUpdate: boolean
   reviewDbReady: boolean
   odpSuggestions: string[]
+  embedded?: boolean
 }
 
 const portStatusOptions = ['AVAILABLE', 'RESERVED', 'FAULTY', 'DISABLED'] as const
@@ -20,6 +21,7 @@ export function InventoryOdpPortStatusForm({
   canUpdate,
   reviewDbReady,
   odpSuggestions,
+  embedded = false,
 }: InventoryOdpPortStatusFormProps) {
   const router = useRouter()
   const [odpValue, setOdpValue] = useState(odpSuggestions[0] ?? '')
@@ -87,12 +89,12 @@ export function InventoryOdpPortStatusForm({
   }
 
   return (
-    <section className="panel p-6">
+    <section className={embedded ? 'space-y-4' : 'panel p-6'}>
       <p className="section-title">Write Action Inventory</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+      <h3 className={`font-[family-name:var(--font-heading)] font-semibold tracking-tight text-slate-950 ${embedded ? 'text-xl' : 'mt-2 text-2xl'}`}>
         Update status port ODP
       </h3>
-      <p className="mt-3 text-sm leading-6 text-mute">
+      <p className={`${embedded ? '' : 'mt-3'} text-sm leading-6 text-mute`}>
         {!canUpdate
           ? 'Role aktif belum memiliki izin update pada domain Inventory.'
           : !reviewDbReady
@@ -100,7 +102,7 @@ export function InventoryOdpPortStatusForm({
             : 'Form ini mengubah status port ODP (AVAILABLE/RESERVED/FAULTY/DISABLED). Jika port sebelumnya USED, Anda bisa mengosongkan mapping agar port bisa dipakai ulang.'}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+      <form onSubmit={handleSubmit} className={`${embedded ? '' : 'mt-6'} grid gap-4 lg:grid-cols-2`}>
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">ODP</span>
           <input

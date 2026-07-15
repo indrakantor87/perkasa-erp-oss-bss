@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 import { ensureInventoryRequestTable } from '@/lib/services/inventory-request-service'
 import type { AppRole } from '@/lib/types'
 
@@ -15,6 +15,8 @@ type RequestRow = {
   inventoryItemId: number
   itemCode: string
   itemName: string
+  rackCode: string | null
+  rackBarcode: string | null
   currentStock: number
 }
 
@@ -33,6 +35,10 @@ function canProcessInventoryRequest(role: AppRole) {
   }
 
   return canPerformAction(role, 'inventory', 'approve') || canPerformAction(role, 'inventory', 'update')
+}
+
+function requiresInventoryPickupScan(role: AppRole) {
+  return !['OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(role)
 }
 
 export async function POST(request: Request) {
@@ -58,12 +64,14 @@ export async function POST(request: Request) {
       nextStatus?: unknown
       pendingReason?: unknown
       processNotes?: unknown
+      scannedRackBarcode?: unknown
     }
 
     const requestId = extractRequestId(String(payload.requestId ?? '').trim())
     const nextStatus = String(payload.nextStatus ?? '').trim().toUpperCase()
     const pendingReason = String(payload.pendingReason ?? '').trim()
     const processNotes = String(payload.processNotes ?? '').trim()
+    const scannedRackBarcode = String(payload.scannedRackBarcode ?? '').trim().toUpperCase()
 
     if (!Number.isInteger(requestId) || requestId <= 0) {
       return Response.json({ message: 'Request inventory tidak valid.' }, { status: 400 })
@@ -77,6 +85,11 @@ export async function POST(request: Request) {
 
     await ensureInventoryRequestTable()
 
+    const [hasRackCode, hasRackBarcode] = await Promise.all([
+      hasReviewDbColumn('inventory_items', 'rack_code'),
+      hasReviewDbColumn('inventory_items', 'rack_barcode'),
+    ])
+
     const [requestRow] = await runReviewDbQuery<RequestRow>(
       `
         SELECT
@@ -87,6 +100,8 @@ export async function POST(request: Request) {
           iir.inventory_item_id AS inventoryItemId,
           ii.item_code AS itemCode,
           ii.item_name AS itemName,
+          ${hasRackCode ? 'ii.rack_code' : 'NULL'} AS rackCode,
+          ${hasRackBarcode ? 'ii.rack_barcode' : 'NULL'} AS rackBarcode,
           ii.current_stock AS currentStock
         FROM inventory_item_requests iir
         JOIN inventory_items ii
@@ -103,6 +118,32 @@ export async function POST(request: Request) {
     const currentStatus = String(requestRow.requestStatus ?? '').trim().toUpperCase()
     if (currentStatus === 'COMPLETED') {
       return Response.json({ message: 'Request inventory ini sudah selesai diproses.' }, { status: 409 })
+    }
+
+    if (nextStatus === 'COMPLETED' && requiresInventoryPickupScan(session.role)) {
+      if (!scannedRackBarcode) {
+        return Response.json(
+          { message: 'Scan barcode rak wajib dilakukan sebelum status request diubah ke Selesai.' },
+          { status: 400 },
+        )
+      }
+
+      const expectedRackBarcode = String(requestRow.rackBarcode || requestRow.rackCode || '').trim().toUpperCase()
+      if (!expectedRackBarcode) {
+        return Response.json(
+          { message: `Item ${requestRow.itemCode} belum memiliki barcode rak. Lengkapi dulu data rak di item inventory.` },
+          { status: 400 },
+        )
+      }
+
+      if (scannedRackBarcode !== expectedRackBarcode) {
+        return Response.json(
+          {
+            message: `Barcode rak tidak cocok. Request ini untuk item ${requestRow.itemCode} di rak ${requestRow.rackCode || '-'}, tetapi barcode yang terbaca ${scannedRackBarcode}.`,
+          },
+          { status: 400 },
+        )
+      }
     }
 
     const actor = `${session.displayName} (${session.username})`

@@ -7,6 +7,7 @@ import type {
   SupportLaneReviewSummary,
   SupportLaneWorkspace,
 } from '@/lib/types'
+import { translateUiText, type UiLanguage } from '@/lib/ui-language'
 
 export const SUPPORT_LANE_KEYS: SupportLaneKey[] = ['tt', 'isolations', 'dismantle', 'sla']
 
@@ -68,7 +69,13 @@ function matchesSupportLaneSectionTitle(title: string, lane: SupportLaneKey) {
 }
 
 const supportLaneOrder: Record<AppRole, SupportLaneKey[]> = {
+  OWNER: ['tt', 'isolations', 'dismantle', 'sla'],
   SUPER_ADMIN: ['tt', 'isolations', 'dismantle', 'sla'],
+  ADMIN: ['tt', 'isolations', 'dismantle', 'sla'],
+  FINANCE: ['isolations', 'sla', 'tt'],
+  HR: ['tt', 'sla'],
+  GA: ['dismantle', 'isolations', 'tt'],
+  PENJUALAN: ['isolations', 'tt', 'dismantle', 'sla'],
   SALES_MARKETING: ['isolations', 'tt', 'dismantle', 'sla'],
   CS_OPERATOR: ['isolations', 'tt', 'dismantle', 'sla'],
   CS_ADMIN: ['isolations', 'tt', 'dismantle', 'sla'],
@@ -120,10 +127,12 @@ export function getActiveSupportLane(role: AppRole, selectedLane: SupportLaneKey
   return getPreferredSupportLane(role)
 }
 
-export function getSupportLaneMeta(lane: SupportLaneKey) {
+export function getSupportLaneMeta(lane: SupportLaneKey, language: UiLanguage = 'id') {
   return {
     key: lane,
     ...supportLaneMetaMap[lane],
+    title: translateUiText(supportLaneMetaMap[lane].title, language),
+    shortLabel: translateUiText(supportLaneMetaMap[lane].shortLabel, language),
   }
 }
 
@@ -134,9 +143,10 @@ export function getSupportLaneSections(sections: DomainReviewSection[], lane: Su
 export function buildSupportLaneSnapshots(
   role: AppRole,
   sections: DomainReviewSection[],
+  language: UiLanguage = 'id',
 ): SupportLaneSnapshot[] {
   return getSupportLaneOrder(role).map((lane) => {
-    const laneMeta = getSupportLaneMeta(lane)
+    const laneMeta = getSupportLaneMeta(lane, language)
     const laneSections = getSupportLaneSections(sections, lane)
     return {
       key: lane,
@@ -153,12 +163,13 @@ export function buildSupportLaneWorkspace(
   role: AppRole,
   lane: SupportLaneKey,
   snapshots: SupportLaneSnapshot[],
+  language: UiLanguage = 'id',
 ): SupportLaneWorkspace {
   const snapshot = snapshots.find((item) => item.key === lane) ?? {
     key: lane,
-    title: getSupportLaneMeta(lane).title,
-    shortLabel: getSupportLaneMeta(lane).shortLabel,
-    accent: getSupportLaneMeta(lane).accent,
+    title: getSupportLaneMeta(lane, language).title,
+    shortLabel: getSupportLaneMeta(lane, language).shortLabel,
+    accent: getSupportLaneMeta(lane, language).accent,
     count: 0,
     sectionTitles: [],
   }
@@ -230,13 +241,13 @@ export function buildSupportLaneWorkspace(
   const workspace = workspaceMap[lane]
   return {
     lane,
-    title: workspace.title,
-    summary: workspace.summary,
-    checklist: workspace.checklist,
+    title: translateUiText(workspace.title, language),
+    summary: translateUiText(workspace.summary, language),
+    checklist: workspace.checklist.map((item) => translateUiText(item, language)),
     actionKeys: workspace.actionKeys as SupportLaneActionKey[],
     sectionTitles: snapshot.sectionTitles,
     count: snapshot.count,
-    escalationNote: workspace.escalationNote,
+    escalationNote: translateUiText(workspace.escalationNote, language),
   }
 }
 

@@ -35,7 +35,7 @@ export async function GET(
   }
 
   const url = new URL(request.url)
-  const payload = await getDomainPageData(domain as DomainKey, session.role, {
+  const payload = await getDomainPageData(domain as DomainKey, session, {
     supportLane: normalizeSupportLane(url.searchParams.get('lane') ?? undefined),
     focus: resolveSearchParam(url.searchParams.get('focus')),
     month: resolvePositiveIntegerParam(url.searchParams.get('month')),
