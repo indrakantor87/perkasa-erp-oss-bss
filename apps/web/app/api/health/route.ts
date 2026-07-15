@@ -70,7 +70,8 @@ export async function GET() {
   const dataSourceRequired = productionEnv
   const dataSourceOk = !dataSourceRequired || (dataSource.effectiveMode === 'review-db' && !dataSource.isFallback)
   const reviewDbRequired = productionEnv && dataSourceOk
-  const reviewDbOk = !reviewDbRequired || Boolean(reviewDb?.ready)
+  const reviewDbReachable = !reviewDbRequired || Boolean(reviewDb?.reachable)
+  const reviewDbSchemaReady = !reviewDbRequired || Boolean(reviewDb?.ready)
   const warnings: string[] = []
 
   if (!authReady) {
@@ -89,7 +90,17 @@ export async function GET() {
     )
   }
 
-  const isOk = authOk && dataSourceOk && reviewDbOk
+  if (reviewDbRequired && reviewDb?.reachable && !reviewDb?.ready) {
+    warnings.push(
+      `Review DB sudah terjangkau, tetapi schema baseline belum lengkap: ${reviewDb.missingColumns.join(', ') || 'cek migration review DB.'}`,
+    )
+  }
+
+  if (reviewDbRequired && !reviewDb?.reachable) {
+    warnings.push('Review DB belum terjangkau dari aplikasi. Cek DATABASE_URL, kredensial, dan status resource MySQL.')
+  }
+
+  const isOk = authOk && dataSourceOk && reviewDbReachable
 
   return NextResponse.json(
     {
@@ -115,7 +126,9 @@ export async function GET() {
         env,
         authReady: authOk,
         dataSourceReady: dataSourceOk,
-        reviewDbReady: reviewDbOk,
+        reviewDbReachable,
+        reviewDbSchemaReady,
+        reviewDbReady: reviewDbSchemaReady,
         ready: isOk,
         warnings,
       },
