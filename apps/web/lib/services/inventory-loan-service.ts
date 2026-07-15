@@ -1,4 +1,9 @@
-import { runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  hasReviewDbColumn,
+  invalidateReviewDbColumnCache,
+  runReviewDbExecute,
+  runReviewDbQuery,
+} from '@/lib/review-db'
 
 type ExecuteResult = {
   insertId?: number
@@ -11,6 +16,24 @@ type LoanCodeRow = {
 
 function padSequence(value: number) {
   return String(value).padStart(4, '0')
+}
+
+async function ensureInventoryLoanColumn(
+  columnName: string,
+  definitionSql: string,
+  afterColumn: string,
+) {
+  if (await hasReviewDbColumn('inventory_item_loans', columnName)) {
+    return
+  }
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE inventory_item_loans
+      ADD COLUMN ${definitionSql} AFTER ${afterColumn}
+    `,
+  )
+  invalidateReviewDbColumnCache('inventory_item_loans', columnName)
 }
 
 export async function ensureInventoryLoanTable() {
@@ -45,25 +68,16 @@ export async function ensureInventoryLoanTable() {
     `,
   )
 
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE inventory_item_loans
-      ADD COLUMN IF NOT EXISTS borrower_division VARCHAR(120) NULL AFTER borrower_name
-    `,
+  await ensureInventoryLoanColumn('borrower_division', 'borrower_division VARCHAR(120) NULL', 'borrower_name')
+  await ensureInventoryLoanColumn(
+    'borrower_subdivision',
+    'borrower_subdivision VARCHAR(150) NULL',
+    'borrower_division',
   )
-
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE inventory_item_loans
-      ADD COLUMN IF NOT EXISTS borrower_subdivision VARCHAR(150) NULL AFTER borrower_division
-    `,
-  )
-
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE inventory_item_loans
-      ADD COLUMN IF NOT EXISTS returned_qty INT UNSIGNED NOT NULL DEFAULT 0 AFTER loan_qty
-    `,
+  await ensureInventoryLoanColumn(
+    'returned_qty',
+    'returned_qty INT UNSIGNED NOT NULL DEFAULT 0',
+    'loan_qty',
   )
 }
 

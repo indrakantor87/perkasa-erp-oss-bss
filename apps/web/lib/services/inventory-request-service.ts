@@ -1,4 +1,9 @@
-import { runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  hasReviewDbColumn,
+  invalidateReviewDbColumnCache,
+  runReviewDbExecute,
+  runReviewDbQuery,
+} from '@/lib/review-db'
 
 type ExecuteResult = {
   insertId?: number
@@ -11,6 +16,24 @@ type RequestCodeRow = {
 
 function padSequence(value: number) {
   return String(value).padStart(4, '0')
+}
+
+async function ensureInventoryRequestColumn(
+  columnName: string,
+  definitionSql: string,
+  afterColumn: string,
+) {
+  if (await hasReviewDbColumn('inventory_item_requests', columnName)) {
+    return
+  }
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE inventory_item_requests
+      ADD COLUMN ${definitionSql} AFTER ${afterColumn}
+    `,
+  )
+  invalidateReviewDbColumnCache('inventory_item_requests', columnName)
 }
 
 export async function ensureInventoryRequestTable() {
@@ -44,18 +67,15 @@ export async function ensureInventoryRequestTable() {
     `,
   )
 
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE inventory_item_requests
-      ADD COLUMN IF NOT EXISTS requested_division VARCHAR(120) NULL AFTER request_status
-    `,
+  await ensureInventoryRequestColumn(
+    'requested_division',
+    'requested_division VARCHAR(120) NULL',
+    'request_status',
   )
-
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE inventory_item_requests
-      ADD COLUMN IF NOT EXISTS requested_subdivision VARCHAR(150) NULL AFTER requested_division
-    `,
+  await ensureInventoryRequestColumn(
+    'requested_subdivision',
+    'requested_subdivision VARCHAR(150) NULL',
+    'requested_division',
   )
 }
 
