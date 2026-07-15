@@ -1,0 +1,17 @@
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+apps/web/.next
+apps/web/node_modules
+apps/web/coverage
+apps/web/out
+apps/web/dist
+apps/web/storage
+apps/web/*.log
+
+production-data
+database/generated
