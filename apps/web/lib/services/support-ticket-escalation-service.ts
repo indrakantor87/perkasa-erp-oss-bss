@@ -1,4 +1,20 @@
-import { runReviewDbExecute } from '@/lib/review-db'
+import { hasReviewDbColumn, invalidateReviewDbColumnCache, runReviewDbExecute } from '@/lib/review-db'
+
+async function ensureSupportTroubleTicketEscalationColumn(
+  columnName: string,
+  definitionSql: string,
+  afterColumn: string,
+) {
+  if (await hasReviewDbColumn('support_trouble_ticket_escalation_logs', columnName)) {
+    return
+  }
+
+  await runReviewDbExecute(`
+    ALTER TABLE support_trouble_ticket_escalation_logs
+    ADD COLUMN ${definitionSql} AFTER ${afterColumn}
+  `)
+  invalidateReviewDbColumnCache('support_trouble_ticket_escalation_logs', columnName)
+}
 
 export async function ensureSupportTroubleTicketEscalationTable() {
   await runReviewDbExecute(`
@@ -19,33 +35,34 @@ export async function ensureSupportTroubleTicketEscalationTable() {
     )
   `)
 
-  await runReviewDbExecute(`
-    ALTER TABLE support_trouble_ticket_escalation_logs
-    ADD COLUMN IF NOT EXISTS escalation_target VARCHAR(150) NOT NULL DEFAULT 'UNSPECIFIED' AFTER trouble_ticket_id
-  `)
-
-  await runReviewDbExecute(`
-    ALTER TABLE support_trouble_ticket_escalation_logs
-    ADD COLUMN IF NOT EXISTS escalation_level VARCHAR(40) NOT NULL DEFAULT 'OVERDUE' AFTER escalation_target
-  `)
-
-  await runReviewDbExecute(`
-    ALTER TABLE support_trouble_ticket_escalation_logs
-    ADD COLUMN IF NOT EXISTS escalation_reason TEXT NULL AFTER escalation_level
-  `)
-
-  await runReviewDbExecute(`
-    ALTER TABLE support_trouble_ticket_escalation_logs
-    ADD COLUMN IF NOT EXISTS escalated_by VARCHAR(150) NOT NULL DEFAULT 'system' AFTER escalation_reason
-  `)
-
-  await runReviewDbExecute(`
-    ALTER TABLE support_trouble_ticket_escalation_logs
-    ADD COLUMN IF NOT EXISTS escalated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER escalated_by
-  `)
-
-  await runReviewDbExecute(`
-    ALTER TABLE support_trouble_ticket_escalation_logs
-    ADD COLUMN IF NOT EXISTS created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER escalated_at
-  `)
+  await ensureSupportTroubleTicketEscalationColumn(
+    'escalation_target',
+    "escalation_target VARCHAR(150) NOT NULL DEFAULT 'UNSPECIFIED'",
+    'trouble_ticket_id',
+  )
+  await ensureSupportTroubleTicketEscalationColumn(
+    'escalation_level',
+    "escalation_level VARCHAR(40) NOT NULL DEFAULT 'OVERDUE'",
+    'escalation_target',
+  )
+  await ensureSupportTroubleTicketEscalationColumn(
+    'escalation_reason',
+    'escalation_reason TEXT NULL',
+    'escalation_level',
+  )
+  await ensureSupportTroubleTicketEscalationColumn(
+    'escalated_by',
+    "escalated_by VARCHAR(150) NOT NULL DEFAULT 'system'",
+    'escalation_reason',
+  )
+  await ensureSupportTroubleTicketEscalationColumn(
+    'escalated_at',
+    'escalated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    'escalated_by',
+  )
+  await ensureSupportTroubleTicketEscalationColumn(
+    'created_at',
+    'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    'escalated_at',
+  )
 }
