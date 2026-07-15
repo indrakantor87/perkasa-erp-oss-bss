@@ -42,6 +42,29 @@ Ambil baseline dari `apps/web/.env.production.example`.
 - Base Directory / Build Context: repository root `.`
 - Branch: `main`
 
+## Field-by-Field
+
+Isi form Coolify dengan urutan berikut:
+
+1. **Repository**
+   - pilih GitHub repo `perkasa-erp-oss-bss`
+2. **Branch**
+   - isi `main`
+3. **Build Pack**
+   - pilih `Dockerfile`
+4. **Dockerfile Location**
+   - isi `./Dockerfile`
+5. **Base Directory**
+   - isi `.`
+6. **Port Exposes**
+   - isi `3000`
+7. **Health Check Path**
+   - isi `/api/health`
+8. **Environment Variables**
+   - copy dari `apps/web/.env.production.example`
+9. **Domain**
+   - isi setelah deploy awal berhasil bila ingin pakai domain custom
+
 ## Deploy Steps
 
 1. Buat project baru di Coolify.
@@ -60,6 +83,7 @@ Ambil baseline dari `apps/web/.env.production.example`.
   - `npm ci`
   - `npm run build`
   - menjalankan `node server.js` dari hasil standalone build
+- Image juga sudah memiliki `HEALTHCHECK` internal ke `/api/health`
 - Jika nanti butuh domain custom atau reverse proxy rules, konfigurasi itu dilakukan di level Coolify, bukan di repo ini.
 - Health endpoint production akan gagal (`503`) bila:
   - `AUTH_SESSION_SECRET` belum valid
