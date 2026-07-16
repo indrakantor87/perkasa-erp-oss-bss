@@ -41,6 +41,10 @@ function normalizeOptionalText(value: unknown) {
   return normalized || null
 }
 
+function getNormalizedInvoiceNoSqlExpression(expression: string) {
+  return `REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(${expression})), CHAR(13), ''), CHAR(10), ''), CHAR(9), ''), ' ', '')`
+}
+
 function reportDebugEvent(event: Record<string, unknown>) {
   // #region debug-point A:billing-suspend-status
   try {
@@ -262,7 +266,7 @@ async function loadBillingIsolationContext(invoiceNo: string) {
         ON ss.id = bi.subscription_id
       ${customerJoinClause}
       ${addressJoinClause}
-      WHERE bi.invoice_no = ?
+      WHERE ${getNormalizedInvoiceNoSqlExpression('bi.invoice_no')} = ${getNormalizedInvoiceNoSqlExpression('?')}
       LIMIT 1
     `,
     [invoiceNo],
@@ -557,7 +561,7 @@ async function updateInvoiceStatus(params: {
         ${invoiceQueryParts.notesExpression} AS notes
       FROM billing_invoices bi
       ${invoiceQueryParts.customerJoin}
-      WHERE UPPER(TRIM(bi.invoice_no)) = UPPER(TRIM(?))
+      WHERE ${getNormalizedInvoiceNoSqlExpression('bi.invoice_no')} = ${getNormalizedInvoiceNoSqlExpression('?')}
       LIMIT 1
     `,
     [params.invoiceNo],
