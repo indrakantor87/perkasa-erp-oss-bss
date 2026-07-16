@@ -1,9 +1,9 @@
-- [ ] Deploy live terbaru sudah aktif dan dapat diakses
-- [ ] Login live dengan akun review valid berhasil
-- [ ] `dashboard` termuat tanpa fallback yang memblokir
-- [ ] `dashboard/worklist` tidak lagi menampilkan fallback SQL syntax
-- [ ] `dashboard/worklist` tetap memakai sumber data `Review DB`
-- [ ] `billing` termuat tanpa fallback yang memblokir
-- [ ] `import center` termuat dan `staging_import_batches` terbaca normal
-- [ ] Hanya `.trae-temp/` yang dihapus saat pekerjaan selesai
-- [ ] `.db-backups/`, `.vscode/`, dan `debug-coolify-domain-404.md` tetap utuh
+- [x] Deploy live terbaru sudah aktif dan dapat diakses
+- [x] Login live dengan akun review valid berhasil
+- [x] `dashboard` termuat tanpa fallback yang memblokir
+- [x] `dashboard/worklist` tidak lagi menampilkan fallback SQL syntax
+- [x] `dashboard/worklist` tetap memakai sumber data `Review DB`
+- [x] `billing` termuat tanpa fallback yang memblokir
+- [x] `import center` termuat dan `staging_import_batches` terbaca normal
+- [x] Hanya `.trae-temp/` yang dihapus saat pekerjaan selesai
+- [x] `.db-backups/`, `.vscode/`, dan `debug-coolify-domain-404.md` tetap utuh
