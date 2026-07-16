@@ -18,21 +18,21 @@ export function KpiGrid({ items }: { items: DashboardMetric[] }) {
       {parsedItems.map((item) => (
         <article
           key={item.label}
-          className="overflow-hidden rounded-3xl border border-line bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-sm"
+          className="surface-elevated overflow-hidden rounded-3xl border p-5 shadow-sm"
         >
           <div className="flex items-start justify-between gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-mute">{item.label}</p>
-            <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+            <span className="status-chip-info rounded-full border px-2.5 py-1 text-[11px] font-semibold">
               {item.change}
             </span>
           </div>
-          <p className="mt-4 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
+          <p className="mt-4 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
             {item.value}
           </p>
-          <div className="mt-4 h-2 rounded-full bg-slate-100">
+          <div className="mt-4 h-2 rounded-full" style={{ backgroundColor: 'var(--color-surface-strong)' }}>
             <div
-              className="h-2 rounded-full bg-[linear-gradient(90deg,#0f172a_0%,#2563eb_100%)]"
-              style={{ width: `${Math.max(10, Math.round((item.numericValue / maxValue) * 100))}%` }}
+              className="h-2 rounded-full"
+              style={{ backgroundColor: 'var(--color-accent)', width: `${Math.max(10, Math.round((item.numericValue / maxValue) * 100))}%` }}
             />
           </div>
           <p className="mt-4 text-sm leading-6 text-mute">{item.note}</p>

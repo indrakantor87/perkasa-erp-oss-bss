@@ -25,19 +25,19 @@ function getPriorityTone(priority: DashboardWorkItem['priority']) {
     case 'tinggi':
       return {
         fill: '#ef4444',
-        soft: 'bg-rose-50 text-rose-700 border-rose-200',
+        soft: 'status-chip-danger',
         label: 'Prioritas Tinggi',
       }
     case 'sedang':
       return {
         fill: '#f59e0b',
-        soft: 'bg-amber-50 text-amber-700 border-amber-200',
+        soft: 'status-chip-warning',
         label: 'Prioritas Sedang',
       }
     default:
       return {
         fill: '#10b981',
-        soft: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        soft: 'status-chip-success',
         label: 'Prioritas Rendah',
       }
   }
@@ -46,7 +46,7 @@ function getPriorityTone(priority: DashboardWorkItem['priority']) {
 function buildPriorityDonutSegments(items: Array<{ value: number; color: string }>) {
   const total = items.reduce((sum, item) => sum + item.value, 0)
   if (total <= 0) {
-    return 'conic-gradient(#e2e8f0 0deg 360deg)'
+    return 'conic-gradient(var(--color-surface-strong) 0deg 360deg)'
   }
 
   let current = 0
@@ -243,34 +243,62 @@ export function DashboardProfessionalOverview({
     <section className="space-y-4">
       <div className="space-y-4">
         <div className="panel overflow-hidden p-0">
-          <div className="border-b border-slate-200 bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_55%,#334155_100%)] px-5 py-5 text-white">
+          <div className="border-b border-line px-5 py-5 text-[var(--color-sidebar-ink)]" style={{ backgroundColor: 'var(--color-sidebar)' }}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-300">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'color-mix(in srgb, var(--color-sidebar-ink) 72%, var(--color-mute) 28%)' }}>
                   {overview.heroKicker}
                 </p>
                 <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight">
                   {overview.heroTitle}
                 </h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+                <p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: 'color-mix(in srgb, var(--color-sidebar-ink) 82%, transparent)' }}>
                   {overview.heroDescription}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <article className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Beban Queue</p>
+                <article
+                  className="rounded-2xl border px-4 py-3"
+                  style={{
+                    borderColor: 'var(--color-line-strong)',
+                    backgroundColor: 'var(--color-surface-strong)',
+                    color: 'var(--color-ink-strong)',
+                  }}
+                >
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-mute">Beban Queue</p>
                   <p className="mt-2 text-2xl font-semibold">{formatCompactNumber(totalQueueLoad)}</p>
                 </article>
-                <article className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Worklist</p>
+                <article
+                  className="rounded-2xl border px-4 py-3"
+                  style={{
+                    borderColor: 'var(--color-line-strong)',
+                    backgroundColor: 'var(--color-surface-strong)',
+                    color: 'var(--color-ink-strong)',
+                  }}
+                >
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-mute">Worklist</p>
                   <p className="mt-2 text-2xl font-semibold">{formatCompactNumber(worklist.length)}</p>
                 </article>
-                <article className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Approval</p>
+                <article
+                  className="rounded-2xl border px-4 py-3"
+                  style={{
+                    borderColor: 'var(--color-line-strong)',
+                    backgroundColor: 'var(--color-surface-strong)',
+                    color: 'var(--color-ink-strong)',
+                  }}
+                >
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-mute">Approval</p>
                   <p className="mt-2 text-2xl font-semibold">{formatCompactNumber(approvalCount)}</p>
                 </article>
-                <article className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">Domain</p>
+                <article
+                  className="rounded-2xl border px-4 py-3"
+                  style={{
+                    borderColor: 'var(--color-line-strong)',
+                    backgroundColor: 'var(--color-surface-strong)',
+                    color: 'var(--color-ink-strong)',
+                  }}
+                >
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-mute">Domain</p>
                   <p className="mt-2 text-2xl font-semibold">{formatCompactNumber(operationalCards.length)}</p>
                 </article>
               </div>
@@ -279,15 +307,14 @@ export function DashboardProfessionalOverview({
 
           <div className="space-y-4 p-5">
             <div
-              className="rounded-3xl border border-line p-5"
-              style={{ backgroundColor: 'var(--color-card-subtle)' }}
+              className="surface-soft rounded-3xl border p-5"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="section-title">{overview.queueTitle}</p>
                   <h3 className="mt-2 text-lg font-semibold text-[var(--color-ink-strong)]">{overview.queueDescription}</h3>
                 </div>
-                <span className="badge border-line bg-surface text-mute">{queueChartItems.length} lane</span>
+                <span className="solid-chip">{queueChartItems.length} lane</span>
               </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -304,22 +331,17 @@ export function DashboardProfessionalOverview({
                           <span className={`badge border ${item.accent}`}>{item.count}</span>
                         </div>
                         <div
-                          className="mt-4 h-28 rounded-2xl p-3"
-                          style={{ backgroundColor: 'var(--color-card-subtle)' }}
+                          className="surface-soft mt-4 h-28 rounded-2xl border p-3"
                         >
                           <div className="flex h-full items-end gap-3">
                             <div
                               className="flex h-full flex-1 items-end rounded-xl p-1"
-                              style={{
-                                background:
-                                  'linear-gradient(180deg, color-mix(in srgb, var(--color-line) 88%, transparent 12%) 0%, color-mix(in srgb, var(--color-card-subtle) 92%, transparent 8%) 100%)',
-                              }}
+                              style={{ backgroundColor: 'var(--color-surface-strong)' }}
                             >
                               <div
                                 className="w-full rounded-lg"
                                 style={{
-                                  background:
-                                    'linear-gradient(180deg, var(--color-panel) 0%, var(--color-accent) 100%)',
+                                  backgroundColor: 'var(--color-accent)',
                                   height: `${percent}%`,
                                 }}
                               />
@@ -336,7 +358,7 @@ export function DashboardProfessionalOverview({
                     )
                   })
                 ) : (
-                  <article className="sm:col-span-2 xl:col-span-3 rounded-3xl border border-dashed border-line bg-surface p-5">
+                    <article className="surface-soft sm:col-span-2 xl:col-span-3 rounded-3xl border border-dashed p-5">
                     <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Belum ada lane queue aktif</p>
                     <p className="mt-2 text-sm leading-6 text-mute">
                       Dashboard tetap stabil. Gunakan worklist, spotlight utama, dan shortcut modul sebagai pembacaan utama sampai antrean baru muncul.
@@ -400,11 +422,19 @@ export function DashboardProfessionalOverview({
                       color: 'var(--color-sidebar-ink)',
                     }}
                   >
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Sinyal Operasional</p>
+                    <p
+                      className="text-[11px] uppercase tracking-[0.18em]"
+                      style={{ color: 'color-mix(in srgb, var(--color-sidebar-ink) 72%, var(--color-mute) 28%)' }}
+                    >
+                      Sinyal Operasional
+                    </p>
                     <p className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold">
                       {approvalCount > 0 ? formatCompactNumber(approvalCount) : 'Stabil'}
                     </p>
-                    <p className="mt-2 text-sm leading-5 text-slate-300">
+                    <p
+                      className="mt-2 text-sm leading-5"
+                      style={{ color: 'color-mix(in srgb, var(--color-sidebar-ink) 82%, transparent)' }}
+                    >
                       {approvalCount > 0
                         ? 'Dipakai sebagai sinyal blocker lintas tim yang bisa menahan ritme kerja role aktif.'
                         : 'Belum ada blocker approval yang menahan ritme kerja. Fokus bisa diarahkan ke queue dan worklist.'}
@@ -562,14 +592,26 @@ export function DashboardProfessionalOverview({
               </article>
 
               <article
-                className="rounded-3xl border border-line p-5 text-surface"
-                style={{ background: 'linear-gradient(180deg, var(--color-sidebar) 0%, var(--color-sidebar-soft) 100%)' }}
+                className="rounded-3xl border border-line p-5"
+                style={{
+                  backgroundColor: 'var(--color-sidebar)',
+                  borderColor: 'var(--color-sidebar-line)',
+                  color: 'var(--color-sidebar-ink)',
+                }}
               >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Domain Paling Aktif</p>
+                <p
+                  className="text-[11px] font-semibold uppercase tracking-[0.2em]"
+                  style={{ color: 'color-mix(in srgb, var(--color-sidebar-ink) 72%, var(--color-mute) 28%)' }}
+                >
+                  Domain Paling Aktif
+                </p>
                 <p className="mt-3 text-lg font-semibold">
                   {domainPressure ? domainPressure.title : 'Belum ada domain dominan'}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
+                <p
+                  className="mt-2 text-sm leading-6"
+                  style={{ color: 'color-mix(in srgb, var(--color-sidebar-ink) 82%, transparent)' }}
+                >
                   {domainPressure
                     ? 'Domain ini memegang tekanan metrik paling besar dan layak dibaca lebih dulu pada snapshot divisi.'
                     : 'Belum ada tekanan domain yang menonjol dari data saat ini.'}

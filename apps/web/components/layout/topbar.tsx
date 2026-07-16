@@ -54,10 +54,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         {session && roleMeta ? (
-          <div
-            className="rounded-2xl border border-line px-4 py-3 text-sm text-mute"
-            style={{ backgroundColor: 'var(--color-card-subtle)' }}
-          >
+          <div className="surface-soft rounded-2xl border px-4 py-3 text-sm text-mute">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">{activeRoleLabel}</p>
               <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.label}</span>
@@ -70,7 +67,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
         ) : null}
 
         <div className="flex items-center gap-3">
-          <div className="inline-flex items-center rounded-full border border-line bg-surface p-1">
+          <div className="surface-soft inline-flex items-center rounded-full border p-1">
             <span className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">
               {themeLabel}
             </span>
@@ -85,8 +82,9 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
                   type="button"
                   onClick={() => setTheme(value)}
                   className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-                    active ? 'bg-panel text-surface' : 'text-mute hover:text-ink'
+                    active ? 'text-[var(--color-accent-ink)]' : 'text-mute hover:text-[var(--color-ink-strong)]'
                   }`}
+                  style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
                   aria-label={label}
                   title={label}
                 >
@@ -95,7 +93,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
               )
             })}
           </div>
-          <div className="inline-flex items-center rounded-full border border-line bg-surface p-1">
+          <div className="surface-soft inline-flex items-center rounded-full border p-1">
             {([
               ['id', 'ID'],
               ['en', 'EN'],
@@ -107,8 +105,9 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
                   type="button"
                   onClick={() => setLanguage(value)}
                   className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-                    active ? 'bg-panel text-surface' : 'text-mute hover:text-ink'
+                    active ? 'text-[var(--color-accent-ink)]' : 'text-mute hover:text-[var(--color-ink-strong)]'
                   }`}
+                  style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
                   aria-label={value === 'id' ? 'Gunakan Bahasa Indonesia' : 'Use English'}
                   title={value === 'id' ? 'Bahasa Indonesia' : 'English'}
                 >
@@ -118,8 +117,11 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
             })}
           </div>
           {session ? (
-            <div className="hidden items-center gap-3 rounded-full border border-line bg-surface px-4 py-2.5 sm:flex">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-panel text-xs font-semibold text-surface">
+            <div className="surface-soft hidden items-center gap-3 rounded-full border px-4 py-2.5 sm:flex">
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold"
+                style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
+              >
                 {session.displayName
                   .split(' ')
                   .slice(0, 2)
@@ -138,7 +140,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
           {canReviewImport ? (
             <Link
               href="/import"
-              className="rounded-full border border-line bg-surface px-4 py-3 text-sm font-semibold text-ink transition hover:border-line"
+              className="surface-soft rounded-full border px-4 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)]"
             >
               {importLabel}
             </Link>
@@ -146,7 +148,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
           <form action="/api/auth/logout" method="post">
             <button
               type="submit"
-              className="rounded-full border border-line bg-surface px-4 py-3 text-sm font-semibold text-ink transition hover:border-line"
+              className="surface-soft rounded-full border px-4 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)]"
             >
               {logoutLabel}
             </button>

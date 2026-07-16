@@ -13,43 +13,43 @@ export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="section-title">Panel Detail</p>
-          <h3 className="mt-2 text-xl font-semibold text-slate-950">Item aktif dan CTA tindak lanjut</h3>
+          <h3 className="mt-2 text-xl font-semibold text-[var(--color-ink-strong)]">Item aktif dan CTA tindak lanjut</h3>
         </div>
-        {item ? <span className="badge border-slate-200 bg-white text-slate-600">{item.queue}</span> : null}
+        {item ? <span className="solid-chip">{item.queue}</span> : null}
       </div>
 
       {item ? (
         <div className="mt-6 space-y-6">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="badge border-slate-200 bg-white text-slate-600">{item.domain}</span>
-              <span className="badge border-transparent bg-slate-950 text-white">{item.status}</span>
-              <span className="badge border-slate-200 bg-white text-slate-600">{item.priority}</span>
+              <span className="solid-chip">{item.domain}</span>
+              <span className="badge border-transparent" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}>{item.status}</span>
+              <span className="solid-chip">{item.priority}</span>
             </div>
             <div>
-              <h4 className="text-xl font-semibold text-slate-950">{item.title}</h4>
-              <p className="mt-1 text-sm font-medium text-slate-700">{item.subtitle}</p>
+              <h4 className="text-xl font-semibold text-[var(--color-ink-strong)]">{item.title}</h4>
+              <p className="mt-1 text-sm font-medium text-[var(--color-mute-strong)]">{item.subtitle}</p>
             </div>
             <p className="text-sm leading-6 text-mute">{item.detail}</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Alasan Muncul</p>
-              <p className="mt-3 text-sm leading-6 text-slate-700">{item.reason || '-'}</p>
+            <article className="surface-soft rounded-3xl border p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Alasan Muncul</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.reason || '-'}</p>
             </article>
-            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Langkah Berikut</p>
-              <p className="mt-3 text-sm leading-6 text-slate-700">{item.nextAction || '-'}</p>
+            <article className="surface-soft rounded-3xl border p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Langkah Berikut</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.nextAction || '-'}</p>
             </article>
-            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">PIC / Target</p>
-              <p className="mt-3 text-sm leading-6 text-slate-700">{item.owner || '-'}</p>
+            <article className="surface-soft rounded-3xl border p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">PIC / Target</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.owner || '-'}</p>
               <p className="mt-1 text-sm leading-6 text-mute">{item.dueLabel || 'Belum ada target eksplisit'}</p>
             </article>
-            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Blocker</p>
-              <p className="mt-3 text-sm leading-6 text-slate-700">{item.blockingInfo || 'Belum ada blocker eksplisit.'}</p>
+            <article className="surface-soft rounded-3xl border p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Blocker</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.blockingInfo || 'Belum ada blocker eksplisit.'}</p>
             </article>
           </div>
 
@@ -67,16 +67,17 @@ export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
 
           {item.evidencePanel ? <CaseEvidencePanelCard evidence={item.evidencePanel} /> : null}
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">CTA</p>
+          <div className="surface-elevated rounded-3xl border p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">CTA</p>
             <div className="mt-4 flex flex-wrap gap-3">
               <Link
                 href={item.href}
-                className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition hover:opacity-90"
+                style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
               >
                 {item.actionLabel}
               </Link>
-              <span className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600">
+              <span className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm text-mute">
                 Prefill token: {item.prefillToken || '-'}
               </span>
             </div>
@@ -86,7 +87,7 @@ export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
                   <Link
                     key={`${item.id}-${link.label}`}
                     href={link.href}
-                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                    className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
                   >
                     {link.label}
                   </Link>
@@ -96,7 +97,7 @@ export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
           </div>
         </div>
       ) : (
-        <div className="mt-6 rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm leading-6 text-mute">
+        <div className="surface-soft mt-6 rounded-3xl border border-dashed p-6 text-sm leading-6 text-mute">
           Belum ada item yang terpilih. Pilih salah satu baris pada daftar item untuk melihat konteks
           lintas domain dan CTA utamanya.
         </div>

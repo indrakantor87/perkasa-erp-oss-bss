@@ -45,12 +45,12 @@ export function WorklistHeader({
         </div>
         <div className="flex flex-wrap gap-2">
           <span className={`badge border-transparent ${roleTone}`}>{roleLabel}</span>
-          <span className="badge border-slate-200 bg-white text-slate-600">
+          <span className="solid-chip">
             {division} / {subdivision}
           </span>
-          <span className="badge border-slate-200 bg-white text-slate-600">{selectedQueue}</span>
+          <span className="solid-chip">{selectedQueue}</span>
           {readOnly ? (
-            <span className="badge border-amber-200 bg-amber-50 text-amber-700">
+            <span className="badge status-chip-warning">
               {translateUiText('Mode baca saja', language)}
             </span>
           ) : null}
@@ -58,37 +58,37 @@ export function WorklistHeader({
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-5">
-        <article className="rounded-md border border-slate-200 bg-white px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <article className="surface-elevated rounded-md border px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">
             {translateUiText('Item Aktif', language)}
           </p>
-          <p className="mt-1 text-xl font-semibold text-slate-950">{totalCount}</p>
+          <p className="mt-1 text-xl font-semibold text-[var(--color-ink-strong)]">{totalCount}</p>
         </article>
-        <article className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700">
+        <article className="status-chip-danger rounded-md border px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">
             {translateUiText('Kritikal', language)}
           </p>
-          <p className="mt-1 text-xl font-semibold text-rose-900">{criticalCount}</p>
+          <p className="mt-1 text-xl font-semibold">{criticalCount}</p>
         </article>
-        <article className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Follow Up</p>
-          <p className="mt-1 text-xl font-semibold text-sky-900">{followUpCount}</p>
+        <article className="status-chip-info rounded-md border px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">Follow Up</p>
+          <p className="mt-1 text-xl font-semibold">{followUpCount}</p>
         </article>
-        <article className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">
+        <article className="status-chip-warning rounded-md border px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">
             {translateUiText('Menunggu', language)}
           </p>
-          <p className="mt-1 text-xl font-semibold text-amber-900">{waitingCount}</p>
+          <p className="mt-1 text-xl font-semibold">{waitingCount}</p>
         </article>
-        <article className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+        <article className="status-chip-success rounded-md border px-3 py-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">
             {translateUiText('Siap Ditutup', language)}
           </p>
-          <p className="mt-1 text-xl font-semibold text-emerald-900">{readyCloseCount}</p>
+          <p className="mt-1 text-xl font-semibold">{readyCloseCount}</p>
         </article>
       </div>
       <div className="mt-2">
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-mute">
           {language === 'en'
             ? `Base scope: ${baseCount} items before active filters are applied.`
             : `Scope dasar: ${baseCount} item sebelum filter aktif diterapkan.`}
