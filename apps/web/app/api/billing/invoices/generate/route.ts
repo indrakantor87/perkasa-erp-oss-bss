@@ -197,14 +197,19 @@ async function buildBillingInvoiceInsertPayload(params: {
     hasReviewDbColumn('billing_invoices', 'notes'),
   ])
 
-  if (!hasSubscriptionId || !hasInvoiceNo || !hasSubtotal || !hasTotalAmount || !hasPaidAmount || !hasInvoiceStatus) {
+  if (!hasSubscriptionId || !hasInvoiceNo || !hasTotalAmount || !hasPaidAmount) {
     throw new Error(
-      'Schema inti billing_invoices belum siap. Kolom subscription_id, invoice_no, subtotal, total_amount, paid_amount, dan invoice_status wajib tersedia.',
+      'Schema inti billing_invoices belum siap. Kolom subscription_id, invoice_no, total_amount, dan paid_amount wajib tersedia.',
     )
   }
 
-  const columns = ['subscription_id', 'invoice_no', 'subtotal', 'total_amount', 'paid_amount', 'invoice_status']
-  const values: unknown[] = [params.subscriptionId, params.invoiceNo, params.subtotal, params.totalAmount, 0, 'ISSUED']
+  const columns = ['subscription_id', 'invoice_no', 'total_amount', 'paid_amount']
+  const values: unknown[] = [params.subscriptionId, params.invoiceNo, params.totalAmount, 0]
+
+  if (hasSubtotal) {
+    columns.push('subtotal')
+    values.push(params.subtotal)
+  }
 
   if (hasInvoiceType) {
     columns.push('invoice_type')

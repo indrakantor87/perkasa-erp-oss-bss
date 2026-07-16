@@ -5980,7 +5980,7 @@ function applyReviewDbCustomerSections(content: DomainPageContent, reviewSection
 }
 
 function applyReviewDbBillingSections(content: DomainPageContent, reviewSections: DomainReviewSection[]) {
-  if (content.key !== 'billing' || reviewSections.length === 0) {
+  if (content.key !== 'billing') {
     return content
   }
 
