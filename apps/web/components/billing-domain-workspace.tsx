@@ -378,6 +378,9 @@ export function BillingDomainWorkspace({
         .filter(Boolean),
     ),
   )
+  const billingStatusInvoiceSuggestions = Array.from(
+    new Set([...billingCollectionSuggestions, ...billingSuspendReadySuggestions, ...billingReconnectReadySuggestions]),
+  )
   const billingSubscriptionSuggestions = Array.from(
     new Set(
       reviewSections
@@ -662,7 +665,7 @@ export function BillingDomainWorkspace({
                   <BillingInvoiceStatusForm
                     canUpdate={canUpdate}
                     reviewDbReady={reviewDbReady}
-                    invoiceSuggestions={billingInvoiceSuggestions}
+        invoiceSuggestions={billingStatusInvoiceSuggestions}
                     followUpSuggestions={billingCollectionFollowUpSuggestions}
                     reconnectSuggestions={billingReconnectContextSuggestions}
                     suspendBatchSuggestions={billingSuspendReadySuggestions}

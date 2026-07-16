@@ -557,7 +557,7 @@ async function updateInvoiceStatus(params: {
         ${invoiceQueryParts.notesExpression} AS notes
       FROM billing_invoices bi
       ${invoiceQueryParts.customerJoin}
-      WHERE bi.invoice_no = ?
+      WHERE UPPER(TRIM(bi.invoice_no)) = UPPER(TRIM(?))
       LIMIT 1
     `,
     [params.invoiceNo],
