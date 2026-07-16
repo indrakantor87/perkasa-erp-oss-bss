@@ -3,7 +3,6 @@
 import type { ChangeEvent } from 'react'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import * as XLSX from 'xlsx'
 
 type ParsedOdpRow = {
   code: string
@@ -31,6 +30,16 @@ type ImportRowResult = {
 
 const MAX_IMPORT_ROWS = 500
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
+let xlsxModulePromise: Promise<typeof import('xlsx')> | null = null
+
+async function loadXlsxModule() {
+  if (!xlsxModulePromise) {
+    xlsxModulePromise = import('xlsx')
+  }
+
+  const module = await xlsxModulePromise
+  return (module as { default?: typeof import('xlsx') }).default ?? module
+}
 
 function normalizeHeader(value: unknown) {
   return String(value ?? '')
@@ -58,11 +67,12 @@ function toBoolean(value: unknown, fallback: boolean) {
   return fallback
 }
 
-function parseSheetFromBuffer(
+async function parseSheetFromBuffer(
   buffer: ArrayBuffer,
   sheetName: string,
   defaults: { totalPorts: string; generatePorts: boolean }
-): ParsedOdpRow[] {
+): Promise<ParsedOdpRow[]> {
+  const XLSX = await loadXlsxModule()
   const workbook = XLSX.read(buffer, { type: 'array' })
   const sheet = workbook.Sheets[sheetName]
   if (!sheet) return []
@@ -154,8 +164,8 @@ export function InventoryOdpImportExcelModal({
 
   if (!open) return null
 
-  function parseSheet(buffer: ArrayBuffer, sheetName: string) {
-    const parsed = parseSheetFromBuffer(buffer, sheetName, {
+  async function parseSheet(buffer: ArrayBuffer, sheetName: string) {
+    const parsed = await parseSheetFromBuffer(buffer, sheetName, {
       totalPorts: defaultTotalPorts,
       generatePorts: defaultGeneratePorts,
     })
@@ -200,6 +210,7 @@ export function InventoryOdpImportExcelModal({
     setParsing(true)
     try {
       const buffer = await readFileAsArrayBuffer(file)
+      const XLSX = await loadXlsxModule()
       const workbook = XLSX.read(buffer, { type: 'array' })
       const availableSheets = workbook.SheetNames.filter(Boolean)
       const selectedSheet = availableSheets[0] ?? ''
@@ -210,7 +221,7 @@ export function InventoryOdpImportExcelModal({
         setFeedback({ tone: 'warning', message: 'File berhasil dibaca, tetapi tidak ada sheet yang ditemukan.' })
         return
       }
-      parseSheet(buffer, selectedSheet)
+      await parseSheet(buffer, selectedSheet)
     } catch (error) {
       setFeedback({
         tone: 'error',
@@ -365,11 +376,7 @@ export function InventoryOdpImportExcelModal({
                     setFeedback(null)
                     if (!fileBuffer || !nextSheet) return
                     setParsing(true)
-                    try {
-                      parseSheet(fileBuffer, nextSheet)
-                    } finally {
-                      setParsing(false)
-                    }
+                  Promise.resolve(parseSheet(fileBuffer, nextSheet)).finally(() => setParsing(false))
                   }}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-slate-400"
                   disabled={!fileBuffer || parsing || importing}

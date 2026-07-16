@@ -581,7 +581,7 @@ export function InventoryNetworkOpsPanel({
         </div>
       ) : null}
 
-      <InventoryOdpImportExcelModal open={showImportModal} onClose={() => setShowImportModal(false)} />
+      {showImportModal ? <InventoryOdpImportExcelModal open onClose={() => setShowImportModal(false)} /> : null}
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]">
         <div className="overflow-x-auto">

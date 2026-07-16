@@ -5057,6 +5057,47 @@ export async function getDashboardSummary() {
   }
 }
 
+function getEmptyDailyActivityApprovalQueue() {
+  return {
+    totalPending: 0,
+    items: [],
+    pendingItems: [],
+    href: '/dashboard/daily-activity?approvalStatus=PENDING',
+  } satisfies DashboardDailyActivityApprovalQueue
+}
+
+export async function getDashboardWorklistBaseData(session: AppSession) {
+  const role = session.role
+  const source = getDataSourceSnapshot()
+
+  if (source.effectiveMode !== 'review-db') {
+    return {
+      source,
+      worklist: getMockWorklist(role),
+      dailyActivityApprovalQueue: getEmptyDailyActivityApprovalQueue(),
+    }
+  }
+
+  try {
+    const [worklist, dailyActivityApprovalQueue] = await Promise.all([
+      getReviewDbWorklist(session),
+      getReviewDbDailyActivityApprovalQueue(session),
+    ])
+
+    return {
+      source,
+      worklist: worklist.length ? worklist : getMockWorklist(role),
+      dailyActivityApprovalQueue,
+    }
+  } catch (error) {
+    return {
+      source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
+      worklist: getMockWorklist(role),
+      dailyActivityApprovalQueue: getEmptyDailyActivityApprovalQueue(),
+    }
+  }
+}
+
 export async function getDashboardPageData(session: AppSession, filters?: DashboardPageFilters) {
   const role = session.role
   const source = getDataSourceSnapshot()
@@ -5070,12 +5111,7 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
     } satisfies DashboardPageFilters)
 
   if (source.effectiveMode !== 'review-db') {
-    const mockDailyActivityApprovalQueue = {
-      totalPending: 0,
-      items: [],
-      pendingItems: [],
-      href: '/dashboard/daily-activity?approvalStatus=PENDING',
-    } satisfies DashboardDailyActivityApprovalQueue
+    const mockDailyActivityApprovalQueue = getEmptyDailyActivityApprovalQueue()
 
     return {
       source,
@@ -5120,12 +5156,7 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
       activities,
     }
   } catch (error) {
-    const fallbackDailyActivityApprovalQueue = {
-      totalPending: 0,
-      items: [],
-      pendingItems: [],
-      href: '/dashboard/daily-activity?approvalStatus=PENDING',
-    } satisfies DashboardDailyActivityApprovalQueue
+    const fallbackDailyActivityApprovalQueue = getEmptyDailyActivityApprovalQueue()
 
     return {
       source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),

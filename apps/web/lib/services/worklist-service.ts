@@ -1,7 +1,7 @@
 import type { AppSession } from '@/lib/auth-session'
 import { canAccessPath, canPerformAction, getDefaultLandingPath } from '@/lib/access-control'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
-import { getDashboardPageData } from '@/lib/services/dashboard-service'
+import { getDashboardWorklistBaseData } from '@/lib/services/dashboard-service'
 import { canAccessSupportLane, canUseSupportAction, normalizeSupportLane } from '@/lib/support-lanes'
 import type {
   AppRole,
@@ -707,12 +707,7 @@ export function buildWorklistHref(role: AppRole, params?: Partial<Pick<WorklistP
 }
 
 async function getWorklistBaseData(session: AppSession) {
-  const now = new Date()
-  const dashboardData = await getDashboardPageData(session, {
-    month: now.getMonth() + 1,
-    year: now.getFullYear(),
-    division: 'ALL',
-  })
+  const dashboardData = await getDashboardWorklistBaseData(session)
   const queueOptions = getWorklistQueues(session.role)
   const approvalItems = buildDailyActivityApprovalWorklistItems(session.role, dashboardData.dailyActivityApprovalQueue)
   const items = upgradeDashboardItems(session.role, [...dashboardData.worklist, ...approvalItems])
