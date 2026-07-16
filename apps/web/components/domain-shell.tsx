@@ -75,6 +75,7 @@ import type {
   DomainPageContent,
   DataSourceSnapshot,
   DomainReviewRow,
+  DomainReviewSection,
   SupportActionLink,
   SupportDrilldownContext,
   SupportFormPrefill,
@@ -2609,11 +2610,11 @@ export function DomainShell({
           },
         ]
       : []
-  const visibleSectionsBase =
+  const visibleSectionsBase: DomainReviewSection[] =
     content.key === 'inventory' && activeInventoryView !== 'overview'
       ? visibleReviewSections.filter((section) => matchesInventoryWorkspaceView(section.title, activeInventoryView))
       : visibleReviewSections
-  const inventoryRequestFallbackSection =
+  const inventoryRequestFallbackSection: DomainReviewSection | null =
     content.key === 'inventory' &&
     activeInventoryView === 'requests' &&
     !visibleSectionsBase.some((section) => section.title.toUpperCase().includes('REQUEST INVENTORY'))
@@ -2621,10 +2622,10 @@ export function DomainShell({
           title: 'Request Inventory Teknisi',
           description:
             'Request barang harian dari teknisi/internal inventory dengan alur mirip marketplace untuk diproses sampai selesai.',
-          rows: [],
+          rows: [] as DomainReviewRow[],
         }
       : null
-  const visibleSections = inventoryRequestFallbackSection
+  const visibleSections: DomainReviewSection[] = inventoryRequestFallbackSection
     ? [inventoryRequestFallbackSection, ...visibleSectionsBase]
     : visibleSectionsBase
   const supportForms: Array<{
