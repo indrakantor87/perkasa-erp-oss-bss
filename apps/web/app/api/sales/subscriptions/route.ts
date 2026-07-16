@@ -178,7 +178,7 @@ async function getSalesPackageQueryParts() {
   ])
 
   return {
-    statusFilter: hasStatus ? "status = 'ACTIVE' AND" : '',
+    statusFilter: hasStatus ? "status = 'ACTIVE'" : '',
     serviceTypeExpression: hasServiceType ? 'service_type' : 'NULL',
     speedLabelExpression: hasSpeedLabel ? 'speed_label' : 'NULL',
     priceExpression: hasPrice ? 'price' : '0',
@@ -621,8 +621,7 @@ export async function POST(request: Request) {
           ${salesPackageQueryParts.speedLabelExpression} AS speedLabel,
           ${salesPackageQueryParts.priceExpression} AS price
         FROM sales_packages
-        WHERE ${salesPackageQueryParts.statusFilter}
-          AND (
+        WHERE ${salesPackageQueryParts.statusFilter ? `${salesPackageQueryParts.statusFilter}\n          AND ` : ''}(
             UPPER(code) = UPPER(?)
             OR UPPER(name) = UPPER(?)
           )
