@@ -5095,11 +5095,13 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
   }
 
   try {
-    const summary = await getReviewDbDashboardSummary()
-    const activities = await getReviewDbActivities(role)
-    const worklist = await getReviewDbWorklist(session)
-    const operationalCards = await getReviewDbOperationalCards(session, resolvedFilters)
-    const dailyActivityApprovalQueue = await getReviewDbDailyActivityApprovalQueue(session)
+    const [summary, activities, worklist, operationalCards, dailyActivityApprovalQueue] = await Promise.all([
+      getReviewDbDashboardSummary(),
+      getReviewDbActivities(role),
+      getReviewDbWorklist(session),
+      getReviewDbOperationalCards(session, resolvedFilters),
+      getReviewDbDailyActivityApprovalQueue(session),
+    ])
     const dashboardAlerts = await getReviewDbDashboardAlerts({
       role,
       summary,

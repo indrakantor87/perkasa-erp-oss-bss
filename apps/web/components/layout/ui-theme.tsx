@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import {
   normalizeUiTheme,
@@ -23,7 +22,6 @@ export function ThemeProvider({
   children: React.ReactNode
   initialTheme: UiTheme
 }) {
-  const router = useRouter()
   const [theme, setTheme] = useState<UiTheme>(initialTheme)
 
   useEffect(() => {
@@ -38,17 +36,14 @@ export function ThemeProvider({
     if (normalized !== theme) {
       setTheme(normalized)
     }
-  }, [initialTheme, theme])
+  }, [initialTheme])
 
   useEffect(() => {
     window.localStorage.setItem(UI_THEME_STORAGE_KEY, theme)
     document.cookie = `${UI_THEME_COOKIE_KEY}=${theme}; path=/; max-age=31536000; samesite=lax`
     document.documentElement.dataset.theme = theme
     document.documentElement.style.colorScheme = theme
-    if (theme !== initialTheme) {
-      router.refresh()
-    }
-  }, [initialTheme, router, theme])
+  }, [theme])
 
   const value = useMemo(() => ({ theme, setTheme }), [theme])
 

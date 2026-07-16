@@ -1,17 +1,35 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { InventoryDeviceAssignmentForm } from '@/components/inventory-device-assignment-form'
 import { InventoryDeviceReturnForm } from '@/components/inventory-device-return-form'
 import { InventoryOdpCreateForm } from '@/components/inventory-odp-create-form'
 import { InventoryOdpPortAssignForm } from '@/components/inventory-odp-port-assign-form'
 import { InventoryOdpPortStatusForm } from '@/components/inventory-odp-port-status-form'
-import { InventoryOdpLeafletMap } from '@/components/inventory-odp-leaflet-map'
-import { InventoryOdpImportExcelModal } from '@/components/inventory-odp-import-excel-modal'
 import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Map, Pencil, Plus, Upload } from 'lucide-react'
 import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
+
+const InventoryOdpLeafletMap = dynamic(
+  () => import('@/components/inventory-odp-leaflet-map').then((module) => module.InventoryOdpLeafletMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[520px] w-full items-center justify-center bg-slate-950 text-sm font-medium text-slate-300">
+        Memuat peta ODP...
+      </div>
+    ),
+  },
+)
+
+const InventoryOdpImportExcelModal = dynamic(
+  () => import('@/components/inventory-odp-import-excel-modal').then((module) => module.InventoryOdpImportExcelModal),
+  {
+    ssr: false,
+  },
+)
 
 function findSection(sections: DomainReviewSection[], keyword: string) {
   return sections.find((section) => section.title.toUpperCase().includes(keyword.toUpperCase())) ?? null
