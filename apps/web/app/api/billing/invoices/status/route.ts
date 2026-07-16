@@ -2,6 +2,7 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { readFileSync } from 'node:fs'
 
 const allowedStatuses = new Set(['CANCELLED', 'SUSPENDED', 'OVERDUE'])
 
@@ -15,8 +16,53 @@ type BillingInvoiceRow = {
   notes: string | null
 }
 
+type BillingIsolationContextRow = {
+  invoiceId: number
+  invoiceNo: string
+  subscriptionId: number | null
+  orderId: number | null
+  serviceNo: string | null
+  customerCode: string | null
+  customerName: string | null
+  customerPhone: string | null
+  customerAddress: string | null
+}
+
+type OpenIsolationRow = {
+  id: number
+}
+
 function normalizeText(value: unknown) {
   return String(value ?? '').trim()
+}
+
+function normalizeOptionalText(value: unknown) {
+  const normalized = normalizeText(value)
+  return normalized || null
+}
+
+function reportDebugEvent(event: Record<string, unknown>) {
+  // #region debug-point A:billing-suspend-status
+  try {
+    const env = readFileSync('.dbg/billing-suspend-gap.env', 'utf8')
+    const debugUrl =
+      env.match(/^DEBUG_SERVER_URL=(.+)$/m)?.[1]?.trim() || 'http://127.0.0.1:7777/event'
+    const sessionId = env.match(/^DEBUG_SESSION_ID=(.+)$/m)?.[1]?.trim() || 'billing-suspend-gap'
+    fetch(debugUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        runId: 'pre-fix',
+        hypothesisId: 'A',
+        location: 'api/billing/invoices/status',
+        msg: '[DEBUG] billing suspend status route',
+        data: event,
+        ts: Date.now(),
+      }),
+    }).catch(() => {})
+  } catch {}
+  // #endregion
 }
 
 async function getBillingInvoiceStatusQueryParts() {
@@ -138,6 +184,357 @@ async function buildReconnectResolutionPayload(invoiceId: number, resolutionNote
     assignments,
     whereClauses,
     values,
+  }
+}
+
+async function loadBillingIsolationContext(invoiceNo: string) {
+  const [
+    hasInvoiceSubscriptionId,
+    hasSubscriptionId,
+    hasSubscriptionCustomerId,
+    hasSubscriptionOrderId,
+    hasSubscriptionServiceNo,
+    hasCustomerId,
+    hasCustomerCode,
+    hasCustomerFullName,
+    hasCustomerPhone,
+    hasAddressCustomerId,
+    hasAddressAddress,
+    hasAddressIsPrimary,
+  ] = await Promise.all([
+    hasReviewDbColumn('billing_invoices', 'subscription_id'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'customer_id'),
+    hasReviewDbColumn('service_subscriptions', 'order_id'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('crm_customers', 'customer_code'),
+    hasReviewDbColumn('crm_customers', 'full_name'),
+    hasReviewDbColumn('crm_customers', 'phone'),
+    hasReviewDbColumn('crm_customer_addresses', 'customer_id'),
+    hasReviewDbColumn('crm_customer_addresses', 'address'),
+    hasReviewDbColumn('crm_customer_addresses', 'is_primary'),
+  ])
+
+  if (!hasInvoiceSubscriptionId || !hasSubscriptionId) {
+    return null
+  }
+
+  const customerJoinClause =
+    hasSubscriptionCustomerId && hasCustomerId
+      ? `LEFT JOIN crm_customers c
+        ON c.id = ss.customer_id`
+      : `LEFT JOIN (
+        SELECT
+          NULL AS id,
+          NULL AS customer_code,
+          NULL AS full_name,
+          NULL AS phone
+      ) c
+        ON 1 = 0`
+
+  const addressJoinClause =
+    hasSubscriptionCustomerId && hasCustomerId && hasAddressCustomerId && hasAddressAddress && hasAddressIsPrimary
+      ? `LEFT JOIN crm_customer_addresses a
+        ON a.customer_id = c.id
+        AND a.is_primary = 1`
+      : `LEFT JOIN (
+        SELECT
+          NULL AS customer_id,
+          NULL AS address
+      ) a
+        ON 1 = 0`
+
+  const [row] = await runReviewDbQuery<BillingIsolationContextRow>(
+    `
+      SELECT
+        bi.id AS invoiceId,
+        bi.invoice_no AS invoiceNo,
+        bi.subscription_id AS subscriptionId,
+        ${hasSubscriptionOrderId ? 'ss.order_id' : 'NULL'} AS orderId,
+        ${hasSubscriptionServiceNo ? 'ss.service_no' : 'NULL'} AS serviceNo,
+        ${hasCustomerCode ? 'c.customer_code' : 'NULL'} AS customerCode,
+        ${hasCustomerFullName ? 'c.full_name' : 'NULL'} AS customerName,
+        ${hasCustomerPhone ? 'c.phone' : 'NULL'} AS customerPhone,
+        a.address AS customerAddress
+      FROM billing_invoices bi
+      LEFT JOIN service_subscriptions ss
+        ON ss.id = bi.subscription_id
+      ${customerJoinClause}
+      ${addressJoinClause}
+      WHERE bi.invoice_no = ?
+      LIMIT 1
+    `,
+    [invoiceNo],
+  )
+
+  return row ?? null
+}
+
+async function resolveMarketingNameFromSalesContext(orderId: number | null) {
+  if (!orderId) {
+    return null
+  }
+
+  try {
+    const [
+      hasSalesOrderId,
+      hasSalesOrderMarketingName,
+      hasSalesOrderLeadId,
+      hasSalesLeadId,
+      hasSalesLeadMarketingName,
+    ] = await Promise.all([
+      hasReviewDbColumn('sales_orders', 'id'),
+      hasReviewDbColumn('sales_orders', 'marketing_name'),
+      hasReviewDbColumn('sales_orders', 'lead_id'),
+      hasReviewDbColumn('sales_leads', 'id'),
+      hasReviewDbColumn('sales_leads', 'marketing_name'),
+    ])
+
+    if (
+      !hasSalesOrderId ||
+      (!hasSalesOrderMarketingName && !(hasSalesOrderLeadId && hasSalesLeadId && hasSalesLeadMarketingName))
+    ) {
+      return null
+    }
+
+    const marketingExpression =
+      hasSalesOrderMarketingName && hasSalesOrderLeadId && hasSalesLeadId && hasSalesLeadMarketingName
+        ? 'COALESCE(so.marketing_name, sl.marketing_name)'
+        : hasSalesOrderMarketingName
+          ? 'so.marketing_name'
+          : 'sl.marketing_name'
+
+    const leadJoinClause =
+      hasSalesOrderLeadId && hasSalesLeadId && hasSalesLeadMarketingName
+        ? `LEFT JOIN sales_leads sl
+          ON sl.id = so.lead_id`
+        : `LEFT JOIN (
+          SELECT
+            NULL AS id,
+            NULL AS marketing_name
+        ) sl
+          ON 1 = 0`
+
+    const [row] = await runReviewDbQuery<{ marketingName: string | null }>(
+      `
+        SELECT ${marketingExpression} AS marketingName
+        FROM sales_orders so
+        ${leadJoinClause}
+        WHERE so.id = ?
+        LIMIT 1
+      `,
+      [orderId],
+    )
+
+    return normalizeOptionalText(row?.marketingName)
+  } catch {
+    return null
+  }
+}
+
+async function findOpenIsolationIds(subscriptionId: number) {
+  const [hasSubscriptionId, hasStatus, hasRestorationDate] = await Promise.all([
+    hasReviewDbColumn('support_isolations', 'subscription_id'),
+    hasReviewDbColumn('support_isolations', 'status'),
+    hasReviewDbColumn('support_isolations', 'restoration_date'),
+  ])
+
+  if (!hasSubscriptionId || !hasStatus) {
+    return []
+  }
+
+  return runReviewDbQuery<OpenIsolationRow>(
+    `
+      SELECT id
+      FROM support_isolations
+      WHERE subscription_id = ?
+        AND COALESCE(UPPER(TRIM(status)), 'OPEN') <> 'CLOSED'
+        ${hasRestorationDate ? 'AND restoration_date IS NULL' : ''}
+      ORDER BY id DESC
+    `,
+    [subscriptionId],
+  )
+}
+
+async function syncIsolationForInvoiceStatus(params: {
+  invoiceNo: string
+  nextStatus: string
+  actorLabel: string
+  notes: string
+}) {
+  const context = await loadBillingIsolationContext(params.invoiceNo)
+  if (!context?.subscriptionId) {
+    reportDebugEvent({
+      stage: 'isolation-sync-skipped',
+      reason: 'missing-subscription-context',
+      invoiceNo: params.invoiceNo,
+      nextStatus: params.nextStatus,
+    })
+    return
+  }
+
+  const openIsolationIds = await findOpenIsolationIds(Number(context.subscriptionId))
+
+  if (params.nextStatus === 'SUSPENDED') {
+    if (openIsolationIds.length > 0) {
+      reportDebugEvent({
+        stage: 'isolation-sync-skip-existing-open',
+        invoiceNo: params.invoiceNo,
+        subscriptionId: context.subscriptionId,
+        openIsolationIds: openIsolationIds.map((row) => row.id),
+      })
+      return
+    }
+
+    const [
+      hasSubscriptionId,
+      hasCustomerName,
+      hasCustomerAddress,
+      hasCustomerPhone,
+      hasMarketingName,
+      hasRadboxName,
+      hasPackagePrice,
+      hasIsolationDate,
+      hasReason,
+      hasStatus,
+      hasIsArchived,
+    ] = await Promise.all([
+      hasReviewDbColumn('support_isolations', 'subscription_id'),
+      hasReviewDbColumn('support_isolations', 'customer_name'),
+      hasReviewDbColumn('support_isolations', 'customer_address'),
+      hasReviewDbColumn('support_isolations', 'customer_phone'),
+      hasReviewDbColumn('support_isolations', 'marketing_name'),
+      hasReviewDbColumn('support_isolations', 'radbox_name'),
+      hasReviewDbColumn('support_isolations', 'package_price'),
+      hasReviewDbColumn('support_isolations', 'isolation_date'),
+      hasReviewDbColumn('support_isolations', 'reason'),
+      hasReviewDbColumn('support_isolations', 'status'),
+      hasReviewDbColumn('support_isolations', 'is_archived'),
+    ])
+
+    if (!hasSubscriptionId || !hasReason || !hasStatus) {
+      reportDebugEvent({
+        stage: 'isolation-sync-skipped',
+        reason: 'support-isolations-schema-not-ready',
+        invoiceNo: params.invoiceNo,
+      })
+      return
+    }
+
+    const columns = ['subscription_id']
+    const values: unknown[] = [context.subscriptionId]
+    const placeholders = ['?']
+
+    if (hasCustomerName) {
+      columns.push('customer_name')
+      values.push(context.customerName || 'Customer belum terpetakan')
+      placeholders.push('?')
+    }
+    if (hasCustomerAddress) {
+      columns.push('customer_address')
+      values.push(context.customerAddress)
+      placeholders.push('?')
+    }
+    if (hasCustomerPhone) {
+      columns.push('customer_phone')
+      values.push(context.customerPhone)
+      placeholders.push('?')
+    }
+    if (hasMarketingName) {
+      columns.push('marketing_name')
+      values.push(await resolveMarketingNameFromSalesContext(context.orderId))
+      placeholders.push('?')
+    }
+    if (hasRadboxName) {
+      columns.push('radbox_name')
+      values.push(`AUTO-SUSPEND ${context.serviceNo || context.customerCode || params.invoiceNo}`)
+      placeholders.push('?')
+    }
+    if (hasPackagePrice) {
+      columns.push('package_price')
+      values.push(null)
+      placeholders.push('?')
+    }
+    if (hasIsolationDate) {
+      columns.push('isolation_date')
+      placeholders.push('CURRENT_TIMESTAMP')
+    }
+
+    columns.push('reason')
+    values.push(`[Sync Billing Suspend] ${params.actorLabel} - ${params.notes}`)
+    placeholders.push('?')
+
+    columns.push('status')
+    values.push('OPEN')
+    placeholders.push('?')
+
+    if (hasIsArchived) {
+      columns.push('is_archived')
+      values.push(0)
+      placeholders.push('?')
+    }
+
+    await runReviewDbExecute(
+      `
+        INSERT INTO support_isolations (
+          ${columns.join(', ')}
+        )
+        VALUES (${placeholders.join(', ')})
+      `,
+      values,
+    )
+
+    reportDebugEvent({
+      stage: 'isolation-created-from-billing',
+      invoiceNo: params.invoiceNo,
+      subscriptionId: context.subscriptionId,
+      serviceNo: context.serviceNo,
+    })
+    return
+  }
+
+  if (params.nextStatus === 'OVERDUE' && openIsolationIds.length > 0) {
+    const [hasRestorationDate, hasCloseNote, hasUpdatedAt] = await Promise.all([
+      hasReviewDbColumn('support_isolations', 'restoration_date'),
+      hasReviewDbColumn('support_isolations', 'close_note'),
+      hasReviewDbColumn('support_isolations', 'updated_at'),
+    ])
+
+    const assignments = [`status = 'CLOSED'`]
+    const values: unknown[] = []
+
+    if (hasRestorationDate) {
+      assignments.push('restoration_date = CURRENT_TIMESTAMP')
+    }
+    if (hasCloseNote) {
+      assignments.push('close_note = ?')
+      values.push(`[Auto Restored via Billing] ${params.actorLabel} - ${params.notes}`)
+    }
+    if (hasUpdatedAt) {
+      assignments.push('updated_at = CURRENT_TIMESTAMP')
+    }
+
+    values.push(context.subscriptionId)
+
+    await runReviewDbExecute(
+      `
+        UPDATE support_isolations
+        SET
+          ${assignments.join(',\n          ')}
+        WHERE subscription_id = ?
+          AND COALESCE(UPPER(TRIM(status)), 'OPEN') <> 'CLOSED'
+          ${hasRestorationDate ? 'AND restoration_date IS NULL' : ''}
+      `,
+      values,
+    )
+
+    reportDebugEvent({
+      stage: 'isolation-restored-from-billing',
+      invoiceNo: params.invoiceNo,
+      subscriptionId: context.subscriptionId,
+      restoredIsolationIds: openIsolationIds.map((row) => row.id),
+    })
   }
 }
 
@@ -274,6 +671,15 @@ export async function POST(request: Request) {
     const notes = normalizeText(payload.notes)
     const isBatchMode = invoiceNos.length > 0
 
+    reportDebugEvent({
+      stage: 'payload-received',
+      invoiceNo,
+      invoiceCount: invoiceNos.length,
+      nextStatus,
+      hasNotes: Boolean(notes),
+      username: session.username,
+    })
+
     if (!invoiceNo && !isBatchMode) {
       return Response.json({ message: 'Nomor invoice wajib diisi.' }, { status: 400 })
     }
@@ -303,8 +709,25 @@ export async function POST(request: Request) {
             notes,
             actorLabel,
           })
+          await syncIsolationForInvoiceStatus({
+            invoiceNo: invoice.invoiceNo,
+            nextStatus,
+            notes,
+            actorLabel,
+          })
           successes.push(invoice.invoiceNo)
+          reportDebugEvent({
+            stage: 'batch-update-success',
+            invoiceNo: invoice.invoiceNo,
+            nextStatus,
+          })
         } catch (error) {
+          reportDebugEvent({
+            stage: 'batch-update-failure',
+            invoiceNo: currentInvoiceNo,
+            nextStatus,
+            error: error instanceof Error ? error.message : String(error),
+          })
           failures.push({
             invoiceNo: currentInvoiceNo,
             message: error instanceof Error && error.message.trim() ? error.message.trim() : 'Batch status invoice gagal.',
@@ -327,11 +750,29 @@ export async function POST(request: Request) {
       notes,
       actorLabel,
     })
+    await syncIsolationForInvoiceStatus({
+      invoiceNo: invoice.invoiceNo,
+      nextStatus,
+      notes,
+      actorLabel,
+    })
+
+    reportDebugEvent({
+      stage: 'single-update-success',
+      invoiceNo: invoice.invoiceNo,
+      nextStatus,
+      customerName: invoice.customerName,
+      invoiceStatusBeforeUpdate: invoice.invoiceStatus,
+    })
 
     return Response.json({
       message: `Invoice ${invoice.invoiceNo} untuk ${invoice.customerName} berhasil diubah ke ${nextStatus}.`,
     })
   } catch (error) {
+    reportDebugEvent({
+      stage: 'route-error',
+      error: error instanceof Error ? error.message : String(error),
+    })
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
   }
 }
