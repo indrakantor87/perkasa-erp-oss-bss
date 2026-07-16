@@ -2,7 +2,6 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
-import { readFileSync } from 'node:fs'
 
 const allowedActionTypes = new Set([
   'REMINDER',
@@ -31,30 +30,6 @@ type AuthUserRow = {
 type ExecuteResult = {
   insertId?: number
   affectedRows?: number
-}
-
-function reportDebugEvent(event: Record<string, unknown>) {
-  // #region debug-point C:billing-collection-action
-  try {
-    const env = readFileSync('.dbg/billing-suspend-gap.env', 'utf8')
-    const debugUrl =
-      env.match(/^DEBUG_SERVER_URL=(.+)$/m)?.[1]?.trim() || 'http://127.0.0.1:7777/event'
-    const sessionId = env.match(/^DEBUG_SESSION_ID=(.+)$/m)?.[1]?.trim() || 'billing-suspend-gap'
-    fetch(debugUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId,
-        runId: 'pre-fix',
-        hypothesisId: 'C',
-        location: 'api/billing/collection-actions',
-        msg: '[DEBUG] billing collection action route',
-        data: event,
-        ts: Date.now(),
-      }),
-    }).catch(() => {})
-  } catch {}
-  // #endregion
 }
 
 type CreateCollectionActionParams = {
@@ -319,17 +294,6 @@ export async function POST(request: Request) {
     const notesRaw = String(payload.notes ?? '').trim()
     const isBatchMode = invoiceNos.length > 0
 
-    reportDebugEvent({
-      stage: 'payload-received',
-      invoiceNo,
-      invoiceCount: invoiceNos.length,
-      actionType,
-      actionStatus,
-      hasDueFollowUpAt: Boolean(dueFollowUpAtRaw),
-      hasNotes: Boolean(notesRaw),
-      username: session.username,
-    })
-
     if (!invoiceNo && !isBatchMode) {
       return Response.json({ message: 'Nomor invoice wajib diisi.' }, { status: 400 })
     }
@@ -362,20 +326,7 @@ export async function POST(request: Request) {
             sessionDisplayName: session.displayName,
           })
           successes.push(currentInvoiceNo)
-          reportDebugEvent({
-            stage: 'batch-create-success',
-            invoiceNo: currentInvoiceNo,
-            actionType,
-            actionStatus,
-          })
         } catch (error) {
-          reportDebugEvent({
-            stage: 'batch-create-failure',
-            invoiceNo: currentInvoiceNo,
-            actionType,
-            actionStatus,
-            error: error instanceof Error ? error.message : String(error),
-          })
           failures.push({
             invoiceNo: currentInvoiceNo,
             message: error instanceof Error && error.message.trim() ? error.message.trim() : 'Collection action batch gagal.',
@@ -402,21 +353,10 @@ export async function POST(request: Request) {
       sessionDisplayName: session.displayName,
     })
 
-    reportDebugEvent({
-      stage: 'single-create-success',
-      invoiceNo,
-      actionType,
-      actionStatus,
-    })
-
     return Response.json({
       message: `Collection action untuk invoice ${invoiceNo} berhasil disimpan.`,
     })
   } catch (error) {
-    reportDebugEvent({
-      stage: 'route-error',
-      error: error instanceof Error ? error.message : String(error),
-    })
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
   }
 }

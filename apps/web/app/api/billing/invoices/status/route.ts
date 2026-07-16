@@ -2,7 +2,6 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
-import { readFileSync } from 'node:fs'
 
 const allowedStatuses = new Set(['CANCELLED', 'SUSPENDED', 'OVERDUE'])
 
@@ -43,30 +42,6 @@ function normalizeOptionalText(value: unknown) {
 
 function getNormalizedInvoiceNoSqlExpression(expression: string) {
   return `REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(${expression})), CHAR(13), ''), CHAR(10), ''), CHAR(9), ''), ' ', '')`
-}
-
-function reportDebugEvent(event: Record<string, unknown>) {
-  // #region debug-point A:billing-suspend-status
-  try {
-    const env = readFileSync('.dbg/billing-suspend-gap.env', 'utf8')
-    const debugUrl =
-      env.match(/^DEBUG_SERVER_URL=(.+)$/m)?.[1]?.trim() || 'http://127.0.0.1:7777/event'
-    const sessionId = env.match(/^DEBUG_SESSION_ID=(.+)$/m)?.[1]?.trim() || 'billing-suspend-gap'
-    fetch(debugUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId,
-        runId: 'pre-fix',
-        hypothesisId: 'A',
-        location: 'api/billing/invoices/status',
-        msg: '[DEBUG] billing suspend status route',
-        data: event,
-        ts: Date.now(),
-      }),
-    }).catch(() => {})
-  } catch {}
-  // #endregion
 }
 
 async function getBillingInvoiceStatusQueryParts() {
@@ -369,12 +344,6 @@ async function syncIsolationForInvoiceStatus(params: {
 }) {
   const context = await loadBillingIsolationContext(params.invoiceNo)
   if (!context?.subscriptionId) {
-    reportDebugEvent({
-      stage: 'isolation-sync-skipped',
-      reason: 'missing-subscription-context',
-      invoiceNo: params.invoiceNo,
-      nextStatus: params.nextStatus,
-    })
     return
   }
 
@@ -382,12 +351,6 @@ async function syncIsolationForInvoiceStatus(params: {
 
   if (params.nextStatus === 'SUSPENDED') {
     if (openIsolationIds.length > 0) {
-      reportDebugEvent({
-        stage: 'isolation-sync-skip-existing-open',
-        invoiceNo: params.invoiceNo,
-        subscriptionId: context.subscriptionId,
-        openIsolationIds: openIsolationIds.map((row) => row.id),
-      })
       return
     }
 
@@ -418,11 +381,6 @@ async function syncIsolationForInvoiceStatus(params: {
     ])
 
     if (!hasSubscriptionId || !hasReason || !hasStatus) {
-      reportDebugEvent({
-        stage: 'isolation-sync-skipped',
-        reason: 'support-isolations-schema-not-ready',
-        invoiceNo: params.invoiceNo,
-      })
       return
     }
 
@@ -488,13 +446,6 @@ async function syncIsolationForInvoiceStatus(params: {
       `,
       values,
     )
-
-    reportDebugEvent({
-      stage: 'isolation-created-from-billing',
-      invoiceNo: params.invoiceNo,
-      subscriptionId: context.subscriptionId,
-      serviceNo: context.serviceNo,
-    })
     return
   }
 
@@ -532,13 +483,6 @@ async function syncIsolationForInvoiceStatus(params: {
       `,
       values,
     )
-
-    reportDebugEvent({
-      stage: 'isolation-restored-from-billing',
-      invoiceNo: params.invoiceNo,
-      subscriptionId: context.subscriptionId,
-      restoredIsolationIds: openIsolationIds.map((row) => row.id),
-    })
   }
 }
 
@@ -675,15 +619,6 @@ export async function POST(request: Request) {
     const notes = normalizeText(payload.notes)
     const isBatchMode = invoiceNos.length > 0
 
-    reportDebugEvent({
-      stage: 'payload-received',
-      invoiceNo,
-      invoiceCount: invoiceNos.length,
-      nextStatus,
-      hasNotes: Boolean(notes),
-      username: session.username,
-    })
-
     if (!invoiceNo && !isBatchMode) {
       return Response.json({ message: 'Nomor invoice wajib diisi.' }, { status: 400 })
     }
@@ -720,18 +655,7 @@ export async function POST(request: Request) {
             actorLabel,
           })
           successes.push(invoice.invoiceNo)
-          reportDebugEvent({
-            stage: 'batch-update-success',
-            invoiceNo: invoice.invoiceNo,
-            nextStatus,
-          })
         } catch (error) {
-          reportDebugEvent({
-            stage: 'batch-update-failure',
-            invoiceNo: currentInvoiceNo,
-            nextStatus,
-            error: error instanceof Error ? error.message : String(error),
-          })
           failures.push({
             invoiceNo: currentInvoiceNo,
             message: error instanceof Error && error.message.trim() ? error.message.trim() : 'Batch status invoice gagal.',
@@ -761,22 +685,10 @@ export async function POST(request: Request) {
       actorLabel,
     })
 
-    reportDebugEvent({
-      stage: 'single-update-success',
-      invoiceNo: invoice.invoiceNo,
-      nextStatus,
-      customerName: invoice.customerName,
-      invoiceStatusBeforeUpdate: invoice.invoiceStatus,
-    })
-
     return Response.json({
       message: `Invoice ${invoice.invoiceNo} untuk ${invoice.customerName} berhasil diubah ke ${nextStatus}.`,
     })
   } catch (error) {
-    reportDebugEvent({
-      stage: 'route-error',
-      error: error instanceof Error ? error.message : String(error),
-    })
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
   }
 }
