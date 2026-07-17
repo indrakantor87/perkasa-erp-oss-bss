@@ -217,7 +217,7 @@ export function OperationalDivisionBoard({
                               className="rounded-2xl border border-line bg-slate-50 p-4"
                             >
                               {metric.href ? (
-                                <Link href={appendDrilldownPeriod(metric.href, month, year) ?? metric.href} className="block transition hover:opacity-80">
+                                <Link prefetch={false} href={appendDrilldownPeriod(metric.href, month, year) ?? metric.href} className="block transition hover:opacity-80">
                                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                     {metric.label}
                                   </p>
@@ -272,6 +272,7 @@ export function OperationalDivisionBoard({
                         <div className="mt-5 flex justify-end">
                           <Link
                             href={card.href}
+                            prefetch={false}
                             className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
                           >
                             Lihat detail

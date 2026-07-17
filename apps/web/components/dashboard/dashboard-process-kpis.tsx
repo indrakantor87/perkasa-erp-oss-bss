@@ -106,6 +106,7 @@ export function DashboardProcessKpis({ cards, month, year }: { cards: DashboardO
               </div>
               <Link
                 href={card.href}
+                prefetch={false}
                 className="shrink-0 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white"
               >
                 Buka Modul
@@ -119,6 +120,7 @@ export function DashboardProcessKpis({ cards, month, year }: { cards: DashboardO
                   <Link
                     key={`${card.key}-${metric.label}`}
                     href={href}
+                    prefetch={false}
                     className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:border-slate-300 hover:bg-slate-50"
                   >
                     <div className="min-w-0">

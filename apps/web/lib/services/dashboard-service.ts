@@ -16,6 +16,7 @@ import {
 } from '@/lib/mock-dashboard'
 import type { AppSession } from '@/lib/auth-session'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { readThroughServerTtlCache } from '@/lib/server-ttl-cache'
 import { buildSupportLaneActionHref, buildSupportLaneHref } from '@/lib/support-action-links'
 import { getRecentAuthPermissionAudits } from '@/lib/services/auth-permission-audit-service'
 import { getRecentAuthRolePermissionAudits } from '@/lib/services/auth-role-permission-audit-service'
@@ -80,6 +81,18 @@ type DashboardNocOperationalRow = {
   monthlyOpenedTickets: number
   escalationPending: number
   readyClose: number
+}
+
+const DASHBOARD_PAGE_CACHE_TTL_MS = 15_000
+const DASHBOARD_WORKLIST_BASE_CACHE_TTL_MS = 10_000
+
+function buildDashboardSessionCacheScope(session: AppSession) {
+  return JSON.stringify({
+    username: session.username,
+    role: session.role,
+    branchId: session.branchId,
+    branchIds: session.branchIds,
+  })
 }
 
 type DashboardDigitalOperationalRow = {
@@ -5078,24 +5091,30 @@ export async function getDashboardWorklistBaseData(session: AppSession) {
     }
   }
 
-  try {
-    const [worklist, dailyActivityApprovalQueue] = await Promise.all([
-      getReviewDbWorklist(session),
-      getReviewDbDailyActivityApprovalQueue(session),
-    ])
+  return readThroughServerTtlCache(
+    `dashboard-worklist-base:${buildDashboardSessionCacheScope(session)}`,
+    DASHBOARD_WORKLIST_BASE_CACHE_TTL_MS,
+    async () => {
+      try {
+        const [worklist, dailyActivityApprovalQueue] = await Promise.all([
+          getReviewDbWorklist(session),
+          getReviewDbDailyActivityApprovalQueue(session),
+        ])
 
-    return {
-      source,
-      worklist: worklist.length ? worklist : getMockWorklist(role),
-      dailyActivityApprovalQueue,
-    }
-  } catch (error) {
-    return {
-      source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
-      worklist: getMockWorklist(role),
-      dailyActivityApprovalQueue: getEmptyDailyActivityApprovalQueue(),
-    }
-  }
+        return {
+          source,
+          worklist: worklist.length ? worklist : getMockWorklist(role),
+          dailyActivityApprovalQueue,
+        }
+      } catch (error) {
+        return {
+          source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
+          worklist: getMockWorklist(role),
+          dailyActivityApprovalQueue: getEmptyDailyActivityApprovalQueue(),
+        }
+      }
+    },
+  )
 }
 
 export async function getDashboardPageData(session: AppSession, filters?: DashboardPageFilters) {
@@ -5130,48 +5149,58 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
     }
   }
 
-  try {
-    const [summary, activities, worklist, operationalCards, dailyActivityApprovalQueue] = await Promise.all([
-      getReviewDbDashboardSummary(),
-      getReviewDbActivities(role),
-      getReviewDbWorklist(session),
-      getReviewDbOperationalCards(session, resolvedFilters),
-      getReviewDbDailyActivityApprovalQueue(session),
-    ])
-    const dashboardAlerts = await getReviewDbDashboardAlerts({
-      role,
-      summary,
-      approvalPending: dailyActivityApprovalQueue.totalPending,
-    })
+  return readThroughServerTtlCache(
+    `dashboard-page:${buildDashboardSessionCacheScope(session)}:${JSON.stringify(resolvedFilters)}`,
+    DASHBOARD_PAGE_CACHE_TTL_MS,
+    async () => {
+      try {
+        const [summary, activities, worklist, operationalCards, dailyActivityApprovalQueue] = await Promise.all([
+          getReviewDbDashboardSummary(),
+          getReviewDbActivities(role),
+          getReviewDbWorklist(session),
+          getReviewDbOperationalCards(session, resolvedFilters),
+          getReviewDbDailyActivityApprovalQueue(session),
+        ])
+        const dashboardAlerts = await getReviewDbDashboardAlerts({
+          role,
+          summary,
+          approvalPending: dailyActivityApprovalQueue.totalPending,
+        })
 
-    return {
-      source,
-      summary,
-      metrics: buildMetrics(summary),
-      roleQueues: buildRoleQueues(role, summary),
-      worklist: worklist.length ? worklist : getMockWorklist(role),
-      operationalCards,
-      dashboardAlerts,
-      dailyActivityApprovalQueue,
-      activities,
-    }
-  } catch (error) {
-    const fallbackDailyActivityApprovalQueue = getEmptyDailyActivityApprovalQueue()
+        return {
+          source,
+          summary,
+          metrics: buildMetrics(summary),
+          roleQueues: buildRoleQueues(role, summary),
+          worklist: worklist.length ? worklist : getMockWorklist(role),
+          operationalCards,
+          dashboardAlerts,
+          dailyActivityApprovalQueue,
+          activities,
+        }
+      } catch (error) {
+        const fallbackDailyActivityApprovalQueue = getEmptyDailyActivityApprovalQueue()
 
-    return {
-      source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
-      summary: dashboardSummary,
-      metrics: dashboardMetrics,
-      roleQueues: buildRoleQueues(role, dashboardSummary),
-      worklist: getMockWorklist(role),
-      operationalCards: sanitizeDashboardOperationalCards(role, buildMockOperationalCards(dashboardSummary, resolvedFilters), resolvedFilters),
-      dashboardAlerts: buildMockDashboardAlerts({
-        summary: dashboardSummary,
-        approvalPending: fallbackDailyActivityApprovalQueue.totalPending,
-        role,
-      }),
-      dailyActivityApprovalQueue: fallbackDailyActivityApprovalQueue,
-      activities: dashboardActivities,
-    }
-  }
+        return {
+          source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
+          summary: dashboardSummary,
+          metrics: dashboardMetrics,
+          roleQueues: buildRoleQueues(role, dashboardSummary),
+          worklist: getMockWorklist(role),
+          operationalCards: sanitizeDashboardOperationalCards(
+            role,
+            buildMockOperationalCards(dashboardSummary, resolvedFilters),
+            resolvedFilters,
+          ),
+          dashboardAlerts: buildMockDashboardAlerts({
+            summary: dashboardSummary,
+            approvalPending: fallbackDailyActivityApprovalQueue.totalPending,
+            role,
+          }),
+          dailyActivityApprovalQueue: fallbackDailyActivityApprovalQueue,
+          activities: dashboardActivities,
+        }
+      }
+    },
+  )
 }

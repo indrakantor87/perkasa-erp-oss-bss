@@ -101,6 +101,7 @@ export function DashboardCommandCenter({
               <Link
                 key={`${item.href}-${item.label}`}
                 href={item.href}
+                prefetch={false}
                 className={
                   item.tone === 'primary'
                     ? 'rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] transition opacity-100 hover:opacity-90'

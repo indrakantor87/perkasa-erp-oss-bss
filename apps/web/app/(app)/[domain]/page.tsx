@@ -1,12 +1,19 @@
+import dynamic from 'next/dynamic'
 import { notFound, redirect } from 'next/navigation'
 import { canAccessPath } from '@/lib/access-control-server'
-import { BillingDomainWorkspace } from '@/components/billing-domain-workspace'
 import { DomainShell } from '@/components/domain-shell'
-import { SalesDomainWorkspace } from '@/components/sales-domain-workspace'
 import { requireSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
 import { normalizeSupportLane } from '@/lib/support-lanes'
 import type { DomainFormPrefill, DomainKey, SupportDrilldownContext, SupportLaneKey } from '@/lib/types'
+
+const SalesDomainWorkspace = dynamic(
+  () => import('@/components/sales-domain-workspace').then((mod) => mod.SalesDomainWorkspace),
+)
+
+const BillingDomainWorkspace = dynamic(
+  () => import('@/components/billing-domain-workspace').then((mod) => mod.BillingDomainWorkspace),
+)
 
 const enabledDomains: DomainKey[] = ['sales', 'customers', 'support', 'inventory', 'hr', 'billing']
 

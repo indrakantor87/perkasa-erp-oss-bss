@@ -2,6 +2,7 @@ import { canPerformAction } from '@/lib/access-control'
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { domainPages } from '@/lib/mock-domains'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
+import { readThroughServerTtlCache } from '@/lib/server-ttl-cache'
 import { getServerUiLanguage } from '@/lib/ui-language-server'
 import { getHrAttendanceFaceConfig } from '@/lib/services/hr-attendance-face-service'
 import { getRecentHrEmployeeFaceReferenceItems } from '@/lib/services/hr-attendance-face-service'
@@ -59,6 +60,17 @@ const capabilityOrder: AccessAction[] = ['view', 'create', 'update', 'approve', 
 type BranchScope = {
   mode: 'GLOBAL' | 'BRANCH_SET' | 'BRANCH_ONLY'
   branchIds: number[]
+}
+
+const DOMAIN_PAGE_CACHE_TTL_MS = 15_000
+
+function buildDomainSessionCacheScope(session: AppSession) {
+  return JSON.stringify({
+    username: session.username,
+    role: session.role,
+    branchId: session.branchId,
+    branchIds: session.branchIds,
+  })
 }
 
 function resolveBranchScope(session: AppSession): BranchScope {
@@ -6239,94 +6251,121 @@ export async function getDomainPageData(
     }
   }
 
-  try {
-    const stats = await getReviewDbDomainStats()
-    const salesSections =
-      domain === 'sales'
-        ? filterReviewSectionsForDomain(domain, await getReviewDbSalesSections(session, {
-            focus: options?.focus,
-            month: options?.month,
-            year: options?.year,
-          }), {
-            focus: options?.focus,
-            month: options?.month,
-            year: options?.year,
-          })
-        : []
-    const supportSections =
-      domain === 'support'
-        ? await getReviewDbSupportSections(session, {
-            lane: selectedSupportLane,
-            focus: options?.focus,
-          })
-        : []
-    const customerSections = domain === 'customers' ? await getReviewDbCustomerSections() : []
-    const billingSections =
-      domain === 'billing'
-        ? filterReviewSectionsForDomain(domain, await getReviewDbBillingSections(session, {
-            focus: options?.focus,
-            month: options?.month,
-            year: options?.year,
-          }), {
-            focus: options?.focus,
-            month: options?.month,
-            year: options?.year,
-          })
-        : []
-    const inventorySections =
-      domain === 'inventory'
-        ? filterReviewSectionsForDomain(domain, await getReviewDbInventorySections({
-            focus: options?.focus,
-            month: options?.month,
-            year: options?.year,
-          }), {
-            focus: options?.focus,
-            month: options?.month,
-            year: options?.year,
-          })
-        : []
-    const hrSections =
-      domain === 'hr'
-        ? filterReviewSectionsForDomain(domain, await getReviewDbHrSections({
-            focus: options?.focus,
-            month: options?.month,
-            year: options?.year,
-          }), {
-            focus: options?.focus,
-            month: options?.month,
-            year: options?.year,
-          })
-        : []
+  return readThroughServerTtlCache(
+    `domain-page:${domain}:${buildDomainSessionCacheScope(session)}:${JSON.stringify({
+      supportLane: selectedSupportLane,
+      focus: options?.focus ?? null,
+      month: options?.month ?? null,
+      year: options?.year ?? null,
+    })}`,
+    DOMAIN_PAGE_CACHE_TTL_MS,
+    async () => {
+      try {
+        const stats = await getReviewDbDomainStats()
+        const salesSections =
+          domain === 'sales'
+            ? filterReviewSectionsForDomain(
+                domain,
+                await getReviewDbSalesSections(session, {
+                  focus: options?.focus,
+                  month: options?.month,
+                  year: options?.year,
+                }),
+                {
+                  focus: options?.focus,
+                  month: options?.month,
+                  year: options?.year,
+                },
+              )
+            : []
+        const supportSections =
+          domain === 'support'
+            ? await getReviewDbSupportSections(session, {
+                lane: selectedSupportLane,
+                focus: options?.focus,
+              })
+            : []
+        const customerSections = domain === 'customers' ? await getReviewDbCustomerSections() : []
+        const billingSections =
+          domain === 'billing'
+            ? filterReviewSectionsForDomain(
+                domain,
+                await getReviewDbBillingSections(session, {
+                  focus: options?.focus,
+                  month: options?.month,
+                  year: options?.year,
+                }),
+                {
+                  focus: options?.focus,
+                  month: options?.month,
+                  year: options?.year,
+                },
+              )
+            : []
+        const inventorySections =
+          domain === 'inventory'
+            ? filterReviewSectionsForDomain(
+                domain,
+                await getReviewDbInventorySections({
+                  focus: options?.focus,
+                  month: options?.month,
+                  year: options?.year,
+                }),
+                {
+                  focus: options?.focus,
+                  month: options?.month,
+                  year: options?.year,
+                },
+              )
+            : []
+        const hrSections =
+          domain === 'hr'
+            ? filterReviewSectionsForDomain(
+                domain,
+                await getReviewDbHrSections({
+                  focus: options?.focus,
+                  month: options?.month,
+                  year: options?.year,
+                }),
+                {
+                  focus: options?.focus,
+                  month: options?.month,
+                  year: options?.year,
+                },
+              )
+            : []
 
-    const nextContent = applyReviewDbHrSections(
-      applyReviewDbInventorySections(
-        applyReviewDbSalesSections(
-          applyReviewDbBillingSections(
-            applyReviewDbCustomerSections(
-              applyReviewDbSupportSections(applyReviewDbSummaries(content, stats), supportSections),
-              customerSections,
+        const nextContent = applyReviewDbHrSections(
+          applyReviewDbInventorySections(
+            applyReviewDbSalesSections(
+              applyReviewDbBillingSections(
+                applyReviewDbCustomerSections(
+                  applyReviewDbSupportSections(applyReviewDbSummaries(content, stats), supportSections),
+                  customerSections,
+                ),
+                billingSections,
+              ),
+              salesSections,
             ),
-            billingSections,
+            inventorySections,
           ),
-          salesSections,
-        ),
-        inventorySections,
-      ),
-      hrSections,
-    )
+          hrSections,
+        )
 
-    return {
-      source,
-      content: nextContent,
-      capabilities: buildCapabilities(session.role, domain),
-      supportFocus: await buildSupportFocus(nextContent, session.role, selectedSupportLane),
-    }
-  } catch (error) {
-    return {
-      source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
-      content,
-      capabilities: buildCapabilities(session.role, domain),
-      supportFocus: await buildSupportFocus(content, session.role, selectedSupportLane),
-    }
-  }
+        return {
+          source,
+          content: nextContent,
+          capabilities: buildCapabilities(session.role, domain),
+          supportFocus: await buildSupportFocus(nextContent, session.role, selectedSupportLane),
+        }
+      } catch (error) {
+        return {
+          source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
+          content,
+          capabilities: buildCapabilities(session.role, domain),
+          supportFocus: await buildSupportFocus(content, session.role, selectedSupportLane),
+        }
+      }
+    },
+  )
 }

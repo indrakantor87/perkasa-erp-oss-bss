@@ -28,6 +28,7 @@ export function WorklistBoard({ items, viewAllHref }: { items: DashboardWorkItem
           <span className="solid-chip">{items.length} item</span>
           <Link
             href={viewAllHref}
+            prefetch={false}
             className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
           >
             Buka list kerja
@@ -40,6 +41,7 @@ export function WorklistBoard({ items, viewAllHref }: { items: DashboardWorkItem
           <Link
             key={item.id}
             href={item.href}
+            prefetch={false}
             className="surface-soft block rounded-2xl border p-5 transition hover:[border-color:var(--color-line-strong)] hover:bg-surface hover:shadow-lg"
           >
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

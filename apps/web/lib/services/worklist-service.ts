@@ -1,5 +1,6 @@
 import type { AppSession } from '@/lib/auth-session'
 import { canAccessPath, canPerformAction, getDefaultLandingPath } from '@/lib/access-control'
+import { readThroughServerTtlCache } from '@/lib/server-ttl-cache'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
 import { getDashboardWorklistBaseData } from '@/lib/services/dashboard-service'
 import { canAccessSupportLane, canUseSupportAction, normalizeSupportLane } from '@/lib/support-lanes'
@@ -70,6 +71,17 @@ export type WorklistBucketData = {
   items: WorklistItem[]
   summary: WorklistSummary
   totalCount: number
+}
+
+const WORKLIST_BASE_CACHE_TTL_MS = 10_000
+
+function buildWorklistSessionCacheScope(session: AppSession) {
+  return JSON.stringify({
+    username: session.username,
+    role: session.role,
+    branchId: session.branchId,
+    branchIds: session.branchIds,
+  })
 }
 
 function isHighPriority(status: string, priority: WorklistItem['priority']) {
@@ -707,16 +719,22 @@ export function buildWorklistHref(role: AppRole, params?: Partial<Pick<WorklistP
 }
 
 async function getWorklistBaseData(session: AppSession) {
-  const dashboardData = await getDashboardWorklistBaseData(session)
-  const queueOptions = getWorklistQueues(session.role)
-  const approvalItems = buildDailyActivityApprovalWorklistItems(session.role, dashboardData.dailyActivityApprovalQueue)
-  const items = upgradeDashboardItems(session.role, [...dashboardData.worklist, ...approvalItems])
+  return readThroughServerTtlCache(
+    `worklist-base:${buildWorklistSessionCacheScope(session)}`,
+    WORKLIST_BASE_CACHE_TTL_MS,
+    async () => {
+      const dashboardData = await getDashboardWorklistBaseData(session)
+      const queueOptions = getWorklistQueues(session.role)
+      const approvalItems = buildDailyActivityApprovalWorklistItems(session.role, dashboardData.dailyActivityApprovalQueue)
+      const items = upgradeDashboardItems(session.role, [...dashboardData.worklist, ...approvalItems])
 
-  return {
-    source: dashboardData.source,
-    queueOptions,
-    items,
-  }
+      return {
+        source: dashboardData.source,
+        queueOptions,
+        items,
+      }
+    },
+  )
 }
 
 export async function getWorklistPageData(session: AppSession, filters: WorklistPageFilters) {

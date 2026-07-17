@@ -45,6 +45,7 @@ export function DashboardNextActions({
               </div>
               <Link
                 href={item.href}
+                prefetch={false}
                 className="shrink-0 rounded-full bg-panel px-4 py-2 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
               >
                 {item.actionLabel}

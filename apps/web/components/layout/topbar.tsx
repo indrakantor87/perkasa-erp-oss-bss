@@ -140,6 +140,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
           {canReviewImport ? (
             <Link
               href="/import"
+              prefetch={false}
               className="surface-soft rounded-full border px-4 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)]"
             >
               {importLabel}

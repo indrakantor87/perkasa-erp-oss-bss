@@ -8,6 +8,7 @@ export function ModuleGrid({ items }: { items: ModuleCard[] }) {
         <Link
           key={item.href}
           href={item.href}
+          prefetch={false}
           className="group surface-elevated block overflow-hidden rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:[border-color:var(--color-line-strong)] hover:shadow-lg"
         >
           <div className="flex items-start justify-between gap-3">

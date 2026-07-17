@@ -81,6 +81,7 @@ export function CrossDomainAlerts({ items }: { items: DashboardAlertItem[] }) {
               </div>
               <Link
                 href={item.href}
+                prefetch={false}
                 className="shrink-0 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
                 {item.actionLabel}

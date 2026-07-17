@@ -23,6 +23,7 @@ export function RoleQueueGrid({ items }: { items: DashboardQueueItem[] }) {
           <Link
             key={`${item.href}-${item.title}`}
             href={item.href}
+            prefetch={false}
             className="group surface-elevated overflow-hidden rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:[border-color:var(--color-line-strong)] hover:shadow-lg"
           >
             <div className="flex items-start justify-between gap-3">

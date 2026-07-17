@@ -829,6 +829,7 @@ function SidebarBrand({
   return (
     <Link
       href="/dashboard"
+      prefetch={false}
       className={collapsed ? 'flex flex-col items-center gap-2.5' : 'space-y-2'}
       onClick={onNavigate}
     >
@@ -939,6 +940,7 @@ function SidebarSection({
           <div key={item.key} className="space-y-1.5">
             <Link
               href={item.href}
+              prefetch={false}
               onClick={handleItemClick}
               title={itemTitle}
               className={`relative block overflow-hidden rounded-2xl border transition ${
@@ -991,6 +993,7 @@ function SidebarSection({
                     <Link
                       key={child.key}
                       href={child.href}
+                      prefetch={false}
                       onClick={onNavigate}
                       title={childTitle}
                       className={`block rounded-xl border px-3 py-1.5 text-sm transition ${
@@ -1281,6 +1284,7 @@ export function Sidebar({
               <Link
                 key={item.key}
                 href={item.href}
+                prefetch={false}
                 className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
                     active ? 'bg-panel text-surface' : 'text-mute'
                 }`}
