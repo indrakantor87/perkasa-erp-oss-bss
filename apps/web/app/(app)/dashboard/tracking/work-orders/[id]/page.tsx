@@ -5,6 +5,81 @@ import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { getWorkOrderTrackingDetail } from '@/lib/services/tracking-service'
 
+type TimelineEntry = {
+  id: string
+  at: string | null
+  type: 'work-order' | 'assignment' | 'status' | 'movement'
+  title: string
+  detail: string
+  href?: string
+}
+
+function buildTimelineEntries(payload: Awaited<ReturnType<typeof getWorkOrderTrackingDetail>>) {
+  const entries: TimelineEntry[] = []
+
+  if (payload.workOrder) {
+    entries.push({
+      id: `wo-${payload.workOrder.id}`,
+      at: payload.workOrder.createdAt,
+      type: 'work-order',
+      title: 'Work order dibuat',
+      detail: `${payload.workOrder.workOrderNo ?? `WO #${payload.workOrder.id}`} • ${payload.workOrder.jobCategory ?? payload.workOrder.workType ?? 'WO'}`,
+    })
+  }
+
+  for (const row of payload.assignments) {
+    entries.push({
+      id: `assignment-${row.id}`,
+      at: row.assignedAt,
+      type: 'assignment',
+      title: `Assignment ${row.assignmentStatus ?? 'ASSIGNED'}`,
+      detail: `${row.assignedFullName ?? row.assignedUsername ?? `User #${row.assignedUserId}`} • ${row.assignmentRole ?? 'TECHNICIAN'}${row.isPrimary ? ' • PIC utama' : ''}`,
+    })
+  }
+
+  for (const row of payload.statusLogs) {
+    entries.push({
+      id: `status-${row.id}`,
+      at: row.changedAt,
+      type: 'status',
+      title: `${row.fromStatus ?? 'DRAFT'} -> ${row.toStatus ?? '-'}`,
+      detail: row.reasonNotes ?? row.reasonCode ?? 'Perubahan status',
+    })
+  }
+
+  for (const row of payload.movements) {
+    entries.push({
+      id: `movement-${row.id}`,
+      at: row.movementAt,
+      type: 'movement',
+      title: `${row.movementType ?? 'MOVEMENT'} ${row.itemCode ?? `Item #${row.itemId}`}`,
+      detail: `${row.qty ?? '-'} unit${row.referenceType ? ` • ${row.referenceType}` : ''}${row.toLocationCode ? ` • ${row.toLocationCode}` : ''}`,
+      href: `/dashboard/tracking/stock-movements/${row.id}`,
+    })
+  }
+
+  return entries.sort((left, right) => {
+    const leftTime = left.at ? new Date(left.at).getTime() : 0
+    const rightTime = right.at ? new Date(right.at).getTime() : 0
+    return rightTime - leftTime
+  })
+}
+
+function getTimelineTone(type: TimelineEntry['type']) {
+  switch (type) {
+    case 'work-order':
+      return 'bg-slate-900 text-white'
+    case 'assignment':
+      return 'bg-sky-600 text-white'
+    case 'status':
+      return 'bg-amber-500 text-slate-950'
+    case 'movement':
+      return 'bg-emerald-600 text-white'
+    default:
+      return 'bg-slate-200 text-slate-900'
+  }
+}
+
 export default async function WorkOrderTrackingDetailPage({
   params,
 }: {
@@ -23,6 +98,7 @@ export default async function WorkOrderTrackingDetailPage({
 
   const payload = await getWorkOrderTrackingDetail(workOrderId)
   const wo = payload.workOrder
+  const timelineEntries = buildTimelineEntries(payload)
 
   return (
     <div className="space-y-6">
@@ -109,9 +185,71 @@ export default async function WorkOrderTrackingDetailPage({
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{wo.notes}</p>
                 </div>
               ) : null}
+
+              <div className="mt-5 rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Jejak Cepat</p>
+                <div className="mt-3 grid gap-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-mute">Status Log</span>
+                    <span className="font-semibold text-[var(--color-ink-strong)]">{payload.statusLogs.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-mute">Assignment</span>
+                    <span className="font-semibold text-[var(--color-ink-strong)]">{payload.assignments.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-mute">Movement</span>
+                    <span className="font-semibold text-[var(--color-ink-strong)]">{payload.movements.length}</span>
+                  </div>
+                </div>
+              </div>
             </section>
 
             <section className="space-y-6">
+              <div className="rounded-3xl border border-line bg-surface p-5">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="section-title">Timeline Tracking</p>
+                  <span className="solid-chip">{timelineEntries.length}</span>
+                </div>
+                <div className="mt-5 space-y-4">
+                  {timelineEntries.length ? (
+                    timelineEntries.map((entry, index) => (
+                      <div key={entry.id} className="flex gap-4">
+                        <div className="flex w-16 flex-col items-center">
+                          <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] ${getTimelineTone(entry.type)}`}>
+                            {entry.type === 'work-order' ? 'WO' : entry.type === 'assignment' ? 'PIC' : entry.type === 'status' ? 'STS' : 'MOV'}
+                          </span>
+                          {index < timelineEntries.length - 1 ? <span className="mt-2 h-full w-px bg-[var(--color-line)]" /> : null}
+                        </div>
+                        <div className="flex-1 rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
+                          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{entry.title}</p>
+                              <p className="mt-1 text-sm leading-6 text-mute">{entry.detail}</p>
+                            </div>
+                            <div className="text-xs uppercase tracking-[0.2em] text-mute">{entry.at ?? '-'}</div>
+                          </div>
+                          {entry.href ? (
+                            <div className="mt-3">
+                              <Link
+                                href={entry.href}
+                                className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90"
+                              >
+                                Buka detail movement
+                              </Link>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-mute">
+                      Belum ada event timeline yang bisa ditampilkan untuk work order ini.
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="rounded-3xl border border-line bg-surface p-5">
                 <div className="flex items-center justify-between gap-4">
                   <p className="section-title">Assignment Log</p>

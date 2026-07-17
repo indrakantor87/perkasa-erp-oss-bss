@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { StockMovementTrackingFilters } from '@/components/stock-movement-tracking-filters'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { getStockMovementTrackingList, type StockMovementTrackingQuery } from '@/lib/services/tracking-service'
@@ -49,87 +50,25 @@ export default async function StockMovementTrackingListPage({
           </Link>
         </div>
 
-        <form className="mt-6 grid gap-4 lg:grid-cols-6" action="/dashboard/tracking/stock-movements" method="get">
-          <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
-            <span className="font-semibold text-slate-950">Search</span>
-            <input
-              name="q"
-              defaultValue={q}
-              placeholder="ITEM / reference no"
-              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            />
-          </label>
+        <StockMovementTrackingFilters
+          defaultValues={{
+            q,
+            movementType,
+            referenceType,
+            workOrderId,
+            troubleTicketId,
+            technicianUserId,
+          }}
+        />
 
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="font-semibold text-slate-950">Type</span>
-            <input
-              name="movementType"
-              defaultValue={movementType}
-              placeholder="OUT"
-              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="font-semibold text-slate-950">Ref Type</span>
-            <input
-              name="referenceType"
-              defaultValue={referenceType}
-              placeholder="WORK_ORDER"
-              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="font-semibold text-slate-950">WO ID</span>
-            <input
-              name="workOrderId"
-              defaultValue={workOrderId}
-              placeholder="120"
-              inputMode="numeric"
-              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="font-semibold text-slate-950">TT ID</span>
-            <input
-              name="troubleTicketId"
-              defaultValue={troubleTicketId}
-              placeholder="88"
-              inputMode="numeric"
-              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="font-semibold text-slate-950">Teknisi User ID</span>
-            <input
-              name="technicianUserId"
-              defaultValue={technicianUserId}
-              placeholder="12"
-              inputMode="numeric"
-              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            />
-          </label>
-
-          <div className="lg:col-span-6 flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition hover:opacity-90"
-              style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
-            >
-              Terapkan Filter
-            </button>
-            <Link
-              href="/dashboard/tracking/stock-movements"
-              className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
-            >
-              Reset
-            </Link>
-            <span className="solid-chip">{payload.items.length} item</span>
-          </div>
-        </form>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <span className="solid-chip">{payload.items.length} item</span>
+          {(workOrderId || troubleTicketId || technicianUserId) ? (
+            <span className="badge border-transparent" style={{ backgroundColor: 'var(--color-surface-soft)', color: 'var(--color-ink-strong)' }}>
+              Filter referensi aktif
+            </span>
+          ) : null}
+        </div>
 
         {payload.error ? (
           <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-800">
@@ -199,4 +138,3 @@ export default async function StockMovementTrackingListPage({
     </div>
   )
 }
-
