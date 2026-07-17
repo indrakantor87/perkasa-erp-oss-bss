@@ -18,17 +18,17 @@ function matchesPrefix(pathname: string, prefix: string) {
 }
 
 const rolePreferredOrder: Partial<Record<AppRole, string[]>> = {
-  SALES_MARKETING: ['/dashboard/worklist', '/sales', '/customers', '/support', '/dashboard/daily-activity', '/dashboard', '/import'],
-  CS_OPERATOR: ['/dashboard/worklist', '/support', '/customers', '/inventory', '/dashboard/daily-activity', '/dashboard', '/billing'],
-  CS_ADMIN: ['/customers/cs-admin', '/dashboard/worklist', '/support', '/customers', '/dashboard/daily-activity', '/dashboard', '/billing'],
-  NOC_OPERATOR: ['/support', '/dashboard/worklist', '/inventory', '/dashboard/daily-activity', '/dashboard'],
-  TT_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/daily-activity', '/dashboard'],
-  DIGITAL_CREATOR: ['/dashboard/worklist', '/sales', '/customers', '/dashboard/daily-activity', '/dashboard'],
-  FIELD_TECHNICIAN: ['/support', '/dashboard/worklist', '/inventory', '/dashboard/daily-activity', '/dashboard'],
-  DISMANTLE_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/daily-activity', '/dashboard'],
+  SALES_MARKETING: ['/dashboard/worklist', '/dashboard/tracking', '/sales', '/customers', '/support', '/dashboard/daily-activity', '/dashboard', '/import'],
+  CS_OPERATOR: ['/dashboard/worklist', '/dashboard/tracking', '/support', '/customers', '/inventory', '/dashboard/daily-activity', '/dashboard', '/billing'],
+  CS_ADMIN: ['/customers/cs-admin', '/dashboard/worklist', '/dashboard/tracking', '/support', '/customers', '/dashboard/daily-activity', '/dashboard', '/billing'],
+  NOC_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/inventory', '/dashboard/daily-activity', '/dashboard'],
+  TT_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard'],
+  DIGITAL_CREATOR: ['/dashboard/worklist', '/dashboard/tracking', '/sales', '/customers', '/dashboard/daily-activity', '/dashboard'],
+  FIELD_TECHNICIAN: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/inventory', '/dashboard/daily-activity', '/dashboard'],
+  DISMANTLE_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard'],
 }
 
-const controlCenterOrder = ['/dashboard/worklist', '/dashboard/daily-activity', '/dashboard', '/import']
+const controlCenterOrder = ['/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard', '/import']
 
 function sortByPreferredOrder(params: { items: typeof navigationItems; role: AppRole | null }) {
   const order = params.role ? rolePreferredOrder[params.role] ?? [] : []
@@ -610,7 +610,7 @@ function dedupeSidebarItems(items: SidebarNavItem[]) {
 }
 
 function getPrimaryNavHrefs(role: AppRole | null) {
-  const base = ['/dashboard', '/dashboard/worklist', '/dashboard/daily-activity']
+  const base = ['/dashboard', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity']
   if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
     return [...base, '/import']
   }
@@ -619,9 +619,9 @@ function getPrimaryNavHrefs(role: AppRole | null) {
 
 function getSuperAdminPrimaryHrefs(mode: SuperAdminSidebarMode) {
   if (mode === 'compact') {
-    return ['/dashboard/worklist', '/dashboard/daily-activity', '/dashboard', '/import']
+    return ['/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard', '/import']
   }
-  return ['/dashboard', '/dashboard/worklist', '/dashboard/daily-activity', '/import']
+  return ['/dashboard', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/import']
 }
 
 function getWorkspaceCustomItems(role: AppRole | null) {

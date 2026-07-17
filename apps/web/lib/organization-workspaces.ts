@@ -510,6 +510,12 @@ export const teknisiPsbWorkspace: OrganizationWorkspaceDefinition = {
           description: 'Tinjau permintaan barang yang masih menunggu proses agar instalasi tidak tertahan.',
           badge: 'material',
         },
+        {
+          label: 'Tracking WO PSB',
+          href: '/dashboard/tracking/work-orders?jobCategory=PSB',
+          description: 'Lihat histori assignment, status log, dan barang terkait untuk work order PSB.',
+          badge: 'tracking',
+        },
       ],
     },
     {
@@ -521,6 +527,12 @@ export const teknisiPsbWorkspace: OrganizationWorkspaceDefinition = {
           href: '/support/sla',
           description: 'Pantau prioritas lapangan dan ticket yang mendekati overdue setelah instalasi dibuka.',
           badge: 'prioritas',
+        },
+        {
+          label: 'Tracking Barang PSB',
+          href: '/dashboard/tracking/stock-movements?referenceType=WORK_ORDER',
+          description: 'Pantau pergerakan barang keluar masuk yang terhubung ke pekerjaan lapangan PSB.',
+          badge: 'barang',
         },
         {
           label: 'Customer Master',
@@ -585,6 +597,12 @@ export const teknisiExpanWorkspace: OrganizationWorkspaceDefinition = {
           description: 'Audit barang keluar masuk yang mendukung pekerjaan ekspan periode berjalan.',
           badge: 'mutasi',
         },
+        {
+          label: 'Tracking WO Expan',
+          href: '/dashboard/tracking/work-orders?jobCategory=EXPAN',
+          description: 'Lihat daftar dan histori work order expan yang sudah masuk ke review DB.',
+          badge: 'tracking',
+        },
       ],
     },
     {
@@ -602,6 +620,12 @@ export const teknisiExpanWorkspace: OrganizationWorkspaceDefinition = {
           href: '/inventory?focus=PENDING_REQUESTS',
           description: 'Pantau kebutuhan material yang masih menunggu proses sebelum eksekusi expan dilanjutkan.',
           badge: 'request',
+        },
+        {
+          label: 'Tracking Barang Expan',
+          href: '/dashboard/tracking/stock-movements?referenceType=WORK_ORDER',
+          description: 'Pantau movement barang yang menunjang pekerjaan jalur, expan, dan jaringan.',
+          badge: 'barang',
         },
       ],
     },
@@ -660,6 +684,12 @@ export const teknisiJointerWorkspace: OrganizationWorkspaceDefinition = {
           description: 'Prioritaskan kasus yang mendekati overdue agar owner lapangan tetap jelas.',
           badge: 'sla',
         },
+        {
+          label: 'Tracking WO Trouble',
+          href: '/dashboard/tracking/work-orders?jobCategory=TROUBLE',
+          description: 'Buka tracking pekerjaan trouble untuk melihat teknisi, log status, dan histori pergerakan.',
+          badge: 'tracking',
+        },
       ],
     },
     {
@@ -671,6 +701,12 @@ export const teknisiJointerWorkspace: OrganizationWorkspaceDefinition = {
           href: '/inventory',
           description: 'Gunakan data ODP, port, dan perangkat untuk menutup kebutuhan pekerjaan jointer.',
           badge: 'ops',
+        },
+        {
+          label: 'Tracking Barang Trouble',
+          href: '/dashboard/tracking/stock-movements?referenceType=TROUBLE_TICKET',
+          description: 'Lihat movement barang yang terkait trouble ticket atau tindak lanjut jointer.',
+          badge: 'barang',
         },
       ],
     },

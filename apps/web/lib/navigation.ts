@@ -28,6 +28,13 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
     icon: SquareKanban,
   },
   {
+    title: 'Tracking',
+    href: '/dashboard/tracking',
+    description: 'Tracking pekerjaan lapangan dan pergerakan barang',
+    tone: 'bg-slate-800 text-white',
+    icon: ClipboardList,
+  },
+  {
     title: 'Daily Activity',
     href: '/dashboard/daily-activity',
     description: 'Plan pagi dan closing sore aktivitas harian',
