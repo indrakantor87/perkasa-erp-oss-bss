@@ -17,6 +17,7 @@ function resolveSearchParam(value: string | string[] | undefined) {
 
 const ticketTypeOptions: NocTicketType[] = ['PSB', 'TROUBLESHOOTS', 'DISMANTLE', 'JALUR']
 const queueStatusOptions: NocQueueStatus[] = ['OPEN', 'ON_PROGRESS', 'TEMPORARY', 'CLOSE']
+const slaStateOptions = ['BREACHED', 'WARNING', 'ON_TRACK'] as const
 
 function getTicketTypeIcon(ticketType: NocTicketType) {
   if (ticketType === 'PSB') return Plus
@@ -57,6 +58,14 @@ function getSlaBadgeClass(slaState: NocQueueItem['slaState']) {
   return 'bg-slate-100 text-slate-700'
 }
 
+function getOperationalBadgeClass(label: string) {
+  if (label.includes('VALIDASI')) return 'bg-violet-100 text-violet-700'
+  if (label.includes('MATERIAL')) return 'bg-cyan-100 text-cyan-700'
+  if (label.includes('REPLACE') || label.includes('RUSAK')) return 'bg-rose-100 text-rose-700'
+  if (label.includes('FOLLOW')) return 'bg-amber-100 text-amber-800'
+  return 'bg-slate-100 text-slate-700'
+}
+
 function renderTicketMeta(item: NocQueueItem) {
   if (item.sourceType === 'WORK_ORDER') {
     return (
@@ -93,6 +102,7 @@ export default async function NocQueuePage({
   const q = resolveSearchParam(query.q) ?? ''
   const ticketType = resolveSearchParam(query.ticketType)?.toUpperCase() ?? ''
   const queueStatus = resolveSearchParam(query.queueStatus)?.toUpperCase() ?? ''
+  const slaState = resolveSearchParam(query.slaState)?.toUpperCase() ?? ''
   const canCreateDeviceLifecycle =
     session.role === 'FIELD_TECHNICIAN' ||
     canPerformAction(session.role, 'inventory', 'update') ||
@@ -124,7 +134,7 @@ export default async function NocQueuePage({
           </Link>
         </div>
 
-        <form className="mt-6 grid gap-4 lg:grid-cols-5" action="/dashboard/tracking/noc-queue" method="get">
+        <form className="mt-6 grid gap-4 lg:grid-cols-6" action="/dashboard/tracking/noc-queue" method="get">
           <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
             <span className="font-semibold text-slate-950">Search</span>
             <input
@@ -167,6 +177,22 @@ export default async function NocQueuePage({
             </select>
           </label>
 
+          <label className="flex flex-col gap-2 text-sm text-slate-700">
+            <span className="font-semibold text-slate-950">SLA</span>
+            <select
+              name="slaState"
+              defaultValue={slaState}
+              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            >
+              <option value="">Semua</option>
+              {slaStateOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <div className="flex flex-col gap-2 text-sm text-slate-700">
             <span className="font-semibold text-slate-950">Shortcut</span>
             <Link
@@ -194,6 +220,7 @@ export default async function NocQueuePage({
             <span className="solid-chip">{payload.items.length} ticket</span>
             {ticketType ? <span className="solid-chip">Jenis: {ticketType}</span> : null}
             {queueStatus ? <span className="solid-chip">Status: {queueStatus}</span> : null}
+            {slaState ? <span className="solid-chip">SLA: {slaState}</span> : null}
           </div>
         </form>
 
@@ -221,6 +248,15 @@ export default async function NocQueuePage({
                 const Icon = getQueueStatusIcon(item)
                 return <Icon className="h-3.5 w-3.5" />
               })()}
+              {item}
+            </Link>
+          ))}
+          {slaStateOptions.map((item) => (
+            <Link
+              key={item}
+              href={`/dashboard/tracking/noc-queue?slaState=${item}`}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-2 ${getSlaBadgeClass(item)}`}
+            >
               {item}
             </Link>
           ))}
@@ -298,6 +334,18 @@ export default async function NocQueuePage({
                     <p className="font-semibold text-[var(--color-ink-strong)]">{item.requestCode ?? '-'}</p>
                     <p>{item.requestStatus ?? 'Belum ada request'}</p>
                     <p>{item.requestRequestedFor ?? ''}</p>
+                    {item.operationalBadges.length ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {item.operationalBadges.map((badge) => (
+                          <span
+                            key={`${item.queueKey}-request-${badge}`}
+                            className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getOperationalBadgeClass(badge)}`}
+                          >
+                            {badge}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     <p className="font-semibold text-[var(--color-ink-strong)]">{item.deviceState ?? '-'}</p>

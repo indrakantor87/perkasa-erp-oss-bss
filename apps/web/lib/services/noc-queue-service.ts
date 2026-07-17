@@ -66,6 +66,7 @@ export type NocQueueQuery = {
   q?: string | string[]
   ticketType?: string | string[]
   queueStatus?: string | string[]
+  slaState?: string | string[]
   limit?: string | string[]
 }
 
@@ -100,6 +101,7 @@ export type NocQueueItem = {
   ageLabel: string | null
   slaState: 'ON_TRACK' | 'WARNING' | 'BREACHED' | null
   slaLabel: string | null
+  operationalBadges: string[]
   lastUpdateAt: string | null
   href: string
 }
@@ -108,6 +110,7 @@ type NocQueueState = {
   q: string | null
   ticketType: NocTicketType | null
   queueStatus: NocQueueStatus | null
+  slaState: 'ON_TRACK' | 'WARNING' | 'BREACHED' | null
   limit: number
 }
 
@@ -361,6 +364,56 @@ function buildSlaSnapshot(params: {
   }
 }
 
+function resolveOperationalBadges(params: {
+  requestStatus?: string | null
+  deviceState?: string | null
+  queueStatus?: NocQueueStatus | null
+  ticketType: NocTicketType
+}) {
+  const badges = new Set<string>()
+  const requestStatus = normalizeText(params.requestStatus)
+  const deviceState = normalizeText(params.deviceState)
+
+  if (requestStatus.includes('PENDING') || requestStatus.includes('WAIT')) {
+    badges.add('MENUNGGU MATERIAL')
+  } else if (requestStatus.includes('PROGRESS') || requestStatus.includes('PROCESS')) {
+    badges.add('MATERIAL DIPROSES')
+  }
+
+  if (deviceState === 'PENDING VALIDASI NOC' || deviceState === 'PENDING_NOC_VALIDATION') {
+    badges.add('PENDING VALIDASI')
+  }
+  if (deviceState === 'REPLACE') {
+    badges.add('BUTUH REPLACE')
+  }
+  if (deviceState === 'RUSAK' || deviceState === 'DAMAGED') {
+    badges.add('DEVICE RUSAK')
+  }
+  if (deviceState === 'KEMBALI' || deviceState === 'RETURNED') {
+    badges.add(params.ticketType === 'DISMANTLE' ? 'BARANG KEMBALI' : 'RETURN')
+  }
+  if (params.queueStatus === 'TEMPORARY') {
+    badges.add('FOLLOW UP')
+  }
+
+  return Array.from(badges)
+}
+
+function getSlaPriority(slaState: NocQueueItem['slaState']) {
+  if (slaState === 'BREACHED') return 3
+  if (slaState === 'WARNING') return 2
+  if (slaState === 'ON_TRACK') return 1
+  return 0
+}
+
+function getQueuePriority(queueStatus: NocQueueStatus) {
+  if (queueStatus === 'ON_PROGRESS') return 4
+  if (queueStatus === 'OPEN') return 3
+  if (queueStatus === 'TEMPORARY') return 2
+  if (queueStatus === 'CLOSE') return 1
+  return 0
+}
+
 function mapRequestDeviceState(request: InventoryRequestSummaryRow | null) {
   if (!request) {
     return null
@@ -519,6 +572,7 @@ function resolveNocQueueState(query: NocQueueQuery): NocQueueState {
   const q = resolveSearchParam(query.q)?.trim() ?? ''
   const ticketTypeRaw = resolveSearchParam(query.ticketType)?.trim().toUpperCase() ?? ''
   const queueStatusRaw = resolveSearchParam(query.queueStatus)?.trim().toUpperCase() ?? ''
+  const slaStateRaw = resolveSearchParam(query.slaState)?.trim().toUpperCase() ?? ''
   const limitRaw = resolveSearchParam(query.limit)?.trim() ?? ''
   const limit = Math.min(Math.max(resolveOptionalInt(limitRaw) ?? 80, 20), 200)
 
@@ -528,11 +582,15 @@ function resolveNocQueueState(query: NocQueueQuery): NocQueueState {
   const queueStatus = ['OPEN', 'ON_PROGRESS', 'TEMPORARY', 'CLOSE'].includes(queueStatusRaw)
     ? (queueStatusRaw as NocQueueStatus)
     : null
+  const slaState = ['ON_TRACK', 'WARNING', 'BREACHED'].includes(slaStateRaw)
+    ? (slaStateRaw as NocQueueState['slaState'])
+    : null
 
   return {
     q: q || null,
     ticketType,
     queueStatus,
+    slaState,
     limit,
   }
 }
@@ -807,6 +865,12 @@ export async function getNocQueueList(query: NocQueueQuery) {
           ageLabel: slaSnapshot.ageLabel,
           slaState: slaSnapshot.slaState,
           slaLabel: slaSnapshot.slaLabel,
+          operationalBadges: resolveOperationalBadges({
+            requestStatus: request?.requestStatus ?? null,
+            deviceState,
+            queueStatus: normalizeQueueStatus(row.status),
+            ticketType,
+          }),
           lastUpdateAt: pickMostRecentDate(lifecycle?.createdAt, movement?.movementAt, request?.completedAt, request?.requestedAt, row.updatedAt, row.scheduledAt, row.createdAt),
           href: `/dashboard/tracking/work-orders/${row.id}`,
         }
@@ -873,6 +937,12 @@ export async function getNocQueueList(query: NocQueueQuery) {
           ageLabel: slaSnapshot.ageLabel,
           slaState: slaSnapshot.slaState,
           slaLabel: slaSnapshot.slaLabel,
+          operationalBadges: resolveOperationalBadges({
+            requestStatus: request?.requestStatus ?? null,
+            deviceState,
+            queueStatus: normalizeQueueStatus(row.status),
+            ticketType,
+          }),
           lastUpdateAt: pickMostRecentDate(lifecycle?.createdAt, movement?.movementAt, request?.completedAt, request?.requestedAt, linkedWorkOrder?.updatedAt, row.updatedAt, row.openedAt),
           href: `/dashboard/tracking/trouble-tickets/${row.id}`,
         }
@@ -883,7 +953,27 @@ export async function getNocQueueList(query: NocQueueQuery) {
       .filter((item) => item.ticketType !== 'OTHER')
       .filter((item) => (state.ticketType ? item.ticketType === state.ticketType : true))
       .filter((item) => (state.queueStatus ? item.queueStatus === state.queueStatus : true))
-      .sort((left, right) => String(right.lastUpdateAt ?? '').localeCompare(String(left.lastUpdateAt ?? '')))
+      .filter((item) => (state.slaState ? item.slaState === state.slaState : true))
+      .sort((left, right) => {
+        const bySla = getSlaPriority(right.slaState) - getSlaPriority(left.slaState)
+        if (bySla !== 0) {
+          return bySla
+        }
+
+        const byQueue = getQueuePriority(right.queueStatus) - getQueuePriority(left.queueStatus)
+        if (byQueue !== 0) {
+          return byQueue
+        }
+
+        const byPriority =
+          resolveFallbackSlaHours(left.ticketType, left.priority) -
+          resolveFallbackSlaHours(right.ticketType, right.priority)
+        if (byPriority !== 0) {
+          return byPriority
+        }
+
+        return String(right.lastUpdateAt ?? '').localeCompare(String(left.lastUpdateAt ?? ''))
+      })
       .slice(0, state.limit)
 
     return { source, items, error: null as string | null, state }
