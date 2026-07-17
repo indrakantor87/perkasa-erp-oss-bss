@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import type { DashboardOperationalCard, DashboardOperationalDivisionKey } from '@/lib/types'
+import type { DashboardMetric } from '@/lib/types'
 import {
   DASHBOARD_DIVISION_CLUSTERS,
   SUPER_ADMIN_OPERASIONAL_INTI_CLUSTERS,
   isDivisionMenuItemIntegrated,
 } from '@/lib/dashboard-division-structure'
+import { buildSuperAdminCoreOperationalCards } from '@/lib/dashboard-super-admin-core'
 
 const monthOptions = [
   { value: 1, label: 'Januari' },
@@ -45,6 +47,7 @@ function appendDrilldownPeriod(href: string | undefined, month: number, year: nu
 
 export function OperationalDivisionBoard({
   cards,
+  metrics = [],
   month,
   year,
   division,
@@ -52,6 +55,7 @@ export function OperationalDivisionBoard({
   superAdminMode = false,
 }: {
   cards: DashboardOperationalCard[]
+  metrics?: DashboardMetric[]
   month: number
   year: number
   division: DashboardOperationalDivisionKey
@@ -59,12 +63,13 @@ export function OperationalDivisionBoard({
   superAdminMode?: boolean
 }) {
   const currentYear = new Date().getFullYear()
+  const displayCards = superAdminMode ? buildSuperAdminCoreOperationalCards({ cards, metrics }) : cards
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1]
   const cardByKey = new Map<Exclude<DashboardOperationalDivisionKey, 'ALL'>, DashboardOperationalCard>(
-    cards.map((card) => [card.key, card]),
+    displayCards.map((card) => [card.key, card]),
   )
   const clusters = superAdminMode ? SUPER_ADMIN_OPERASIONAL_INTI_CLUSTERS : DASHBOARD_DIVISION_CLUSTERS
-  const visibleCardCount = new Set(clusters.flatMap((cluster) => cluster.cardKeys)).size
+  const visibleCardCount = superAdminMode ? displayCards.length : new Set(clusters.flatMap((cluster) => cluster.cardKeys)).size
 
   return (
     <section className="panel p-6">
@@ -160,7 +165,7 @@ export function OperationalDivisionBoard({
             </p>
           </div>
           <span className="badge border-slate-200 bg-white text-slate-600">
-            {superAdminMode ? `${visibleCardCount} area operasional` : `${cards.length} sub-divisi tampil`}
+            {superAdminMode ? `${visibleCardCount} area operasional` : `${displayCards.length} sub-divisi tampil`}
           </span>
         </div>
 

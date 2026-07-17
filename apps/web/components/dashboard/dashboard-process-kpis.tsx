@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { buildSuperAdminCoreOperationalCards } from '@/lib/dashboard-super-admin-core'
+import type { DashboardMetric } from '@/lib/types'
 import type { DashboardOperationalCard } from '@/lib/types'
 
 function appendDrilldownPeriod(href: string | undefined, month: number, year: number) {
@@ -73,8 +75,22 @@ function resolveMetricHref(params: { card: DashboardOperationalCard; metricLabel
   return params.card.href
 }
 
-export function DashboardProcessKpis({ cards, month, year }: { cards: DashboardOperationalCard[]; month: number; year: number }) {
-  if (!cards.length) {
+export function DashboardProcessKpis({
+  cards,
+  metrics = [],
+  month,
+  year,
+  superAdminMode = false,
+}: {
+  cards: DashboardOperationalCard[]
+  metrics?: DashboardMetric[]
+  month: number
+  year: number
+  superAdminMode?: boolean
+}) {
+  const displayCards = superAdminMode ? buildSuperAdminCoreOperationalCards({ cards, metrics }) : cards
+
+  if (!displayCards.length) {
     return null
   }
 
@@ -90,11 +106,11 @@ export function DashboardProcessKpis({ cards, month, year }: { cards: DashboardO
             Panel ini memecah ringkasan sub-divisi menjadi metrik proses yang bisa langsung diklik ke lane atau modul yang relevan.
           </p>
         </div>
-        <span className="badge border-slate-200 bg-white text-slate-600">{cards.length} sub-divisi</span>
+        <span className="badge border-slate-200 bg-white text-slate-600">{displayCards.length} sub-divisi</span>
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
-        {cards.map((card) => (
+        {displayCards.map((card) => (
           <article key={card.key} className="rounded-2xl border border-line bg-slate-50 p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>

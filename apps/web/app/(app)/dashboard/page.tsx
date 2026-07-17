@@ -346,13 +346,20 @@ export default async function DashboardPage({
           {!showInlineActionPanels ? <CrossDomainAlerts items={dashboardAlerts} /> : null}
           <OperationalDivisionBoard
             cards={operationalCards}
+            metrics={metrics}
             month={month}
             year={year}
             division={division}
             lockDivision={lockDivisionFilter}
             superAdminMode={session.role === 'SUPER_ADMIN'}
           />
-          <DashboardProcessKpis cards={operationalCards} month={month} year={year} />
+          <DashboardProcessKpis
+            cards={operationalCards}
+            metrics={metrics}
+            month={month}
+            year={year}
+            superAdminMode={session.role === 'SUPER_ADMIN'}
+          />
           <DivisionStructureBoard
             activeDivision={roleMeta.division}
             activeSubdivision={roleMeta.subdivision}
