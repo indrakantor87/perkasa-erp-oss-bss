@@ -75,6 +75,49 @@ type StockMovementRow = {
   movementAt: string | null
 }
 
+type TroubleTicketRow = {
+  id: number
+  branchId: number | null
+  subscriptionId: number | null
+  ticketCode: string | null
+  customerName: string | null
+  customerUser: string | null
+  category: string | null
+  type: string | null
+  status: string | null
+  problemCategory: string | null
+  resolutionAction: string | null
+  notes: string | null
+  closeNotes: string | null
+  openedAt: string | null
+  closedAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+type InventoryRequestRow = {
+  id: number
+  requestCode: string | null
+  inventoryItemId: number
+  itemCode: string | null
+  itemName: string | null
+  requestQty: number | null
+  requestType: string | null
+  requestStatus: string | null
+  requestedDivision: string | null
+  requestedSubdivision: string | null
+  requestedFor: string | null
+  requestNotes: string | null
+  pendingReason: string | null
+  requestedBy: string | null
+  processedBy: string | null
+  requestedAt: string | null
+  processedAt: string | null
+  completedAt: string | null
+  workOrderId: number | null
+  troubleTicketId: number | null
+}
+
 function resolveSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
@@ -554,6 +597,348 @@ export async function getStockMovementTrackingDetail(movementId: number) {
     return { source, movement: movement ?? null, error: null as string | null }
   } catch (error) {
     return { source: getFallbackDataSource(source, error), movement: null, error: getReviewDbErrorDetail(error) }
+  }
+}
+
+export async function getTroubleTicketTrackingDetail(troubleTicketId: number) {
+  const source = getDataSourceSnapshot()
+  if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    return {
+      source,
+      troubleTicket: null as TroubleTicketRow | null,
+      workOrders: [] as WorkOrderRow[],
+      movements: [] as StockMovementRow[],
+      error: null as string | null,
+    }
+  }
+
+  try {
+    const hasWorkOrderTicketId = await hasReviewDbColumn('service_work_orders', 'trouble_ticket_id')
+    const hasMovementTicketId = await hasReviewDbColumn('inventory_stock_movements', 'trouble_ticket_id')
+    const hasMovementRefType = await hasReviewDbColumn('inventory_stock_movements', 'reference_type')
+    const hasMovementStatus = await hasReviewDbColumn('inventory_stock_movements', 'movement_status')
+    const hasMovementRequestId = await hasReviewDbColumn('inventory_stock_movements', 'request_id')
+    const hasMovementLocations =
+      (await hasReviewDbColumn('inventory_stock_movements', 'from_location_id')) &&
+      (await hasReviewDbColumn('inventory_stock_movements', 'to_location_id')) &&
+      (await hasReviewDbColumn('inventory_locations', 'id'))
+    const hasMovementTechnician = await hasReviewDbColumn('inventory_stock_movements', 'technician_user_id')
+
+    const [troubleTicket] = await runReviewDbQuery<TroubleTicketRow>(
+      `
+        SELECT
+          id AS id,
+          branch_id AS branchId,
+          subscription_id AS subscriptionId,
+          ticket_code AS ticketCode,
+          customer_name AS customerName,
+          customer_user AS customerUser,
+          category AS category,
+          type AS type,
+          status AS status,
+          problem_category AS problemCategory,
+          resolution_action AS resolutionAction,
+          notes AS notes,
+          close_notes AS closeNotes,
+          opened_at AS openedAt,
+          closed_at AS closedAt,
+          created_at AS createdAt,
+          updated_at AS updatedAt
+        FROM support_trouble_tickets
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [troubleTicketId],
+    )
+
+    if (!troubleTicket) {
+      return {
+        source,
+        troubleTicket: null as TroubleTicketRow | null,
+        workOrders: [] as WorkOrderRow[],
+        movements: [] as StockMovementRow[],
+        error: null as string | null,
+      }
+    }
+
+    const workOrders = hasWorkOrderTicketId
+      ? await runReviewDbQuery<WorkOrderRow>(
+          `
+            SELECT
+              wo.id AS id,
+              wo.work_order_no AS workOrderNo,
+              wo.work_type AS workType,
+              ${await hasReviewDbColumn('service_work_orders', 'job_category') ? 'wo.job_category' : 'NULL'} AS jobCategory,
+              wo.status AS status,
+              ${await hasReviewDbColumn('service_work_orders', 'priority') ? 'wo.priority' : 'NULL'} AS priority,
+              ${await hasReviewDbColumn('service_work_orders', 'scheduled_at') ? 'wo.scheduled_at' : 'NULL'} AS scheduledAt,
+              wo.technician_name AS technicianName,
+              wo.trouble_ticket_id AS troubleTicketId,
+              ${await hasReviewDbColumn('service_work_orders', 'sales_order_id') ? 'wo.sales_order_id' : 'NULL'} AS salesOrderId,
+              ${await hasReviewDbColumn('service_work_orders', 'subscription_id') ? 'wo.subscription_id' : 'NULL'} AS subscriptionId,
+              ${await hasReviewDbColumn('service_work_orders', 'current_pic_user_id') ? 'wo.current_pic_user_id' : 'NULL'} AS picUserId,
+              au.username AS picUsername,
+              au.full_name AS picFullName,
+              ${await hasReviewDbColumn('service_work_orders', 'notes') ? 'wo.notes' : 'NULL'} AS notes,
+              ${await hasReviewDbColumn('service_work_orders', 'created_at') ? 'wo.created_at' : 'NULL'} AS createdAt,
+              ${await hasReviewDbColumn('service_work_orders', 'updated_at') ? 'wo.updated_at' : 'NULL'} AS updatedAt
+            FROM service_work_orders wo
+            LEFT JOIN auth_users au
+              ON au.id = wo.current_pic_user_id
+            WHERE wo.trouble_ticket_id = ?
+            ORDER BY wo.id DESC
+            LIMIT 200
+          `,
+          [troubleTicketId],
+        )
+      : []
+
+    const movements = hasMovementTicketId
+      ? await runReviewDbQuery<StockMovementRow>(
+          `
+            SELECT
+              m.id AS id,
+              m.item_id AS itemId,
+              i.item_code AS itemCode,
+              i.item_name AS itemName,
+              m.movement_type AS movementType,
+              ${hasMovementRefType ? 'm.reference_type' : 'NULL'} AS referenceType,
+              m.reference_no AS referenceNo,
+              m.qty AS qty,
+              m.unit_price AS unitPrice,
+              ${hasMovementStatus ? 'm.movement_status' : 'NULL'} AS movementStatus,
+              ${await hasReviewDbColumn('inventory_stock_movements', 'work_order_id') ? 'm.work_order_id' : 'NULL'} AS workOrderId,
+              m.trouble_ticket_id AS troubleTicketId,
+              ${hasMovementRequestId ? 'm.request_id' : 'NULL'} AS requestId,
+              ${hasMovementLocations ? 'm.from_location_id' : 'NULL'} AS fromLocationId,
+              ${hasMovementLocations ? 'm.to_location_id' : 'NULL'} AS toLocationId,
+              ${hasMovementTechnician ? 'm.technician_user_id' : 'NULL'} AS technicianUserId,
+              tu.username AS technicianUsername,
+              tu.full_name AS technicianFullName,
+              fl.location_code AS fromLocationCode,
+              fl.location_name AS fromLocationName,
+              tl.location_code AS toLocationCode,
+              tl.location_name AS toLocationName,
+              m.notes AS notes,
+              m.movement_at AS movementAt
+            FROM inventory_stock_movements m
+            INNER JOIN inventory_items i
+              ON i.id = m.item_id
+            LEFT JOIN auth_users tu
+              ON tu.id = m.technician_user_id
+            LEFT JOIN inventory_locations fl
+              ON fl.id = m.from_location_id
+            LEFT JOIN inventory_locations tl
+              ON tl.id = m.to_location_id
+            WHERE m.trouble_ticket_id = ?
+            ORDER BY m.id DESC
+            LIMIT 200
+          `,
+          [troubleTicketId],
+        )
+      : []
+
+    return { source, troubleTicket, workOrders, movements, error: null as string | null }
+  } catch (error) {
+    return {
+      source: getFallbackDataSource(source, error),
+      troubleTicket: null,
+      workOrders: [],
+      movements: [],
+      error: getReviewDbErrorDetail(error),
+    }
+  }
+}
+
+export async function getInventoryRequestTrackingDetail(requestId: number) {
+  const source = getDataSourceSnapshot()
+  if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    return {
+      source,
+      request: null as InventoryRequestRow | null,
+      linkedWorkOrder: null as WorkOrderRow | null,
+      linkedTroubleTicket: null as TroubleTicketRow | null,
+      movements: [] as StockMovementRow[],
+      error: null as string | null,
+    }
+  }
+
+  try {
+    const hasRequestWorkOrderId = await hasReviewDbColumn('inventory_item_requests', 'work_order_id')
+    const hasRequestTroubleTicketId = await hasReviewDbColumn('inventory_item_requests', 'trouble_ticket_id')
+    const hasRequestType = await hasReviewDbColumn('inventory_item_requests', 'request_type')
+    const hasMovementRequestId = await hasReviewDbColumn('inventory_stock_movements', 'request_id')
+    const hasMovementTroubleTicketId = await hasReviewDbColumn('inventory_stock_movements', 'trouble_ticket_id')
+    const hasMovementRefType = await hasReviewDbColumn('inventory_stock_movements', 'reference_type')
+    const hasMovementStatus = await hasReviewDbColumn('inventory_stock_movements', 'movement_status')
+    const hasMovementLocations =
+      (await hasReviewDbColumn('inventory_stock_movements', 'from_location_id')) &&
+      (await hasReviewDbColumn('inventory_stock_movements', 'to_location_id')) &&
+      (await hasReviewDbColumn('inventory_locations', 'id'))
+    const hasMovementTechnician = await hasReviewDbColumn('inventory_stock_movements', 'technician_user_id')
+
+    const [request] = await runReviewDbQuery<InventoryRequestRow>(
+      `
+        SELECT
+          r.id AS id,
+          r.request_code AS requestCode,
+          r.inventory_item_id AS inventoryItemId,
+          i.item_code AS itemCode,
+          i.item_name AS itemName,
+          r.request_qty AS requestQty,
+          ${hasRequestType ? 'r.request_type' : 'NULL'} AS requestType,
+          r.request_status AS requestStatus,
+          r.requested_division AS requestedDivision,
+          r.requested_subdivision AS requestedSubdivision,
+          r.requested_for AS requestedFor,
+          r.request_notes AS requestNotes,
+          r.pending_reason AS pendingReason,
+          r.requested_by AS requestedBy,
+          r.processed_by AS processedBy,
+          r.requested_at AS requestedAt,
+          r.processed_at AS processedAt,
+          r.completed_at AS completedAt,
+          ${hasRequestWorkOrderId ? 'r.work_order_id' : 'NULL'} AS workOrderId,
+          ${hasRequestTroubleTicketId ? 'r.trouble_ticket_id' : 'NULL'} AS troubleTicketId
+        FROM inventory_item_requests r
+        INNER JOIN inventory_items i
+          ON i.id = r.inventory_item_id
+        WHERE r.id = ?
+        LIMIT 1
+      `,
+      [requestId],
+    )
+
+    if (!request) {
+      return {
+        source,
+        request: null as InventoryRequestRow | null,
+        linkedWorkOrder: null as WorkOrderRow | null,
+        linkedTroubleTicket: null as TroubleTicketRow | null,
+        movements: [] as StockMovementRow[],
+        error: null as string | null,
+      }
+    }
+
+    const linkedWorkOrder = request.workOrderId
+      ? (
+          await runReviewDbQuery<WorkOrderRow>(
+            `
+              SELECT
+                wo.id AS id,
+                wo.work_order_no AS workOrderNo,
+                wo.work_type AS workType,
+                ${await hasReviewDbColumn('service_work_orders', 'job_category') ? 'wo.job_category' : 'NULL'} AS jobCategory,
+                wo.status AS status,
+                ${await hasReviewDbColumn('service_work_orders', 'priority') ? 'wo.priority' : 'NULL'} AS priority,
+                ${await hasReviewDbColumn('service_work_orders', 'scheduled_at') ? 'wo.scheduled_at' : 'NULL'} AS scheduledAt,
+                wo.technician_name AS technicianName,
+                ${await hasReviewDbColumn('service_work_orders', 'trouble_ticket_id') ? 'wo.trouble_ticket_id' : 'NULL'} AS troubleTicketId,
+                ${await hasReviewDbColumn('service_work_orders', 'sales_order_id') ? 'wo.sales_order_id' : 'NULL'} AS salesOrderId,
+                ${await hasReviewDbColumn('service_work_orders', 'subscription_id') ? 'wo.subscription_id' : 'NULL'} AS subscriptionId,
+                ${await hasReviewDbColumn('service_work_orders', 'current_pic_user_id') ? 'wo.current_pic_user_id' : 'NULL'} AS picUserId,
+                au.username AS picUsername,
+                au.full_name AS picFullName,
+                ${await hasReviewDbColumn('service_work_orders', 'notes') ? 'wo.notes' : 'NULL'} AS notes,
+                ${await hasReviewDbColumn('service_work_orders', 'created_at') ? 'wo.created_at' : 'NULL'} AS createdAt,
+                ${await hasReviewDbColumn('service_work_orders', 'updated_at') ? 'wo.updated_at' : 'NULL'} AS updatedAt
+              FROM service_work_orders wo
+              LEFT JOIN auth_users au
+                ON au.id = wo.current_pic_user_id
+              WHERE wo.id = ?
+              LIMIT 1
+            `,
+            [request.workOrderId],
+          )
+        )[0] ?? null
+      : null
+
+    const linkedTroubleTicket = request.troubleTicketId
+      ? (
+          await runReviewDbQuery<TroubleTicketRow>(
+            `
+              SELECT
+                id AS id,
+                branch_id AS branchId,
+                subscription_id AS subscriptionId,
+                ticket_code AS ticketCode,
+                customer_name AS customerName,
+                customer_user AS customerUser,
+                category AS category,
+                type AS type,
+                status AS status,
+                problem_category AS problemCategory,
+                resolution_action AS resolutionAction,
+                notes AS notes,
+                close_notes AS closeNotes,
+                opened_at AS openedAt,
+                closed_at AS closedAt,
+                created_at AS createdAt,
+                updated_at AS updatedAt
+              FROM support_trouble_tickets
+              WHERE id = ?
+              LIMIT 1
+            `,
+            [request.troubleTicketId],
+          )
+        )[0] ?? null
+      : null
+
+    const movements = hasMovementRequestId
+      ? await runReviewDbQuery<StockMovementRow>(
+          `
+            SELECT
+              m.id AS id,
+              m.item_id AS itemId,
+              i.item_code AS itemCode,
+              i.item_name AS itemName,
+              m.movement_type AS movementType,
+              ${hasMovementRefType ? 'm.reference_type' : 'NULL'} AS referenceType,
+              m.reference_no AS referenceNo,
+              m.qty AS qty,
+              m.unit_price AS unitPrice,
+              ${hasMovementStatus ? 'm.movement_status' : 'NULL'} AS movementStatus,
+              ${await hasReviewDbColumn('inventory_stock_movements', 'work_order_id') ? 'm.work_order_id' : 'NULL'} AS workOrderId,
+              ${hasMovementTroubleTicketId ? 'm.trouble_ticket_id' : 'NULL'} AS troubleTicketId,
+              m.request_id AS requestId,
+              ${hasMovementLocations ? 'm.from_location_id' : 'NULL'} AS fromLocationId,
+              ${hasMovementLocations ? 'm.to_location_id' : 'NULL'} AS toLocationId,
+              ${hasMovementTechnician ? 'm.technician_user_id' : 'NULL'} AS technicianUserId,
+              tu.username AS technicianUsername,
+              tu.full_name AS technicianFullName,
+              fl.location_code AS fromLocationCode,
+              fl.location_name AS fromLocationName,
+              tl.location_code AS toLocationCode,
+              tl.location_name AS toLocationName,
+              m.notes AS notes,
+              m.movement_at AS movementAt
+            FROM inventory_stock_movements m
+            INNER JOIN inventory_items i
+              ON i.id = m.item_id
+            LEFT JOIN auth_users tu
+              ON tu.id = m.technician_user_id
+            LEFT JOIN inventory_locations fl
+              ON fl.id = m.from_location_id
+            LEFT JOIN inventory_locations tl
+              ON tl.id = m.to_location_id
+            WHERE m.request_id = ?
+            ORDER BY m.id DESC
+            LIMIT 200
+          `,
+          [requestId],
+        )
+      : []
+
+    return { source, request, linkedWorkOrder, linkedTroubleTicket, movements, error: null as string | null }
+  } catch (error) {
+    return {
+      source: getFallbackDataSource(source, error),
+      request: null,
+      linkedWorkOrder: null,
+      linkedTroubleTicket: null,
+      movements: [],
+      error: getReviewDbErrorDetail(error),
+    }
   }
 }
 

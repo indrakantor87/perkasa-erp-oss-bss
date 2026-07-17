@@ -52,6 +52,22 @@ export default async function StockMovementTrackingDetailPage({
                 Buka WO #{m.workOrderId}
               </Link>
             ) : null}
+            {m?.troubleTicketId ? (
+              <Link
+                href={`/dashboard/tracking/trouble-tickets/${m.troubleTicketId}`}
+                className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+              >
+                Buka TT #{m.troubleTicketId}
+              </Link>
+            ) : null}
+            {m?.requestId ? (
+              <Link
+                href={`/dashboard/tracking/inventory-requests/${m.requestId}`}
+                className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+              >
+                Buka Request #{m.requestId}
+              </Link>
+            ) : null}
           </div>
         </div>
 
@@ -97,15 +113,39 @@ export default async function StockMovementTrackingDetailPage({
               <dl className="mt-4 grid gap-3 text-sm">
                 <div className="flex items-start justify-between gap-4">
                   <dt className="text-mute">Work Order</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{m.workOrderId ?? '-'}</dd>
+                  <dd className="font-semibold text-[var(--color-ink-strong)]">
+                    {m.workOrderId ? (
+                      <Link href={`/dashboard/tracking/work-orders/${m.workOrderId}`} className="hover:opacity-80">
+                        WO #{m.workOrderId}
+                      </Link>
+                    ) : (
+                      '-'
+                    )}
+                  </dd>
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <dt className="text-mute">Trouble Ticket</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{m.troubleTicketId ?? '-'}</dd>
+                  <dd className="font-semibold text-[var(--color-ink-strong)]">
+                    {m.troubleTicketId ? (
+                      <Link href={`/dashboard/tracking/trouble-tickets/${m.troubleTicketId}`} className="hover:opacity-80">
+                        TT #{m.troubleTicketId}
+                      </Link>
+                    ) : (
+                      '-'
+                    )}
+                  </dd>
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <dt className="text-mute">Request</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{m.requestId ?? '-'}</dd>
+                  <dd className="font-semibold text-[var(--color-ink-strong)]">
+                    {m.requestId ? (
+                      <Link href={`/dashboard/tracking/inventory-requests/${m.requestId}`} className="hover:opacity-80">
+                        REQ #{m.requestId}
+                      </Link>
+                    ) : (
+                      '-'
+                    )}
+                  </dd>
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <dt className="text-mute">Teknisi</dt>
@@ -139,4 +179,3 @@ export default async function StockMovementTrackingDetailPage({
     </div>
   )
 }
-
