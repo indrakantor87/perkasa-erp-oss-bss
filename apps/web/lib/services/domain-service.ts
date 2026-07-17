@@ -2,7 +2,7 @@ import { canPerformAction } from '@/lib/access-control'
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { domainPages } from '@/lib/mock-domains'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
-import { readThroughServerTtlCache } from '@/lib/server-ttl-cache'
+import { readThroughServerTtlCache, runOncePerServer } from '@/lib/server-ttl-cache'
 import { getServerUiLanguage } from '@/lib/ui-language-server'
 import { getHrAttendanceFaceConfig } from '@/lib/services/hr-attendance-face-service'
 import { getRecentHrEmployeeFaceReferenceItems } from '@/lib/services/hr-attendance-face-service'
@@ -70,6 +70,30 @@ function buildDomainSessionCacheScope(session: AppSession) {
     role: session.role,
     branchId: session.branchId,
     branchIds: session.branchIds,
+  })
+}
+
+async function ensureDomainSupportDismantleQueueTable() {
+  await runOncePerServer('domain-support-dismantle-queue-table', async () => {
+    await ensureSupportDismantleQueueTable()
+  })
+}
+
+async function ensureDomainSupportTicketReadTables() {
+  await runOncePerServer('domain-support-ticket-read-tables', async () => {
+    await Promise.all([ensureSupportTroubleTicketProgressTable(), ensureSupportTroubleTicketEscalationTable()])
+  })
+}
+
+async function ensureDomainInventoryReadTables() {
+  await runOncePerServer('domain-inventory-read-tables', async () => {
+    await Promise.all([ensureInventoryLoanTable(), ensureInventoryRequestTable()])
+  })
+}
+
+async function ensureDomainHrReadTables() {
+  await runOncePerServer('domain-hr-read-tables', async () => {
+    await ensureHrSalarySlipVoidTable()
   })
 }
 
@@ -1301,9 +1325,10 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
     : hasCustomerBranchId
       ? buildBranchWhere(branchScope, 'c.branch_id')
       : { clause: '', values: [] as unknown[] }
+  const ticketReadEnsurePromise = wantTickets ? ensureDomainSupportTicketReadTables() : Promise.resolve()
 
   if (wantIsolations || wantDismantle) {
-    await ensureSupportDismantleQueueTable()
+    await ensureDomainSupportDismantleQueueTable()
   }
 
   const supportNonTicketReadSchema =
@@ -1356,8 +1381,7 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
     sectionLabel: 'Trouble Ticket',
     enabled: wantTickets,
     query: async () => {
-      await ensureSupportTroubleTicketProgressTable()
-      await ensureSupportTroubleTicketEscalationTable()
+      await ticketReadEnsurePromise
       return runReviewDbQuery<ReviewDbSupportTicketRow>(`
     SELECT
       stt.id AS ticketId,
@@ -4641,8 +4665,7 @@ async function getReviewDbInventorySections(filters?: DomainReviewDrilldownFilte
     .toUpperCase()
   const period = resolveSqlPeriodRange(filters)
 
-  await ensureInventoryLoanTable()
-  await ensureInventoryRequestTable()
+  await ensureDomainInventoryReadTables()
   const inventorySchema = await getInventoryReadSchema()
   const canJoinItemCategory = inventorySchema.itemCategoryId && inventorySchema.categoryId
   const canJoinItemUnit = inventorySchema.itemUnitId && inventorySchema.unitId
@@ -5282,17 +5305,31 @@ async function getReviewDbHrSections(filters?: DomainReviewDrilldownFilters): Pr
     .toUpperCase()
   const period = resolveSqlPeriodRange(filters)
 
-  await ensureHrSalarySlipVoidTable()
-  const faceConfig = await getHrAttendanceFaceConfig().catch(() => null)
-  const faceReferenceItems = await getRecentHrEmployeeFaceReferenceItems(5).catch(() => [])
-  const faceReferenceHistoryItems = await getRecentHrEmployeeFaceReferenceHistoryItems(8).catch(() => [])
-  const faceReferenceTrendItems = await getHrEmployeeFaceReferenceTrendItems(5).catch(() => [])
-  const faceRetakeQueueItems = await getRecentHrAttendanceFaceRetakeQueueItems(5).catch(() => [])
-  const facePriorityQueueItems = await getHrAttendanceFacePriorityQueueItems(8).catch(() => [])
-  const verifiedFaceReferenceCandidates = await getVerifiedHrEmployeeFaceReferenceCandidates(5).catch(() => [])
-  const faceReviewItems = await getRecentHrAttendanceFaceReviewItems(5).catch(() => [])
-  const faceOutcomeAnalytics = await getHrAttendanceFaceOutcomeAnalytics().catch(() => null)
-  const geofenceConfig = await getHrAttendanceGeofenceConfig().catch(() => null)
+  const [
+    ,
+    faceConfig,
+    faceReferenceItems,
+    faceReferenceHistoryItems,
+    faceReferenceTrendItems,
+    faceRetakeQueueItems,
+    facePriorityQueueItems,
+    verifiedFaceReferenceCandidates,
+    faceReviewItems,
+    faceOutcomeAnalytics,
+    geofenceConfig,
+  ] = await Promise.all([
+    ensureDomainHrReadTables(),
+    getHrAttendanceFaceConfig().catch(() => null),
+    getRecentHrEmployeeFaceReferenceItems(5).catch(() => []),
+    getRecentHrEmployeeFaceReferenceHistoryItems(8).catch(() => []),
+    getHrEmployeeFaceReferenceTrendItems(5).catch(() => []),
+    getRecentHrAttendanceFaceRetakeQueueItems(5).catch(() => []),
+    getHrAttendanceFacePriorityQueueItems(8).catch(() => []),
+    getVerifiedHrEmployeeFaceReferenceCandidates(5).catch(() => []),
+    getRecentHrAttendanceFaceReviewItems(5).catch(() => []),
+    getHrAttendanceFaceOutcomeAnalytics().catch(() => null),
+    getHrAttendanceGeofenceConfig().catch(() => null),
+  ])
 
 
   const employees = await runReviewDbQuery<ReviewDbHrEmployeeRow>(`
@@ -6261,79 +6298,38 @@ export async function getDomainPageData(
     DOMAIN_PAGE_CACHE_TTL_MS,
     async () => {
       try {
-        const stats = await getReviewDbDomainStats()
-        const salesSections =
-          domain === 'sales'
-            ? filterReviewSectionsForDomain(
-                domain,
-                await getReviewDbSalesSections(session, {
+        const reviewFilters = {
+          focus: options?.focus,
+          month: options?.month,
+          year: options?.year,
+        }
+        const [stats, salesSectionsRaw, supportSections, customerSections, billingSectionsRaw, inventorySectionsRaw, hrSectionsRaw] =
+          await Promise.all([
+            getReviewDbDomainStats(),
+            domain === 'sales'
+              ? getReviewDbSalesSections(session, reviewFilters)
+              : Promise.resolve([] as DomainReviewSection[]),
+            domain === 'support'
+              ? getReviewDbSupportSections(session, {
+                  lane: selectedSupportLane,
                   focus: options?.focus,
-                  month: options?.month,
-                  year: options?.year,
-                }),
-                {
-                  focus: options?.focus,
-                  month: options?.month,
-                  year: options?.year,
-                },
-              )
-            : []
-        const supportSections =
-          domain === 'support'
-            ? await getReviewDbSupportSections(session, {
-                lane: selectedSupportLane,
-                focus: options?.focus,
-              })
-            : []
-        const customerSections = domain === 'customers' ? await getReviewDbCustomerSections() : []
+                })
+              : Promise.resolve([] as DomainReviewSection[]),
+            domain === 'customers' ? getReviewDbCustomerSections() : Promise.resolve([] as DomainReviewSection[]),
+            domain === 'billing'
+              ? getReviewDbBillingSections(session, reviewFilters)
+              : Promise.resolve([] as DomainReviewSection[]),
+            domain === 'inventory'
+              ? getReviewDbInventorySections(reviewFilters)
+              : Promise.resolve([] as DomainReviewSection[]),
+            domain === 'hr' ? getReviewDbHrSections(reviewFilters) : Promise.resolve([] as DomainReviewSection[]),
+          ])
+        const salesSections = domain === 'sales' ? filterReviewSectionsForDomain(domain, salesSectionsRaw, reviewFilters) : []
         const billingSections =
-          domain === 'billing'
-            ? filterReviewSectionsForDomain(
-                domain,
-                await getReviewDbBillingSections(session, {
-                  focus: options?.focus,
-                  month: options?.month,
-                  year: options?.year,
-                }),
-                {
-                  focus: options?.focus,
-                  month: options?.month,
-                  year: options?.year,
-                },
-              )
-            : []
+          domain === 'billing' ? filterReviewSectionsForDomain(domain, billingSectionsRaw, reviewFilters) : []
         const inventorySections =
-          domain === 'inventory'
-            ? filterReviewSectionsForDomain(
-                domain,
-                await getReviewDbInventorySections({
-                  focus: options?.focus,
-                  month: options?.month,
-                  year: options?.year,
-                }),
-                {
-                  focus: options?.focus,
-                  month: options?.month,
-                  year: options?.year,
-                },
-              )
-            : []
-        const hrSections =
-          domain === 'hr'
-            ? filterReviewSectionsForDomain(
-                domain,
-                await getReviewDbHrSections({
-                  focus: options?.focus,
-                  month: options?.month,
-                  year: options?.year,
-                }),
-                {
-                  focus: options?.focus,
-                  month: options?.month,
-                  year: options?.year,
-                },
-              )
-            : []
+          domain === 'inventory' ? filterReviewSectionsForDomain(domain, inventorySectionsRaw, reviewFilters) : []
+        const hrSections = domain === 'hr' ? filterReviewSectionsForDomain(domain, hrSectionsRaw, reviewFilters) : []
 
         const nextContent = applyReviewDbHrSections(
           applyReviewDbInventorySections(

@@ -16,7 +16,7 @@ import {
 } from '@/lib/mock-dashboard'
 import type { AppSession } from '@/lib/auth-session'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
-import { readThroughServerTtlCache } from '@/lib/server-ttl-cache'
+import { readThroughServerTtlCache, runOncePerServer } from '@/lib/server-ttl-cache'
 import { buildSupportLaneActionHref, buildSupportLaneHref } from '@/lib/support-action-links'
 import { getRecentAuthPermissionAudits } from '@/lib/services/auth-permission-audit-service'
 import { getRecentAuthRolePermissionAudits } from '@/lib/services/auth-role-permission-audit-service'
@@ -92,6 +92,28 @@ function buildDashboardSessionCacheScope(session: AppSession) {
     role: session.role,
     branchId: session.branchId,
     branchIds: session.branchIds,
+  })
+}
+
+async function ensureDashboardDismantleQueueTable() {
+  await runOncePerServer('dashboard-dismantle-queue-table', async () => {
+    await ensureSupportDismantleQueueTable()
+  })
+}
+
+async function ensureDashboardSupportReadTables() {
+  await runOncePerServer('dashboard-support-read-tables', async () => {
+    await Promise.all([
+      ensureSupportDismantleQueueTable(),
+      ensureSupportTroubleTicketProgressTable(),
+      ensureSupportTroubleTicketEscalationTable(),
+    ])
+  })
+}
+
+async function ensureDashboardImportBatchActionTable() {
+  await runOncePerServer('dashboard-import-batch-action-table', async () => {
+    await ensureImportBatchActionTable()
   })
 }
 
@@ -1827,9 +1849,7 @@ async function getReviewDbOperationalCards(
   const { startText, endText } = getMonthRange(filters)
   const digitalSources = ['DIGITAL', 'FACEBOOK', 'INSTAGRAM', 'TIKTOK', 'GOOGLE', 'WEBSITE', 'META ADS']
   const digitalSourceConditions = digitalSources.map(() => '?').join(', ')
-  await ensureSupportDismantleQueueTable()
-  await ensureSupportTroubleTicketProgressTable()
-  await ensureSupportTroubleTicketEscalationTable()
+  await ensureDashboardSupportReadTables()
 
   const [
     hasSupportSlaDueAt,
@@ -3387,7 +3407,7 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         ORDER BY ${hasIsolationDate ? 'si.isolation_date' : 'si.id'} ASC, si.id ASC
         LIMIT 1
       `)
-      await ensureSupportDismantleQueueTable()
+      await ensureDashboardDismantleQueueTable()
       const terminateCandidates = await runReviewDbQuery<DashboardDismantleDecisionRow>(`
         SELECT
           dq.id AS queueId,
@@ -4101,7 +4121,7 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
       }))
     }
     case 'DISMANTLE_OPERATOR': {
-      await ensureSupportDismantleQueueTable()
+      await ensureDashboardDismantleQueueTable()
       const [hasDismantleQueueTransferNote, hasDismantleQueueTransferredAt] = await Promise.all([
         hasReviewDbColumn('support_dismantle_queue', 'transfer_note'),
         hasReviewDbColumn('support_dismantle_queue', 'transferred_at'),
@@ -4332,7 +4352,7 @@ async function getReviewDbImportBatchActivities() {
 }
 
 async function getReviewDbImportAuditTimeline(limit = 6): Promise<TimelineActivityItem[]> {
-  await ensureImportBatchActionTable()
+  await ensureDashboardImportBatchActionTable()
 
   const rows = await runReviewDbQuery<ImportBatchActionActivityRow>(
     `

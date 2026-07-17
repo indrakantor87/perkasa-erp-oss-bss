@@ -57,3 +57,12 @@ export async function readThroughServerTtlCache<T>(
 
   return promise
 }
+
+const SERVER_RUN_ONCE_TTL_MS = 24 * 60 * 60 * 1000
+
+export async function runOncePerServer(key: string, loader: () => Promise<void>) {
+  await readThroughServerTtlCache(`server-run-once:${key}`, SERVER_RUN_ONCE_TTL_MS, async () => {
+    await loader()
+    return true
+  })
+}
