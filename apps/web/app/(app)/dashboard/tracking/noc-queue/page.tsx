@@ -15,6 +15,32 @@ function resolveSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
+function buildNocQueueFilterHref(params: {
+  q?: string
+  ticketType?: string
+  queueStatus?: string
+  slaState?: string
+  patch: Partial<{
+    ticketType: string
+    queueStatus: string
+    slaState: string
+  }>
+}) {
+  const search = new URLSearchParams()
+  const q = String(params.q ?? '').trim()
+  const ticketType = String(params.patch.ticketType ?? params.ticketType ?? '').trim()
+  const queueStatus = String(params.patch.queueStatus ?? params.queueStatus ?? '').trim()
+  const slaState = String(params.patch.slaState ?? params.slaState ?? '').trim()
+
+  if (q) search.set('q', q)
+  if (ticketType) search.set('ticketType', ticketType)
+  if (queueStatus) search.set('queueStatus', queueStatus)
+  if (slaState) search.set('slaState', slaState)
+
+  const query = search.toString()
+  return query ? `/dashboard/tracking/noc-queue?${query}` : '/dashboard/tracking/noc-queue'
+}
+
 const ticketTypeOptions: NocTicketType[] = ['PSB', 'TROUBLESHOOTS', 'DISMANTLE', 'JALUR']
 const queueStatusOptions: NocQueueStatus[] = ['OPEN', 'ON_PROGRESS', 'TEMPORARY', 'CLOSE']
 const slaStateOptions = ['BREACHED', 'WARNING', 'ON_TRACK'] as const
@@ -224,42 +250,89 @@ export default async function NocQueuePage({
           </div>
         </form>
 
-        <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.18em]">
-          {ticketTypeOptions.map((item) => (
-            <Link
-              key={item}
-              href={`/dashboard/tracking/noc-queue?ticketType=${item}`}
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-2 ${getTypeBadgeClass(item)}`}
-            >
-              {(() => {
-                const Icon = getTicketTypeIcon(item)
-                return <Icon className="h-3.5 w-3.5" />
-              })()}
-              {item}
-            </Link>
-          ))}
-          {queueStatusOptions.map((item) => (
-            <Link
-              key={item}
-              href={`/dashboard/tracking/noc-queue?queueStatus=${item}`}
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-2 ${getStatusBadgeClass(item)}`}
-            >
-              {(() => {
-                const Icon = getQueueStatusIcon(item)
-                return <Icon className="h-3.5 w-3.5" />
-              })()}
-              {item}
-            </Link>
-          ))}
-          {slaStateOptions.map((item) => (
-            <Link
-              key={item}
-              href={`/dashboard/tracking/noc-queue?slaState=${item}`}
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-2 ${getSlaBadgeClass(item)}`}
-            >
-              {item}
-            </Link>
-          ))}
+        <div className="mt-4 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.18em]">
+          <details className="group relative">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-2xl border border-line bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+              <span>Jenis Ticket</span>
+              {ticketType ? <span className={`rounded-full px-2 py-1 text-[10px] ${getTypeBadgeClass(ticketType as NocTicketType)}`}>{ticketType}</span> : null}
+              <span className="text-sm leading-none transition group-open:rotate-180">v</span>
+            </summary>
+            <div className="absolute left-0 z-10 mt-2 min-w-[220px] rounded-2xl border border-line bg-white p-2 shadow-xl">
+              <Link
+                href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { ticketType: '' } })}
+                className="flex rounded-xl px-3 py-2 text-slate-600 transition hover:bg-slate-50"
+              >
+                Semua Jenis
+              </Link>
+              {ticketTypeOptions.map((item) => (
+                <Link
+                  key={item}
+                  href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { ticketType: item } })}
+                  className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 transition hover:bg-slate-50"
+                >
+                  {(() => {
+                    const Icon = getTicketTypeIcon(item)
+                    return <Icon className="h-3.5 w-3.5" />
+                  })()}
+                  <span className={`rounded-full px-2 py-1 text-[10px] ${getTypeBadgeClass(item)}`}>{item}</span>
+                </Link>
+              ))}
+            </div>
+          </details>
+
+          <details className="group relative">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-2xl border border-line bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+              <span>Status Queue</span>
+              {queueStatus ? <span className={`rounded-full px-2 py-1 text-[10px] ${getStatusBadgeClass(queueStatus as NocQueueStatus)}`}>{queueStatus}</span> : null}
+              <span className="text-sm leading-none transition group-open:rotate-180">v</span>
+            </summary>
+            <div className="absolute left-0 z-10 mt-2 min-w-[220px] rounded-2xl border border-line bg-white p-2 shadow-xl">
+              <Link
+                href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { queueStatus: '' } })}
+                className="flex rounded-xl px-3 py-2 text-slate-600 transition hover:bg-slate-50"
+              >
+                Semua Status
+              </Link>
+              {queueStatusOptions.map((item) => (
+                <Link
+                  key={item}
+                  href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { queueStatus: item } })}
+                  className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 transition hover:bg-slate-50"
+                >
+                  {(() => {
+                    const Icon = getQueueStatusIcon(item)
+                    return <Icon className="h-3.5 w-3.5" />
+                  })()}
+                  <span className={`rounded-full px-2 py-1 text-[10px] ${getStatusBadgeClass(item)}`}>{item}</span>
+                </Link>
+              ))}
+            </div>
+          </details>
+
+          <details className="group relative">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-2xl border border-line bg-white px-4 py-2 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+              <span>SLA</span>
+              {slaState ? <span className={`rounded-full px-2 py-1 text-[10px] ${getSlaBadgeClass(slaState as NocQueueItem['slaState'])}`}>{slaState}</span> : null}
+              <span className="text-sm leading-none transition group-open:rotate-180">v</span>
+            </summary>
+            <div className="absolute left-0 z-10 mt-2 min-w-[220px] rounded-2xl border border-line bg-white p-2 shadow-xl">
+              <Link
+                href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { slaState: '' } })}
+                className="flex rounded-xl px-3 py-2 text-slate-600 transition hover:bg-slate-50"
+              >
+                Semua SLA
+              </Link>
+              {slaStateOptions.map((item) => (
+                <Link
+                  key={item}
+                  href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { slaState: item } })}
+                  className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2 text-slate-700 transition hover:bg-slate-50"
+                >
+                  <span className={`rounded-full px-2 py-1 text-[10px] ${getSlaBadgeClass(item)}`}>{item}</span>
+                </Link>
+              ))}
+            </div>
+          </details>
         </div>
 
         {payload.error ? (
