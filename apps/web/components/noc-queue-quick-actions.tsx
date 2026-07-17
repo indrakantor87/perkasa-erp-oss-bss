@@ -52,6 +52,57 @@ function resolveDefaultTargetTeam(ticketType: NocTicketType, lifecycleStatus: De
   return ''
 }
 
+type QuickPreset = {
+  key: string
+  label: string
+  lifecycleStatus: DeviceLifecycleStatus
+  targetTeam?: string
+}
+
+function buildQuickPresets(ticketType: NocTicketType): QuickPreset[] {
+  const delegationStatus = ticketType === 'PSB' ? 'TEAM_PSB' : 'TEAM_TROUBLESHOOTS'
+  const delegationTarget = ticketType === 'PSB' ? 'Team Teknisi PSB' : 'Team Troubleshoots'
+
+  const presets: QuickPreset[] = [
+    {
+      key: 'delegasi',
+      label: 'Delegasi',
+      lifecycleStatus: delegationStatus,
+      targetTeam: delegationTarget,
+    },
+    {
+      key: 'pending',
+      label: 'Pending Validasi',
+      lifecycleStatus: 'PENDING_NOC_VALIDATION',
+    },
+    {
+      key: 'installed',
+      label: 'Terpasang',
+      lifecycleStatus: 'INSTALLED',
+    },
+    {
+      key: 'damaged',
+      label: 'Rusak',
+      lifecycleStatus: 'DAMAGED',
+    },
+    {
+      key: 'returned',
+      label: 'Kembali',
+      lifecycleStatus: 'RETURNED',
+    },
+  ]
+
+  if (ticketType === 'TROUBLESHOOTS') {
+    presets.splice(1, 0, {
+      key: 'replace',
+      label: 'Replace',
+      lifecycleStatus: 'REPLACE',
+    })
+  }
+
+  return presets
+}
+
 export function NocQueueQuickActions({
   canCreate,
   reviewDbReady,
@@ -62,14 +113,31 @@ export function NocQueueQuickActions({
   deviceState,
 }: NocQueueQuickActionsProps) {
   const [open, setOpen] = useState(false)
-  const defaultLifecycleStatus = useMemo(
+  const presets = useMemo(() => buildQuickPresets(ticketType), [ticketType])
+  const fallbackLifecycleStatus = useMemo(
     () => resolveDefaultLifecycleStatus(ticketType, deviceState),
     [deviceState, ticketType],
   )
-  const defaultTargetTeam = useMemo(
-    () => resolveDefaultTargetTeam(ticketType, defaultLifecycleStatus),
-    [defaultLifecycleStatus, ticketType],
-  )
+  const initialPreset =
+    presets.find((item) => item.lifecycleStatus === fallbackLifecycleStatus) ??
+    presets[0] ?? {
+      key: 'default',
+      label: 'Delegasi',
+      lifecycleStatus: fallbackLifecycleStatus,
+      targetTeam: resolveDefaultTargetTeam(ticketType, fallbackLifecycleStatus),
+    }
+  const [selectedPresetKey, setSelectedPresetKey] = useState(initialPreset.key)
+
+  const selectedPreset = useMemo(() => {
+    const matched = presets.find((item) => item.key === selectedPresetKey)
+    if (matched) {
+      return matched
+    }
+
+    return initialPreset
+  }, [initialPreset, presets, selectedPresetKey])
+
+  const defaultTargetTeam = selectedPreset.targetTeam ?? resolveDefaultTargetTeam(ticketType, selectedPreset.lifecycleStatus)
 
   return (
     <div className="space-y-2">
@@ -83,17 +151,34 @@ export function NocQueueQuickActions({
 
       {open ? (
         <div className="rounded-2xl border border-line bg-[var(--color-surface-soft)] p-3">
+          <div className="mb-3 flex flex-wrap gap-2">
+            {presets.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => setSelectedPresetKey(preset.key)}
+                className={`rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition ${
+                  selectedPreset.key === preset.key
+                    ? 'bg-slate-950 text-white'
+                    : 'border border-line bg-white text-slate-700 hover:border-slate-400'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
           <DeviceLifecycleActionForm
+            key={selectedPreset.key}
             canCreate={canCreate}
             reviewDbReady={reviewDbReady}
             itemSuggestions={itemSuggestions}
             workOrderId={workOrderId}
             troubleTicketId={troubleTicketId}
-            defaultLifecycleStatus={defaultLifecycleStatus}
+            defaultLifecycleStatus={selectedPreset.lifecycleStatus}
             defaultTargetTeam={defaultTargetTeam}
             embedded
             title="Validasi cepat NOC"
-            description="Gunakan dari tabel NOC untuk scan, delegasi, pending validasi, terpasang, rusak, atau kembali."
+            description={`Preset aktif: ${selectedPreset.label}. Gunakan dari tabel NOC untuk scan, delegasi, pending validasi, terpasang, rusak, atau kembali.`}
           />
         </div>
       ) : null}

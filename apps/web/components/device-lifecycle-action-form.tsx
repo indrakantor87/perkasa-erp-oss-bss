@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
 import { extractInventoryItemCodeFromScan, findInventorySuggestionByCode } from '@/lib/inventory-barcode-utils'
@@ -60,6 +60,14 @@ export function DeviceLifecycleActionForm({
   const isDisabled = !canCreate || !reviewDbReady || submitting
 
   const resolvedItemCode = useMemo(() => extractInventoryItemCodeFromScan(itemValue), [itemValue])
+
+  useEffect(() => {
+    setLifecycleStatus(defaultLifecycleStatus)
+  }, [defaultLifecycleStatus])
+
+  useEffect(() => {
+    setTargetTeam(defaultTargetTeam)
+  }, [defaultTargetTeam])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

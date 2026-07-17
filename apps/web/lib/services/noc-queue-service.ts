@@ -86,6 +86,7 @@ export type NocQueueItem = {
   troubleTicketId: number | null
   priority: string | null
   technicianName: string | null
+  supportLaneLabel: string
   requestCode: string | null
   requestStatus: string | null
   requestRequestedFor: string | null
@@ -183,6 +184,9 @@ function normalizeQueueStatus(rawStatus: string | null | undefined): NocQueueSta
   if (!value || value === 'OPEN' || value === 'NEW') {
     return 'OPEN'
   }
+  if (value === 'SCHEDULED' || value === 'ASSIGNED') {
+    return 'OPEN'
+  }
   if (
     value.includes('CLOSE') ||
     value.includes('DONE') ||
@@ -194,6 +198,7 @@ function normalizeQueueStatus(rawStatus: string | null | undefined): NocQueueSta
     return 'CLOSE'
   }
   if (
+    value.includes('FOLLOW_UP') ||
     value.includes('TEMP') ||
     value.includes('PENDING') ||
     value.includes('WAIT') ||
@@ -215,6 +220,16 @@ function normalizeQueueStatus(rawStatus: string | null | undefined): NocQueueSta
   }
 
   return 'OPEN'
+}
+
+function resolveSupportLaneLabel(ticketType: NocTicketType) {
+  if (ticketType === 'DISMANTLE') {
+    return 'Lane Dismantle'
+  }
+  if (ticketType === 'JALUR') {
+    return 'Lane Jalur'
+  }
+  return 'Lane TT'
 }
 
 function mapRequestDeviceState(request: InventoryRequestSummaryRow | null) {
@@ -631,6 +646,13 @@ export async function getNocQueueList(query: NocQueueQuery) {
           troubleTicketId: row.troubleTicketId,
           priority: row.priority,
           technicianName: row.technicianName,
+          supportLaneLabel: resolveSupportLaneLabel(
+            detectTicketType({
+              workType: row.workType,
+              jobCategory: row.jobCategory,
+              sourceType: 'WORK_ORDER',
+            }),
+          ),
           requestCode: request?.requestCode ?? null,
           requestStatus: request?.requestStatus ?? null,
           requestRequestedFor: request?.requestedFor ?? null,
@@ -679,6 +701,15 @@ export async function getNocQueueList(query: NocQueueQuery) {
           troubleTicketId: row.id,
           priority: linkedWorkOrder?.priority ?? null,
           technicianName: linkedWorkOrder?.technicianName ?? null,
+          supportLaneLabel: resolveSupportLaneLabel(
+            detectTicketType({
+              category: row.category,
+              type: row.type,
+              jobCategory: linkedWorkOrder?.jobCategory ?? null,
+              workType: linkedWorkOrder?.workType ?? null,
+              sourceType: 'TROUBLE_TICKET',
+            }),
+          ),
           requestCode: request?.requestCode ?? null,
           requestStatus: request?.requestStatus ?? null,
           requestRequestedFor: request?.requestedFor ?? null,

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Camera, Download, Link2, Map, Pencil, Plus, ScanLine, Upload } from 'lucide-react'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { NocQueueQuickActions } from '@/components/noc-queue-quick-actions'
 import { canPerformAction } from '@/lib/access-control'
@@ -15,6 +16,14 @@ function resolveSearchParam(value: string | string[] | undefined) {
 const ticketTypeOptions: NocTicketType[] = ['PSB', 'TROUBLESHOOTS', 'DISMANTLE', 'JALUR']
 const queueStatusOptions: NocQueueStatus[] = ['OPEN', 'ON_PROGRESS', 'TEMPORARY', 'CLOSE']
 
+function getTicketTypeIcon(ticketType: NocTicketType) {
+  if (ticketType === 'PSB') return Plus
+  if (ticketType === 'TROUBLESHOOTS') return Pencil
+  if (ticketType === 'DISMANTLE') return Download
+  if (ticketType === 'JALUR') return Map
+  return Link2
+}
+
 function getTypeBadgeClass(ticketType: NocTicketType) {
   if (ticketType === 'PSB') return 'bg-sky-100 text-sky-700'
   if (ticketType === 'TROUBLESHOOTS') return 'bg-amber-100 text-amber-800'
@@ -29,6 +38,14 @@ function getStatusBadgeClass(queueStatus: NocQueueStatus) {
   if (queueStatus === 'TEMPORARY') return 'bg-orange-100 text-orange-700'
   if (queueStatus === 'CLOSE') return 'bg-emerald-100 text-emerald-700'
   return 'bg-slate-100 text-slate-700'
+}
+
+function getQueueStatusIcon(queueStatus: NocQueueStatus) {
+  if (queueStatus === 'OPEN') return Plus
+  if (queueStatus === 'ON_PROGRESS') return ScanLine
+  if (queueStatus === 'TEMPORARY') return Camera
+  if (queueStatus === 'CLOSE') return Upload
+  return Plus
 }
 
 function renderTicketMeta(item: NocQueueItem) {
@@ -174,8 +191,12 @@ export default async function NocQueuePage({
             <Link
               key={item}
               href={`/dashboard/tracking/noc-queue?ticketType=${item}`}
-              className={`rounded-full px-3 py-2 ${getTypeBadgeClass(item)}`}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-2 ${getTypeBadgeClass(item)}`}
             >
+              {(() => {
+                const Icon = getTicketTypeIcon(item)
+                return <Icon className="h-3.5 w-3.5" />
+              })()}
               {item}
             </Link>
           ))}
@@ -183,8 +204,12 @@ export default async function NocQueuePage({
             <Link
               key={item}
               href={`/dashboard/tracking/noc-queue?queueStatus=${item}`}
-              className={`rounded-full px-3 py-2 ${getStatusBadgeClass(item)}`}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-2 ${getStatusBadgeClass(item)}`}
             >
+              {(() => {
+                const Icon = getQueueStatusIcon(item)
+                return <Icon className="h-3.5 w-3.5" />
+              })()}
               {item}
             </Link>
           ))}
@@ -229,20 +254,29 @@ export default async function NocQueuePage({
                     <p className="text-xs uppercase tracking-[0.2em] text-mute">{item.customerUser ?? ''}</p>
                   </td>
                   <td className="px-4 py-4 align-top">
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getTypeBadgeClass(item.ticketType)}`}>
+                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getTypeBadgeClass(item.ticketType)}`}>
+                      {(() => {
+                        const Icon = getTicketTypeIcon(item.ticketType)
+                        return <Icon className="h-3.5 w-3.5" />
+                      })()}
                       {item.ticketType}
                     </span>
                     {item.priority ? <p className="mt-2 text-xs uppercase tracking-[0.2em] text-mute">Priority {item.priority}</p> : null}
+                    <p className="mt-2 text-xs uppercase tracking-[0.2em] text-mute">{item.supportLaneLabel}</p>
                   </td>
                   <td className="px-4 py-4 align-top">
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(item.queueStatus)}`}>
+                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(item.queueStatus)}`}>
+                      {(() => {
+                        const Icon = getQueueStatusIcon(item.queueStatus)
+                        return <Icon className="h-3.5 w-3.5" />
+                      })()}
                       {item.queueStatus}
                     </span>
                     {item.rawStatus ? <p className="mt-2 text-xs uppercase tracking-[0.2em] text-mute">Raw: {item.rawStatus}</p> : null}
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     <p className="font-semibold text-[var(--color-ink-strong)]">{item.technicianName ?? '-'}</p>
-                    <p>{item.sourceType === 'WORK_ORDER' ? 'Lane WO' : 'Lane TT'}</p>
+                    <p>{item.supportLaneLabel}</p>
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     <p className="font-semibold text-[var(--color-ink-strong)]">{item.requestCode ?? '-'}</p>
