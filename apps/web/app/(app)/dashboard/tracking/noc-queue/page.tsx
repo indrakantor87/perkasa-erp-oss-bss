@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Camera, Download, Link2, Map, Pencil, Plus, ScanLine, Upload } from 'lucide-react'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { NocQueueQuickActions } from '@/components/noc-queue-quick-actions'
+import { NocQueueSupportActions } from '@/components/noc-queue-support-actions'
 import { canPerformAction } from '@/lib/access-control'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
@@ -89,6 +90,7 @@ export default async function NocQueuePage({
     canPerformAction(session.role, 'inventory', 'update') ||
     canPerformAction(session.role, 'inventory', 'create') ||
     canPerformAction(session.role, 'support', 'update')
+  const canUpdateSupport = canPerformAction(session.role, 'support', 'update')
   const reviewDbReady = payload.source.effectiveMode === 'review-db' && !payload.source.isFallback
 
   return (
@@ -311,6 +313,16 @@ export default async function NocQueuePage({
                         ticketType={item.ticketType}
                         deviceState={item.deviceState}
                       />
+                      {item.sourceType === 'TROUBLE_TICKET' && item.ticketNo ? (
+                        <NocQueueSupportActions
+                          canUpdate={canUpdateSupport}
+                          reviewDbReady={reviewDbReady}
+                          ticketCode={item.ticketNo}
+                          rawStatus={item.rawStatus}
+                          supportLaneLabel={item.supportLaneLabel}
+                          detailHref={item.href}
+                        />
+                      ) : null}
                     </div>
                   </td>
                 </tr>

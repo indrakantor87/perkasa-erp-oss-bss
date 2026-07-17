@@ -15,6 +15,7 @@ type DeviceLifecycleActionFormProps = {
   troubleTicketId?: number | null
   defaultLifecycleStatus?: DeviceLifecycleStatus
   defaultTargetTeam?: string
+  defaultNotes?: string
   title?: string
   description?: string
   embedded?: boolean
@@ -44,6 +45,7 @@ export function DeviceLifecycleActionForm({
   troubleTicketId = null,
   defaultLifecycleStatus = 'NOC',
   defaultTargetTeam = '',
+  defaultNotes = '',
   title = 'Scan & validasi device',
   description = 'Catat perpindahan lifecycle ONT/modem dari Inventory, NOC, delegasi teknisi, replace, sampai validasi akhir.',
   embedded = false,
@@ -68,6 +70,10 @@ export function DeviceLifecycleActionForm({
   useEffect(() => {
     setTargetTeam(defaultTargetTeam)
   }, [defaultTargetTeam])
+
+  useEffect(() => {
+    setNotes(defaultNotes)
+  }, [defaultNotes])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -128,7 +134,7 @@ export function DeviceLifecycleActionForm({
       setItemValue('')
       setLifecycleStatus(defaultLifecycleStatus)
       setTargetTeam(defaultTargetTeam)
-      setNotes('')
+      setNotes(defaultNotes)
       router.refresh()
     } finally {
       setSubmitting(false)

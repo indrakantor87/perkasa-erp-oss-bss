@@ -57,6 +57,11 @@ type QuickPreset = {
   label: string
   lifecycleStatus: DeviceLifecycleStatus
   targetTeam?: string
+  notes: string
+}
+
+function normalizeDeviceState(deviceState: string | null | undefined) {
+  return String(deviceState ?? '').trim().toUpperCase()
 }
 
 function buildQuickPresets(ticketType: NocTicketType): QuickPreset[] {
@@ -69,26 +74,45 @@ function buildQuickPresets(ticketType: NocTicketType): QuickPreset[] {
       label: 'Delegasi',
       lifecycleStatus: delegationStatus,
       targetTeam: delegationTarget,
+      notes: `Delegasi device dari NOC ke ${delegationTarget}.`,
     },
     {
       key: 'pending',
       label: 'Pending Validasi',
       lifecycleStatus: 'PENDING_NOC_VALIDATION',
+      notes: 'Teknisi sudah scan hasil pekerjaan, menunggu validasi NOC.',
     },
     {
       key: 'installed',
       label: 'Terpasang',
       lifecycleStatus: 'INSTALLED',
+      notes: 'Validasi NOC: device terpasang normal dan layanan aktif.',
     },
     {
       key: 'damaged',
       label: 'Rusak',
       lifecycleStatus: 'DAMAGED',
+      notes: 'Validasi NOC: device dinyatakan rusak atau gagal dipasang.',
     },
     {
       key: 'returned',
       label: 'Kembali',
       lifecycleStatus: 'RETURNED',
+      notes: 'Device dikembalikan ke NOC / inventory untuk pemeriksaan lanjutan.',
+    },
+    {
+      key: 'noc',
+      label: 'Ke NOC',
+      lifecycleStatus: 'NOC',
+      targetTeam: 'NOC',
+      notes: 'Device diterima NOC untuk pengecekan awal.',
+    },
+    {
+      key: 'inventory',
+      label: 'Ke Inventory',
+      lifecycleStatus: 'INVENTORY',
+      targetTeam: 'Inventory',
+      notes: 'Device tercatat kembali di inventory / gudang.',
     },
   ]
 
@@ -97,10 +121,43 @@ function buildQuickPresets(ticketType: NocTicketType): QuickPreset[] {
       key: 'replace',
       label: 'Replace',
       lifecycleStatus: 'REPLACE',
+      notes: 'Teknisi trouble melakukan replace device lama di lokasi.',
     })
   }
 
   return presets
+}
+
+function filterQuickPresets(presets: QuickPreset[], deviceState: string | null | undefined) {
+  const state = normalizeDeviceState(deviceState)
+  if (!state || state === 'REQUEST BARANG' || state === 'MENUNGGU MATERIAL') {
+    return presets.filter((item) => ['inventory', 'noc', 'delegasi'].includes(item.key))
+  }
+  if (state === 'INVENTORY' || state === 'DIPROSES INVENTORY' || state === 'SIAP DIPASANG') {
+    return presets.filter((item) => ['noc', 'delegasi', 'inventory'].includes(item.key))
+  }
+  if (state === 'NOC') {
+    return presets.filter((item) => ['delegasi', 'inventory', 'returned'].includes(item.key))
+  }
+  if (
+    state === 'TEAM TEKNISI PSB' ||
+    state === 'TEAM TEKNISI TROUBLESHOOTS' ||
+    state === 'TEAM_PSB' ||
+    state === 'TEAM_TROUBLESHOOTS'
+  ) {
+    return presets.filter((item) => ['pending', 'replace', 'returned', 'delegasi'].includes(item.key))
+  }
+  if (state === 'PENDING VALIDASI NOC' || state === 'PENDING_NOC_VALIDATION' || state === 'REPLACE') {
+    return presets.filter((item) => ['installed', 'damaged', 'returned', 'pending'].includes(item.key))
+  }
+  if (state === 'TERPASANG' || state === 'INSTALLED') {
+    return presets.filter((item) => ['damaged', 'returned', 'installed'].includes(item.key))
+  }
+  if (state === 'RUSAK' || state === 'DAMAGED' || state === 'KEMBALI' || state === 'RETURNED') {
+    return presets.filter((item) => ['inventory', 'noc', 'delegasi'].includes(item.key))
+  }
+
+  return presets.filter((item) => item.key !== 'inventory')
 }
 
 export function NocQueueQuickActions({
@@ -113,7 +170,10 @@ export function NocQueueQuickActions({
   deviceState,
 }: NocQueueQuickActionsProps) {
   const [open, setOpen] = useState(false)
-  const presets = useMemo(() => buildQuickPresets(ticketType), [ticketType])
+  const presets = useMemo(
+    () => filterQuickPresets(buildQuickPresets(ticketType), deviceState),
+    [deviceState, ticketType],
+  )
   const fallbackLifecycleStatus = useMemo(
     () => resolveDefaultLifecycleStatus(ticketType, deviceState),
     [deviceState, ticketType],
@@ -125,6 +185,7 @@ export function NocQueueQuickActions({
       label: 'Delegasi',
       lifecycleStatus: fallbackLifecycleStatus,
       targetTeam: resolveDefaultTargetTeam(ticketType, fallbackLifecycleStatus),
+      notes: 'Update lifecycle device dari queue NOC.',
     }
   const [selectedPresetKey, setSelectedPresetKey] = useState(initialPreset.key)
 
@@ -138,6 +199,7 @@ export function NocQueueQuickActions({
   }, [initialPreset, presets, selectedPresetKey])
 
   const defaultTargetTeam = selectedPreset.targetTeam ?? resolveDefaultTargetTeam(ticketType, selectedPreset.lifecycleStatus)
+  const defaultNotes = selectedPreset.notes
 
   return (
     <div className="space-y-2">
@@ -176,6 +238,7 @@ export function NocQueueQuickActions({
             troubleTicketId={troubleTicketId}
             defaultLifecycleStatus={selectedPreset.lifecycleStatus}
             defaultTargetTeam={defaultTargetTeam}
+            defaultNotes={defaultNotes}
             embedded
             title="Validasi cepat NOC"
             description={`Preset aktif: ${selectedPreset.label}. Gunakan dari tabel NOC untuk scan, delegasi, pending validasi, terpasang, rusak, atau kembali.`}
