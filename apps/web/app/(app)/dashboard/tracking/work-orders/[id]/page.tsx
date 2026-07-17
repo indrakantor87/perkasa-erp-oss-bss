@@ -129,6 +129,18 @@ export default async function WorkOrderTrackingDetailPage({
             >
               Lihat movement
             </Link>
+            <Link
+              href={`/inventory/requests?inventoryAction=item-request&workOrderId=${workOrderId}&requestType=WO_MATERIAL#inventory-action-item-request`}
+              className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+            >
+              Buat request barang
+            </Link>
+            <Link
+              href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=WORK_ORDER&workOrderId=${workOrderId}#inventory-action-stock-movement`}
+              className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+            >
+              Buat movement
+            </Link>
             {wo?.troubleTicketId ? (
               <Link
                 href={`/dashboard/tracking/trouble-tickets/${wo.troubleTicketId}`}

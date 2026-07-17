@@ -1,8 +1,8 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { LookupIdPicker } from '@/components/lookup-id-picker'
 import { TechnicianUserPicker } from '@/components/technician-user-picker'
 import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
@@ -34,6 +34,7 @@ export function InventoryStockMovementForm({
   embedded = false,
 }: InventoryStockMovementFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [itemValue, setItemValue] = useState(initialItemValue || itemSuggestions[0] || '')
   const [scanValue, setScanValue] = useState('')
   const [movementType, setMovementType] = useState<(typeof movementTypeOptions)[number]>('IN')
@@ -58,6 +59,58 @@ export function InventoryStockMovementForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    const workOrderIdParam = String(searchParams.get('workOrderId') ?? '').trim()
+    const troubleTicketIdParam = String(searchParams.get('troubleTicketId') ?? '').trim()
+    const requestIdParam = String(searchParams.get('requestId') ?? '').trim()
+    const fromLocationIdParam = String(searchParams.get('fromLocationId') ?? '').trim()
+    const toLocationIdParam = String(searchParams.get('toLocationId') ?? '').trim()
+    const technicianUserIdParam = String(searchParams.get('technicianUserId') ?? '').trim()
+    const referenceTypeParam = String(searchParams.get('referenceType') ?? '').trim().toUpperCase()
+    const movementTypeParam = String(searchParams.get('movementType') ?? '').trim().toUpperCase()
+
+    if (workOrderIdParam && !workOrderId) {
+      setWorkOrderRaw(workOrderIdParam)
+      setWorkOrderId(workOrderIdParam)
+    }
+    if (troubleTicketIdParam && !troubleTicketId) {
+      setTroubleTicketRaw(troubleTicketIdParam)
+      setTroubleTicketId(troubleTicketIdParam)
+    }
+    if (requestIdParam && !requestId) {
+      setRequestRaw(requestIdParam)
+      setRequestId(requestIdParam)
+    }
+    if (fromLocationIdParam && !fromLocationId) {
+      setFromLocationRaw(fromLocationIdParam)
+      setFromLocationId(fromLocationIdParam)
+    }
+    if (toLocationIdParam && !toLocationId) {
+      setToLocationRaw(toLocationIdParam)
+      setToLocationId(toLocationIdParam)
+    }
+    if (technicianUserIdParam && !technicianUserId) {
+      setTechnicianRaw(technicianUserIdParam)
+      setTechnicianUserId(technicianUserIdParam)
+    }
+    if (referenceTypeParam && referenceType === 'MANUAL' && referenceTypeOptions.includes(referenceTypeParam as (typeof referenceTypeOptions)[number])) {
+      setReferenceType(referenceTypeParam as (typeof referenceTypeOptions)[number])
+    }
+    if (movementTypeParam && movementType === 'IN' && movementTypeOptions.includes(movementTypeParam as (typeof movementTypeOptions)[number])) {
+      setMovementType(movementTypeParam as (typeof movementTypeOptions)[number])
+    }
+  }, [
+    movementType,
+    referenceType,
+    requestId,
+    searchParams,
+    technicianUserId,
+    troubleTicketId,
+    workOrderId,
+    fromLocationId,
+    toLocationId,
+  ])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

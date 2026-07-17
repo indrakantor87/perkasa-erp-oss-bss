@@ -1,8 +1,8 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { LookupIdPicker } from '@/components/lookup-id-picker'
 import {
   INVENTORY_REQUEST_DIVISION,
@@ -32,6 +32,7 @@ export function InventoryItemRequestForm({
   embedded = false,
 }: InventoryItemRequestFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [itemValue, setItemValue] = useState(initialItemValue || itemSuggestions[0] || '')
   const [qty, setQty] = useState('1')
   const [requestedSubdivision, setRequestedSubdivision] = useState<InventoryRequestSubdivision>(
@@ -48,6 +49,24 @@ export function InventoryItemRequestForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+
+  useEffect(() => {
+    const workOrderIdParam = String(searchParams.get('workOrderId') ?? '').trim()
+    const troubleTicketIdParam = String(searchParams.get('troubleTicketId') ?? '').trim()
+    const requestTypeParam = String(searchParams.get('requestType') ?? '').trim().toUpperCase()
+
+    if (workOrderIdParam && !workOrderId) {
+      setWorkOrderRaw(workOrderIdParam)
+      setWorkOrderId(workOrderIdParam)
+    }
+    if (troubleTicketIdParam && !troubleTicketId) {
+      setTroubleTicketRaw(troubleTicketIdParam)
+      setTroubleTicketId(troubleTicketIdParam)
+    }
+    if (requestTypeParam && requestType === 'MANUAL' && requestTypeOptions.includes(requestTypeParam as (typeof requestTypeOptions)[number])) {
+      setRequestType(requestTypeParam as (typeof requestTypeOptions)[number])
+    }
+  }, [searchParams, requestType, troubleTicketId, workOrderId])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
