@@ -354,6 +354,16 @@ function buildBillingMainItem(role: AppRole | null) {
   })
 }
 
+function buildCompactBillingItem() {
+  return buildSidebarNavItem('/billing', {
+    key: 'billing-compact',
+    title: 'Billing',
+    description: 'Invoice, payment, collection, dan kontrol suspend',
+    matchPrefixes: ['/billing'],
+    assignHrefs: ['/billing'],
+  })
+}
+
 function buildBillingSubmenuItems(role: AppRole | null) {
   if (!role) {
     return []
@@ -396,6 +406,62 @@ function buildHrMainItem() {
     key: 'hr-main',
     title: 'HR',
     description: 'Employee, attendance, payroll, dan pinjaman karyawan',
+  })
+}
+
+function buildCompactTicketingItem() {
+  return buildSidebarNavItem('/dashboard/tracking', {
+    key: 'tracking-ticketing-compact',
+    title: 'Ticketing',
+    description: 'Tabel kombinasi ticket PSB, trouble ticket, dismantle, dan trouble jalur',
+    href: '/dashboard/tracking/noc-queue',
+    requiredPath: '/dashboard/tracking',
+    assignHrefs: ['/dashboard/tracking/noc-queue'],
+    matchPrefixes: ['/dashboard/tracking/noc-queue'],
+  })
+}
+
+function buildCompactIsolirItem() {
+  return buildSidebarNavItem('/support', {
+    key: 'support-isolir-compact',
+    title: 'Isolir',
+    description: 'Monitoring pelanggan suspend, restore, dan sinkron billing operasional',
+    href: '/support/isolations',
+    requiredPath: '/support',
+    assignHrefs: ['/support/isolations'],
+    matchPrefixes: ['/support/isolations'],
+  })
+}
+
+function buildCompactInventoryItem() {
+  return buildSidebarNavItem('/inventory', {
+    key: 'inventory-compact',
+    title: 'Inventory',
+    description: 'Ringkasan stok, request, pinjaman, rack, dan network inventory',
+    matchPrefixes: ['/inventory'],
+    excludePrefixes: ['/inventory/legal', '/inventory/kantor', '/inventory/toko'],
+    assignHrefs: ['/inventory'],
+  })
+}
+
+function buildCompactCustomerItem() {
+  return buildSidebarNavItem('/customers', {
+    key: 'customers-compact',
+    title: 'Customer',
+    description: 'Data pelanggan, langganan aktif, dan tindak lanjut layanan',
+    matchPrefixes: ['/customers'],
+    excludePrefixes: ['/customers/cs-admin'],
+    assignHrefs: ['/customers'],
+  })
+}
+
+function buildCompactHrItem() {
+  return buildSidebarNavItem('/hr', {
+    key: 'hr-compact',
+    title: 'HR',
+    description: 'Employee, attendance, payroll, dan pinjaman karyawan',
+    matchPrefixes: ['/hr'],
+    assignHrefs: ['/hr'],
   })
 }
 
@@ -681,10 +747,12 @@ function getWorkspaceCustomItems(role: AppRole | null) {
 
 function getSuperAdminCompactWorkspaceItems() {
   return [
-    buildCsAdminItem(),
-    buildSupportMainItem('SUPER_ADMIN'),
-    buildSalesMainItem('SUPER_ADMIN'),
-    buildBillingMainItem('SUPER_ADMIN'),
+    buildCompactBillingItem(),
+    buildCompactTicketingItem(),
+    buildCompactIsolirItem(),
+    buildCompactInventoryItem(),
+    buildCompactCustomerItem(),
+    buildCompactHrItem(),
   ]
 }
 
