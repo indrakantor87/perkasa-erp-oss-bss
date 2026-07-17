@@ -106,7 +106,6 @@ export function InventoryStockMovementForm({
     movementType,
     referenceType,
     requestId,
-    searchParams,
     technicianUserId,
     troubleTicketId,
     workOrderId,
