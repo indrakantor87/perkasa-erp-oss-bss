@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { DashboardOperationalCard, DashboardOperationalDivisionKey } from '@/lib/types'
 import {
   DASHBOARD_DIVISION_CLUSTERS,
+  SUPER_ADMIN_OPERASIONAL_INTI_CLUSTERS,
   isDivisionMenuItemIntegrated,
 } from '@/lib/dashboard-division-structure'
 
@@ -48,18 +49,22 @@ export function OperationalDivisionBoard({
   year,
   division,
   lockDivision = false,
+  superAdminMode = false,
 }: {
   cards: DashboardOperationalCard[]
   month: number
   year: number
   division: DashboardOperationalDivisionKey
   lockDivision?: boolean
+  superAdminMode?: boolean
 }) {
   const currentYear = new Date().getFullYear()
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1]
   const cardByKey = new Map<Exclude<DashboardOperationalDivisionKey, 'ALL'>, DashboardOperationalCard>(
     cards.map((card) => [card.key, card]),
   )
+  const clusters = superAdminMode ? SUPER_ADMIN_OPERASIONAL_INTI_CLUSTERS : DASHBOARD_DIVISION_CLUSTERS
+  const visibleCardCount = new Set(clusters.flatMap((cluster) => cluster.cardKeys)).size
 
   return (
     <section className="panel p-6">
@@ -149,14 +154,18 @@ export function OperationalDivisionBoard({
           <div>
             <p className="section-title">Performa Sub-divisi</p>
             <p className="mt-2 text-sm leading-6 text-mute">
-              Ringkasan per divisi dari data operasional yang sudah aktif di ERP.
+              {superAdminMode
+                ? 'Susunan Operasional Inti untuk Super Admin dengan pemetaan menu utama yang dipakai di ERP.'
+                : 'Ringkasan per divisi dari data operasional yang sudah aktif di ERP.'}
             </p>
           </div>
-          <span className="badge border-slate-200 bg-white text-slate-600">{cards.length} sub-divisi tampil</span>
+          <span className="badge border-slate-200 bg-white text-slate-600">
+            {superAdminMode ? `${visibleCardCount} area operasional` : `${cards.length} sub-divisi tampil`}
+          </span>
         </div>
 
         <div className="mt-6 space-y-6">
-          {DASHBOARD_DIVISION_CLUSTERS.map((cluster) => {
+          {clusters.map((cluster) => {
             const clusterCards = cluster.cardKeys
               .map((key) => cardByKey.get(key))
               .filter((card): card is DashboardOperationalCard => Boolean(card))

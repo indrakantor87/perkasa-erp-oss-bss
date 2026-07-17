@@ -114,6 +114,47 @@ export const DASHBOARD_DIVISION_CLUSTERS: DashboardDivisionCluster[] = [
   },
 ]
 
+export const SUPER_ADMIN_OPERASIONAL_INTI_CLUSTERS: DashboardDivisionCluster[] = [
+  {
+    title: 'Operasional Inti',
+    tone: 'border-slate-200 bg-slate-50 text-slate-900',
+    wide: true,
+    items: [
+      {
+        label: 'Billing',
+        aliases: ['Billing'],
+        cardKeys: ['BILLING'],
+      },
+      {
+        label: 'Ticketing',
+        aliases: ['Ticketing', 'PSB', 'Trouble Ticket', 'Dismantle', 'Trouble Jalur', 'NOC Queue'],
+        cardKeys: ['NOC', 'TT', 'DISMANTLE'],
+      },
+      {
+        label: 'Isolir',
+        aliases: ['Isolir', 'Suspend', 'Restore'],
+        cardKeys: ['CS'],
+      },
+      {
+        label: 'Inventory',
+        aliases: ['Inventory'],
+        cardKeys: ['INVENTORY'],
+      },
+      {
+        label: 'Customer',
+        aliases: ['Customer', 'Pelanggan'],
+        cardKeys: ['CS'],
+      },
+      {
+        label: 'HR',
+        aliases: ['HR'],
+        cardKeys: ['HR'],
+      },
+    ],
+    cardKeys: ['BILLING', 'NOC', 'TT', 'DISMANTLE', 'CS', 'INVENTORY', 'HR'],
+  },
+]
+
 export function matchesDivisionMenuItem(activeValue: string, item: DashboardDivisionMenuItem) {
   const normalized = activeValue.trim().toLowerCase()
   if (!normalized) return false

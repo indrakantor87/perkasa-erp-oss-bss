@@ -350,9 +350,14 @@ export default async function DashboardPage({
             year={year}
             division={division}
             lockDivision={lockDivisionFilter}
+            superAdminMode={session.role === 'SUPER_ADMIN'}
           />
           <DashboardProcessKpis cards={operationalCards} month={month} year={year} />
-          <DivisionStructureBoard activeDivision={roleMeta.division} activeSubdivision={roleMeta.subdivision} />
+          <DivisionStructureBoard
+            activeDivision={roleMeta.division}
+            activeSubdivision={roleMeta.subdivision}
+            superAdminMode={session.role === 'SUPER_ADMIN'}
+          />
           <DashboardKpiManagerPanel
             reviewDbReady={reviewDbReady}
             managerScope={managerScope}

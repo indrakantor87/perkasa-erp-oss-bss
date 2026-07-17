@@ -1,21 +1,36 @@
-import { DASHBOARD_DIVISION_CLUSTERS, matchesDivisionMenuItem } from '@/lib/dashboard-division-structure'
+import {
+  DASHBOARD_DIVISION_CLUSTERS,
+  SUPER_ADMIN_OPERASIONAL_INTI_CLUSTERS,
+  matchesDivisionMenuItem,
+} from '@/lib/dashboard-division-structure'
 
 type DivisionStructureBoardProps = {
   activeDivision: string
   activeSubdivision: string
+  superAdminMode?: boolean
 }
 
-export function DivisionStructureBoard({ activeDivision, activeSubdivision }: DivisionStructureBoardProps) {
+export function DivisionStructureBoard({
+  activeDivision,
+  activeSubdivision,
+  superAdminMode = false,
+}: DivisionStructureBoardProps) {
+  const divisions = superAdminMode ? SUPER_ADMIN_OPERASIONAL_INTI_CLUSTERS : DASHBOARD_DIVISION_CLUSTERS
+
   return (
     <section className="panel p-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="section-title">Struktur Divisi</p>
           <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-            Pemisahan divisi dan kelompok menu yang dipakai di ERP
+            {superAdminMode
+              ? 'Struktur Operasional Inti yang dipakai Super Admin'
+              : 'Pemisahan divisi dan kelompok menu yang dipakai di ERP'}
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-            Struktur ini menjadi acuan cara membaca dashboard, sidebar, worklist, dan scope akses per role.
+            {superAdminMode
+              ? 'Struktur ini menyamakan pembacaan dashboard tambahan dengan sidebar compact Super Admin agar fokus operasional inti tetap konsisten.'
+              : 'Struktur ini menjadi acuan cara membaca dashboard, sidebar, worklist, dan scope akses per role.'}
           </p>
         </div>
         <div className="rounded-2xl border border-line bg-slate-50 p-4">
@@ -26,7 +41,7 @@ export function DivisionStructureBoard({ activeDivision, activeSubdivision }: Di
       </div>
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
-        {DASHBOARD_DIVISION_CLUSTERS.map((division) => (
+        {divisions.map((division) => (
           <article
             key={division.title}
             className={`rounded-3xl border border-line bg-white p-5 ${division.wide ? 'lg:col-span-2' : ''}`}
