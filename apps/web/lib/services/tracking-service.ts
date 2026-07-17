@@ -149,6 +149,23 @@ export type StockMovementTrackingQuery = {
   limit?: string | string[]
 }
 
+export type TroubleTicketTrackingQuery = {
+  q?: string | string[]
+  status?: string | string[]
+  type?: string | string[]
+  category?: string | string[]
+  limit?: string | string[]
+}
+
+export type InventoryRequestTrackingQuery = {
+  q?: string | string[]
+  status?: string | string[]
+  requestType?: string | string[]
+  workOrderId?: string | string[]
+  troubleTicketId?: string | string[]
+  limit?: string | string[]
+}
+
 export async function getWorkOrderTrackingList(query: WorkOrderTrackingQuery) {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
@@ -600,6 +617,157 @@ export async function getStockMovementTrackingDetail(movementId: number) {
   }
 }
 
+export async function getTroubleTicketTrackingList(query: TroubleTicketTrackingQuery) {
+  const source = getDataSourceSnapshot()
+  if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    return { source, items: [], error: null as string | null, state: resolveTroubleTicketTrackingState(query) }
+  }
+
+  const state = resolveTroubleTicketTrackingState(query)
+  try {
+    const where: string[] = []
+    const values: unknown[] = []
+
+    if (state.q) {
+      where.push('(tt.ticket_code LIKE ? OR tt.customer_name LIKE ? OR tt.customer_user LIKE ?)')
+      values.push(normalizeLike(state.q), normalizeLike(state.q), normalizeLike(state.q))
+    }
+    if (state.status) {
+      where.push('tt.status = ?')
+      values.push(state.status)
+    }
+    if (state.type) {
+      where.push('tt.type = ?')
+      values.push(state.type)
+    }
+    if (state.category) {
+      where.push('tt.category = ?')
+      values.push(state.category)
+    }
+
+    values.push(state.limit)
+
+    const rows = await runReviewDbQuery<TroubleTicketRow>(
+      `
+        SELECT
+          tt.id AS id,
+          tt.branch_id AS branchId,
+          tt.subscription_id AS subscriptionId,
+          tt.ticket_code AS ticketCode,
+          tt.customer_name AS customerName,
+          tt.customer_user AS customerUser,
+          tt.category AS category,
+          tt.type AS type,
+          tt.status AS status,
+          tt.problem_category AS problemCategory,
+          tt.resolution_action AS resolutionAction,
+          tt.notes AS notes,
+          tt.close_notes AS closeNotes,
+          tt.opened_at AS openedAt,
+          tt.closed_at AS closedAt,
+          tt.created_at AS createdAt,
+          tt.updated_at AS updatedAt
+        FROM support_trouble_tickets tt
+        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+        ORDER BY tt.id DESC
+        LIMIT ?
+      `,
+      values,
+    )
+
+    return { source, items: rows, error: null as string | null, state }
+  } catch (error) {
+    return {
+      source: getFallbackDataSource(source, error),
+      items: [],
+      error: getReviewDbErrorDetail(error),
+      state,
+    }
+  }
+}
+
+export async function getInventoryRequestTrackingList(query: InventoryRequestTrackingQuery) {
+  const source = getDataSourceSnapshot()
+  if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    return { source, items: [], error: null as string | null, state: resolveInventoryRequestTrackingState(query) }
+  }
+
+  const state = resolveInventoryRequestTrackingState(query)
+  try {
+    const hasWorkOrderId = await hasReviewDbColumn('inventory_item_requests', 'work_order_id')
+    const hasTroubleTicketId = await hasReviewDbColumn('inventory_item_requests', 'trouble_ticket_id')
+    const hasRequestType = await hasReviewDbColumn('inventory_item_requests', 'request_type')
+
+    const where: string[] = []
+    const values: unknown[] = []
+
+    if (state.q) {
+      where.push('(r.request_code LIKE ? OR i.item_code LIKE ? OR i.item_name LIKE ? OR r.requested_by LIKE ?)')
+      values.push(normalizeLike(state.q), normalizeLike(state.q), normalizeLike(state.q), normalizeLike(state.q))
+    }
+    if (state.status) {
+      where.push('r.request_status = ?')
+      values.push(state.status)
+    }
+    if (state.requestType && hasRequestType) {
+      where.push('r.request_type = ?')
+      values.push(state.requestType)
+    }
+    if (state.workOrderId && hasWorkOrderId) {
+      where.push('r.work_order_id = ?')
+      values.push(state.workOrderId)
+    }
+    if (state.troubleTicketId && hasTroubleTicketId) {
+      where.push('r.trouble_ticket_id = ?')
+      values.push(state.troubleTicketId)
+    }
+
+    values.push(state.limit)
+
+    const rows = await runReviewDbQuery<InventoryRequestRow>(
+      `
+        SELECT
+          r.id AS id,
+          r.request_code AS requestCode,
+          r.inventory_item_id AS inventoryItemId,
+          i.item_code AS itemCode,
+          i.item_name AS itemName,
+          r.request_qty AS requestQty,
+          ${hasRequestType ? 'r.request_type' : 'NULL'} AS requestType,
+          r.request_status AS requestStatus,
+          r.requested_division AS requestedDivision,
+          r.requested_subdivision AS requestedSubdivision,
+          r.requested_for AS requestedFor,
+          r.request_notes AS requestNotes,
+          r.pending_reason AS pendingReason,
+          r.requested_by AS requestedBy,
+          r.processed_by AS processedBy,
+          r.requested_at AS requestedAt,
+          r.processed_at AS processedAt,
+          r.completed_at AS completedAt,
+          ${hasWorkOrderId ? 'r.work_order_id' : 'NULL'} AS workOrderId,
+          ${hasTroubleTicketId ? 'r.trouble_ticket_id' : 'NULL'} AS troubleTicketId
+        FROM inventory_item_requests r
+        INNER JOIN inventory_items i
+          ON i.id = r.inventory_item_id
+        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+        ORDER BY r.id DESC
+        LIMIT ?
+      `,
+      values,
+    )
+
+    return { source, items: rows, error: null as string | null, state }
+  } catch (error) {
+    return {
+      source: getFallbackDataSource(source, error),
+      items: [],
+      error: getReviewDbErrorDetail(error),
+      state,
+    }
+  }
+}
+
 export async function getTroubleTicketTrackingDetail(troubleTicketId: number) {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
@@ -976,6 +1144,42 @@ function resolveStockMovementTrackingState(query: StockMovementTrackingQuery) {
     workOrderId,
     troubleTicketId,
     technicianUserId,
+    limit,
+  }
+}
+
+function resolveTroubleTicketTrackingState(query: TroubleTicketTrackingQuery) {
+  const q = resolveSearchParam(query.q)?.trim() ?? ''
+  const status = resolveSearchParam(query.status)?.trim().toUpperCase() ?? ''
+  const type = resolveSearchParam(query.type)?.trim().toUpperCase() ?? ''
+  const category = resolveSearchParam(query.category)?.trim().toUpperCase() ?? ''
+  const limitRaw = resolveSearchParam(query.limit)?.trim() ?? ''
+  const limit = Math.min(Math.max(resolveOptionalInt(limitRaw) ?? 100, 20), 300)
+
+  return {
+    q: q || null,
+    status: status || null,
+    type: type || null,
+    category: category || null,
+    limit,
+  }
+}
+
+function resolveInventoryRequestTrackingState(query: InventoryRequestTrackingQuery) {
+  const q = resolveSearchParam(query.q)?.trim() ?? ''
+  const status = resolveSearchParam(query.status)?.trim().toUpperCase() ?? ''
+  const requestType = resolveSearchParam(query.requestType)?.trim().toUpperCase() ?? ''
+  const workOrderId = resolveOptionalInt(resolveSearchParam(query.workOrderId)) ?? null
+  const troubleTicketId = resolveOptionalInt(resolveSearchParam(query.troubleTicketId)) ?? null
+  const limitRaw = resolveSearchParam(query.limit)?.trim() ?? ''
+  const limit = Math.min(Math.max(resolveOptionalInt(limitRaw) ?? 100, 20), 300)
+
+  return {
+    q: q || null,
+    status: status || null,
+    requestType: requestType || null,
+    workOrderId,
+    troubleTicketId,
     limit,
   }
 }

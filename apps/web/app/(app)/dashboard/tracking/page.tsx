@@ -37,18 +37,24 @@ export default async function DashboardTrackingIndexPage() {
             <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Tracking Barang (Stock Movement)</p>
             <p className="mt-2 text-sm leading-6 text-mute">List movement + filter WO/TT/teknisi/lokasi dan detail jejak barang.</p>
           </Link>
-          <div className="surface-soft rounded-3xl border border-line p-5">
-            <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Deep Link Trouble Ticket</p>
+          <Link
+            href="/dashboard/tracking/trouble-tickets"
+            className="surface-soft rounded-3xl border border-line p-5 transition hover:[border-color:var(--color-line-strong)]"
+          >
+            <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Tracking Trouble Ticket</p>
             <p className="mt-2 text-sm leading-6 text-mute">
-              Detail TT bisa dibuka dari movement atau work order yang sudah terhubung ke ticket lapangan.
+              List TT + detail work order terkait dan movement inventory yang terhubung ke ticket.
             </p>
-          </div>
-          <div className="surface-soft rounded-3xl border border-line p-5">
-            <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Deep Link Request Barang</p>
+          </Link>
+          <Link
+            href="/dashboard/tracking/inventory-requests"
+            className="surface-soft rounded-3xl border border-line p-5 transition hover:[border-color:var(--color-line-strong)]"
+          >
+            <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Tracking Request Barang</p>
             <p className="mt-2 text-sm leading-6 text-mute">
-              Detail request barang bisa dibuka dari movement yang punya relasi `request_id`.
+              List request + detail konteks WO/TT dan movement terkait untuk audit pemakaian barang.
             </p>
-          </div>
+          </Link>
         </div>
       </section>
     </div>
