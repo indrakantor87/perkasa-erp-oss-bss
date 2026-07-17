@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { LookupIdPicker } from '@/components/lookup-id-picker'
 import { TechnicianUserPicker } from '@/components/technician-user-picker'
 import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
 
@@ -38,10 +39,15 @@ export function InventoryStockMovementForm({
   const [movementType, setMovementType] = useState<(typeof movementTypeOptions)[number]>('IN')
   const [referenceType, setReferenceType] = useState<(typeof referenceTypeOptions)[number]>('MANUAL')
   const [referenceNo, setReferenceNo] = useState('')
+  const [workOrderRaw, setWorkOrderRaw] = useState('')
   const [workOrderId, setWorkOrderId] = useState('')
+  const [troubleTicketRaw, setTroubleTicketRaw] = useState('')
   const [troubleTicketId, setTroubleTicketId] = useState('')
+  const [requestRaw, setRequestRaw] = useState('')
   const [requestId, setRequestId] = useState('')
+  const [fromLocationRaw, setFromLocationRaw] = useState('')
   const [fromLocationId, setFromLocationId] = useState('')
+  const [toLocationRaw, setToLocationRaw] = useState('')
   const [toLocationId, setToLocationId] = useState('')
   const [technicianRaw, setTechnicianRaw] = useState('')
   const [technicianUserId, setTechnicianUserId] = useState('')
@@ -128,10 +134,15 @@ export function InventoryStockMovementForm({
       setMovementType('IN')
       setReferenceType('MANUAL')
       setReferenceNo('')
+      setWorkOrderRaw('')
       setWorkOrderId('')
+      setTroubleTicketRaw('')
       setTroubleTicketId('')
+      setRequestRaw('')
       setRequestId('')
+      setFromLocationRaw('')
       setFromLocationId('')
+      setToLocationRaw('')
       setToLocationId('')
       setTechnicianRaw('')
       setTechnicianUserId('')
@@ -242,41 +253,41 @@ export function InventoryStockMovementForm({
             Isi konteks jika movement ini terkait WO, trouble ticket, request barang, lokasi gudang, atau teknisi.
           </p>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <label className="flex flex-col gap-2 text-sm text-slate-700">
-              <span className="font-semibold text-slate-950">Work Order ID</span>
-              <input
-                value={workOrderId}
-                onChange={(event) => setWorkOrderId(event.target.value)}
-                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                placeholder="Contoh: 120"
-                inputMode="numeric"
-                disabled={isDisabled}
-              />
-            </label>
+            <LookupIdPicker
+              label="Work Order (Opsional)"
+              value={workOrderRaw}
+              endpoint="/api/lookups/work-orders"
+              placeholder="Pilih WO dari review DB"
+              disabled={isDisabled}
+              onChange={({ raw, id }) => {
+                setWorkOrderRaw(raw)
+                setWorkOrderId(id)
+              }}
+            />
 
-            <label className="flex flex-col gap-2 text-sm text-slate-700">
-              <span className="font-semibold text-slate-950">Trouble Ticket ID</span>
-              <input
-                value={troubleTicketId}
-                onChange={(event) => setTroubleTicketId(event.target.value)}
-                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                placeholder="Contoh: 88"
-                inputMode="numeric"
-                disabled={isDisabled}
-              />
-            </label>
+            <LookupIdPicker
+              label="Trouble Ticket (Opsional)"
+              value={troubleTicketRaw}
+              endpoint="/api/lookups/trouble-tickets"
+              placeholder="Pilih TT dari review DB"
+              disabled={isDisabled}
+              onChange={({ raw, id }) => {
+                setTroubleTicketRaw(raw)
+                setTroubleTicketId(id)
+              }}
+            />
 
-            <label className="flex flex-col gap-2 text-sm text-slate-700">
-              <span className="font-semibold text-slate-950">Request ID</span>
-              <input
-                value={requestId}
-                onChange={(event) => setRequestId(event.target.value)}
-                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                placeholder="Contoh: 44"
-                inputMode="numeric"
-                disabled={isDisabled}
-              />
-            </label>
+            <LookupIdPicker
+              label="Request Barang (Opsional)"
+              value={requestRaw}
+              endpoint="/api/lookups/inventory-requests"
+              placeholder="Pilih request dari review DB"
+              disabled={isDisabled}
+              onChange={({ raw, id }) => {
+                setRequestRaw(raw)
+                setRequestId(id)
+              }}
+            />
 
             <TechnicianUserPicker
               label="Teknisi (Opsional)"
@@ -288,29 +299,29 @@ export function InventoryStockMovementForm({
               disabled={isDisabled}
             />
 
-            <label className="flex flex-col gap-2 text-sm text-slate-700">
-              <span className="font-semibold text-slate-950">From Location ID</span>
-              <input
-                value={fromLocationId}
-                onChange={(event) => setFromLocationId(event.target.value)}
-                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                placeholder="Contoh: 1"
-                inputMode="numeric"
-                disabled={isDisabled}
-              />
-            </label>
+            <LookupIdPicker
+              label="From Location (Opsional)"
+              value={fromLocationRaw}
+              endpoint="/api/lookups/inventory-locations"
+              placeholder="Pilih lokasi asal"
+              disabled={isDisabled}
+              onChange={({ raw, id }) => {
+                setFromLocationRaw(raw)
+                setFromLocationId(id)
+              }}
+            />
 
-            <label className="flex flex-col gap-2 text-sm text-slate-700">
-              <span className="font-semibold text-slate-950">To Location ID</span>
-              <input
-                value={toLocationId}
-                onChange={(event) => setToLocationId(event.target.value)}
-                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                placeholder="Contoh: 2"
-                inputMode="numeric"
-                disabled={isDisabled}
-              />
-            </label>
+            <LookupIdPicker
+              label="To Location (Opsional)"
+              value={toLocationRaw}
+              endpoint="/api/lookups/inventory-locations"
+              placeholder="Pilih lokasi tujuan"
+              disabled={isDisabled}
+              onChange={({ raw, id }) => {
+                setToLocationRaw(raw)
+                setToLocationId(id)
+              }}
+            />
           </div>
         </div>
 

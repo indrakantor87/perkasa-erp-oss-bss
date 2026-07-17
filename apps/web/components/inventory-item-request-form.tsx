@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { LookupIdPicker } from '@/components/lookup-id-picker'
 import {
   INVENTORY_REQUEST_DIVISION,
   INVENTORY_REQUEST_SUBDIVISIONS,
@@ -38,7 +39,9 @@ export function InventoryItemRequestForm({
   )
   const [requestedFor, setRequestedFor] = useState('')
   const [requestType, setRequestType] = useState<(typeof requestTypeOptions)[number]>('MANUAL')
+  const [workOrderRaw, setWorkOrderRaw] = useState('')
   const [workOrderId, setWorkOrderId] = useState('')
+  const [troubleTicketRaw, setTroubleTicketRaw] = useState('')
   const [troubleTicketId, setTroubleTicketId] = useState('')
   const [requestNotes, setRequestNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -97,7 +100,9 @@ export function InventoryItemRequestForm({
       setRequestedSubdivision(INVENTORY_REQUEST_SUBDIVISIONS[0])
       setRequestedFor('')
       setRequestType('MANUAL')
+      setWorkOrderRaw('')
       setWorkOrderId('')
+      setTroubleTicketRaw('')
       setTroubleTicketId('')
       setRequestNotes('')
       router.refresh()
@@ -204,29 +209,29 @@ export function InventoryItemRequestForm({
           />
         </label>
 
-        <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Work Order ID (Opsional)</span>
-          <input
-            value={workOrderId}
-            onChange={(event) => setWorkOrderId(event.target.value)}
-            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            placeholder="Contoh: 120"
-            inputMode="numeric"
-            disabled={isDisabled}
-          />
-        </label>
+        <LookupIdPicker
+          label="Work Order (Opsional)"
+          value={workOrderRaw}
+          endpoint="/api/lookups/work-orders"
+          placeholder="Pilih WO dari review DB"
+          disabled={isDisabled}
+          onChange={({ raw, id }) => {
+            setWorkOrderRaw(raw)
+            setWorkOrderId(id)
+          }}
+        />
 
-        <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Trouble Ticket ID (Opsional)</span>
-          <input
-            value={troubleTicketId}
-            onChange={(event) => setTroubleTicketId(event.target.value)}
-            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            placeholder="Contoh: 88"
-            inputMode="numeric"
-            disabled={isDisabled}
-          />
-        </label>
+        <LookupIdPicker
+          label="Trouble Ticket (Opsional)"
+          value={troubleTicketRaw}
+          endpoint="/api/lookups/trouble-tickets"
+          placeholder="Pilih TT dari review DB"
+          disabled={isDisabled}
+          onChange={({ raw, id }) => {
+            setTroubleTicketRaw(raw)
+            setTroubleTicketId(id)
+          }}
+        />
 
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Catatan kebutuhan</span>
