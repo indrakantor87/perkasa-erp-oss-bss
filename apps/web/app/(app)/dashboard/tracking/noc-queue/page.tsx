@@ -4,6 +4,7 @@ import { Camera, Download, Link2, Map, Pencil, Plus, ScanLine, Upload } from 'lu
 import { DataSourceStatus } from '@/components/data-source-status'
 import { NocQueueQuickActions } from '@/components/noc-queue-quick-actions'
 import { NocQueueSupportActions } from '@/components/noc-queue-support-actions'
+import { NocQueueWorkOrderActions } from '@/components/noc-queue-work-order-actions'
 import { canPerformAction } from '@/lib/access-control'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
@@ -49,6 +50,13 @@ function getQueueStatusIcon(queueStatus: NocQueueStatus) {
   return Plus
 }
 
+function getSlaBadgeClass(slaState: NocQueueItem['slaState']) {
+  if (slaState === 'BREACHED') return 'bg-rose-100 text-rose-700'
+  if (slaState === 'WARNING') return 'bg-amber-100 text-amber-800'
+  if (slaState === 'ON_TRACK') return 'bg-emerald-100 text-emerald-700'
+  return 'bg-slate-100 text-slate-700'
+}
+
 function renderTicketMeta(item: NocQueueItem) {
   if (item.sourceType === 'WORK_ORDER') {
     return (
@@ -91,6 +99,7 @@ export default async function NocQueuePage({
     canPerformAction(session.role, 'inventory', 'create') ||
     canPerformAction(session.role, 'support', 'update')
   const canUpdateSupport = canPerformAction(session.role, 'support', 'update')
+  const canUpdateWorkOrder = canPerformAction(session.role, 'support', 'update')
   const reviewDbReady = payload.source.effectiveMode === 'review-db' && !payload.source.isFallback
 
   return (
@@ -275,6 +284,11 @@ export default async function NocQueuePage({
                       {item.queueStatus}
                     </span>
                     {item.rawStatus ? <p className="mt-2 text-xs uppercase tracking-[0.2em] text-mute">Raw: {item.rawStatus}</p> : null}
+                    {item.slaLabel ? (
+                      <p className={`mt-2 inline-flex rounded-full px-3 py-1 text-[11px] font-semibold ${getSlaBadgeClass(item.slaState)}`}>
+                        SLA {item.slaLabel}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     <p className="font-semibold text-[var(--color-ink-strong)]">{item.technicianName ?? '-'}</p>
@@ -293,6 +307,7 @@ export default async function NocQueuePage({
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     <p>{item.lastUpdateAt ?? '-'}</p>
+                    {item.ageLabel ? <p>Umur: {item.ageLabel}</p> : null}
                     {item.troubleTicketId ? <p>TT: {item.troubleTicketId}</p> : null}
                     {item.workOrderId ? <p>WO: {item.workOrderId}</p> : null}
                   </td>
@@ -313,6 +328,16 @@ export default async function NocQueuePage({
                         ticketType={item.ticketType}
                         deviceState={item.deviceState}
                       />
+                      {item.sourceType === 'WORK_ORDER' && item.workOrderId ? (
+                        <NocQueueWorkOrderActions
+                          canUpdate={canUpdateWorkOrder}
+                          reviewDbReady={reviewDbReady}
+                          workOrderId={item.workOrderId}
+                          queueStatus={item.queueStatus}
+                          supportLaneLabel={item.supportLaneLabel}
+                          detailHref={item.href}
+                        />
+                      ) : null}
                       {item.sourceType === 'TROUBLE_TICKET' && item.ticketNo ? (
                         <NocQueueSupportActions
                           canUpdate={canUpdateSupport}

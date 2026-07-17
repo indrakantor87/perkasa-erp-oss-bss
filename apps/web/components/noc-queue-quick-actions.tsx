@@ -160,6 +160,20 @@ function filterQuickPresets(presets: QuickPreset[], deviceState: string | null |
   return presets.filter((item) => item.key !== 'inventory')
 }
 
+function filterByTicketType(presets: QuickPreset[], ticketType: NocTicketType) {
+  if (ticketType === 'DISMANTLE') {
+    return presets.filter((item) => ['inventory', 'noc', 'delegasi', 'returned'].includes(item.key))
+  }
+  if (ticketType === 'JALUR') {
+    return presets.filter((item) => ['noc', 'delegasi', 'pending', 'installed', 'damaged', 'returned'].includes(item.key))
+  }
+  if (ticketType === 'PSB') {
+    return presets.filter((item) => item.key !== 'replace')
+  }
+
+  return presets
+}
+
 export function NocQueueQuickActions({
   canCreate,
   reviewDbReady,
@@ -171,7 +185,7 @@ export function NocQueueQuickActions({
 }: NocQueueQuickActionsProps) {
   const [open, setOpen] = useState(false)
   const presets = useMemo(
-    () => filterQuickPresets(buildQuickPresets(ticketType), deviceState),
+    () => filterQuickPresets(filterByTicketType(buildQuickPresets(ticketType), ticketType), deviceState),
     [deviceState, ticketType],
   )
   const fallbackLifecycleStatus = useMemo(

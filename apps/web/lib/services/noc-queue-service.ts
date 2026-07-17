@@ -10,6 +10,7 @@ type WorkOrderQueueRow = {
   jobCategory: string | null
   status: string | null
   priority: string | null
+  slaDueAt: string | null
   scheduledAt: string | null
   technicianName: string | null
   troubleTicketId: number | null
@@ -94,6 +95,11 @@ export type NocQueueItem = {
   deviceItemLabel: string | null
   deviceLocationLabel: string | null
   deviceLastActor: string | null
+  queueStartedAt: string | null
+  ageHours: number | null
+  ageLabel: string | null
+  slaState: 'ON_TRACK' | 'WARNING' | 'BREACHED' | null
+  slaLabel: string | null
   lastUpdateAt: string | null
   href: string
 }
@@ -230,6 +236,129 @@ function resolveSupportLaneLabel(ticketType: NocTicketType) {
     return 'Lane Jalur'
   }
   return 'Lane TT'
+}
+
+function resolveQueueStartedAt(params: {
+  sourceType: 'WORK_ORDER' | 'TROUBLE_TICKET'
+  createdAt?: string | null
+  scheduledAt?: string | null
+  openedAt?: string | null
+}) {
+  if (params.sourceType === 'WORK_ORDER') {
+    return params.scheduledAt ?? params.createdAt ?? null
+  }
+
+  return params.openedAt ?? params.createdAt ?? null
+}
+
+function parseDateValue(value: string | null | undefined) {
+  const parsed = Date.parse(String(value ?? '').trim())
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function resolveAgeHours(startedAt: string | null | undefined) {
+  const startedMs = parseDateValue(startedAt)
+  if (startedMs === null) {
+    return null
+  }
+
+  return Math.max(0, Math.floor((Date.now() - startedMs) / (1000 * 60 * 60)))
+}
+
+function formatAgeLabel(ageHours: number | null) {
+  if (ageHours === null) {
+    return null
+  }
+  if (ageHours < 24) {
+    return `${ageHours}j`
+  }
+
+  const days = Math.floor(ageHours / 24)
+  const hours = ageHours % 24
+  return hours ? `${days}h ${hours}j` : `${days}h`
+}
+
+function resolveFallbackSlaHours(ticketType: NocTicketType, priority: string | null | undefined) {
+  const normalizedPriority = normalizeText(priority)
+  if (normalizedPriority === 'URGENT') return 4
+  if (normalizedPriority === 'HIGH') return 8
+  if (normalizedPriority === 'MEDIUM') return 24
+  if (normalizedPriority === 'LOW') return 48
+  if (ticketType === 'TROUBLESHOOTS') return 12
+  if (ticketType === 'DISMANTLE') return 24
+  if (ticketType === 'JALUR') return 48
+  return 24
+}
+
+function buildSlaSnapshot(params: {
+  startedAt: string | null
+  dueAt?: string | null
+  ticketType: NocTicketType
+  priority?: string | null
+}) {
+  const ageHours = resolveAgeHours(params.startedAt)
+  const ageLabel = formatAgeLabel(ageHours)
+  const dueMs = parseDateValue(params.dueAt)
+
+  if (dueMs !== null) {
+    const diffHours = Math.floor((dueMs - Date.now()) / (1000 * 60 * 60))
+    if (diffHours < 0) {
+      return {
+        ageHours,
+        ageLabel,
+        slaState: 'BREACHED' as const,
+        slaLabel: `Lewat ${Math.abs(diffHours)}j`,
+      }
+    }
+    if (diffHours <= 2) {
+      return {
+        ageHours,
+        ageLabel,
+        slaState: 'WARNING' as const,
+        slaLabel: `Sisa ${diffHours}j`,
+      }
+    }
+
+    return {
+      ageHours,
+      ageLabel,
+      slaState: 'ON_TRACK' as const,
+      slaLabel: `SLA ${diffHours}j`,
+    }
+  }
+
+  const targetHours = resolveFallbackSlaHours(params.ticketType, params.priority)
+  if (ageHours === null) {
+    return {
+      ageHours: null,
+      ageLabel: null,
+      slaState: null,
+      slaLabel: null,
+    }
+  }
+  if (ageHours >= targetHours) {
+    return {
+      ageHours,
+      ageLabel,
+      slaState: 'BREACHED' as const,
+      slaLabel: `>${targetHours}j`,
+    }
+  }
+  if (ageHours >= Math.max(1, targetHours - 2)) {
+    return {
+      ageHours,
+      ageLabel,
+      slaState: 'WARNING' as const,
+      slaLabel: `Mepet ${targetHours}j`,
+    }
+  }
+
+  return {
+    ageHours,
+    ageLabel,
+    slaState: 'ON_TRACK' as const,
+    slaLabel: `Target ${targetHours}j`,
+  }
 }
 
 function mapRequestDeviceState(request: InventoryRequestSummaryRow | null) {
@@ -419,6 +548,7 @@ export async function getNocQueueList(query: NocQueueQuery) {
     const fetchLimit = Math.min(state.limit * 3, 400)
     const hasWorkOrderJobCategory = await hasReviewDbColumn('service_work_orders', 'job_category')
     const hasWorkOrderPriority = await hasReviewDbColumn('service_work_orders', 'priority')
+    const hasWorkOrderSlaDueAt = await hasReviewDbColumn('service_work_orders', 'sla_due_at')
     const hasWorkOrderScheduledAt = await hasReviewDbColumn('service_work_orders', 'scheduled_at')
     const hasWorkOrderTroubleTicketId = await hasReviewDbColumn('service_work_orders', 'trouble_ticket_id')
     const hasWorkOrderNotes = await hasReviewDbColumn('service_work_orders', 'notes')
@@ -456,6 +586,7 @@ export async function getNocQueueList(query: NocQueueQuery) {
           ${hasWorkOrderJobCategory ? 'wo.job_category' : 'NULL'} AS jobCategory,
           wo.status AS status,
           ${hasWorkOrderPriority ? 'wo.priority' : 'NULL'} AS priority,
+          ${hasWorkOrderSlaDueAt ? 'wo.sla_due_at' : 'NULL'} AS slaDueAt,
           ${hasWorkOrderScheduledAt ? 'wo.scheduled_at' : 'NULL'} AS scheduledAt,
           wo.technician_name AS technicianName,
           ${hasWorkOrderTroubleTicketId ? 'wo.trouble_ticket_id' : 'NULL'} AS troubleTicketId,
@@ -620,6 +751,11 @@ export async function getNocQueueList(query: NocQueueQuery) {
 
     const items: NocQueueItem[] = [
       ...workOrders.map((row) => {
+        const ticketType = detectTicketType({
+          workType: row.workType,
+          jobCategory: row.jobCategory,
+          sourceType: 'WORK_ORDER',
+        })
         const request = requestMaps.byWorkOrder.get(row.id) ?? (row.troubleTicketId ? requestMaps.byTroubleTicket.get(row.troubleTicketId) ?? null : null)
         const movement = movementMaps.byWorkOrder.get(row.id) ?? (row.troubleTicketId ? movementMaps.byTroubleTicket.get(row.troubleTicketId) ?? null : null)
         const lifecycle =
@@ -627,17 +763,24 @@ export async function getNocQueueList(query: NocQueueQuery) {
           (row.troubleTicketId ? lifecycleMaps.byTroubleTicket.get(row.troubleTicketId) ?? null : null)
         const deviceState =
           mapLifecycleDeviceState(lifecycle?.lifecycleStatus) ?? mapMovementDeviceState(movement) ?? mapRequestDeviceState(request)
+        const queueStartedAt = resolveQueueStartedAt({
+          sourceType: 'WORK_ORDER',
+          createdAt: row.createdAt,
+          scheduledAt: row.scheduledAt,
+        })
+        const slaSnapshot = buildSlaSnapshot({
+          startedAt: queueStartedAt,
+          dueAt: row.slaDueAt,
+          ticketType,
+          priority: row.priority,
+        })
 
         const item: NocQueueItem = {
           queueKey: `WO-${row.id}`,
           sourceType: 'WORK_ORDER',
           sourceId: row.id,
           ticketNo: row.workOrderNo,
-          ticketType: detectTicketType({
-            workType: row.workType,
-            jobCategory: row.jobCategory,
-            sourceType: 'WORK_ORDER',
-          }),
+          ticketType,
           queueStatus: normalizeQueueStatus(row.status),
           rawStatus: row.status,
           customerName: null,
@@ -646,13 +789,7 @@ export async function getNocQueueList(query: NocQueueQuery) {
           troubleTicketId: row.troubleTicketId,
           priority: row.priority,
           technicianName: row.technicianName,
-          supportLaneLabel: resolveSupportLaneLabel(
-            detectTicketType({
-              workType: row.workType,
-              jobCategory: row.jobCategory,
-              sourceType: 'WORK_ORDER',
-            }),
-          ),
+          supportLaneLabel: resolveSupportLaneLabel(ticketType),
           requestCode: request?.requestCode ?? null,
           requestStatus: request?.requestStatus ?? null,
           requestRequestedFor: request?.requestedFor ?? null,
@@ -665,6 +802,11 @@ export async function getNocQueueList(query: NocQueueQuery) {
                 : null,
           deviceLocationLabel: lifecycle?.targetTeam ?? buildMovementLocationLabel(movement),
           deviceLastActor: lifecycle?.actorName ?? null,
+          queueStartedAt,
+          ageHours: slaSnapshot.ageHours,
+          ageLabel: slaSnapshot.ageLabel,
+          slaState: slaSnapshot.slaState,
+          slaLabel: slaSnapshot.slaLabel,
           lastUpdateAt: pickMostRecentDate(lifecycle?.createdAt, movement?.movementAt, request?.completedAt, request?.requestedAt, row.updatedAt, row.scheduledAt, row.createdAt),
           href: `/dashboard/tracking/work-orders/${row.id}`,
         }
@@ -673,6 +815,13 @@ export async function getNocQueueList(query: NocQueueQuery) {
       }),
       ...troubleTickets.map((row) => {
         const linkedWorkOrder = firstWorkOrderByTroubleTicket.get(row.id) ?? null
+        const ticketType = detectTicketType({
+          category: row.category,
+          type: row.type,
+          jobCategory: linkedWorkOrder?.jobCategory ?? null,
+          workType: linkedWorkOrder?.workType ?? null,
+          sourceType: 'TROUBLE_TICKET',
+        })
         const request = requestMaps.byTroubleTicket.get(row.id) ?? (linkedWorkOrder ? requestMaps.byWorkOrder.get(linkedWorkOrder.id) ?? null : null)
         const movement = movementMaps.byTroubleTicket.get(row.id) ?? (linkedWorkOrder ? movementMaps.byWorkOrder.get(linkedWorkOrder.id) ?? null : null)
         const lifecycle =
@@ -680,19 +829,24 @@ export async function getNocQueueList(query: NocQueueQuery) {
           (linkedWorkOrder ? lifecycleMaps.byWorkOrder.get(linkedWorkOrder.id) ?? null : null)
         const deviceState =
           mapLifecycleDeviceState(lifecycle?.lifecycleStatus) ?? mapMovementDeviceState(movement) ?? mapRequestDeviceState(request)
+        const queueStartedAt = resolveQueueStartedAt({
+          sourceType: 'TROUBLE_TICKET',
+          createdAt: linkedWorkOrder?.createdAt ?? null,
+          openedAt: row.openedAt,
+        })
+        const slaSnapshot = buildSlaSnapshot({
+          startedAt: queueStartedAt,
+          dueAt: linkedWorkOrder?.slaDueAt ?? null,
+          ticketType,
+          priority: linkedWorkOrder?.priority ?? null,
+        })
 
         const item: NocQueueItem = {
           queueKey: `TT-${row.id}`,
           sourceType: 'TROUBLE_TICKET',
           sourceId: row.id,
           ticketNo: row.ticketCode,
-          ticketType: detectTicketType({
-            category: row.category,
-            type: row.type,
-            jobCategory: linkedWorkOrder?.jobCategory ?? null,
-            workType: linkedWorkOrder?.workType ?? null,
-            sourceType: 'TROUBLE_TICKET',
-          }),
+          ticketType,
           queueStatus: normalizeQueueStatus(row.status),
           rawStatus: row.status,
           customerName: row.customerName,
@@ -701,15 +855,7 @@ export async function getNocQueueList(query: NocQueueQuery) {
           troubleTicketId: row.id,
           priority: linkedWorkOrder?.priority ?? null,
           technicianName: linkedWorkOrder?.technicianName ?? null,
-          supportLaneLabel: resolveSupportLaneLabel(
-            detectTicketType({
-              category: row.category,
-              type: row.type,
-              jobCategory: linkedWorkOrder?.jobCategory ?? null,
-              workType: linkedWorkOrder?.workType ?? null,
-              sourceType: 'TROUBLE_TICKET',
-            }),
-          ),
+          supportLaneLabel: resolveSupportLaneLabel(ticketType),
           requestCode: request?.requestCode ?? null,
           requestStatus: request?.requestStatus ?? null,
           requestRequestedFor: request?.requestedFor ?? null,
@@ -722,6 +868,11 @@ export async function getNocQueueList(query: NocQueueQuery) {
                 : null,
           deviceLocationLabel: lifecycle?.targetTeam ?? buildMovementLocationLabel(movement),
           deviceLastActor: lifecycle?.actorName ?? null,
+          queueStartedAt,
+          ageHours: slaSnapshot.ageHours,
+          ageLabel: slaSnapshot.ageLabel,
+          slaState: slaSnapshot.slaState,
+          slaLabel: slaSnapshot.slaLabel,
           lastUpdateAt: pickMostRecentDate(lifecycle?.createdAt, movement?.movementAt, request?.completedAt, request?.requestedAt, linkedWorkOrder?.updatedAt, row.updatedAt, row.openedAt),
           href: `/dashboard/tracking/trouble-tickets/${row.id}`,
         }
