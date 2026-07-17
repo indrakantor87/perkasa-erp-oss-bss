@@ -2,7 +2,7 @@
 
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { LookupIdPicker } from '@/components/lookup-id-picker'
 import { TechnicianUserPicker } from '@/components/technician-user-picker'
 import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
@@ -34,7 +34,6 @@ export function InventoryStockMovementForm({
   embedded = false,
 }: InventoryStockMovementFormProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [itemValue, setItemValue] = useState(initialItemValue || itemSuggestions[0] || '')
   const [scanValue, setScanValue] = useState('')
   const [movementType, setMovementType] = useState<(typeof movementTypeOptions)[number]>('IN')
@@ -61,14 +60,17 @@ export function InventoryStockMovementForm({
   const isDisabled = !canCreate || !reviewDbReady || submitting
 
   useEffect(() => {
-    const workOrderIdParam = String(searchParams.get('workOrderId') ?? '').trim()
-    const troubleTicketIdParam = String(searchParams.get('troubleTicketId') ?? '').trim()
-    const requestIdParam = String(searchParams.get('requestId') ?? '').trim()
-    const fromLocationIdParam = String(searchParams.get('fromLocationId') ?? '').trim()
-    const toLocationIdParam = String(searchParams.get('toLocationId') ?? '').trim()
-    const technicianUserIdParam = String(searchParams.get('technicianUserId') ?? '').trim()
-    const referenceTypeParam = String(searchParams.get('referenceType') ?? '').trim().toUpperCase()
-    const movementTypeParam = String(searchParams.get('movementType') ?? '').trim().toUpperCase()
+    if (typeof window === 'undefined') return
+
+    const params = new URLSearchParams(window.location.search)
+    const workOrderIdParam = String(params.get('workOrderId') ?? '').trim()
+    const troubleTicketIdParam = String(params.get('troubleTicketId') ?? '').trim()
+    const requestIdParam = String(params.get('requestId') ?? '').trim()
+    const fromLocationIdParam = String(params.get('fromLocationId') ?? '').trim()
+    const toLocationIdParam = String(params.get('toLocationId') ?? '').trim()
+    const technicianUserIdParam = String(params.get('technicianUserId') ?? '').trim()
+    const referenceTypeParam = String(params.get('referenceType') ?? '').trim().toUpperCase()
+    const movementTypeParam = String(params.get('movementType') ?? '').trim().toUpperCase()
 
     if (workOrderIdParam && !workOrderId) {
       setWorkOrderRaw(workOrderIdParam)
