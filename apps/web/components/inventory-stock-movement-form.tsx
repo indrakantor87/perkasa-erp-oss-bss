@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { TechnicianUserPicker } from '@/components/technician-user-picker'
 import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
 
 type InventoryStockMovementFormProps = {
@@ -16,6 +17,7 @@ type InventoryStockMovementFormProps = {
 }
 
 const movementTypeOptions = ['IN', 'OUT', 'ADJUSTMENT'] as const
+const referenceTypeOptions = ['WORK_ORDER', 'TROUBLE_TICKET', 'REQUEST', 'MANUAL', 'PURCHASE_RECEIPT'] as const
 
 function extractItemCode(value: string) {
   return value.split('|')[0]?.trim() ?? ''
@@ -34,7 +36,15 @@ export function InventoryStockMovementForm({
   const [itemValue, setItemValue] = useState(initialItemValue || itemSuggestions[0] || '')
   const [scanValue, setScanValue] = useState('')
   const [movementType, setMovementType] = useState<(typeof movementTypeOptions)[number]>('IN')
+  const [referenceType, setReferenceType] = useState<(typeof referenceTypeOptions)[number]>('MANUAL')
   const [referenceNo, setReferenceNo] = useState('')
+  const [workOrderId, setWorkOrderId] = useState('')
+  const [troubleTicketId, setTroubleTicketId] = useState('')
+  const [requestId, setRequestId] = useState('')
+  const [fromLocationId, setFromLocationId] = useState('')
+  const [toLocationId, setToLocationId] = useState('')
+  const [technicianRaw, setTechnicianRaw] = useState('')
+  const [technicianUserId, setTechnicianUserId] = useState('')
   const [qty, setQty] = useState('1')
   const [unitPrice, setUnitPrice] = useState('')
   const [notes, setNotes] = useState('')
@@ -87,7 +97,14 @@ export function InventoryStockMovementForm({
         body: JSON.stringify({
           itemCode,
           movementType,
+          referenceType,
           referenceNo,
+          workOrderId,
+          troubleTicketId,
+          requestId,
+          fromLocationId,
+          toLocationId,
+          technicianUserId,
           qty,
           unitPrice,
           notes,
@@ -109,7 +126,15 @@ export function InventoryStockMovementForm({
         message: payload?.message || 'Stock movement berhasil disimpan.',
       })
       setMovementType('IN')
+      setReferenceType('MANUAL')
       setReferenceNo('')
+      setWorkOrderId('')
+      setTroubleTicketId('')
+      setRequestId('')
+      setFromLocationId('')
+      setToLocationId('')
+      setTechnicianRaw('')
+      setTechnicianUserId('')
       setQty('1')
       setUnitPrice('')
       setNotes('')
@@ -185,6 +210,22 @@ export function InventoryStockMovementForm({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Reference Type</span>
+          <select
+            value={referenceType}
+            onChange={(event) => setReferenceType(event.target.value as (typeof referenceTypeOptions)[number])}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            disabled={isDisabled}
+          >
+            {referenceTypeOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Reference No</span>
           <input
             value={referenceNo}
@@ -194,6 +235,84 @@ export function InventoryStockMovementForm({
             disabled={isDisabled}
           />
         </label>
+
+        <div className="lg:col-span-2 rounded-2xl border border-line bg-slate-50 px-4 py-3">
+          <p className="text-sm font-semibold text-slate-950">Konteks Movement (Opsional)</p>
+          <p className="mt-1 text-sm leading-6 text-mute">
+            Isi konteks jika movement ini terkait WO, trouble ticket, request barang, lokasi gudang, atau teknisi.
+          </p>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Work Order ID</span>
+              <input
+                value={workOrderId}
+                onChange={(event) => setWorkOrderId(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                placeholder="Contoh: 120"
+                inputMode="numeric"
+                disabled={isDisabled}
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Trouble Ticket ID</span>
+              <input
+                value={troubleTicketId}
+                onChange={(event) => setTroubleTicketId(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                placeholder="Contoh: 88"
+                inputMode="numeric"
+                disabled={isDisabled}
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Request ID</span>
+              <input
+                value={requestId}
+                onChange={(event) => setRequestId(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                placeholder="Contoh: 44"
+                inputMode="numeric"
+                disabled={isDisabled}
+              />
+            </label>
+
+            <TechnicianUserPicker
+              label="Teknisi (Opsional)"
+              value={technicianRaw}
+              onChange={({ raw, userId }) => {
+                setTechnicianRaw(raw)
+                setTechnicianUserId(userId)
+              }}
+              disabled={isDisabled}
+            />
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">From Location ID</span>
+              <input
+                value={fromLocationId}
+                onChange={(event) => setFromLocationId(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                placeholder="Contoh: 1"
+                inputMode="numeric"
+                disabled={isDisabled}
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">To Location ID</span>
+              <input
+                value={toLocationId}
+                onChange={(event) => setToLocationId(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                placeholder="Contoh: 2"
+                inputMode="numeric"
+                disabled={isDisabled}
+              />
+            </label>
+          </div>
+        </div>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Qty</span>

@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { TechnicianUserPicker } from '@/components/technician-user-picker'
 import { SupportFormContextNote } from '@/components/support-form-context-note'
 
 type SupportTicketCreateFormProps = {
@@ -14,6 +15,10 @@ type SupportTicketCreateFormProps = {
 
 const categoryOptions = ['TT', 'PV'] as const
 const statusOptions = ['OPEN', 'ON_PROGRESS'] as const
+const fieldWorkTypeOptions = ['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'] as const
+const fieldWorkOrderStatusOptions = ['OPEN', 'SCHEDULED', 'ON_PROGRESS'] as const
+const fieldJobCategoryOptions = ['TROUBLE', 'JOINTER', 'JALUR', 'EXPAN'] as const
+const priorityOptions = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
 
 export function SupportTicketCreateForm({
   canCreate,
@@ -29,6 +34,15 @@ export function SupportTicketCreateForm({
   const [ticketType, setTicketType] = useState(typeSuggestions[0] ?? 'KONEKSI')
   const [status, setStatus] = useState<(typeof statusOptions)[number]>('OPEN')
   const [problemCategory, setProblemCategory] = useState('')
+  const [createFieldWorkOrder, setCreateFieldWorkOrder] = useState(false)
+  const [fieldWorkType, setFieldWorkType] = useState<(typeof fieldWorkTypeOptions)[number]>('REPAIR')
+  const [workOrderStatus, setWorkOrderStatus] = useState<(typeof fieldWorkOrderStatusOptions)[number]>('OPEN')
+  const [jobCategory, setJobCategory] = useState<(typeof fieldJobCategoryOptions)[number]>('TROUBLE')
+  const [priority, setPriority] = useState<(typeof priorityOptions)[number]>('MEDIUM')
+  const [currentPicRaw, setCurrentPicRaw] = useState('')
+  const [currentPicUserId, setCurrentPicUserId] = useState('')
+  const [scheduledAt, setScheduledAt] = useState('')
+  const [address, setAddress] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
@@ -43,21 +57,34 @@ export function SupportTicketCreateForm({
     setFeedback(null)
 
     try {
+      const submitPayload: Record<string, unknown> = {
+        serviceReference,
+        customerName,
+        customerUser,
+        category,
+        type: ticketType,
+        status,
+        problemCategory,
+        notes,
+      }
+
+      if (createFieldWorkOrder) {
+        submitPayload.createFieldWorkOrder = true
+        submitPayload.fieldWorkType = fieldWorkType
+        submitPayload.workOrderStatus = workOrderStatus
+        submitPayload.jobCategory = jobCategory
+        submitPayload.priority = priority
+        submitPayload.currentPicUserId = currentPicUserId
+        submitPayload.scheduledAt = scheduledAt || null
+        submitPayload.address = address
+      }
+
       const response = await fetch('/api/support/trouble-tickets', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          serviceReference,
-          customerName,
-          customerUser,
-          category,
-          type: ticketType,
-          status,
-          problemCategory,
-          notes,
-        }),
+        body: JSON.stringify(submitPayload),
       })
 
       const payload = (await response.json().catch(() => null)) as { message?: string } | null
@@ -80,6 +107,15 @@ export function SupportTicketCreateForm({
       setTicketType(typeSuggestions[0] ?? 'KONEKSI')
       setStatus('OPEN')
       setProblemCategory('')
+      setCreateFieldWorkOrder(false)
+      setFieldWorkType('REPAIR')
+      setWorkOrderStatus('OPEN')
+      setJobCategory('TROUBLE')
+      setPriority('MEDIUM')
+      setCurrentPicRaw('')
+      setCurrentPicUserId('')
+      setScheduledAt('')
+      setAddress('')
       setNotes('')
       router.refresh()
     } finally {
@@ -219,6 +255,122 @@ export function SupportTicketCreateForm({
             disabled={isDisabled}
           />
         </label>
+
+        <div className="lg:col-span-2 rounded-2xl border border-line bg-slate-50 px-4 py-3">
+          <label className="flex items-center justify-between gap-3 text-sm">
+            <span className="font-semibold text-slate-950">Perlu kunjungan lapangan (buat WO)</span>
+            <input
+              type="checkbox"
+              checked={createFieldWorkOrder}
+              onChange={(event) => setCreateFieldWorkOrder(event.target.checked)}
+              disabled={isDisabled}
+              className="h-4 w-4"
+            />
+          </label>
+          <p className="mt-2 text-sm leading-6 text-mute">
+            Aktifkan bila ticket harus ditindak teknisi lapangan dan perlu tracking pekerjaan serta material.
+          </p>
+        </div>
+
+        {createFieldWorkOrder ? (
+          <>
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Tipe Work Order</span>
+              <select
+                value={fieldWorkType}
+                onChange={(event) => setFieldWorkType(event.target.value as (typeof fieldWorkTypeOptions)[number])}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                disabled={isDisabled}
+              >
+                {fieldWorkTypeOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Status WO</span>
+              <select
+                value={workOrderStatus}
+                onChange={(event) => setWorkOrderStatus(event.target.value as (typeof fieldWorkOrderStatusOptions)[number])}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                disabled={isDisabled}
+              >
+                {fieldWorkOrderStatusOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Kategori Kerja Lapangan</span>
+              <select
+                value={jobCategory}
+                onChange={(event) => setJobCategory(event.target.value as (typeof fieldJobCategoryOptions)[number])}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                disabled={isDisabled}
+              >
+                {fieldJobCategoryOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Prioritas</span>
+              <select
+                value={priority}
+                onChange={(event) => setPriority(event.target.value as (typeof priorityOptions)[number])}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                disabled={isDisabled}
+              >
+                {priorityOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <TechnicianUserPicker
+              label="PIC Teknisi (Opsional)"
+              value={currentPicRaw}
+              onChange={({ raw, userId }) => {
+                setCurrentPicRaw(raw)
+                setCurrentPicUserId(userId)
+              }}
+              disabled={isDisabled}
+            />
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Jadwal Lapangan (Opsional)</span>
+              <input
+                type="datetime-local"
+                value={scheduledAt}
+                onChange={(event) => setScheduledAt(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                disabled={isDisabled}
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
+              <span className="font-semibold text-slate-950">Alamat Lapangan (Opsional)</span>
+              <textarea
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+                className="min-h-24 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                placeholder="Alamat lokasi gangguan / lokasi kerja teknisi"
+                disabled={isDisabled}
+              />
+            </label>
+          </>
+        ) : null}
 
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Catatan</span>

@@ -21,6 +21,8 @@ function extractItemCode(value: string) {
   return value.split('|')[0]?.trim() ?? ''
 }
 
+const requestTypeOptions = ['WO_MATERIAL', 'TECHNICIAN_REPLENISH', 'TROUBLE_SUPPORT', 'JALUR_PROJECT', 'MANUAL'] as const
+
 export function InventoryItemRequestForm({
   canCreate,
   reviewDbReady,
@@ -35,6 +37,9 @@ export function InventoryItemRequestForm({
     INVENTORY_REQUEST_SUBDIVISIONS[0],
   )
   const [requestedFor, setRequestedFor] = useState('')
+  const [requestType, setRequestType] = useState<(typeof requestTypeOptions)[number]>('MANUAL')
+  const [workOrderId, setWorkOrderId] = useState('')
+  const [troubleTicketId, setTroubleTicketId] = useState('')
   const [requestNotes, setRequestNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
@@ -68,6 +73,9 @@ export function InventoryItemRequestForm({
           qty,
           requestedSubdivision,
           requestedFor,
+          requestType,
+          workOrderId,
+          troubleTicketId,
           requestNotes,
         }),
       })
@@ -88,6 +96,9 @@ export function InventoryItemRequestForm({
       setQty('1')
       setRequestedSubdivision(INVENTORY_REQUEST_SUBDIVISIONS[0])
       setRequestedFor('')
+      setRequestType('MANUAL')
+      setWorkOrderId('')
+      setTroubleTicketId('')
       setRequestNotes('')
       router.refresh()
     } finally {
@@ -167,12 +178,52 @@ export function InventoryItemRequestForm({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Jenis Request</span>
+          <select
+            value={requestType}
+            onChange={(event) => setRequestType(event.target.value as (typeof requestTypeOptions)[number])}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            disabled={isDisabled}
+          >
+            {requestTypeOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Untuk teknisi / tim</span>
           <input
             value={requestedFor}
             onChange={(event) => setRequestedFor(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
             placeholder="Teknisi Fadil / Tim Instalasi POP Timur"
+            disabled={isDisabled}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Work Order ID (Opsional)</span>
+          <input
+            value={workOrderId}
+            onChange={(event) => setWorkOrderId(event.target.value)}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="Contoh: 120"
+            inputMode="numeric"
+            disabled={isDisabled}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Trouble Ticket ID (Opsional)</span>
+          <input
+            value={troubleTicketId}
+            onChange={(event) => setTroubleTicketId(event.target.value)}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="Contoh: 88"
+            inputMode="numeric"
             disabled={isDisabled}
           />
         </label>

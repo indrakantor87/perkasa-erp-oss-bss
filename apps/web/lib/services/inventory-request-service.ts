@@ -43,7 +43,12 @@ export async function ensureInventoryRequestTable() {
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         request_code VARCHAR(40) NOT NULL,
         inventory_item_id BIGINT UNSIGNED NOT NULL,
+        work_order_id BIGINT UNSIGNED NULL,
+        trouble_ticket_id BIGINT UNSIGNED NULL,
+        requested_by_user_id BIGINT UNSIGNED NULL,
+        processed_by_user_id BIGINT UNSIGNED NULL,
         request_qty INT UNSIGNED NOT NULL DEFAULT 1,
+        request_type VARCHAR(50) NOT NULL DEFAULT 'MANUAL',
         request_status VARCHAR(30) NOT NULL DEFAULT 'REQUEST',
         requested_division VARCHAR(120) NULL,
         requested_subdivision VARCHAR(150) NULL,
@@ -61,12 +66,39 @@ export async function ensureInventoryRequestTable() {
         UNIQUE KEY uq_inventory_item_requests_code (request_code),
         KEY idx_inventory_item_requests_status (request_status),
         KEY idx_inventory_item_requests_item (inventory_item_id),
+        KEY idx_inventory_item_requests_wo (work_order_id),
+        KEY idx_inventory_item_requests_ticket (trouble_ticket_id),
         CONSTRAINT fk_inventory_item_requests_item
           FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id)
       )
     `,
   )
 
+  await ensureInventoryRequestColumn(
+    'work_order_id',
+    'work_order_id BIGINT UNSIGNED NULL',
+    'inventory_item_id',
+  )
+  await ensureInventoryRequestColumn(
+    'trouble_ticket_id',
+    'trouble_ticket_id BIGINT UNSIGNED NULL',
+    'work_order_id',
+  )
+  await ensureInventoryRequestColumn(
+    'requested_by_user_id',
+    'requested_by_user_id BIGINT UNSIGNED NULL',
+    'trouble_ticket_id',
+  )
+  await ensureInventoryRequestColumn(
+    'processed_by_user_id',
+    'processed_by_user_id BIGINT UNSIGNED NULL',
+    'requested_by_user_id',
+  )
+  await ensureInventoryRequestColumn(
+    'request_type',
+    "request_type VARCHAR(50) NOT NULL DEFAULT 'MANUAL'",
+    'request_qty',
+  )
   await ensureInventoryRequestColumn(
     'requested_division',
     'requested_division VARCHAR(120) NULL',

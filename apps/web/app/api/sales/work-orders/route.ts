@@ -2,9 +2,20 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  buildServiceWorkOrderInsertPayload,
+  generateServiceWorkOrderNo,
+  insertServiceWorkOrderAssignment,
+  insertServiceWorkOrderStatusLog,
+  resolveReviewAuthUserIdByUsername,
+} from '@/lib/services/field-ops-service'
 
 const allowedWorkTypes = new Set(['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'])
 const allowedStatuses = new Set(['OPEN', 'SCHEDULED', 'ON_PROGRESS'])
+const allowedJobCategories = new Set(['PSB', 'TROUBLE', 'JALUR', 'EXPAN', 'JOINTER'])
+const allowedPriorities = new Set(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
+
+type WorkOrderPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
 
 type ReviewSalesOrderRow = {
   id: number
@@ -13,38 +24,24 @@ type ReviewSalesOrderRow = {
   customerName: string
 }
 
-type WorkOrderNoRow = {
-  workOrderNo: string | null
-}
-
 type ExecuteResult = {
   insertId?: number
   affectedRows?: number
 }
 
-function padSequence(value: number) {
-  return String(value).padStart(4, '0')
+function resolveOptionalPositiveInt(value: unknown) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
-async function generateWorkOrderNo() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const likePrefix = `WO-${year}${month}-%`
-  const rows = await runReviewDbQuery<WorkOrderNoRow>(
-    `
-      SELECT work_order_no AS workOrderNo
-      FROM service_work_orders
-      WHERE work_order_no LIKE ?
-      ORDER BY id DESC
-      LIMIT 1
-    `,
-    [likePrefix]
-  )
+function resolveOptionalCoordinate(value: unknown) {
+  const raw = String(value ?? '').trim()
+  if (!raw) {
+    return null
+  }
 
-  const currentCode = rows[0]?.workOrderNo ?? ''
-  const lastSequence = Number.parseInt(currentCode.split('-').pop() ?? '0', 10)
-  return `WO-${year}${month}-${padSequence(Number.isFinite(lastSequence) ? lastSequence + 1 : 1)}`
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 function resolveNextOrderStatus(workOrderStatus: string) {
@@ -100,82 +97,6 @@ async function getSalesOrderQueryParts() {
       : canJoinCustomer && hasCustomerFullName
         ? `COALESCE(c.full_name, 'Customer belum terpetakan')`
         : `'Customer belum terpetakan'`,
-  }
-}
-
-async function buildWorkOrderInsertPayload(params: {
-  salesOrderId: number
-  workOrderNo: string
-  workType: string
-  status: string
-  technicianName: string | null
-  scheduledAt: Date | null
-  notes: string
-}) {
-  const [
-    hasSalesOrderId,
-    hasSubscriptionId,
-    hasWorkOrderNo,
-    hasWorkType,
-    hasStatus,
-    hasTechnicianName,
-    hasScheduledAt,
-    hasStartedAt,
-    hasCompletedAt,
-    hasNotes,
-  ] = await Promise.all([
-    hasReviewDbColumn('service_work_orders', 'sales_order_id'),
-    hasReviewDbColumn('service_work_orders', 'subscription_id'),
-    hasReviewDbColumn('service_work_orders', 'work_order_no'),
-    hasReviewDbColumn('service_work_orders', 'work_type'),
-    hasReviewDbColumn('service_work_orders', 'status'),
-    hasReviewDbColumn('service_work_orders', 'technician_name'),
-    hasReviewDbColumn('service_work_orders', 'scheduled_at'),
-    hasReviewDbColumn('service_work_orders', 'started_at'),
-    hasReviewDbColumn('service_work_orders', 'completed_at'),
-    hasReviewDbColumn('service_work_orders', 'notes'),
-  ])
-
-  if (!hasSalesOrderId || !hasWorkOrderNo || !hasStatus) {
-    throw new Error('Schema inti service_work_orders belum siap. Kolom sales_order_id, work_order_no, dan status wajib tersedia.')
-  }
-
-  const columns = ['sales_order_id', 'work_order_no', 'status']
-  const values: unknown[] = [params.salesOrderId, params.workOrderNo, params.status]
-
-  if (hasSubscriptionId) {
-    columns.push('subscription_id')
-    values.push(null)
-  }
-  if (hasWorkType) {
-    columns.push('work_type')
-    values.push(params.workType)
-  }
-  if (hasTechnicianName) {
-    columns.push('technician_name')
-    values.push(params.technicianName)
-  }
-  if (hasScheduledAt) {
-    columns.push('scheduled_at')
-    values.push(params.scheduledAt)
-  }
-  if (hasStartedAt) {
-    columns.push('started_at')
-    values.push(null)
-  }
-  if (hasCompletedAt) {
-    columns.push('completed_at')
-    values.push(null)
-  }
-  if (hasNotes) {
-    columns.push('notes')
-    values.push(params.notes)
-  }
-
-  return {
-    columns,
-    placeholders: columns.map(() => '?'),
-    values,
   }
 }
 
@@ -240,6 +161,13 @@ export async function POST(request: Request) {
       status?: unknown
       scheduledAt?: unknown
       technicianName?: unknown
+      jobCategory?: unknown
+      priority?: unknown
+      branchId?: unknown
+      currentPicUserId?: unknown
+      address?: unknown
+      latitude?: unknown
+      longitude?: unknown
       notes?: unknown
     }
 
@@ -248,7 +176,17 @@ export async function POST(request: Request) {
     const status = String(payload.status ?? '').trim().toUpperCase()
     const scheduledAtRaw = String(payload.scheduledAt ?? '').trim()
     const technicianName = String(payload.technicianName ?? '').trim()
+    const jobCategoryRaw = String(payload.jobCategory ?? '').trim().toUpperCase()
+    const priorityRaw = String(payload.priority ?? '').trim().toUpperCase()
+    const branchId = resolveOptionalPositiveInt(payload.branchId) ?? session.branchId
+    const currentPicUserId = resolveOptionalPositiveInt(payload.currentPicUserId)
+    const address = String(payload.address ?? '').trim()
+    const latitude = resolveOptionalCoordinate(payload.latitude)
+    const longitude = resolveOptionalCoordinate(payload.longitude)
     const notesRaw = String(payload.notes ?? '').trim()
+    const jobCategory = jobCategoryRaw && allowedJobCategories.has(jobCategoryRaw) ? jobCategoryRaw : null
+    const priority: WorkOrderPriority =
+      priorityRaw && allowedPriorities.has(priorityRaw) ? (priorityRaw as WorkOrderPriority) : 'MEDIUM'
 
     if (!Number.isInteger(salesOrderId) || salesOrderId <= 0) {
       return Response.json({ message: 'Sales order sumber tidak valid.' }, { status: 400 })
@@ -285,21 +223,31 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Format jadwal work order tidak valid.' }, { status: 400 })
     }
 
-    const workOrderNo = await generateWorkOrderNo()
+    const actorUserId = await resolveReviewAuthUserIdByUsername(session.username)
+    const workOrderNo = await generateServiceWorkOrderNo()
     const notes = `[Review Work Order] ${session.displayName} (${session.username})${
       notesRaw ? ` - ${notesRaw}` : ''
     }`
-    const workOrderInsertPayload = await buildWorkOrderInsertPayload({
-      salesOrderId: salesOrder.id,
+    const workOrderInsertPayload = await buildServiceWorkOrderInsertPayload({
+      salesOrderId,
       workOrderNo,
       workType,
       status,
       technicianName: technicianName || null,
       scheduledAt,
       notes,
+      branchId,
+      jobCategory,
+      priority,
+      sourceType: 'SALES_ORDER',
+      currentPicUserId,
+      scheduledByUserId: actorUserId,
+      address: address || null,
+      latitude,
+      longitude,
     })
 
-    await runReviewDbExecute<ExecuteResult>(
+    const insertResult = await runReviewDbExecute<ExecuteResult>(
       `
         INSERT INTO service_work_orders (
           ${workOrderInsertPayload.columns.join(',\n          ')}
@@ -308,6 +256,30 @@ export async function POST(request: Request) {
       `,
       workOrderInsertPayload.values
     )
+    const workOrderId = Number(insertResult.insertId ?? 0)
+    if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+      throw new Error('Work order berhasil disimpan tetapi ID insert tidak terbaca.')
+    }
+
+    if (currentPicUserId) {
+      await insertServiceWorkOrderAssignment({
+        workOrderId,
+        assignedUserId: currentPicUserId,
+        assignedByUserId: actorUserId,
+        assignmentRole: 'TECHNICIAN',
+        assignmentStatus: 'ASSIGNED',
+        isPrimary: true,
+        notes: technicianName || null,
+      })
+    }
+    await insertServiceWorkOrderStatusLog({
+      workOrderId,
+      fromStatus: null,
+      toStatus: status,
+      changedByUserId: actorUserId,
+      reasonCode: 'AUTO_CREATED',
+      reasonNotes: `WO dibuat dari sales order ${salesOrder.orderNo}${jobCategory ? ` (${jobCategory})` : ''}.`,
+    })
 
     const salesOrderUpdatePayload = await buildSalesOrderUpdatePayload({
       nextOrderStatus: resolveNextOrderStatus(status),
@@ -325,7 +297,7 @@ export async function POST(request: Request) {
     )
 
     return Response.json({
-      message: `Work order ${workOrderNo} untuk order ${salesOrder.orderNo} (${salesOrder.customerName}) berhasil disimpan.`,
+      message: `Work order ${workOrderNo} untuk order ${salesOrder.orderNo} (${salesOrder.customerName}) berhasil disimpan${jobCategory ? ` dengan kategori ${jobCategory}` : ''}.`,
     })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })

@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { TechnicianUserPicker } from '@/components/technician-user-picker'
 
 type SalesWorkOrderCreateFormProps = {
   canCreate: boolean
@@ -13,6 +14,8 @@ type SalesWorkOrderCreateFormProps = {
 
 const workTypeOptions = ['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'] as const
 const workStatusOptions = ['OPEN', 'SCHEDULED', 'ON_PROGRESS'] as const
+const jobCategoryOptions = ['PSB', 'TROUBLE', 'JALUR', 'EXPAN', 'JOINTER'] as const
+const priorityOptions = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
 
 function extractOrderId(value: string) {
   const matched = value.trim().match(/^(\d+)/)
@@ -29,8 +32,15 @@ export function SalesWorkOrderCreateForm({
   const [orderValue, setOrderValue] = useState(initialOrderValue?.trim() || orderSuggestions[0] || '')
   const [workType, setWorkType] = useState<(typeof workTypeOptions)[number]>('INSTALLATION')
   const [status, setStatus] = useState<(typeof workStatusOptions)[number]>('SCHEDULED')
+  const [jobCategory, setJobCategory] = useState<(typeof jobCategoryOptions)[number]>('PSB')
+  const [priority, setPriority] = useState<(typeof priorityOptions)[number]>('MEDIUM')
   const [scheduledAt, setScheduledAt] = useState('')
+  const [currentPicRaw, setCurrentPicRaw] = useState('')
+  const [currentPicUserId, setCurrentPicUserId] = useState('')
   const [technicianName, setTechnicianName] = useState('')
+  const [address, setAddress] = useState('')
+  const [latitude, setLatitude] = useState('')
+  const [longitude, setLongitude] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
@@ -69,8 +79,14 @@ export function SalesWorkOrderCreateForm({
           salesOrderId,
           workType,
           status,
+          jobCategory,
+          priority,
           scheduledAt: scheduledAt || null,
+          currentPicUserId,
           technicianName,
+          address,
+          latitude,
+          longitude,
           notes,
         }),
       })
@@ -90,8 +106,15 @@ export function SalesWorkOrderCreateForm({
       })
       setWorkType('INSTALLATION')
       setStatus('SCHEDULED')
+      setJobCategory('PSB')
+      setPriority('MEDIUM')
       setScheduledAt('')
+      setCurrentPicRaw('')
+      setCurrentPicUserId('')
       setTechnicianName('')
+      setAddress('')
+      setLatitude('')
+      setLongitude('')
       setNotes('')
       router.refresh()
     } finally {
@@ -149,6 +172,22 @@ export function SalesWorkOrderCreateForm({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Kategori Pekerjaan</span>
+          <select
+            value={jobCategory}
+            onChange={(event) => setJobCategory(event.target.value as (typeof jobCategoryOptions)[number])}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            disabled={isDisabled}
+          >
+            {jobCategoryOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Status Awal</span>
           <select
             value={status}
@@ -157,6 +196,22 @@ export function SalesWorkOrderCreateForm({
             disabled={isDisabled}
           >
             {workStatusOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Prioritas</span>
+          <select
+            value={priority}
+            onChange={(event) => setPriority(event.target.value as (typeof priorityOptions)[number])}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            disabled={isDisabled}
+          >
+            {priorityOptions.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -175,6 +230,16 @@ export function SalesWorkOrderCreateForm({
           />
         </label>
 
+        <TechnicianUserPicker
+          label="PIC Teknisi (Opsional)"
+          value={currentPicRaw}
+          onChange={({ raw, userId }) => {
+            setCurrentPicRaw(raw)
+            setCurrentPicUserId(userId)
+          }}
+          disabled={isDisabled}
+        />
+
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Teknisi / Tim</span>
           <input
@@ -182,6 +247,39 @@ export function SalesWorkOrderCreateForm({
             onChange={(event) => setTechnicianName(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
             placeholder="Nama teknisi, vendor, atau tim instalasi"
+            disabled={isDisabled}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
+          <span className="font-semibold text-slate-950">Alamat Pekerjaan (Opsional)</span>
+          <textarea
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            className="min-h-24 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="Alamat instalasi / lokasi kerja lapangan"
+            disabled={isDisabled}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Latitude (Opsional)</span>
+          <input
+            value={latitude}
+            onChange={(event) => setLatitude(event.target.value)}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="-6.1234567"
+            disabled={isDisabled}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">Longitude (Opsional)</span>
+          <input
+            value={longitude}
+            onChange={(event) => setLongitude(event.target.value)}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="106.1234567"
             disabled={isDisabled}
           />
         </label>

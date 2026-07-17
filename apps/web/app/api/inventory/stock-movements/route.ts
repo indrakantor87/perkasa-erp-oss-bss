@@ -4,6 +4,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 
 const allowedMovementTypes = new Set(['IN', 'OUT', 'ADJUSTMENT'])
+const allowedReferenceTypes = new Set(['WORK_ORDER', 'TROUBLE_TICKET', 'REQUEST', 'MANUAL', 'PURCHASE_RECEIPT'])
 
 type ItemRow = {
   id: number
@@ -38,6 +39,11 @@ function requiresInventoryPickupScan(role: string) {
   return !['OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(String(role).trim().toUpperCase())
 }
 
+function resolveOptionalPositiveInt(value: unknown) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) {
@@ -62,6 +68,13 @@ export async function POST(request: Request) {
       referenceNo?: unknown
       qty?: unknown
       unitPrice?: unknown
+      workOrderId?: unknown
+      troubleTicketId?: unknown
+      requestId?: unknown
+      fromLocationId?: unknown
+      toLocationId?: unknown
+      technicianUserId?: unknown
+      referenceType?: unknown
       notes?: unknown
       scannedRackBarcode?: unknown
     }
@@ -71,8 +84,25 @@ export async function POST(request: Request) {
     const referenceNo = String(payload.referenceNo ?? '').trim()
     const qty = Number.parseInt(String(payload.qty ?? '0').trim() || '0', 10)
     const unitPrice = normalizePrice(payload.unitPrice)
+    const workOrderId = resolveOptionalPositiveInt(payload.workOrderId)
+    const troubleTicketId = resolveOptionalPositiveInt(payload.troubleTicketId)
+    const requestId = resolveOptionalPositiveInt(payload.requestId)
+    const fromLocationId = resolveOptionalPositiveInt(payload.fromLocationId)
+    const toLocationId = resolveOptionalPositiveInt(payload.toLocationId)
+    const technicianUserId = resolveOptionalPositiveInt(payload.technicianUserId)
+    const referenceTypeRaw = String(payload.referenceType ?? '').trim().toUpperCase()
     const notes = String(payload.notes ?? '').trim()
     const scannedRackBarcode = String(payload.scannedRackBarcode ?? '').trim().toUpperCase()
+    const referenceType =
+      referenceTypeRaw && allowedReferenceTypes.has(referenceTypeRaw)
+        ? referenceTypeRaw
+        : workOrderId
+          ? 'WORK_ORDER'
+          : troubleTicketId
+            ? 'TROUBLE_TICKET'
+            : requestId
+              ? 'REQUEST'
+              : 'MANUAL'
 
     if (!itemCode) {
       return Response.json({ message: 'Item inventory wajib dipilih.' }, { status: 400 })
@@ -86,10 +116,33 @@ export async function POST(request: Request) {
     if (unitPrice === null || unitPrice < 0) {
       return Response.json({ message: 'Harga satuan tidak valid.' }, { status: 400 })
     }
+    if (referenceType === 'WORK_ORDER' && !workOrderId) {
+      return Response.json({ message: 'Reference type WORK_ORDER membutuhkan workOrderId.' }, { status: 400 })
+    }
+    if (referenceType === 'TROUBLE_TICKET' && !troubleTicketId) {
+      return Response.json({ message: 'Reference type TROUBLE_TICKET membutuhkan troubleTicketId.' }, { status: 400 })
+    }
+    if (referenceType === 'REQUEST' && !requestId) {
+      return Response.json({ message: 'Reference type REQUEST membutuhkan requestId.' }, { status: 400 })
+    }
+    if (movementType === 'OUT' && !toLocationId && !technicianUserId && !workOrderId && !troubleTicketId) {
+      return Response.json(
+        { message: 'Movement OUT wajib memiliki tujuan berupa lokasi, teknisi, work order, atau trouble ticket.' },
+        { status: 400 },
+      )
+    }
 
-    const [hasRackCode, hasRackBarcode] = await Promise.all([
+    const [hasRackCode, hasRackBarcode, hasWorkOrderId, hasTroubleTicketId, hasRequestId, hasFromLocationId, hasToLocationId, hasTechnicianUserId, hasReferenceType, hasMovementStatus] = await Promise.all([
       hasReviewDbColumn('inventory_items', 'rack_code'),
       hasReviewDbColumn('inventory_items', 'rack_barcode'),
+      hasReviewDbColumn('inventory_stock_movements', 'work_order_id'),
+      hasReviewDbColumn('inventory_stock_movements', 'trouble_ticket_id'),
+      hasReviewDbColumn('inventory_stock_movements', 'request_id'),
+      hasReviewDbColumn('inventory_stock_movements', 'from_location_id'),
+      hasReviewDbColumn('inventory_stock_movements', 'to_location_id'),
+      hasReviewDbColumn('inventory_stock_movements', 'technician_user_id'),
+      hasReviewDbColumn('inventory_stock_movements', 'reference_type'),
+      hasReviewDbColumn('inventory_stock_movements', 'movement_status'),
     ])
 
     const [item] = await runReviewDbQuery<ItemRow>(
@@ -145,22 +198,61 @@ export async function POST(request: Request) {
     const noteText = `[Review Movement] ${session.displayName} (${session.username})${
       notes ? ` - ${notes}` : ''
     }`
+    const columns = ['item_id']
+    const values: unknown[] = [item.id]
+
+    if (hasWorkOrderId) {
+      columns.push('work_order_id')
+      values.push(workOrderId)
+    }
+    if (hasTroubleTicketId) {
+      columns.push('trouble_ticket_id')
+      values.push(troubleTicketId)
+    }
+    if (hasRequestId) {
+      columns.push('request_id')
+      values.push(requestId)
+    }
+
+    columns.push('movement_type')
+    values.push(movementType)
+
+    if (hasReferenceType) {
+      columns.push('reference_type')
+      values.push(referenceType)
+    }
+    if (hasFromLocationId) {
+      columns.push('from_location_id')
+      values.push(fromLocationId)
+    }
+    if (hasToLocationId) {
+      columns.push('to_location_id')
+      values.push(toLocationId)
+    }
+    if (hasTechnicianUserId) {
+      columns.push('technician_user_id')
+      values.push(technicianUserId)
+    }
+
+    columns.push('reference_no', 'qty', 'unit_price')
+    values.push(referenceNo || null, qty, unitPrice)
+
+    if (hasMovementStatus) {
+      columns.push('movement_status')
+      values.push('POSTED')
+    }
+
+    columns.push('notes', 'movement_at')
+    values.push(noteText, new Date())
 
     await runReviewDbExecute<InsertResult>(
       `
         INSERT INTO inventory_stock_movements (
-          item_id,
-          work_order_id,
-          movement_type,
-          reference_no,
-          qty,
-          unit_price,
-          notes,
-          movement_at
+          ${columns.join(',\n          ')}
         )
-        VALUES (?, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (${columns.map(() => '?').join(', ')})
       `,
-      [item.id, movementType, referenceNo || null, qty, unitPrice, noteText],
+      values,
     )
 
     await runReviewDbExecute<InsertResult>(
@@ -175,7 +267,7 @@ export async function POST(request: Request) {
     )
 
     return Response.json({
-      message: `Stock movement ${movementType} untuk ${item.itemCode} (${item.itemName}) berhasil disimpan.`,
+      message: `Stock movement ${movementType} untuk ${item.itemCode} (${item.itemName}) berhasil disimpan${workOrderId ? ` pada WO #${workOrderId}` : troubleTicketId ? ` pada TT #${troubleTicketId}` : ''}.`,
     })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })

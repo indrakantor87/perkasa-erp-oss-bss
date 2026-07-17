@@ -2,9 +2,22 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  buildServiceWorkOrderInsertPayload,
+  generateServiceWorkOrderNo,
+  insertServiceWorkOrderAssignment,
+  insertServiceWorkOrderStatusLog,
+  resolveReviewAuthUserIdByUsername,
+} from '@/lib/services/field-ops-service'
 
 const allowedCategories = new Set(['TT', 'PV'])
 const allowedStatuses = new Set(['OPEN', 'ON_PROGRESS'])
+const allowedPriorities = new Set(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
+const allowedFieldStatuses = new Set(['OPEN', 'SCHEDULED', 'ON_PROGRESS'])
+const allowedFieldWorkTypes = new Set(['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'])
+const allowedJobCategories = new Set(['TROUBLE', 'JOINTER', 'JALUR', 'EXPAN'])
+
+type WorkOrderPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
 
 type TicketCodeRow = {
   ticketCode: string
@@ -16,6 +29,7 @@ type LinkedSubscriptionRow = {
   serviceNo: string | null
   customerCode: string | null
   customerName: string
+  branchId: number | null
 }
 
 type TroubleTypeRow = {
@@ -29,6 +43,21 @@ type ExecuteResult = {
 
 function padSequence(value: number) {
   return String(value).padStart(4, '0')
+}
+
+function resolveOptionalPositiveInt(value: unknown) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function resolveOptionalDate(value: unknown) {
+  const raw = String(value ?? '').trim()
+  if (!raw) {
+    return null
+  }
+
+  const parsed = new Date(raw)
+  return Number.isFinite(parsed.getTime()) ? parsed : null
 }
 
 async function generateTicketCode(category: string) {
@@ -60,7 +89,8 @@ async function resolveLinkedSubscription(serviceReference: string) {
         ss.customer_id AS customerId,
         ss.service_no AS serviceNo,
         c.customer_code AS customerCode,
-        c.full_name AS customerName
+        c.full_name AS customerName,
+        c.branch_id AS branchId
       FROM service_subscriptions ss
       INNER JOIN crm_customers c
         ON c.id = ss.customer_id
@@ -109,6 +139,14 @@ export async function POST(request: Request) {
       type?: unknown
       status?: unknown
       problemCategory?: unknown
+      createFieldWorkOrder?: unknown
+      workOrderStatus?: unknown
+      fieldWorkType?: unknown
+      jobCategory?: unknown
+      priority?: unknown
+      currentPicUserId?: unknown
+      scheduledAt?: unknown
+      address?: unknown
       notes?: unknown
     }
 
@@ -119,7 +157,21 @@ export async function POST(request: Request) {
     const type = String(payload.type ?? '').trim().toUpperCase()
     const status = String(payload.status ?? '').trim().toUpperCase()
     const problemCategory = String(payload.problemCategory ?? '').trim()
+    const createFieldWorkOrder = ['1', 'true', 'yes', 'on'].includes(
+      String(payload.createFieldWorkOrder ?? '')
+        .trim()
+        .toLowerCase(),
+    )
+    const workOrderStatus = String(payload.workOrderStatus ?? 'OPEN').trim().toUpperCase()
+    const fieldWorkType = String(payload.fieldWorkType ?? 'REPAIR').trim().toUpperCase()
+    const jobCategoryRaw = String(payload.jobCategory ?? 'TROUBLE').trim().toUpperCase()
+    const priorityRaw = String(payload.priority ?? 'MEDIUM').trim().toUpperCase()
+    const currentPicUserId = resolveOptionalPositiveInt(payload.currentPicUserId)
+    const scheduledAt = resolveOptionalDate(payload.scheduledAt)
+    const address = String(payload.address ?? '').trim()
     const notesRaw = String(payload.notes ?? '').trim()
+    const priority: WorkOrderPriority = allowedPriorities.has(priorityRaw) ? (priorityRaw as WorkOrderPriority) : 'MEDIUM'
+    const jobCategory = allowedJobCategories.has(jobCategoryRaw) ? jobCategoryRaw : 'TROUBLE'
 
     if (!serviceReference) {
       return Response.json({ message: 'Service No atau Customer Code wajib diisi.' }, { status: 400 })
@@ -132,6 +184,15 @@ export async function POST(request: Request) {
     }
     if (!allowedStatuses.has(status)) {
       return Response.json({ message: 'Status ticket tidak valid.' }, { status: 400 })
+    }
+    if (createFieldWorkOrder && !allowedFieldStatuses.has(workOrderStatus)) {
+      return Response.json({ message: 'Status awal work order lapangan tidak valid.' }, { status: 400 })
+    }
+    if (createFieldWorkOrder && !allowedFieldWorkTypes.has(fieldWorkType)) {
+      return Response.json({ message: 'Tipe work order lapangan tidak valid.' }, { status: 400 })
+    }
+    if (String(payload.scheduledAt ?? '').trim() && !scheduledAt) {
+      return Response.json({ message: 'Jadwal work order lapangan tidak valid.' }, { status: 400 })
     }
 
     const linkedSubscription = await resolveLinkedSubscription(serviceReference)
@@ -167,8 +228,9 @@ export async function POST(request: Request) {
     }`
     const resolvedCustomerName = customerName || linkedSubscription.customerName
     const resolvedCustomerUser = customerUser || linkedSubscription.serviceNo || linkedSubscription.customerCode || null
+    const actorUserId = await resolveReviewAuthUserIdByUsername(session.username)
 
-    await runReviewDbExecute<ExecuteResult>(
+    const ticketInsertResult = await runReviewDbExecute<ExecuteResult>(
       `
         INSERT INTO support_trouble_tickets (
           subscription_id,
@@ -195,9 +257,67 @@ export async function POST(request: Request) {
         notes,
       ],
     )
+    const troubleTicketId = Number(ticketInsertResult.insertId ?? 0)
+    const ticketCodeForMessage = ticketCode
+
+    if (createFieldWorkOrder) {
+      const workOrderNo = await generateServiceWorkOrderNo()
+      const workOrderNotes = `${notes} [AUTO_WO:${ticketCodeForMessage}]`
+      const workOrderInsertPayload = await buildServiceWorkOrderInsertPayload({
+        salesOrderId: null,
+        subscriptionId: linkedSubscription.subscriptionId,
+        troubleTicketId: Number.isInteger(troubleTicketId) && troubleTicketId > 0 ? troubleTicketId : null,
+        workOrderNo,
+        workType: fieldWorkType,
+        status: workOrderStatus,
+        technicianName: null,
+        scheduledAt,
+        notes: workOrderNotes,
+        branchId: linkedSubscription.branchId,
+        jobCategory,
+        priority,
+        sourceType: 'TROUBLE_TICKET',
+        currentPicUserId,
+        scheduledByUserId: actorUserId,
+        address: address || null,
+      })
+
+      const workOrderInsertResult = await runReviewDbExecute<ExecuteResult>(
+        `
+          INSERT INTO service_work_orders (
+            ${workOrderInsertPayload.columns.join(',\n            ')}
+          )
+          VALUES (${workOrderInsertPayload.placeholders.join(', ')})
+        `,
+        workOrderInsertPayload.values,
+      )
+
+      const workOrderId = Number(workOrderInsertResult.insertId ?? 0)
+      if (Number.isInteger(workOrderId) && workOrderId > 0) {
+        if (currentPicUserId) {
+          await insertServiceWorkOrderAssignment({
+            workOrderId,
+            assignedUserId: currentPicUserId,
+            assignedByUserId: actorUserId,
+            assignmentRole: 'TECHNICIAN',
+            assignmentStatus: 'ASSIGNED',
+            isPrimary: true,
+            notes: `WO lapangan dibuat dari ticket ${ticketCodeForMessage}.`,
+          })
+        }
+        await insertServiceWorkOrderStatusLog({
+          workOrderId,
+          fromStatus: null,
+          toStatus: workOrderStatus,
+          changedByUserId: actorUserId,
+          reasonCode: 'AUTO_CREATED',
+          reasonNotes: `WO lapangan dibuat dari trouble ticket ${ticketCodeForMessage}.`,
+        })
+      }
+    }
 
     return Response.json({
-      message: `Trouble ticket ${ticketCode} untuk ${resolvedCustomerName} berhasil disimpan dan terhubung ke ${linkedSubscription.serviceNo || linkedSubscription.customerCode || serviceReference}.`,
+      message: `Trouble ticket ${ticketCode} untuk ${resolvedCustomerName} berhasil disimpan dan terhubung ke ${linkedSubscription.serviceNo || linkedSubscription.customerCode || serviceReference}${createFieldWorkOrder ? ' beserta work order lapangan.' : '.'}`,
     })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
