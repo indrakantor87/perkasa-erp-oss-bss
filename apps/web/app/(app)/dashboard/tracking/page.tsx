@@ -24,6 +24,16 @@ export default async function DashboardTrackingIndexPage() {
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <Link
+            href="/dashboard/tracking/noc-queue"
+            className="surface-soft rounded-3xl border border-line p-5 transition hover:[border-color:var(--color-line-strong)]"
+          >
+            <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Meja Queue NOC</p>
+            <p className="mt-2 text-sm leading-6 text-mute">
+              Satu tabel gabungan untuk PSB, Troubleshoots, Dismantle, dan Jalur dengan status queue
+              operasional dan ringkasan device terakhir.
+            </p>
+          </Link>
+          <Link
             href="/dashboard/tracking/work-orders"
             className="surface-soft rounded-3xl border border-line p-5 transition hover:[border-color:var(--color-line-strong)]"
           >

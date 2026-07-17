@@ -1,8 +1,11 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { DeviceLifecycleActionForm } from '@/components/device-lifecycle-action-form'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { canPerformAction } from '@/lib/access-control'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
+import { getDeviceLifecycleLogs, getInventoryDeviceLifecycleItemSuggestions, type DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
 import { getWorkOrderTrackingDetail } from '@/lib/services/tracking-service'
 
 type TimelineEntry = {
@@ -80,6 +83,39 @@ function getTimelineTone(type: TimelineEntry['type']) {
   }
 }
 
+function canWriteDeviceLifecycle(role: Awaited<ReturnType<typeof requireSession>>['role']) {
+  return (
+    role === 'FIELD_TECHNICIAN' ||
+    canPerformAction(role, 'inventory', 'update') ||
+    canPerformAction(role, 'inventory', 'create') ||
+    canPerformAction(role, 'support', 'update')
+  )
+}
+
+function getLifecycleTone(status: string | null) {
+  switch (status) {
+    case 'INVENTORY':
+      return 'bg-slate-100 text-slate-700'
+    case 'NOC':
+      return 'bg-sky-100 text-sky-700'
+    case 'TEAM_PSB':
+    case 'TEAM_TROUBLESHOOTS':
+      return 'bg-amber-100 text-amber-800'
+    case 'PENDING_NOC_VALIDATION':
+      return 'bg-orange-100 text-orange-700'
+    case 'INSTALLED':
+      return 'bg-emerald-100 text-emerald-700'
+    case 'DAMAGED':
+      return 'bg-rose-100 text-rose-700'
+    case 'REPLACE':
+      return 'bg-violet-100 text-violet-700'
+    case 'RETURNED':
+      return 'bg-slate-200 text-slate-700'
+    default:
+      return 'bg-slate-100 text-slate-700'
+  }
+}
+
 export default async function WorkOrderTrackingDetailPage({
   params,
 }: {
@@ -96,9 +132,15 @@ export default async function WorkOrderTrackingDetailPage({
     redirect('/dashboard/tracking/work-orders')
   }
 
-  const payload = await getWorkOrderTrackingDetail(workOrderId)
+  const [payload, lifecyclePayload, itemSuggestions] = await Promise.all([
+    getWorkOrderTrackingDetail(workOrderId),
+    getDeviceLifecycleLogs({ workOrderId, limit: 30 }),
+    getInventoryDeviceLifecycleItemSuggestions(200),
+  ])
   const wo = payload.workOrder
   const timelineEntries = buildTimelineEntries(payload)
+  const canCreateDeviceLifecycle = canWriteDeviceLifecycle(session.role)
+  const reviewDbReady = payload.source.effectiveMode === 'review-db' && !payload.source.isFallback
 
   return (
     <div className="space-y-6">
@@ -221,7 +263,26 @@ export default async function WorkOrderTrackingDetailPage({
                     <span className="text-mute">Movement</span>
                     <span className="font-semibold text-[var(--color-ink-strong)]">{payload.movements.length}</span>
                   </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-mute">Lifecycle Device</span>
+                    <span className="font-semibold text-[var(--color-ink-strong)]">{lifecyclePayload.items.length}</span>
+                  </div>
                 </div>
+              </div>
+
+              <div className="mt-5 rounded-3xl border border-line bg-surface p-4">
+                <DeviceLifecycleActionForm
+                  canCreate={canCreateDeviceLifecycle}
+                  reviewDbReady={reviewDbReady}
+                  itemSuggestions={itemSuggestions}
+                  workOrderId={workOrderId}
+                  troubleTicketId={wo.troubleTicketId}
+                  defaultLifecycleStatus={wo.jobCategory === 'PSB' ? 'TEAM_PSB' : 'NOC'}
+                  defaultTargetTeam={wo.jobCategory === 'PSB' ? 'Team Teknisi PSB' : ''}
+                  embedded
+                  title="Scan lifecycle device"
+                  description="Gunakan form ini untuk mencatat scan barcode ONT/modem pada alur NOC, delegasi ke teknisi, replace, sampai validasi akhir."
+                />
               </div>
             </section>
 
@@ -404,6 +465,45 @@ export default async function WorkOrderTrackingDetailPage({
                       ) : null}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-line bg-surface p-5">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="section-title">Lifecycle Device</p>
+                  <span className="solid-chip">{lifecyclePayload.items.length}</span>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {lifecyclePayload.items.length ? (
+                    lifecyclePayload.items.map((row: DeviceLifecycleLogRow) => (
+                      <div
+                        key={row.id}
+                        className="surface-soft rounded-2xl border border-line px-4 py-3"
+                      >
+                        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-[var(--color-ink-strong)]">
+                              {row.itemCode ?? `Item #${row.inventoryItemId}`} {row.itemName ? `• ${row.itemName}` : ''}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-mute">
+                              {row.eventType ?? '-'} {row.targetTeam ? `• ${row.targetTeam}` : ''} {row.scanSource ? `• ${row.scanSource}` : ''}
+                            </p>
+                          </div>
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getLifecycleTone(row.lifecycleStatus)}`}>
+                            {row.lifecycleStatus ?? '-'}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-mute">
+                          {row.actorName ?? row.actorRole ?? '-'} {row.createdAt ? `• ${row.createdAt}` : ''}
+                        </p>
+                        {row.notes ? <p className="mt-2 text-sm leading-6 text-[var(--color-ink-strong)]">{row.notes}</p> : null}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-mute">
+                      Belum ada log lifecycle device untuk work order ini.
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
