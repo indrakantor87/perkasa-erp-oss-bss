@@ -97,6 +97,28 @@ function getOperationalBadgeClass(label: string) {
   return 'bg-slate-100 text-slate-700'
 }
 
+function getLifecycleBadgeClass(status: string | null | undefined) {
+  const value = String(status ?? '').trim().toUpperCase()
+  if (!value) return 'bg-slate-100 text-slate-600'
+  if (value === 'INVENTORY') return 'bg-slate-100 text-slate-700'
+  if (value === 'NOC') return 'bg-sky-100 text-sky-700'
+  if (value.startsWith('TEAM_')) return 'bg-amber-100 text-amber-800'
+  if (value === 'PENDING_NOC_VALIDATION') return 'bg-orange-100 text-orange-700'
+  if (value === 'INSTALLED') return 'bg-emerald-100 text-emerald-700'
+  if (value === 'DAMAGED') return 'bg-rose-100 text-rose-700'
+  if (value === 'RETURNED') return 'bg-slate-200 text-slate-700'
+  if (value.startsWith('REPLACE')) return 'bg-violet-100 text-violet-700'
+  return 'bg-slate-100 text-slate-700'
+}
+
+function getValidationBadgeClass(status: string | null | undefined) {
+  const value = String(status ?? '').trim().toUpperCase()
+  if (value === 'APPROVED') return 'bg-emerald-100 text-emerald-700'
+  if (value === 'PENDING') return 'bg-amber-100 text-amber-800'
+  if (value === 'REJECTED') return 'bg-rose-100 text-rose-700'
+  return 'bg-slate-100 text-slate-600'
+}
+
 function renderTicketMeta(item: NocQueueItem) {
   if (item.sourceType === 'WORK_ORDER') {
     return (
@@ -396,7 +418,7 @@ export default async function NocQueuePage({
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     <p className="font-semibold text-[var(--color-ink-strong)]">{item.customerName ?? '-'}</p>
-                    <p className="text-xs uppercase tracking-[0.2em] text-mute">{item.customerUser ?? ''}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-mute">{item.customerUser ?? 'CUSTOMER / SITE BELUM TERHUBUNG'}</p>
                   </td>
                   <td className="px-4 py-4 align-top">
                     <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getTypeBadgeClass(item.ticketType)}`}>
@@ -426,7 +448,8 @@ export default async function NocQueuePage({
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     <p className="font-semibold text-[var(--color-ink-strong)]">{item.technicianName ?? '-'}</p>
-                    <p>{item.supportLaneLabel}</p>
+                    <p>{item.picName ? `PIC: ${item.picName}` : item.supportLaneLabel}</p>
+                    {item.picUsername ? <p className="text-xs uppercase tracking-[0.18em] text-mute">@{item.picUsername}</p> : null}
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     <p className="font-semibold text-[var(--color-ink-strong)]">{item.requestCode ?? '-'}</p>
@@ -447,9 +470,24 @@ export default async function NocQueuePage({
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     <p className="font-semibold text-[var(--color-ink-strong)]">{item.deviceState ?? '-'}</p>
-                    <p>{item.deviceItemLabel ?? ''}</p>
-                    <p>{item.deviceLocationLabel ?? ''}</p>
-                    <p>{item.deviceLastActor ?? ''}</p>
+                    {item.deviceLifecycleStatus ? (
+                      <p className="mt-2">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getLifecycleBadgeClass(item.deviceLifecycleStatus)}`}>
+                          {item.deviceLifecycleStatus}
+                        </span>
+                      </p>
+                    ) : null}
+                    {item.deviceValidationStatus && item.deviceValidationStatus !== 'NOT_REQUIRED' ? (
+                      <p className="mt-2">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getValidationBadgeClass(item.deviceValidationStatus)}`}>
+                          {item.deviceValidationStatus}
+                        </span>
+                      </p>
+                    ) : null}
+                    <p className="mt-2">{item.deviceItemLabel ?? ''}</p>
+                    <p>{item.deviceLocationLabel ? `Lokasi: ${item.deviceLocationLabel}` : ''}</p>
+                    <p>{item.deviceTicketRef ? `Ref: ${item.deviceTicketRef}` : ''}</p>
+                    <p>{item.deviceLastActor ? `Actor: ${item.deviceLastActor}` : ''}</p>
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     <p>{item.lastUpdateAt ?? '-'}</p>

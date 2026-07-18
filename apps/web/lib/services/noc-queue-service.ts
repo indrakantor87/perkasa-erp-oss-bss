@@ -14,6 +14,8 @@ type WorkOrderQueueRow = {
   scheduledAt: string | null
   technicianName: string | null
   troubleTicketId: number | null
+  picUsername: string | null
+  picFullName: string | null
   notes: string | null
   createdAt: string | null
   updatedAt: string | null
@@ -88,11 +90,16 @@ export type NocQueueItem = {
   troubleTicketId: number | null
   priority: string | null
   technicianName: string | null
+  picName: string | null
+  picUsername: string | null
   supportLaneLabel: string
   requestCode: string | null
   requestStatus: string | null
   requestRequestedFor: string | null
   deviceState: string | null
+  deviceLifecycleStatus: string | null
+  deviceValidationStatus: string | null
+  deviceTicketRef: string | null
   deviceItemLabel: string | null
   deviceLocationLabel: string | null
   deviceLastActor: string | null
@@ -383,7 +390,13 @@ function resolveOperationalBadges(params: {
   if (deviceState === 'PENDING VALIDASI NOC' || deviceState === 'PENDING_NOC_VALIDATION') {
     badges.add('PENDING VALIDASI')
   }
-  if (deviceState === 'REPLACE') {
+  if (
+    deviceState === 'REPLACE' ||
+    deviceState === 'REPLACE_OLD' ||
+    deviceState === 'REPLACE_NEW' ||
+    deviceState === 'REPLACE DEVICE LAMA' ||
+    deviceState === 'REPLACE DEVICE BARU'
+  ) {
     badges.add('BUTUH REPLACE')
   }
   if (deviceState === 'RUSAK' || deviceState === 'DAMAGED') {
@@ -498,6 +511,12 @@ function mapLifecycleDeviceState(status: string | null | undefined) {
   if (value === 'TEAM_TROUBLESHOOTS') {
     return 'TEAM TEKNISI TROUBLESHOOTS'
   }
+  if (value === 'TEAM_JALUR') {
+    return 'TEAM TEKNISI JALUR'
+  }
+  if (value === 'TEAM_DISMANTLE') {
+    return 'TEAM TEKNISI DISMANTLE'
+  }
   if (value === 'PENDING_NOC_VALIDATION') {
     return 'PENDING VALIDASI NOC'
   }
@@ -509,6 +528,12 @@ function mapLifecycleDeviceState(status: string | null | undefined) {
   }
   if (value === 'RETURNED') {
     return 'KEMBALI'
+  }
+  if (value === 'REPLACE_OLD') {
+    return 'REPLACE DEVICE LAMA'
+  }
+  if (value === 'REPLACE_NEW') {
+    return 'REPLACE DEVICE BARU'
   }
   return value
 }
@@ -609,6 +634,7 @@ export async function getNocQueueList(query: NocQueueQuery) {
     const hasWorkOrderSlaDueAt = await hasReviewDbColumn('service_work_orders', 'sla_due_at')
     const hasWorkOrderScheduledAt = await hasReviewDbColumn('service_work_orders', 'scheduled_at')
     const hasWorkOrderTroubleTicketId = await hasReviewDbColumn('service_work_orders', 'trouble_ticket_id')
+    const hasWorkOrderPicUserId = await hasReviewDbColumn('service_work_orders', 'current_pic_user_id')
     const hasWorkOrderNotes = await hasReviewDbColumn('service_work_orders', 'notes')
     const hasWorkOrderCreatedAt = await hasReviewDbColumn('service_work_orders', 'created_at')
     const hasWorkOrderUpdatedAt = await hasReviewDbColumn('service_work_orders', 'updated_at')
@@ -648,10 +674,13 @@ export async function getNocQueueList(query: NocQueueQuery) {
           ${hasWorkOrderScheduledAt ? 'wo.scheduled_at' : 'NULL'} AS scheduledAt,
           wo.technician_name AS technicianName,
           ${hasWorkOrderTroubleTicketId ? 'wo.trouble_ticket_id' : 'NULL'} AS troubleTicketId,
+          ${hasWorkOrderPicUserId ? 'au.username' : 'NULL'} AS picUsername,
+          ${hasWorkOrderPicUserId ? 'au.full_name' : 'NULL'} AS picFullName,
           ${hasWorkOrderNotes ? 'wo.notes' : 'NULL'} AS notes,
           ${hasWorkOrderCreatedAt ? 'wo.created_at' : 'NULL'} AS createdAt,
           ${hasWorkOrderUpdatedAt ? 'wo.updated_at' : 'NULL'} AS updatedAt
         FROM service_work_orders wo
+        ${hasWorkOrderPicUserId ? 'LEFT JOIN auth_users au ON au.id = wo.current_pic_user_id' : ''}
         ${workOrderWhere.length ? `WHERE ${workOrderWhere.join(' AND ')}` : ''}
         ORDER BY wo.id DESC
         LIMIT ?
@@ -800,6 +829,7 @@ export async function getNocQueueList(query: NocQueueQuery) {
       troubleTicketIds,
     })
     const firstWorkOrderByTroubleTicket = new Map<number, WorkOrderQueueRow>()
+    const troubleTicketById = new Map<number, TroubleTicketQueueRow>()
 
     for (const row of workOrders) {
       if (row.troubleTicketId && !firstWorkOrderByTroubleTicket.has(row.troubleTicketId)) {
@@ -807,8 +837,13 @@ export async function getNocQueueList(query: NocQueueQuery) {
       }
     }
 
+    for (const row of troubleTickets) {
+      troubleTicketById.set(row.id, row)
+    }
+
     const items: NocQueueItem[] = [
       ...workOrders.map((row) => {
+        const linkedTroubleTicket = row.troubleTicketId ? troubleTicketById.get(row.troubleTicketId) ?? null : null
         const ticketType = detectTicketType({
           workType: row.workType,
           jobCategory: row.jobCategory,
@@ -841,24 +876,29 @@ export async function getNocQueueList(query: NocQueueQuery) {
           ticketType,
           queueStatus: normalizeQueueStatus(row.status),
           rawStatus: row.status,
-          customerName: null,
-          customerUser: null,
+          customerName: linkedTroubleTicket?.customerName ?? null,
+          customerUser: linkedTroubleTicket?.customerUser ?? null,
           workOrderId: row.id,
           troubleTicketId: row.troubleTicketId,
           priority: row.priority,
           technicianName: row.technicianName,
+          picName: row.picFullName ?? null,
+          picUsername: row.picUsername ?? null,
           supportLaneLabel: resolveSupportLaneLabel(ticketType),
           requestCode: request?.requestCode ?? null,
           requestStatus: request?.requestStatus ?? null,
           requestRequestedFor: request?.requestedFor ?? null,
           deviceState,
+          deviceLifecycleStatus: lifecycle?.lifecycleStatus ?? null,
+          deviceValidationStatus: lifecycle?.validationStatus ?? null,
+          deviceTicketRef: lifecycle?.ticketRef ?? row.workOrderNo ?? null,
           deviceItemLabel:
             lifecycle && (lifecycle.itemCode || lifecycle.itemName)
               ? [lifecycle.itemCode, lifecycle.itemName].filter(Boolean).join(' | ')
               : movement
                 ? [movement.itemCode, movement.itemName].filter(Boolean).join(' | ')
                 : null,
-          deviceLocationLabel: lifecycle?.targetTeam ?? buildMovementLocationLabel(movement),
+          deviceLocationLabel: lifecycle?.locationName ?? lifecycle?.targetTeam ?? buildMovementLocationLabel(movement),
           deviceLastActor: lifecycle?.actorName ?? null,
           queueStartedAt,
           ageHours: slaSnapshot.ageHours,
@@ -919,18 +959,23 @@ export async function getNocQueueList(query: NocQueueQuery) {
           troubleTicketId: row.id,
           priority: linkedWorkOrder?.priority ?? null,
           technicianName: linkedWorkOrder?.technicianName ?? null,
+          picName: linkedWorkOrder?.picFullName ?? null,
+          picUsername: linkedWorkOrder?.picUsername ?? null,
           supportLaneLabel: resolveSupportLaneLabel(ticketType),
           requestCode: request?.requestCode ?? null,
           requestStatus: request?.requestStatus ?? null,
           requestRequestedFor: request?.requestedFor ?? null,
           deviceState,
+          deviceLifecycleStatus: lifecycle?.lifecycleStatus ?? null,
+          deviceValidationStatus: lifecycle?.validationStatus ?? null,
+          deviceTicketRef: lifecycle?.ticketRef ?? row.ticketCode ?? null,
           deviceItemLabel:
             lifecycle && (lifecycle.itemCode || lifecycle.itemName)
               ? [lifecycle.itemCode, lifecycle.itemName].filter(Boolean).join(' | ')
               : movement
                 ? [movement.itemCode, movement.itemName].filter(Boolean).join(' | ')
                 : null,
-          deviceLocationLabel: lifecycle?.targetTeam ?? buildMovementLocationLabel(movement),
+          deviceLocationLabel: lifecycle?.locationName ?? lifecycle?.targetTeam ?? buildMovementLocationLabel(movement),
           deviceLastActor: lifecycle?.actorName ?? null,
           queueStartedAt,
           ageHours: slaSnapshot.ageHours,

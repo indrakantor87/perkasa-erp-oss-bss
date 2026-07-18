@@ -100,6 +100,8 @@ function getLifecycleTone(status: string | null) {
       return 'bg-sky-100 text-sky-700'
     case 'TEAM_PSB':
     case 'TEAM_TROUBLESHOOTS':
+    case 'TEAM_JALUR':
+    case 'TEAM_DISMANTLE':
       return 'bg-amber-100 text-amber-800'
     case 'PENDING_NOC_VALIDATION':
       return 'bg-orange-100 text-orange-700'
@@ -108,9 +110,24 @@ function getLifecycleTone(status: string | null) {
     case 'DAMAGED':
       return 'bg-rose-100 text-rose-700'
     case 'REPLACE':
+    case 'REPLACE_OLD':
+    case 'REPLACE_NEW':
       return 'bg-violet-100 text-violet-700'
     case 'RETURNED':
       return 'bg-slate-200 text-slate-700'
+    default:
+      return 'bg-slate-100 text-slate-700'
+  }
+}
+
+function getValidationTone(status: string | null) {
+  switch (status) {
+    case 'APPROVED':
+      return 'bg-emerald-100 text-emerald-700'
+    case 'PENDING':
+      return 'bg-amber-100 text-amber-800'
+    case 'REJECTED':
+      return 'bg-rose-100 text-rose-700'
     default:
       return 'bg-slate-100 text-slate-700'
   }
@@ -475,28 +492,64 @@ export default async function WorkOrderTrackingDetailPage({
                 </div>
                 <div className="mt-4 space-y-3">
                   {lifecyclePayload.items.length ? (
-                    lifecyclePayload.items.map((row: DeviceLifecycleLogRow) => (
-                      <div
-                        key={row.id}
-                        className="surface-soft rounded-2xl border border-line px-4 py-3"
-                      >
-                        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                          <div>
-                            <p className="text-sm font-semibold text-[var(--color-ink-strong)]">
-                              {row.itemCode ?? `Item #${row.inventoryItemId}`} {row.itemName ? `• ${row.itemName}` : ''}
+                    lifecyclePayload.items.map((row: DeviceLifecycleLogRow, index) => (
+                      <div key={row.id} className="flex gap-4">
+                        <div className="flex w-16 flex-col items-center">
+                          <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] ${getLifecycleTone(row.lifecycleStatus)}`}>
+                            DEV
+                          </span>
+                          {index < lifecyclePayload.items.length - 1 ? <span className="mt-2 h-full w-px bg-[var(--color-line)]" /> : null}
+                        </div>
+                        <div className="surface-soft flex-1 rounded-2xl border border-line px-4 py-3">
+                          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-[var(--color-ink-strong)]">
+                                {row.itemCode ?? `Item #${row.inventoryItemId}`} {row.itemName ? `• ${row.itemName}` : ''}
+                              </p>
+                              <p className="mt-1 text-sm leading-6 text-mute">
+                                {row.eventType ?? '-'} {row.scanSource ? `• ${row.scanSource}` : ''} {row.ticketRef ? `• ${row.ticketRef}` : ''}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {row.fromStatus ? (
+                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getLifecycleTone(row.fromStatus)}`}>
+                                  {row.fromStatus}
+                                </span>
+                              ) : null}
+                              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getLifecycleTone(row.lifecycleStatus)}`}>
+                                {row.lifecycleStatus ?? '-'}
+                              </span>
+                              {row.validationStatus && row.validationStatus !== 'NOT_REQUIRED' ? (
+                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getValidationTone(row.validationStatus)}`}>
+                                  {row.validationStatus}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="mt-3 grid gap-2 text-sm text-mute lg:grid-cols-2">
+                            <p>
+                              Actor: <span className="font-semibold text-[var(--color-ink-strong)]">{row.actorName ?? row.actorRole ?? '-'}</span>
                             </p>
-                            <p className="mt-1 text-sm leading-6 text-mute">
-                              {row.eventType ?? '-'} {row.targetTeam ? `• ${row.targetTeam}` : ''} {row.scanSource ? `• ${row.scanSource}` : ''}
+                            <p>
+                              Waktu: <span className="font-semibold text-[var(--color-ink-strong)]">{row.createdAt ?? '-'}</span>
+                            </p>
+                            <p>
+                              Tim: <span className="font-semibold text-[var(--color-ink-strong)]">{row.targetTeam ?? '-'}</span>
+                            </p>
+                            <p>
+                              Lokasi: <span className="font-semibold text-[var(--color-ink-strong)]">{row.locationName ?? row.locationCode ?? '-'}</span>
+                            </p>
+                            <p className="lg:col-span-2">
+                              Pasangan Replace:{' '}
+                              <span className="font-semibold text-[var(--color-ink-strong)]">
+                                {row.relatedItemCode || row.relatedItemName
+                                  ? [row.relatedItemCode, row.relatedItemName].filter(Boolean).join(' | ')
+                                  : '-'}
+                              </span>
                             </p>
                           </div>
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getLifecycleTone(row.lifecycleStatus)}`}>
-                            {row.lifecycleStatus ?? '-'}
-                          </span>
+                          {row.notes ? <p className="mt-3 text-sm leading-6 text-[var(--color-ink-strong)]">{row.notes}</p> : null}
                         </div>
-                        <p className="mt-3 text-sm leading-6 text-mute">
-                          {row.actorName ?? row.actorRole ?? '-'} {row.createdAt ? `• ${row.createdAt}` : ''}
-                        </p>
-                        {row.notes ? <p className="mt-2 text-sm leading-6 text-[var(--color-ink-strong)]">{row.notes}</p> : null}
                       </div>
                     ))
                   ) : (

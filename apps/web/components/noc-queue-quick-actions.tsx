@@ -21,24 +21,34 @@ function resolveDefaultLifecycleStatus(ticketType: NocTicketType, deviceState: s
     return 'NOC'
   }
   if (normalized === 'NOC') {
-    return ticketType === 'PSB' ? 'TEAM_PSB' : 'TEAM_TROUBLESHOOTS'
+    if (ticketType === 'PSB') return 'TEAM_PSB'
+    if (ticketType === 'JALUR') return 'TEAM_JALUR'
+    if (ticketType === 'DISMANTLE') return 'TEAM_DISMANTLE'
+    return 'TEAM_TROUBLESHOOTS'
   }
   if (
     normalized === 'TEAM TEKNISI PSB' ||
     normalized === 'TEAM TEKNISI TROUBLESHOOTS' ||
+    normalized === 'TEAM TEKNISI JALUR' ||
+    normalized === 'TEAM TEKNISI DISMANTLE' ||
     normalized === 'TEAM_PSB' ||
-    normalized === 'TEAM_TROUBLESHOOTS'
+    normalized === 'TEAM_TROUBLESHOOTS' ||
+    normalized === 'TEAM_JALUR' ||
+    normalized === 'TEAM_DISMANTLE'
   ) {
     return 'PENDING_NOC_VALIDATION'
   }
   if (normalized === 'PENDING VALIDASI NOC' || normalized === 'PENDING_NOC_VALIDATION') {
     return 'INSTALLED'
   }
-  if (normalized === 'REPLACE') {
+  if (normalized === 'REPLACE' || normalized === 'REPLACE_OLD' || normalized === 'REPLACE_NEW') {
     return 'PENDING_NOC_VALIDATION'
   }
 
-  return ticketType === 'PSB' ? 'TEAM_PSB' : 'TEAM_TROUBLESHOOTS'
+  if (ticketType === 'PSB') return 'TEAM_PSB'
+  if (ticketType === 'JALUR') return 'TEAM_JALUR'
+  if (ticketType === 'DISMANTLE') return 'TEAM_DISMANTLE'
+  return 'TEAM_TROUBLESHOOTS'
 }
 
 function resolveDefaultTargetTeam(ticketType: NocTicketType, lifecycleStatus: DeviceLifecycleStatus) {
@@ -47,6 +57,12 @@ function resolveDefaultTargetTeam(ticketType: NocTicketType, lifecycleStatus: De
   }
   if (lifecycleStatus === 'TEAM_TROUBLESHOOTS') {
     return ticketType === 'PSB' ? 'Team Teknisi PSB' : 'Team Troubleshoots'
+  }
+  if (lifecycleStatus === 'TEAM_JALUR') {
+    return 'Team Jalur'
+  }
+  if (lifecycleStatus === 'TEAM_DISMANTLE') {
+    return 'Team Dismantle'
   }
 
   return ''
@@ -65,8 +81,22 @@ function normalizeDeviceState(deviceState: string | null | undefined) {
 }
 
 function buildQuickPresets(ticketType: NocTicketType): QuickPreset[] {
-  const delegationStatus = ticketType === 'PSB' ? 'TEAM_PSB' : 'TEAM_TROUBLESHOOTS'
-  const delegationTarget = ticketType === 'PSB' ? 'Team Teknisi PSB' : 'Team Troubleshoots'
+  const delegationStatus =
+    ticketType === 'PSB'
+      ? 'TEAM_PSB'
+      : ticketType === 'JALUR'
+        ? 'TEAM_JALUR'
+        : ticketType === 'DISMANTLE'
+          ? 'TEAM_DISMANTLE'
+          : 'TEAM_TROUBLESHOOTS'
+  const delegationTarget =
+    ticketType === 'PSB'
+      ? 'Team Teknisi PSB'
+      : ticketType === 'JALUR'
+        ? 'Team Jalur'
+        : ticketType === 'DISMANTLE'
+          ? 'Team Dismantle'
+          : 'Team Troubleshoots'
 
   const presets: QuickPreset[] = [
     {
@@ -120,8 +150,14 @@ function buildQuickPresets(ticketType: NocTicketType): QuickPreset[] {
     presets.splice(1, 0, {
       key: 'replace',
       label: 'Replace',
-      lifecycleStatus: 'REPLACE',
-      notes: 'Teknisi trouble melakukan replace device lama di lokasi.',
+      lifecycleStatus: 'REPLACE_OLD',
+      notes: 'Teknisi trouble scan device lama yang akan diganti di lokasi.',
+    })
+    presets.splice(2, 0, {
+      key: 'replace-new',
+      label: 'Device Baru',
+      lifecycleStatus: 'REPLACE_NEW',
+      notes: 'Teknisi trouble menyiapkan device pengganti sebelum validasi NOC.',
     })
   }
 
@@ -142,13 +178,23 @@ function filterQuickPresets(presets: QuickPreset[], deviceState: string | null |
   if (
     state === 'TEAM TEKNISI PSB' ||
     state === 'TEAM TEKNISI TROUBLESHOOTS' ||
+    state === 'TEAM TEKNISI JALUR' ||
+    state === 'TEAM TEKNISI DISMANTLE' ||
     state === 'TEAM_PSB' ||
-    state === 'TEAM_TROUBLESHOOTS'
+    state === 'TEAM_TROUBLESHOOTS' ||
+    state === 'TEAM_JALUR' ||
+    state === 'TEAM_DISMANTLE'
   ) {
-    return presets.filter((item) => ['pending', 'replace', 'returned', 'delegasi'].includes(item.key))
+    return presets.filter((item) => ['pending', 'replace', 'replace-new', 'returned', 'delegasi'].includes(item.key))
   }
-  if (state === 'PENDING VALIDASI NOC' || state === 'PENDING_NOC_VALIDATION' || state === 'REPLACE') {
-    return presets.filter((item) => ['installed', 'damaged', 'returned', 'pending'].includes(item.key))
+  if (
+    state === 'PENDING VALIDASI NOC' ||
+    state === 'PENDING_NOC_VALIDATION' ||
+    state === 'REPLACE' ||
+    state === 'REPLACE_OLD' ||
+    state === 'REPLACE_NEW'
+  ) {
+    return presets.filter((item) => ['installed', 'damaged', 'returned', 'pending', 'replace-new'].includes(item.key))
   }
   if (state === 'TERPASANG' || state === 'INSTALLED') {
     return presets.filter((item) => ['damaged', 'returned', 'installed'].includes(item.key))

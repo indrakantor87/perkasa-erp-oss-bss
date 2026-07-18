@@ -26,7 +26,10 @@ const lifecycleStatusOptions: DeviceLifecycleStatus[] = [
   'NOC',
   'TEAM_PSB',
   'TEAM_TROUBLESHOOTS',
-  'REPLACE',
+  'TEAM_JALUR',
+  'TEAM_DISMANTLE',
+  'REPLACE_OLD',
+  'REPLACE_NEW',
   'PENDING_NOC_VALIDATION',
   'INSTALLED',
   'DAMAGED',
@@ -34,7 +37,16 @@ const lifecycleStatusOptions: DeviceLifecycleStatus[] = [
 ]
 
 function needsTargetTeam(status: DeviceLifecycleStatus) {
-  return status === 'TEAM_PSB' || status === 'TEAM_TROUBLESHOOTS'
+  return (
+    status === 'TEAM_PSB' ||
+    status === 'TEAM_TROUBLESHOOTS' ||
+    status === 'TEAM_JALUR' ||
+    status === 'TEAM_DISMANTLE'
+  )
+}
+
+function needsRelatedReplaceItem(status: DeviceLifecycleStatus) {
+  return status === 'REPLACE_OLD' || status === 'REPLACE_NEW'
 }
 
 export function DeviceLifecycleActionForm({
@@ -47,12 +59,13 @@ export function DeviceLifecycleActionForm({
   defaultTargetTeam = '',
   defaultNotes = '',
   title = 'Scan & validasi device',
-  description = 'Catat perpindahan lifecycle ONT/modem dari Inventory, NOC, delegasi teknisi, replace, sampai validasi akhir.',
+  description = 'Catat perpindahan lifecycle ONT/modem dari Inventory, NOC, delegasi teknisi, replace device lama/baru, sampai validasi akhir.',
   embedded = false,
 }: DeviceLifecycleActionFormProps) {
   const router = useRouter()
   const datalistId = useId().replace(/:/g, '-')
   const [itemValue, setItemValue] = useState('')
+  const [relatedItemValue, setRelatedItemValue] = useState('')
   const [lifecycleStatus, setLifecycleStatus] = useState<DeviceLifecycleStatus>(defaultLifecycleStatus)
   const [targetTeam, setTargetTeam] = useState(defaultTargetTeam)
   const [notes, setNotes] = useState('')
@@ -62,6 +75,7 @@ export function DeviceLifecycleActionForm({
   const isDisabled = !canCreate || !reviewDbReady || submitting
 
   const resolvedItemCode = useMemo(() => extractInventoryItemCodeFromScan(itemValue), [itemValue])
+  const resolvedRelatedItemCode = useMemo(() => extractInventoryItemCodeFromScan(relatedItemValue), [relatedItemValue])
 
   useEffect(() => {
     setLifecycleStatus(defaultLifecycleStatus)
@@ -97,6 +111,13 @@ export function DeviceLifecycleActionForm({
       })
       return
     }
+    if (needsRelatedReplaceItem(lifecycleStatus) && !resolvedRelatedItemCode) {
+      setFeedback({
+        tone: 'error',
+        message: 'Scan atau pilih device pasangan replace terlebih dahulu.',
+      })
+      return
+    }
 
     setSubmitting(true)
     setFeedback(null)
@@ -109,6 +130,7 @@ export function DeviceLifecycleActionForm({
         },
         body: JSON.stringify({
           itemValue: finalItemValue,
+          relatedItemValue,
           lifecycleStatus,
           workOrderId,
           troubleTicketId,
@@ -132,6 +154,7 @@ export function DeviceLifecycleActionForm({
         message: payload?.message || 'Lifecycle device berhasil dicatat.',
       })
       setItemValue('')
+      setRelatedItemValue('')
       setLifecycleStatus(defaultLifecycleStatus)
       setTargetTeam(defaultTargetTeam)
       setNotes(defaultNotes)
@@ -186,6 +209,26 @@ export function DeviceLifecycleActionForm({
             Kode terdeteksi: {resolvedItemCode || '-'}
           </span>
         </label>
+
+        {needsRelatedReplaceItem(lifecycleStatus) ? (
+          <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
+            <span className="font-semibold text-slate-950">
+              {lifecycleStatus === 'REPLACE_OLD' ? 'Device pengganti' : 'Device lama yang diganti'}
+            </span>
+            <input
+              list={datalistId}
+              value={relatedItemValue}
+              onChange={(event) => setRelatedItemValue(event.target.value)}
+              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+              placeholder="INV-202607-0002 | ONU Pengganti"
+              required
+              disabled={isDisabled}
+            />
+            <span className="text-xs text-mute">
+              Kode pasangan terdeteksi: {resolvedRelatedItemCode || '-'}
+            </span>
+          </label>
+        ) : null}
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Status lifecycle</span>
