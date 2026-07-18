@@ -41,6 +41,8 @@ export type DeviceLifecycleTicketType = 'PSB' | 'TROUBLESHOOTS' | 'JALUR' | 'DIS
 
 export type DeviceLifecycleValidationStatus = 'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED'
 
+export type DeviceLifecycleHandoverProofType = 'BARCODE_SCAN' | 'SERIAL_CHECK' | 'MANUAL_CONFIRMATION'
+
 export type DeviceLifecycleLogRow = {
   id: number
   inventoryItemId: number
@@ -61,6 +63,10 @@ export type DeviceLifecycleLogRow = {
   locationCode: string | null
   locationName: string | null
   validationStatus: DeviceLifecycleValidationStatus | null
+  handoverFromLabel: string | null
+  handoverToLabel: string | null
+  handoverProofType: DeviceLifecycleHandoverProofType | null
+  handoverProofRef: string | null
   notes: string | null
   actorUserId: number | null
   actorName: string | null
@@ -139,6 +145,35 @@ export function getAllowedNextDeviceLifecycleStatuses(currentStatus: DeviceLifec
   }
 
   return transitionMap[currentStatus] ?? []
+}
+
+export function needsHandoverProofLifecycleStatus(status: DeviceLifecycleStatus | null | undefined) {
+  if (!status) {
+    return false
+  }
+
+  return status === 'NOC' || status === 'RETURNED' || isDelegationLifecycleStatus(status)
+}
+
+export function normalizeDeviceLifecycleHandoverProofType(
+  value: string | null | undefined,
+): DeviceLifecycleHandoverProofType | null {
+  const normalized = String(value ?? '').trim().toUpperCase()
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized === 'BARCODE' || normalized === 'BARCODE_SCAN' || normalized === 'SCAN') {
+    return 'BARCODE_SCAN'
+  }
+  if (normalized === 'SERIAL' || normalized === 'SERIAL_CHECK') {
+    return 'SERIAL_CHECK'
+  }
+  if (normalized === 'MANUAL' || normalized === 'MANUAL_CONFIRMATION') {
+    return 'MANUAL_CONFIRMATION'
+  }
+
+  return null
 }
 
 export function inferDeviceLifecycleEventType(params: {
@@ -237,6 +272,10 @@ export async function ensureInventoryDeviceLifecycleTable() {
         location_code VARCHAR(100) NULL,
         location_name VARCHAR(190) NULL,
         validation_status VARCHAR(30) NULL,
+        handover_from_label VARCHAR(190) NULL,
+        handover_to_label VARCHAR(190) NULL,
+        handover_proof_type VARCHAR(50) NULL,
+        handover_proof_ref VARCHAR(190) NULL,
         notes TEXT NULL,
         actor_user_id BIGINT UNSIGNED NULL,
         actor_name VARCHAR(190) NULL,
@@ -268,6 +307,26 @@ export async function ensureInventoryDeviceLifecycleTable() {
   await ensureInventoryDeviceLifecycleColumn('location_code', 'location_code VARCHAR(100) NULL', 'target_team')
   await ensureInventoryDeviceLifecycleColumn('location_name', 'location_name VARCHAR(190) NULL', 'location_code')
   await ensureInventoryDeviceLifecycleColumn('validation_status', 'validation_status VARCHAR(30) NULL', 'location_name')
+  await ensureInventoryDeviceLifecycleColumn(
+    'handover_from_label',
+    'handover_from_label VARCHAR(190) NULL',
+    'validation_status',
+  )
+  await ensureInventoryDeviceLifecycleColumn(
+    'handover_to_label',
+    'handover_to_label VARCHAR(190) NULL',
+    'handover_from_label',
+  )
+  await ensureInventoryDeviceLifecycleColumn(
+    'handover_proof_type',
+    'handover_proof_type VARCHAR(50) NULL',
+    'handover_to_label',
+  )
+  await ensureInventoryDeviceLifecycleColumn(
+    'handover_proof_ref',
+    'handover_proof_ref VARCHAR(190) NULL',
+    'handover_proof_type',
+  )
 }
 
 export async function getInventoryDeviceLifecycleItemSuggestions(limit = 200) {
@@ -352,6 +411,10 @@ export async function getDeviceLifecycleLogs(params: {
           l.location_code AS locationCode,
           l.location_name AS locationName,
           l.validation_status AS validationStatus,
+          l.handover_from_label AS handoverFromLabel,
+          l.handover_to_label AS handoverToLabel,
+          l.handover_proof_type AS handoverProofType,
+          l.handover_proof_ref AS handoverProofRef,
           l.notes AS notes,
           l.actor_user_id AS actorUserId,
           l.actor_name AS actorName,
@@ -410,6 +473,10 @@ export async function getLatestDeviceLifecycleLogForItem(inventoryItemId: number
           l.location_code AS locationCode,
           l.location_name AS locationName,
           l.validation_status AS validationStatus,
+          l.handover_from_label AS handoverFromLabel,
+          l.handover_to_label AS handoverToLabel,
+          l.handover_proof_type AS handoverProofType,
+          l.handover_proof_ref AS handoverProofRef,
           l.notes AS notes,
           l.actor_user_id AS actorUserId,
           l.actor_name AS actorName,
@@ -509,6 +576,10 @@ export async function getLatestDeviceLifecycleMaps(params: {
           l.location_code AS locationCode,
           l.location_name AS locationName,
           l.validation_status AS validationStatus,
+          l.handover_from_label AS handoverFromLabel,
+          l.handover_to_label AS handoverToLabel,
+          l.handover_proof_type AS handoverProofType,
+          l.handover_proof_ref AS handoverProofRef,
           l.notes AS notes,
           l.actor_user_id AS actorUserId,
           l.actor_name AS actorName,

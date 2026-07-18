@@ -540,6 +540,15 @@ export default async function WorkOrderTrackingDetailPage({
                               Lokasi: <span className="font-semibold text-[var(--color-ink-strong)]">{row.locationName ?? row.locationCode ?? '-'}</span>
                             </p>
                             <p className="lg:col-span-2">
+                              Handover: <span className="font-semibold text-[var(--color-ink-strong)]">{row.handoverFromLabel || row.handoverToLabel ? `${row.handoverFromLabel ?? '-'} -> ${row.handoverToLabel ?? '-'}` : '-'}</span>
+                            </p>
+                            <p>
+                              Jenis Proof: <span className="font-semibold text-[var(--color-ink-strong)]">{row.handoverProofType ?? '-'}</span>
+                            </p>
+                            <p>
+                              Ref Proof: <span className="font-semibold text-[var(--color-ink-strong)]">{row.handoverProofRef ?? '-'}</span>
+                            </p>
+                            <p className="lg:col-span-2">
                               Pasangan Replace:{' '}
                               <span className="font-semibold text-[var(--color-ink-strong)]">
                                 {row.relatedItemCode || row.relatedItemName

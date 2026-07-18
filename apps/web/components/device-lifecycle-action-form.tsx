@@ -5,7 +5,10 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
 import { extractInventoryItemCodeFromScan, findInventorySuggestionByCode } from '@/lib/inventory-barcode-utils'
-import type { DeviceLifecycleStatus } from '@/lib/services/device-lifecycle-service'
+import type {
+  DeviceLifecycleHandoverProofType,
+  DeviceLifecycleStatus,
+} from '@/lib/services/device-lifecycle-service'
 
 type DeviceLifecycleActionFormProps = {
   canCreate: boolean
@@ -49,6 +52,64 @@ function needsRelatedReplaceItem(status: DeviceLifecycleStatus) {
   return status === 'REPLACE_OLD' || status === 'REPLACE_NEW'
 }
 
+function needsHandoverProof(status: DeviceLifecycleStatus) {
+  return status === 'NOC' || status === 'RETURNED' || needsTargetTeam(status)
+}
+
+function getSuggestedHandover(params: { status: DeviceLifecycleStatus; targetTeam: string }) {
+  const { status, targetTeam } = params
+  switch (status) {
+    case 'NOC':
+      return {
+        fromLabel: 'Inventory / GA',
+        toLabel: 'NOC',
+        proofType: 'BARCODE_SCAN' as DeviceLifecycleHandoverProofType,
+      }
+    case 'TEAM_PSB':
+      return {
+        fromLabel: 'NOC',
+        toLabel: targetTeam || 'Team Teknisi PSB',
+        proofType: 'BARCODE_SCAN' as DeviceLifecycleHandoverProofType,
+      }
+    case 'TEAM_TROUBLESHOOTS':
+      return {
+        fromLabel: 'NOC',
+        toLabel: targetTeam || 'Team Troubleshoots',
+        proofType: 'BARCODE_SCAN' as DeviceLifecycleHandoverProofType,
+      }
+    case 'TEAM_JALUR':
+      return {
+        fromLabel: 'NOC',
+        toLabel: targetTeam || 'Team Jalur',
+        proofType: 'BARCODE_SCAN' as DeviceLifecycleHandoverProofType,
+      }
+    case 'TEAM_DISMANTLE':
+      return {
+        fromLabel: 'NOC',
+        toLabel: targetTeam || 'Team Dismantle',
+        proofType: 'BARCODE_SCAN' as DeviceLifecycleHandoverProofType,
+      }
+    case 'RETURNED':
+      return {
+        fromLabel: targetTeam || 'Team Teknisi',
+        toLabel: 'NOC / Inventory',
+        proofType: 'MANUAL_CONFIRMATION' as DeviceLifecycleHandoverProofType,
+      }
+    default:
+      return {
+        fromLabel: '',
+        toLabel: '',
+        proofType: 'BARCODE_SCAN' as DeviceLifecycleHandoverProofType,
+      }
+  }
+}
+
+const handoverProofTypeOptions: DeviceLifecycleHandoverProofType[] = [
+  'BARCODE_SCAN',
+  'SERIAL_CHECK',
+  'MANUAL_CONFIRMATION',
+]
+
 export function DeviceLifecycleActionForm({
   canCreate,
   reviewDbReady,
@@ -68,6 +129,10 @@ export function DeviceLifecycleActionForm({
   const [relatedItemValue, setRelatedItemValue] = useState('')
   const [lifecycleStatus, setLifecycleStatus] = useState<DeviceLifecycleStatus>(defaultLifecycleStatus)
   const [targetTeam, setTargetTeam] = useState(defaultTargetTeam)
+  const [handoverFromLabel, setHandoverFromLabel] = useState('')
+  const [handoverToLabel, setHandoverToLabel] = useState('')
+  const [handoverProofType, setHandoverProofType] = useState<DeviceLifecycleHandoverProofType>('BARCODE_SCAN')
+  const [handoverProofRef, setHandoverProofRef] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
@@ -84,6 +149,13 @@ export function DeviceLifecycleActionForm({
   useEffect(() => {
     setTargetTeam(defaultTargetTeam)
   }, [defaultTargetTeam])
+
+  useEffect(() => {
+    const suggestion = getSuggestedHandover({ status: lifecycleStatus, targetTeam })
+    setHandoverFromLabel((current) => (current ? current : suggestion.fromLabel))
+    setHandoverToLabel((current) => (current ? current : suggestion.toLabel))
+    setHandoverProofType((current) => current || suggestion.proofType)
+  }, [lifecycleStatus, targetTeam])
 
   useEffect(() => {
     setNotes(defaultNotes)
@@ -118,6 +190,13 @@ export function DeviceLifecycleActionForm({
       })
       return
     }
+    if (needsHandoverProof(lifecycleStatus) && (!handoverFromLabel.trim() || !handoverToLabel.trim() || !handoverProofType)) {
+      setFeedback({
+        tone: 'error',
+        message: 'Lengkapi proof serah-terima: pihak penyerah, penerima, dan jenis bukti.',
+      })
+      return
+    }
 
     setSubmitting(true)
     setFeedback(null)
@@ -135,6 +214,10 @@ export function DeviceLifecycleActionForm({
           workOrderId,
           troubleTicketId,
           targetTeam,
+          handoverFromLabel,
+          handoverToLabel,
+          handoverProofType,
+          handoverProofRef,
           notes,
           scanSource: 'BARCODE',
         }),
@@ -157,6 +240,10 @@ export function DeviceLifecycleActionForm({
       setRelatedItemValue('')
       setLifecycleStatus(defaultLifecycleStatus)
       setTargetTeam(defaultTargetTeam)
+      setHandoverFromLabel('')
+      setHandoverToLabel('')
+      setHandoverProofType('BARCODE_SCAN')
+      setHandoverProofRef('')
       setNotes(defaultNotes)
       router.refresh()
     } finally {
@@ -256,6 +343,61 @@ export function DeviceLifecycleActionForm({
             disabled={isDisabled}
           />
         </label>
+
+        {needsHandoverProof(lifecycleStatus) ? (
+          <>
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Diserahterimakan dari</span>
+              <input
+                value={handoverFromLabel}
+                onChange={(event) => setHandoverFromLabel(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                placeholder={getSuggestedHandover({ status: lifecycleStatus, targetTeam }).fromLabel || 'Inventory / GA / NOC / Teknisi'}
+                disabled={isDisabled}
+                required
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Diterima oleh</span>
+              <input
+                value={handoverToLabel}
+                onChange={(event) => setHandoverToLabel(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                placeholder={getSuggestedHandover({ status: lifecycleStatus, targetTeam }).toLabel || 'NOC / Teknisi / Inventory'}
+                disabled={isDisabled}
+                required
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Jenis bukti serah-terima</span>
+              <select
+                value={handoverProofType}
+                onChange={(event) => setHandoverProofType(event.target.value as DeviceLifecycleHandoverProofType)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                disabled={isDisabled}
+              >
+                {handoverProofTypeOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-950">Referensi bukti</span>
+              <input
+                value={handoverProofRef}
+                onChange={(event) => setHandoverProofRef(event.target.value)}
+                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                placeholder="Contoh: BAST-NOC-001 / scan serial / catatan serah-terima"
+                disabled={isDisabled}
+              />
+            </label>
+          </>
+        ) : null}
 
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Catatan</span>

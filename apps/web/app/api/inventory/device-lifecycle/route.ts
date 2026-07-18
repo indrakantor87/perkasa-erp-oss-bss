@@ -10,8 +10,11 @@ import {
   getLatestDeviceLifecycleLogForItem,
   inferDeviceLifecycleEventType,
   isDelegationLifecycleStatus,
+  needsHandoverProofLifecycleStatus,
+  normalizeDeviceLifecycleHandoverProofType,
   normalizeDeviceLifecycleStatus,
   type DeviceLifecycleStatus,
+  type DeviceLifecycleHandoverProofType,
   type DeviceLifecycleTicketType,
   type DeviceLifecycleValidationStatus,
 } from '@/lib/services/device-lifecycle-service'
@@ -139,6 +142,52 @@ function resolveValidationStatus(lifecycleStatus: DeviceLifecycleStatus): Device
   return 'NOT_REQUIRED'
 }
 
+function resolveSuggestedHandoverLabels(params: {
+  lifecycleStatus: DeviceLifecycleStatus
+  targetTeam: string
+  previousTargetTeam?: string | null
+}) {
+  const { lifecycleStatus, targetTeam, previousTargetTeam = null } = params
+
+  switch (lifecycleStatus) {
+    case 'NOC':
+      return {
+        fromLabel: previousTargetTeam || 'Inventory / GA',
+        toLabel: 'NOC',
+      }
+    case 'RETURNED':
+      return {
+        fromLabel: previousTargetTeam || targetTeam || 'Team Teknisi',
+        toLabel: 'NOC / Inventory',
+      }
+    case 'TEAM_PSB':
+      return {
+        fromLabel: 'NOC',
+        toLabel: targetTeam || 'Team Teknisi PSB',
+      }
+    case 'TEAM_TROUBLESHOOTS':
+      return {
+        fromLabel: 'NOC',
+        toLabel: targetTeam || 'Team Troubleshoots',
+      }
+    case 'TEAM_JALUR':
+      return {
+        fromLabel: 'NOC',
+        toLabel: targetTeam || 'Team Jalur',
+      }
+    case 'TEAM_DISMANTLE':
+      return {
+        fromLabel: 'NOC',
+        toLabel: targetTeam || 'Team Dismantle',
+      }
+    default:
+      return {
+        fromLabel: '',
+        toLabel: '',
+      }
+  }
+}
+
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) {
@@ -168,6 +217,10 @@ export async function POST(request: Request) {
       targetTeam?: unknown
       locationCode?: unknown
       locationName?: unknown
+      handoverFromLabel?: unknown
+      handoverToLabel?: unknown
+      handoverProofType?: unknown
+      handoverProofRef?: unknown
       notes?: unknown
       scanSource?: unknown
     }
@@ -182,6 +235,10 @@ export async function POST(request: Request) {
     const targetTeam = String(payload.targetTeam ?? '').trim()
     const locationCode = String(payload.locationCode ?? '').trim()
     const locationName = String(payload.locationName ?? '').trim()
+    const handoverFromLabel = String(payload.handoverFromLabel ?? '').trim()
+    const handoverToLabel = String(payload.handoverToLabel ?? '').trim()
+    const handoverProofType = normalizeDeviceLifecycleHandoverProofType(String(payload.handoverProofType ?? '').trim())
+    const handoverProofRef = String(payload.handoverProofRef ?? '').trim()
     const notes = String(payload.notes ?? '').trim()
     const scanSource = String(payload.scanSource ?? 'BARCODE').trim().toUpperCase()
 
@@ -359,6 +416,28 @@ export async function POST(request: Request) {
     const resolvedTargetTeam =
       targetTeam ||
       (isDelegationLifecycleStatus(lifecycleStatus) ? latestLog?.targetTeam ?? '' : latestLog?.targetTeam ?? '')
+    const suggestedHandover = resolveSuggestedHandoverLabels({
+      lifecycleStatus,
+      targetTeam: resolvedTargetTeam,
+      previousTargetTeam: latestLog?.targetTeam ?? null,
+    })
+    const resolvedHandoverFromLabel = handoverFromLabel || suggestedHandover.fromLabel || null
+    const resolvedHandoverToLabel = handoverToLabel || suggestedHandover.toLabel || null
+    const resolvedHandoverProofType: DeviceLifecycleHandoverProofType | null =
+      handoverProofType ?? (needsHandoverProofLifecycleStatus(lifecycleStatus) ? 'BARCODE_SCAN' : null)
+
+    if (needsHandoverProofLifecycleStatus(lifecycleStatus)) {
+      if (!resolvedHandoverFromLabel || !resolvedHandoverToLabel || !resolvedHandoverProofType) {
+        return Response.json(
+          {
+            message:
+              'Proof serah-terima wajib dilengkapi untuk check-in NOC, delegasi teknisi, atau return. Isi pihak penyerah, penerima, dan jenis bukti.',
+          },
+          { status: 400 },
+        )
+      }
+    }
+
     const locationSnapshot = resolveLocationSnapshot({
       lifecycleStatus,
       targetTeam: resolvedTargetTeam,
@@ -385,13 +464,17 @@ export async function POST(request: Request) {
           location_code,
           location_name,
           validation_status,
+          handover_from_label,
+          handover_to_label,
+          handover_proof_type,
+          handover_proof_ref,
           notes,
           actor_user_id,
           actor_name,
           actor_role,
           created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `,
       [
         item.id,
@@ -408,6 +491,10 @@ export async function POST(request: Request) {
         locationSnapshot.locationCode,
         locationSnapshot.locationName,
         resolveValidationStatus(lifecycleStatus),
+        resolvedHandoverFromLabel,
+        resolvedHandoverToLabel,
+        resolvedHandoverProofType,
+        handoverProofRef || null,
         notes || null,
         actorUserId,
         actorName,

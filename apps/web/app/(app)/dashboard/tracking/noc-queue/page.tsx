@@ -486,6 +486,13 @@ export default async function NocQueuePage({
                     ) : null}
                     <p className="mt-2">{item.deviceItemLabel ?? ''}</p>
                     <p>{item.deviceLocationLabel ? `Lokasi: ${item.deviceLocationLabel}` : ''}</p>
+                    <p>
+                      {item.deviceHandoverFrom || item.deviceHandoverTo
+                        ? `Handover: ${item.deviceHandoverFrom ?? '-'} -> ${item.deviceHandoverTo ?? '-'}`
+                        : ''}
+                    </p>
+                    <p>{item.deviceHandoverProofType ? `Proof: ${item.deviceHandoverProofType}` : ''}</p>
+                    <p>{item.deviceHandoverProofRef ? `Ref Proof: ${item.deviceHandoverProofRef}` : ''}</p>
                     <p>{item.deviceTicketRef ? `Ref: ${item.deviceTicketRef}` : ''}</p>
                     <p>{item.deviceLastActor ? `Actor: ${item.deviceLastActor}` : ''}</p>
                   </td>

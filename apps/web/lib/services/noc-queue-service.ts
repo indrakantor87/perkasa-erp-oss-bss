@@ -100,6 +100,10 @@ export type NocQueueItem = {
   deviceLifecycleStatus: string | null
   deviceValidationStatus: string | null
   deviceTicketRef: string | null
+  deviceHandoverFrom: string | null
+  deviceHandoverTo: string | null
+  deviceHandoverProofType: string | null
+  deviceHandoverProofRef: string | null
   deviceItemLabel: string | null
   deviceLocationLabel: string | null
   deviceLastActor: string | null
@@ -892,6 +896,10 @@ export async function getNocQueueList(query: NocQueueQuery) {
           deviceLifecycleStatus: lifecycle?.lifecycleStatus ?? null,
           deviceValidationStatus: lifecycle?.validationStatus ?? null,
           deviceTicketRef: lifecycle?.ticketRef ?? row.workOrderNo ?? null,
+          deviceHandoverFrom: lifecycle?.handoverFromLabel ?? null,
+          deviceHandoverTo: lifecycle?.handoverToLabel ?? null,
+          deviceHandoverProofType: lifecycle?.handoverProofType ?? null,
+          deviceHandoverProofRef: lifecycle?.handoverProofRef ?? null,
           deviceItemLabel:
             lifecycle && (lifecycle.itemCode || lifecycle.itemName)
               ? [lifecycle.itemCode, lifecycle.itemName].filter(Boolean).join(' | ')
@@ -969,6 +977,10 @@ export async function getNocQueueList(query: NocQueueQuery) {
           deviceLifecycleStatus: lifecycle?.lifecycleStatus ?? null,
           deviceValidationStatus: lifecycle?.validationStatus ?? null,
           deviceTicketRef: lifecycle?.ticketRef ?? row.ticketCode ?? null,
+          deviceHandoverFrom: lifecycle?.handoverFromLabel ?? null,
+          deviceHandoverTo: lifecycle?.handoverToLabel ?? null,
+          deviceHandoverProofType: lifecycle?.handoverProofType ?? null,
+          deviceHandoverProofRef: lifecycle?.handoverProofRef ?? null,
           deviceItemLabel:
             lifecycle && (lifecycle.itemCode || lifecycle.itemName)
               ? [lifecycle.itemCode, lifecycle.itemName].filter(Boolean).join(' | ')
