@@ -10,6 +10,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.43] - 2026-07-19
+
+### Changed
+
+- Memperkuat Docker build/runtime production dengan mengganti seluruh stage dari `node:20-alpine` ke `node:20-slim`, mengubah instalasi paket runner dari `apk` ke `apt`, dan menambahkan `NODE_OPTIONS=--max-old-space-size=2048` pada builder agar fase `next build` khususnya saat `Running TypeScript ...` lebih stabil di environment deploy remote: [Dockerfile](file:///d:/trae_projects/perkasa-erp-oss-bss/Dockerfile)
+- Memeringankan step dependency install di stage `deps` dengan `npm ci --no-audit --no-fund` agar output build lebih bersih dan mengurangi noise yang tidak relevan terhadap deploy production: [Dockerfile](file:///d:/trae_projects/perkasa-erp-oss-bss/Dockerfile)
+- Versioning diselaraskan ke `0.66.43` untuk menandai batch hardening deploy production.
+
 ## [0.66.42] - 2026-07-19
 
 ### Added

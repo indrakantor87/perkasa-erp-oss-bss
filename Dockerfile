@@ -1,24 +1,27 @@
-FROM node:20-alpine AS deps
+FROM node:20-slim AS deps
 WORKDIR /app/apps/web
 COPY apps/web/package.json apps/web/package-lock.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app/apps/web
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS=--max-old-space-size=2048
 COPY apps/web/package.json apps/web/package-lock.json ./
 COPY --from=deps /app/apps/web/node_modules ./node_modules
 COPY apps/web ./
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app/apps/web
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-RUN apk add --no-cache bash curl
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends bash curl \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./.next/static
