@@ -66,13 +66,15 @@ export default async function InventoryWorkspacePage({
 
   const resolvedSearchParams = await searchParams
   const inventoryAction = resolveSearchParam(resolvedSearchParams.inventoryAction)
+  const shouldLoadLifecycle =
+    inventoryWorkspaceViewMap[workspace] === 'items' || inventoryWorkspaceViewMap[workspace] === 'network'
   const [payload, lifecyclePayload] = await Promise.all([
     getDomainPageData('inventory', session, {
       focus: resolveSearchParam(resolvedSearchParams.focus),
       month: resolvePositiveIntegerParam(resolvedSearchParams.month),
       year: resolvePositiveIntegerParam(resolvedSearchParams.year),
     }),
-    workspace === 'network' ? getDeviceLifecycleLogs({ limit: 12 }) : Promise.resolve({ items: [] }),
+    shouldLoadLifecycle ? getDeviceLifecycleLogs({ limit: 24 }) : Promise.resolve({ items: [] }),
   ])
 
   if (!payload) {

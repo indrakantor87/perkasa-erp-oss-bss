@@ -791,7 +791,7 @@ function matchesInventoryWorkspaceView(title: string, view: InventoryWorkspaceVi
   const normalized = title.trim().toUpperCase()
 
   if (view === 'items') {
-    return normalized.includes('ITEM')
+    return normalized.includes('ITEM') || normalized.includes('REQUEST INVENTORY')
   }
 
   if (view === 'requests') {
@@ -3647,10 +3647,11 @@ export function DomainShell({
           ) : null}
           {shouldShowInventoryAction('rack-layout') || shouldShowInventoryAction('item-create') ? (
             <InventoryItemBarcodePanel
-              sections={visibleSections}
+              sections={content.reviewSections ?? visibleSections}
               canCreate={canCreate}
               canUpdate={canUpdate}
               reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              lifecycleItems={inventoryLifecycleItems}
             />
           ) : null}
         </>

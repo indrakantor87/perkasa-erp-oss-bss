@@ -4,6 +4,12 @@ export function buildInventoryItemRelativePath(itemCode: string) {
   return `/inventory?itemCode=${encodeURIComponent(normalized)}`
 }
 
+export function buildInventoryBarcodeDetailPath(itemCode: string) {
+  const normalized = String(itemCode ?? '').trim()
+  if (!normalized) return '/inventory/items'
+  return `/inventory/barcodes/${encodeURIComponent(normalized)}`
+}
+
 function normalizeInventoryItemCodeCandidate(value: string) {
   const normalized = String(value ?? '').trim()
   if (!normalized) return ''
@@ -42,6 +48,11 @@ export function extractInventoryItemCodeFromScan(rawValue: string) {
     const pathCode = inventoryItemIndex >= 0 ? pathSegments[inventoryItemIndex + 1] : ''
     const normalizedPathCode = normalizeInventoryItemCodeCandidate(decodeURIComponent(pathCode))
     if (normalizedPathCode) return normalizedPathCode
+
+    const inventoryBarcodeIndex = pathSegments.findIndex((segment) => segment.toLowerCase() === 'barcodes')
+    const barcodePathCode = inventoryBarcodeIndex >= 0 ? pathSegments[inventoryBarcodeIndex + 1] : ''
+    const normalizedBarcodePathCode = normalizeInventoryItemCodeCandidate(decodeURIComponent(barcodePathCode))
+    if (normalizedBarcodePathCode) return normalizedBarcodePathCode
   } catch {
     return ''
   }

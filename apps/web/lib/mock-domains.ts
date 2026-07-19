@@ -412,6 +412,28 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
         ],
       },
       {
+        title: 'Request Inventory Teknisi',
+        description: 'Sampel request barang teknisi untuk menghubungkan kebutuhan lapangan dengan item inventory per barcode.',
+        rows: [
+          {
+            id: 'REQ-202607-0088',
+            primary: 'REQ-202607-0088',
+            secondary: 'INV-202607-0001 | ONU ZTE F660',
+            status: 'APPROVED',
+            detail: 'Request ONT untuk pemasangan baru PSB area Pati Kidul dan menunggu serah terima dari gudang.',
+            meta: ['Qty: 1', 'Requested For: Team PSB Timur', 'Work Order: WO-202607-0021', 'Requested: 08 Jul 2026 09:10'],
+          },
+          {
+            id: 'REQ-202607-0087',
+            primary: 'REQ-202607-0087',
+            secondary: 'INV-202607-0002 | Kabel Dropcore 1C',
+            status: 'PICKED',
+            detail: 'Request kabel dropcore untuk kebutuhan jalur instalasi dan sudah diproses pengambilan parsial.',
+            meta: ['Qty: 80', 'Requested For: Team Jalur Barat', 'Work Order: WO-202607-0020', 'Requested: 07 Jul 2026 14:20'],
+          },
+        ],
+      },
+      {
         title: 'Stock Movement Terbaru',
         description: 'Sampel pergerakan stok terbaru untuk menghubungkan inventory dengan aktivitas lapangan.',
         rows: [
