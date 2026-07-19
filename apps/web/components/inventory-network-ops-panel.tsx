@@ -73,6 +73,13 @@ function getStatusTone(status: string) {
   return 'border-slate-200 bg-white text-slate-600'
 }
 
+function isAttentionStatus(status: string) {
+  const normalized = String(status ?? '').trim().toUpperCase()
+  return ['OPEN', 'PENDING', 'REVIEW', 'MONITOR', 'FAULT', 'FAULTY', 'RESERVED'].some((item) =>
+    normalized.includes(item),
+  )
+}
+
 function buildCsvCell(value: string) {
   const normalized = String(value ?? '').replace(/\r?\n/g, ' ').trim()
   return `"${normalized.replace(/"/g, '""')}"`
@@ -285,6 +292,57 @@ export function InventoryNetworkOpsPanel({
   })
   const visibleOdpRows = filteredOdpRows.slice(0, pageSize)
   const routeDistanceMeters = useMemo(() => buildRouteDistanceMeters(routePoints), [routePoints])
+  const totalPorts = useMemo(
+    () =>
+      odpRows.reduce((total, row) => total + (Number.parseInt(pickMeta(row.meta, 'Total Ports: ') || '0', 10) || 0), 0),
+    [odpRows],
+  )
+  const totalActivePorts = useMemo(
+    () =>
+      odpRows.reduce((total, row) => total + (Number.parseInt(pickMeta(row.meta, 'Active Ports: ') || '0', 10) || 0), 0),
+    [odpRows],
+  )
+  const pendingAssignments = useMemo(
+    () => assignmentRows.filter((row) => isAttentionStatus(row.status)).length,
+    [assignmentRows],
+  )
+  const pendingReturns = useMemo(
+    () => returnRows.filter((row) => isAttentionStatus(row.status)).length,
+    [returnRows],
+  )
+  const reconciliationItems = useMemo(
+    () =>
+      [
+        ...issuePortRows.slice(0, 3).map((row) => ({
+          id: `issue-${row.id}`,
+          lane: 'Port Issue',
+          title: row.primary,
+          subtitle: row.secondary,
+          detail: row.detail,
+          status: row.status,
+          tone: 'border-amber-200 bg-amber-50 text-amber-900',
+        })),
+        ...assignmentRows.filter((row) => isAttentionStatus(row.status)).slice(0, 3).map((row) => ({
+          id: `assignment-${row.id}`,
+          lane: 'Assignment',
+          title: row.primary,
+          subtitle: row.secondary,
+          detail: row.detail,
+          status: row.status,
+          tone: 'border-sky-200 bg-sky-50 text-sky-900',
+        })),
+        ...returnRows.filter((row) => isAttentionStatus(row.status)).slice(0, 3).map((row) => ({
+          id: `return-${row.id}`,
+          lane: 'Return',
+          title: row.primary,
+          subtitle: row.secondary,
+          detail: row.detail,
+          status: row.status,
+          tone: 'border-violet-200 bg-violet-50 text-violet-900',
+        })),
+      ].slice(0, 6),
+    [assignmentRows, issuePortRows, returnRows],
+  )
 
   useEffect(() => {
     if (routeMode) return
@@ -360,6 +418,71 @@ export function InventoryNetworkOpsPanel({
 
       <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
         Fokus ke data PORT ODP untuk kebutuhan operasional CS & Admin CS sesuai struktur menu terbaru.
+      </div>
+
+      <div className="mt-4 grid gap-3 xl:grid-cols-4">
+        <article className="rounded-2xl border border-slate-700 bg-slate-900/25 px-4 py-4 text-slate-100">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">ODP dan Port</p>
+          <p className="mt-2 text-3xl font-semibold text-white">{odpRows.length}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-200">
+            Total {totalPorts || 0} port dengan {totalActivePorts || 0} port aktif untuk pembacaan kapasitas.
+          </p>
+        </article>
+        <article className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-50">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-100">Port Butuh Tindak Lanjut</p>
+          <p className="mt-2 text-3xl font-semibold text-white">{issuePortRows.length}</p>
+          <p className="mt-2 text-sm leading-6 text-amber-100">
+            Port issue yang perlu dicek ulang agar order, assignment, dan layanan tidak tertahan.
+          </p>
+        </article>
+        <article className="rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-4 text-sky-50">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">Assignment Device</p>
+          <p className="mt-2 text-3xl font-semibold text-white">{assignmentRows.length}</p>
+          <p className="mt-2 text-sm leading-6 text-sky-100">
+            {pendingAssignments} assignment masih perlu follow up, termasuk {accessoryAssignments.length} assignment aksesoris.
+          </p>
+        </article>
+        <article className="rounded-2xl border border-violet-500/40 bg-violet-500/10 px-4 py-4 text-violet-50">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-100">Return Perangkat</p>
+          <p className="mt-2 text-3xl font-semibold text-white">{returnRows.length}</p>
+          <p className="mt-2 text-sm leading-6 text-violet-100">
+            {pendingReturns} histori return masih perlu pengecekan atau verifikasi lanjutan.
+          </p>
+        </article>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Antrian Rekonsiliasi</p>
+            <h4 className="mt-2 text-lg font-semibold text-white">Port, assignment, dan return yang perlu dibaca berurutan</h4>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+              Blok ini membantu inventory membaca titik yang paling berpotensi memutus alur antara kapasitas ODP, assignment perangkat,
+              dan barang return sebelum diteruskan ke NOC atau tim lapangan.
+            </p>
+          </div>
+          <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
+            {reconciliationItems.length} item prioritas
+          </span>
+        </div>
+        <div className="mt-4 grid gap-3 xl:grid-cols-3">
+          {reconciliationItems.map((item) => (
+            <article key={item.id} className={`rounded-2xl border px-4 py-3 ${item.tone}`}>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">{item.lane}</span>
+                <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
+              </div>
+              <p className="mt-3 text-sm font-semibold">{item.title}</p>
+              <p className="mt-1 text-sm opacity-85">{item.subtitle}</p>
+              <p className="mt-2 text-sm leading-6 opacity-90">{item.detail}</p>
+            </article>
+          ))}
+          {!reconciliationItems.length ? (
+            <div className="rounded-2xl border border-dashed border-slate-600 bg-slate-900/20 px-4 py-5 text-sm leading-6 text-slate-300 xl:col-span-3">
+              Belum ada port issue, assignment, atau return yang perlu direkonsiliasi pada review saat ini.
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
