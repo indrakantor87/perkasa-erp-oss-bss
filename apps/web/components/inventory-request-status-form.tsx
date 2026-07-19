@@ -67,6 +67,8 @@ export function InventoryRequestStatusForm({
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
   const scanRequired = requireScan && nextStatus === 'COMPLETED'
+  const showScanPanel = Boolean(canCreate)
+  const scanInputDisabled = isDisabled || nextStatus !== 'COMPLETED'
   const expectedItemCode = extractRequestedItemCode(requestValue).trim()
 
   useEffect(() => {
@@ -160,7 +162,7 @@ export function InventoryRequestStatusForm({
           handoverTo,
           handoverProofType,
           handoverProofRef,
-          scannedRackBarcode: scanRequired ? extractRackBarcode(scanValue).trim() : '',
+          scannedRackBarcode: nextStatus === 'COMPLETED' ? extractRackBarcode(scanValue).trim() : '',
         }),
       })
 
@@ -224,21 +226,31 @@ export function InventoryRequestStatusForm({
           </datalist>
         </label>
 
-        {requireScan ? (
+        {showScanPanel ? (
           <div className="lg:col-span-2">
             <InventoryItemScanAssist
               itemSuggestions={rackSuggestions}
-              disabled={isDisabled || nextStatus !== 'COMPLETED'}
+              disabled={scanInputDisabled}
               guidancePreset="request_completion"
               onResolved={(value) => setScanValue(value)}
             />
             <div className="mt-2 text-sm text-mute">
-              {nextStatus === 'COMPLETED'
-                ? expectedItemCode
-                  ? `Wajib scan barcode rak untuk item ${expectedItemCode} sebelum menandai request selesai.`
-                  : 'Wajib scan barcode rak sebelum menandai request selesai.'
-                : 'Scan barcode hanya dibutuhkan saat status diubah ke Selesai.'}
+              {nextStatus !== 'COMPLETED'
+                ? 'Panel scan tetap ditampilkan sebagai mode edukasi. Scan akan aktif saat status diubah ke Selesai.'
+                : requireScan
+                  ? expectedItemCode
+                    ? `Wajib scan barcode rak untuk item ${expectedItemCode} sebelum menandai request selesai.`
+                    : 'Wajib scan barcode rak sebelum menandai request selesai.'
+                  : expectedItemCode
+                    ? `Role ini tidak diwajibkan scan, tetapi barcode untuk item ${expectedItemCode} tetap bisa dipindai sebagai mode edukasi dan pembiasaan proses.`
+                    : 'Role ini tidak diwajibkan scan, tetapi panel tetap tersedia sebagai mode edukasi dan pembiasaan proses.'}
             </div>
+            {!requireScan ? (
+              <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                Scan opsional ini membantu role supervisor atau admin tetap mengikuti flow serah-terima yang
+                sama dengan tim operasional lapangan, walaupun validasi barcode tidak diwajibkan oleh sistem.
+              </div>
+            ) : null}
           </div>
         ) : null}
 

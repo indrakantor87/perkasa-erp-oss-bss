@@ -27,7 +27,7 @@ type VideoInputOption = {
 }
 
 type CameraOverlayFeedback = {
-  tone: 'idle' | 'detecting' | 'success'
+  tone: 'idle' | 'detecting' | 'success' | 'warning'
   message: string
 }
 
@@ -40,6 +40,26 @@ type BrowserBarcodeDetectorInstance = {
 }
 
 type BrowserBarcodeDetector = new (options?: { formats?: string[] }) => BrowserBarcodeDetectorInstance
+
+type AudioContextLike = {
+  createOscillator: () => {
+    type: string
+    frequency: { value: number }
+    connect: (node: unknown) => void
+    start: () => void
+    stop: (when?: number) => void
+  }
+  createGain: () => {
+    gain: {
+      value: number
+      setValueAtTime: (value: number, time: number) => void
+      exponentialRampToValueAtTime: (value: number, time: number) => void
+    }
+    connect: (node: unknown) => void
+  }
+  destination: unknown
+  currentTime: number
+}
 
 function getFeedbackToneClass(tone: ScanFeedback['tone']) {
   if (tone === 'success') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -87,6 +107,53 @@ function getGuidanceContent(preset: InventoryItemScanAssistProps['guidancePreset
       }
     default:
       return null
+  }
+}
+
+function triggerDeviceSuccessFeedback() {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(60)
+    }
+  } catch {
+  }
+
+  try {
+    const AudioContextCtor = (
+      window as unknown as {
+        AudioContext?: new () => AudioContextLike
+        webkitAudioContext?: new () => AudioContextLike
+      }
+    ).AudioContext
+      ?? (
+        window as unknown as {
+          webkitAudioContext?: new () => AudioContextLike
+        }
+      ).webkitAudioContext
+
+    if (!AudioContextCtor) {
+      return
+    }
+
+    const audioContext = new AudioContextCtor()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+
+    oscillator.type = 'sine'
+    oscillator.frequency.value = 880
+    gainNode.gain.setValueAtTime(0.001, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.05, audioContext.currentTime + 0.01)
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.12)
+
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    oscillator.start()
+    oscillator.stop(audioContext.currentTime + 0.12)
+  } catch {
   }
 }
 
@@ -168,6 +235,7 @@ export function InventoryItemScanAssist({
     const matchedSuggestion = findInventorySuggestionByCode(itemSuggestions, itemCode)
     if (!matchedSuggestion) {
       onResolved(itemCode)
+      triggerDeviceSuccessFeedback()
       setFeedback({
         tone: 'warning',
         message: `Kode ${itemCode} terbaca. Item akan dipakai berdasarkan kode, meski tidak muncul di daftar saran.`,
@@ -176,6 +244,7 @@ export function InventoryItemScanAssist({
     }
 
     onResolved(matchedSuggestion)
+    triggerDeviceSuccessFeedback()
     setScanValue('')
     setFeedback({
       tone: 'success',
@@ -243,6 +312,9 @@ export function InventoryItemScanAssist({
             const nextValue = results[0]?.rawValue?.trim()
             if (!nextValue) return
             const detectedItemCode = extractInventoryItemCodeFromScan(nextValue)
+            const matchedSuggestion = detectedItemCode
+              ? findInventorySuggestionByCode(itemSuggestions, detectedItemCode)
+              : null
             setCameraOverlayFeedback({
               tone: 'detecting',
               message: detectedItemCode
@@ -256,10 +328,12 @@ export function InventoryItemScanAssist({
               intervalRef.current = null
             }
             setCameraOverlayFeedback({
-              tone: 'success',
-              message: detectedItemCode
+              tone: matchedSuggestion || !detectedItemCode ? 'success' : 'warning',
+              message: matchedSuggestion
                 ? `Scan berhasil: ${detectedItemCode}`
-                : 'Scan berhasil. Item inventory langsung dipilih.',
+                : detectedItemCode
+                  ? `Barcode terbaca: ${detectedItemCode}. Item dipakai berdasarkan kode.`
+                  : 'Scan berhasil. Item inventory langsung dipilih.',
             })
             closeCameraTimeoutRef.current = window.setTimeout(() => {
               stopCamera()
@@ -419,6 +493,8 @@ export function InventoryItemScanAssist({
                   className={
                     cameraOverlayFeedback.tone === 'success'
                       ? 'rounded-full border border-emerald-300/80 bg-emerald-500/85 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-emerald-950/30'
+                      : cameraOverlayFeedback.tone === 'warning'
+                        ? 'rounded-full border border-amber-300/80 bg-amber-500/90 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-amber-950/30'
                       : cameraOverlayFeedback.tone === 'detecting'
                         ? 'rounded-full border border-sky-300/80 bg-sky-500/85 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-sky-950/30'
                         : 'rounded-full border border-white/20 bg-slate-950/65 px-4 py-2 text-center text-xs font-medium tracking-[0.08em] text-white'
