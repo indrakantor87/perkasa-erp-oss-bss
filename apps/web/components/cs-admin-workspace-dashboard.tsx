@@ -7,6 +7,7 @@ import { WorklistDetailPanel } from '@/components/worklist/worklist-detail-panel
 import { WorklistQuickActionModal } from '@/components/worklist/worklist-quick-action-modal'
 import { getRoleMeta } from '@/lib/role-meta'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
+import type { DashboardOperationalCard } from '@/lib/types'
 import type { WorklistBucketData } from '@/lib/services/worklist-service'
 import type { AppRole, DataSourceSnapshot, WorklistItem } from '@/lib/types'
 
@@ -17,6 +18,15 @@ type CsAdminWorkspaceDashboardProps = {
   buckets: WorklistBucketData[]
   selectedQueue: string
   selectedItemId?: string
+  reportCards: DashboardOperationalCard[]
+}
+
+type CsReportingShortcut = {
+  label: string
+  href: string
+  detail: string
+  badge: string
+  tone: string
 }
 
 const queueDescriptions: Record<string, string> = {
@@ -46,6 +56,38 @@ const priorityTone: Record<WorklistItem['priority'], string> = {
   sedang: 'bg-amber-50 text-amber-700',
   rendah: 'bg-emerald-50 text-emerald-700',
 }
+
+const reportingShortcuts: CsReportingShortcut[] = [
+  {
+    label: 'Customer',
+    href: '/customers',
+    detail: 'Membaca data customer yang menjadi pintu pelaporan pemasangan baru dari penjualan dan marketing.',
+    badge: 'customer',
+    tone: 'border-sky-200 bg-sky-50 text-sky-900',
+  },
+  {
+    label: 'Isolir',
+    href: buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' }),
+    detail: 'Menampilkan pelanggan isolir aktif yang biasa dibaca bersama billing untuk tindak lanjut layanan.',
+    badge: 'billing',
+    tone: 'border-amber-200 bg-amber-50 text-amber-900',
+  },
+  {
+    label: 'ODP dan Port',
+    href: '/inventory',
+    detail: 'Masuk ke pembacaan ODP dan port yang dipakai bersama GA dan NOC untuk validasi kapasitas.',
+    badge: 'ga / noc',
+    tone: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  },
+  {
+    label: 'Ticketing',
+    href: '/dashboard/tracking/noc-queue',
+    detail:
+      'Membuka ticketing terpadu yang menyatukan PSB, Troubleshoots, Dismantle, dan Jalur dalam satu meja operasional seperti di NOC.',
+    badge: 'terpadu',
+    tone: 'border-violet-200 bg-violet-50 text-violet-900',
+  },
+]
 
 function getStatusTone(status: string) {
   const normalized = String(status ?? '').trim().toUpperCase()
@@ -113,6 +155,7 @@ export function CsAdminWorkspaceDashboard({
   buckets,
   selectedQueue,
   selectedItemId,
+  reportCards,
 }: CsAdminWorkspaceDashboardProps) {
   const roleMeta = getRoleMeta(role)
   const activeBucket = pickActiveBucket(buckets, selectedQueue)
@@ -176,13 +219,7 @@ export function CsAdminWorkspaceDashboard({
             href="/customers"
             className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            Buka Customer Master
-          </Link>
-          <Link
-            href="/inventory"
-            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-          >
-            Cek ODP dan Port
+            Buka Customer
           </Link>
           <Link
             href="/support/isolations"
@@ -191,16 +228,16 @@ export function CsAdminWorkspaceDashboard({
             Buka Isolir
           </Link>
           <Link
-            href="/support/dismantle"
+            href="/inventory"
             className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
           >
-            Buka Dismantle
+            Buka ODP dan Port
           </Link>
           <Link
-            href={buildSupportLaneHref('tt', { focus: 'OPEN_TICKETS' })}
+            href="/dashboard/tracking/noc-queue"
             className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
           >
-            Buka TT Aktif
+            Buka Ticketing
           </Link>
           <Link
             href={buildSupportLaneHref('sla', { focus: 'SLA_OVERDUE' })}
@@ -208,6 +245,136 @@ export function CsAdminWorkspaceDashboard({
           >
             Buka SLA Kritis
           </Link>
+        </div>
+
+        <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="section-title">Rekap Pelaporan CS</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-950">
+                Ringkasan satu layar untuk screenshot cepat status operasional
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
+                Rekap ini mengikuti istilah yang saat ini dipakai di web agar tim CS bisa membuka,
+                membaca, lalu mengirim screenshot laporan tanpa perlu mengubah istilah antar divisi.
+              </p>
+            </div>
+            <span className="badge border-slate-200 bg-slate-50 text-slate-600">
+              {reportCards.length} panel ringkas
+            </span>
+          </div>
+
+          {reportCards.length ? (
+            <div className="mt-5 grid gap-4 xl:grid-cols-2">
+              {reportCards.map((card) => (
+                <article key={card.key} className="rounded-3xl border border-slate-200 bg-[var(--color-surface-soft)] p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`badge border ${card.tone}`}>{card.badge}</span>
+                        <span className="badge border-slate-200 bg-white text-slate-600">panel CS</span>
+                      </div>
+                      <h3 className="mt-3 text-lg font-semibold text-slate-950">{card.title}</h3>
+                      <p className="mt-3 text-sm leading-6 text-mute">{card.description}</p>
+                    </div>
+                    <Link
+                      href={card.href}
+                      prefetch={false}
+                      className="inline-flex shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                    >
+                      Buka
+                    </Link>
+                  </div>
+
+                  {card.metrics[0] ? (
+                    <Link
+                      href={card.metrics[0].href || card.href}
+                      prefetch={false}
+                      className="mt-5 block rounded-2xl border border-slate-200 bg-white px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        {card.metrics[0].label}
+                      </p>
+                      <div className="mt-2 flex items-end justify-between gap-4">
+                        <p className="text-3xl font-semibold tracking-tight text-slate-950">
+                          {card.metrics[0].value}
+                        </p>
+                        <span className="badge border-slate-200 bg-slate-50 text-slate-600">
+                          utama
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-slate-600">
+                        {card.metrics[0].hint || 'Klik untuk membuka detail operasional terkait.'}
+                      </p>
+                    </Link>
+                  ) : null}
+
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    {card.metrics.slice(1, 3).map((metric) => (
+                      <Link
+                        key={`${card.key}-${metric.label}`}
+                        href={metric.href || card.href}
+                        prefetch={false}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:border-slate-300 hover:bg-slate-50"
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          {metric.label}
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                          {metric.value}
+                        </p>
+                        <p className="mt-2 text-xs leading-5 text-slate-600">
+                          {metric.hint || 'Klik untuk membuka detail operasional terkait.'}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-mute">
+              Rekap pelaporan belum memiliki panel aktif dari sumber dashboard saat ini.
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 rounded-3xl border border-slate-200 bg-[var(--color-surface-soft)] p-5">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="section-title">Laporan Cepat CS</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-950">
+                Menu ringkas untuk screenshot laporan operasional ke grup WA
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
+                Shortcut ini memusatkan Customer, Isolir, ODP dan Port, serta ticketing terpadu
+                supaya tim CS bisa membuka layar yang sama dengan divisi terkait tanpa berpindah
+                modul terlalu jauh.
+              </p>
+            </div>
+            <span className="badge border-slate-200 bg-white text-slate-600">
+              {reportingShortcuts.length} menu laporan
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {reportingShortcuts.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`rounded-3xl border p-4 transition hover:-translate-y-0.5 hover:shadow-sm ${item.tone}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                    {item.badge}
+                  </span>
+                  <span className="badge border-current/15 bg-white/70 text-current">buka</span>
+                </div>
+                <h3 className="mt-4 text-base font-semibold">{item.label}</h3>
+                <p className="mt-2 text-sm leading-6 text-current/85">{item.detail}</p>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 

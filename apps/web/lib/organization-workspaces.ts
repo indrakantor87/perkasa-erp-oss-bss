@@ -212,6 +212,36 @@ export const csAdminWorkspace: OrganizationWorkspaceDefinition = {
         },
       ],
     },
+    {
+      title: 'Laporan cepat CS',
+      description: 'Menu ringkas untuk membuka layar operasional yang paling sering dipakai sebagai bahan screenshot laporan ke grup WA.',
+      links: [
+        {
+          label: 'Customer',
+          href: '/customers',
+          description: 'Baca data customer yang menjadi pintu pelaporan pemasangan baru dari penjualan/marketing.',
+          badge: 'customer',
+        },
+        {
+          label: 'Isolir',
+          href: '/support/isolations?focus=ACTIVE_ISOLATIONS',
+          description: 'Lihat pelanggan isolir aktif dengan sudut pandang yang sama seperti billing.',
+          badge: 'billing',
+        },
+        {
+          label: 'ODP dan Port',
+          href: '/inventory',
+          description: 'Masuk ke pembacaan ODP dan port yang dipakai bersama GA dan NOC.',
+          badge: 'ga / noc',
+        },
+        {
+          label: 'Ticketing',
+          href: '/dashboard/tracking/noc-queue',
+          description: 'Buka ticketing terpadu yang menyatukan PSB, Troubleshoots, Dismantle, dan Jalur seperti meja NOC.',
+          badge: 'terpadu',
+        },
+      ],
+    },
   ],
 }
 
