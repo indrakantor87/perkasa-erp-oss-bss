@@ -68,7 +68,7 @@ export function InventoryItemScanAssist({
     if (!itemCode) {
       setFeedback({
         tone: 'error',
-        message: 'Hasil scan tidak dikenali. Gunakan barcode item inventory berbentuk URL internal atau kode item.',
+        message: 'Hasil scan tidak dikenali. Gunakan barcode inventory yang dipindai lewat kamera atau tempel URL/kode item hasil scan.',
       })
       return false
     }
@@ -90,7 +90,7 @@ export function InventoryItemScanAssist({
       message:
         source === 'camera'
           ? `Scan kamera berhasil. Item ${itemCode} langsung dipilih.`
-          : `Scan scanner berhasil. Item ${itemCode} langsung dipilih.`,
+          : `Hasil scan barcode diterima. Item ${itemCode} langsung dipilih.`,
     })
     return true
   }
@@ -109,7 +109,7 @@ export function InventoryItemScanAssist({
     if (!BarcodeDetectorCtor) {
       setFeedback({
         tone: 'warning',
-        message: 'Browser ini belum mendukung BarcodeDetector untuk scan kamera.',
+        message: 'Browser ini belum mendukung pembacaan barcode langsung dari kamera. Buka dari Chrome/Edge modern di HP atau PC/laptop.',
       })
       return
     }
@@ -150,7 +150,10 @@ export function InventoryItemScanAssist({
       } catch (error) {
         setFeedback({
           tone: 'error',
-          message: error instanceof Error ? error.message : 'Kamera tidak bisa diakses dari browser ini.',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Kamera tidak bisa diakses dari browser ini. Coba izinkan kamera HP/webcam atau pakai browser lain.',
         })
         setCameraOpen(false)
       } finally {
@@ -174,8 +177,9 @@ export function InventoryItemScanAssist({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Scan barang</p>
           <p className="mt-2 text-sm leading-6 text-slate-700">
-            Tempel hasil scan dari scanner USB atau relative URL item inventory, misalnya
-            ` /inventory?itemCode=INV-202607-0001 `.
+            Barcode dipakai sebagai media scan pengganti infrared, jadi cukup gunakan kamera HP, webcam
+            laptop, atau kamera eksternal di PC. Jika perlu, tempel juga hasil scan berupa URL internal atau
+            kode item, misalnya ` /inventory?itemCode=INV-202607-0001 `.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -189,9 +193,14 @@ export function InventoryItemScanAssist({
             className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
           >
             <Camera className="h-4 w-4" />
-            Scan Kamera
+            Buka Kamera
           </button>
         </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+        Scan barcode bisa dilakukan langsung dari kamera HP atau kamera eksternal pada PC/laptop. Infrared
+        tidak dibutuhkan untuk flow ini.
       </div>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -204,7 +213,7 @@ export function InventoryItemScanAssist({
             applyScanValue(scanValue, 'scanner')
           }}
           disabled={disabled}
-          placeholder="Paste / scan URL relative atau kode item"
+          placeholder="Tempel hasil scan barcode, URL internal, atau kode item inventory"
           className="w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
         />
         <button
@@ -220,7 +229,8 @@ export function InventoryItemScanAssist({
 
       {!barcodeDetectorSupported ? (
         <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-          Browser ini belum mendukung scan kamera otomatis. Scanner USB tetap bisa dipakai, atau buka halaman ini dari Chrome/Edge modern.
+          Browser ini belum mendukung scan kamera otomatis. Buka halaman ini dari Chrome/Edge modern di HP
+          atau PC/laptop, atau tempel hasil scan barcode secara manual.
         </div>
       ) : null}
 
@@ -247,7 +257,8 @@ export function InventoryItemScanAssist({
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Scan Kamera</p>
                 <h3 className="mt-2 text-xl font-semibold text-slate-950">Arahkan kamera ke barcode item</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Format yang didukung: QR Code dan Code128. Hasil scan akan langsung memilih item di form.
+                  Gunakan kamera HP, webcam laptop, atau kamera eksternal PC untuk membaca barcode. Format yang
+                  didukung: QR Code dan Code128. Infrared tidak dibutuhkan untuk flow ini.
                 </p>
               </div>
               <button
@@ -270,8 +281,8 @@ export function InventoryItemScanAssist({
               {cameraBusy
                 ? 'Mengaktifkan kamera...'
                 : cameraReady
-                  ? 'Kamera aktif. Arahkan barcode ke tengah frame.'
-                  : 'Menunggu izin kamera...'}
+                  ? 'Kamera aktif. Arahkan barcode ke tengah frame sampai item terbaca otomatis.'
+                  : 'Menunggu izin kamera HP/webcam...'}
             </div>
           </div>
         </div>
