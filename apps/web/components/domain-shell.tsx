@@ -1976,6 +1976,10 @@ export function DomainShell({
           })
           .filter(Boolean)
       : []
+  const inventoryMovementRows =
+    content.key === 'inventory'
+      ? (content.reviewSections ?? []).find((section) => section.title.toUpperCase().includes('STOCK MOVEMENT'))?.rows ?? []
+      : []
   const hrEmployeeSuggestions =
     content.key === 'hr'
       ? (content.reviewSections ?? [])
@@ -3610,6 +3614,7 @@ export function DomainShell({
               itemSuggestions={inventoryItemSuggestions}
               requestSuggestions={inventoryRequestSuggestions}
               rackSuggestions={inventoryRackSuggestions}
+              movementRows={inventoryMovementRows}
               requireScan={requireInventoryPickupScan}
               initialItemValue={inventoryItemPrefillValue}
               initialRequestValue={inventoryRequestPrefillValue}

@@ -19,6 +19,11 @@ type InventoryStockMovementFormProps = {
 
 const movementTypeOptions = ['IN', 'OUT', 'ADJUSTMENT'] as const
 const referenceTypeOptions = ['WORK_ORDER', 'TROUBLE_TICKET', 'REQUEST', 'MANUAL', 'PURCHASE_RECEIPT'] as const
+const handoverProofOptions = [
+  { value: 'BARCODE_SCAN', label: 'Barcode Scan' },
+  { value: 'SERIAL_CHECK', label: 'Serial Check' },
+  { value: 'MANUAL_CONFIRMATION', label: 'Manual Confirmation' },
+] as const
 
 function extractItemCode(value: string) {
   return value.split('|')[0]?.trim() ?? ''
@@ -54,6 +59,10 @@ export function InventoryStockMovementForm({
   const [qty, setQty] = useState('1')
   const [unitPrice, setUnitPrice] = useState('')
   const [notes, setNotes] = useState('')
+  const [handoverFrom, setHandoverFrom] = useState('')
+  const [handoverTo, setHandoverTo] = useState('')
+  const [handoverProofType, setHandoverProofType] = useState<(typeof handoverProofOptions)[number]['value']>('BARCODE_SCAN')
+  const [handoverProofRef, setHandoverProofRef] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
@@ -144,6 +153,15 @@ export function InventoryStockMovementForm({
         return
       }
     }
+    if (movementType === 'OUT' && (handoverFrom.trim() || handoverTo.trim() || handoverProofRef.trim())) {
+      if (!handoverFrom.trim() || !handoverTo.trim() || !handoverProofRef.trim()) {
+        setFeedback({
+          tone: 'error',
+          message: 'Jika handover diisi pada movement OUT, lengkapi asal, penerima, dan referensi bukti.',
+        })
+        return
+      }
+    }
 
     setSubmitting(true)
     setFeedback(null)
@@ -168,6 +186,10 @@ export function InventoryStockMovementForm({
           qty,
           unitPrice,
           notes,
+          handoverFrom,
+          handoverTo,
+          handoverProofType,
+          handoverProofRef,
           scannedRackBarcode: requireScan && movementType === 'OUT' ? scannedRackBarcode : '',
         }),
       })
@@ -203,6 +225,10 @@ export function InventoryStockMovementForm({
       setQty('1')
       setUnitPrice('')
       setNotes('')
+      setHandoverFrom('')
+      setHandoverTo('')
+      setHandoverProofType('BARCODE_SCAN')
+      setHandoverProofRef('')
       setScanValue('')
       router.refresh()
     } finally {
@@ -413,6 +439,64 @@ export function InventoryStockMovementForm({
             disabled={isDisabled}
           />
         </label>
+
+        {movementType === 'OUT' ? (
+          <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <p className="text-sm font-semibold text-slate-950">Bukti Serah-Terima</p>
+            <p className="mt-1 text-sm leading-6 text-mute">
+              Lengkapi saat movement `OUT` dipakai untuk serah-terima ke teknisi, NOC, atau lokasi tujuan lain.
+            </p>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <label className="flex flex-col gap-2 text-sm text-slate-700">
+                <span className="font-semibold text-slate-950">Diserahkan dari</span>
+                <input
+                  value={handoverFrom}
+                  onChange={(event) => setHandoverFrom(event.target.value)}
+                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                  placeholder="Contoh: Inventory / GA"
+                  disabled={isDisabled}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-slate-700">
+                <span className="font-semibold text-slate-950">Diterima oleh</span>
+                <input
+                  value={handoverTo}
+                  onChange={(event) => setHandoverTo(event.target.value)}
+                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                  placeholder="Contoh: NOC / Teknisi"
+                  disabled={isDisabled}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-slate-700">
+                <span className="font-semibold text-slate-950">Jenis bukti</span>
+                <select
+                  value={handoverProofType}
+                  onChange={(event) =>
+                    setHandoverProofType(event.target.value as (typeof handoverProofOptions)[number]['value'])
+                  }
+                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                  disabled={isDisabled}
+                >
+                  {handoverProofOptions.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-slate-700">
+                <span className="font-semibold text-slate-950">Referensi bukti</span>
+                <input
+                  value={handoverProofRef}
+                  onChange={(event) => setHandoverProofRef(event.target.value)}
+                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                  placeholder="Contoh: HO-MOV-202607-0001"
+                  disabled={isDisabled}
+                />
+              </label>
+            </div>
+          </div>
+        ) : null}
 
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">

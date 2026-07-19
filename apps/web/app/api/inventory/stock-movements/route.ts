@@ -44,6 +44,25 @@ function resolveOptionalPositiveInt(value: unknown) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
+function buildHandoverAuditNote(params: {
+  handoverFrom?: string
+  handoverTo?: string
+  handoverProofType?: string
+  handoverProofRef?: string
+}) {
+  const handoverFrom = String(params.handoverFrom ?? '').trim()
+  const handoverTo = String(params.handoverTo ?? '').trim()
+  const handoverProofType = String(params.handoverProofType ?? '').trim().toUpperCase()
+  const handoverProofRef = String(params.handoverProofRef ?? '').trim()
+
+  if (!handoverFrom || !handoverTo) {
+    return ''
+  }
+
+  const proofParts = [handoverProofType || '-', handoverProofRef || '-'].join(' / ')
+  return `[HANDOVER] ${handoverFrom} -> ${handoverTo} | [PROOF] ${proofParts}`
+}
+
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) {
@@ -76,6 +95,10 @@ export async function POST(request: Request) {
       technicianUserId?: unknown
       referenceType?: unknown
       notes?: unknown
+      handoverFrom?: unknown
+      handoverTo?: unknown
+      handoverProofType?: unknown
+      handoverProofRef?: unknown
       scannedRackBarcode?: unknown
     }
 
@@ -92,6 +115,10 @@ export async function POST(request: Request) {
     const technicianUserId = resolveOptionalPositiveInt(payload.technicianUserId)
     const referenceTypeRaw = String(payload.referenceType ?? '').trim().toUpperCase()
     const notes = String(payload.notes ?? '').trim()
+    const handoverFrom = String(payload.handoverFrom ?? '').trim()
+    const handoverTo = String(payload.handoverTo ?? '').trim()
+    const handoverProofType = String(payload.handoverProofType ?? '').trim().toUpperCase()
+    const handoverProofRef = String(payload.handoverProofRef ?? '').trim()
     const scannedRackBarcode = String(payload.scannedRackBarcode ?? '').trim().toUpperCase()
     const referenceType =
       referenceTypeRaw && allowedReferenceTypes.has(referenceTypeRaw)
@@ -128,6 +155,12 @@ export async function POST(request: Request) {
     if (movementType === 'OUT' && !toLocationId && !technicianUserId && !workOrderId && !troubleTicketId) {
       return Response.json(
         { message: 'Movement OUT wajib memiliki tujuan berupa lokasi, teknisi, work order, atau trouble ticket.' },
+        { status: 400 },
+      )
+    }
+    if (movementType === 'OUT' && (handoverFrom || handoverTo || handoverProofRef) && (!handoverFrom || !handoverTo || !handoverProofRef)) {
+      return Response.json(
+        { message: 'Lengkapi asal, penerima, dan referensi bukti jika movement OUT mencatat handover.' },
         { status: 400 },
       )
     }
@@ -195,9 +228,20 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Qty adjustment tidak valid.' }, { status: 400 })
     }
 
-    const noteText = `[Review Movement] ${session.displayName} (${session.username})${
-      notes ? ` - ${notes}` : ''
-    }`
+    const handoverAuditNote = buildHandoverAuditNote({
+      handoverFrom,
+      handoverTo,
+      handoverProofType,
+      handoverProofRef,
+    })
+    const noteParts = [`[Review Movement] ${session.displayName} (${session.username})`]
+    if (notes) {
+      noteParts.push(notes)
+    }
+    if (handoverAuditNote) {
+      noteParts.push(handoverAuditNote)
+    }
+    const noteText = noteParts.join(' - ')
     const columns = ['item_id']
     const values: unknown[] = [item.id]
 

@@ -6,6 +6,25 @@ function pickMeta(meta: string[], prefix: string) {
   return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? ''
 }
 
+function normalizeText(value: string) {
+  return value.trim().toUpperCase()
+}
+
+function getMovementTone(value: string) {
+  const normalized = normalizeText(value)
+  if (normalized === 'IN') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+  if (normalized === 'OUT') {
+    return 'border-sky-200 bg-sky-50 text-sky-700'
+  }
+  return 'border-amber-200 bg-amber-50 text-amber-700'
+}
+
+function hasHandoverProof(detail: string) {
+  return /\[HANDOVER\].*\[PROOF\]/i.test(detail)
+}
+
 export function InventoryStockReceiptPanel({
   sections,
   canCreate,
@@ -30,12 +49,15 @@ export function InventoryStockReceiptPanel({
     return null
   }
 
-  const inboundRows = movementSection.rows.filter((row) => row.status.trim().toUpperCase() === 'IN')
-  if (!inboundRows.length) {
-    return null
-  }
+  const inboundRows = movementSection.rows.filter((row) => normalizeText(row.primary) === 'IN')
+  const outboundRows = movementSection.rows.filter((row) => normalizeText(row.primary) === 'OUT')
+  const handoverRows = movementSection.rows.filter((row) => hasHandoverProof(row.detail))
 
   const totalQty = inboundRows.reduce((sum, row) => {
+    const qty = Number.parseInt(pickMeta(row.meta, 'Qty: '), 10)
+    return sum + (Number.isFinite(qty) ? qty : 0)
+  }, 0)
+  const totalOutboundQty = outboundRows.reduce((sum, row) => {
     const qty = Number.parseInt(pickMeta(row.meta, 'Qty: '), 10)
     return sum + (Number.isFinite(qty) ? qty : 0)
   }, 0)
@@ -54,9 +76,38 @@ export function InventoryStockReceiptPanel({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <span className="badge border-transparent bg-slate-950 text-white">{inboundRows.length} transaksi</span>
+          <span className="badge border-transparent bg-slate-950 text-white">{movementSection.rows.length} transaksi</span>
           <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">{totalQty} qty masuk</span>
+          <span className="badge border-sky-200 bg-sky-50 text-sky-700">{totalOutboundQty} qty keluar</span>
+          {handoverRows.length ? (
+            <span className="badge border-violet-200 bg-violet-50 text-violet-700">{handoverRows.length} handover</span>
+          ) : null}
         </div>
+      </div>
+
+      <div className="mt-6 grid gap-3 xl:grid-cols-4">
+        <article className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Barang Masuk</p>
+          <p className="mt-2 text-3xl font-semibold text-emerald-900">{inboundRows.length}</p>
+          <p className="mt-2 text-sm leading-6 text-emerald-800">Transaksi penerimaan stok yang tercatat pada review terbaru.</p>
+        </article>
+        <article className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Barang Keluar</p>
+          <p className="mt-2 text-3xl font-semibold text-sky-900">{outboundRows.length}</p>
+          <p className="mt-2 text-sm leading-6 text-sky-800">Movement keluar yang memengaruhi alokasi barang ke lapangan atau tujuan lain.</p>
+        </article>
+        <article className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Bukti Handover</p>
+          <p className="mt-2 text-3xl font-semibold text-violet-900">{handoverRows.length}</p>
+          <p className="mt-2 text-sm leading-6 text-violet-800">Movement yang sudah menyimpan jejak serah-terima dan referensi bukti.</p>
+        </article>
+        <article className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Adjustment</p>
+          <p className="mt-2 text-3xl font-semibold text-amber-900">
+            {movementSection.rows.filter((row) => normalizeText(row.primary) === 'ADJUSTMENT').length}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-amber-800">Penyesuaian stok yang perlu dibaca bersama arus barang masuk dan keluar.</p>
+        </article>
       </div>
 
       <article className="mt-6 rounded-2xl border border-line bg-slate-50 p-5">
@@ -86,7 +137,7 @@ export function InventoryStockReceiptPanel({
       </article>
 
       <div className="mt-6 space-y-3">
-        {inboundRows.map((row) => {
+        {movementSection.rows.map((row) => {
           const qty = pickMeta(row.meta, 'Qty: ')
           const ref = pickMeta(row.meta, 'Ref: ')
           const price = pickMeta(row.meta, 'Harga: ')
@@ -98,13 +149,16 @@ export function InventoryStockReceiptPanel({
                   <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
                   <p className="mt-1 text-sm text-mute">{row.secondary}</p>
                 </div>
-                <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">Barang Masuk</span>
+                <span className={`badge ${getMovementTone(row.primary)}`}>{row.primary}</span>
               </div>
               <p className="mt-3 text-sm leading-6 text-mute">{row.detail}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="badge border-slate-200 bg-white text-slate-600">Qty: {qty || '-'}</span>
                 <span className="badge border-slate-200 bg-white text-slate-600">Ref: {ref || '-'}</span>
                 <span className="badge border-slate-200 bg-white text-slate-600">Harga: {price || '-'}</span>
+                {hasHandoverProof(row.detail) ? (
+                  <span className="badge border-violet-200 bg-violet-50 text-violet-700">Bukti handover tercatat</span>
+                ) : null}
               </div>
             </article>
           )

@@ -25,6 +25,25 @@ type ExecuteResult = {
   affectedRows?: number
 }
 
+function buildHandoverAuditNote(params: {
+  handoverFrom?: string
+  handoverTo?: string
+  handoverProofType?: string
+  handoverProofRef?: string
+}) {
+  const handoverFrom = String(params.handoverFrom ?? '').trim()
+  const handoverTo = String(params.handoverTo ?? '').trim()
+  const handoverProofType = String(params.handoverProofType ?? '').trim().toUpperCase()
+  const handoverProofRef = String(params.handoverProofRef ?? '').trim()
+
+  if (!handoverFrom || !handoverTo) {
+    return ''
+  }
+
+  const proofParts = [handoverProofType || '-', handoverProofRef || '-'].join(' / ')
+  return `[HANDOVER] ${handoverFrom} -> ${handoverTo} | [PROOF] ${proofParts}`
+}
+
 function extractRequestId(value: string) {
   return Number.parseInt(value.split('|')[0]?.trim() ?? '', 10)
 }
@@ -64,6 +83,10 @@ export async function POST(request: Request) {
       nextStatus?: unknown
       pendingReason?: unknown
       processNotes?: unknown
+      handoverFrom?: unknown
+      handoverTo?: unknown
+      handoverProofType?: unknown
+      handoverProofRef?: unknown
       scannedRackBarcode?: unknown
     }
 
@@ -71,6 +94,10 @@ export async function POST(request: Request) {
     const nextStatus = String(payload.nextStatus ?? '').trim().toUpperCase()
     const pendingReason = String(payload.pendingReason ?? '').trim()
     const processNotes = String(payload.processNotes ?? '').trim()
+    const handoverFrom = String(payload.handoverFrom ?? '').trim()
+    const handoverTo = String(payload.handoverTo ?? '').trim()
+    const handoverProofType = String(payload.handoverProofType ?? '').trim().toUpperCase()
+    const handoverProofRef = String(payload.handoverProofRef ?? '').trim()
     const scannedRackBarcode = String(payload.scannedRackBarcode ?? '').trim().toUpperCase()
 
     if (!Number.isInteger(requestId) || requestId <= 0) {
@@ -81,6 +108,12 @@ export async function POST(request: Request) {
     }
     if (nextStatus === 'PENDING' && !pendingReason) {
       return Response.json({ message: 'Alasan pending wajib diisi.' }, { status: 400 })
+    }
+    if (nextStatus === 'COMPLETED' && (!handoverFrom || !handoverTo || !handoverProofRef)) {
+      return Response.json(
+        { message: 'Bukti serah-terima wajib diisi saat request diselesaikan.' },
+        { status: 400 },
+      )
     }
 
     await ensureInventoryRequestTable()
@@ -147,7 +180,20 @@ export async function POST(request: Request) {
     }
 
     const actor = `${session.displayName} (${session.username})`
-    const noteText = processNotes ? `[${nextStatus}] ${actor} - ${processNotes}` : `[${nextStatus}] ${actor}`
+    const handoverAuditNote = buildHandoverAuditNote({
+      handoverFrom,
+      handoverTo,
+      handoverProofType,
+      handoverProofRef,
+    })
+    const noteSegments = [`[${nextStatus}] ${actor}`]
+    if (processNotes) {
+      noteSegments.push(processNotes)
+    }
+    if (handoverAuditNote) {
+      noteSegments.push(handoverAuditNote)
+    }
+    const noteText = noteSegments.join(' - ')
 
     await runReviewDbTransaction(async (connection) => {
       if (nextStatus === 'COMPLETED') {
