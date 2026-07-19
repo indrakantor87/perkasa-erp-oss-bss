@@ -3,6 +3,7 @@ import { DataSourceStatus } from '@/components/data-source-status'
 import { PsbListWorkspace } from '@/components/psb-list-workspace'
 import { canAccessPath, canPerformAction } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
+import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getRoleMeta } from '@/lib/role-meta'
 import { getPsbListPageData } from '@/lib/services/psb-list-service'
 import { getServerUiLanguage } from '@/lib/ui-language-server'
@@ -26,6 +27,8 @@ export default async function ListPsbPage({
   const payload = await getPsbListPageData(resolvedSearchParams)
   const language = await getServerUiLanguage()
   const roleMeta = getRoleMeta(session.role, language)
+  const writeSource = getDataSourceSnapshot()
+  const reviewDbReady = writeSource.effectiveMode === 'review-db' && !writeSource.isFallback
   const canUpdate =
     canPerformAction(session.role, 'sales', 'update') ||
     canPerformAction(session.role, 'customers', 'update')
@@ -41,6 +44,7 @@ export default async function ListPsbPage({
         roleLabel={roleMeta.label}
         canUpdate={canUpdate}
         canApprove={canApprove}
+        reviewDbReady={reviewDbReady}
       />
     </div>
   )

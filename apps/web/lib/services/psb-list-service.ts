@@ -1,5 +1,13 @@
 import { getConfiguredDataMode, getFallbackDataSourceSnapshot, getDataSourceSnapshot } from '@/lib/data-source'
-import type { DataSourceSnapshot } from '@/lib/types'
+import {
+  getReviewDbErrorDetail,
+  hasReviewDbColumn,
+  invalidateReviewDbColumnCache,
+  runReviewDbExecute,
+  runReviewDbQuery,
+  runReviewDbTransaction,
+} from '@/lib/review-db'
+import type { AppRole, DataSourceSnapshot } from '@/lib/types'
 
 export type PsbListStatus =
   | 'BARU'
@@ -60,6 +68,54 @@ export type PsbListPagePayload = {
     q: string | null
     selected: string | null
   }
+}
+
+export type PsbListTransitionAction =
+  | 'SUBMIT_REVIEW'
+  | 'REQUEST_CORRECTION'
+  | 'APPROVE'
+  | 'REJECT'
+
+type ExecuteResult = {
+  insertId?: number
+  affectedRows?: number
+}
+
+type ReviewDbPsbListRow = {
+  id: number
+  psbListCode: string | null
+  customerName: string | null
+  customerPhone: string | null
+  addressText: string | null
+  odpCode: string | null
+  packageLabel: string | null
+  salesOwnerName: string | null
+  requestedInstallDate: string | null
+  status: string | null
+  reviewNotes: string | null
+  correctionNotes: string | null
+  transferredTicketRef: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  areaLabel: string | null
+  escortNotes: string | null
+  activityNotes: string | null
+  csPicName: string | null
+  nextActionLabel: string | null
+}
+
+type ReviewDbAuditRow = {
+  eventType: string | null
+  toStatus: string | null
+  notes: string | null
+}
+
+type ReviewDbOwnerRow = {
+  ownerName: string | null
+}
+
+type ReviewDbCountRow = {
+  total: number
 }
 
 const mockPsbListItems: PsbListItem[] = [
@@ -203,6 +259,25 @@ const mockPsbListItems: PsbListItem[] = [
   },
 ]
 
+const transitionMap: Record<PsbListTransitionAction, { from: PsbListStatus[]; to: PsbListStatus }> = {
+  SUBMIT_REVIEW: {
+    from: ['BARU', 'PERLU_KOREKSI'],
+    to: 'REVIEW_CS',
+  },
+  REQUEST_CORRECTION: {
+    from: ['REVIEW_CS'],
+    to: 'PERLU_KOREKSI',
+  },
+  APPROVE: {
+    from: ['REVIEW_CS'],
+    to: 'DISETUJUI',
+  },
+  REJECT: {
+    from: ['REVIEW_CS'],
+    to: 'DITOLAK',
+  },
+}
+
 function resolveSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
@@ -216,24 +291,415 @@ function normalizeText(value: string | null | undefined) {
   return String(value ?? '').trim().toUpperCase()
 }
 
-function buildSourceSnapshot() {
-  const source = getDataSourceSnapshot()
-  if (source.effectiveMode === 'review-db' && !source.isFallback) {
-    return getFallbackDataSourceSnapshot(
-      'List PSB fase 1 masih memakai mock operasional. Jalur review DB akan disambungkan pada batch write-side berikutnya tanpa mengganggu flow yang sudah stabil.',
+function normalizeStatus(value: string | null | undefined): PsbListStatus {
+  const normalized = normalizeText(value)
+  if (
+    normalized === 'BARU' ||
+    normalized === 'REVIEW_CS' ||
+    normalized === 'PERLU_KOREKSI' ||
+    normalized === 'DISETUJUI' ||
+    normalized === 'DITOLAK' ||
+    normalized === 'DITRANSFER_KE_TICKETING'
+  ) {
+    return normalized
+  }
+
+  return 'BARU'
+}
+
+function buildNextActionLabel(status: PsbListStatus) {
+  switch (status) {
+    case 'BARU':
+      return 'Masuk review CS'
+    case 'REVIEW_CS':
+      return 'Putuskan review'
+    case 'PERLU_KOREKSI':
+      return 'Tunggu koreksi penjualan'
+    case 'DISETUJUI':
+      return 'Transfer ke ticketing'
+    case 'DITRANSFER_KE_TICKETING':
+      return 'Monitor ticket'
+    case 'DITOLAK':
+      return 'Tunggu submit ulang'
+    default:
+      return 'Pantau antrean'
+  }
+}
+
+function buildFallbackSnapshot(detail: string) {
+  return getFallbackDataSourceSnapshot(detail)
+}
+
+function mapReviewDbRowToPsbListItem(row: ReviewDbPsbListRow): PsbListItem {
+  const status = normalizeStatus(row.status)
+
+  return {
+    id: Number(row.id),
+    psbListCode: String(row.psbListCode ?? '-'),
+    customerName: String(row.customerName ?? 'Customer belum diisi'),
+    customerPhone: row.customerPhone,
+    addressText: String(row.addressText ?? '-'),
+    odpCode: row.odpCode,
+    packageLabel: row.packageLabel,
+    salesOwnerName: row.salesOwnerName,
+    requestedInstallDate: row.requestedInstallDate,
+    status,
+    reviewNotes: row.reviewNotes,
+    correctionNotes: row.correctionNotes,
+    transferredTicketRef: row.transferredTicketRef,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    areaLabel: row.areaLabel,
+    escortNotes: row.escortNotes,
+    activityNotes: row.activityNotes,
+    csPicName: row.csPicName,
+    nextActionLabel: row.nextActionLabel?.trim() || buildNextActionLabel(status),
+    auditSummary: [],
+  }
+}
+
+async function ensurePsbListColumn(columnName: string, definitionSql: string, afterColumn: string) {
+  if (await hasReviewDbColumn('sales_psb_lists', columnName)) {
+    return
+  }
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE sales_psb_lists
+      ADD COLUMN ${definitionSql} AFTER ${afterColumn}
+    `,
+  )
+  invalidateReviewDbColumnCache('sales_psb_lists', columnName)
+}
+
+async function ensurePsbListAuditColumn(columnName: string, definitionSql: string, afterColumn: string) {
+  if (await hasReviewDbColumn('sales_psb_list_audits', columnName)) {
+    return
+  }
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE sales_psb_list_audits
+      ADD COLUMN ${definitionSql} AFTER ${afterColumn}
+    `,
+  )
+  invalidateReviewDbColumnCache('sales_psb_list_audits', columnName)
+}
+
+export async function ensurePsbListTables() {
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      CREATE TABLE IF NOT EXISTS sales_psb_lists (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        psb_list_code VARCHAR(40) NOT NULL,
+        customer_name VARCHAR(180) NOT NULL,
+        customer_phone VARCHAR(40) NULL,
+        address_text TEXT NOT NULL,
+        odp_code VARCHAR(60) NULL,
+        package_label VARCHAR(120) NULL,
+        sales_owner_name VARCHAR(120) NULL,
+        requested_install_date DATETIME NULL,
+        status VARCHAR(40) NOT NULL DEFAULT 'BARU',
+        review_notes TEXT NULL,
+        correction_notes TEXT NULL,
+        transferred_ticket_ref VARCHAR(80) NULL,
+        area_label VARCHAR(120) NULL,
+        escort_notes TEXT NULL,
+        activity_notes TEXT NULL,
+        cs_pic_name VARCHAR(120) NULL,
+        next_action_label VARCHAR(150) NULL,
+        approved_by VARCHAR(150) NULL,
+        approved_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_sales_psb_lists_code (psb_list_code),
+        KEY idx_sales_psb_lists_status (status),
+        KEY idx_sales_psb_lists_owner (sales_owner_name),
+        KEY idx_sales_psb_lists_schedule (requested_install_date)
+      )
+    `,
+  )
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      CREATE TABLE IF NOT EXISTS sales_psb_list_audits (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        psb_list_id BIGINT UNSIGNED NOT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        from_status VARCHAR(40) NULL,
+        to_status VARCHAR(40) NULL,
+        actor_name VARCHAR(150) NOT NULL,
+        actor_role VARCHAR(80) NOT NULL,
+        notes TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_sales_psb_list_audits_item (psb_list_id),
+        KEY idx_sales_psb_list_audits_event (event_type),
+        CONSTRAINT fk_sales_psb_list_audits_item FOREIGN KEY (psb_list_id) REFERENCES sales_psb_lists(id)
+      )
+    `,
+  )
+
+  await ensurePsbListColumn('area_label', 'area_label VARCHAR(120) NULL', 'transferred_ticket_ref')
+  await ensurePsbListColumn('escort_notes', 'escort_notes TEXT NULL', 'area_label')
+  await ensurePsbListColumn('activity_notes', 'activity_notes TEXT NULL', 'escort_notes')
+  await ensurePsbListColumn('cs_pic_name', 'cs_pic_name VARCHAR(120) NULL', 'activity_notes')
+  await ensurePsbListColumn('next_action_label', 'next_action_label VARCHAR(150) NULL', 'cs_pic_name')
+  await ensurePsbListColumn('approved_by', 'approved_by VARCHAR(150) NULL', 'next_action_label')
+  await ensurePsbListColumn('approved_at', 'approved_at DATETIME NULL', 'approved_by')
+
+  await ensurePsbListAuditColumn('from_status', 'from_status VARCHAR(40) NULL', 'event_type')
+  await ensurePsbListAuditColumn('to_status', 'to_status VARCHAR(40) NULL', 'from_status')
+  await ensurePsbListAuditColumn('actor_name', "actor_name VARCHAR(150) NOT NULL DEFAULT 'system'", 'to_status')
+  await ensurePsbListAuditColumn('actor_role', "actor_role VARCHAR(80) NOT NULL DEFAULT 'SYSTEM'", 'actor_name')
+  await ensurePsbListAuditColumn('notes', 'notes TEXT NULL', 'actor_role')
+  await ensurePsbListAuditColumn('created_at', 'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP', 'notes')
+}
+
+export async function ensurePsbListBaselineSeeds() {
+  await ensurePsbListTables()
+
+  const rows = await runReviewDbQuery<ReviewDbCountRow>(
+    `
+      SELECT COUNT(*) AS total
+      FROM sales_psb_lists
+    `,
+  )
+  if (Number(rows[0]?.total ?? 0) > 0) {
+    return
+  }
+
+  const itemPlaceholders = mockPsbListItems.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')
+  const itemValues: Array<number | string | null> = []
+  for (const item of mockPsbListItems) {
+    itemValues.push(
+      item.id,
+      item.psbListCode,
+      item.customerName,
+      item.customerPhone,
+      item.addressText,
+      item.odpCode,
+      item.packageLabel,
+      item.salesOwnerName,
+      item.requestedInstallDate,
+      item.status,
+      item.reviewNotes,
+      item.correctionNotes,
+      item.transferredTicketRef,
+      item.areaLabel,
+      item.escortNotes,
+      item.activityNotes,
+      item.csPicName,
+      item.nextActionLabel,
+      item.status === 'DISETUJUI' ? 'seed-system' : null,
+      item.status === 'DISETUJUI' ? item.updatedAt : null,
+      item.createdAt,
     )
   }
 
-  if (getConfiguredDataMode() === 'mock') {
-    return source
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      INSERT INTO sales_psb_lists (
+        id,
+        psb_list_code,
+        customer_name,
+        customer_phone,
+        address_text,
+        odp_code,
+        package_label,
+        sales_owner_name,
+        requested_install_date,
+        status,
+        review_notes,
+        correction_notes,
+        transferred_ticket_ref,
+        area_label,
+        escort_notes,
+        activity_notes,
+        cs_pic_name,
+        next_action_label,
+        approved_by,
+        approved_at,
+        created_at
+      )
+      VALUES ${itemPlaceholders}
+    `,
+    itemValues,
+  )
+
+  const auditPlaceholders: string[] = []
+  const auditValues: Array<number | string | null> = []
+  for (const item of mockPsbListItems) {
+    for (const note of item.auditSummary) {
+      auditPlaceholders.push('(?, ?, ?, ?, ?, ?, ?)')
+      auditValues.push(item.id, 'SEED', null, item.status, 'system', 'SYSTEM', note)
+    }
   }
 
-  return getFallbackDataSourceSnapshot(
-    'List PSB fase 1 sementara memakai mock operasional karena sumber review DB khusus untuk domain ini belum dibuka.',
-  )
+  if (auditPlaceholders.length) {
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        INSERT INTO sales_psb_list_audits (
+          psb_list_id,
+          event_type,
+          from_status,
+          to_status,
+          actor_name,
+          actor_role,
+          notes
+        )
+        VALUES ${auditPlaceholders.join(', ')}
+      `,
+      auditValues,
+    )
+  }
 }
 
-export async function getPsbListPageData(query: PsbListQuery): Promise<PsbListPagePayload> {
+async function getPsbListAuditSummary(psbListId: number) {
+  const rows = await runReviewDbQuery<ReviewDbAuditRow>(
+    `
+      SELECT
+        event_type AS eventType,
+        to_status AS toStatus,
+        notes
+      FROM sales_psb_list_audits
+      WHERE psb_list_id = ?
+      ORDER BY id DESC
+      LIMIT 3
+    `,
+    [psbListId],
+  )
+
+  if (!rows.length) {
+    return ['Belum ada audit tambahan di review DB.']
+  }
+
+  return rows.map((row) => {
+    const eventType = String(row.eventType ?? 'UPDATE').trim().toUpperCase()
+    const toStatus = String(row.toStatus ?? '').trim().toUpperCase()
+    const notes = String(row.notes ?? '').trim()
+    return notes || `${eventType}${toStatus ? ` -> ${toStatus}` : ''}`
+  })
+}
+
+async function getOwnerOptionsFromReviewDb() {
+  const rows = await runReviewDbQuery<ReviewDbOwnerRow>(
+    `
+      SELECT DISTINCT sales_owner_name AS ownerName
+      FROM sales_psb_lists
+      WHERE sales_owner_name IS NOT NULL
+        AND TRIM(sales_owner_name) <> ''
+      ORDER BY sales_owner_name ASC
+    `,
+  )
+
+  return rows
+    .map((row) => String(row.ownerName ?? '').trim())
+    .filter(Boolean)
+}
+
+async function getReviewDbPsbListPageData(query: PsbListQuery, source: DataSourceSnapshot): Promise<PsbListPagePayload> {
+  await ensurePsbListBaselineSeeds()
+
+  const state = {
+    status: resolveSearchParam(query.status)?.trim().toUpperCase() || null,
+    owner: resolveSearchParam(query.owner)?.trim() || null,
+    q: resolveSearchParam(query.q)?.trim() || null,
+    selected: resolveSearchParam(query.selected)?.trim() || null,
+  }
+
+  const where: string[] = []
+  const values: unknown[] = []
+  if (state.status) {
+    where.push('status = ?')
+    values.push(state.status)
+  }
+  if (state.owner) {
+    where.push('sales_owner_name = ?')
+    values.push(state.owner)
+  }
+  if (state.q) {
+    const like = `%${state.q.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
+    where.push(`(
+      psb_list_code LIKE ?
+      OR customer_name LIKE ?
+      OR customer_phone LIKE ?
+      OR address_text LIKE ?
+      OR odp_code LIKE ?
+      OR package_label LIKE ?
+      OR sales_owner_name LIKE ?
+      OR transferred_ticket_ref LIKE ?
+      OR area_label LIKE ?
+    )`)
+    values.push(like, like, like, like, like, like, like, like, like)
+  }
+
+  const rows = await runReviewDbQuery<ReviewDbPsbListRow>(
+    `
+      SELECT
+        id,
+        psb_list_code AS psbListCode,
+        customer_name AS customerName,
+        customer_phone AS customerPhone,
+        address_text AS addressText,
+        odp_code AS odpCode,
+        package_label AS packageLabel,
+        sales_owner_name AS salesOwnerName,
+        requested_install_date AS requestedInstallDate,
+        status,
+        review_notes AS reviewNotes,
+        correction_notes AS correctionNotes,
+        transferred_ticket_ref AS transferredTicketRef,
+        created_at AS createdAt,
+        updated_at AS updatedAt,
+        area_label AS areaLabel,
+        escort_notes AS escortNotes,
+        activity_notes AS activityNotes,
+        cs_pic_name AS csPicName,
+        next_action_label AS nextActionLabel
+      FROM sales_psb_lists
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY requested_install_date IS NULL, requested_install_date ASC, id DESC
+    `,
+    values,
+  )
+
+  const items = rows.map((row) => mapReviewDbRowToPsbListItem(row))
+  const selectedId = resolvePositiveInt(state.selected)
+  const selectedBase =
+    items.find((item) => item.id === selectedId) ??
+    items[0] ??
+    null
+  const selectedItem = selectedBase
+    ? {
+        ...selectedBase,
+        auditSummary: await getPsbListAuditSummary(selectedBase.id),
+      }
+    : null
+
+  return {
+    source,
+    items,
+    selectedItem,
+    summary: {
+      totalCount: items.length,
+      baruCount: items.filter((item) => item.status === 'BARU').length,
+      reviewCount: items.filter((item) => item.status === 'REVIEW_CS').length,
+      correctionCount: items.filter((item) => item.status === 'PERLU_KOREKSI').length,
+      approvedCount: items.filter((item) => item.status === 'DISETUJUI').length,
+      rejectedCount: items.filter((item) => item.status === 'DITOLAK').length,
+      transferredCount: items.filter((item) => item.status === 'DITRANSFER_KE_TICKETING').length,
+    },
+    ownerOptions: await getOwnerOptionsFromReviewDb(),
+    state,
+  }
+}
+
+async function getPsbListPageDataWithMock(
+  query: PsbListQuery,
+  source: DataSourceSnapshot,
+): Promise<PsbListPagePayload> {
   const state = {
     status: resolveSearchParam(query.status)?.trim().toUpperCase() || null,
     owner: resolveSearchParam(query.owner)?.trim() || null,
@@ -270,7 +736,7 @@ export async function getPsbListPageData(query: PsbListQuery): Promise<PsbListPa
     null
 
   return {
-    source: buildSourceSnapshot(),
+    source,
     items: filteredItems,
     selectedItem,
     summary: {
@@ -287,4 +753,200 @@ export async function getPsbListPageData(query: PsbListQuery): Promise<PsbListPa
     ),
     state,
   }
+}
+
+export function canUpdatePsbList(role: AppRole) {
+  return ['SUPER_ADMIN', 'ADMIN', 'CS_OPERATOR', 'CS_ADMIN', 'PENJUALAN', 'SALES_MARKETING'].includes(role)
+}
+
+export function canApprovePsbList(role: AppRole) {
+  return ['SUPER_ADMIN', 'ADMIN', 'CS_ADMIN'].includes(role)
+}
+
+export function resolvePsbListAvailableActions(params: {
+  status: PsbListStatus
+  canUpdate: boolean
+  canApprove: boolean
+}) {
+  const actions: PsbListTransitionAction[] = []
+
+  if (params.canUpdate && (params.status === 'BARU' || params.status === 'PERLU_KOREKSI')) {
+    actions.push('SUBMIT_REVIEW')
+  }
+  if (params.canUpdate && params.status === 'REVIEW_CS') {
+    actions.push('REQUEST_CORRECTION')
+  }
+  if (params.canApprove && params.status === 'REVIEW_CS') {
+    actions.push('APPROVE', 'REJECT')
+  }
+
+  return actions
+}
+
+export function getPsbListActionLabel(action: PsbListTransitionAction) {
+  switch (action) {
+    case 'SUBMIT_REVIEW':
+      return 'Masuk Review CS'
+    case 'REQUEST_CORRECTION':
+      return 'Minta Koreksi'
+    case 'APPROVE':
+      return 'Setujui'
+    case 'REJECT':
+      return 'Tolak'
+    default:
+      return action
+  }
+}
+
+function buildTransitionEventType(action: PsbListTransitionAction) {
+  switch (action) {
+    case 'SUBMIT_REVIEW':
+      return 'SUBMIT_REVIEW'
+    case 'REQUEST_CORRECTION':
+      return 'REQUEST_CORRECTION'
+    case 'APPROVE':
+      return 'APPROVE'
+    case 'REJECT':
+      return 'REJECT'
+    default:
+      return 'UPDATE'
+  }
+}
+
+export async function transitionPsbListStatus(params: {
+  psbListId: number
+  action: PsbListTransitionAction
+  notes: string
+  actorName: string
+  actorRole: string
+}) {
+  await ensurePsbListBaselineSeeds()
+
+  const rule = transitionMap[params.action]
+  const [row] = await runReviewDbQuery<ReviewDbPsbListRow>(
+    `
+      SELECT
+        id,
+        psb_list_code AS psbListCode,
+        customer_name AS customerName,
+        status,
+        review_notes AS reviewNotes,
+        correction_notes AS correctionNotes
+      FROM sales_psb_lists
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [params.psbListId],
+  )
+
+  if (!row) {
+    throw new Error('Item List PSB tidak ditemukan.')
+  }
+
+  const currentStatus = normalizeStatus(row.status)
+  if (!rule.from.includes(currentStatus)) {
+    throw new Error(`Transisi ${params.action} tidak valid dari status ${currentStatus}.`)
+  }
+
+  const notes = params.notes.trim()
+  if ((params.action === 'REQUEST_CORRECTION' || params.action === 'REJECT') && !notes) {
+    throw new Error('Catatan wajib diisi untuk aksi koreksi atau penolakan.')
+  }
+
+  const nextStatus = rule.to
+  const nextActionLabel = buildNextActionLabel(nextStatus)
+  const reviewNotes = params.action === 'REQUEST_CORRECTION' ? row.reviewNotes : notes || row.reviewNotes
+  const correctionNotes =
+    params.action === 'REQUEST_CORRECTION'
+      ? notes
+      : params.action === 'SUBMIT_REVIEW'
+        ? null
+        : row.correctionNotes
+
+  await runReviewDbTransaction(async (connection) => {
+    await connection.query(
+      `
+        UPDATE sales_psb_lists
+        SET
+          status = ?,
+          review_notes = ?,
+          correction_notes = ?,
+          cs_pic_name = CASE
+            WHEN ? IN ('CS_OPERATOR', 'CS_ADMIN', 'SUPER_ADMIN', 'ADMIN') THEN ?
+            ELSE cs_pic_name
+          END,
+          next_action_label = ?,
+          approved_by = CASE WHEN ? = 'APPROVE' THEN ? ELSE approved_by END,
+          approved_at = CASE WHEN ? = 'APPROVE' THEN CURRENT_TIMESTAMP ELSE approved_at END,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [
+        nextStatus,
+        reviewNotes,
+        correctionNotes,
+        params.actorRole,
+        params.actorName,
+        nextActionLabel,
+        params.action,
+        params.actorName,
+        params.action,
+        row.id,
+      ],
+    )
+
+    await connection.query(
+      `
+        INSERT INTO sales_psb_list_audits (
+          psb_list_id,
+          event_type,
+          from_status,
+          to_status,
+          actor_name,
+          actor_role,
+          notes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        row.id,
+        buildTransitionEventType(params.action),
+        currentStatus,
+        nextStatus,
+        params.actorName,
+        params.actorRole,
+        notes || `${buildTransitionEventType(params.action)} via web`,
+      ],
+    )
+  })
+
+  return {
+    id: row.id,
+    psbListCode: String(row.psbListCode ?? '-'),
+    customerName: String(row.customerName ?? 'Customer belum diisi'),
+    previousStatus: currentStatus,
+    nextStatus,
+  }
+}
+
+export async function getPsbListPageData(query: PsbListQuery): Promise<PsbListPagePayload> {
+  const source = getDataSourceSnapshot()
+  if (source.effectiveMode === 'review-db' && !source.isFallback) {
+    try {
+      return await getReviewDbPsbListPageData(query, source)
+    } catch (error) {
+      return getPsbListPageDataWithMock(query, buildFallbackSnapshot(getReviewDbErrorDetail(error)))
+    }
+  }
+
+  if (getConfiguredDataMode() === 'mock') {
+    return getPsbListPageDataWithMock(query, source)
+  }
+
+  return getPsbListPageDataWithMock(
+    query,
+    buildFallbackSnapshot(
+      'List PSB sementara memakai mock operasional karena sumber review DB khusus untuk domain ini belum dibuka.',
+    ),
+  )
 }

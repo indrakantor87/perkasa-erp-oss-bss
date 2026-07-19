@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { PsbListTransitionForm } from '@/components/psb-list-transition-form'
 import type { PsbListItem, PsbListPagePayload, PsbListStatus } from '@/lib/services/psb-list-service'
 
 function formatDateTime(value: string | null) {
@@ -98,11 +99,13 @@ export function PsbListWorkspace({
   roleLabel,
   canUpdate,
   canApprove,
+  reviewDbReady,
 }: {
   payload: PsbListPagePayload
   roleLabel: string
   canUpdate: boolean
   canApprove: boolean
+  reviewDbReady: boolean
 }) {
   const { state, summary, items, selectedItem } = payload
 
@@ -395,6 +398,15 @@ export function PsbListWorkspace({
                   <span className="badge border-slate-200 bg-white text-slate-700">Transfer ticketing batch berikutnya</span>
                 </div>
               </div>
+
+              <PsbListTransitionForm
+                itemId={selectedItem.id}
+                itemCode={selectedItem.psbListCode}
+                currentStatus={selectedItem.status}
+                canUpdate={canUpdate}
+                canApprove={canApprove}
+                reviewDbReady={reviewDbReady}
+              />
             </div>
           ) : (
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">

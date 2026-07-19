@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.39] - 2026-07-19
+
+### Added
+
+- Ditambahkan write-side dasar `List PSB` berupa form aksi review di panel detail, route API transisi status, dan audit trail awal untuk aksi `Masuk Review CS`, `Minta Koreksi`, `Setujui`, dan `Tolak`: [psb-list-transition-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/psb-list-transition-form.tsx), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/sales/psb-lists/[id]/transition/route.ts)
+- Ditambahkan fondasi tabel `sales_psb_lists` dan `sales_psb_list_audits` beserta seed baseline review DB agar domain `List PSB` bisa langsung dibaca dan diuji pada mode `review-db` tanpa menulis ke mock: [psb-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/psb-list-service.ts)
+
+### Changed
+
+- Read-side `List PSB` tidak lagi selalu dipaksa fallback saat `review-db` aktif; service kini membaca data dari review DB, menampilkan audit singkat item terpilih, dan tetap kembali aman ke mock bila query gagal: [psb-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/psb-list-service.ts), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/list-psb/page.tsx), [psb-list-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/psb-list-workspace.tsx)
+- Versioning diselaraskan ke `0.66.39` untuk menandai batch write-side dasar `List PSB` yang sudah lolos pemeriksaan diagnostics dan `tsc --noEmit`.
+
 ## [0.66.38] - 2026-07-19
 
 ### Added
