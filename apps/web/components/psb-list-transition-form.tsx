@@ -97,7 +97,7 @@ export function PsbListTransitionForm({
           ? `Status ${currentStatus} belum punya aksi review lanjutan pada batch ini.`
           : !reviewDbReady
             ? 'Write-side hanya aktif saat review DB benar-benar tersedia, jadi form ini dinonaktifkan agar tidak menulis ke mock.'
-            : `Aksi ini memperbarui status operasional ${itemCode} sekaligus mencatat audit trail dasar di review DB.`}
+            : `Aksi ini memperbarui status operasional ${itemCode}; untuk status disetujui, aksi transfer akan langsung membuat ticket operasional ke jalur NOC.`}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
@@ -129,6 +129,12 @@ export function PsbListTransitionForm({
             disabled={isDisabled}
           />
         </label>
+        {action === 'TRANSFER' ? (
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+            Transfer akan membuat work order `INSTALLATION` kategori `PSB` dan menandai item ini sebagai
+            `DITRANSFER_KE_TICKETING`.
+          </div>
+        ) : null}
 
         {feedback ? (
           <div

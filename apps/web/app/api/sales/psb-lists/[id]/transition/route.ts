@@ -4,6 +4,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import {
   canApprovePsbList,
   canUpdatePsbList,
+  transferPsbListToTicket,
   transitionPsbListStatus,
   type PsbListTransitionAction,
 } from '@/lib/services/psb-list-service'
@@ -14,6 +15,7 @@ const allowedActions = new Set<PsbListTransitionAction>([
   'REQUEST_CORRECTION',
   'APPROVE',
   'REJECT',
+  'TRANSFER',
 ])
 
 function resolvePositiveInt(value: string) {
@@ -62,6 +64,25 @@ export async function POST(
     const hasApprovePermission =
       canApprovePsbList(session.role) &&
       (canPerformAction(session.role, 'sales', 'approve') || canPerformAction(session.role, 'customers', 'approve'))
+
+    if (action === 'TRANSFER') {
+      if (!hasApprovePermission) {
+        return Response.json({ message: 'Role aktif belum memiliki izin transfer List PSB ke ticketing.' }, { status: 403 })
+      }
+
+      const result = await transferPsbListToTicket({
+        psbListId,
+        notes,
+        actorName: `${session.displayName} (${session.username})`,
+        actorRole: session.role,
+        actorUsername: session.username,
+        branchId: session.branchId ?? null,
+      })
+
+      return Response.json({
+        message: `List PSB ${result.psbListCode} (${result.customerName}) berhasil ditransfer ke ticket operasional ${result.workOrderNo}.`,
+      })
+    }
 
     if (action === 'APPROVE' || action === 'REJECT') {
       if (!hasApprovePermission) {

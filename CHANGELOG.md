@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.40] - 2026-07-19
+
+### Added
+
+- Ditambahkan aksi `TRANSFER` pada flow `List PSB` sehingga item yang sudah `DISETUJUI` dapat langsung dibuatkan work order `INSTALLATION` kategori `PSB` dan masuk ke jalur ticket operasional/NOC: [psb-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/psb-list-service.ts), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/sales/psb-lists/[id]/transition/route.ts)
+- Ditambahkan pengayaan skema review DB untuk `List PSB` berupa metadata transfer ticketing seperti `transferred_work_order_id`, `transferred_by`, dan `transferred_at`, agar histori perpindahan dari antrean CS ke ticket operasional tetap terbaca jelas pada satu domain: [psb-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/psb-list-service.ts)
+
+### Changed
+
+- Form aksi `List PSB` kini mengenali transfer ticketing dan memberi umpan balik yang lebih eksplisit ketika item disiapkan untuk masuk ke jalur work order PSB: [psb-list-transition-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/psb-list-transition-form.tsx), [psb-list-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/psb-list-workspace.tsx)
+- Versioning diselaraskan ke `0.66.40` untuk menandai batch transfer `List PSB -> ticket operasional` yang sudah lolos diagnostics dan `tsc --noEmit`.
+
 ## [0.66.39] - 2026-07-19
 
 ### Added

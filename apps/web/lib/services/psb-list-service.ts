@@ -7,6 +7,12 @@ import {
   runReviewDbQuery,
   runReviewDbTransaction,
 } from '@/lib/review-db'
+import {
+  buildServiceWorkOrderInsertPayload,
+  ensureServiceWorkOrderStatusLogTable,
+  generateServiceWorkOrderNo,
+  resolveReviewAuthUserIdByUsername,
+} from '@/lib/services/field-ops-service'
 import type { AppRole, DataSourceSnapshot } from '@/lib/types'
 
 export type PsbListStatus =
@@ -75,6 +81,7 @@ export type PsbListTransitionAction =
   | 'REQUEST_CORRECTION'
   | 'APPROVE'
   | 'REJECT'
+  | 'TRANSFER'
 
 type ExecuteResult = {
   insertId?: number
@@ -116,6 +123,10 @@ type ReviewDbOwnerRow = {
 
 type ReviewDbCountRow = {
   total: number
+}
+
+type TransferablePsbListRow = ReviewDbPsbListRow & {
+  transferredWorkOrderId: number | null
 }
 
 const mockPsbListItems: PsbListItem[] = [
@@ -275,6 +286,10 @@ const transitionMap: Record<PsbListTransitionAction, { from: PsbListStatus[]; to
   REJECT: {
     from: ['REVIEW_CS'],
     to: 'DITOLAK',
+  },
+  TRANSFER: {
+    from: ['DISETUJUI'],
+    to: 'DITRANSFER_KE_TICKETING',
   },
 }
 
@@ -448,6 +463,9 @@ export async function ensurePsbListTables() {
   await ensurePsbListColumn('next_action_label', 'next_action_label VARCHAR(150) NULL', 'cs_pic_name')
   await ensurePsbListColumn('approved_by', 'approved_by VARCHAR(150) NULL', 'next_action_label')
   await ensurePsbListColumn('approved_at', 'approved_at DATETIME NULL', 'approved_by')
+  await ensurePsbListColumn('transferred_work_order_id', 'transferred_work_order_id BIGINT UNSIGNED NULL', 'transferred_ticket_ref')
+  await ensurePsbListColumn('transferred_by', 'transferred_by VARCHAR(150) NULL', 'transferred_work_order_id')
+  await ensurePsbListColumn('transferred_at', 'transferred_at DATETIME NULL', 'transferred_by')
 
   await ensurePsbListAuditColumn('from_status', 'from_status VARCHAR(40) NULL', 'event_type')
   await ensurePsbListAuditColumn('to_status', 'to_status VARCHAR(40) NULL', 'from_status')
@@ -779,6 +797,9 @@ export function resolvePsbListAvailableActions(params: {
   if (params.canApprove && params.status === 'REVIEW_CS') {
     actions.push('APPROVE', 'REJECT')
   }
+  if (params.canApprove && params.status === 'DISETUJUI') {
+    actions.push('TRANSFER')
+  }
 
   return actions
 }
@@ -793,6 +814,8 @@ export function getPsbListActionLabel(action: PsbListTransitionAction) {
       return 'Setujui'
     case 'REJECT':
       return 'Tolak'
+    case 'TRANSFER':
+      return 'Transfer Ticketing'
     default:
       return action
   }
@@ -808,6 +831,8 @@ function buildTransitionEventType(action: PsbListTransitionAction) {
       return 'APPROVE'
     case 'REJECT':
       return 'REJECT'
+    case 'TRANSFER':
+      return 'TRANSFER'
     default:
       return 'UPDATE'
   }
@@ -926,6 +951,179 @@ export async function transitionPsbListStatus(params: {
     customerName: String(row.customerName ?? 'Customer belum diisi'),
     previousStatus: currentStatus,
     nextStatus,
+  }
+}
+
+export async function transferPsbListToTicket(params: {
+  psbListId: number
+  notes: string
+  actorName: string
+  actorRole: string
+  actorUsername: string
+  branchId: number | null
+}) {
+  await ensurePsbListBaselineSeeds()
+  await ensureServiceWorkOrderStatusLogTable()
+
+  const [row] = await runReviewDbQuery<TransferablePsbListRow>(
+    `
+      SELECT
+        id,
+        psb_list_code AS psbListCode,
+        customer_name AS customerName,
+        customer_phone AS customerPhone,
+        address_text AS addressText,
+        odp_code AS odpCode,
+        package_label AS packageLabel,
+        sales_owner_name AS salesOwnerName,
+        requested_install_date AS requestedInstallDate,
+        status,
+        review_notes AS reviewNotes,
+        correction_notes AS correctionNotes,
+        transferred_ticket_ref AS transferredTicketRef,
+        created_at AS createdAt,
+        updated_at AS updatedAt,
+        area_label AS areaLabel,
+        escort_notes AS escortNotes,
+        activity_notes AS activityNotes,
+        cs_pic_name AS csPicName,
+        next_action_label AS nextActionLabel,
+        transferred_work_order_id AS transferredWorkOrderId
+      FROM sales_psb_lists
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [params.psbListId],
+  )
+
+  if (!row) {
+    throw new Error('Item List PSB tidak ditemukan.')
+  }
+
+  const currentStatus = normalizeStatus(row.status)
+  if (currentStatus === 'DITRANSFER_KE_TICKETING') {
+    throw new Error('Item List PSB ini sudah pernah ditransfer ke ticketing.')
+  }
+  if (currentStatus !== 'DISETUJUI') {
+    throw new Error(`Hanya item dengan status DISETUJUI yang bisa ditransfer. Status saat ini: ${currentStatus}.`)
+  }
+
+  const actorUserId = await resolveReviewAuthUserIdByUsername(params.actorUsername)
+  const workOrderNo = await generateServiceWorkOrderNo()
+  const requestedDate = row.requestedInstallDate ? new Date(row.requestedInstallDate) : null
+  const scheduledAt = requestedDate && Number.isFinite(requestedDate.getTime()) ? requestedDate : null
+  const transferNotes = [
+    `[Transfer PSB] ${params.actorName}`,
+    `Sumber ${row.psbListCode ?? '-'}`,
+    row.reviewNotes?.trim() ? `Review: ${row.reviewNotes.trim()}` : null,
+    params.notes.trim() ? `Catatan: ${params.notes.trim()}` : null,
+  ]
+    .filter(Boolean)
+    .join(' - ')
+
+  const insertPayload = await buildServiceWorkOrderInsertPayload({
+    workOrderNo,
+    workType: 'INSTALLATION',
+    status: 'OPEN',
+    technicianName: null,
+    scheduledAt,
+    notes: transferNotes,
+    branchId: params.branchId ?? null,
+    jobCategory: 'PSB',
+    priority: 'MEDIUM',
+    sourceType: 'MANUAL',
+    currentPicUserId: actorUserId,
+    scheduledByUserId: actorUserId,
+    address: row.addressText ?? null,
+  })
+
+  let workOrderId = 0
+  await runReviewDbTransaction(async (connection) => {
+    const [insertResult] = await connection.query(
+      `
+        INSERT INTO service_work_orders (
+          ${insertPayload.columns.join(',\n          ')}
+        )
+        VALUES (${insertPayload.placeholders.join(', ')})
+      `,
+      insertPayload.values,
+    )
+
+    workOrderId = Number((insertResult as ExecuteResult).insertId ?? 0)
+    if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+      throw new Error('Work order PSB berhasil dibuat tetapi ID insert tidak terbaca.')
+    }
+
+    await connection.query(
+      `
+        INSERT INTO service_work_order_status_logs (
+          work_order_id,
+          from_status,
+          to_status,
+          reason_code,
+          reason_notes,
+          changed_by_user_id,
+          changed_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `,
+      [
+        workOrderId,
+        null,
+        'OPEN',
+        'AUTO_CREATED',
+        `WO PSB dibuat dari List PSB ${row.psbListCode ?? '-'}.`,
+        actorUserId,
+      ],
+    )
+
+    await connection.query(
+      `
+        UPDATE sales_psb_lists
+        SET
+          status = 'DITRANSFER_KE_TICKETING',
+          transferred_ticket_ref = ?,
+          transferred_work_order_id = ?,
+          transferred_by = ?,
+          transferred_at = CURRENT_TIMESTAMP,
+          next_action_label = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [workOrderNo, workOrderId, params.actorName, buildNextActionLabel('DITRANSFER_KE_TICKETING'), row.id],
+    )
+
+    await connection.query(
+      `
+        INSERT INTO sales_psb_list_audits (
+          psb_list_id,
+          event_type,
+          from_status,
+          to_status,
+          actor_name,
+          actor_role,
+          notes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        row.id,
+        'TRANSFER',
+        currentStatus,
+        'DITRANSFER_KE_TICKETING',
+        params.actorName,
+        params.actorRole,
+        params.notes.trim() || `Transfer ke ticketing operasional dengan WO ${workOrderNo}.`,
+      ],
+    )
+  })
+
+  return {
+    id: row.id,
+    psbListCode: String(row.psbListCode ?? '-'),
+    customerName: String(row.customerName ?? 'Customer belum diisi'),
+    workOrderNo,
+    workOrderId,
   }
 }
 

@@ -119,9 +119,9 @@ export function PsbListWorkspace({
               List PSB
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Antrean validasi PSB di antara penjualan, CS, dan ticketing. Fase 1 ini fokus ke read-side operasional
-              yang aman, sehingga alur baru sudah bisa dipakai tanpa mengganggu jalur NOC, CS, dan inventory yang
-              sudah stabil.
+              Antrean validasi PSB di antara penjualan, CS, dan ticketing. Batch saat ini sudah membuka review dasar
+              sampai transfer ke ticket operasional, dengan fallback aman agar tidak mengganggu jalur NOC, CS, dan
+              inventory yang sudah stabil.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -390,12 +390,12 @@ export function PsbListWorkspace({
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Arah Batch Berikutnya</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="badge border-slate-200 bg-white text-slate-700">
-                    {canUpdate ? 'Write-side review siap disambung' : 'Mode monitor'}
+                    {canUpdate ? 'Write-side review aktif' : 'Mode monitor'}
                   </span>
                   <span className="badge border-slate-200 bg-white text-slate-700">
-                    {canApprove ? 'Approve CS bisa diaktifkan berikutnya' : 'Approve menunggu role yang berwenang'}
+                    {canApprove ? 'Approve dan transfer siap dipakai' : 'Approve menunggu role yang berwenang'}
                   </span>
-                  <span className="badge border-slate-200 bg-white text-slate-700">Transfer ticketing batch berikutnya</span>
+                  <span className="badge border-slate-200 bg-white text-slate-700">WO PSB masuk jalur NOC</span>
                 </div>
               </div>
 
