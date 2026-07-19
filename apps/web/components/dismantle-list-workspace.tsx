@@ -117,6 +117,41 @@ function renderWorkOrderLinks(item: DismantleListItem) {
   )
 }
 
+function buildSupportLaneHref(
+  item: DismantleListItem,
+  focus: 'OPEN_QUEUE' | 'CLOSED_THIS_PERIOD',
+) {
+  const params = new URLSearchParams()
+  params.set('focus', focus)
+  if (item.customerName.trim()) {
+    params.set('customer', item.customerName.trim())
+  }
+  if (item.serviceRef?.trim()) {
+    params.set('service', item.serviceRef.trim())
+  }
+
+  return `/support/dismantle?${params.toString()}`
+}
+
+function renderSupportBacklinks(item: DismantleListItem) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Link
+        href={buildSupportLaneHref(item, 'OPEN_QUEUE')}
+        className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+      >
+        Buka Queue Support
+      </Link>
+      <Link
+        href={buildSupportLaneHref(item, 'CLOSED_THIS_PERIOD')}
+        className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+      >
+        Buka Histori Support
+      </Link>
+    </div>
+  )
+}
+
 export function DismantleListWorkspace({
   payload,
   roleLabel,
@@ -362,6 +397,7 @@ export function DismantleListWorkspace({
                 {renderMetaBadge('Ticket', selectedItem.transferredTicketRef)}
                 {renderMetaBadge('PIC CS', selectedItem.csPicName)}
               </div>
+              {renderSupportBacklinks(selectedItem)}
               {renderWorkOrderLinks(selectedItem)}
               <div className="space-y-3 text-sm text-slate-700">
                 <div>

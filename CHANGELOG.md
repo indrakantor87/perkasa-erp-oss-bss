@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.44] - 2026-07-19
+
+### Added
+
+- Ditambahkan sinkron read-side dari `support_dismantle_queue` ke domain `List Dismantle`, sehingga kandidat hasil transfer `Isolir -> Dismantle` dari billing kini otomatis muncul di `/list-dismantle` tanpa perlu seed/manual entry tambahan: [dismantle-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dismantle-list-service.ts)
+- Ditambahkan backlink operator pada panel detail `List Dismantle` untuk melompat langsung ke lane `/support/dismantle` baik pada fokus queue open maupun histori close, memakai filter `customer/service` agar pembacaan kasus tetap linear: [dismantle-list-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dismantle-list-workspace.tsx)
+
+### Changed
+
+- Read-side `List Dismantle` kini menyerap queue aktif lebih dulu sebelum fallback seed review DB, lalu otomatis menyembunyikan item seed saat data riil sudah tersedia agar operator hanya melihat antrean dismantle nyata dari billing/support: [dismantle-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dismantle-list-service.ts)
+- Versioning diselaraskan ke `0.66.44` untuk menandai batch integrasi `Isolir -> List Dismantle` dan backlink operator ke lane support yang sudah lolos diagnostics, `npm run check`, dan `npm run build`.
+
 ## [0.66.43] - 2026-07-19
 
 ### Changed

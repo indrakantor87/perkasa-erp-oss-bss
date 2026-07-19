@@ -57,12 +57,31 @@ type ReviewDbAuditRow = {
   notes: string | null
 }
 
-type ReviewDbOwnerRow = {
-  ownerName: string | null
-}
-
 type ReviewDbCountRow = {
   total: number
+}
+
+type ReviewDbQueueSourceRow = {
+  queueId: number
+  isolationId: number
+  customerName: string | null
+  customerPhone: string | null
+  serviceRef: string | null
+  addressText: string | null
+  odpCode: string | null
+  isolationStartedAt: string | null
+  eligibleAt: string | null
+  transferNote: string | null
+  areaLabel: string | null
+  terminationReason: string | null
+  transferredAt: string | null
+}
+
+type ReviewDbExistingListRow = {
+  id: number
+  status: string | null
+  transferredTicketRef: string | null
+  transferredWorkOrderId: number | null
 }
 
 const mockDismantleListItems: DismantleListItem[] = [
@@ -188,6 +207,8 @@ const mockDismantleListItems: DismantleListItem[] = [
   },
 ]
 
+const seededDismantleListIds = new Set(mockDismantleListItems.map((item) => item.id))
+
 const transitionMap: Record<DismantleListTransitionAction, { from: DismantleListStatus[]; to: DismantleListStatus }> = {
   SUBMIT_REVIEW: {
     from: ['BARU', 'PERLU_KOREKSI'],
@@ -254,6 +275,228 @@ function buildNextActionLabel(status: DismantleListStatus) {
     default:
       return 'Pantau antrean'
   }
+}
+
+function formatDismantleListCode(isolationId: number, eligibleAt: string | null, transferredAt: string | null) {
+  const seedDate = eligibleAt || transferredAt
+  const resolvedDate = seedDate ? new Date(seedDate) : new Date()
+  const yearMonth =
+    Number.isFinite(resolvedDate.getTime())
+      ? `${resolvedDate.getFullYear()}${String(resolvedDate.getMonth() + 1).padStart(2, '0')}`
+      : '000000'
+
+  return `DML-${yearMonth}-${String(isolationId).padStart(4, '0')}`
+}
+
+async function getActiveQueueSourceRows() {
+  const [
+    hasQueueId,
+    hasQueueIsolationId,
+    hasTransferNote,
+    hasTransferredAt,
+    hasIsolationCustomerName,
+    hasIsolationCustomerPhone,
+    hasIsolationAddress,
+    hasIsolationReason,
+    hasIsolationDate,
+    hasIsolationRadboxName,
+    hasIsolationSubscriptionId,
+  ] = await Promise.all([
+    hasReviewDbColumn('support_dismantle_queue', 'id'),
+    hasReviewDbColumn('support_dismantle_queue', 'isolation_id'),
+    hasReviewDbColumn('support_dismantle_queue', 'transfer_note'),
+    hasReviewDbColumn('support_dismantle_queue', 'transferred_at'),
+    hasReviewDbColumn('support_isolations', 'customer_name'),
+    hasReviewDbColumn('support_isolations', 'customer_phone'),
+    hasReviewDbColumn('support_isolations', 'customer_address'),
+    hasReviewDbColumn('support_isolations', 'reason'),
+    hasReviewDbColumn('support_isolations', 'isolation_date'),
+    hasReviewDbColumn('support_isolations', 'radbox_name'),
+    hasReviewDbColumn('support_isolations', 'subscription_id'),
+  ])
+
+  if (!hasQueueId || !hasQueueIsolationId || !hasIsolationCustomerName) {
+    return [] as ReviewDbQueueSourceRow[]
+  }
+
+  return runReviewDbQuery<ReviewDbQueueSourceRow>(
+    `
+      SELECT
+        dq.id AS queueId,
+        dq.isolation_id AS isolationId,
+        si.customer_name AS customerName,
+        ${hasIsolationCustomerPhone ? 'si.customer_phone' : 'NULL'} AS customerPhone,
+        ${hasIsolationSubscriptionId ? 'CAST(si.subscription_id AS CHAR)' : 'NULL'} AS serviceRef,
+        ${hasIsolationAddress ? 'si.customer_address' : 'NULL'} AS addressText,
+        NULL AS odpCode,
+        ${hasIsolationDate ? 'si.isolation_date' : 'NULL'} AS isolationStartedAt,
+        ${hasTransferredAt ? 'dq.transferred_at' : hasIsolationDate ? 'si.isolation_date' : 'NULL'} AS eligibleAt,
+        ${hasTransferNote ? 'dq.transfer_note' : 'NULL'} AS transferNote,
+        ${hasIsolationRadboxName ? 'si.radbox_name' : 'NULL'} AS areaLabel,
+        ${hasIsolationReason ? 'si.reason' : 'NULL'} AS terminationReason,
+        ${hasTransferredAt ? 'dq.transferred_at' : 'NULL'} AS transferredAt
+      FROM support_dismantle_queue dq
+      INNER JOIN support_isolations si
+        ON si.id = dq.isolation_id
+      ORDER BY ${hasTransferredAt ? 'dq.transferred_at' : 'dq.id'} DESC, dq.id DESC
+    `,
+  )
+}
+
+async function syncDismantleListsFromActiveQueue() {
+  await ensureDismantleListTables()
+
+  const sourceRows = await getActiveQueueSourceRows()
+  if (!sourceRows.length) {
+    return 0
+  }
+
+  let insertedCount = 0
+  await runReviewDbTransaction(async (connection) => {
+    for (const row of sourceRows) {
+      const sourceIsolationRef = `ISO-${String(row.isolationId).padStart(6, '0')}`
+      const [existingRows] = await connection.query(
+        `
+          SELECT
+            id,
+            status,
+            transferred_ticket_ref AS transferredTicketRef,
+            transferred_work_order_id AS transferredWorkOrderId
+          FROM support_dismantle_lists
+          WHERE source_isolation_ref = ?
+          ORDER BY id DESC
+          LIMIT 1
+        `,
+        [sourceIsolationRef],
+      )
+      const existing = (existingRows as ReviewDbExistingListRow[])[0] ?? null
+
+      const nextStatus =
+        existing?.status && normalizeStatus(existing.status) === 'DITRANSFER_KE_TICKETING'
+          ? 'DITRANSFER_KE_TICKETING'
+          : existing?.status && normalizeStatus(existing.status) === 'REVIEW_CS'
+            ? 'REVIEW_CS'
+            : existing?.status && normalizeStatus(existing.status) === 'PERLU_KOREKSI'
+              ? 'PERLU_KOREKSI'
+              : 'BARU'
+
+      const nextActionLabel =
+        nextStatus === 'BARU' && row.transferNote?.trim()
+          ? 'Masuk review CS dari isolir'
+          : buildNextActionLabel(nextStatus)
+
+      const reviewNotes =
+        nextStatus === 'BARU' && row.transferNote?.trim() ? row.transferNote.trim() : existing?.status ? null : row.transferNote?.trim() || null
+
+      if (existing) {
+        await connection.query(
+          `
+            UPDATE support_dismantle_lists
+            SET
+              customer_name = ?,
+              customer_phone = ?,
+              service_ref = ?,
+              address_text = ?,
+              odp_code = ?,
+              isolation_started_at = ?,
+              eligible_at = ?,
+              review_notes = COALESCE(review_notes, ?),
+              area_label = ?,
+              termination_reason = COALESCE(termination_reason, ?),
+              next_action_label = ?,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `,
+          [
+            row.customerName ?? 'Customer belum diisi',
+            row.customerPhone,
+            row.serviceRef,
+            row.addressText ?? '-',
+            row.odpCode,
+            row.isolationStartedAt,
+            row.eligibleAt,
+            reviewNotes,
+            row.areaLabel,
+            row.terminationReason ?? row.transferNote ?? null,
+            nextActionLabel,
+            existing.id,
+          ],
+        )
+        continue
+      }
+
+      const dismantleListCode = formatDismantleListCode(row.isolationId, row.eligibleAt, row.transferredAt)
+      const [insertResult] = await connection.query(
+        `
+          INSERT INTO support_dismantle_lists (
+            dismantle_list_code,
+            source_isolation_ref,
+            customer_name,
+            customer_phone,
+            service_ref,
+            address_text,
+            odp_code,
+            isolation_started_at,
+            eligible_at,
+            status,
+            review_notes,
+            area_label,
+            termination_reason,
+            next_action_label
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          dismantleListCode,
+          sourceIsolationRef,
+          row.customerName ?? 'Customer belum diisi',
+          row.customerPhone,
+          row.serviceRef,
+          row.addressText ?? '-',
+          row.odpCode,
+          row.isolationStartedAt,
+          row.eligibleAt,
+          nextStatus,
+          reviewNotes,
+          row.areaLabel,
+          row.terminationReason ?? row.transferNote ?? null,
+          nextActionLabel,
+        ],
+      )
+
+      const dismantleListId = Number((insertResult as ExecuteResult).insertId ?? 0)
+      if (Number.isInteger(dismantleListId) && dismantleListId > 0) {
+        insertedCount += 1
+        await connection.query(
+          `
+            INSERT INTO support_dismantle_list_audits (
+              dismantle_list_id,
+              event_type,
+              from_status,
+              to_status,
+              actor_name,
+              actor_role,
+              notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            dismantleListId,
+            'SYNC_QUEUE',
+            null,
+            nextStatus,
+            'system',
+            'SYSTEM',
+            row.transferNote?.trim()
+              ? `Sinkron dari queue dismantle aktif. ${row.transferNote.trim()}`
+              : 'Sinkron dari queue dismantle aktif.',
+          ],
+        )
+      }
+    }
+  })
+
+  return insertedCount
 }
 
 function buildFallbackSnapshot(detail: string) {
@@ -513,23 +756,8 @@ async function getDismantleListAuditSummary(dismantleListId: number) {
   })
 }
 
-async function getOwnerOptionsFromReviewDb() {
-  const rows = await runReviewDbQuery<ReviewDbOwnerRow>(
-    `
-      SELECT DISTINCT cs_pic_name AS ownerName
-      FROM support_dismantle_lists
-      WHERE cs_pic_name IS NOT NULL
-        AND TRIM(cs_pic_name) <> ''
-      ORDER BY cs_pic_name ASC
-    `,
-  )
-
-  return rows
-    .map((row) => String(row.ownerName ?? '').trim())
-    .filter(Boolean)
-}
-
 async function getReviewDbDismantleListPageData(query: DismantleListQuery, source: DataSourceSnapshot): Promise<DismantleListPagePayload> {
+  await syncDismantleListsFromActiveQueue()
   await ensureDismantleListBaselineSeeds()
 
   const state = {
@@ -597,7 +825,10 @@ async function getReviewDbDismantleListPageData(query: DismantleListQuery, sourc
     values,
   )
 
-  const items = rows.map((row) => mapReviewDbRowToDismantleListItem(row))
+  const visibleRows = rows.some((row) => !seededDismantleListIds.has(Number(row.id)))
+    ? rows.filter((row) => !seededDismantleListIds.has(Number(row.id)))
+    : rows
+  const items = visibleRows.map((row) => mapReviewDbRowToDismantleListItem(row))
   const selectedId = resolvePositiveInt(state.selected)
   const selectedBase = items.find((item) => item.id === selectedId) ?? items[0] ?? null
   const selectedItem = selectedBase
@@ -619,7 +850,13 @@ async function getReviewDbDismantleListPageData(query: DismantleListQuery, sourc
       transferredCount: items.filter((item) => item.status === 'DITRANSFER_KE_TICKETING').length,
       canceledCount: items.filter((item) => item.status === 'BATAL').length,
     },
-    ownerOptions: await getOwnerOptionsFromReviewDb(),
+    ownerOptions: Array.from(
+      new Set(
+        visibleRows
+          .map((row) => String(row.csPicName ?? '').trim())
+          .filter(Boolean),
+      ),
+    ).sort((left, right) => left.localeCompare(right)),
     state,
   }
 }
