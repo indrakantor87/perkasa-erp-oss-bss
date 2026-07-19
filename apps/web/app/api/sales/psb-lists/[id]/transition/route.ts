@@ -1,12 +1,12 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
+import type { PsbListTransitionAction } from '@/lib/psb-list-shared'
 import {
   canApprovePsbList,
   canUpdatePsbList,
   transferPsbListToTicket,
   transitionPsbListStatus,
-  type PsbListTransitionAction,
 } from '@/lib/services/psb-list-service'
 import { getReviewDbErrorDetail } from '@/lib/review-db'
 

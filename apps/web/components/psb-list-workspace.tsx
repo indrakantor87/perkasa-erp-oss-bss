@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { PsbListTransitionForm } from '@/components/psb-list-transition-form'
-import type { PsbListItem, PsbListPagePayload, PsbListStatus } from '@/lib/services/psb-list-service'
+import type { PsbListItem, PsbListPagePayload, PsbListStatus } from '@/lib/psb-list-shared'
 
 function formatDateTime(value: string | null) {
   if (!value) {

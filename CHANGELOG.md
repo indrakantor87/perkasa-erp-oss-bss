@@ -10,6 +10,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.41] - 2026-07-19
+
+### Fixed
+
+- Memisahkan tipe dan helper aksi `List PSB` ke modul shared yang aman untuk client agar `psb-list-transition-form.tsx` tidak lagi menarik `psb-list-service.ts` beserta dependency `mysql2` ke bundle browser, sehingga akar error build production `Module not found: Can't resolve 'net'` pada Turbopack terselesaikan: [psb-list-shared.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/psb-list-shared.ts), [psb-list-transition-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/psb-list-transition-form.tsx), [psb-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/psb-list-service.ts)
+- Memperbarui import route API transisi `List PSB` agar memakai tipe shared yang sama setelah boundary client/server dipisahkan, menjaga konsistensi antara build `tsc` dan build production Next.js: [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/sales/psb-lists/[id]/transition/route.ts)
+
+### Changed
+
+- Versioning diselaraskan ke `0.66.41` untuk menandai batch perbaikan deploy production pada domain `List PSB`.
+
 ## [0.66.40] - 2026-07-19
 
 ### Added

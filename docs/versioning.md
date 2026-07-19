@@ -116,5 +116,5 @@ Setiap kali ada perubahan berarti:
 
 ## Baseline Saat Ini
 
-- versi aktif: `0.66.40`
-- status: fondasi review database, write-side domain inti, lifecycle inventory lintas NOC-teknisi, workspace CS supervisor, barcode audit end-to-end, popup aksi cepat lintas tabel operasional, optimasi runtime berisiko rendah, baseline backlog teknis final lintas divisi, spesifikasi teknis awal `List PSB`, spesifikasi teknis awal `List Dismantle`, implementasi kode `List PSB` fase 1, write-side dasar `List PSB`, serta transfer `List PSB` ke ticket operasional PSB yang kini sudah membuat work order review-db, menulis audit, dan memindahkan status ke `DITRANSFER_KE_TICKETING`.
+- versi aktif: `0.66.41`
+- status: fondasi review database, write-side domain inti, lifecycle inventory lintas NOC-teknisi, workspace CS supervisor, barcode audit end-to-end, popup aksi cepat lintas tabel operasional, optimasi runtime berisiko rendah, baseline backlog teknis final lintas divisi, spesifikasi teknis awal `List PSB`, spesifikasi teknis awal `List Dismantle`, implementasi kode `List PSB` fase 1, write-side dasar `List PSB`, transfer `List PSB` ke ticket operasional PSB, serta perbaikan boundary client/server untuk domain `List PSB` agar `next build` production tidak lagi mencoba membundel `mysql2` ke browser.

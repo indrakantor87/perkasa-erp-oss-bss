@@ -8,7 +8,7 @@ import {
   resolvePsbListAvailableActions,
   type PsbListStatus,
   type PsbListTransitionAction,
-} from '@/lib/services/psb-list-service'
+} from '@/lib/psb-list-shared'
 
 type PsbListTransitionFormProps = {
   itemId: number
