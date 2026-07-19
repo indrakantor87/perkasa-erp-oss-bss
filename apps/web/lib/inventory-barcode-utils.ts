@@ -10,6 +10,10 @@ export function buildInventoryBarcodeDetailPath(itemCode: string) {
   return `/inventory/barcodes/${encodeURIComponent(normalized)}`
 }
 
+function isInventoryItemCodeCandidate(value: string) {
+  return /^INV(?:-[A-Z0-9._/]+){2,}$/i.test(String(value ?? '').trim())
+}
+
 function normalizeInventoryItemCodeCandidate(value: string) {
   const normalized = String(value ?? '').trim()
   if (!normalized) return ''
@@ -23,12 +27,16 @@ function normalizeInventoryItemCodeCandidate(value: string) {
     return ''
   }
 
-  return normalized.toUpperCase()
+  return isInventoryItemCodeCandidate(normalized) ? normalized.toUpperCase() : ''
 }
 
 export function extractInventoryItemCodeFromScan(rawValue: string) {
   const raw = String(rawValue ?? '').trim()
   if (!raw) return ''
+
+  const embeddedMatch = raw.match(/(?:^|[^A-Z0-9])(INV(?:-[A-Z0-9._/]+){2,})(?=$|[^A-Z0-9._/])/i)
+  const embeddedCode = normalizeInventoryItemCodeCandidate(embeddedMatch?.[1] ?? '')
+  if (embeddedCode) return embeddedCode
 
   const directCode = normalizeInventoryItemCodeCandidate(raw)
   if (directCode) return directCode

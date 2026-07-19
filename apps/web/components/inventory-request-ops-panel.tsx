@@ -1,5 +1,7 @@
+import Link from 'next/link'
 import { InventoryItemRequestForm } from '@/components/inventory-item-request-form'
 import { InventoryRequestStatusForm } from '@/components/inventory-request-status-form'
+import { buildInventoryBarcodeDetailPath, extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
 import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
 
 function findSection(sections: DomainReviewSection[], keyword: string) {
@@ -38,6 +40,15 @@ function parseMovementHandover(detail: string) {
     proofType: proofMatch?.[1]?.trim() || '',
     proofRef: proofMatch?.[2]?.trim() || '',
   }
+}
+
+function getRowBarcodeHref(row: DomainReviewRow | null | undefined) {
+  if (!row) return ''
+  const itemCode = [row.primary, row.secondary, row.detail, ...row.meta]
+    .map((value) => extractInventoryItemCodeFromScan(value))
+    .find(Boolean)
+
+  return itemCode ? buildInventoryBarcodeDetailPath(itemCode) : ''
 }
 
 function buildCountMap(rows: DomainReviewRow[], prefix?: string) {
@@ -245,6 +256,8 @@ export function InventoryRequestOpsPanel({
                 const requestedAt = pickMeta(row.meta, 'Requested: ')
                 const audit = requestAuditRows.find((item) => item.request.id === row.id) ?? null
                 const handover = audit?.handover
+                const requestBarcodeHref = getRowBarcodeHref(row)
+                const movementBarcodeHref = getRowBarcodeHref(audit?.movement)
 
                 return (
                   <div key={row.id} className="rounded-2xl border border-line bg-white p-4">
@@ -253,7 +266,17 @@ export function InventoryRequestOpsPanel({
                         <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
                         <p className="mt-1 text-sm text-mute">{row.secondary}</p>
                       </div>
-                      <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {requestBarcodeHref ? (
+                          <Link
+                            href={requestBarcodeHref}
+                            className="badge border-slate-300 bg-slate-950 text-white transition hover:bg-slate-800"
+                          >
+                            Buka Barcode
+                          </Link>
+                        ) : null}
+                        <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                      </div>
                     </div>
                     <p className="mt-3 text-sm leading-6 text-slate-700">{row.detail}</p>
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -288,7 +311,17 @@ export function InventoryRequestOpsPanel({
                     </div>
                     {audit?.movement ? (
                       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        <p className="font-semibold text-slate-950">Audit Movement</p>
+                        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                          <p className="font-semibold text-slate-950">Audit Movement</p>
+                          {movementBarcodeHref ? (
+                            <Link
+                              href={movementBarcodeHref}
+                              className="badge border-slate-300 bg-white text-slate-700 transition hover:border-slate-400"
+                            >
+                              Barcode Movement
+                            </Link>
+                          ) : null}
+                        </div>
                         <p className="mt-1 leading-6">{audit.movement.detail}</p>
                         {audit.movement.meta.length ? (
                           <div className="mt-3 flex flex-wrap gap-2">

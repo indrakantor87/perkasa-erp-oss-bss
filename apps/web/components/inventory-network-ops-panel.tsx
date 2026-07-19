@@ -8,6 +8,7 @@ import { InventoryOdpCreateForm } from '@/components/inventory-odp-create-form'
 import { InventoryOdpPortAssignForm } from '@/components/inventory-odp-port-assign-form'
 import { InventoryOdpPortStatusForm } from '@/components/inventory-odp-port-status-form'
 import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
+import { buildInventoryBarcodeDetailPath, extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Map, Pencil, Plus, Upload } from 'lucide-react'
 import type { DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
@@ -287,6 +288,20 @@ function buildInventoryQuickActionPayload(row: DomainReviewRow): TableQuickActio
   }
 }
 
+function getRowBarcodeHref(row: DomainReviewRow | null | undefined) {
+  if (!row) return ''
+  const itemCode = [row.primary, row.secondary, row.detail, ...row.meta]
+    .map((value) => extractInventoryItemCodeFromScan(value))
+    .find(Boolean)
+
+  return itemCode ? buildInventoryBarcodeDetailPath(itemCode) : ''
+}
+
+function getLifecycleBarcodeHref(item: DeviceLifecycleLogRow) {
+  const itemCode = extractInventoryItemCodeFromScan(item.itemCode ?? '')
+  return itemCode ? buildInventoryBarcodeDetailPath(itemCode) : ''
+}
+
 export function InventoryNetworkOpsPanel({
   sections,
   canCreate,
@@ -551,7 +566,23 @@ export function InventoryNetworkOpsPanel({
             <article key={item.id} className={`rounded-2xl border px-4 py-3 ${item.tone}`}>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">{item.lane}</span>
-                <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {[item.title, item.subtitle, item.detail]
+                    .map((value) => extractInventoryItemCodeFromScan(value))
+                    .find(Boolean) ? (
+                    <Link
+                      href={buildInventoryBarcodeDetailPath(
+                        [item.title, item.subtitle, item.detail]
+                          .map((value) => extractInventoryItemCodeFromScan(value))
+                          .find(Boolean) ?? '',
+                      )}
+                      className="badge border-slate-300 bg-white text-slate-700 transition hover:border-slate-400"
+                    >
+                      Buka Barcode
+                    </Link>
+                  ) : null}
+                  <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
+                </div>
               </div>
               <p className="mt-3 text-sm font-semibold">{item.title}</p>
               <p className="mt-1 text-sm opacity-85">{item.subtitle}</p>
@@ -617,9 +648,19 @@ export function InventoryNetworkOpsPanel({
                     {item.ticketRef || 'Tanpa ticket'} {item.ticketType ? `· ${item.ticketType}` : ''}
                   </p>
                 </div>
-                <span className={`badge ${getLifecycleStatusTone(item.lifecycleStatus)}`}>
-                  {getLifecycleStatusLabel(item.lifecycleStatus)}
-                </span>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {getLifecycleBarcodeHref(item) ? (
+                    <Link
+                      href={getLifecycleBarcodeHref(item)}
+                      className="badge border-slate-500 bg-white/10 text-white transition hover:bg-white/20"
+                    >
+                      Buka Barcode
+                    </Link>
+                  ) : null}
+                  <span className={`badge ${getLifecycleStatusTone(item.lifecycleStatus)}`}>
+                    {getLifecycleStatusLabel(item.lifecycleStatus)}
+                  </span>
+                </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {item.validationStatus ? (
@@ -1033,7 +1074,17 @@ export function InventoryNetworkOpsPanel({
                     <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
                     <p className="mt-1 text-sm text-mute">{row.secondary}</p>
                   </div>
-                  <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {getRowBarcodeHref(row) ? (
+                      <Link
+                        href={getRowBarcodeHref(row)}
+                        className="badge border-slate-300 bg-slate-950 text-white transition hover:bg-slate-800"
+                      >
+                        Buka Barcode
+                      </Link>
+                    ) : null}
+                    <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                  </div>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-700">{row.detail}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -1083,7 +1134,17 @@ export function InventoryNetworkOpsPanel({
                     <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
                     <p className="mt-1 text-sm text-mute">{row.secondary}</p>
                   </div>
-                  <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {getRowBarcodeHref(row) ? (
+                      <Link
+                        href={getRowBarcodeHref(row)}
+                        className="badge border-slate-300 bg-slate-950 text-white transition hover:bg-slate-800"
+                      >
+                        Buka Barcode
+                      </Link>
+                    ) : null}
+                    <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                  </div>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-700">{row.detail}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
