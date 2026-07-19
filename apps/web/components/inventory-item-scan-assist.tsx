@@ -25,6 +25,11 @@ type VideoInputOption = {
   label: string
 }
 
+type CameraOverlayFeedback = {
+  tone: 'idle' | 'detecting' | 'success'
+  message: string
+}
+
 type BarcodeDetectorResult = {
   rawValue?: string
 }
@@ -49,6 +54,7 @@ export function InventoryItemScanAssist({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const intervalRef = useRef<number | null>(null)
+  const closeCameraTimeoutRef = useRef<number | null>(null)
   const [scanValue, setScanValue] = useState('')
   const [feedback, setFeedback] = useState<ScanFeedback | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
@@ -58,11 +64,19 @@ export function InventoryItemScanAssist({
   const [cameraPreference, setCameraPreference] = useState<CameraPreference>('environment')
   const [videoInputOptions, setVideoInputOptions] = useState<VideoInputOption[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState('')
+  const [cameraOverlayFeedback, setCameraOverlayFeedback] = useState<CameraOverlayFeedback>({
+    tone: 'idle',
+    message: 'Arahkan barcode ke dalam bingkai hijau agar kamera mulai membaca.',
+  })
 
   function stopCamera() {
     if (intervalRef.current !== null) {
       window.clearInterval(intervalRef.current)
       intervalRef.current = null
+    }
+    if (closeCameraTimeoutRef.current !== null) {
+      window.clearTimeout(closeCameraTimeoutRef.current)
+      closeCameraTimeoutRef.current = null
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop())
@@ -70,6 +84,10 @@ export function InventoryItemScanAssist({
     }
     setCameraReady(false)
     setCameraBusy(false)
+    setCameraOverlayFeedback({
+      tone: 'idle',
+      message: 'Arahkan barcode ke dalam bingkai hijau agar kamera mulai membaca.',
+    })
   }
 
   async function loadVideoInputs() {
@@ -147,6 +165,10 @@ export function InventoryItemScanAssist({
         stopCamera()
         setCameraBusy(true)
         setCameraReady(false)
+        setCameraOverlayFeedback({
+          tone: 'idle',
+          message: 'Mengaktifkan kamera dan menunggu barcode masuk ke bingkai.',
+        })
         const videoConstraints = selectedDeviceId
           ? { deviceId: { exact: selectedDeviceId } }
           : { facingMode: cameraPreference }
@@ -174,10 +196,29 @@ export function InventoryItemScanAssist({
             const results = await detector.detect(videoRef.current)
             const nextValue = results[0]?.rawValue?.trim()
             if (!nextValue) return
+            const detectedItemCode = extractInventoryItemCodeFromScan(nextValue)
+            setCameraOverlayFeedback({
+              tone: 'detecting',
+              message: detectedItemCode
+                ? `Barcode terdeteksi: ${detectedItemCode}`
+                : 'Barcode terdeteksi. Sedang mencocokkan item inventory.',
+            })
             const resolved = applyScanValue(nextValue, 'camera')
             if (!resolved) return
-            stopCamera()
-            setCameraOpen(false)
+            if (intervalRef.current !== null) {
+              window.clearInterval(intervalRef.current)
+              intervalRef.current = null
+            }
+            setCameraOverlayFeedback({
+              tone: 'success',
+              message: detectedItemCode
+                ? `Scan berhasil: ${detectedItemCode}`
+                : 'Scan berhasil. Item inventory langsung dipilih.',
+            })
+            closeCameraTimeoutRef.current = window.setTimeout(() => {
+              stopCamera()
+              setCameraOpen(false)
+            }, 850)
           } catch {
           }
         }, 650)
@@ -311,6 +352,19 @@ export function InventoryItemScanAssist({
 
             <div className="relative mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-slate-950">
               <video ref={videoRef} className="aspect-video w-full object-cover" playsInline muted />
+              <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center px-4">
+                <div
+                  className={
+                    cameraOverlayFeedback.tone === 'success'
+                      ? 'rounded-full border border-emerald-300/80 bg-emerald-500/85 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-emerald-950/30'
+                      : cameraOverlayFeedback.tone === 'detecting'
+                        ? 'rounded-full border border-sky-300/80 bg-sky-500/85 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-sky-950/30'
+                        : 'rounded-full border border-white/20 bg-slate-950/65 px-4 py-2 text-center text-xs font-medium tracking-[0.08em] text-white'
+                  }
+                >
+                  {cameraOverlayFeedback.message}
+                </div>
+              </div>
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(15,23,42,0.05)_0%,rgba(15,23,42,0.38)_100%)]" />
                 <div className="relative w-[68%] max-w-[420px] rounded-[28px] border border-white/70 shadow-[0_0_0_9999px_rgba(2,6,23,0.18)]">
