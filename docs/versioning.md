@@ -116,5 +116,5 @@ Setiap kali ada perubahan berarti:
 
 ## Baseline Saat Ini
 
-- versi aktif: `0.66.35`
-- status: fondasi review database, write-side domain inti, lifecycle inventory lintas NOC-teknisi, workspace CS supervisor, barcode audit end-to-end, popup aksi cepat lintas tabel operasional, optimasi runtime berisiko rendah, serta baseline backlog teknis final lintas divisi untuk `List PSB`, `List Dismantle`, ownership `ODP/Port` oleh `CS`, pemisahan `Finance` dari `Billing`, penguatan `HR` berbasis KPI manual per karyawan, dan pemisahan workspace teknisi berdasarkan sumber kerja.
+- versi aktif: `0.66.36`
+- status: fondasi review database, write-side domain inti, lifecycle inventory lintas NOC-teknisi, workspace CS supervisor, barcode audit end-to-end, popup aksi cepat lintas tabel operasional, optimasi runtime berisiko rendah, baseline backlog teknis final lintas divisi, serta spesifikasi teknis awal `List PSB` yang sudah memetakan status domain, data model, API, permission, audit trail, dan urutan implementasi.
