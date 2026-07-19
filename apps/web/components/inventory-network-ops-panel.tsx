@@ -10,6 +10,7 @@ import { InventoryOdpPortStatusForm } from '@/components/inventory-odp-port-stat
 import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Map, Pencil, Plus, Upload } from 'lucide-react'
+import type { DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
 import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
 
 const InventoryOdpLeafletMap = dynamic(
@@ -78,6 +79,64 @@ function isAttentionStatus(status: string) {
   return ['OPEN', 'PENDING', 'REVIEW', 'MONITOR', 'FAULT', 'FAULTY', 'RESERVED'].some((item) =>
     normalized.includes(item),
   )
+}
+
+function formatLifecycleTimestamp(value: string | null) {
+  if (!value) return '-'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return '-'
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(parsed)
+}
+
+function getLifecycleStatusLabel(status: DeviceLifecycleLogRow['lifecycleStatus']) {
+  switch (status) {
+    case 'TEAM_PSB':
+      return 'Team PSB'
+    case 'TEAM_TROUBLESHOOTS':
+      return 'Team Troubleshoots'
+    case 'TEAM_JALUR':
+      return 'Team Jalur'
+    case 'TEAM_DISMANTLE':
+      return 'Team Dismantle'
+    case 'PENDING_NOC_VALIDATION':
+      return 'Pending Validasi NOC'
+    case 'REPLACE_OLD':
+      return 'Replace Device Lama'
+    case 'REPLACE_NEW':
+      return 'Replace Device Baru'
+    case 'INSTALLED':
+      return 'Terpasang'
+    case 'DAMAGED':
+      return 'Rusak'
+    case 'RETURNED':
+      return 'Kembali'
+    default:
+      return status ? status.replace(/_/g, ' ') : 'Belum Ada Status'
+  }
+}
+
+function getLifecycleStatusTone(status: DeviceLifecycleLogRow['lifecycleStatus']) {
+  switch (status) {
+    case 'INSTALLED':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    case 'PENDING_NOC_VALIDATION':
+      return 'border-amber-200 bg-amber-50 text-amber-700'
+    case 'RETURNED':
+    case 'DAMAGED':
+      return 'border-rose-200 bg-rose-50 text-rose-700'
+    case 'TEAM_PSB':
+    case 'TEAM_TROUBLESHOOTS':
+    case 'TEAM_JALUR':
+    case 'TEAM_DISMANTLE':
+      return 'border-sky-200 bg-sky-50 text-sky-700'
+    default:
+      return 'border-slate-200 bg-white text-slate-600'
+  }
 }
 
 function buildCsvCell(value: string) {
@@ -236,6 +295,7 @@ export function InventoryNetworkOpsPanel({
   itemSuggestions,
   odpSuggestions,
   assignmentSuggestions,
+  lifecycleItems,
   showDeviceReturnForm,
 }: {
   sections: DomainReviewSection[]
@@ -245,6 +305,7 @@ export function InventoryNetworkOpsPanel({
   itemSuggestions: string[]
   odpSuggestions: string[]
   assignmentSuggestions: string[]
+  lifecycleItems: DeviceLifecycleLogRow[]
   showDeviceReturnForm: boolean
 }) {
   const odpSection = findSection(sections, 'ODP TERBARU')
@@ -310,6 +371,25 @@ export function InventoryNetworkOpsPanel({
     () => returnRows.filter((row) => isAttentionStatus(row.status)).length,
     [returnRows],
   )
+  const delegatedLifecycleCount = useMemo(
+    () =>
+      lifecycleItems.filter((row) =>
+        ['TEAM_PSB', 'TEAM_TROUBLESHOOTS', 'TEAM_JALUR', 'TEAM_DISMANTLE'].includes(String(row.lifecycleStatus ?? '')),
+      ).length,
+    [lifecycleItems],
+  )
+  const pendingValidationLifecycleCount = useMemo(
+    () => lifecycleItems.filter((row) => row.lifecycleStatus === 'PENDING_NOC_VALIDATION').length,
+    [lifecycleItems],
+  )
+  const installedLifecycleCount = useMemo(
+    () => lifecycleItems.filter((row) => row.lifecycleStatus === 'INSTALLED').length,
+    [lifecycleItems],
+  )
+  const returnedLifecycleCount = useMemo(
+    () => lifecycleItems.filter((row) => row.lifecycleStatus === 'RETURNED').length,
+    [lifecycleItems],
+  )
   const reconciliationItems = useMemo(
     () =>
       [
@@ -343,6 +423,7 @@ export function InventoryNetworkOpsPanel({
       ].slice(0, 6),
     [assignmentRows, issuePortRows, returnRows],
   )
+  const visibleLifecycleItems = useMemo(() => lifecycleItems.slice(0, 6), [lifecycleItems])
 
   useEffect(() => {
     if (routeMode) return
@@ -480,6 +561,96 @@ export function InventoryNetworkOpsPanel({
           {!reconciliationItems.length ? (
             <div className="rounded-2xl border border-dashed border-slate-600 bg-slate-900/20 px-4 py-5 text-sm leading-6 text-slate-300 xl:col-span-3">
               Belum ada port issue, assignment, atau return yang perlu direkonsiliasi pada review saat ini.
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Lifecycle Device</p>
+            <h4 className="mt-2 text-lg font-semibold text-white">Status perangkat terbaru dari inventory ke NOC dan tim lapangan</h4>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+              Ringkasan ini membantu inventory membaca apakah perangkat masih di gudang, sudah didelegasikan,
+              menunggu validasi NOC, terpasang, atau sudah kembali.
+            </p>
+          </div>
+          <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
+            {lifecycleItems.length} histori terbaru
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 xl:grid-cols-4">
+          <article className="rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-4 text-sky-50">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">Delegasi Teknisi</p>
+            <p className="mt-2 text-3xl font-semibold text-white">{delegatedLifecycleCount}</p>
+            <p className="mt-2 text-sm leading-6 text-sky-100">Perangkat yang sedang berada di jalur tim PSB, Troubleshoots, Jalur, atau Dismantle.</p>
+          </article>
+          <article className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-50">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-100">Pending Validasi</p>
+            <p className="mt-2 text-3xl font-semibold text-white">{pendingValidationLifecycleCount}</p>
+            <p className="mt-2 text-sm leading-6 text-amber-100">Scan lapangan sudah masuk, tetapi masih menunggu validasi akhir dari NOC.</p>
+          </article>
+          <article className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-4 text-emerald-50">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-100">Terpasang</p>
+            <p className="mt-2 text-3xl font-semibold text-white">{installedLifecycleCount}</p>
+            <p className="mt-2 text-sm leading-6 text-emerald-100">Perangkat yang sudah dinyatakan terpasang dan tidak lagi menunggu handoff berikutnya.</p>
+          </article>
+          <article className="rounded-2xl border border-violet-500/40 bg-violet-500/10 px-4 py-4 text-violet-50">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-100">Kembali ke Inventory</p>
+            <p className="mt-2 text-3xl font-semibold text-white">{returnedLifecycleCount}</p>
+            <p className="mt-2 text-sm leading-6 text-violet-100">Perangkat yang kembali dari lapangan atau sudah selesai melalui proses return.</p>
+          </article>
+        </div>
+
+        <div className="mt-4 grid gap-3 xl:grid-cols-2">
+          {visibleLifecycleItems.map((item) => (
+            <article key={item.id} className="rounded-2xl border border-slate-700 bg-slate-950/35 p-4 text-slate-100">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">
+                    {item.itemCode || `Item #${item.inventoryItemId}`}
+                    {item.itemName ? ` · ${item.itemName}` : ''}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-300">
+                    {item.ticketRef || 'Tanpa ticket'} {item.ticketType ? `· ${item.ticketType}` : ''}
+                  </p>
+                </div>
+                <span className={`badge ${getLifecycleStatusTone(item.lifecycleStatus)}`}>
+                  {getLifecycleStatusLabel(item.lifecycleStatus)}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {item.validationStatus ? (
+                  <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">Validasi: {item.validationStatus}</span>
+                ) : null}
+                {item.targetTeam ? (
+                  <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">Tim: {item.targetTeam}</span>
+                ) : null}
+                {item.locationCode || item.locationName ? (
+                  <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
+                    Lokasi: {[item.locationCode, item.locationName].filter(Boolean).join(' · ')}
+                  </span>
+                ) : null}
+                {item.handoverFromLabel || item.handoverToLabel ? (
+                  <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
+                    Handover: {[item.handoverFromLabel, item.handoverToLabel].filter(Boolean).join(' -> ')}
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-300">
+                {item.notes || item.eventType || 'Belum ada catatan tambahan untuk lifecycle ini.'}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                <span>Actor: {item.actorName || item.actorRole || '-'}</span>
+                <span>Waktu: {formatLifecycleTimestamp(item.createdAt)}</span>
+              </div>
+            </article>
+          ))}
+          {!visibleLifecycleItems.length ? (
+            <div className="rounded-2xl border border-dashed border-slate-600 bg-slate-900/20 px-4 py-5 text-sm leading-6 text-slate-300 xl:col-span-2">
+              Belum ada histori lifecycle perangkat yang bisa dibaca pada workspace inventory network.
             </div>
           ) : null}
         </div>

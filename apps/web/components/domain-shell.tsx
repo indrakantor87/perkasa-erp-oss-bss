@@ -58,6 +58,7 @@ import { SupportSlaQueuePanel } from '@/components/support-sla-queue-panel'
 import { SupportTroubleTicketQueuePanel } from '@/components/support-tt-queue-panel'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { getRoleMeta } from '@/lib/role-meta'
+import type { DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
 import { buildSupportLaneHref, getSupportActionAnchorId } from '@/lib/support-action-links'
 import { canProcessSupportDismantle, canUseSupportAction, getSupportLanePath } from '@/lib/support-lanes'
 import { extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
@@ -1701,6 +1702,7 @@ export function DomainShell({
   supportDrilldown,
   inventoryView,
   inventoryAction,
+  inventoryLifecycleItems = [],
   hideInventoryWorkspaceTabs = false,
 }: {
   content: DomainPageContent
@@ -1722,6 +1724,7 @@ export function DomainShell({
   supportDrilldown?: SupportDrilldownContext
   inventoryView?: string
   inventoryAction?: string
+  inventoryLifecycleItems?: DeviceLifecycleLogRow[]
   hideInventoryWorkspaceTabs?: boolean
 }) {
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
@@ -3594,6 +3597,7 @@ export function DomainShell({
               itemSuggestions={inventoryItemSuggestions}
               odpSuggestions={inventoryOdpSuggestions}
               assignmentSuggestions={inventoryAssignmentSuggestions}
+              lifecycleItems={inventoryLifecycleItems}
               showDeviceReturnForm={!isFieldTechnicianInventory && shouldShowInventoryAction('device-return')}
             />
           ) : null}

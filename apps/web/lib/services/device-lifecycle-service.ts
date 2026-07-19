@@ -390,11 +390,8 @@ export async function getDeviceLifecycleLogs(params: {
       values.push(params.troubleTicketId)
     }
 
-    if (!where.length) {
-      return { source, items: [] as DeviceLifecycleLogRow[], error: null as string | null }
-    }
-
-    values.push(Math.min(Math.max(params.limit ?? 100, 10), 300))
+    const limit = Math.min(Math.max(params.limit ?? 100, 10), 300)
+    values.push(limit)
 
     const rows = await runReviewDbQuery<DeviceLifecycleLogRow>(
       `
@@ -432,7 +429,7 @@ export async function getDeviceLifecycleLogs(params: {
           ON i.id = l.inventory_item_id
         LEFT JOIN inventory_items ri
           ON ri.id = l.related_inventory_item_id
-        WHERE ${where.join(' OR ')}
+        ${where.length ? `WHERE ${where.join(' OR ')}` : ''}
         ORDER BY l.id DESC
         LIMIT ?
       `,

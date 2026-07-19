@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { DomainShell } from '@/components/domain-shell'
+import { getDeviceLifecycleLogs } from '@/lib/services/device-lifecycle-service'
 import { getDomainPageData } from '@/lib/services/domain-service'
 import type { DomainFormPrefill } from '@/lib/types'
 
@@ -65,11 +66,14 @@ export default async function InventoryWorkspacePage({
 
   const resolvedSearchParams = await searchParams
   const inventoryAction = resolveSearchParam(resolvedSearchParams.inventoryAction)
-  const payload = await getDomainPageData('inventory', session, {
-    focus: resolveSearchParam(resolvedSearchParams.focus),
-    month: resolvePositiveIntegerParam(resolvedSearchParams.month),
-    year: resolvePositiveIntegerParam(resolvedSearchParams.year),
-  })
+  const [payload, lifecyclePayload] = await Promise.all([
+    getDomainPageData('inventory', session, {
+      focus: resolveSearchParam(resolvedSearchParams.focus),
+      month: resolvePositiveIntegerParam(resolvedSearchParams.month),
+      year: resolvePositiveIntegerParam(resolvedSearchParams.year),
+    }),
+    workspace === 'network' ? getDeviceLifecycleLogs({ limit: 12 }) : Promise.resolve({ items: [] }),
+  ])
 
   if (!payload) {
     notFound()
@@ -97,6 +101,7 @@ export default async function InventoryWorkspacePage({
       domainPrefill={domainPrefill}
       inventoryView={inventoryWorkspaceViewMap[workspace]}
       inventoryAction={inventoryAction}
+      inventoryLifecycleItems={lifecyclePayload.items}
       hideInventoryWorkspaceTabs
     />
   )
