@@ -67,6 +67,8 @@ export function InventoryStockMovementForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+  const showScanPanel = Boolean(canCreate)
+  const scanInputDisabled = isDisabled || movementType !== 'OUT'
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -190,7 +192,7 @@ export function InventoryStockMovementForm({
           handoverTo,
           handoverProofType,
           handoverProofRef,
-          scannedRackBarcode: requireScan && movementType === 'OUT' ? scannedRackBarcode : '',
+          scannedRackBarcode: movementType === 'OUT' ? scannedRackBarcode : '',
         }),
       })
 
@@ -251,21 +253,31 @@ export function InventoryStockMovementForm({
       </p>
 
       <form onSubmit={handleSubmit} className={`${embedded ? '' : 'mt-6'} grid gap-4 lg:grid-cols-2`}>
-        <div className="lg:col-span-2">
-          <InventoryItemScanAssist
-            itemSuggestions={rackSuggestions}
-            disabled={isDisabled}
-            guidancePreset="inventory_handover"
-            onResolved={(value) => {
-              setScanValue(value)
-            }}
-          />
-          {requireScan ? (
+        {showScanPanel ? (
+          <div className="lg:col-span-2">
+            <InventoryItemScanAssist
+              itemSuggestions={rackSuggestions}
+              disabled={scanInputDisabled}
+              guidancePreset="inventory_handover"
+              onResolved={(value) => {
+                setScanValue(value)
+              }}
+            />
             <div className="mt-2 text-sm text-mute">
-              Scan barcode rak diwajibkan saat movement `OUT`. Movement `IN` dan `ADJUSTMENT` tetap bisa tanpa scan.
+              {movementType !== 'OUT'
+                ? 'Panel scan tetap ditampilkan sebagai mode edukasi. Scan akan aktif saat movement diubah ke OUT.'
+                : requireScan
+                  ? 'Scan barcode rak diwajibkan saat movement `OUT` sebelum data disimpan.'
+                  : 'Role ini tidak diwajibkan scan, tetapi barcode tetap bisa dipindai sebagai mode edukasi dan pembiasaan proses.'}
             </div>
-          ) : null}
-        </div>
+            {!requireScan ? (
+              <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                Supervisor atau admin tetap bisa mencoba flow scan yang sama dengan tim gudang saat movement
+                `OUT`, walaupun validasi barcode tidak diwajibkan oleh sistem.
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Item Inventory</span>

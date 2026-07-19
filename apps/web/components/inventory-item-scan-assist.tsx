@@ -163,6 +163,7 @@ export function InventoryItemScanAssist({
   onResolved,
   guidancePreset,
 }: InventoryItemScanAssistProps) {
+  const feedbackStorageKey = 'inventory-scan-feedback-preferences'
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const intervalRef = useRef<number | null>(null)
@@ -176,6 +177,8 @@ export function InventoryItemScanAssist({
   const [cameraPreference, setCameraPreference] = useState<CameraPreference>('environment')
   const [videoInputOptions, setVideoInputOptions] = useState<VideoInputOption[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState('')
+  const [feedbackSoundEnabled, setFeedbackSoundEnabled] = useState(true)
+  const [feedbackHapticEnabled, setFeedbackHapticEnabled] = useState(true)
   const [cameraOverlayFeedback, setCameraOverlayFeedback] = useState<CameraOverlayFeedback>({
     tone: 'idle',
     message: 'Arahkan barcode ke dalam bingkai hijau agar kamera mulai membaca.',
@@ -201,6 +204,57 @@ export function InventoryItemScanAssist({
       tone: 'idle',
       message: 'Arahkan barcode ke dalam bingkai hijau agar kamera mulai membaca.',
     })
+  }
+
+  function triggerDeviceSuccessFeedback() {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      if (feedbackHapticEnabled && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        navigator.vibrate(60)
+      }
+    } catch {
+    }
+
+    try {
+      if (!feedbackSoundEnabled) {
+        return
+      }
+
+      const AudioContextCtor = (
+        window as unknown as {
+          AudioContext?: new () => AudioContextLike
+          webkitAudioContext?: new () => AudioContextLike
+        }
+      ).AudioContext
+        ?? (
+          window as unknown as {
+            webkitAudioContext?: new () => AudioContextLike
+          }
+        ).webkitAudioContext
+
+      if (!AudioContextCtor) {
+        return
+      }
+
+      const audioContext = new AudioContextCtor()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator.type = 'sine'
+      oscillator.frequency.value = 880
+      gainNode.gain.setValueAtTime(0.001, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.05, audioContext.currentTime + 0.01)
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.12)
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      oscillator.start()
+      oscillator.stop(audioContext.currentTime + 0.12)
+    } catch {
+    }
   }
 
   async function loadVideoInputs() {
@@ -259,6 +313,49 @@ export function InventoryItemScanAssist({
   useEffect(() => {
     setBarcodeDetectorSupported(typeof window !== 'undefined' && 'BarcodeDetector' in window)
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      const rawPreferences = window.localStorage.getItem(feedbackStorageKey)
+      if (!rawPreferences) {
+        return
+      }
+
+      const parsed = JSON.parse(rawPreferences) as {
+        soundEnabled?: boolean
+        hapticEnabled?: boolean
+      }
+
+      if (typeof parsed.soundEnabled === 'boolean') {
+        setFeedbackSoundEnabled(parsed.soundEnabled)
+      }
+      if (typeof parsed.hapticEnabled === 'boolean') {
+        setFeedbackHapticEnabled(parsed.hapticEnabled)
+      }
+    } catch {
+    }
+  }, [feedbackStorageKey])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      window.localStorage.setItem(
+        feedbackStorageKey,
+        JSON.stringify({
+          soundEnabled: feedbackSoundEnabled,
+          hapticEnabled: feedbackHapticEnabled,
+        }),
+      )
+    } catch {
+    }
+  }, [feedbackHapticEnabled, feedbackSoundEnabled, feedbackStorageKey])
 
   useEffect(() => {
     if (!cameraOpen || !barcodeDetectorSupported) {
@@ -398,6 +495,35 @@ export function InventoryItemScanAssist({
       <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
         Scan barcode bisa dilakukan langsung dari kamera HP atau kamera eksternal pada PC/laptop. Infrared
         tidak dibutuhkan untuk flow ini.
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+            Feedback Scan
+          </span>
+          <span className="text-sm text-slate-600">Atur bunyi dan getar ringan saat barcode berhasil dibaca.</span>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <label className="inline-flex items-center gap-2 rounded-full border border-line bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={feedbackSoundEnabled}
+              onChange={(event) => setFeedbackSoundEnabled(event.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-slate-900"
+            />
+            Bunyi bip
+          </label>
+          <label className="inline-flex items-center gap-2 rounded-full border border-line bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={feedbackHapticEnabled}
+              onChange={(event) => setFeedbackHapticEnabled(event.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-slate-900"
+            />
+            Getar ringan
+          </label>
+        </div>
       </div>
 
       {guidanceContent ? (
