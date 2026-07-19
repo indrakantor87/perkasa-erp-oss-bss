@@ -1161,8 +1161,7 @@ export function Sidebar({
 }) {
   const { language } = useUiLanguage()
   const pathname = usePathname()
-  const currentQueryParams =
-    typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)
+  const [currentQueryParams, setCurrentQueryParams] = useState(() => new URLSearchParams())
   const focus =
     String(currentQueryParams.get('focus') ?? '')
       .trim()
@@ -1183,6 +1182,10 @@ export function Sidebar({
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    setCurrentQueryParams(new URLSearchParams(window.location.search))
+  }, [pathname])
 
   useEffect(() => {
     const stored = window.localStorage.getItem('perkasa.sidebar.collapsed')

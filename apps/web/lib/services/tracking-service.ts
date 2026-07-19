@@ -1,4 +1,11 @@
 import { getDataSourceSnapshot } from '@/lib/data-source'
+import {
+  mockTrackingStockMovements,
+  mockTrackingTroubleTickets,
+  mockTrackingWorkOrderAssignments,
+  mockTrackingWorkOrderStatusLogs,
+  mockTrackingWorkOrders,
+} from '@/lib/mock-tracking'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import type { DataSourceSnapshot } from '@/lib/types'
 
@@ -131,6 +138,17 @@ function resolveOptionalInt(value: string | undefined) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
+function matchesMockSearch(values: Array<string | number | null | undefined>, query: string | null | undefined) {
+  const needle = String(query ?? '')
+    .trim()
+    .toUpperCase()
+  if (!needle) {
+    return true
+  }
+
+  return values.some((value) => String(value ?? '').toUpperCase().includes(needle))
+}
+
 export type WorkOrderTrackingQuery = {
   q?: string | string[]
   status?: string | string[]
@@ -168,11 +186,18 @@ export type InventoryRequestTrackingQuery = {
 
 export async function getWorkOrderTrackingList(query: WorkOrderTrackingQuery) {
   const source = getDataSourceSnapshot()
+  const state = resolveWorkOrderTrackingState(query)
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return { source, items: [], error: null as string | null, state: resolveWorkOrderTrackingState(query) }
+    const items = mockTrackingWorkOrders
+      .filter((row) => matchesMockSearch([row.workOrderNo, row.technicianName, row.picFullName, row.picUsername], state.q))
+      .filter((row) => !state.status || String(row.status ?? '').toUpperCase() === state.status)
+      .filter((row) => !state.jobCategory || String(row.jobCategory ?? '').toUpperCase() === state.jobCategory)
+      .filter((row) => !state.priority || String(row.priority ?? '').toUpperCase() === state.priority)
+      .slice(0, state.limit)
+
+    return { source, items, error: null as string | null, state }
   }
 
-  const state = resolveWorkOrderTrackingState(query)
   try {
     const hasPicUserId = await hasReviewDbColumn('service_work_orders', 'current_pic_user_id')
     const hasJobCategory = await hasReviewDbColumn('service_work_orders', 'job_category')
@@ -295,7 +320,15 @@ export async function getWorkOrderTrackingList(query: WorkOrderTrackingQuery) {
 export async function getWorkOrderTrackingDetail(workOrderId: number) {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return { source, workOrder: null as WorkOrderRow | null, assignments: [], statusLogs: [], movements: [], error: null as string | null }
+    const workOrder = mockTrackingWorkOrders.find((row) => row.id === workOrderId) ?? null
+    return {
+      source,
+      workOrder,
+      assignments: mockTrackingWorkOrderAssignments.filter((row) => row.workOrderId === workOrderId),
+      statusLogs: mockTrackingWorkOrderStatusLogs.filter((row) => row.workOrderId === workOrderId),
+      movements: mockTrackingStockMovements.filter((row) => row.workOrderId === workOrderId),
+      error: null as string | null,
+    }
   }
 
   try {
@@ -619,11 +652,18 @@ export async function getStockMovementTrackingDetail(movementId: number) {
 
 export async function getTroubleTicketTrackingList(query: TroubleTicketTrackingQuery) {
   const source = getDataSourceSnapshot()
+  const state = resolveTroubleTicketTrackingState(query)
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return { source, items: [], error: null as string | null, state: resolveTroubleTicketTrackingState(query) }
+    const items = mockTrackingTroubleTickets
+      .filter((row) => matchesMockSearch([row.ticketCode, row.customerName, row.customerUser], state.q))
+      .filter((row) => !state.status || String(row.status ?? '').toUpperCase() === state.status)
+      .filter((row) => !state.type || String(row.type ?? '').toUpperCase() === state.type)
+      .filter((row) => !state.category || String(row.category ?? '').toUpperCase() === state.category)
+      .slice(0, state.limit)
+
+    return { source, items, error: null as string | null, state }
   }
 
-  const state = resolveTroubleTicketTrackingState(query)
   try {
     const where: string[] = []
     const values: unknown[] = []
@@ -773,9 +813,9 @@ export async function getTroubleTicketTrackingDetail(troubleTicketId: number) {
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     return {
       source,
-      troubleTicket: null as TroubleTicketRow | null,
-      workOrders: [] as WorkOrderRow[],
-      movements: [] as StockMovementRow[],
+      troubleTicket: mockTrackingTroubleTickets.find((row) => row.id === troubleTicketId) ?? null,
+      workOrders: mockTrackingWorkOrders.filter((row) => row.troubleTicketId === troubleTicketId),
+      movements: mockTrackingStockMovements.filter((row) => row.troubleTicketId === troubleTicketId),
       error: null as string | null,
     }
   }

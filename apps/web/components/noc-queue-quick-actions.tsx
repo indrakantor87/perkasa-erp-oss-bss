@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DeviceLifecycleActionForm } from '@/components/device-lifecycle-action-form'
 import type { DeviceLifecycleStatus } from '@/lib/services/device-lifecycle-service'
 import type { NocTicketType } from '@/lib/services/noc-queue-service'
@@ -248,6 +248,10 @@ export function NocQueueQuickActions({
       notes: 'Update lifecycle device dari queue NOC.',
     }
   const [selectedPresetKey, setSelectedPresetKey] = useState(initialPreset.key)
+
+  useEffect(() => {
+    setSelectedPresetKey(initialPreset.key)
+  }, [initialPreset.key])
 
   const selectedPreset = useMemo(() => {
     const matched = presets.find((item) => item.key === selectedPresetKey)

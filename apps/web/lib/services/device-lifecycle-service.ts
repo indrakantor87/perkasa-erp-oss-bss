@@ -1,4 +1,5 @@
 import { getDataSourceSnapshot } from '@/lib/data-source'
+import { mockTrackingDeviceLifecycleLogs, mockTrackingItemSuggestions } from '@/lib/mock-tracking'
 import {
   getReviewDbErrorDetail,
   hasReviewDbColumn,
@@ -332,7 +333,7 @@ export async function ensureInventoryDeviceLifecycleTable() {
 export async function getInventoryDeviceLifecycleItemSuggestions(limit = 200) {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return [] as string[]
+    return mockTrackingItemSuggestions.slice(0, Math.min(Math.max(limit, 20), mockTrackingItemSuggestions.length))
   }
 
   const tableExists = await hasTable('inventory_items')
@@ -366,7 +367,13 @@ export async function getDeviceLifecycleLogs(params: {
 }) {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return { source, items: [] as DeviceLifecycleLogRow[], error: null as string | null }
+    const limit = Math.min(Math.max(params.limit ?? 100, 10), 300)
+    const items = mockTrackingDeviceLifecycleLogs
+      .filter((row) => (!params.workOrderId || row.workOrderId === params.workOrderId))
+      .filter((row) => (!params.troubleTicketId || row.troubleTicketId === params.troubleTicketId))
+      .slice(0, limit)
+
+    return { source, items, error: null as string | null }
   }
 
   try {
@@ -445,7 +452,11 @@ export async function getDeviceLifecycleLogs(params: {
 export async function getLatestDeviceLifecycleLogForItem(inventoryItemId: number) {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return { source, item: null as DeviceLifecycleLogRow | null, error: null as string | null }
+    return {
+      source,
+      item: mockTrackingDeviceLifecycleLogs.find((row) => row.inventoryItemId === inventoryItemId) ?? null,
+      error: null as string | null,
+    }
   }
 
   try {
@@ -514,10 +525,26 @@ export async function getLatestDeviceLifecycleMaps(params: {
 }) {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    const byWorkOrder = new Map<number, DeviceLifecycleLogRow>()
+    const byTroubleTicket = new Map<number, DeviceLifecycleLogRow>()
+
+    for (const row of mockTrackingDeviceLifecycleLogs) {
+      if (row.workOrderId && params.workOrderIds?.includes(row.workOrderId) && !byWorkOrder.has(row.workOrderId)) {
+        byWorkOrder.set(row.workOrderId, row)
+      }
+      if (
+        row.troubleTicketId &&
+        params.troubleTicketIds?.includes(row.troubleTicketId) &&
+        !byTroubleTicket.has(row.troubleTicketId)
+      ) {
+        byTroubleTicket.set(row.troubleTicketId, row)
+      }
+    }
+
     return {
       source,
-      byWorkOrder: new Map<number, DeviceLifecycleLogRow>(),
-      byTroubleTicket: new Map<number, DeviceLifecycleLogRow>(),
+      byWorkOrder,
+      byTroubleTicket,
       error: null as string | null,
     }
   }

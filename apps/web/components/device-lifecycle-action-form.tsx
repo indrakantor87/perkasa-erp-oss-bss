@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
 import { extractInventoryItemCodeFromScan, findInventorySuggestionByCode } from '@/lib/inventory-barcode-utils'
@@ -125,17 +125,22 @@ export function DeviceLifecycleActionForm({
 }: DeviceLifecycleActionFormProps) {
   const router = useRouter()
   const datalistId = useId().replace(/:/g, '-')
+  const initialSuggestedHandover = getSuggestedHandover({
+    status: defaultLifecycleStatus,
+    targetTeam: defaultTargetTeam,
+  })
   const [itemValue, setItemValue] = useState('')
   const [relatedItemValue, setRelatedItemValue] = useState('')
   const [lifecycleStatus, setLifecycleStatus] = useState<DeviceLifecycleStatus>(defaultLifecycleStatus)
   const [targetTeam, setTargetTeam] = useState(defaultTargetTeam)
-  const [handoverFromLabel, setHandoverFromLabel] = useState('')
-  const [handoverToLabel, setHandoverToLabel] = useState('')
-  const [handoverProofType, setHandoverProofType] = useState<DeviceLifecycleHandoverProofType>('BARCODE_SCAN')
+  const [handoverFromLabel, setHandoverFromLabel] = useState(initialSuggestedHandover.fromLabel)
+  const [handoverToLabel, setHandoverToLabel] = useState(initialSuggestedHandover.toLabel)
+  const [handoverProofType, setHandoverProofType] = useState<DeviceLifecycleHandoverProofType>(initialSuggestedHandover.proofType)
   const [handoverProofRef, setHandoverProofRef] = useState('')
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(defaultNotes)
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+  const previousSuggestedHandoverRef = useRef(initialSuggestedHandover)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
 
@@ -152,9 +157,18 @@ export function DeviceLifecycleActionForm({
 
   useEffect(() => {
     const suggestion = getSuggestedHandover({ status: lifecycleStatus, targetTeam })
-    setHandoverFromLabel((current) => (current ? current : suggestion.fromLabel))
-    setHandoverToLabel((current) => (current ? current : suggestion.toLabel))
-    setHandoverProofType((current) => current || suggestion.proofType)
+    const previousSuggestion = previousSuggestedHandoverRef.current
+
+    setHandoverFromLabel((current) =>
+      !current || current === previousSuggestion.fromLabel ? suggestion.fromLabel : current,
+    )
+    setHandoverToLabel((current) =>
+      !current || current === previousSuggestion.toLabel ? suggestion.toLabel : current,
+    )
+    setHandoverProofType((current) =>
+      !current || current === previousSuggestion.proofType ? suggestion.proofType : current,
+    )
+    previousSuggestedHandoverRef.current = suggestion
   }, [lifecycleStatus, targetTeam])
 
   useEffect(() => {

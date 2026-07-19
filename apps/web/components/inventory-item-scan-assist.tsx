@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Camera, ScanLine } from 'lucide-react'
 import {
   extractInventoryItemCodeFromScan,
@@ -48,10 +48,7 @@ export function InventoryItemScanAssist({
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraBusy, setCameraBusy] = useState(false)
 
-  const barcodeDetectorSupported = useMemo(
-    () => typeof window !== 'undefined' && 'BarcodeDetector' in window,
-    [],
-  )
+  const [barcodeDetectorSupported, setBarcodeDetectorSupported] = useState(false)
 
   function stopCamera() {
     if (intervalRef.current !== null) {
@@ -97,6 +94,10 @@ export function InventoryItemScanAssist({
     })
     return true
   }
+
+  useEffect(() => {
+    setBarcodeDetectorSupported(typeof window !== 'undefined' && 'BarcodeDetector' in window)
+  }, [])
 
   useEffect(() => {
     if (!cameraOpen || !barcodeDetectorSupported) {

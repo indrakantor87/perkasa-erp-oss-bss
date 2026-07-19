@@ -1,4 +1,5 @@
 import { getDataSourceSnapshot } from '@/lib/data-source'
+import { mockTrackingNocQueueItems } from '@/lib/mock-tracking'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import { getLatestDeviceLifecycleMaps } from '@/lib/services/device-lifecycle-service'
 import type { DataSourceSnapshot } from '@/lib/types'
@@ -628,7 +629,27 @@ export async function getNocQueueList(query: NocQueueQuery) {
   const source = getDataSourceSnapshot()
   const state = resolveNocQueueState(query)
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return { source, items: [] as NocQueueItem[], error: null as string | null, state }
+    const searchNeedle = normalizeText(state.q)
+    const items = mockTrackingNocQueueItems
+      .filter((item) =>
+        !searchNeedle ||
+        [
+          item.ticketNo,
+          item.customerName,
+          item.customerUser,
+          item.technicianName,
+          item.picName,
+          item.picUsername,
+          item.deviceItemLabel,
+          item.deviceTicketRef,
+        ].some((value) => normalizeText(value).includes(searchNeedle)),
+      )
+      .filter((item) => !state.ticketType || item.ticketType === state.ticketType)
+      .filter((item) => !state.queueStatus || item.queueStatus === state.queueStatus)
+      .filter((item) => !state.slaState || item.slaState === state.slaState)
+      .slice(0, state.limit)
+
+    return { source, items, error: null as string | null, state }
   }
 
   try {
