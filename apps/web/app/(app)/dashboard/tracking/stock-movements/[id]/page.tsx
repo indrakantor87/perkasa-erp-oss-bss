@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
+import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import { getStockMovementTrackingDetail } from '@/lib/services/tracking-service'
 
 export default async function StockMovementTrackingDetailPage({
@@ -66,6 +67,14 @@ export default async function StockMovementTrackingDetailPage({
                 className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
               >
                 Buka Request #{m.requestId}
+              </Link>
+            ) : null}
+            {m?.itemCode ? (
+              <Link
+                href={buildInventoryBarcodeDetailPath(m.itemCode)}
+                className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+              >
+                Buka Barcode
               </Link>
             ) : null}
           </div>

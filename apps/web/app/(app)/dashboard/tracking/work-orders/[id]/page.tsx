@@ -5,6 +5,7 @@ import { DataSourceStatus } from '@/components/data-source-status'
 import { canPerformAction } from '@/lib/access-control'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
+import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import { getDeviceLifecycleLogs, getInventoryDeviceLifecycleItemSuggestions, type DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
 import { getWorkOrderTrackingDetail } from '@/lib/services/tracking-service'
 
@@ -511,6 +512,14 @@ export default async function WorkOrderTrackingDetailPage({
                               </p>
                             </div>
                             <div className="flex flex-wrap gap-2">
+                              {row.itemCode ? (
+                                <Link
+                                  href={buildInventoryBarcodeDetailPath(row.itemCode)}
+                                  className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
+                                >
+                                  Buka Barcode
+                                </Link>
+                              ) : null}
                               {row.fromStatus ? (
                                 <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getLifecycleTone(row.fromStatus)}`}>
                                   {row.fromStatus}

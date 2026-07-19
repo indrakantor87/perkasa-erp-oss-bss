@@ -1,5 +1,6 @@
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import {
+  mockTrackingInventoryRequests,
   mockTrackingStockMovements,
   mockTrackingTroubleTickets,
   mockTrackingWorkOrderAssignments,
@@ -485,11 +486,20 @@ export async function getWorkOrderTrackingDetail(workOrderId: number) {
 
 export async function getStockMovementTrackingList(query: StockMovementTrackingQuery) {
   const source = getDataSourceSnapshot()
+  const state = resolveStockMovementTrackingState(query)
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return { source, items: [], error: null as string | null, state: resolveStockMovementTrackingState(query) }
+    const items = mockTrackingStockMovements
+      .filter((row) => matchesMockSearch([row.itemCode, row.itemName, row.referenceNo], state.q))
+      .filter((row) => !state.movementType || String(row.movementType ?? '').toUpperCase() === state.movementType)
+      .filter((row) => !state.referenceType || String(row.referenceType ?? '').toUpperCase() === state.referenceType)
+      .filter((row) => !state.workOrderId || row.workOrderId === state.workOrderId)
+      .filter((row) => !state.troubleTicketId || row.troubleTicketId === state.troubleTicketId)
+      .filter((row) => !state.technicianUserId || row.technicianUserId === state.technicianUserId)
+      .slice(0, state.limit)
+
+    return { source, items, error: null as string | null, state }
   }
 
-  const state = resolveStockMovementTrackingState(query)
   try {
     const hasWorkOrderId = await hasReviewDbColumn('inventory_stock_movements', 'work_order_id')
     const hasTroubleTicketId = await hasReviewDbColumn('inventory_stock_movements', 'trouble_ticket_id')
@@ -588,7 +598,11 @@ export async function getStockMovementTrackingList(query: StockMovementTrackingQ
 export async function getStockMovementTrackingDetail(movementId: number) {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return { source, movement: null as StockMovementRow | null, error: null as string | null }
+    return {
+      source,
+      movement: mockTrackingStockMovements.find((row) => row.id === movementId) ?? null,
+      error: null as string | null,
+    }
   }
 
   try {
@@ -728,11 +742,24 @@ export async function getTroubleTicketTrackingList(query: TroubleTicketTrackingQ
 
 export async function getInventoryRequestTrackingList(query: InventoryRequestTrackingQuery) {
   const source = getDataSourceSnapshot()
+  const state = resolveInventoryRequestTrackingState(query)
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return { source, items: [], error: null as string | null, state: resolveInventoryRequestTrackingState(query) }
+    const items = mockTrackingInventoryRequests
+      .filter((row) =>
+        matchesMockSearch(
+          [row.requestCode, row.itemCode, row.itemName, row.requestedBy, row.requestedFor, row.requestedSubdivision],
+          state.q,
+        ),
+      )
+      .filter((row) => !state.status || String(row.requestStatus ?? '').toUpperCase() === state.status)
+      .filter((row) => !state.requestType || String(row.requestType ?? '').toUpperCase() === state.requestType)
+      .filter((row) => !state.workOrderId || row.workOrderId === state.workOrderId)
+      .filter((row) => !state.troubleTicketId || row.troubleTicketId === state.troubleTicketId)
+      .slice(0, state.limit)
+
+    return { source, items, error: null as string | null, state }
   }
 
-  const state = resolveInventoryRequestTrackingState(query)
   try {
     const hasWorkOrderId = await hasReviewDbColumn('inventory_item_requests', 'work_order_id')
     const hasTroubleTicketId = await hasReviewDbColumn('inventory_item_requests', 'trouble_ticket_id')
@@ -961,12 +988,19 @@ export async function getTroubleTicketTrackingDetail(troubleTicketId: number) {
 export async function getInventoryRequestTrackingDetail(requestId: number) {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    const request = mockTrackingInventoryRequests.find((row) => row.id === requestId) ?? null
     return {
       source,
-      request: null as InventoryRequestRow | null,
-      linkedWorkOrder: null as WorkOrderRow | null,
-      linkedTroubleTicket: null as TroubleTicketRow | null,
-      movements: [] as StockMovementRow[],
+      request,
+      linkedWorkOrder: request?.workOrderId ? (mockTrackingWorkOrders.find((row) => row.id === request.workOrderId) ?? null) : null,
+      linkedTroubleTicket:
+        request?.troubleTicketId ? (mockTrackingTroubleTickets.find((row) => row.id === request.troubleTicketId) ?? null) : null,
+      movements: mockTrackingStockMovements.filter(
+        (row) =>
+          row.requestId === requestId ||
+          (request ? row.itemId === request.inventoryItemId && (!request.workOrderId || row.workOrderId === request.workOrderId) : false) ||
+          (request ? row.itemId === request.inventoryItemId && (!request.troubleTicketId || row.troubleTicketId === request.troubleTicketId) : false),
+      ),
       error: null as string | null,
     }
   }

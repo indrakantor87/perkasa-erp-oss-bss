@@ -8,6 +8,7 @@ import { NocQueueWorkOrderActions } from '@/components/noc-queue-work-order-acti
 import { canPerformAction } from '@/lib/access-control'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
+import { buildInventoryBarcodeDetailPath, extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
 import { getInventoryDeviceLifecycleItemSuggestions } from '@/lib/services/device-lifecycle-service'
 import { getNocQueueList, type NocQueueItem, type NocQueueQuery, type NocQueueStatus, type NocTicketType } from '@/lib/services/noc-queue-service'
 
@@ -135,6 +136,11 @@ function renderTicketMeta(item: NocQueueItem) {
       {item.workOrderId ? <p className="mt-1 text-xs text-mute">WO terkait: #{item.workOrderId}</p> : null}
     </>
   )
+}
+
+function getQueueItemBarcodeHref(item: NocQueueItem) {
+  const itemCode = extractInventoryItemCodeFromScan(item.deviceItemLabel ?? '')
+  return itemCode ? buildInventoryBarcodeDetailPath(itemCode) : null
 }
 
 export default async function NocQueuePage({
@@ -469,6 +475,16 @@ export default async function NocQueuePage({
                     ) : null}
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
+                    {getQueueItemBarcodeHref(item) ? (
+                      <p className="mb-2">
+                        <Link
+                          href={getQueueItemBarcodeHref(item) ?? '#'}
+                          className="inline-flex rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-700 transition hover:border-slate-400"
+                        >
+                          Buka Barcode
+                        </Link>
+                      </p>
+                    ) : null}
                     <p className="font-semibold text-[var(--color-ink-strong)]">{item.deviceState ?? '-'}</p>
                     {item.deviceLifecycleStatus ? (
                       <p className="mt-2">
