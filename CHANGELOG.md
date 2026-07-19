@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.42] - 2026-07-19
+
+### Added
+
+- Ditambahkan cross-link dari `List PSB` yang sudah ditransfer ke jalur ticketing, sehingga operator bisa langsung membuka queue NOC berbasis ticket `PSB` atau masuk ke detail work order terkait saat `transferred_work_order_id` tersedia: [psb-list-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/psb-list-workspace.tsx), [psb-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/psb-list-service.ts), [psb-list-shared.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/psb-list-shared.ts)
+- Ditambahkan domain baru `List Dismantle` fase 1 dengan route `/list-dismantle`, akses role awal, item navigasi, service read-side/mock-reviewDB, workspace UI, form transisi review, dan endpoint write-side dasar untuk review serta transfer ke ticket operasional: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/list-dismantle/page.tsx), [dismantle-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dismantle-list-service.ts), [dismantle-list-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dismantle-list-workspace.tsx), [dismantle-list-transition-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dismantle-list-transition-form.tsx), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle-lists/[id]/transition/route.ts)
+
+### Changed
+
+- Sidebar, route access, dan navigasi utama kini mengenali `List Dismantle` sebagai domain kerja tersendiri yang muncul di jalur Billing/CS/Dismantle sesuai role operasional: [access-control.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control.ts), [navigation.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/navigation.ts), [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx)
+- Versioning diselaraskan ke `0.66.42` untuk menandai batch cross-link `List PSB` dan implementasi `List Dismantle` fase 1.
+
 ## [0.66.41] - 2026-07-19
 
 ### Fixed

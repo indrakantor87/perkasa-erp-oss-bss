@@ -11,12 +11,13 @@ function getDbPermissionSets() {
 }
 
 const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
-  OWNER: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory', '/billing'],
+  OWNER: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing'],
   SUPER_ADMIN: [
     '/dashboard',
     '/import',
     '/sales',
     '/list-psb',
+    '/list-dismantle',
     '/customers',
     '/support',
     '/inventory',
@@ -25,19 +26,19 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
     '/settings/access',
     '/settings/users',
   ],
-  ADMIN: ['/dashboard', '/import', '/sales', '/list-psb', '/customers', '/support', '/inventory', '/billing'],
-  FINANCE: ['/dashboard', '/billing', '/sales', '/customers', '/support'],
+  ADMIN: ['/dashboard', '/import', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing'],
+  FINANCE: ['/dashboard', '/billing', '/list-dismantle', '/sales', '/customers', '/support'],
   HR: ['/dashboard', '/hr'],
   GA: ['/dashboard', '/inventory', '/support'],
   PENJUALAN: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
   SALES_MARKETING: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
-  CS_OPERATOR: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
-  CS_ADMIN: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
+  CS_OPERATOR: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory'],
+  CS_ADMIN: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory'],
   NOC_OPERATOR: ['/dashboard', '/support', '/inventory'],
   FIELD_TECHNICIAN: ['/dashboard', '/support', '/inventory'],
   TT_OPERATOR: ['/dashboard', '/support'],
   DIGITAL_CREATOR: ['/dashboard', '/sales'],
-  DISMANTLE_OPERATOR: ['/dashboard', '/support'],
+  DISMANTLE_OPERATOR: ['/dashboard', '/list-dismantle', '/support'],
 }
 
 const baselineRoleLandingPaths: Record<AppRole, string> = {

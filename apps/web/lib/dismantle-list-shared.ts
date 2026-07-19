@@ -1,24 +1,24 @@
 import type { DataSourceSnapshot } from '@/lib/types'
 
-export type PsbListStatus =
+export type DismantleListStatus =
   | 'BARU'
   | 'REVIEW_CS'
   | 'PERLU_KOREKSI'
-  | 'DISETUJUI'
-  | 'DITOLAK'
   | 'DITRANSFER_KE_TICKETING'
+  | 'BATAL'
 
-export type PsbListItem = {
+export type DismantleListItem = {
   id: number
-  psbListCode: string
+  dismantleListCode: string
+  sourceIsolationRef: string | null
   customerName: string
   customerPhone: string | null
+  serviceRef: string | null
   addressText: string
   odpCode: string | null
-  packageLabel: string | null
-  salesOwnerName: string | null
-  requestedInstallDate: string | null
-  status: PsbListStatus
+  isolationStartedAt: string | null
+  eligibleAt: string | null
+  status: DismantleListStatus
   reviewNotes: string | null
   correctionNotes: string | null
   transferredTicketRef: string | null
@@ -26,32 +26,30 @@ export type PsbListItem = {
   createdAt: string | null
   updatedAt: string | null
   areaLabel: string | null
-  escortNotes: string | null
-  activityNotes: string | null
   csPicName: string | null
+  terminationReason: string | null
   nextActionLabel: string
   auditSummary: string[]
 }
 
-export type PsbListQuery = {
+export type DismantleListQuery = {
   status?: string | string[]
   owner?: string | string[]
   q?: string | string[]
   selected?: string | string[]
 }
 
-export type PsbListPagePayload = {
+export type DismantleListPagePayload = {
   source: DataSourceSnapshot
-  items: PsbListItem[]
-  selectedItem: PsbListItem | null
+  items: DismantleListItem[]
+  selectedItem: DismantleListItem | null
   summary: {
     totalCount: number
     baruCount: number
     reviewCount: number
     correctionCount: number
-    approvedCount: number
-    rejectedCount: number
     transferredCount: number
+    canceledCount: number
   }
   ownerOptions: string[]
   state: {
@@ -62,19 +60,19 @@ export type PsbListPagePayload = {
   }
 }
 
-export type PsbListTransitionAction =
+export type DismantleListTransitionAction =
   | 'SUBMIT_REVIEW'
   | 'REQUEST_CORRECTION'
-  | 'APPROVE'
-  | 'REJECT'
   | 'TRANSFER'
+  | 'CANCEL'
+  | 'REOPEN'
 
-export function resolvePsbListAvailableActions(params: {
-  status: PsbListStatus
+export function resolveDismantleListAvailableActions(params: {
+  status: DismantleListStatus
   canUpdate: boolean
   canApprove: boolean
 }) {
-  const actions: PsbListTransitionAction[] = []
+  const actions: DismantleListTransitionAction[] = []
 
   if (params.canUpdate && (params.status === 'BARU' || params.status === 'PERLU_KOREKSI')) {
     actions.push('SUBMIT_REVIEW')
@@ -83,27 +81,27 @@ export function resolvePsbListAvailableActions(params: {
     actions.push('REQUEST_CORRECTION')
   }
   if (params.canApprove && params.status === 'REVIEW_CS') {
-    actions.push('APPROVE', 'REJECT')
+    actions.push('TRANSFER', 'CANCEL')
   }
-  if (params.canApprove && params.status === 'DISETUJUI') {
-    actions.push('TRANSFER')
+  if (params.canApprove && params.status === 'BATAL') {
+    actions.push('REOPEN')
   }
 
   return actions
 }
 
-export function getPsbListActionLabel(action: PsbListTransitionAction) {
+export function getDismantleListActionLabel(action: DismantleListTransitionAction) {
   switch (action) {
     case 'SUBMIT_REVIEW':
       return 'Masuk Review CS'
     case 'REQUEST_CORRECTION':
       return 'Minta Koreksi'
-    case 'APPROVE':
-      return 'Setujui'
-    case 'REJECT':
-      return 'Tolak'
     case 'TRANSFER':
       return 'Transfer Ticketing'
+    case 'CANCEL':
+      return 'Batalkan'
+    case 'REOPEN':
+      return 'Buka Ulang'
     default:
       return action
   }

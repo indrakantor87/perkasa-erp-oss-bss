@@ -19,13 +19,14 @@ function matchesPrefix(pathname: string, prefix: string) {
 
 const rolePreferredOrder: Partial<Record<AppRole, string[]>> = {
   SALES_MARKETING: ['/dashboard/worklist', '/dashboard/tracking', '/sales', '/list-psb', '/customers', '/support', '/dashboard/daily-activity', '/dashboard', '/import'],
-  CS_OPERATOR: ['/dashboard/worklist', '/dashboard/tracking', '/list-psb', '/support', '/customers', '/inventory', '/dashboard/daily-activity', '/dashboard', '/billing'],
-  CS_ADMIN: ['/customers/cs-admin', '/dashboard/worklist', '/dashboard/tracking', '/list-psb', '/support', '/customers', '/dashboard/daily-activity', '/dashboard', '/billing'],
+  CS_OPERATOR: ['/dashboard/worklist', '/dashboard/tracking', '/list-psb', '/list-dismantle', '/support', '/customers', '/inventory', '/dashboard/daily-activity', '/dashboard', '/billing'],
+  CS_ADMIN: ['/customers/cs-admin', '/dashboard/worklist', '/dashboard/tracking', '/list-psb', '/list-dismantle', '/support', '/customers', '/dashboard/daily-activity', '/dashboard', '/billing'],
+  FINANCE: ['/billing', '/list-dismantle', '/support', '/customers', '/dashboard/worklist', '/dashboard/daily-activity', '/dashboard'],
   NOC_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/inventory', '/dashboard/daily-activity', '/dashboard'],
   TT_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard'],
   DIGITAL_CREATOR: ['/dashboard/worklist', '/dashboard/tracking', '/sales', '/customers', '/dashboard/daily-activity', '/dashboard'],
   FIELD_TECHNICIAN: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/inventory', '/dashboard/daily-activity', '/dashboard'],
-  DISMANTLE_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard'],
+  DISMANTLE_OPERATOR: ['/list-dismantle', '/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard'],
 }
 
 const controlCenterOrder = ['/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard', '/import']
@@ -225,7 +226,7 @@ function buildSupportSubmenuItems(role: AppRole | null) {
     },
   ]
 
-  return supportLaneItems
+  const items = supportLaneItems
     .filter((item) => canAccessSupportLane(role, item.lane))
     .map((item) =>
       buildSidebarNavItem('/support', {
@@ -236,6 +237,20 @@ function buildSupportSubmenuItems(role: AppRole | null) {
         matchPrefixes: [getSupportLanePath(item.lane)],
       }),
     )
+
+  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'FINANCE', 'CS_OPERATOR', 'CS_ADMIN', 'DISMANTLE_OPERATOR'].includes(role)) {
+    items.unshift(
+      buildSidebarNavItem('/list-dismantle', {
+        key: 'support-sub-list-dismantle',
+        title: 'List Dismantle',
+        description: 'Antrean validasi dismantle sebelum diteruskan ke ticket operasional.',
+        href: '/list-dismantle',
+        matchPrefixes: ['/list-dismantle'],
+      }),
+    )
+  }
+
+  return items
 }
 
 function buildCsAdminItem() {
@@ -401,6 +416,13 @@ function buildBillingSubmenuItems(role: AppRole | null) {
         description: 'Monitoring suspend aktif yang terkait penagihan dan restore.',
         href: '/support/isolations',
         matchPrefixes: ['/support/isolations'],
+      }),
+      buildSidebarNavItem('/list-dismantle', {
+        key: 'billing-sub-list-dismantle',
+        title: 'List Dismantle',
+        description: 'Antrean pelanggan isolir yang siap direview sebelum jadi ticket dismantle.',
+        href: '/list-dismantle',
+        matchPrefixes: ['/list-dismantle'],
       }),
     )
   }

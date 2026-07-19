@@ -63,6 +63,13 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
     icon: ClipboardList,
   },
   {
+    title: 'List Dismantle',
+    href: '/list-dismantle',
+    description: 'Antrean validasi dismantle antara billing, CS, dan ticketing',
+    tone: 'bg-rose-700 text-white',
+    icon: ClipboardList,
+  },
+  {
     title: 'CS & Admin CS',
     href: '/customers/cs-admin',
     description: 'Workspace supervisor untuk approval, koreksi, transfer, dan backlog risiko CS',
