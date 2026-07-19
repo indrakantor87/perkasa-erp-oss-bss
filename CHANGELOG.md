@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.37] - 2026-07-19
+
+### Added
+
+- Ditambahkan spesifikasi teknis implementasi `List Dismantle` sebagai domain baru yang memisahkan sumber kandidat `Billing/Isolir` dari ticket dismantle operasional, sekaligus merinci route, status, data model, service, API, permission, audit trail, strategi mock/review DB, dan fase implementasi: [web-list-dismantle-implementation-spec.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-list-dismantle-implementation-spec.md)
+- Indeks dokumentasi diperbarui agar spesifikasi `List Dismantle` langsung masuk ke jalur referensi utama untuk backlog implementasi lintas divisi: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Changed
+
+- Panduan versioning diselaraskan ke baseline terbaru `0.66.37` dan kini menandai bahwa `List Dismantle` sudah memiliki desain teknis implementasi awal yang siap dipakai sebagai pegangan build: [versioning.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/versioning.md)
+- Versioning diselaraskan ke `0.66.37` untuk menandai batch dokumentasi desain teknis `List Dismantle`, changelog, dan baseline release terkait.
+
 ## [0.66.36] - 2026-07-19
 
 ### Added

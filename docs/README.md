@@ -206,6 +206,9 @@
 - `web-list-psb-implementation-spec.md`  
   Desain teknis implementasi `List PSB` sebagai domain baru di antara `Penjualan`, `CS`, dan `Ticketing`, lengkap dengan status, data model, service, API, permission, audit trail, dan fase implementasi.
 
+- `web-list-dismantle-implementation-spec.md`  
+  Desain teknis implementasi `List Dismantle` sebagai domain baru di antara `Billing/Isolir`, `CS`, dan `Ticketing`, lengkap dengan status, data model, service, API, permission, audit trail, dan fase implementasi.
+
 - `web-role-division-menu-feature-catalog.md`  
   Inventaris aktual role aktif, divisi, menu sidebar, fitur domain, dan kolom layar web untuk membaca ERP dari perspektif operasional per role.
 
