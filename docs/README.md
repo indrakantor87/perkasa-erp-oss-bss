@@ -200,6 +200,9 @@
 - `web-psb-module-gap-plan.md`  
   Gap implementasi per modul untuk menentukan prioritas pengerjaan parity setelah role dan permission matrix target dikunci.
 
+- `web-operational-final-backlog.md`  
+  Backlog teknis final lintas divisi untuk `List PSB`, `List Dismantle`, ownership `ODP/Port`, domain `Finance`, penguatan `HR`, dan pemisahan workspace teknisi berdasarkan keputusan bisnis terbaru.
+
 - `web-role-division-menu-feature-catalog.md`  
   Inventaris aktual role aktif, divisi, menu sidebar, fitur domain, dan kolom layar web untuk membaca ERP dari perspektif operasional per role.
 

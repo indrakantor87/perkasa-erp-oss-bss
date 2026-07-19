@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.35] - 2026-07-19
+
+### Added
+
+- Ditambahkan dokumen backlog teknis final lintas divisi untuk menerjemahkan mapping bisnis terbaru ke backlog implementasi yang bisa langsung dieksekusi, dengan fokus pada `List PSB`, `List Dismantle`, ownership `ODP/Port` oleh `CS`, domain `Finance`, penguatan `HR`, dan pemisahan workspace teknisi: [web-operational-final-backlog.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/web-operational-final-backlog.md)
+- Indeks dokumentasi diperbarui agar backlog lintas divisi baru masuk ke daftar dokumen utama dan mudah ditemukan saat handoff atau perencanaan sprint: [README.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/README.md)
+
+### Changed
+
+- Panduan versioning diselaraskan ke baseline terbaru `0.66.35` dan ringkasan status proyek kini menandai bahwa backlog teknis final lintas divisi sudah dikunci sebagai arah implementasi berikutnya: [versioning.md](file:///d:/trae_projects/perkasa-erp-oss-bss/docs/versioning.md)
+- Versioning diselaraskan ke `0.66.35` untuk menandai batch sinkronisasi backlog teknis final, changelog, dan baseline release dokumentasi lintas divisi.
+
 ## [0.66.34] - 2026-07-14
 
 ### Improved
