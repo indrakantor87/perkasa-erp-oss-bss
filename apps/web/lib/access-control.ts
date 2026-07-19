@@ -11,11 +11,12 @@ function getDbPermissionSets() {
 }
 
 const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
-  OWNER: ['/dashboard', '/sales', '/customers', '/support', '/inventory', '/billing'],
+  OWNER: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory', '/billing'],
   SUPER_ADMIN: [
     '/dashboard',
     '/import',
     '/sales',
+    '/list-psb',
     '/customers',
     '/support',
     '/inventory',
@@ -24,14 +25,14 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
     '/settings/access',
     '/settings/users',
   ],
-  ADMIN: ['/dashboard', '/import', '/sales', '/customers', '/support', '/inventory', '/billing'],
+  ADMIN: ['/dashboard', '/import', '/sales', '/list-psb', '/customers', '/support', '/inventory', '/billing'],
   FINANCE: ['/dashboard', '/billing', '/sales', '/customers', '/support'],
   HR: ['/dashboard', '/hr'],
   GA: ['/dashboard', '/inventory', '/support'],
-  PENJUALAN: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
-  SALES_MARKETING: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
-  CS_OPERATOR: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
-  CS_ADMIN: ['/dashboard', '/sales', '/customers', '/support', '/inventory'],
+  PENJUALAN: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
+  SALES_MARKETING: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
+  CS_OPERATOR: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
+  CS_ADMIN: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
   NOC_OPERATOR: ['/dashboard', '/support', '/inventory'],
   FIELD_TECHNICIAN: ['/dashboard', '/support', '/inventory'],
   TT_OPERATOR: ['/dashboard', '/support'],

@@ -56,6 +56,13 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
     icon: BriefcaseBusiness,
   },
   {
+    title: 'List PSB',
+    href: '/list-psb',
+    description: 'Antrean validasi PSB antara penjualan, CS, dan ticketing',
+    tone: 'bg-cyan-700 text-white',
+    icon: ClipboardList,
+  },
+  {
     title: 'CS & Admin CS',
     href: '/customers/cs-admin',
     description: 'Workspace supervisor untuk approval, koreksi, transfer, dan backlog risiko CS',

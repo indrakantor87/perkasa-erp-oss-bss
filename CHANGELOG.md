@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.38] - 2026-07-19
+
+### Added
+
+- Ditambahkan domain route `List PSB` fase 1 yang membuka halaman operasional baru di `/list-psb`, lengkap dengan penjagaan session server-side, pemeriksaan akses role, status sumber data, serta workspace awal untuk membaca antrean validasi PSB antara penjualan, CS, dan ticketing: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/list-psb/page.tsx), [psb-list-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/psb-list-workspace.tsx)
+- Ditambahkan service read-side `List PSB` berbasis mock/fallback yang sudah menyediakan status domain, filter pencarian, opsi marketing, ringkasan summary, detail item terpilih, dan jalur aman saat mode `review-db` belum disambungkan: [psb-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/psb-list-service.ts)
+
+### Changed
+
+- Permission route dan navigasi utama kini sudah mengenali `/list-psb`, termasuk menu utama dan susunan sidebar yang lebih natural untuk peran `Penjualan`, `Sales Marketing`, `CS Operator`, dan `CS Admin`, sehingga domain baru bisa diakses tanpa mengganggu flow operasional lama: [access-control.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control.ts), [navigation.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/navigation.ts), [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx)
+- Versioning diselaraskan ke `0.66.38` untuk menandai batch implementasi kode `List PSB` fase 1 yang sudah lolos pemeriksaan TypeScript dasar.
+
 ## [0.66.37] - 2026-07-19
 
 ### Added

@@ -18,9 +18,9 @@ function matchesPrefix(pathname: string, prefix: string) {
 }
 
 const rolePreferredOrder: Partial<Record<AppRole, string[]>> = {
-  SALES_MARKETING: ['/dashboard/worklist', '/dashboard/tracking', '/sales', '/customers', '/support', '/dashboard/daily-activity', '/dashboard', '/import'],
-  CS_OPERATOR: ['/dashboard/worklist', '/dashboard/tracking', '/support', '/customers', '/inventory', '/dashboard/daily-activity', '/dashboard', '/billing'],
-  CS_ADMIN: ['/customers/cs-admin', '/dashboard/worklist', '/dashboard/tracking', '/support', '/customers', '/dashboard/daily-activity', '/dashboard', '/billing'],
+  SALES_MARKETING: ['/dashboard/worklist', '/dashboard/tracking', '/sales', '/list-psb', '/customers', '/support', '/dashboard/daily-activity', '/dashboard', '/import'],
+  CS_OPERATOR: ['/dashboard/worklist', '/dashboard/tracking', '/list-psb', '/support', '/customers', '/inventory', '/dashboard/daily-activity', '/dashboard', '/billing'],
+  CS_ADMIN: ['/customers/cs-admin', '/dashboard/worklist', '/dashboard/tracking', '/list-psb', '/support', '/customers', '/dashboard/daily-activity', '/dashboard', '/billing'],
   NOC_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/inventory', '/dashboard/daily-activity', '/dashboard'],
   TT_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard'],
   DIGITAL_CREATOR: ['/dashboard/worklist', '/dashboard/tracking', '/sales', '/customers', '/dashboard/daily-activity', '/dashboard'],
@@ -158,6 +158,13 @@ function buildSalesSubmenuItems(role: AppRole | null) {
 
   if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING'].includes(role)) {
     items.push(
+      buildSidebarNavItem('/list-psb', {
+        key: 'sales-sub-list-psb',
+        title: 'List PSB',
+        description: 'Antrean validasi PSB sebelum diteruskan ke ticketing operasional.',
+        href: '/list-psb',
+        matchPrefixes: ['/list-psb'],
+      }),
       buildSidebarNavItem('/sales', {
         key: 'sales-sub-marketing-activities',
         title: 'Aktivitas Marketing',
