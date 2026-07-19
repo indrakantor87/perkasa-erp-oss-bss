@@ -229,6 +229,7 @@ export function InventoryRequestStatusForm({
             <InventoryItemScanAssist
               itemSuggestions={rackSuggestions}
               disabled={isDisabled || nextStatus !== 'COMPLETED'}
+              guidancePreset="request_completion"
               onResolved={(value) => setScanValue(value)}
             />
             <div className="mt-2 text-sm text-mute">

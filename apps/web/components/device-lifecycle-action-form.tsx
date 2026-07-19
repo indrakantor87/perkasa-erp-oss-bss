@@ -284,6 +284,7 @@ export function DeviceLifecycleActionForm({
           <InventoryItemScanAssist
             itemSuggestions={itemSuggestions}
             disabled={isDisabled}
+            guidancePreset="noc_lifecycle"
             onResolved={(value) => {
               setItemValue(value)
             }}

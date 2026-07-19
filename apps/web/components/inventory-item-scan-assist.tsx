@@ -11,6 +11,7 @@ type InventoryItemScanAssistProps = {
   itemSuggestions: string[]
   disabled?: boolean
   onResolved: (value: string) => void
+  guidancePreset?: 'inventory_handover' | 'noc_lifecycle' | 'request_completion' | 'loan_handover'
 }
 
 type ScanFeedback = {
@@ -46,10 +47,54 @@ function getFeedbackToneClass(tone: ScanFeedback['tone']) {
   return 'border-rose-200 bg-rose-50 text-rose-700'
 }
 
+function getGuidanceContent(preset: InventoryItemScanAssistProps['guidancePreset']) {
+  switch (preset) {
+    case 'inventory_handover':
+      return {
+        badge: 'GA / Inventory',
+        title: 'Pastikan barcode barang atau rak dipindai saat serah terima stok.',
+        points: [
+          'Pakai scan ini saat barang keluar dari gudang atau dipindahkan antar lokasi.',
+          'Cocokkan barcode dengan item fisik sebelum stok dinyatakan keluar.',
+        ],
+      }
+    case 'noc_lifecycle':
+      return {
+        badge: 'NOC & Teknisi',
+        title: 'Gunakan scan untuk check-in NOC, delegasi ke teknisi, dan validasi balik dari lapangan.',
+        points: [
+          'NOC memindai barcode saat menerima perangkat dari inventory dan saat menyerahkan ke teknisi.',
+          'Teknisi memindai barcode yang sama saat pemasangan, replace, atau pengembalian ke NOC.',
+        ],
+      }
+    case 'request_completion':
+      return {
+        badge: 'Request Barang',
+        title: 'Scan dipakai untuk memastikan item yang diserahkan benar sebelum request ditandai selesai.',
+        points: [
+          'Gunakan barcode rak atau item yang benar-benar keluar untuk menutup request.',
+          'Pastikan kode hasil scan sama dengan item yang diminta teknisi atau unit kerja.',
+        ],
+      }
+    case 'loan_handover':
+      return {
+        badge: 'Pinjaman',
+        title: 'Scan dipakai saat barang pinjaman keluar dari GA dan saat pengembalian diproses.',
+        points: [
+          'Pindai barcode sebelum barang pinjaman diserahkan ke peminjam.',
+          'Gunakan barcode yang sama saat barang kembali agar histori pinjaman tetap utuh.',
+        ],
+      }
+    default:
+      return null
+  }
+}
+
 export function InventoryItemScanAssist({
   itemSuggestions,
   disabled,
   onResolved,
+  guidancePreset,
 }: InventoryItemScanAssistProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -68,6 +113,7 @@ export function InventoryItemScanAssist({
     tone: 'idle',
     message: 'Arahkan barcode ke dalam bingkai hijau agar kamera mulai membaca.',
   })
+  const guidanceContent = getGuidanceContent(guidancePreset)
 
   function stopCamera() {
     if (intervalRef.current !== null) {
@@ -279,6 +325,22 @@ export function InventoryItemScanAssist({
         Scan barcode bisa dilakukan langsung dari kamera HP atau kamera eksternal pada PC/laptop. Infrared
         tidak dibutuhkan untuk flow ini.
       </div>
+
+      {guidanceContent ? (
+        <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-700">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">
+              {guidanceContent.badge}
+            </span>
+            <span className="font-semibold text-violet-950">{guidanceContent.title}</span>
+          </div>
+          <div className="mt-2 space-y-1 text-sm leading-6">
+            {guidanceContent.points.map((item) => (
+              <p key={item}>- {item}</p>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <input

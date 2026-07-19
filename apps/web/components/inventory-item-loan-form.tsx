@@ -138,6 +138,7 @@ export function InventoryItemLoanForm({
           <InventoryItemScanAssist
             itemSuggestions={rackSuggestions}
             disabled={isDisabled}
+            guidancePreset="loan_handover"
             onResolved={(value) => {
               setScanValue(value)
             }}

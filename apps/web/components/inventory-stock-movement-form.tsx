@@ -255,6 +255,7 @@ export function InventoryStockMovementForm({
           <InventoryItemScanAssist
             itemSuggestions={rackSuggestions}
             disabled={isDisabled}
+            guidancePreset="inventory_handover"
             onResolved={(value) => {
               setScanValue(value)
             }}
