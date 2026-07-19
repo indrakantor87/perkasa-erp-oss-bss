@@ -18,6 +18,13 @@ type ScanFeedback = {
   message: string
 }
 
+type CameraPreference = 'environment' | 'user'
+
+type VideoInputOption = {
+  deviceId: string
+  label: string
+}
+
 type BarcodeDetectorResult = {
   rawValue?: string
 }
@@ -47,8 +54,10 @@ export function InventoryItemScanAssist({
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraBusy, setCameraBusy] = useState(false)
-
   const [barcodeDetectorSupported, setBarcodeDetectorSupported] = useState(false)
+  const [cameraPreference, setCameraPreference] = useState<CameraPreference>('environment')
+  const [videoInputOptions, setVideoInputOptions] = useState<VideoInputOption[]>([])
+  const [selectedDeviceId, setSelectedDeviceId] = useState('')
 
   function stopCamera() {
     if (intervalRef.current !== null) {
@@ -61,6 +70,25 @@ export function InventoryItemScanAssist({
     }
     setCameraReady(false)
     setCameraBusy(false)
+  }
+
+  async function loadVideoInputs() {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+      return
+    }
+
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const nextOptions = devices
+        .filter((device) => device.kind === 'videoinput')
+        .map((device, index) => ({
+          deviceId: device.deviceId,
+          label: device.label?.trim() || `Kamera ${index + 1}`,
+        }))
+
+      setVideoInputOptions(nextOptions)
+    } catch {
+    }
   }
 
   function applyScanValue(rawValue: string, source: 'scanner' | 'camera') {
@@ -116,9 +144,14 @@ export function InventoryItemScanAssist({
 
     async function startCamera() {
       try {
+        stopCamera()
         setCameraBusy(true)
+        setCameraReady(false)
+        const videoConstraints = selectedDeviceId
+          ? { deviceId: { exact: selectedDeviceId } }
+          : { facingMode: cameraPreference }
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
+          video: videoConstraints,
           audio: false,
         })
         if (canceled) {
@@ -126,6 +159,7 @@ export function InventoryItemScanAssist({
           return
         }
         streamRef.current = stream
+        await loadVideoInputs()
         const video = videoRef.current
         if (!video) return
         video.srcObject = stream
@@ -167,7 +201,7 @@ export function InventoryItemScanAssist({
       canceled = true
       stopCamera()
     }
-  }, [barcodeDetectorSupported, cameraOpen, itemSuggestions])
+  }, [barcodeDetectorSupported, cameraOpen, cameraPreference, itemSuggestions, selectedDeviceId])
 
   useEffect(() => () => stopCamera(), [])
 
@@ -187,6 +221,8 @@ export function InventoryItemScanAssist({
             type="button"
             onClick={() => {
               setFeedback(null)
+              setCameraPreference('environment')
+              setSelectedDeviceId('')
               setCameraOpen(true)
             }}
             disabled={disabled || !barcodeDetectorSupported}
@@ -277,12 +313,73 @@ export function InventoryItemScanAssist({
               <video ref={videoRef} className="aspect-video w-full object-cover" playsInline muted />
             </div>
 
+            <div className="mt-4 grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">Arah Kamera</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDeviceId('')
+                      setCameraPreference('environment')
+                    }}
+                    className={
+                      cameraPreference === 'environment' && !selectedDeviceId
+                        ? 'rounded-full border border-slate-950 bg-slate-950 px-3 py-2 text-xs font-semibold text-white'
+                        : 'rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700'
+                    }
+                  >
+                    Kamera Belakang
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDeviceId('')
+                      setCameraPreference('user')
+                    }}
+                    className={
+                      cameraPreference === 'user' && !selectedDeviceId
+                        ? 'rounded-full border border-slate-950 bg-slate-950 px-3 py-2 text-xs font-semibold text-white'
+                        : 'rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700'
+                    }
+                  >
+                    Kamera Depan
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <label className="flex flex-col gap-2 text-sm text-slate-700">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">
+                    Webcam / Kamera Eksternal
+                  </span>
+                  <select
+                    value={selectedDeviceId}
+                    onChange={(event) => setSelectedDeviceId(event.target.value)}
+                    className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                  >
+                    <option value="">Gunakan kamera default perangkat</option>
+                    {videoInputOptions.map((item) => (
+                      <option key={item.deviceId} value={item.deviceId}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
               {cameraBusy
                 ? 'Mengaktifkan kamera...'
                 : cameraReady
                   ? 'Kamera aktif. Arahkan barcode ke tengah frame sampai item terbaca otomatis.'
                   : 'Menunggu izin kamera HP/webcam...'}
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+              Prioritaskan kamera belakang di HP untuk barcode fisik. Jika memakai PC/laptop, pilih webcam
+              atau kamera eksternal yang paling dekat dengan barcode agar fokus lebih cepat terkunci.
             </div>
           </div>
         </div>
