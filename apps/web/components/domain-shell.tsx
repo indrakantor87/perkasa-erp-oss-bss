@@ -799,7 +799,7 @@ function matchesInventoryWorkspaceView(title: string, view: InventoryWorkspaceVi
   }
 
   if (view === 'movements') {
-    return normalized.includes('LOAN') || normalized.includes('STOCK')
+    return normalized.includes('LOAN') || normalized.includes('PINJAMAN') || normalized.includes('STOCK')
   }
 
   return (

@@ -110,6 +110,18 @@ function getGuidanceContent(preset: InventoryItemScanAssistProps['guidancePreset
   }
 }
 
+function formatFeedbackPreferenceState(soundEnabled: boolean, hapticEnabled: boolean) {
+  const states: string[] = []
+  if (soundEnabled) {
+    states.push('Bunyi aktif')
+  }
+  if (hapticEnabled) {
+    states.push('Getar aktif')
+  }
+
+  return states.length > 0 ? states.join(' • ') : 'Bunyi dan getar nonaktif'
+}
+
 function triggerDeviceSuccessFeedback() {
   if (typeof window === 'undefined') {
     return
@@ -483,7 +495,7 @@ export function InventoryItemScanAssist({
               setSelectedDeviceId('')
               setCameraOpen(true)
             }}
-            disabled={disabled || !barcodeDetectorSupported}
+            disabled={disabled}
             className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
           >
             <Camera className="h-4 w-4" />
@@ -612,40 +624,48 @@ export function InventoryItemScanAssist({
               </button>
             </div>
 
-            <div className="relative mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-slate-950">
-              <video ref={videoRef} className="aspect-video w-full object-cover" playsInline muted />
-              <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center px-4">
-                <div
-                  className={
-                    cameraOverlayFeedback.tone === 'success'
-                      ? 'rounded-full border border-emerald-300/80 bg-emerald-500/85 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-emerald-950/30'
-                      : cameraOverlayFeedback.tone === 'warning'
-                        ? 'rounded-full border border-amber-300/80 bg-amber-500/90 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-amber-950/30'
-                      : cameraOverlayFeedback.tone === 'detecting'
-                        ? 'rounded-full border border-sky-300/80 bg-sky-500/85 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-sky-950/30'
-                        : 'rounded-full border border-white/20 bg-slate-950/65 px-4 py-2 text-center text-xs font-medium tracking-[0.08em] text-white'
-                  }
-                >
-                  {cameraOverlayFeedback.message}
+            {barcodeDetectorSupported ? (
+              <div className="relative mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-slate-950">
+                <video ref={videoRef} className="aspect-video w-full object-cover" playsInline muted />
+                <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center px-4">
+                  <div
+                    className={
+                      cameraOverlayFeedback.tone === 'success'
+                        ? 'rounded-full border border-emerald-300/80 bg-emerald-500/85 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-emerald-950/30'
+                        : cameraOverlayFeedback.tone === 'warning'
+                          ? 'rounded-full border border-amber-300/80 bg-amber-500/90 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-amber-950/30'
+                          : cameraOverlayFeedback.tone === 'detecting'
+                            ? 'rounded-full border border-sky-300/80 bg-sky-500/85 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-white shadow-lg shadow-sky-950/30'
+                            : 'rounded-full border border-white/20 bg-slate-950/65 px-4 py-2 text-center text-xs font-medium tracking-[0.08em] text-white'
+                    }
+                  >
+                    {cameraOverlayFeedback.message}
+                  </div>
+                </div>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(15,23,42,0.05)_0%,rgba(15,23,42,0.38)_100%)]" />
+                  <div className="relative w-[68%] max-w-[420px] rounded-[28px] border border-white/70 shadow-[0_0_0_9999px_rgba(2,6,23,0.18)]">
+                    <div className="absolute -left-1.5 -top-1.5 h-8 w-8 rounded-tl-2xl border-l-4 border-t-4 border-emerald-300" />
+                    <div className="absolute -right-1.5 -top-1.5 h-8 w-8 rounded-tr-2xl border-r-4 border-t-4 border-emerald-300" />
+                    <div className="absolute -bottom-1.5 -left-1.5 h-8 w-8 rounded-bl-2xl border-b-4 border-l-4 border-emerald-300" />
+                    <div className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-br-2xl border-b-4 border-r-4 border-emerald-300" />
+                    <div className="aspect-[1.9/1] w-full rounded-[24px] bg-white/[0.03]" />
+                    <div className="absolute left-1/2 top-1/2 h-[2px] w-[72%] -translate-x-1/2 -translate-y-1/2 bg-emerald-300/80 shadow-[0_0_18px_rgba(110,231,183,0.75)]" />
+                  </div>
+                </div>
+                <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4">
+                  <div className="rounded-full border border-white/20 bg-slate-950/65 px-4 py-2 text-center text-xs font-medium tracking-[0.08em] text-white">
+                    Posisikan barcode di dalam bingkai hijau agar kamera lebih cepat membaca
+                  </div>
                 </div>
               </div>
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(15,23,42,0.05)_0%,rgba(15,23,42,0.38)_100%)]" />
-                <div className="relative w-[68%] max-w-[420px] rounded-[28px] border border-white/70 shadow-[0_0_0_9999px_rgba(2,6,23,0.18)]">
-                  <div className="absolute -left-1.5 -top-1.5 h-8 w-8 rounded-tl-2xl border-l-4 border-t-4 border-emerald-300" />
-                  <div className="absolute -right-1.5 -top-1.5 h-8 w-8 rounded-tr-2xl border-r-4 border-t-4 border-emerald-300" />
-                  <div className="absolute -bottom-1.5 -left-1.5 h-8 w-8 rounded-bl-2xl border-b-4 border-l-4 border-emerald-300" />
-                  <div className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-br-2xl border-b-4 border-r-4 border-emerald-300" />
-                  <div className="aspect-[1.9/1] w-full rounded-[24px] bg-white/[0.03]" />
-                  <div className="absolute left-1/2 top-1/2 h-[2px] w-[72%] -translate-x-1/2 -translate-y-1/2 bg-emerald-300/80 shadow-[0_0_18px_rgba(110,231,183,0.75)]" />
-                </div>
+            ) : (
+              <div className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-6 text-sm text-amber-700">
+                Browser ini belum mendukung scan kamera otomatis. Modal tetap dibuka agar operator bisa mengecek
+                panduan scan, memilih preferensi feedback, dan berlatih alur sebelum memakai Chrome/Edge modern
+                di HP atau PC/laptop yang mendukung `BarcodeDetector`.
               </div>
-              <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4">
-                <div className="rounded-full border border-white/20 bg-slate-950/65 px-4 py-2 text-center text-xs font-medium tracking-[0.08em] text-white">
-                  Posisikan barcode di dalam bingkai hijau agar kamera lebih cepat membaca
-                </div>
-              </div>
-            </div>
+            )}
 
             <div className="mt-4 grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -703,12 +723,23 @@ export function InventoryItemScanAssist({
               </div>
             </div>
 
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                Preferensi Feedback
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                {formatFeedbackPreferenceState(feedbackSoundEnabled, feedbackHapticEnabled)}
+              </span>
+            </div>
+
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
               {cameraBusy
                 ? 'Mengaktifkan kamera...'
                 : cameraReady
                   ? 'Kamera aktif. Arahkan barcode ke tengah frame sampai item terbaca otomatis.'
-                  : 'Menunggu izin kamera HP/webcam...'}
+                  : barcodeDetectorSupported
+                    ? 'Menunggu izin kamera HP/webcam...'
+                    : 'Browser belum mendukung scan kamera otomatis. Pakai modal ini untuk edukasi flow dan atur preferensi feedback.'}
             </div>
 
             <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">

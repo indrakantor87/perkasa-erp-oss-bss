@@ -456,6 +456,48 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
         ],
       },
       {
+        title: 'Pinjaman Inventory',
+        description: 'Sampel barang inventaris yang dipinjam dan wajib kembali ke gudang agar mode edukasi pinjaman bisa dicek langsung di preview mock.',
+        rows: [
+          {
+            id: 'LOAN-55',
+            primary: 'LOAN-202607-0055',
+            secondary: 'INV-202607-0001 | ONU ZTE F660',
+            status: 'ACTIVE',
+            detail: 'Pinjaman 1 item ONU untuk standby NOC lapangan dan masih menunggu pengembalian ke gudang.',
+            meta: [
+              'Peminjam: NOC Support Shift Malam',
+              'Divisi: NOC',
+              'Sub-divisi: Support',
+              'Qty Pinjam: 1',
+              'Qty Kembali: 0',
+              'Sisa Pinjam: 1',
+              'Dipinjam: 08 Jul 2026 20:10',
+              'Jatuh Tempo: 10 Jul 2026 08:00',
+              'Dikembalikan: -',
+            ],
+          },
+          {
+            id: 'LOAN-56',
+            primary: 'LOAN-202607-0056',
+            secondary: 'INV-202607-0002 | Kabel Dropcore 1C',
+            status: 'PARTIAL_RETURN',
+            detail: 'Pinjaman kabel untuk troubleshooting area barat dengan pengembalian sebagian setelah pekerjaan selesai.',
+            meta: [
+              'Peminjam: Teknisi Trouble 01',
+              'Divisi: Support',
+              'Sub-divisi: Troubleshoots',
+              'Qty Pinjam: 2',
+              'Qty Kembali: 1',
+              'Sisa Pinjam: 1',
+              'Dipinjam: 09 Jul 2026 09:30',
+              'Jatuh Tempo: 11 Jul 2026 17:00',
+              'Dikembalikan: 09 Jul 2026 16:40',
+            ],
+          },
+        ],
+      },
+      {
         title: 'ODP Terbaru',
         description: 'Sampel ODP terbaru untuk memulai pemetaan port dan assignment jaringan.',
         rows: [

@@ -68,7 +68,7 @@ export function InventoryStockMovementForm({
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
   const showScanPanel = Boolean(canCreate)
-  const scanInputDisabled = isDisabled || movementType !== 'OUT'
+  const scanInputDisabled = !canCreate || submitting || movementType !== 'OUT'
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -266,14 +266,17 @@ export function InventoryStockMovementForm({
             <div className="mt-2 text-sm text-mute">
               {movementType !== 'OUT'
                 ? 'Panel scan tetap ditampilkan sebagai mode edukasi. Scan akan aktif saat movement diubah ke OUT.'
-                : requireScan
-                  ? 'Scan barcode rak diwajibkan saat movement `OUT` sebelum data disimpan.'
-                  : 'Role ini tidak diwajibkan scan, tetapi barcode tetap bisa dipindai sebagai mode edukasi dan pembiasaan proses.'}
+                : !reviewDbReady
+                  ? 'Mode review database belum aktif, jadi scan tetap dibuka sebagai mode edukasi walau write action stock movement belum bisa disimpan.'
+                  : requireScan
+                    ? 'Scan barcode rak diwajibkan saat movement `OUT` sebelum data disimpan.'
+                    : 'Role ini tidak diwajibkan scan, tetapi barcode tetap bisa dipindai sebagai mode edukasi dan pembiasaan proses.'}
             </div>
-            {!requireScan ? (
+            {!reviewDbReady || !requireScan ? (
               <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                Supervisor atau admin tetap bisa mencoba flow scan yang sama dengan tim gudang saat movement
-                `OUT`, walaupun validasi barcode tidak diwajibkan oleh sistem.
+                {!reviewDbReady
+                  ? 'Flow ini tetap bisa dicoba untuk latihan kamera, scan barcode rak, dan cek feedback operator tanpa menulis movement baru ke mock.'
+                  : 'Supervisor atau admin tetap bisa mencoba flow scan yang sama dengan tim gudang saat movement `OUT`, walaupun validasi barcode tidak diwajibkan oleh sistem.'}
               </div>
             ) : null}
           </div>

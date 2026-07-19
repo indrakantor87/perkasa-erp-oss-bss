@@ -42,6 +42,7 @@ export function InventoryItemLoanForm({
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
   const showScanPanel = Boolean(canCreate)
+  const scanInputDisabled = !canCreate || submitting
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -139,21 +140,24 @@ export function InventoryItemLoanForm({
           <div className="lg:col-span-2">
             <InventoryItemScanAssist
               itemSuggestions={rackSuggestions}
-              disabled={isDisabled}
+              disabled={scanInputDisabled}
               guidancePreset="loan_handover"
               onResolved={(value) => {
                 setScanValue(value)
               }}
             />
             <div className="mt-2 text-sm text-mute">
-              {requireScan
-                ? 'Untuk role ini, scan barcode rak wajib sebelum barang dipinjamkan keluar dari GA.'
-                : 'Role ini tidak diwajibkan scan, tetapi panel tetap tersedia sebagai mode edukasi dan pembiasaan flow pinjaman.'}
+              {!reviewDbReady
+                ? 'Mode review database belum aktif, jadi panel scan dibuka sebagai mode edukasi agar flow pinjaman tetap bisa dicek tanpa menulis data.'
+                : requireScan
+                  ? 'Untuk role ini, scan barcode rak wajib sebelum barang dipinjamkan keluar dari GA.'
+                  : 'Role ini tidak diwajibkan scan, tetapi panel tetap tersedia sebagai mode edukasi dan pembiasaan flow pinjaman.'}
             </div>
-            {!requireScan ? (
+            {!reviewDbReady || !requireScan ? (
               <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                Supervisor atau admin tetap bisa mencontoh flow scan pinjaman yang sama dengan tim operasional,
-                meskipun validasi barcode tidak diwajibkan oleh sistem untuk role ini.
+                {!reviewDbReady
+                  ? 'Gunakan mode ini untuk mencoba kamera, tempel hasil scan, dan mengecek feedback bunyi/getar sebelum write action inventory diaktifkan.'
+                  : 'Supervisor atau admin tetap bisa mencontoh flow scan pinjaman yang sama dengan tim operasional, meskipun validasi barcode tidak diwajibkan oleh sistem untuk role ini.'}
               </div>
             ) : null}
           </div>
