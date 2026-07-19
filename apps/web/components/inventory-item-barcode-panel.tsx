@@ -4,9 +4,7 @@ import Link from 'next/link'
 import { InventoryItemCreateForm } from '@/components/inventory-item-create-form'
 import { InventoryRackLayoutPanel } from '@/components/inventory-rack-layout-panel'
 import type { DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
-import { useState } from 'react'
-import JsBarcode from 'jsbarcode'
-import QRCode from 'qrcode'
+import { useMemo, useState } from 'react'
 import { Download, Link2 } from 'lucide-react'
 import type { DomainReviewSection } from '@/lib/types'
 import { buildInventoryBarcodeDetailPath, buildInventoryItemRelativePath } from '@/lib/inventory-barcode-utils'
@@ -14,6 +12,53 @@ import { buildInventoryBarcodeDetailPath, buildInventoryItemRelativePath } from 
 type InventoryBarcodeFeedback = {
   tone: 'success' | 'error'
   message: string
+}
+
+type QRCodeModule = {
+  toCanvas: (
+    canvas: HTMLCanvasElement,
+    payload: string,
+    options?: {
+      width?: number
+      margin?: number
+      color?: {
+        dark?: string
+        light?: string
+      }
+    },
+  ) => Promise<void>
+}
+
+type JsBarcodeModule = (
+  element: HTMLCanvasElement,
+  payload: string,
+  options?: {
+    format?: string
+    displayValue?: boolean
+    height?: number
+    width?: number
+    margin?: number
+    background?: string
+    lineColor?: string
+    fontOptions?: string
+    fontSize?: number
+  },
+) => void
+
+let qrCodeModulePromise: Promise<QRCodeModule> | null = null
+let jsBarcodeModulePromise: Promise<JsBarcodeModule> | null = null
+
+function loadQrCodeModule() {
+  qrCodeModulePromise ??= import('qrcode').then((module) => module as unknown as QRCodeModule)
+  return qrCodeModulePromise
+}
+
+function loadJsBarcodeModule() {
+  jsBarcodeModulePromise ??= import('jsbarcode').then((module) => {
+    const resolved = module as unknown as { default?: JsBarcodeModule }
+    return resolved.default ?? (module as unknown as JsBarcodeModule)
+  })
+  return jsBarcodeModulePromise
 }
 
 function findSection(sections: DomainReviewSection[], keyword: string) {
@@ -174,6 +219,7 @@ async function downloadCanvasAsPng(canvas: HTMLCanvasElement, fileName: string) 
 }
 
 async function downloadQrCode(fileRef: string, payload: string) {
+  const QRCode = await loadQrCodeModule()
   const canvas = document.createElement('canvas')
   await QRCode.toCanvas(canvas, payload, {
     width: 280,
@@ -187,8 +233,9 @@ async function downloadQrCode(fileRef: string, payload: string) {
 }
 
 async function downloadCode128(fileRef: string, payload: string) {
+  const applyJsBarcode = await loadJsBarcodeModule()
   const canvas = document.createElement('canvas')
-  JsBarcode(canvas, payload, {
+  applyJsBarcode(canvas, payload, {
     format: 'CODE128',
     displayValue: true,
     height: 88,
@@ -227,40 +274,58 @@ export function InventoryItemBarcodePanel({
     return null
   }
 
-  const reconciliationRows = itemSection.rows.map((row) => {
-    const itemCode = row.primary
-    const requestRows = (requestSection?.rows ?? []).filter((item) => matchesItemComposite(item.secondary, itemCode))
-    const movementRows = (movementSection?.rows ?? []).filter((item) => matchesItemComposite(item.secondary, itemCode))
-    const assignmentRows = (assignmentSection?.rows ?? []).filter((item) => matchesItemComposite(item.primary, itemCode))
-    const returnRows = (returnSection?.rows ?? []).filter((item) => matchesItemComposite(item.primary, itemCode))
-    const lifecycleRows = lifecycleItems.filter(
-      (item) => getItemCodeFingerprint(item.itemCode) === getItemCodeFingerprint(itemCode),
-    )
+  const reconciliationRows = useMemo(
+    () =>
+      itemSection.rows.map((row) => {
+        const itemCode = row.primary
+        const requestRows = (requestSection?.rows ?? []).filter((item) => matchesItemComposite(item.secondary, itemCode))
+        const movementRows = (movementSection?.rows ?? []).filter((item) => matchesItemComposite(item.secondary, itemCode))
+        const assignmentRows = (assignmentSection?.rows ?? []).filter((item) => matchesItemComposite(item.primary, itemCode))
+        const returnRows = (returnSection?.rows ?? []).filter((item) => matchesItemComposite(item.primary, itemCode))
+        const lifecycleRows = lifecycleItems.filter(
+          (item) => getItemCodeFingerprint(item.itemCode) === getItemCodeFingerprint(itemCode),
+        )
 
-    return {
-      item: row,
-      requestRows,
-      movementRows,
-      assignmentRows,
-      returnRows,
-      lifecycleRows,
-    }
-  })
-  const itemsWithSignals = reconciliationRows.filter(
-    (item) =>
-      item.requestRows.length ||
-      item.movementRows.length ||
-      item.assignmentRows.length ||
-      item.returnRows.length ||
-      item.lifecycleRows.length,
+        return {
+          item: row,
+          requestRows,
+          movementRows,
+          assignmentRows,
+          returnRows,
+          lifecycleRows,
+        }
+      }),
+    [assignmentSection, itemSection.rows, lifecycleItems, movementSection, requestSection, returnSection],
   )
-  const itemsWithAssignment = reconciliationRows.filter((item) => item.assignmentRows.length).length
-  const itemsWithReturn = reconciliationRows.filter((item) => item.returnRows.length).length
-  const itemsWithRequest = reconciliationRows.filter((item) => item.requestRows.length).length
-  const itemsWithLifecycle = reconciliationRows.filter((item) => item.lifecycleRows.length).length
-  const itemsWithHandoverProof = reconciliationRows.filter((item) =>
-    item.lifecycleRows.some((row) => Boolean(String(row.handoverProofRef ?? '').trim())),
-  ).length
+  const itemsWithSignals = useMemo(
+    () =>
+      reconciliationRows.filter(
+        (item) =>
+          item.requestRows.length ||
+          item.movementRows.length ||
+          item.assignmentRows.length ||
+          item.returnRows.length ||
+          item.lifecycleRows.length,
+      ),
+    [reconciliationRows],
+  )
+  const itemsWithAssignment = useMemo(
+    () => reconciliationRows.filter((item) => item.assignmentRows.length).length,
+    [reconciliationRows],
+  )
+  const itemsWithReturn = useMemo(() => reconciliationRows.filter((item) => item.returnRows.length).length, [reconciliationRows])
+  const itemsWithRequest = useMemo(() => reconciliationRows.filter((item) => item.requestRows.length).length, [reconciliationRows])
+  const itemsWithLifecycle = useMemo(
+    () => reconciliationRows.filter((item) => item.lifecycleRows.length).length,
+    [reconciliationRows],
+  )
+  const itemsWithHandoverProof = useMemo(
+    () =>
+      reconciliationRows.filter((item) =>
+        item.lifecycleRows.some((row) => Boolean(String(row.handoverProofRef ?? '').trim())),
+      ).length,
+    [reconciliationRows],
+  )
 
   return (
     <section className="panel p-6">

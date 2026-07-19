@@ -1,10 +1,17 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useState } from 'react'
 import type { WorklistItem } from '@/lib/types'
-import { WorklistQuickActionModal } from '@/components/worklist/worklist-quick-action-modal'
 import { buildWorklistQueryHref, type WorklistQueryState } from '@/components/worklist/worklist-query'
+
+const WorklistQuickActionModal = dynamic(
+  () => import('@/components/worklist/worklist-quick-action-modal').then((module) => module.WorklistQuickActionModal),
+  {
+    ssr: false,
+  },
+)
 
 type WorklistTableProps = {
   items: WorklistItem[]

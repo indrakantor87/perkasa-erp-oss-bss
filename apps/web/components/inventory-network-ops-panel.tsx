@@ -7,7 +7,7 @@ import { InventoryDeviceReturnForm } from '@/components/inventory-device-return-
 import { InventoryOdpCreateForm } from '@/components/inventory-odp-create-form'
 import { InventoryOdpPortAssignForm } from '@/components/inventory-odp-port-assign-form'
 import { InventoryOdpPortStatusForm } from '@/components/inventory-odp-port-status-form'
-import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
+import type { TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { buildInventoryBarcodeDetailPath, extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Map, Pencil, Plus, Upload } from 'lucide-react'
@@ -28,6 +28,13 @@ const InventoryOdpLeafletMap = dynamic(
 
 const InventoryOdpImportExcelModal = dynamic(
   () => import('@/components/inventory-odp-import-excel-modal').then((module) => module.InventoryOdpImportExcelModal),
+  {
+    ssr: false,
+  },
+)
+
+const TableQuickActionModal = dynamic(
+  () => import('@/components/table-quick-action-modal').then((module) => module.TableQuickActionModal),
   {
     ssr: false,
   },
@@ -333,8 +340,9 @@ export function InventoryNetworkOpsPanel({
     return null
   }
 
-  const accessoryAssignments = (assignmentSection?.rows ?? []).filter((row) =>
-    isAccessoryCategory(pickMeta(row.meta, 'Category: ')),
+  const accessoryAssignments = useMemo(
+    () => (assignmentSection?.rows ?? []).filter((row) => isAccessoryCategory(pickMeta(row.meta, 'Category: '))),
+    [assignmentSection],
   )
   const odpRows = odpSection?.rows ?? []
   const usedPortRows = usedPortSection?.rows ?? []
@@ -355,18 +363,22 @@ export function InventoryNetworkOpsPanel({
   const [mapFitMode, setMapFitMode] = useState<'markers' | 'route'>('markers')
   const canWrite = canCreate && reviewDbReady
 
-  const normalizedSearch = searchQuery.trim().toLowerCase()
-  const filteredOdpRows = odpRows.filter((row) => {
-    if (!normalizedSearch) return true
-    const latitude = pickMeta(row.meta, 'Latitude: ')
-    const longitude = pickMeta(row.meta, 'Longitude: ')
-    return [row.primary, row.secondary, row.detail, latitude, longitude].some((value) =>
-      String(value ?? '')
-        .toLowerCase()
-        .includes(normalizedSearch),
-    )
-  })
-  const visibleOdpRows = filteredOdpRows.slice(0, pageSize)
+  const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
+  const filteredOdpRows = useMemo(
+    () =>
+      odpRows.filter((row) => {
+        if (!normalizedSearch) return true
+        const latitude = pickMeta(row.meta, 'Latitude: ')
+        const longitude = pickMeta(row.meta, 'Longitude: ')
+        return [row.primary, row.secondary, row.detail, latitude, longitude].some((value) =>
+          String(value ?? '')
+            .toLowerCase()
+            .includes(normalizedSearch),
+        )
+      }),
+    [normalizedSearch, odpRows],
+  )
+  const visibleOdpRows = useMemo(() => filteredOdpRows.slice(0, pageSize), [filteredOdpRows, pageSize])
   const routeDistanceMeters = useMemo(() => buildRouteDistanceMeters(routePoints), [routePoints])
   const totalPorts = useMemo(
     () =>

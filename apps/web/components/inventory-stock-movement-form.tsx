@@ -1,11 +1,23 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LookupIdPicker } from '@/components/lookup-id-picker'
 import { TechnicianUserPicker } from '@/components/technician-user-picker'
-import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
+
+const InventoryItemScanAssist = dynamic(
+  () => import('@/components/inventory-item-scan-assist').then((module) => module.InventoryItemScanAssist),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        Memuat panel scan barcode...
+      </div>
+    ),
+  },
+)
 
 type InventoryStockMovementFormProps = {
   canCreate: boolean

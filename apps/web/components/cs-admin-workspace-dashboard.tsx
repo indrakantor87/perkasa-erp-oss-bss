@@ -1,15 +1,22 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useState } from 'react'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { WorklistDetailPanel } from '@/components/worklist/worklist-detail-panel'
-import { WorklistQuickActionModal } from '@/components/worklist/worklist-quick-action-modal'
 import { getRoleMeta } from '@/lib/role-meta'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
 import type { DashboardOperationalCard } from '@/lib/types'
 import type { WorklistBucketData } from '@/lib/services/worklist-service'
 import type { AppRole, DataSourceSnapshot, WorklistItem } from '@/lib/types'
+
+const WorklistQuickActionModal = dynamic(
+  () => import('@/components/worklist/worklist-quick-action-modal').then((module) => module.WorklistQuickActionModal),
+  {
+    ssr: false,
+  },
+)
 
 type CsAdminWorkspaceDashboardProps = {
   role: AppRole

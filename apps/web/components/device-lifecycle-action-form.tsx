@@ -1,14 +1,26 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import type { FormEvent } from 'react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { InventoryItemScanAssist } from '@/components/inventory-item-scan-assist'
 import { extractInventoryItemCodeFromScan, findInventorySuggestionByCode } from '@/lib/inventory-barcode-utils'
 import type {
   DeviceLifecycleHandoverProofType,
   DeviceLifecycleStatus,
 } from '@/lib/services/device-lifecycle-service'
+
+const InventoryItemScanAssist = dynamic(
+  () => import('@/components/inventory-item-scan-assist').then((module) => module.InventoryItemScanAssist),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        Memuat panel scan barcode...
+      </div>
+    ),
+  },
+)
 
 type DeviceLifecycleActionFormProps = {
   canCreate: boolean
