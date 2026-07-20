@@ -24,12 +24,14 @@ function getPortCapacityTone(params: { totalPorts: number; activePorts: number }
   return '#10b981'
 }
 
-function buildOdpMarkerIcon(tone: string) {
+function buildOdpMarkerIcon(tone: string, selected = false) {
+  const size = selected ? 18 : 14
+  const border = selected ? '3px solid rgba(255,255,255,0.95)' : '2px solid rgba(15,23,42,0.9)'
   return L.divIcon({
     className: '',
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-    html: `<span style="display:block;width:14px;height:14px;border-radius:9999px;background:${tone};border:2px solid rgba(15,23,42,0.9);box-shadow:0 0 0 2px rgba(255,255,255,0.08)"></span>`,
+    iconSize: [size + 4, size + 4],
+    iconAnchor: [(size + 4) / 2, (size + 4) / 2],
+    html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:9999px;background:${tone};border:${border};box-shadow:0 0 0 2px rgba(15,23,42,0.28)"></span>`,
   })
 }
 
@@ -47,6 +49,20 @@ function buildRoutePointIcon(index: number) {
   })
 }
 
+function buildProspectMarkerIcon() {
+  return L.divIcon({
+    className: '',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    html: `<span style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:9999px;background:rgba(225,29,72,0.96);border:3px solid rgba(255,255,255,0.96);color:#ffffff;font-weight:700;font-size:11px;box-shadow:0 8px 22px rgba(2,6,23,0.35)">P</span>`,
+  })
+}
+
+function normalizePoint(point?: { lat: number; lng: number; label?: string } | null) {
+  if (!point) return null
+  return Number.isFinite(point.lat) && Number.isFinite(point.lng) ? point : null
+}
+
 export function InventoryOdpLeafletMap({
   rows,
   height = 420,
@@ -56,6 +72,9 @@ export function InventoryOdpLeafletMap({
   routeMode = false,
   routePoints,
   fitMode = 'markers',
+  selectedRowId,
+  prospectPoint,
+  focusPoints,
 }: {
   rows: DomainReviewRow[]
   height?: number
@@ -64,7 +83,10 @@ export function InventoryOdpLeafletMap({
   mapKey?: string
   routeMode?: boolean
   routePoints?: Array<{ lat: number; lng: number }>
-  fitMode?: 'markers' | 'route'
+  fitMode?: 'markers' | 'route' | 'selection'
+  selectedRowId?: string | null
+  prospectPoint?: { lat: number; lng: number; label?: string } | null
+  focusPoints?: Array<{ lat: number; lng: number; label?: string }>
 }) {
   const mapId = useId()
   const mapRef = useRef<L.Map | null>(null)
@@ -103,6 +125,12 @@ export function InventoryOdpLeafletMap({
   }, [rows])
 
   const safeRoutePoints = useMemo(() => normalizeRoutePoints(routePoints), [routePoints])
+  const safeProspectPoint = useMemo(() => normalizePoint(prospectPoint), [prospectPoint])
+  const safeFocusPoints = useMemo(() => normalizeRoutePoints(focusPoints), [focusPoints])
+  const selectedMarkerItem = useMemo(
+    () => markerItems.find((item) => item.row.id === selectedRowId) ?? null,
+    [markerItems, selectedRowId],
+  )
 
   useEffect(() => {
     const element = document.getElementById(mapId)
@@ -138,7 +166,7 @@ export function InventoryOdpLeafletMap({
     const markerBounds = L.latLngBounds([])
     markerItems.forEach((item) => {
       const marker = L.marker([item.latitude, item.longitude], {
-        icon: buildOdpMarkerIcon(item.tone),
+        icon: buildOdpMarkerIcon(item.tone, item.row.id === selectedRowId),
         riseOnHover: true,
       })
       const popupContent = `
@@ -151,8 +179,8 @@ export function InventoryOdpLeafletMap({
       `
       marker.bindPopup(popupContent, { closeButton: true, autoPan: true })
       marker.on('click', () => {
+        onSelectRow?.(item.row)
         if (!routeMode) {
-          onSelectRow?.(item.row)
           return
         }
         onPickRoutePoint?.({ row: item.row, lat: item.latitude, lng: item.longitude })
@@ -181,8 +209,56 @@ export function InventoryOdpLeafletMap({
       })
     }
 
+    let selectionBounds: L.LatLngBounds | null = null
+    if (fitMode === 'selection') {
+      selectionBounds = L.latLngBounds([])
+      safeFocusPoints.forEach((point) => {
+        selectionBounds?.extend([point.lat, point.lng])
+      })
+    }
+
+    if (routeLayer && safeProspectPoint) {
+      const prospectMarker = L.marker([safeProspectPoint.lat, safeProspectPoint.lng], {
+        icon: buildProspectMarkerIcon(),
+        riseOnHover: true,
+      })
+      prospectMarker.bindPopup(
+        `
+          <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.4;">
+            <div style="font-weight: 700; margin-bottom: 4px;">${safeProspectPoint.label || 'Lokasi Prospek'}</div>
+            <div style="opacity: 0.85;">${safeProspectPoint.lat.toFixed(6)}, ${safeProspectPoint.lng.toFixed(6)}</div>
+          </div>
+        `,
+        { closeButton: true, autoPan: true },
+      )
+      prospectMarker.addTo(routeLayer)
+
+      if (selectedMarkerItem) {
+        L.polyline(
+          [
+            [selectedMarkerItem.latitude, selectedMarkerItem.longitude],
+            [safeProspectPoint.lat, safeProspectPoint.lng],
+          ],
+          {
+            color: '#f43f5e',
+            weight: 3,
+            opacity: 0.95,
+            dashArray: '8 8',
+          },
+        ).addTo(routeLayer)
+      }
+    }
+
     if (fitMode === 'route' && routeBounds && safeRoutePoints.length >= 2) {
       map.fitBounds(routeBounds.pad(0.2))
+    } else if (fitMode === 'selection' && selectionBounds?.isValid()) {
+      const pointsCount = safeFocusPoints.length
+      if (pointsCount === 1) {
+        const point = safeFocusPoints[0]
+        map.setView([point.lat, point.lng], 18)
+      } else {
+        map.fitBounds(selectionBounds.pad(0.2))
+      }
     } else if (markerItems.length && markerBounds.isValid()) {
       map.fitBounds(markerBounds.pad(0.2))
     } else {
@@ -190,7 +266,7 @@ export function InventoryOdpLeafletMap({
     }
 
     map.invalidateSize()
-  }, [mapId, markerItems, onSelectRow, mapKey, routeMode, safeRoutePoints, fitMode])
+  }, [mapId, markerItems, onSelectRow, mapKey, routeMode, safeRoutePoints, fitMode, selectedRowId, safeProspectPoint, safeFocusPoints, onPickRoutePoint, selectedMarkerItem])
 
   useEffect(() => {
     return () => {

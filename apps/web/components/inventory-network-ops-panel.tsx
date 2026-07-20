@@ -200,6 +200,90 @@ function formatDistanceMetersWithUnit(value: number, unit: 'auto' | 'm' | 'km') 
   return formatDistanceMeters(value)
 }
 
+function parseCoordinatePair(value: string) {
+  const match = value.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/)
+  if (!match) return null
+  const lat = Number(match[1])
+  const lng = Number(match[2])
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
+  return { lat, lng }
+}
+
+function parseGoogleMapsLocation(rawValue: string) {
+  const value = rawValue.trim()
+  if (!value) return null
+
+  const directPair = parseCoordinatePair(value)
+  if (directPair) {
+    return {
+      ...directPair,
+      label: 'Lokasi Prospek',
+      sourceLabel: 'Koordinat manual',
+    }
+  }
+
+  const atMatch = value.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
+  if (atMatch) {
+    return {
+      lat: Number(atMatch[1]),
+      lng: Number(atMatch[2]),
+      label: 'Lokasi Prospek',
+      sourceLabel: 'Link Google Maps',
+    }
+  }
+
+  const embedMatch = value.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/)
+  if (embedMatch) {
+    return {
+      lat: Number(embedMatch[1]),
+      lng: Number(embedMatch[2]),
+      label: 'Lokasi Prospek',
+      sourceLabel: 'Link Google Maps',
+    }
+  }
+
+  try {
+    const normalizedUrl = value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`
+    const url = new URL(normalizedUrl)
+    const candidates = [
+      url.searchParams.get('q'),
+      url.searchParams.get('query'),
+      url.searchParams.get('ll'),
+      url.searchParams.get('destination'),
+    ]
+      .map((item) => String(item ?? '').trim())
+      .filter(Boolean)
+
+    for (const candidate of candidates) {
+      const pair = parseCoordinatePair(candidate)
+      if (pair) {
+        return {
+          ...pair,
+          label: 'Lokasi Prospek',
+          sourceLabel: 'Link Google Maps',
+        }
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+function extractOdpPoint(row: DomainReviewRow | null | undefined) {
+  if (!row) return null
+  const lat = Number(pickMeta(row.meta, 'Latitude: '))
+  const lng = Number(pickMeta(row.meta, 'Longitude: '))
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  return {
+    lat,
+    lng,
+    label: row.primary,
+  }
+}
+
 function exportOdpCsv(rows: DomainReviewRow[]) {
   const headers = ['#', 'Nama ODP', 'POP', 'Lokasi', 'Kapasitas', 'Terpakai', 'Sisa', 'Status', 'Status Tiang']
   const lines = [headers.map(buildCsvCell).join(',')]
@@ -361,6 +445,10 @@ export function InventoryNetworkOpsPanel({
   const [routePoints, setRoutePoints] = useState<Array<{ lat: number; lng: number; label: string }>>([])
   const [routeDistanceUnit, setRouteDistanceUnit] = useState<'auto' | 'm' | 'km'>('auto')
   const [mapFitMode, setMapFitMode] = useState<'markers' | 'route'>('markers')
+  const [selectedOdpId, setSelectedOdpId] = useState<string | null>(null)
+  const [prospectQuery, setProspectQuery] = useState('')
+  const [prospectPoint, setProspectPoint] = useState<{ lat: number; lng: number; label: string; sourceLabel: string } | null>(null)
+  const [prospectMessage, setProspectMessage] = useState<string>('')
   const canWrite = canCreate && reviewDbReady
 
   const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
@@ -380,6 +468,71 @@ export function InventoryNetworkOpsPanel({
   )
   const visibleOdpRows = useMemo(() => filteredOdpRows.slice(0, pageSize), [filteredOdpRows, pageSize])
   const routeDistanceMeters = useMemo(() => buildRouteDistanceMeters(routePoints), [routePoints])
+  const allOdpPoints = useMemo(
+    () =>
+      odpRows
+        .map((row) => {
+          const point = extractOdpPoint(row)
+          if (!point) return null
+          const totalPorts = Number.parseInt(pickMeta(row.meta, 'Total Ports: ') || '0', 10) || 0
+          const activePorts = Number.parseInt(pickMeta(row.meta, 'Active Ports: ') || '0', 10) || 0
+          return {
+            row,
+            point,
+            totalPorts,
+            activePorts,
+            remainingPorts: Math.max(0, totalPorts - activePorts),
+          }
+        })
+        .filter(Boolean) as Array<{
+        row: DomainReviewRow
+        point: { lat: number; lng: number; label: string }
+        totalPorts: number
+        activePorts: number
+        remainingPorts: number
+      }>,
+    [odpRows],
+  )
+  const selectedOdpData = useMemo(
+    () => allOdpPoints.find((item) => item.row.id === selectedOdpId) ?? allOdpPoints[0] ?? null,
+    [allOdpPoints, selectedOdpId],
+  )
+  const selectedOdpPoint = selectedOdpData?.point ?? null
+  const nearestProspectOdp = useMemo(() => {
+    if (!prospectPoint || !allOdpPoints.length) return null
+    return allOdpPoints.reduce<{
+      row: DomainReviewRow
+      point: { lat: number; lng: number; label: string }
+      totalPorts: number
+      activePorts: number
+      remainingPorts: number
+      distanceMeters: number
+    } | null>((closest, item) => {
+      const distanceMeters = buildRouteDistanceMeters([
+        { lat: prospectPoint.lat, lng: prospectPoint.lng },
+        { lat: item.point.lat, lng: item.point.lng },
+      ])
+      if (!closest || distanceMeters < closest.distanceMeters) {
+        return { ...item, distanceMeters }
+      }
+      return closest
+    }, null)
+  }, [allOdpPoints, prospectPoint])
+  const selectedToProspectDistanceMeters = useMemo(() => {
+    if (!prospectPoint || !selectedOdpPoint) return 0
+    return buildRouteDistanceMeters([
+      { lat: selectedOdpPoint.lat, lng: selectedOdpPoint.lng },
+      { lat: prospectPoint.lat, lng: prospectPoint.lng },
+    ])
+  }, [prospectPoint, selectedOdpPoint])
+  const mapSelectionPoints = useMemo(
+    () =>
+      [
+        ...(selectedOdpPoint ? [selectedOdpPoint] : []),
+        ...(prospectPoint ? [prospectPoint] : []),
+      ].filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng)),
+    [prospectPoint, selectedOdpPoint],
+  )
   const totalPorts = useMemo(
     () =>
       odpRows.reduce((total, row) => total + (Number.parseInt(pickMeta(row.meta, 'Total Ports: ') || '0', 10) || 0), 0),
@@ -460,6 +613,36 @@ export function InventoryNetworkOpsPanel({
     setMapFitKey((current) => current + 1)
   }, [routeMode, routePoints.length])
 
+  useEffect(() => {
+    if (!filteredOdpRows.length) {
+      setSelectedOdpId(null)
+      return
+    }
+    if (!selectedOdpId || !filteredOdpRows.some((row) => row.id === selectedOdpId)) {
+      setSelectedOdpId(filteredOdpRows[0]?.id ?? null)
+    }
+  }, [filteredOdpRows, selectedOdpId])
+
+  useEffect(() => {
+    if (!prospectPoint || selectedOdpPoint) return
+    if (!nearestProspectOdp) return
+    setSelectedOdpId(nearestProspectOdp.row.id)
+  }, [nearestProspectOdp, prospectPoint, selectedOdpPoint])
+
+  function applyProspectLocation(rawValue: string) {
+    const parsed = parseGoogleMapsLocation(rawValue)
+    if (!parsed) {
+      setProspectMessage('Link Google Maps atau koordinat belum valid. Gunakan format `lat,lng` atau link lokasi Google Maps.')
+      return
+    }
+
+    setProspectPoint(parsed)
+    setProspectQuery(rawValue.trim())
+    setProspectMessage(`${parsed.sourceLabel} terbaca. Peta diarahkan ke lokasi prospek.`)
+    setShowMap(true)
+    setMapFitKey((current) => current + 1)
+  }
+
   return (
     <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -525,7 +708,7 @@ export function InventoryNetworkOpsPanel({
       </div>
 
       <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
-        Fokus ke data PORT ODP untuk kebutuhan operasional CS & Admin CS sesuai struktur menu terbaru.
+        Fokus ke data PORT ODP untuk kebutuhan operasional sales, CS, dan Admin CS: baca detail ODP, lihat marker di peta, lalu ukur jarak prospek ke titik ODP terdekat.
       </div>
 
       <div className="mt-4 grid gap-3 xl:grid-cols-4">
@@ -709,32 +892,160 @@ export function InventoryNetworkOpsPanel({
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={String(pageSize)}
-            onChange={(event) => setPageSize(Number.parseInt(event.target.value, 10))}
-            className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none"
-          >
-            <option value="10">Tampil 10</option>
-            <option value="25">Tampil 25</option>
-            <option value="50">Tampil 50</option>
-          </select>
-          <select className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none">
-            <option>Semua POP</option>
-          </select>
-          <select className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none">
-            <option>CS & Admin CS</option>
-          </select>
-        </div>
-        <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-slate-100">
-          <input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Cari ODP / lokasi... (paste link maps)"
-            className="w-[340px] bg-transparent text-sm text-white outline-none placeholder:text-slate-400"
-          />
-        </div>
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+        <article className="rounded-2xl border border-slate-700 bg-slate-900/25 p-4 text-slate-100">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={String(pageSize)}
+                onChange={(event) => setPageSize(Number.parseInt(event.target.value, 10))}
+                className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none"
+              >
+                <option value="10">Tampil 10</option>
+                <option value="25">Tampil 25</option>
+                <option value="50">Tampil 50</option>
+              </select>
+              <select className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none">
+                <option>Semua POP</option>
+              </select>
+              <select className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none">
+                <option>CS & Admin CS</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-slate-100">
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Cari kode ODP, POP, lokasi, atau koordinat ODP"
+                className="w-full min-w-[260px] bg-transparent text-sm text-white outline-none placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-950/25 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Detail ODP Terpilih</p>
+                <h4 className="mt-2 text-lg font-semibold text-white">
+                  {selectedOdpData?.row.primary || 'Pilih ODP dari tabel atau marker'}
+                </h4>
+                <p className="mt-1 text-sm text-slate-300">
+                  {selectedOdpData?.row.secondary || 'Belum ada ODP yang aktif dipilih untuk dibaca detailnya.'}
+                </p>
+              </div>
+              {selectedOdpData ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMap(true)
+                    setMapFitKey((current) => current + 1)
+                  }}
+                  className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                >
+                  Fokus ke Peta
+                </button>
+              ) : null}
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-slate-700 bg-slate-900/30 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Lokasi</p>
+                <p className="mt-2 text-sm leading-6 text-white">{selectedOdpData?.row.detail || '-'}</p>
+              </div>
+              <div className="rounded-xl border border-slate-700 bg-slate-900/30 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Koordinat</p>
+                <p className="mt-2 text-sm leading-6 text-white">
+                  {selectedOdpPoint ? `${selectedOdpPoint.lat.toFixed(6)}, ${selectedOdpPoint.lng.toFixed(6)}` : '-'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-700 bg-slate-900/30 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Port</p>
+                <p className="mt-2 text-sm leading-6 text-white">
+                  Total {selectedOdpData?.totalPorts ?? '-'} · Terpakai {selectedOdpData?.activePorts ?? '-'} · Sisa {selectedOdpData?.remainingPorts ?? '-'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-700 bg-slate-900/30 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Jarak ke Prospek</p>
+                <p className="mt-2 text-sm leading-6 text-white">
+                  {prospectPoint && selectedOdpData ? formatDistanceMeters(selectedToProspectDistanceMeters) : 'Belum ada lokasi prospek'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article className="rounded-2xl border border-slate-700 bg-slate-900/25 p-4 text-slate-100">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Lokasi Prospek</p>
+          <h4 className="mt-2 text-lg font-semibold text-white">Paste link Google Maps atau koordinat rumah calon pelanggan</h4>
+          <p className="mt-2 text-sm leading-6 text-slate-200">
+            Sistem akan membaca titik prospek, menaruh marker di peta, lalu menghitung jarak ke ODP terpilih dan ODP terdekat.
+          </p>
+
+          <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-950/25 p-3">
+            <div className="flex flex-col gap-3">
+              <input
+                value={prospectQuery}
+                onChange={(event) => setProspectQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return
+                  event.preventDefault()
+                  applyProspectLocation(prospectQuery)
+                }}
+                onPaste={(event) => {
+                  const pastedValue = event.clipboardData.getData('text')
+                  if (!pastedValue) return
+                  setTimeout(() => applyProspectLocation(pastedValue), 0)
+                }}
+                placeholder="Paste link Google Maps atau tulis koordinat: -6.676640, 111.0879242"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-3 text-sm text-white outline-none placeholder:text-slate-400"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => applyProspectLocation(prospectQuery)}
+                  className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-950"
+                >
+                  Gunakan Lokasi Prospek
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProspectPoint(null)
+                    setProspectQuery('')
+                    setProspectMessage('')
+                    setMapFitKey((current) => current + 1)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                >
+                  Reset Lokasi
+                </button>
+              </div>
+            </div>
+            {prospectMessage ? (
+              <p className="mt-3 text-sm text-slate-200">{prospectMessage}</p>
+            ) : (
+              <p className="mt-3 text-xs text-slate-400">Bisa dari link `maps.google.com`, `google.com/maps`, atau koordinat manual `lat,lng`.</p>
+            )}
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-700 bg-slate-900/30 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Titik Prospek</p>
+              <p className="mt-2 text-sm leading-6 text-white">
+                {prospectPoint ? `${prospectPoint.lat.toFixed(6)}, ${prospectPoint.lng.toFixed(6)}` : 'Belum ada titik prospek'}
+              </p>
+              <p className="mt-2 text-xs text-slate-400">{prospectPoint?.sourceLabel || 'Paste link Google Maps untuk auto-zoom ke lokasi prospek.'}</p>
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-900/30 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">ODP Terdekat</p>
+              <p className="mt-2 text-sm font-semibold text-white">{nearestProspectOdp?.row.primary || '-'}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-300">{nearestProspectOdp?.row.detail || 'Belum ada pembacaan karena titik prospek belum diisi.'}</p>
+              <p className="mt-2 text-sm text-white">
+                {nearestProspectOdp ? `Jarak ${formatDistanceMeters(nearestProspectOdp.distanceMeters)} · Sisa port ${nearestProspectOdp.remainingPorts}` : '-'}
+              </p>
+            </div>
+          </div>
+        </article>
       </div>
 
       {showMap ? (
@@ -828,7 +1139,7 @@ export function InventoryNetworkOpsPanel({
                     : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
                 }
               >
-                Fit: {mapFitMode === 'route' ? 'Rute' : 'Marker'}
+                Fit: {routePoints.length >= 2 && mapFitMode === 'route' ? 'Rute' : prospectPoint ? 'Prospek' : 'Marker'}
               </button>
               <button
                 type="button"
@@ -874,7 +1185,7 @@ export function InventoryNetworkOpsPanel({
                 Marker: {filteredOdpRows.length}
               </span>
               <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
-                Fit: {mapFitMode === 'route' ? 'Rute' : 'Marker'}
+                Fit: {routePoints.length >= 2 && mapFitMode === 'route' ? 'Rute' : prospectPoint ? 'Prospek' : 'Marker'}
               </span>
             </div>
             <InventoryOdpLeafletMap
@@ -883,8 +1194,14 @@ export function InventoryNetworkOpsPanel({
               mapKey={`${mapRefreshKey}:${mapFitKey}`}
               routeMode={routeMode}
               routePoints={routePoints}
-              fitMode={mapFitMode}
-              onSelectRow={(row) => setQuickActionItem(buildInventoryQuickActionPayload(row))}
+              fitMode={routePoints.length >= 2 && mapFitMode === 'route' ? 'route' : mapSelectionPoints.length ? 'selection' : 'markers'}
+              selectedRowId={selectedOdpData?.row.id ?? null}
+              prospectPoint={prospectPoint}
+              focusPoints={mapSelectionPoints}
+              onSelectRow={(row) => {
+                setSelectedOdpId(row.id)
+                setShowMap(true)
+              }}
               onPickRoutePoint={({ row, lat, lng }) => {
                 if (!routeMode) return
                 setRoutePoints((current) => [...current, { lat, lng, label: row.primary }].slice(0, 24))
@@ -955,12 +1272,28 @@ export function InventoryNetworkOpsPanel({
                 const remaining = Math.max(0, totalPorts - activePorts)
                 const mapHref = buildOdpMapHref(row)
                 const statusTone = getPortCapacityTone({ totalPorts, activePorts })
+                const isSelected = selectedOdpData?.row.id === row.id
 
                 return (
-                  <tr key={row.id} className="align-top transition-colors hover:bg-[#24395c]">
+                  <tr
+                    key={row.id}
+                    className={isSelected ? 'align-top bg-[#24395c] transition-colors' : 'align-top transition-colors hover:bg-[#24395c]'}
+                  >
                     <td className="px-3 py-2 text-sm text-slate-100"></td>
                     <td className="px-3 py-2 text-sm text-slate-100">{index + 1}</td>
-                    <td className="px-3 py-2 text-sm font-semibold text-white">{row.primary}</td>
+                    <td className="px-3 py-2 text-sm font-semibold text-white">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedOdpId(row.id)
+                          setShowMap(true)
+                          setMapFitKey((current) => current + 1)
+                        }}
+                        className="text-left text-white transition hover:text-sky-200"
+                      >
+                        {row.primary}
+                      </button>
+                    </td>
                     <td className="px-3 py-2 text-sm text-slate-100">{row.secondary}</td>
                     <td className="px-3 py-2 text-sm text-slate-100">
                       <p className="line-clamp-2">{row.detail}</p>
@@ -975,7 +1308,21 @@ export function InventoryNetworkOpsPanel({
                     <td className="px-3 py-2 text-sm">
                       <button
                         type="button"
-                        onClick={() => setQuickActionItem(buildInventoryQuickActionPayload(row))}
+                        onClick={() => {
+                          setSelectedOdpId(row.id)
+                          setShowMap(true)
+                          setMapFitKey((current) => current + 1)
+                        }}
+                        className="mr-2 inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                      >
+                        Detail
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedOdpId(row.id)
+                          setQuickActionItem(buildInventoryQuickActionPayload(row))
+                        }}
                         className="inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 p-2 text-white transition hover:bg-slate-700"
                       >
                         <Pencil className="h-4 w-4" />
