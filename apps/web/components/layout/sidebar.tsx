@@ -128,7 +128,11 @@ function buildSalesMainItem(role: AppRole | null) {
   return buildSidebarNavItem('/sales', {
     key: 'sales-main',
     title: 'Penjualan',
-    description: 'Lead, survey, order, dan aktivasi komersial',
+    href: role === 'PENJUALAN' ? '/sales/input-psb' : undefined,
+    description:
+      role === 'PENJUALAN'
+        ? 'Input prospek lapangan ke List PSB sampai siap diproses CS'
+        : 'Input PSB, monitoring komersial, dan progres aktivasi',
     excludeFocusPrefix: 'DIGITAL_',
     children: buildSalesSubmenuItems(role),
   })
@@ -139,6 +143,25 @@ function buildSalesSubmenuItems(role: AppRole | null) {
     return []
   }
 
+  if (role === 'PENJUALAN') {
+    return [
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-input-psb',
+        title: 'Input PSB',
+        description: 'Form input prospek lapangan yang langsung masuk ke List PSB.',
+        href: '/sales/input-psb',
+        matchPrefixes: ['/sales/input-psb'],
+      }),
+      buildSidebarNavItem('/list-psb', {
+        key: 'sales-sub-list-psb',
+        title: 'List PSB',
+        description: 'Antrean PSB yang dipilih CS, dijadwalkan, dan diteruskan ke ticketing.',
+        href: '/list-psb',
+        matchPrefixes: ['/list-psb'],
+      }),
+    ]
+  }
+
   const items: SidebarNavItem[] = []
 
   if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING'].includes(role)) {
@@ -146,8 +169,8 @@ function buildSalesSubmenuItems(role: AppRole | null) {
       buildSidebarNavItem('/sales', {
         key: 'sales-sub-input-psb',
         title: 'Input PSB',
-        description: 'Buka panel input PSB baru untuk lead, coverage, survey, dan order awal.',
-        href: '/sales/input-psb#sales-action-lead-create',
+        description: 'Form input prospek lapangan yang langsung masuk ke List PSB.',
+        href: '/sales/input-psb',
         matchPrefixes: ['/sales/input-psb'],
       }),
     )
@@ -157,7 +180,7 @@ function buildSalesSubmenuItems(role: AppRole | null) {
     buildSidebarNavItem('/sales', {
       key: 'sales-sub-workspace',
       title: 'Workspace Sales',
-      description: 'Ringkasan lead, survey, order, dan progres aktivasi.',
+      description: 'Ringkasan input PSB, antrean PSB, dan shortcut monitoring komersial.',
       href: '/sales',
       matchPrefixes: ['/sales'],
       excludePrefixes: [

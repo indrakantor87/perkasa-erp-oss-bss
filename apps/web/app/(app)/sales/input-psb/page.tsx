@@ -1,8 +1,9 @@
 import { notFound, redirect } from 'next/navigation'
-import { SalesDomainWorkspace } from '@/components/sales-domain-workspace'
+import { SalesPsbInputForm } from '@/components/sales-psb-input-form'
+import { canPerformAction } from '@/lib/access-control'
 import { requireSession } from '@/lib/auth'
 import { canAccessPath } from '@/lib/access-control-server'
-import { getDomainPageData } from '@/lib/services/domain-service'
+import { getDataSourceSnapshot } from '@/lib/data-source'
 
 export default async function SalesInputPsbPage() {
   const session = await requireSession()
@@ -10,19 +11,16 @@ export default async function SalesInputPsbPage() {
     redirect('/dashboard')
   }
 
-  const payload = await getDomainPageData('sales', session, {})
-  if (!payload) {
+  const source = getDataSourceSnapshot()
+  if (!source) {
     notFound()
   }
 
   return (
-    <SalesDomainWorkspace
-      content={payload.content}
-      source={payload.source}
-      capabilities={payload.capabilities}
-      role={session.role}
-      initialActionPanelOpen
-      displayMode="input"
+    <SalesPsbInputForm
+      canCreate={canPerformAction(session.role, 'sales', 'create')}
+      reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+      defaultSalesOwner={`${session.displayName} (${session.username})`}
     />
   )
 }

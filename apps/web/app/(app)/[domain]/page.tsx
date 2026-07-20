@@ -374,6 +374,10 @@ export default async function DomainPage({
   const salesOrder = resolveSearchParam(resolvedSearchParams.order)
 
   if ((domain as DomainKey) === 'sales') {
+    if (session.role === 'PENJUALAN' && !salesFocus && !salesLead && !salesOrder) {
+      redirect('/sales/input-psb')
+    }
+
     if (!salesFocus && !salesLead && !salesOrder) {
       return (
         <OrganizationWorkspacePage

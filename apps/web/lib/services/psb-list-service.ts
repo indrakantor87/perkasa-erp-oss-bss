@@ -287,6 +287,55 @@ function buildNextActionLabel(status: PsbListStatus) {
   }
 }
 
+function normalizeNullableText(value: string | null | undefined) {
+  const normalized = String(value ?? '').trim()
+  return normalized || null
+}
+
+function normalizeRequestedInstallDate(value: string | null | undefined) {
+  const normalized = String(value ?? '').trim()
+  if (!normalized) {
+    return null
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized)) {
+    return `${normalized.replace('T', ' ')}:00`
+  }
+
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)) {
+    return `${normalized}:00`
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(normalized)) {
+    return normalized.replace('T', ' ')
+  }
+
+  throw new Error('Format jadwal permintaan PSB tidak valid.')
+}
+
+async function generatePsbListCode() {
+  const now = new Date()
+  const period = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+  const rows = await runReviewDbQuery<{ psbListCode: string | null }>(
+    `
+      SELECT psb_list_code AS psbListCode
+      FROM sales_psb_lists
+      WHERE psb_list_code LIKE ?
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    [`PSBL-${period}-%`],
+  )
+
+  const latestCode = String(rows[0]?.psbListCode ?? '').trim()
+  const latestParts = latestCode.split('-')
+  const latestSequenceText = latestParts[latestParts.length - 1] ?? '0'
+  const latestSequence = Number.parseInt(latestSequenceText, 10)
+  const nextSequence = Number.isFinite(latestSequence) && latestSequence > 0 ? latestSequence + 1 : 1
+
+  return `PSBL-${period}-${String(nextSequence).padStart(4, '0')}`
+}
+
 function buildFallbackSnapshot(detail: string) {
   return getFallbackDataSourceSnapshot(detail)
 }
@@ -727,6 +776,109 @@ export function canUpdatePsbList(role: AppRole) {
 
 export function canApprovePsbList(role: AppRole) {
   return ['SUPER_ADMIN', 'ADMIN', 'CS_ADMIN'].includes(role)
+}
+
+export async function createPsbListItem(params: {
+  customerName: string
+  customerPhone?: string | null
+  addressText: string
+  odpCode?: string | null
+  packageLabel?: string | null
+  salesOwnerName?: string | null
+  requestedInstallDate?: string | null
+  areaLabel?: string | null
+  escortNotes?: string | null
+  activityNotes?: string | null
+  actorName: string
+  actorRole: string
+}) {
+  await ensurePsbListTables()
+
+  const customerName = String(params.customerName ?? '').trim()
+  const addressText = String(params.addressText ?? '').trim()
+  if (!customerName) {
+    throw new Error('Nama customer wajib diisi.')
+  }
+  if (!addressText) {
+    throw new Error('Alamat pemasangan wajib diisi.')
+  }
+
+  const psbListCode = await generatePsbListCode()
+  const customerPhone = normalizeNullableText(params.customerPhone)
+  const odpCode = normalizeNullableText(params.odpCode)
+  const packageLabel = normalizeNullableText(params.packageLabel)
+  const salesOwnerName = normalizeNullableText(params.salesOwnerName) ?? params.actorName
+  const requestedInstallDate = normalizeRequestedInstallDate(params.requestedInstallDate)
+  const areaLabel = normalizeNullableText(params.areaLabel)
+  const escortNotes = normalizeNullableText(params.escortNotes)
+  const activityNotes = normalizeNullableText(params.activityNotes)
+  const nextActionLabel = buildNextActionLabel('BARU')
+  const auditNotes =
+    activityNotes ??
+    escortNotes ??
+    `Input PSB baru dari penjualan. Menunggu dipilih CS untuk review dan penjadwalan.`
+
+  const insertResult = await runReviewDbExecute<ExecuteResult>(
+    `
+      INSERT INTO sales_psb_lists (
+        psb_list_code,
+        customer_name,
+        customer_phone,
+        address_text,
+        odp_code,
+        package_label,
+        sales_owner_name,
+        requested_install_date,
+        status,
+        area_label,
+        escort_notes,
+        activity_notes,
+        next_action_label
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'BARU', ?, ?, ?, ?)
+    `,
+    [
+      psbListCode,
+      customerName,
+      customerPhone,
+      addressText,
+      odpCode,
+      packageLabel,
+      salesOwnerName,
+      requestedInstallDate,
+      areaLabel,
+      escortNotes,
+      activityNotes,
+      nextActionLabel,
+    ],
+  )
+
+  const psbListId = Number((insertResult as ExecuteResult).insertId ?? 0)
+  if (!Number.isInteger(psbListId) || psbListId <= 0) {
+    throw new Error('Input PSB berhasil disimpan tetapi ID List PSB tidak terbaca.')
+  }
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      INSERT INTO sales_psb_list_audits (
+        psb_list_id,
+        event_type,
+        from_status,
+        to_status,
+        actor_name,
+        actor_role,
+        notes
+      )
+      VALUES (?, 'CREATE', NULL, 'BARU', ?, ?, ?)
+    `,
+    [psbListId, params.actorName, params.actorRole, auditNotes],
+  )
+
+  return {
+    id: psbListId,
+    psbListCode,
+    customerName,
+  }
 }
 
 function buildTransitionEventType(action: PsbListTransitionAction) {
