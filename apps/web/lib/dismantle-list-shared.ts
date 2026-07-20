@@ -29,6 +29,9 @@ export type DismantleListItem = {
   csPicName: string | null
   terminationReason: string | null
   nextActionLabel: string
+  supportHistoryId: number | null
+  supportClosedAt: string | null
+  inventoryItemCodes: string[]
   auditSummary: string[]
 }
 

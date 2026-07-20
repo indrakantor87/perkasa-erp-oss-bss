@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.45] - 2026-07-19
+
+### Added
+
+- Ditambahkan enrichment `List Dismantle` untuk membaca status histori close support berdasarkan `isolation_id` dan mengumpulkan kandidat `item_code` inventory dari `inventory_stock_movements` yang terhubung ke `transferred_work_order_id`, sehingga detail item bisa mengetahui kapan kasus sudah benar-benar masuk histori support dan barang mana yang relevan untuk ditelusuri: [dismantle-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dismantle-list-service.ts)
+- Ditambahkan tombol `Histori Barang` pada panel detail `List Dismantle` yang hanya muncul ketika kasus sudah punya histori close support dan item code inventory nyata, lalu mengarah langsung ke halaman barcode inventory terkait: [dismantle-list-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/dismantle-list-workspace.tsx)
+
+### Changed
+
+- Model shared `DismantleListItem` kini membawa metadata `supportHistoryId`, `supportClosedAt`, dan `inventoryItemCodes` agar boundary client/server tetap aman saat workspace perlu menampilkan backlink histori barang tanpa menarik service server-only ke client: [dismantle-list-shared.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/dismantle-list-shared.ts)
+- Versioning diselaraskan ke `0.66.45` untuk menandai batch backlink histori inventory pada flow dismantle; batch ini sudah lolos diagnostics dan `npm run check`, sementara `npm run build` di sandbox masuk ke fase `next build` namun penantian selesai penuh masih dibatasi eksekutor.
+
 ## [0.66.44] - 2026-07-19
 
 ### Added

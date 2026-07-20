@@ -84,6 +84,17 @@ type ReviewDbExistingListRow = {
   transferredWorkOrderId: number | null
 }
 
+type ReviewDbHistoryStateRow = {
+  historyId: number
+  isolationId: number
+  closedAt: string | null
+}
+
+type ReviewDbWorkOrderInventoryRow = {
+  workOrderId: number
+  itemCode: string | null
+}
+
 const mockDismantleListItems: DismantleListItem[] = [
   {
     id: 201,
@@ -107,6 +118,9 @@ const mockDismantleListItems: DismantleListItem[] = [
     csPicName: null,
     terminationReason: 'Isolir aktif melewati 1 bulan, menunggu validasi CS.',
     nextActionLabel: 'Masuk review CS',
+    supportHistoryId: null,
+    supportClosedAt: null,
+    inventoryItemCodes: [],
     auditSummary: ['Dibuat dari isolir 1 bulan', 'Menunggu review CS'],
   },
   {
@@ -131,6 +145,9 @@ const mockDismantleListItems: DismantleListItem[] = [
     csPicName: 'Admin CS Pagi',
     terminationReason: 'Pelanggan tidak melanjutkan layanan setelah isolir lebih dari 30 hari.',
     nextActionLabel: 'Putuskan review',
+    supportHistoryId: null,
+    supportClosedAt: null,
+    inventoryItemCodes: [],
     auditSummary: ['Masuk dari isolir', 'Sedang direview CS'],
   },
   {
@@ -155,6 +172,9 @@ const mockDismantleListItems: DismantleListItem[] = [
     csPicName: 'CS Operator 01',
     terminationReason: 'Data perangkat belum sinkron antara billing dan catatan lapangan.',
     nextActionLabel: 'Tunggu koreksi billing/CS',
+    supportHistoryId: null,
+    supportClosedAt: null,
+    inventoryItemCodes: [],
     auditSummary: ['Masuk review CS', 'Dikembalikan untuk koreksi data'],
   },
   {
@@ -179,6 +199,9 @@ const mockDismantleListItems: DismantleListItem[] = [
     csPicName: 'CS Admin',
     terminationReason: 'Kontrak berakhir, layanan resmi terminasi.',
     nextActionLabel: 'Monitor ticket dismantle',
+    supportHistoryId: 301,
+    supportClosedAt: '2026-07-19T14:25:00+07:00',
+    inventoryItemCodes: ['INV-ONT-ZTE-F670L-000301', 'INV-ADP-ZTE-12V-000301'],
     auditSummary: ['Masuk dari isolir', 'Ditransfer ke ticketing'],
   },
   {
@@ -203,6 +226,9 @@ const mockDismantleListItems: DismantleListItem[] = [
     csPicName: 'CS Admin',
     terminationReason: 'Terminasi dibatalkan setelah pelunasan.',
     nextActionLabel: 'Bisa dibuka ulang jika perlu',
+    supportHistoryId: null,
+    supportClosedAt: null,
+    inventoryItemCodes: [],
     auditSummary: ['Masuk review CS', 'Dibatalkan karena layanan aktif kembali'],
   },
 ]
@@ -286,6 +312,135 @@ function formatDismantleListCode(isolationId: number, eligibleAt: string | null,
       : '000000'
 
   return `DML-${yearMonth}-${String(isolationId).padStart(4, '0')}`
+}
+
+function parseIsolationIdFromRef(value: string | null) {
+  const matched = String(value ?? '').trim().match(/(\d+)\s*$/)
+  if (!matched) {
+    return null
+  }
+
+  const parsed = Number.parseInt(matched[1], 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+async function getSupportHistoryStateMap(isolationIds: number[]) {
+  const uniqueIsolationIds = Array.from(new Set(isolationIds.filter((value) => Number.isFinite(value) && value > 0)))
+  if (!uniqueIsolationIds.length) {
+    return new Map<number, ReviewDbHistoryStateRow>()
+  }
+
+  const [hasHistoryId, hasIsolationId, hasClosedAt] = await Promise.all([
+    hasReviewDbColumn('support_dismantle_history', 'id'),
+    hasReviewDbColumn('support_dismantle_history', 'isolation_id'),
+    hasReviewDbColumn('support_dismantle_history', 'closed_at'),
+  ])
+  if (!hasHistoryId || !hasIsolationId) {
+    return new Map<number, ReviewDbHistoryStateRow>()
+  }
+
+  const placeholders = uniqueIsolationIds.map(() => '?').join(', ')
+  const rows = await runReviewDbQuery<ReviewDbHistoryStateRow>(
+    `
+      SELECT
+        id AS historyId,
+        isolation_id AS isolationId,
+        ${hasClosedAt ? 'closed_at' : 'NULL'} AS closedAt
+      FROM support_dismantle_history
+      WHERE isolation_id IN (${placeholders})
+      ORDER BY id DESC
+    `,
+    uniqueIsolationIds,
+  )
+
+  const map = new Map<number, ReviewDbHistoryStateRow>()
+  for (const row of rows) {
+    if (!map.has(row.isolationId)) {
+      map.set(row.isolationId, row)
+    }
+  }
+
+  return map
+}
+
+async function getWorkOrderInventoryItemCodesMap(workOrderIds: number[]) {
+  const uniqueWorkOrderIds = Array.from(new Set(workOrderIds.filter((value) => Number.isFinite(value) && value > 0)))
+  if (!uniqueWorkOrderIds.length) {
+    return new Map<number, string[]>()
+  }
+
+  const [hasMovementWorkOrderId, hasMovementItemId, hasInventoryItemId, hasInventoryItemCode] = await Promise.all([
+    hasReviewDbColumn('inventory_stock_movements', 'work_order_id'),
+    hasReviewDbColumn('inventory_stock_movements', 'item_id'),
+    hasReviewDbColumn('inventory_items', 'id'),
+    hasReviewDbColumn('inventory_items', 'item_code'),
+  ])
+  if (!hasMovementWorkOrderId || !hasMovementItemId || !hasInventoryItemId || !hasInventoryItemCode) {
+    return new Map<number, string[]>()
+  }
+
+  const placeholders = uniqueWorkOrderIds.map(() => '?').join(', ')
+  const rows = await runReviewDbQuery<ReviewDbWorkOrderInventoryRow>(
+    `
+      SELECT
+        m.work_order_id AS workOrderId,
+        i.item_code AS itemCode
+      FROM inventory_stock_movements m
+      INNER JOIN inventory_items i
+        ON i.id = m.item_id
+      WHERE m.work_order_id IN (${placeholders})
+      ORDER BY m.id DESC
+    `,
+    uniqueWorkOrderIds,
+  )
+
+  const map = new Map<number, string[]>()
+  for (const row of rows) {
+    const itemCode = String(row.itemCode ?? '').trim().toUpperCase()
+    if (!itemCode) {
+      continue
+    }
+
+    const current = map.get(row.workOrderId) ?? []
+    if (!current.includes(itemCode)) {
+      current.push(itemCode)
+      map.set(row.workOrderId, current)
+    }
+  }
+
+  return map
+}
+
+async function enrichDismantleListItems(items: DismantleListItem[]) {
+  const historyStateMapPromise = getSupportHistoryStateMap(
+    items
+      .map((item) => parseIsolationIdFromRef(item.sourceIsolationRef))
+      .filter((value): value is number => value != null),
+  )
+  const inventoryItemCodesMapPromise = getWorkOrderInventoryItemCodesMap(
+    items
+      .map((item) => item.transferredWorkOrderId)
+      .filter((value): value is number => value != null),
+  )
+
+  const [historyStateMap, inventoryItemCodesMap] = await Promise.all([
+    historyStateMapPromise,
+    inventoryItemCodesMapPromise,
+  ])
+
+  return items.map((item) => {
+    const isolationId = parseIsolationIdFromRef(item.sourceIsolationRef)
+    const historyState = isolationId ? historyStateMap.get(isolationId) ?? null : null
+    const inventoryItemCodes =
+      item.transferredWorkOrderId != null ? inventoryItemCodesMap.get(item.transferredWorkOrderId) ?? [] : []
+
+    return {
+      ...item,
+      supportHistoryId: historyState?.historyId ?? null,
+      supportClosedAt: historyState?.closedAt ?? null,
+      inventoryItemCodes,
+    }
+  })
 }
 
 async function getActiveQueueSourceRows() {
@@ -528,6 +683,9 @@ function mapReviewDbRowToDismantleListItem(row: ReviewDbDismantleListRow): Disma
     csPicName: row.csPicName,
     terminationReason: row.terminationReason,
     nextActionLabel: row.nextActionLabel?.trim() || buildNextActionLabel(status),
+    supportHistoryId: null,
+    supportClosedAt: null,
+    inventoryItemCodes: [],
     auditSummary: [],
   }
 }
@@ -828,13 +986,23 @@ async function getReviewDbDismantleListPageData(query: DismantleListQuery, sourc
   const visibleRows = rows.some((row) => !seededDismantleListIds.has(Number(row.id)))
     ? rows.filter((row) => !seededDismantleListIds.has(Number(row.id)))
     : rows
-  const items = visibleRows.map((row) => mapReviewDbRowToDismantleListItem(row))
+  const items = await enrichDismantleListItems(visibleRows.map((row) => mapReviewDbRowToDismantleListItem(row)))
   const selectedId = resolvePositiveInt(state.selected)
   const selectedBase = items.find((item) => item.id === selectedId) ?? items[0] ?? null
   const selectedItem = selectedBase
     ? {
         ...selectedBase,
-        auditSummary: await getDismantleListAuditSummary(selectedBase.id),
+        auditSummary: [
+          ...(await getDismantleListAuditSummary(selectedBase.id)),
+          ...(selectedBase.supportHistoryId
+            ? [
+                `Sudah close ke histori support${selectedBase.supportClosedAt ? ` pada ${selectedBase.supportClosedAt}` : ''}`,
+              ]
+            : []),
+          ...(selectedBase.supportHistoryId && selectedBase.inventoryItemCodes.length
+            ? [`Histori inventory siap dibuka untuk ${selectedBase.inventoryItemCodes.length} item`]
+            : []),
+        ],
       }
     : null
 

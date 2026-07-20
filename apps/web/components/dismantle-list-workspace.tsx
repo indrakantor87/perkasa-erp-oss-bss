@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { DismantleListTransitionForm } from '@/components/dismantle-list-transition-form'
 import type { DismantleListItem, DismantleListPagePayload, DismantleListStatus } from '@/lib/dismantle-list-shared'
+import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 
 function formatDateTime(value: string | null) {
   if (!value) {
@@ -148,6 +149,31 @@ function renderSupportBacklinks(item: DismantleListItem) {
       >
         Buka Histori Support
       </Link>
+    </div>
+  )
+}
+
+function renderInventoryBacklinks(item: DismantleListItem) {
+  if (!item.supportHistoryId || !item.inventoryItemCodes.length) {
+    return null
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {item.inventoryItemCodes.slice(0, 3).map((itemCode) => (
+        <Link
+          key={itemCode}
+          href={buildInventoryBarcodeDetailPath(itemCode)}
+          className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+        >
+          Histori Barang {itemCode}
+        </Link>
+      ))}
+      {item.inventoryItemCodes.length > 3 ? (
+        <span className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
+          +{item.inventoryItemCodes.length - 3} item lain
+        </span>
+      ) : null}
     </div>
   )
 }
@@ -396,9 +422,11 @@ export function DismantleListWorkspace({
                 {renderMetaBadge('Ref Isolir', selectedItem.sourceIsolationRef)}
                 {renderMetaBadge('Ticket', selectedItem.transferredTicketRef)}
                 {renderMetaBadge('PIC CS', selectedItem.csPicName)}
+                {renderMetaBadge('Close Support', selectedItem.supportClosedAt ? formatDateTime(selectedItem.supportClosedAt) : null)}
               </div>
               {renderSupportBacklinks(selectedItem)}
               {renderWorkOrderLinks(selectedItem)}
+              {renderInventoryBacklinks(selectedItem)}
               <div className="space-y-3 text-sm text-slate-700">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Alamat</p>
