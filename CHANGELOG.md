@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.48] - 2026-07-19
+
+### Added
+
+- Halaman detail barcode inventory sekarang menampilkan section `Histori Dismantle Terkait` yang membaca histori close support berdasarkan `returned_item_codes` atau fallback note terstruktur, lalu menyediakan backlink langsung ke lane `/support/dismantle` dengan konteks kasus yang sama: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/inventory/barcodes/[itemCode]/page.tsx)
+- Lane `/support/dismantle` sekarang menerima konteks `dismantleHistory` dari backlink barcode, otomatis membuka panel histori, dan menyorot kartu kasus yang sama agar operator langsung mendarat pada histori close yang relevan: [support-dismantle-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-workspace.tsx), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+
+### Changed
+
+- Navigasi histori barang untuk flow dismantle kini benar-benar dua arah: support close dapat membuka barcode inventory, dan barcode inventory dapat kembali membuka histori support close asalnya dengan filter dan highlight kasus.
+- Versioning diselaraskan ke `0.66.48`; batch ini lolos diagnostics dan `npm run check`, sedangkan `npm run build` di sandbox kembali berhenti pada fase `next build` tanpa error eksplisit sebelum dihentikan manual.
+
 ## [0.66.47] - 2026-07-19
 
 ### Added

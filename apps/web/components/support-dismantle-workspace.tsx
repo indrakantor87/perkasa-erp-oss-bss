@@ -206,6 +206,7 @@ export function SupportDismantleWorkspace({
         canCreate={canCreate}
         canUpdate={canUpdate}
         canApprove={canApprove}
+        supportPrefill={supportPrefill}
         supportDrilldown={supportDrilldown ?? null}
       />
 

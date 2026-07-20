@@ -337,6 +337,7 @@ export function SupportDismantleQueuePanel({
   canCreate = true,
   canUpdate = true,
   canApprove = false,
+  supportPrefill,
   supportDrilldown = null,
 }: {
   sections: DomainReviewSection[]
@@ -345,6 +346,9 @@ export function SupportDismantleQueuePanel({
   canCreate?: boolean
   canUpdate?: boolean
   canApprove?: boolean
+  supportPrefill?: {
+    dismantleHistory?: string
+  }
   supportDrilldown?: SupportDrilldownContext | null
 }) {
   const openSection =
@@ -368,6 +372,10 @@ export function SupportDismantleQueuePanel({
   const [radboxFilter, setRadboxFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('Open')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const focusedHistoryId = String(supportPrefill?.dismantleHistory ?? '')
+    .split('|')[0]
+    ?.trim()
+  const focusedHistoryRowId = focusedHistoryId ? `DIS-${focusedHistoryId}` : ''
   function buildQueuePrefillValue(row: DomainReviewRow) {
     const queueId = row.id.replace(/^DISMANTLE-QUEUE-/, '')
     return `${queueId} | ${row.primary} | ${row.secondary}`
@@ -601,10 +609,18 @@ export function SupportDismantleQueuePanel({
       </div>
 
       {historySection?.rows.length ? (
-        <details className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
+        <details
+          open={Boolean(focusedHistoryRowId)}
+          className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100"
+        >
           <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-white">
             Histori Penutupan ({historySummary.total})
           </summary>
+          {focusedHistoryRowId ? (
+            <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              Kasus histori yang datang dari backlink barcode sedang disorot pada daftar di bawah.
+            </div>
+          ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             <Link href={buildSupportLaneHref('dismantle', { focus: 'MONTHLY_DISMANTLES' })} className="rounded-md border border-slate-500 bg-slate-700/90 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-600">
               Buka Histori
@@ -621,10 +637,21 @@ export function SupportDismantleQueuePanel({
                 canProcessDismantle,
                 canOpenBillingDecision,
               })
+              const isFocusedHistory = focusedHistoryRowId === row.id
 
               return (
-                <article key={row.id} className="rounded-2xl border border-slate-700 bg-[#152643] p-4 shadow-[0_10px_30px_rgba(2,6,23,0.18)]">
+                <article
+                  key={row.id}
+                  className={`rounded-2xl border p-4 shadow-[0_10px_30px_rgba(2,6,23,0.18)] ${
+                    isFocusedHistory
+                      ? 'border-amber-300 bg-amber-500/10 ring-1 ring-amber-300/70'
+                      : 'border-slate-700 bg-[#152643]'
+                  }`}
+                >
                   <div className="flex flex-wrap items-center gap-2">
+                    {isFocusedHistory ? (
+                      <span className="badge border-amber-300/70 bg-amber-500/20 text-amber-100">Kasus Barcode</span>
+                    ) : null}
                     <span className="badge border-emerald-400/40 bg-emerald-500/10 text-emerald-100">{row.status}</span>
                     <span className="badge border-slate-600 bg-slate-800 text-slate-100">{closedAt || '-'}</span>
                     <span className="badge border-violet-400/40 bg-violet-500/10 text-violet-100">{billingDisposition || '-'}</span>

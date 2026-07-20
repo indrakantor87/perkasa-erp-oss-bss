@@ -4,9 +4,20 @@ import { DataSourceStatus } from '@/components/data-source-status'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { buildInventoryBarcodeDetailPath, buildInventoryItemRelativePath } from '@/lib/inventory-barcode-utils'
+import { hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import { getDeviceLifecycleLogs, type DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
 import { getDomainPageData } from '@/lib/services/domain-service'
-import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
+import { buildSupportLaneHref } from '@/lib/support-action-links'
+import type { DataSourceSnapshot, DomainReviewRow, DomainReviewSection } from '@/lib/types'
+
+type ReviewDbBarcodeDismantleHistoryRow = {
+  historyId: number
+  customerName: string | null
+  serviceNo: string | null
+  closedAt: string | null
+  closeNote: string | null
+  returnedItemCodes: string | null
+}
 
 function findSection(sections: DomainReviewSection[], keyword: string) {
   return sections.find((section) => section.title.toUpperCase().includes(keyword.toUpperCase())) ?? null
@@ -40,6 +51,100 @@ function matchesItemComposite(value: string | null | undefined, itemCode: string
   const valueFingerprint = getItemCodeFingerprint(normalizedValue)
   const itemFingerprint = getItemCodeFingerprint(normalizedItemCode)
   return Boolean(valueFingerprint) && valueFingerprint === itemFingerprint
+}
+
+function parseReturnedItemCodes(value: string | null | undefined) {
+  return Array.from(
+    new Set(
+      String(value ?? '')
+        .split(/[\r\n,;]+/)
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  )
+}
+
+async function getDismantleHistoryRowsForItem(itemCode: string, source: DataSourceSnapshot) {
+  if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    return [] as ReviewDbBarcodeDismantleHistoryRow[]
+  }
+
+  const [
+    hasHistoryId,
+    hasCloseNote,
+    hasReturnedItemCodes,
+    hasClosedAt,
+    hasHistoryCustomerName,
+    hasIsolationId,
+    hasIsolationCustomerName,
+    hasIsolationSubscriptionId,
+    hasServiceSubscriptionId,
+    hasServiceSubscriptionNo,
+  ] = await Promise.all([
+    hasReviewDbColumn('support_dismantle_history', 'id'),
+    hasReviewDbColumn('support_dismantle_history', 'close_note'),
+    hasReviewDbColumn('support_dismantle_history', 'returned_item_codes'),
+    hasReviewDbColumn('support_dismantle_history', 'closed_at'),
+    hasReviewDbColumn('support_dismantle_history', 'customer_name'),
+    hasReviewDbColumn('support_dismantle_history', 'isolation_id'),
+    hasReviewDbColumn('support_isolations', 'customer_name'),
+    hasReviewDbColumn('support_isolations', 'subscription_id'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+  ])
+
+  if (!hasHistoryId || (!hasCloseNote && !hasReturnedItemCodes)) {
+    return [] as ReviewDbBarcodeDismantleHistoryRow[]
+  }
+
+  const searchToken = `%${itemCode}%`
+  const rows = await runReviewDbQuery<ReviewDbBarcodeDismantleHistoryRow>(
+    `
+      SELECT
+        dh.id AS historyId,
+        ${
+          hasHistoryCustomerName
+            ? 'dh.customer_name'
+            : hasIsolationId && hasIsolationCustomerName
+              ? 'si.customer_name'
+              : "CONCAT('Histori Dismantle #', dh.id)"
+        } AS customerName,
+        ${
+          hasIsolationId && hasIsolationSubscriptionId && hasServiceSubscriptionId && hasServiceSubscriptionNo
+            ? 'ss.service_no'
+            : 'NULL'
+        } AS serviceNo,
+        ${hasClosedAt ? 'dh.closed_at' : 'NULL'} AS closedAt,
+        ${hasCloseNote ? 'dh.close_note' : 'NULL'} AS closeNote,
+        ${hasReturnedItemCodes ? 'dh.returned_item_codes' : 'NULL'} AS returnedItemCodes
+      FROM support_dismantle_history dh
+      ${hasIsolationId ? 'LEFT JOIN support_isolations si ON si.id = dh.isolation_id' : ''}
+      ${
+        hasIsolationId && hasIsolationSubscriptionId && hasServiceSubscriptionId
+          ? 'LEFT JOIN service_subscriptions ss ON ss.id = si.subscription_id'
+          : ''
+      }
+      WHERE ${
+        hasReturnedItemCodes && hasCloseNote
+          ? '(dh.returned_item_codes LIKE ? OR dh.close_note LIKE ?)'
+          : hasReturnedItemCodes
+            ? 'dh.returned_item_codes LIKE ?'
+            : 'dh.close_note LIKE ?'
+      }
+      ORDER BY ${hasClosedAt ? 'dh.closed_at' : 'dh.id'} DESC, dh.id DESC
+      LIMIT 10
+    `,
+    hasReturnedItemCodes && hasCloseNote ? [searchToken, searchToken] : [searchToken],
+  )
+
+  return rows.filter((row) => {
+    const explicitCodes = parseReturnedItemCodes(row.returnedItemCodes)
+    if (explicitCodes.length) {
+      return explicitCodes.includes(itemCode)
+    }
+
+    return row.closeNote?.toUpperCase().includes(itemCode) ?? false
+  })
 }
 
 function formatLifecycleStatus(status: DeviceLifecycleLogRow['lifecycleStatus']) {
@@ -234,6 +339,7 @@ export default async function InventoryBarcodeDetailPage({
   }
 
   const sections = payload.content.reviewSections ?? []
+  const dismantleHistoryRows = await getDismantleHistoryRowsForItem(itemCode, payload.source)
   const itemSection = findSection(sections, 'ITEM INVENTORY TERBARU')
   const requestSection = findSection(sections, 'REQUEST INVENTORY TEKNISI')
   const movementSection = findSection(sections, 'STOCK MOVEMENT TERBARU')
@@ -285,6 +391,25 @@ export default async function InventoryBarcodeDetailPage({
           : '',
       ])
     : ''
+  const dismantleBacklinkRows: DomainReviewRow[] = dismantleHistoryRows.map((entry) => ({
+    id: `DIS-${entry.historyId}`,
+    primary: entry.customerName || `Histori Dismantle #${entry.historyId}`,
+    secondary: entry.serviceNo || '-',
+    status: 'CLOSE',
+    detail:
+      entry.closeNote?.split('\n').find((line) => line.trim())?.trim() ||
+      'Kasus dismantle close yang mengembalikan item ini ke histori support.',
+    meta: [
+      `Closed: ${entry.closedAt || '-'}`,
+      `Service No: ${entry.serviceNo || '-'}`,
+      `Returned Item Codes: ${
+        parseReturnedItemCodes(entry.returnedItemCodes).length
+          ? parseReturnedItemCodes(entry.returnedItemCodes).join(', ')
+          : itemCode
+      }`,
+      `Support History ID: ${entry.historyId}`,
+    ],
+  }))
 
   return (
     <div className="space-y-6">
@@ -444,6 +569,20 @@ export default async function InventoryBarcodeDetailPage({
             description="Return perangkat yang mengembalikan item ini ke inventory atau audit lapangan."
             rows={returnRows}
             emptyMessage="Belum ada return yang tertaut ke item ini."
+          />
+          <DetailListCard
+            title="Histori Dismantle Terkait"
+            description="Kasus terminate close yang mengembalikan item ini dan bisa dibuka lagi ke lane support dismantle."
+            rows={dismantleBacklinkRows}
+            emptyMessage="Belum ada histori dismantle yang mengembalikan item ini."
+            hrefBuilder={(row) =>
+              buildSupportLaneHref('dismantle', {
+                focus: 'CLOSED_THIS_PERIOD',
+                customer: row.primary,
+                service: row.secondary !== '-' ? row.secondary : '',
+                dismantleHistory: `${row.id.replace(/^DIS-/, '')} | ${row.primary} | ${row.secondary}`,
+              })
+            }
           />
         </div>
 
