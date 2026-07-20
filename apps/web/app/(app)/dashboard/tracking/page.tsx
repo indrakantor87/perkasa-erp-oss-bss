@@ -80,7 +80,7 @@ function buildRecommendedCards(session: AppSession): TrackingEntryCard[] {
         badge: 'teknisi',
       },
       {
-        title: 'Queue NOC Saya',
+        title: 'Antrean NOC Saya',
         description: 'Masuk ke antrean NOC yang paling relevan dengan PIC login untuk tindak lanjut operasional.',
         href: buildNocQueueHref(session),
         badge: 'queue',
@@ -97,13 +97,13 @@ function buildRecommendedCards(session: AppSession): TrackingEntryCard[] {
   if (session.role === 'NOC_OPERATOR' || session.role === 'TT_OPERATOR') {
     return [
       {
-        title: 'Queue NOC Saya',
+        title: 'Antrean NOC Saya',
         description: 'Fokus ke ticket gabungan yang PIC-nya sesuai dengan user login Anda.',
         href: buildNocQueueHref(session),
         badge: 'noc',
       },
       {
-        title: 'Queue Trouble Saya',
+        title: 'Antrean Trouble Saya',
         description: 'Langsung ke antrean trouble yang menjadi fokus utama follow up operasional NOC.',
         href: buildNocQueueHref(session, { ticketType: 'TROUBLESHOOTS' }),
         badge: 'trouble',
@@ -119,8 +119,8 @@ function buildRecommendedCards(session: AppSession): TrackingEntryCard[] {
 
   return [
     {
-      title: 'Queue NOC',
-      description: 'Masuk ke meja queue gabungan untuk PSB, Trouble, Dismantle, dan Jalur.',
+      title: 'Antrean NOC',
+      description: 'Masuk ke meja antrean gabungan untuk PSB, Trouble, Dismantle, dan Jalur.',
       href: '/dashboard/tracking/noc-queue',
       badge: 'utama',
     },
@@ -193,9 +193,9 @@ export default async function DashboardTrackingIndexPage() {
             href="/dashboard/tracking/noc-queue"
             className="surface-soft rounded-3xl border border-line p-5 transition hover:[border-color:var(--color-line-strong)]"
           >
-            <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Meja Queue NOC</p>
+            <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Ticketing Perkasa</p>
             <p className="mt-2 text-sm leading-6 text-mute">
-              Satu tabel gabungan untuk PSB, Troubleshoots, Dismantle, dan Jalur dengan status queue
+              Satu tabel gabungan untuk PSB, Troubleshoots, Dismantle, dan Jalur dengan status antrean
               operasional dan ringkasan device terakhir.
             </p>
           </Link>

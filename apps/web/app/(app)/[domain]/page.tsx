@@ -100,8 +100,8 @@ function resolveSupportDrilldown(
   if (lane === 'dismantle' && normalized === 'OPEN_QUEUE') {
     return {
       key: normalized,
-      label: 'Fokus KPI Proses: Queue Dismantle Open',
-      detail: 'Lane ini dipersempit ke kandidat terminate yang masih aktif di queue dismantle dan belum masuk histori close.',
+      label: 'Fokus KPI Proses: Antrean Dismantle Open',
+      detail: 'Lane ini dipersempit ke kandidat terminate yang masih aktif di antrean dismantle dan belum masuk histori close.',
       clearHref: '/support?lane=dismantle',
     }
   }

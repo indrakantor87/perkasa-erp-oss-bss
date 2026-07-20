@@ -59,9 +59,9 @@ export const teknisiPsbWorkspaceConfig: TechnicianWorkspaceConfig = {
       description: 'Jalur pendukung agar pekerjaan PSB tidak putus saat butuh verifikasi teknis atau data customer.',
       links: [
         {
-          label: 'Queue Ticketing PSB',
+          label: 'Antrean Ticketing PSB',
           href: '/dashboard/tracking/noc-queue?ticketType=PSB',
-          description: 'Buka queue ticketing PSB untuk membaca sumber kerja dari jalur CS/NOC.',
+          description: 'Buka antrean ticketing PSB untuk membaca sumber kerja dari jalur CS/NOC.',
           badge: 'ticket',
         },
         {
@@ -85,8 +85,8 @@ export const teknisiTroubleshootsWorkspaceConfig: TechnicianWorkspaceConfig = {
   inventoryReferenceType: 'TROUBLE_TICKET',
   primaryActionLabel: 'Buka WO Trouble Saya',
   primaryActionDescription: 'Masuk ke daftar work order trouble dengan filter job category dan pencarian nama login teknisi Anda.',
-  secondaryActionLabel: 'Buka Queue Trouble',
-  secondaryActionDescription: 'Masuk ke queue ticketing trouble untuk melihat sumber kerja dari NOC.',
+  secondaryActionLabel: 'Buka Antrean Trouble',
+  secondaryActionDescription: 'Masuk ke antrean ticketing trouble untuk melihat sumber kerja dari NOC.',
   steps: [
     {
       title: 'Lihat Assignment Trouble',
@@ -119,9 +119,9 @@ export const teknisiTroubleshootsWorkspaceConfig: TechnicianWorkspaceConfig = {
           badge: 'progress',
         },
         {
-          label: 'Queue Trouble',
+          label: 'Antrean Trouble',
           href: '__AUTO_QUEUE__',
-          description: 'Masuk ke queue ticketing trouble agar sumber gangguan tetap terlihat.',
+          description: 'Masuk ke antrean ticketing trouble agar sumber gangguan tetap terlihat.',
           badge: 'ticket',
         },
         {

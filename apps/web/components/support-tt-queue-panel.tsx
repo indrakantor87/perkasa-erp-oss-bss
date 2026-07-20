@@ -571,7 +571,7 @@ export function SupportTroubleTicketQueuePanel({
     <section className="panel p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="section-title">Queue Trouble Ticket</p>
+          <p className="section-title">Antrean Trouble Ticket</p>
           <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
             Ticket terbuka yang perlu diproses
           </h3>

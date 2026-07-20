@@ -34,7 +34,7 @@ export function WorklistTable({ items, selectedItemId, state }: WorklistTablePro
         <p className="section-title">Daftar Item</p>
         <h3 className="mt-2 text-xl font-semibold text-[var(--color-ink-strong)]">Tidak ada item pada kombinasi filter ini</h3>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-mute">
-          Coba longgarkan filter queue, domain, atau keyword. Jika hasil tetap kosong, memang belum ada item yang masuk ke queue tersebut.
+          Coba longgarkan filter antrean, domain, atau keyword. Jika hasil tetap kosong, memang belum ada item yang masuk ke antrean tersebut.
         </p>
       </section>
     )

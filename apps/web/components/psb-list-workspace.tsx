@@ -106,7 +106,7 @@ function renderWorkOrderLinks(item: PsbListItem) {
           href={`/dashboard/tracking/noc-queue?ticketType=PSB&q=${encodeURIComponent(item.transferredTicketRef)}`}
           className="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-100"
         >
-          Buka Queue Ticketing
+          Buka Antrean Ticketing
         </Link>
       ) : null}
       {item.transferredWorkOrderId ? (

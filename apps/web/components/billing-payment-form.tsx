@@ -250,8 +250,8 @@ export function BillingPaymentForm({
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
             {invoiceSuggestions.length > 0
-              ? 'Saran invoice diambil dari queue invoice tindak lanjut yang sedang tampil pada halaman ini.'
-              : 'Belum ada saran invoice dari review queue saat ini; Anda tetap bisa mengisi manual.'}
+              ? 'Saran invoice diambil dari antrean invoice tindak lanjut yang sedang tampil pada halaman ini.'
+              : 'Belum ada saran invoice dari review antrean saat ini; Anda tetap bisa mengisi manual.'}
           </div>
           <button
             type="submit"

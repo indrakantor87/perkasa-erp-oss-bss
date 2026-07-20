@@ -70,14 +70,14 @@ export function SupportDismantleForm({
       if (!response.ok) {
         setFeedback({
           tone: 'error',
-          message: payload?.message || 'Transfer ke queue dismantle gagal diproses di review DB.',
+          message: payload?.message || 'Transfer ke antrean dismantle gagal diproses di review DB.',
         })
         return
       }
 
       setFeedback({
         tone: 'success',
-        message: payload?.message || 'Transfer ke queue dismantle berhasil diproses.',
+        message: payload?.message || 'Transfer ke antrean dismantle berhasil diproses.',
       })
       setIsolationValue(isolationSuggestions[0] ?? '')
       setTransferNote('')
@@ -91,14 +91,14 @@ export function SupportDismantleForm({
     <section className="panel p-6">
       <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-        Transfer ke queue dismantle
+        Transfer ke antrean dismantle
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">
         {!canProcess
           ? 'Role aktif belum memiliki akses operasional untuk memproses dismantle pada lane ini.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi flow dismantle dinonaktifkan agar tidak menulis ke mock.'
-            : 'Form ini memindahkan isolir aktif ke queue dismantle terlebih dahulu, sehingga terminasi final dan histori close diproses pada tahap berikutnya.'}
+            : 'Form ini memindahkan isolir aktif ke antrean dismantle terlebih dahulu, sehingga terminasi final dan histori close diproses pada tahap berikutnya.'}
       </p>
       <SupportFormContextNote
         items={[
@@ -112,7 +112,7 @@ export function SupportDismantleForm({
           },
           {
             label: 'Hasil',
-            value: 'Kasus siap ditangani di queue dismantle untuk close lapangan atau reopen bila keputusan berubah.',
+            value: 'Kasus siap ditangani di antrean dismantle untuk close lapangan atau reopen bila keputusan berubah.',
           },
         ]}
       />
@@ -142,7 +142,7 @@ export function SupportDismantleForm({
             value={transferNote}
             onChange={(event) => setTransferNote(event.target.value)}
             className="min-h-28 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            placeholder="Alasan terminasi, status perangkat, atau konteks kenapa kasus dipindahkan ke queue dismantle"
+            placeholder="Alasan terminasi, status perangkat, atau konteks kenapa kasus dipindahkan ke antrean dismantle"
             required
             disabled={isDisabled}
           />
@@ -150,14 +150,14 @@ export function SupportDismantleForm({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Data sumber belum diarsipkan pada tahap ini. Final close dilakukan dari queue dismantle aktif.
+            Data sumber belum diarsipkan pada tahap ini. Final close dilakukan dari antrean dismantle aktif.
           </div>
           <button
             type="submit"
             disabled={isDisabled}
             className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            {submitting ? 'Memindahkan Queue...' : 'Transfer Ke Dismantle'}
+            {submitting ? 'Memindahkan Antrean...' : 'Transfer Ke Dismantle'}
           </button>
         </div>
       </form>

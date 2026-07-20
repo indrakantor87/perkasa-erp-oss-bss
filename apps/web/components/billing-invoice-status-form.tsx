@@ -140,7 +140,7 @@ export function BillingInvoiceStatusForm({
       return {
         label: 'Suspend invoice harus langsung terbaca di Isolir dan SLA',
         detail:
-          'Begitu invoice dipindahkan ke jalur suspend, Billing perlu memastikan queue Isolir membaca pelanggan sebagai kandidat follow-up aktif, sementara TT/SLA tetap dipantau bila masih ada gangguan teknis yang berjalan.',
+          'Begitu invoice dipindahkan ke jalur suspend, Billing perlu memastikan antrean Isolir membaca pelanggan sebagai kandidat follow-up aktif, sementara TT/SLA tetap dipantau bila masih ada gangguan teknis yang berjalan.',
       }
     }
     if (nextStatus === 'OVERDUE') {
@@ -153,7 +153,7 @@ export function BillingInvoiceStatusForm({
     return {
       label: 'Cancel invoice tetap butuh validasi lintas divisi',
       detail:
-        'Pembatalan invoice yang belum terbayar perlu dibaca ulang oleh Supervisor dan Support agar tidak ada ticket, isolir, atau queue terminate yang masih bergerak berdasarkan invoice yang sudah dibatalkan.',
+          'Pembatalan invoice yang belum terbayar perlu dibaca ulang oleh Supervisor dan Support agar tidak ada ticket, isolir, atau antrean terminate yang masih bergerak berdasarkan invoice yang sudah dibatalkan.',
     }
   }, [nextStatus])
 
@@ -311,7 +311,7 @@ export function BillingInvoiceStatusForm({
           <div className="text-sm text-mute">
             {mode === 'batch'
               ? `Batch memakai antrean ${nextStatus === 'SUSPENDED' ? 'siap suspend' : 'siap reconnect'} yang sedang tampil pada halaman ini.`
-              : 'Saran invoice diambil dari daftar invoice billing dan queue follow-up yang sedang tampil pada halaman ini.'}
+              : 'Saran invoice diambil dari daftar invoice billing dan antrean follow-up yang sedang tampil pada halaman ini.'}
           </div>
           <button
             type="submit"

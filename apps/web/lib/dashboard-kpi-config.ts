@@ -60,7 +60,7 @@ export const DASHBOARD_KPI_TEMPLATE_OPTIONS = [
   { key: 'TT_OPEN_TICKETS', label: 'TT Open' },
   { key: 'TT_NEED_ESCALATION', label: 'Perlu Eskalasi' },
   { key: 'TT_READY_CLOSE', label: 'Siap Close' },
-  { key: 'DISMANTLE_OPEN_QUEUE', label: 'Queue Dismantle' },
+  { key: 'DISMANTLE_OPEN_QUEUE', label: 'Antrean Dismantle' },
   { key: 'DISMANTLE_FIELD_FOLLOW_UP', label: 'Follow Up Lapangan' },
   { key: 'DISMANTLE_CLOSED_THIS_PERIOD', label: 'Close Periode Ini' },
   { key: 'DIGITAL_LEADS', label: 'Lead Digital' },

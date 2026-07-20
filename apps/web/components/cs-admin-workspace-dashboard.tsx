@@ -58,6 +58,10 @@ const queueShortLabel: Record<string, string> = {
   'Queue Risiko Tinggi': 'risiko',
 }
 
+function getQueueDisplayLabel(queue: string) {
+  return queue.replace(/^Queue\s+/i, 'Antrean ')
+}
+
 const priorityTone: Record<WorklistItem['priority'], string> = {
   tinggi: 'bg-rose-50 text-rose-700',
   sedang: 'bg-amber-50 text-amber-700',
@@ -182,7 +186,7 @@ export function CsAdminWorkspaceDashboard({
           <div>
             <p className="section-title">Workspace Supervisor CS</p>
             <h1 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
-              Queue hidup untuk approval, koreksi, transfer, dan risiko tinggi
+              Antrean hidup untuk approval, koreksi, transfer, dan risiko tinggi
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
               Workspace ini membaca antrean supervisor secara langsung agar approval, koreksi, transfer,
@@ -194,7 +198,7 @@ export function CsAdminWorkspaceDashboard({
             <span className="badge border-slate-200 bg-white text-slate-600">
               {roleMeta.division} / {roleMeta.subdivision}
             </span>
-            {activeBucket ? <span className="badge border-slate-200 bg-white text-slate-600">{activeBucket.queue}</span> : null}
+            {activeBucket ? <span className="badge border-slate-200 bg-white text-slate-600">{getQueueDisplayLabel(activeBucket.queue)}</span> : null}
           </div>
         </div>
 
@@ -399,13 +403,13 @@ export function CsAdminWorkspaceDashboard({
             >
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold uppercase tracking-[0.2em]">
-                  {queueShortLabel[bucket.queue] ?? 'queue'}
+                  {queueShortLabel[bucket.queue] ?? 'antrean'}
                 </span>
                 <span className={`badge ${active ? 'border-white/20 bg-white/10 text-current' : 'border-slate-200 bg-white text-slate-600'}`}>
                   {bucket.totalCount} item
                 </span>
               </div>
-              <h2 className="mt-4 text-lg font-semibold">{bucket.queue}</h2>
+              <h2 className="mt-4 text-lg font-semibold">{getQueueDisplayLabel(bucket.queue)}</h2>
               <p className={`mt-2 text-sm leading-6 ${active ? 'text-current/90' : 'text-mute'}`}>
                 {queueDescriptions[bucket.queue] ?? 'Bucket supervisor untuk tindak lanjut operasional CS.'}
               </p>
@@ -426,9 +430,9 @@ export function CsAdminWorkspaceDashboard({
         <section className="panel p-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="section-title">Queue Aktif</p>
+              <p className="section-title">Antrean Aktif</p>
               <h2 className="mt-2 text-xl font-semibold text-slate-950">
-                {activeBucket ? activeBucket.queue : 'Belum ada queue supervisor'}
+                {activeBucket ? getQueueDisplayLabel(activeBucket.queue) : 'Belum ada antrean supervisor'}
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-mute">
                 {activeBucket
@@ -445,7 +449,7 @@ export function CsAdminWorkspaceDashboard({
                 <article className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Item Aktif</p>
                   <p className="mt-1 text-lg font-semibold text-slate-950">{activeBucket.totalCount}</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">Backlog aktif yang sedang dibaca supervisor pada queue ini.</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">Backlog aktif yang sedang dibaca supervisor pada antrean ini.</p>
                 </article>
                 <article className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">Kritikal</p>
@@ -519,7 +523,7 @@ export function CsAdminWorkspaceDashboard({
                           <td className="px-4 py-3 align-top">
                             <div className="space-y-1">
                               <p className="text-sm font-semibold text-slate-950">{item.actionLabel}</p>
-                              <p className="text-xs leading-5 text-slate-500">{item.reason || 'Buka detail untuk melihat alasan lengkap item masuk ke queue supervisor.'}</p>
+                              <p className="text-xs leading-5 text-slate-500">{item.reason || 'Buka detail untuk melihat alasan lengkap item masuk ke antrean supervisor.'}</p>
                             </div>
                           </td>
                           <td className="px-4 py-3 align-top">
@@ -598,7 +602,7 @@ export function CsAdminWorkspaceDashboard({
             </>
           ) : (
             <div className="mt-6 rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm leading-6 text-mute">
-              Queue ini belum memiliki item aktif. Pilih bucket lain atau lanjut ke modul terkait untuk melihat scope detail.
+              Antrean ini belum memiliki item aktif. Pilih bucket lain atau lanjut ke modul terkait untuk melihat scope detail.
             </div>
           )}
         </section>

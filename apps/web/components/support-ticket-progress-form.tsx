@@ -155,7 +155,7 @@ export function SupportTicketProgressForm({
           },
           {
             label: 'Hasil',
-            value: 'Ticket tetap hidup di queue dengan jejak follow-up yang lebih jelas untuk operator berikutnya.',
+            value: 'Ticket tetap hidup di antrean dengan jejak follow-up yang lebih jelas untuk operator berikutnya.',
           },
         ]}
       />
@@ -248,7 +248,7 @@ export function SupportTicketProgressForm({
 
         <div className="flex flex-col gap-3 lg:col-span-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Saran ticket diambil dari queue trouble ticket yang sedang tampil, lengkap dengan snapshot PIC dan follow-up terakhir.
+            Saran ticket diambil dari antrean trouble ticket yang sedang tampil, lengkap dengan snapshot PIC dan follow-up terakhir.
           </div>
           <button
             type="submit"

@@ -284,7 +284,7 @@ function getDashboardKpiBaselineSeeds(): DashboardKpiBaselineSeed[] {
     {
       dashboardKey: 'DISMANTLE',
       metricKey: 'DISMANTLE_DISMANTLE_OPEN_QUEUE',
-      metricLabel: 'Queue Dismantle',
+      metricLabel: 'Antrean Dismantle',
       metricType: 'COUNT',
       templateKey: 'DISMANTLE_OPEN_QUEUE',
       displayOrder: 10,

@@ -20,13 +20,13 @@ type SupportLaneMeta = {
 
 const supportLaneMetaMap: Record<SupportLaneKey, SupportLaneMeta> = {
   tt: {
-    title: 'Queue Trouble Ticket',
+    title: 'Antrean Trouble Ticket',
     shortLabel: 'TT',
     accent: 'bg-orange-50 text-orange-700',
     sectionKeywords: ['TROUBLE'],
   },
   isolations: {
-    title: 'Queue Isolir Aktif',
+    title: 'Antrean Isolir Aktif',
     shortLabel: 'Isolir',
     accent: 'bg-amber-50 text-amber-700',
     sectionKeywords: ['ISOLIR'],
@@ -213,7 +213,7 @@ export function buildSupportLaneWorkspace(
         'Gunakan lane ini untuk membaca kandidat terminasi dari isolir aktif, memfinalkan keputusan dismantle, dan menjaga histori penutupan layanan tetap sinkron.',
       checklist: [
         'Pastikan kandidat dismantle berasal dari isolir atau keputusan terminasi yang valid.',
-        'Verifikasi queue open sebelum pelanggan dipindahkan ke histori dismantle.',
+        'Verifikasi antrean open sebelum pelanggan dipindahkan ke histori dismantle.',
         'Simpan close note atau reopen note sebagai jejak operasional.',
       ],
       actionKeys: ['dismantle-approve', 'dismantle-close', 'dismantle-reopen', 'isolation-restore'],

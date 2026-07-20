@@ -115,24 +115,24 @@ export function SupportDismantleCloseForm({
     <section className="panel p-6">
       <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-        Tutup queue dismantle ke histori
+        Tutup antrean dismantle ke histori
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">
         {!canProcess
           ? 'Role aktif belum memiliki akses operasional untuk menutup dismantle pada lane ini.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi close dismantle dinonaktifkan agar tidak menulis ke mock.'
-            : 'Form ini memindahkan queue dismantle aktif ke histori close lengkap dengan metadata lapangan, kondisi perangkat, dan keputusan billing agar parity terminasi lebih dekat ke baseline.'}
+            : 'Form ini memindahkan antrean dismantle aktif ke histori close lengkap dengan metadata lapangan, kondisi perangkat, dan keputusan billing agar parity terminasi lebih dekat ke baseline.'}
       </p>
       <SupportFormContextNote
         items={[
           {
             label: 'Tujuan',
-            value: 'Memfinalkan terminate dari queue aktif ke histori dengan jejak lapangan yang lengkap.',
+            value: 'Memfinalkan terminate dari antrean aktif ke histori dengan jejak lapangan yang lengkap.',
           },
           {
             label: 'Sumber',
-            value: 'Pilihan diambil dari queue dismantle aktif yang memang masih menunggu close lapangan.',
+            value: 'Pilihan diambil dari antrean dismantle aktif yang memang masih menunggu close lapangan.',
           },
           {
             label: 'Hasil',
@@ -143,7 +143,7 @@ export function SupportDismantleCloseForm({
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Queue Dismantle</span>
+          <span className="font-semibold text-slate-950">Antrean Dismantle</span>
           <input
             list="support-dismantle-close-suggestions"
             value={dismantleValue}

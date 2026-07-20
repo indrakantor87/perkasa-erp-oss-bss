@@ -64,7 +64,7 @@ function getOwnershipState(row: DomainReviewRow) {
     return {
       label: 'Jalur Dismantle',
       owner: 'CS & Admin CS',
-      note: 'Kasus sudah masuk queue dismantle dan diperlakukan sebagai terminate permanen.',
+      note: 'Kasus sudah masuk antrean dismantle dan diperlakukan sebagai terminate permanen.',
       tone: 'border-rose-200 bg-rose-50 text-rose-700',
       nextLabel: 'Buka Form Dismantle',
       nextHref: buildSupportActionHref('dismantle-approve', {

@@ -265,7 +265,7 @@ export function SupportTicketEscalateForm({
 
         <div className="flex flex-col gap-3 lg:col-span-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Ticket diambil dari queue TT aktif yang sudah membawa konteks SLA, progress, dan jejak eskalasi terakhir.
+            Ticket diambil dari antrean TT aktif yang sudah membawa konteks SLA, progress, dan jejak eskalasi terakhir.
           </div>
           <button
             type="submit"

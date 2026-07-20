@@ -122,9 +122,9 @@ export function TechnicianWorkspacePage({
   }
   const secondaryAction: OrganizationWorkspaceLink | undefined = config.queueTicketType
     ? {
-        label: config.secondaryActionLabel || 'Buka queue terkait',
+        label: config.secondaryActionLabel || 'Buka antrean terkait',
         href: buildQueueHref(session, config),
-        description: config.secondaryActionDescription || 'Masuk ke queue ticketing untuk melihat sumber kerja teknis yang relevan.',
+        description: config.secondaryActionDescription || 'Masuk ke antrean ticketing untuk melihat sumber kerja teknis yang relevan.',
       }
     : undefined
 

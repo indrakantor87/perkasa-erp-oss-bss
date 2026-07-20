@@ -133,7 +133,7 @@ export function BillingCollectionActionForm({
       return {
         label: 'Keputusan suspend siap diteruskan ke Isolir dan SLA',
         detail:
-          'Setelah action suspend dibuka, tim perlu menyelaraskan kasus pelanggan pada queue isolir aktif, memantau ticket yang berisiko melewati SLA, dan menyiapkan supervisor jika kasus bergerak ke terminate.',
+          'Setelah action suspend dibuka, tim perlu menyelaraskan kasus pelanggan pada antrean isolir aktif, memantau ticket yang berisiko melewati SLA, dan menyiapkan supervisor jika kasus bergerak ke terminate.',
       }
     }
     if (actionType === 'RECONNECT') {
@@ -147,7 +147,7 @@ export function BillingCollectionActionForm({
       return {
         label: 'Janji bayar menahan keputusan isolir atau terminate',
         detail:
-          'Promise to pay menjaga kasus tetap pada jalur follow-up Billing. Queue isolir, SLA, dan supervisor tetap perlu memonitor agar tidak salah didorong ke terminate terlalu cepat.',
+          'Promise to pay menjaga kasus tetap pada jalur follow-up Billing. Antrean isolir, SLA, dan supervisor tetap perlu memonitor agar tidak salah didorong ke terminate terlalu cepat.',
       }
     }
     return {
@@ -360,8 +360,8 @@ export function BillingCollectionActionForm({
             {(mode === 'batch' ? resolvedBatchSuggestions.length : invoiceSuggestions.length) > 0
               ? mode === 'batch'
                 ? `Batch akan memproses seluruh invoice pada antrean ${batchQueueLabel} yang sedang tampil di halaman ini.`
-                : `Saran invoice diambil dari queue invoice tindak lanjut yang sedang tampil pada halaman ini.`
-              : 'Belum ada saran invoice dari review queue saat ini; Anda tetap bisa mengisi manual.'}
+                : `Saran invoice diambil dari antrean invoice tindak lanjut yang sedang tampil pada halaman ini.`
+              : 'Belum ada saran invoice dari review antrean saat ini; Anda tetap bisa mengisi manual.'}
           </div>
           <button
             type="submit"

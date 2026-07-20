@@ -179,7 +179,7 @@ export function getMockRoleQueues(role: AppRole, summary: DashboardSummary): Das
       ]
     case 'DISMANTLE_OPERATOR':
       return [
-        buildQueueItem('Queue Dismantle', '/support', Math.max(5, Math.round(summary.isolations / 3)), 'Daftar pelanggan yang masuk tindak lanjut dismantle.', 'bg-rose-50 text-rose-700'),
+        buildQueueItem('Antrean Dismantle', '/support', Math.max(5, Math.round(summary.isolations / 3)), 'Daftar pelanggan yang masuk tindak lanjut dismantle.', 'bg-rose-50 text-rose-700'),
         buildQueueItem('Catatan Lapangan', '/support', 4, 'Ticket yang butuh update hasil kunjungan.', 'bg-amber-50 text-amber-700'),
       ]
     default:
@@ -279,7 +279,7 @@ export function getMockWorklist(role: AppRole): DashboardWorkItem[] {
           id: 'port-1',
           domain: 'Inventory',
           title: 'Cek ketersediaan ODP untuk pemasangan',
-          subtitle: 'Queue teknis untuk order yang siap dijadwalkan',
+          subtitle: 'Antrean teknis untuk order yang siap dijadwalkan',
           status: 'READY',
           priority: 'sedang',
           detail: 'Validasi port kosong sebelum konfirmasi ke tim lapangan.',
@@ -443,11 +443,11 @@ export function getMockWorklist(role: AppRole): DashboardWorkItem[] {
         {
           id: 'dis-1',
           domain: 'Support',
-          title: 'Queue dismantle pelanggan suspend',
+          title: 'Antrean dismantle pelanggan suspend',
           subtitle: 'Perlu cek ticket dan note lapangan',
           status: 'READY',
           priority: 'tinggi',
-          detail: 'Pastikan pelanggan yang masuk queue sudah lolos review administrasi.',
+          detail: 'Pastikan pelanggan yang masuk antrean sudah lolos review administrasi.',
           href: '/support',
         },
         {

@@ -134,7 +134,7 @@ export function SupportTicketCreateForm({
           ? 'Role aktif belum memiliki izin create pada domain Support.'
           : !reviewDbReady
             ? 'Mode review database belum aktif, jadi write action support dinonaktifkan agar tidak menulis ke mock.'
-            : 'Form ini menambah trouble ticket open awal ke review DB agar queue support bisa diuji dari sisi input hingga tindak lanjut.'}
+            : 'Form ini menambah trouble ticket open awal ke review DB agar antrean support bisa diuji dari sisi input hingga tindak lanjut.'}
       </p>
       <SupportFormContextNote
         items={[
@@ -144,7 +144,7 @@ export function SupportTicketCreateForm({
           },
           {
             label: 'Sumber',
-            value: 'Anchor layanan memakai Service No atau Customer Code dari queue support yang sedang tampil.',
+            value: 'Anchor layanan memakai Service No atau Customer Code dari antrean support yang sedang tampil.',
           },
           {
             label: 'Hasil',

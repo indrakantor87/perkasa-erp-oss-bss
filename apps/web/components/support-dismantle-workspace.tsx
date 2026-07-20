@@ -77,7 +77,7 @@ export function SupportDismantleWorkspace({
     {
       key: 'dismantle-approve',
       label: 'Transfer Dismantle',
-      description: 'Masukkan isolir aktif ke queue dismantle.',
+      description: 'Masukkan isolir aktif ke antrean dismantle.',
       href: `#${getSupportActionAnchorId('dismantle-approve')}`,
     },
     {
@@ -88,8 +88,8 @@ export function SupportDismantleWorkspace({
     },
     {
       key: 'dismantle-reopen',
-      label: 'Reopen Queue',
-      description: 'Buka kembali histori ke queue aktif.',
+      label: 'Reopen Antrean',
+      description: 'Buka kembali histori ke antrean aktif.',
       href: `#${getSupportActionAnchorId('dismantle-reopen')}`,
     },
   ] satisfies SupportActionLink[]

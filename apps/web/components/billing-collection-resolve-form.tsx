@@ -89,7 +89,7 @@ export function BillingCollectionResolveForm({
       return {
         label: 'Resolve suspend perlu ditutup dengan sinkron Isolir dan Supervisor',
         detail:
-          'Follow-up suspend yang selesai tetap harus dibaca ulang pada queue Isolir dan Supervisor CS_ADMIN agar keputusan restore, tahan, atau terminate tidak menggantung di domain support.',
+          'Follow-up suspend yang selesai tetap harus dibaca ulang pada antrean Isolir dan Supervisor CS_ADMIN agar keputusan restore, tahan, atau terminate tidak menggantung di domain support.',
       }
     }
     if (actionType === 'RECONNECT' && resolutionStatus === 'DONE') {
@@ -240,7 +240,7 @@ export function BillingCollectionResolveForm({
 
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Resolve memakai queue follow-up collection OPEN yang sedang tampil agar operator menutup action berdasarkan konteks invoice aktif.
+            Resolve memakai antrean follow-up collection OPEN yang sedang tampil agar operator menutup action berdasarkan konteks invoice aktif.
           </div>
           <button
             type="submit"

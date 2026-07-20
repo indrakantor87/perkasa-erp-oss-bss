@@ -23,7 +23,7 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
   {
     title: 'List Kerja',
     href: '/dashboard/worklist',
-    description: 'Queue lintas domain untuk tindak lanjut harian',
+    description: 'Antrean lintas domain untuk tindak lanjut harian',
     tone: 'bg-slate-700 text-white',
     icon: SquareKanban,
   },

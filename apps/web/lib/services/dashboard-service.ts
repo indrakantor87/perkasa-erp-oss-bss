@@ -1766,12 +1766,12 @@ function buildMockOperationalCards(summary: DashboardSummary, filters: Dashboard
     {
       key: 'DISMANTLE',
       title: 'Dismantle',
-      description: 'Queue pembongkaran, tindak lanjut lapangan, dan penutupan catatan dismantle operasional.',
+      description: 'Antrean pembongkaran, tindak lanjut lapangan, dan penutupan catatan dismantle operasional.',
       badge: 'Dismantle',
       href: '/support/dismantle',
       tone: 'border-rose-200 bg-rose-50 text-rose-900',
       metrics: [
-        { label: 'Queue Dismantle', value: formatNumber(Math.max(5, Math.round(summary.isolations / 3))) },
+        { label: 'Antrean Dismantle', value: formatNumber(Math.max(5, Math.round(summary.isolations / 3))) },
         { label: 'Follow Up Lapangan', value: formatNumber(Math.max(2, Math.round(summary.isolations / 5))) },
         { label: 'Close Periode Ini', value: formatNumber(Math.max(2, Math.round(summary.isolations / 6))) },
       ],
@@ -2668,12 +2668,12 @@ async function getReviewDbOperationalCards(
     {
       key: 'DISMANTLE',
       title: 'Dismantle',
-      description: 'Queue pembongkaran, tindak lanjut lapangan, dan penutupan catatan dismantle operasional.',
+      description: 'Antrean pembongkaran, tindak lanjut lapangan, dan penutupan catatan dismantle operasional.',
       badge: 'Dismantle',
       href: '/support/dismantle',
       tone: 'border-rose-200 bg-rose-50 text-rose-900',
       metrics: [
-        { label: 'Queue Dismantle', value: formatNumber(Number(cs.openDismantles ?? 0)) },
+        { label: 'Antrean Dismantle', value: formatNumber(Number(cs.openDismantles ?? 0)) },
         { label: 'Follow Up Lapangan', value: formatNumber(Math.max(0, Number(cs.openDismantles ?? 0))) },
         { label: 'Close Periode Ini', value: formatNumber(Number(cs.monthlyDismantles ?? 0)) },
       ],

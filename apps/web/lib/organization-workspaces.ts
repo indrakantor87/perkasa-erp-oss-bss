@@ -189,7 +189,7 @@ export const csAdminWorkspace: OrganizationWorkspaceDefinition = {
           badge: 'port odp',
         },
         {
-          label: 'Queue Dismantle',
+          label: 'Antrean Dismantle',
           href: '/support/dismantle',
           description: 'Finalisasi terminasi, approval, dan penutupan layanan yang berasal dari isolir atau keputusan supervisor.',
           badge: 'terintegrasi',
@@ -201,7 +201,7 @@ export const csAdminWorkspace: OrganizationWorkspaceDefinition = {
       description: 'Jalur pendukung agar CS dan Admin CS bisa membaca kasus yang bergerak dari support ke terminasi.',
       links: [
         {
-          label: 'Queue Isolir',
+          label: 'Antrean Isolir',
           href: '/support/isolations',
           description: 'Cek kasus isolir aktif yang masih mungkin dipulihkan atau dipindah ke dismantle.',
         },
@@ -292,7 +292,7 @@ export const legalWorkspace: OrganizationWorkspaceDefinition = {
           badge: 'pelanggan',
         },
         {
-          label: 'Queue Isolir',
+          label: 'Antrean Isolir',
           href: '/support/isolations',
           description: 'Pantau kasus isolir aktif yang berpotensi berujung ke keputusan legal, collection, atau terminasi.',
           badge: 'isolir',
@@ -316,7 +316,7 @@ export const legalWorkspace: OrganizationWorkspaceDefinition = {
           badge: 'worklist',
         },
         {
-          label: 'Queue Dismantle',
+          label: 'Antrean Dismantle',
           href: '/support/dismantle',
           description: 'Pantau terminasi layanan yang butuh jejak administrasi dan keputusan penutupan yang rapi.',
           badge: 'terminasi',
@@ -332,7 +332,7 @@ export const kantorWorkspace: OrganizationWorkspaceDefinition = {
   description:
     'Workspace organisasi untuk ritme kantor, stok aktif, dan tindak lanjut administrasi harian yang menopang divisi lain di ERP.',
   primaryAction: {
-    label: 'Queue Inventory Kantor',
+    label: 'Antrean Inventory Kantor',
     href: buildWorklistHref({ domain: 'Inventory' }),
     description: 'Masuk ke antrean inventory dan request yang paling sering disentuh operasional kantor.',
   },
@@ -361,7 +361,7 @@ export const kantorWorkspace: OrganizationWorkspaceDefinition = {
       description: 'Landing kantor sekarang diarahkan ke request inventory, ritme kerja harian, dan koordinasi internal.',
       links: [
         {
-          label: 'Queue Inventory Kantor',
+          label: 'Antrean Inventory Kantor',
           href: buildWorklistHref({ domain: 'Inventory' }),
           description: 'Baca antrean inventory dan request yang sedang menyentuh kebutuhan operasional kantor.',
           badge: 'kantor',
@@ -494,7 +494,7 @@ export const teknisiPsbWorkspace: OrganizationWorkspaceDefinition = {
   description:
     'Landing organisasi untuk instalasi baru, kesiapan material, dan tindak lanjut work order lapangan yang terkait proses PSB.',
   primaryAction: {
-    label: 'Queue WO Lapangan',
+    label: 'Antrean WO Lapangan',
     href: buildWorklistHref({ queue: 'Work Order Lapangan', domain: 'Sales' }),
     description: 'Masuk ke antrean work order lapangan yang paling dekat dengan instalasi baru.',
   },
@@ -506,7 +506,7 @@ export const teknisiPsbWorkspace: OrganizationWorkspaceDefinition = {
   steps: [
     {
       title: 'Terima WO PSB',
-      detail: 'Baca pekerjaan lapangan dari queue work order agar instalasi baru tidak tertinggal.',
+      detail: 'Baca pekerjaan lapangan dari antrean work order agar instalasi baru tidak tertinggal.',
     },
     {
       title: 'Siapkan Material',
@@ -523,7 +523,7 @@ export const teknisiPsbWorkspace: OrganizationWorkspaceDefinition = {
       description: 'Menu ini diperdalam untuk pekerjaan PSB, bukan sekadar pintu masuk teknisi generik.',
       links: [
         {
-          label: 'Queue WO Lapangan',
+          label: 'Antrean WO Lapangan',
           href: buildWorklistHref({ queue: 'Work Order Lapangan', domain: 'Sales' }),
           description: 'Prioritaskan antrian work order lapangan yang paling dekat dengan instalasi pelanggan baru.',
           badge: 'psb',
@@ -581,7 +581,7 @@ export const teknisiExpanWorkspace: OrganizationWorkspaceDefinition = {
   description:
     'Landing ini memfokuskan pekerjaan ekspan jaringan, kesiapan jalur, dan kebutuhan ODP/port agar tim lapangan punya pintu kerja yang eksplisit.',
   primaryAction: {
-    label: 'Queue ODP dan Port',
+    label: 'Antrean ODP dan Port',
     href: buildWorklistHref({ queue: 'ODP dan Port', domain: 'Inventory' }),
     description: 'Masuk ke antrean ODP dan port yang paling relevan untuk penataan jalur expan.',
   },
@@ -610,7 +610,7 @@ export const teknisiExpanWorkspace: OrganizationWorkspaceDefinition = {
       description: 'Landing expan sekarang membaca jalur, port, dan movement sebagai isi utama operasionalnya.',
       links: [
         {
-          label: 'Queue ODP dan Port',
+          label: 'Antrean ODP dan Port',
           href: buildWorklistHref({ queue: 'ODP dan Port', domain: 'Inventory' }),
           description: 'Prioritaskan antrean inventory yang berhubungan langsung dengan ODP, port, dan kapasitas jaringan.',
           badge: 'expan',
@@ -668,19 +668,19 @@ export const teknisiJointerWorkspace: OrganizationWorkspaceDefinition = {
   description:
     'Landing organisasi untuk pekerjaan joint, sambungan jaringan, dan tindak lanjut kualitas backbone yang terhubung ke support dan inventory.',
   primaryAction: {
-    label: 'Queue TT Teknis',
+    label: 'Antrean TT Teknis',
     href: buildWorklistHref({ queue: 'TT Teknis', domain: 'Support', overdue: true }),
     description: 'Masuk ke antrean ticket teknis yang paling dekat dengan pekerjaan joint dan tindak lanjut backbone.',
   },
   secondaryAction: {
     label: 'Buka TT',
     href: '/support/tt',
-    description: 'Masuk ke queue trouble ticket untuk tindak lanjut jaringan lapangan.',
+    description: 'Masuk ke antrean trouble ticket untuk tindak lanjut jaringan lapangan.',
   },
   steps: [
     {
       title: 'Cek Gangguan',
-      detail: 'Gunakan queue TT untuk membaca kasus yang menuntut pekerjaan joint atau tindak lanjut backbone.',
+      detail: 'Gunakan antrean TT untuk membaca kasus yang menuntut pekerjaan joint atau tindak lanjut backbone.',
     },
     {
       title: 'Validasi Jaringan',
@@ -697,13 +697,13 @@ export const teknisiJointerWorkspace: OrganizationWorkspaceDefinition = {
       description: 'Landing jointer sekarang menonjolkan TT teknis dan SLA, bukan hanya link umum ke support.',
       links: [
         {
-          label: 'Queue TT Teknis',
+          label: 'Antrean TT Teknis',
           href: buildWorklistHref({ queue: 'TT Teknis', domain: 'Support', overdue: true }),
           description: 'Baca ticket teknis yang masih aktif atau overdue untuk kebutuhan sambungan dan perbaikan jaringan.',
           badge: 'jointer',
         },
         {
-          label: 'Queue Trouble Ticket',
+          label: 'Antrean Trouble Ticket',
           href: '/support/tt',
           description: 'Masuk ke lane TT untuk analisis gangguan dan tindak lanjut operasional.',
           badge: 'ticket',
@@ -754,14 +754,14 @@ export const teknisiTroubleshootsWorkspace: OrganizationWorkspaceDefinition = {
     description: 'Masuk ke daftar work order trouble untuk melihat assignment, status, dan histori perangkat.',
   },
   secondaryAction: {
-    label: 'Buka Queue Ticketing',
+    label: 'Buka Antrean Ticketing',
     href: '/dashboard/tracking/noc-queue?ticketType=TROUBLESHOOTS',
-    description: 'Masuk ke queue ticketing gabungan dengan filter trouble agar konteks NOC tetap terbaca.',
+    description: 'Masuk ke antrean ticketing gabungan dengan filter trouble agar konteks NOC tetap terbaca.',
   },
   steps: [
     {
       title: 'Terima Job Trouble',
-      detail: 'Baca work order trouble atau queue ticketing yang sudah didelegasikan agar gangguan tidak menumpuk.',
+      detail: 'Baca work order trouble atau antrean ticketing yang sudah didelegasikan agar gangguan tidak menumpuk.',
     },
     {
       title: 'Eksekusi Lapangan',
@@ -784,7 +784,7 @@ export const teknisiTroubleshootsWorkspace: OrganizationWorkspaceDefinition = {
           badge: 'trouble',
         },
         {
-          label: 'Queue Ticketing Trouble',
+          label: 'Antrean Ticketing Trouble',
           href: '/dashboard/tracking/noc-queue?ticketType=TROUBLESHOOTS',
           description: 'Baca antrean ticketing khusus trouble untuk memantau status OPEN, ON PROGRESS, dan CLOSE.',
           badge: 'ticket',

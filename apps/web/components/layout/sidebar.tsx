@@ -185,8 +185,8 @@ function buildSupportMainItem(role: AppRole | null) {
     title: role === 'NOC_OPERATOR' ? 'NOC & Ticketing' : 'Support Teknis',
     description:
       role === 'NOC_OPERATOR'
-        ? 'Queue ticket teknis, prioritas SLA, monitoring isolir, dan tindak lanjut operasional NOC'
-        : 'Queue teknis, TT, monitoring ticket, dan kontrol SLA operasional',
+        ? 'Antrean ticket teknis, prioritas SLA, monitoring isolir, dan tindak lanjut operasional NOC'
+        : 'Antrean teknis, TT, monitoring ticket, dan kontrol SLA operasional',
     excludePrefixes: ['/support/isolations', '/support/dismantle'],
     children: buildSupportSubmenuItems(role),
   })
@@ -210,8 +210,8 @@ function buildSupportSubmenuItems(role: AppRole | null) {
       title: role === 'NOC_OPERATOR' ? 'Ticketing NOC' : 'Trouble Ticket',
       description:
         role === 'NOC_OPERATOR'
-          ? 'Queue ticket teknis aktif untuk intake, dispatch, update progres, dan validasi penutupan.'
-          : 'Queue ticket open, progress, ready close, dan tindak lanjut teknis.',
+          ? 'Antrean ticket teknis aktif untuk intake, dispatch, update progres, dan validasi penutupan.'
+          : 'Antrean ticket open, progress, ready close, dan tindak lanjut teknis.',
     },
     isolations: {
       key: 'support-sub-isolations',
@@ -224,7 +224,7 @@ function buildSupportSubmenuItems(role: AppRole | null) {
     dismantle: {
       key: 'support-sub-dismantle',
       title: 'Dismantle',
-      description: 'Queue pembongkaran perangkat dan tindak lanjut terminasi lapangan.',
+      description: 'Antrean pembongkaran perangkat dan tindak lanjut terminasi lapangan.',
     },
     sla: {
       key: 'support-sub-sla',
@@ -715,7 +715,7 @@ function buildDismantleItem() {
   return buildSidebarNavItem('/support', {
     key: 'support-dismantle-only',
     title: 'Dismantle',
-    description: 'Queue pembongkaran perangkat dan tindak lanjut lapangan',
+    description: 'Antrean pembongkaran perangkat dan tindak lanjut lapangan',
     href: '/support/dismantle',
     requiredPath: '/support/dismantle',
     allowedRoles: ['SUPER_ADMIN', 'DISMANTLE_OPERATOR'],
@@ -797,7 +797,7 @@ function getWorkspaceCustomItems(role: AppRole | null) {
     case 'CS_ADMIN':
       return [buildCsAdminItem()]
     case 'NOC_OPERATOR':
-      return [buildSupportMainItem(role)]
+      return [buildCompactTicketingItem()]
     case 'FIELD_TECHNICIAN':
       return [buildTeknisiLapanganItem()]
     case 'TT_OPERATOR':
@@ -839,7 +839,7 @@ function getSupportingCustomItems(role: AppRole | null) {
     case 'SALES_MARKETING':
       return [buildCustomersMainItem(role)]
     case 'NOC_OPERATOR':
-      return [buildInventoryMainItem(role)]
+      return [buildCompactIsolirItem(), buildInventoryMainItem(role)]
     default:
       return []
   }

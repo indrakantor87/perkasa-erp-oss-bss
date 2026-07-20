@@ -18,7 +18,7 @@ const englishTextMap: Record<string, string> = {
   Akses: 'Access',
   'User Internal': 'Internal Users',
   'Ringkasan singkat kesehatan operasi dan jalur masuk kerja': 'Brief summary of operation health and work entry points',
-  'Queue lintas domain untuk tindak lanjut harian': 'Cross-domain queue for daily follow-up',
+  'Antrean lintas domain untuk tindak lanjut harian': 'Cross-domain queue for daily follow-up',
   'Plan pagi dan closing sore aktivitas harian': 'Morning planning and afternoon closing for daily activities',
   'Audit batch import, exception, dan finalisasi data': 'Audit import batches, exceptions, and data finalization',
   'Lead, survey, dan order': 'Leads, surveys, and orders',
@@ -37,16 +37,16 @@ const englishTextMap: Record<string, string> = {
   'Agenda canvassing, covered area, dan ritme aktivitas marketing.':
     'Canvassing schedule, covered area, and marketing activity rhythm.',
   'Support Teknis': 'Technical Support',
-  'Queue teknis, TT, monitoring ticket, dan kontrol SLA operasional':
+  'Antrean teknis, TT, monitoring ticket, dan kontrol SLA operasional':
     'Technical queue, TT, ticket monitoring, and operational SLA control',
   'Trouble Ticket': 'Trouble Ticket',
-  'Queue ticket open, progress, ready close, dan tindak lanjut teknis.':
+  'Antrean ticket open, progress, ready close, dan tindak lanjut teknis.':
     'Open, in-progress, and ready-to-close tickets with technical follow-up.',
   Isolir: 'Suspensions',
   'Monitoring pelanggan suspend, restore, dan sinkron support-billing.':
     'Monitor suspended customers, restores, and support-billing sync.',
   Dismantle: 'Dismantle',
-  'Queue pembongkaran perangkat dan tindak lanjut terminasi lapangan.':
+  'Antrean pembongkaran perangkat dan tindak lanjut terminasi lapangan.':
     'Device dismantle queue and field termination follow-up.',
   'Kontrol SLA': 'SLA Control',
   'Pantau overdue, kedisiplinan progres, dan ticket yang perlu eskalasi.':
@@ -117,11 +117,11 @@ const englishTextMap: Record<string, string> = {
   Pendukung: 'Supporting',
   Pengaturan: 'Settings',
   'ERP OSS BSS': 'ERP OSS BSS',
-  'Masuk ke queue, list kerja, dan modul harian tanpa perlu menebak alur dari awal.':
+  'Masuk ke antrean, list kerja, dan modul harian tanpa perlu menebak alur dari awal.':
     'Access queues, worklists, and daily modules without guessing the flow from scratch.',
   'Mode Harian': 'Daily Mode',
   'Mode Kontrol': 'Control Mode',
-  'Fokus ke queue cepat, daily activity, dan workspace inti.':
+  'Fokus ke antrean cepat, daily activity, dan workspace inti.':
     'Focus on quick queues, daily activity, and core workspaces.',
   'Tampilkan area lintas divisi dan menu pengawasan yang lebih lengkap.':
     'Show cross-division areas and a more complete oversight menu.',
@@ -159,15 +159,15 @@ const englishTextMap: Record<string, string> = {
     'CS operations supervisor with approval authority and specific data corrections.',
   'Trouble ticket teknis, monitoring jaringan, dan ODP operasional.':
     'Technical trouble tickets, network monitoring, and operational ODP.',
-  'Eksekusi lapangan, hasil kunjungan, dan update teknis sesuai queue.':
+  'Eksekusi lapangan, hasil kunjungan, dan update teknis sesuai antrean.':
     'Field execution, visit outcomes, and technical updates by queue.',
   'Penanganan trouble ticket dengan scope support yang sempit.':
     'Trouble ticket handling with a narrow support scope.',
   'Campaign, lead digital, konten, dan analytics marketing.': 'Campaigns, digital leads, content, and marketing analytics.',
-  'Queue dismantle, catatan lapangan, dan penyelesaian pembongkaran.':
+  'Antrean dismantle, catatan lapangan, dan penyelesaian pembongkaran.':
     'Dismantle queue, field notes, and dismantle completion.',
-  'Queue Trouble Ticket': 'Trouble Ticket Queue',
-  'Queue Isolir Aktif': 'Active Suspension Queue',
+  'Antrean Trouble Ticket': 'Trouble Ticket Queue',
+  'Antrean Isolir Aktif': 'Active Suspension Queue',
   'Dismantle Dan Terminasi': 'Dismantle and Termination',
   'Workspace Trouble Ticket': 'Trouble Ticket Workspace',
   'Workspace Monitoring Trouble Ticket': 'Trouble Ticket Monitoring Workspace',
@@ -197,7 +197,7 @@ const englishTextMap: Record<string, string> = {
     'Use this lane to review termination candidates from active suspensions, finalize dismantle decisions, and keep service closure history in sync.',
   'Pastikan kandidat dismantle berasal dari isolir atau keputusan terminasi yang valid.':
     'Ensure dismantle candidates come from suspensions or valid termination decisions.',
-  'Verifikasi queue open sebelum pelanggan dipindahkan ke histori dismantle.':
+  'Verifikasi antrean open sebelum pelanggan dipindahkan ke histori dismantle.':
     'Verify the open queue before moving customers to dismantle history.',
   'Simpan close note atau reopen note sebagai jejak operasional.':
     'Save close notes or reopen notes as the operational audit trail.',
@@ -259,7 +259,7 @@ const englishTextMap: Record<string, string> = {
   'Pantau antrean lintas domain yang mengandung kata kunci digital, campaign, atau konten.':
     'Track cross-domain queues related to digital, campaign, or content keywords.',
   'List Kerja Terpadu': 'Unified Worklist',
-  'Queue lintas domain untuk role aktif': 'Cross-domain queue for the active role',
+  'Antrean lintas domain untuk role aktif': 'Cross-domain queue for the active role',
   'Penjualan, customer, support, inventory, dan import dibaca dari satu layar kerja.':
     'Sales, customers, support, inventory, and imports are reviewed from one workspace.',
   'Mode baca saja': 'Read-only mode',

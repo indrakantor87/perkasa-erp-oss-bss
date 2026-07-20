@@ -156,15 +156,15 @@ const supportActionCopyMap: Record<
   },
   'dismantle-approve': {
     label: 'Approve Dismantle',
-    description: 'Transfer pelanggan dari isolir aktif ke queue dismantle agar terminasi final diproses bertahap.',
+    description: 'Transfer pelanggan dari isolir aktif ke antrean dismantle agar terminasi final diproses bertahap.',
   },
   'dismantle-close': {
     label: 'Close Dismantle',
-    description: 'Tutup queue dismantle aktif ke histori permanen setelah terminasi lapangan benar-benar selesai.',
+    description: 'Tutup antrean dismantle aktif ke histori permanen setelah terminasi lapangan benar-benar selesai.',
   },
   'dismantle-reopen': {
     label: 'Reopen Dismantle',
-    description: 'Buka kembali histori dismantle ke queue aktif saat kasus perlu dikoreksi atau dibuka ulang.',
+    description: 'Buka kembali histori dismantle ke antrean aktif saat kasus perlu dikoreksi atau dibuka ulang.',
   },
 }
 

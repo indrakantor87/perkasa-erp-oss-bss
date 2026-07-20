@@ -17,10 +17,10 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
   const lanes: SupportLane[] = [
     {
       key: 'tt',
-      title: 'Queue Trouble Ticket',
+      title: 'Antrean Trouble Ticket',
       description:
         role === 'TT_OPERATOR' || role === 'NOC_OPERATOR'
-          ? 'Queue utama untuk ticket teknis yang perlu analisis, tindak lanjut, atau close loop.'
+          ? 'Antrean utama untuk ticket teknis yang perlu analisis, tindak lanjut, atau close loop.'
           : 'Ticket terbuka yang perlu dipantau dari perspektif operasional support.',
       count: snapshots.find((item) => item.key === 'tt')?.count ?? 0,
       accent: snapshots.find((item) => item.key === 'tt')?.accent ?? 'bg-orange-50 text-orange-700',
@@ -30,7 +30,7 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
     },
     {
       key: 'isolations',
-      title: 'Queue Isolir Aktif',
+      title: 'Antrean Isolir Aktif',
       description:
         role === 'CS_OPERATOR' || role === 'CS_ADMIN'
           ? 'Pelanggan suspend yang perlu tindak lanjut administrasi, ticket, atau transfer proses.'
@@ -43,7 +43,7 @@ function buildSupportLanes(role: AppRole, sections: DomainReviewSection[]): Supp
     },
     {
       key: 'dismantle',
-      title: role === 'DISMANTLE_OPERATOR' ? 'Queue Histori Dismantle' : 'Dismantle Dan Terminasi',
+      title: role === 'DISMANTLE_OPERATOR' ? 'Antrean Histori Dismantle' : 'Dismantle Dan Terminasi',
       description:
         role === 'DISMANTLE_OPERATOR'
           ? 'Jejak pelanggan yang sudah diproses atau siap ditindaklanjuti pada flow dismantle.'
@@ -93,14 +93,14 @@ export function SupportRoleQueueBoard({
     <section className="panel p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="section-title">{role === 'NOC_OPERATOR' ? 'Micro Queue NOC' : 'Micro Queue Support'}</p>
+          <p className="section-title">{role === 'NOC_OPERATOR' ? 'Micro Antrean NOC' : 'Micro Antrean Support'}</p>
           <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
             Prioritas support untuk {roleMeta.label}
           </h3>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
             {role === 'NOC_OPERATOR'
-              ? 'Queue ini memecah area kerja NOC menjadi jalur ticket teknis, prioritas SLA, dan monitoring isolir agar operator fokus ke antrean yang benar-benar relevan.'
-              : 'Queue ini memecah domain support menjadi jalur kerja trouble ticket, isolir, dismantle, dan kontrol SLA agar role operasional tidak melihat daftar campur aduk.'}
+              ? 'Antrean ini memecah area kerja NOC menjadi jalur ticket teknis, prioritas SLA, dan monitoring isolir agar operator fokus ke antrean yang benar-benar relevan.'
+              : 'Antrean ini memecah domain support menjadi jalur kerja trouble ticket, isolir, dismantle, dan kontrol SLA agar role operasional tidak melihat daftar campur aduk.'}
           </p>
         </div>
         <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.shortLabel}</span>

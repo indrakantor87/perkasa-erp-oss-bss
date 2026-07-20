@@ -15,7 +15,7 @@ const handoffLinks = [
     tone: 'border-violet-200 bg-violet-50 text-violet-700',
   },
   {
-    label: 'Queue Isolir',
+    label: 'Antrean Isolir',
     href: buildSupportLaneHref('isolations', { focus: 'ACTIVE_ISOLATIONS' }),
     tone: 'border-amber-200 bg-amber-50 text-amber-700',
   },
@@ -30,7 +30,7 @@ const handoffLinks = [
     tone: 'border-sky-200 bg-sky-50 text-sky-700',
   },
   {
-    label: 'Queue Dismantle',
+    label: 'Antrean Dismantle',
     href: buildSupportLaneHref('dismantle', { focus: 'RECENT_DISMANTLE' }),
     tone: 'border-rose-200 bg-rose-50 text-rose-700',
   },

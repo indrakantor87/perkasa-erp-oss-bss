@@ -127,7 +127,7 @@ const roleMetaMap: Record<AppRole, RoleMeta> = {
     label: 'Dismantle Operator',
     shortLabel: 'Dismantle',
     tone: 'bg-rose-600 text-white',
-    scope: 'Queue dismantle, catatan lapangan, dan penyelesaian pembongkaran.',
+    scope: 'Antrean dismantle, catatan lapangan, dan penyelesaian pembongkaran.',
     division: 'Pemasaran dan Pelayanan',
     subdivision: 'Dismantle',
   },

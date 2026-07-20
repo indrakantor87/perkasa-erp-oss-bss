@@ -35,10 +35,10 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
     session && roleMeta
       ? language === 'en'
         ? `Workspace for ${roleMeta.label} focused on ${roleMeta.scope.toLowerCase()}. Open the relevant queues, work tables, and modules from here.`
-        : `Area kerja ${roleMeta.label} untuk ${roleMeta.scope.toLowerCase()}. Buka queue, tabel kerja, dan modul yang relevan dari sini.`
+        : `Area kerja ${roleMeta.label} untuk ${roleMeta.scope.toLowerCase()}. Buka antrean, tabel kerja, dan modul yang relevan dari sini.`
       : language === 'en'
         ? 'Open the main workspace, priority queues, and operational modules from one compact shell.'
-        : 'Buka area kerja utama, queue prioritas, dan modul operasional dari satu shell yang lebih ringkas.'
+        : 'Buka area kerja utama, antrean prioritas, dan modul operasional dari satu shell yang lebih ringkas.'
 
   return (
     <header className="flex flex-col gap-4 border-b border-line pb-6 lg:flex-row lg:items-end lg:justify-between">

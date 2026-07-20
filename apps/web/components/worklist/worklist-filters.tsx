@@ -18,7 +18,7 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="section-title">Filter Global</p>
-          <h3 className="mt-2 text-xl font-semibold text-[var(--color-ink-strong)]">Kunci tampilan queue melalui URL</h3>
+          <h3 className="mt-2 text-xl font-semibold text-[var(--color-ink-strong)]">Kunci tampilan antrean melalui URL</h3>
           <p className="mt-2 text-sm leading-6 text-mute">
             Semua filter memakai query parameter agar tautan bisa dibagikan ke tim dengan konteks yang sama.
           </p>
@@ -33,7 +33,7 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
 
       <form className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Queue</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Antrean</span>
           <select
             name="queue"
             defaultValue={state.queue}

@@ -1633,7 +1633,7 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
   })
 
   const dismantleOpenResult = await runSafeSupportSectionQuery<ReviewDbSupportDismantleOpenRow>({
-    sectionLabel: 'Queue Dismantle Open',
+    sectionLabel: 'Antrean Dismantle Open',
     enabled: wantDismantle,
     query: () => {
       if (!supportNonTicketReadSchema?.dismantleQueueId || !supportNonTicketReadSchema.dismantleQueueIsolationId) {
@@ -1929,7 +1929,7 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
       })),
     },
     {
-      title: 'Queue Dismantle Open',
+      title: 'Antrean Dismantle Open',
       description:
         'Kandidat terminasi yang masih aktif di isolir dan perlu divalidasi lebih dulu sebelum dipindahkan ke histori dismantle permanen.',
       rows: dismantleOpenRows.map((item) => ({

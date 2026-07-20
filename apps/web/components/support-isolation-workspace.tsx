@@ -209,7 +209,7 @@ export function SupportIsolationWorkspace({
                 href={dismantleTransferHref}
                 className="rounded-md border border-slate-500 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
               >
-                {canProcessSupportDismantle(role, canApprove) ? 'Queue Dismantle' : 'Buka Dismantle'}
+                {canProcessSupportDismantle(role, canApprove) ? 'Antrean Dismantle' : 'Buka Dismantle'}
               </Link>
             ) : null}
           </div>

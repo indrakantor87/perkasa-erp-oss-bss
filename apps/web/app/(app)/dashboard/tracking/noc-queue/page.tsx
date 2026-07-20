@@ -183,7 +183,7 @@ export default async function NocQueuePage({
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="section-title">NOC Workspace</p>
-            <h2 className="mt-2 text-2xl font-semibold text-[var(--color-ink-strong)]">Meja Queue Gabungan</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-[var(--color-ink-strong)]">Ticketing Perkasa</h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
               Tabel ini menyatukan ticket PSB, Troubleshoots, Dismantle, dan Jalur dalam satu antrean
               NOC. Status device sekarang memprioritaskan lifecycle scan terbaru, lalu fallback ke
@@ -226,7 +226,7 @@ export default async function NocQueuePage({
           </label>
 
           <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="font-semibold text-slate-950">Status Queue</span>
+            <span className="font-semibold text-slate-950">Status Antrean</span>
             <select
               name="queueStatus"
               defaultValue={queueStatus}
@@ -411,7 +411,7 @@ export default async function NocQueuePage({
                 <th className="px-4 py-3">Ticket</th>
                 <th className="px-4 py-3">Customer / Site</th>
                 <th className="px-4 py-3">Jenis</th>
-                <th className="px-4 py-3">Status Queue</th>
+                <th className="px-4 py-3">Status Antrean</th>
                 <th className="px-4 py-3">PIC / Teknisi</th>
                 <th className="px-4 py-3">Request Barang</th>
                 <th className="px-4 py-3">Status Device</th>
