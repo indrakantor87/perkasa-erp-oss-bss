@@ -259,9 +259,9 @@ function buildCsAdminItem() {
     title: 'CS & Admin CS',
     description: 'Approval, koreksi, restore, dan backlog risiko CS',
     href: '/customers/cs-admin',
-    matchPrefixes: ['/customers/cs-admin', '/support/dismantle'],
+    matchPrefixes: ['/customers/cs-admin', '/customers/cs-admin/odp-port', '/support/dismantle'],
     allowedRoles: ['SUPER_ADMIN', 'CS_ADMIN'],
-    assignHrefs: ['/customers/cs-admin', '/support/dismantle'],
+    assignHrefs: ['/customers/cs-admin', '/customers/cs-admin/odp-port', '/support/dismantle'],
   })
 }
 
@@ -294,7 +294,7 @@ function buildCustomersSubmenuItems(role: AppRole | null) {
       title: 'CS & Admin CS',
       description: 'Approval, koreksi, restore, dan backlog risiko customer service.',
       href: '/customers/cs-admin',
-      matchPrefixes: ['/customers/cs-admin'],
+      matchPrefixes: ['/customers/cs-admin', '/customers/cs-admin/odp-port'],
     }),
   ]
 }

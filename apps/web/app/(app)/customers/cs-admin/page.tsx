@@ -114,14 +114,14 @@ function buildCsReportingCards(
       title: 'ODP dan Port',
       badge: 'ODP dan Port',
       description:
-        'Ringkasan ODP dan port untuk membaca kapasitas, pergerakan, dan request yang biasa dipakai bersama GA dan NOC.',
-      href: '/inventory',
+        'Ringkasan ODP dan port untuk membaca kapasitas, assignment, dan follow up customer dengan ownership UI di CS.',
+      href: '/customers/cs-admin/odp-port',
       tone: 'border-emerald-200 bg-emerald-50 text-emerald-900',
       metrics: [
         {
           label: 'Item Aktif',
           value: formatCount(summary.inventoryItems),
-          href: '/inventory?focus=ACTIVE_ITEMS',
+          href: '/customers/cs-admin/odp-port?focus=ACTIVE_ITEMS',
           hint: 'Jumlah item inventory aktif yang masih dipakai membaca kesiapan ODP dan port.',
         },
         {
@@ -133,7 +133,7 @@ function buildCsReportingCards(
         {
           label: 'Perlu Follow Up',
           value: formatCount(inventoryBacklog),
-          href: '/inventory',
+          href: '/customers/cs-admin/odp-port',
           hint: 'Jumlah pekerjaan inventory aktif yang sedang berdampak ke kesiapan teknis atau kapasitas lapangan.',
         },
       ],

@@ -83,6 +83,7 @@ async function main() {
   assert.equal(getDefaultLandingPath('TT_OPERATOR'), '/support/tt')
   assert.equal(getDefaultLandingPath('DIGITAL_CREATOR'), '/dashboard/worklist')
   assert.equal(getDefaultLandingPath('DISMANTLE_OPERATOR'), '/support/dismantle')
+  assert.equal(canAccessPath('CS_ADMIN', '/customers/cs-admin/odp-port'), true)
   assert.equal(canAccessPath('CS_ADMIN', '/hr'), false)
   assert.equal(canAccessPath('SUPER_ADMIN', '/settings/users'), true)
   assert.equal(canAccessPath('CS_ADMIN', '/settings/users'), false)
@@ -529,6 +530,12 @@ async function main() {
 
   const customerDomain = await getDomainPageData('customers', buildTestSession('CS_ADMIN'))
   assert.equal(customerDomain?.content.resource, 'customers')
+  const csWorkspaceDashboard = await getDashboardPageData(buildTestSession('CS_ADMIN'))
+  assert.equal(
+    csWorkspaceDashboard.roleQueues.some((item) => item.href === '/customers/cs-admin/odp-port'),
+    false,
+    'Role queue CS tidak perlu dipaksa ke route ODP/Port baru.',
+  )
   assert.equal((customerDomain?.content.reviewSections?.length ?? 0) > 0, true)
   assert.equal(customerDomain?.content.reviewSections?.[1]?.rows.length, 3)
   assert.equal((customerDomain?.content.reviewSections?.[0]?.rows[0]?.status.length ?? 0) > 0, true)

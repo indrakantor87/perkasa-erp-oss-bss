@@ -144,8 +144,8 @@ export const csAdminWorkspace: OrganizationWorkspaceDefinition = {
   },
   secondaryAction: {
     label: 'Buka Port ODP',
-    href: '/inventory',
-    description: 'Tinjau ODP, port, dan assignment jaringan yang terkait input customer.',
+    href: '/customers/cs-admin/odp-port',
+    description: 'Tinjau ODP, port, dan assignment jaringan dari workspace CS yang menjadi owner UI terbaru.',
   },
   steps: [
     {
@@ -184,7 +184,7 @@ export const csAdminWorkspace: OrganizationWorkspaceDefinition = {
         },
         {
           label: 'ODP dan Port',
-          href: '/inventory',
+          href: '/customers/cs-admin/odp-port',
           description: 'Cek ODP terbaru, port terpakai, dan kapasitas layanan sebelum input customer difinalkan.',
           badge: 'port odp',
         },
@@ -230,9 +230,9 @@ export const csAdminWorkspace: OrganizationWorkspaceDefinition = {
         },
         {
           label: 'ODP dan Port',
-          href: '/inventory',
-          description: 'Masuk ke pembacaan ODP dan port yang dipakai bersama GA dan NOC.',
-          badge: 'ga / noc',
+          href: '/customers/cs-admin/odp-port',
+          description: 'Masuk ke pembacaan ODP dan port milik CS tanpa harus lompat dulu ke workspace inventory umum.',
+          badge: 'owner cs',
         },
         {
           label: 'Ticketing',

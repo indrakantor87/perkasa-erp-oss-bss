@@ -10,6 +10,19 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.52] - 2026-07-20
+
+### Added
+
+- Ditambahkan route `CS & Admin CS -> ODP dan Port` di `/customers/cs-admin/odp-port` yang membungkus panel ODP/Port existing (`InventoryNetworkOpsPanel`) tanpa memutus engine inventory: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/customers/cs-admin/odp-port/page.tsx)
+
+### Changed
+
+- Shortcut `ODP dan Port` pada rekap dan dashboard `CS & Admin CS` kini mendarat ke workspace CS (bukan lagi `/inventory`) agar ownership UI benar-benar berada di CS: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/customers/cs-admin/page.tsx), [cs-admin-workspace-dashboard.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/cs-admin-workspace-dashboard.tsx)
+- Workspace organisasi `CS & Admin CS` ikut diarahkan ke route baru untuk menjaga konsistensi pintu masuk: [organization-workspaces.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/organization-workspaces.ts)
+- Sidebar kini menganggap `/customers/cs-admin/odp-port` sebagai bagian workspace CS agar highlight dan assignHrefs tetap konsisten: [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx)
+- Smoke test diperkuat untuk memastikan route CS ODP/Port bisa diakses role `CS_ADMIN`: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+
 ## [0.66.51] - 2026-07-20
 
 ### Added

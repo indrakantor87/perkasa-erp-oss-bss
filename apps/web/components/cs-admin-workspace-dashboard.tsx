@@ -81,9 +81,9 @@ const reportingShortcuts: CsReportingShortcut[] = [
   },
   {
     label: 'ODP dan Port',
-    href: '/inventory',
-    detail: 'Masuk ke pembacaan ODP dan port yang dipakai bersama GA dan NOC untuk validasi kapasitas.',
-    badge: 'ga / noc',
+    href: '/customers/cs-admin/odp-port',
+    detail: 'Masuk ke workspace ODP dan port milik CS untuk validasi kapasitas, assignment, dan follow up customer.',
+    badge: 'owner cs',
     tone: 'border-emerald-200 bg-emerald-50 text-emerald-900',
   },
   {
@@ -235,7 +235,7 @@ export function CsAdminWorkspaceDashboard({
             Buka Isolir
           </Link>
           <Link
-            href="/inventory"
+            href="/customers/cs-admin/odp-port"
             className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
           >
             Buka ODP dan Port
