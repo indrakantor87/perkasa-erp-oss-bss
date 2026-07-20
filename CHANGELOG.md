@@ -10,6 +10,16 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.63] - 2026-07-20
+
+### Fixed
+
+- Role `NOC Operator` tidak lagi jatuh ke `Mock Fallback` hanya karena review DB belum memiliki kolom `network_odp_ports.port_status`; query dashboard sekarang mengecek schema lebih dulu dan mengosongkan bucket `ODP/Port issue` secara aman bila kolom itu belum tersedia: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
+### Changed
+
+- Helper query `ODP/Port issue` di dashboard sekarang juga menghindari ketergantungan langsung pada `network_odp_ports.updated_at`, sehingga pembacaan review DB lebih toleran terhadap variasi schema existing: [dashboard-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dashboard-service.ts)
+
 ## [0.66.62] - 2026-07-20
 
 ### Changed

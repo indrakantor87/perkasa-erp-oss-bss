@@ -850,6 +850,9 @@ type DashboardPortIssueQueryParts = {
   customerCodeExpression: string
   serviceNoExpression: string
   installedAtExpression: string
+  portStatusExpression: string
+  issueWhereClause: string
+  orderByExpression: string
 }
 
 type DashboardSupportTicketServiceQueryParts = {
@@ -1218,17 +1221,21 @@ async function hasReviewDbColumn(tableName: string, columnName: string) {
 
 async function getDashboardPortIssueQueryParts(): Promise<DashboardPortIssueQueryParts> {
   const [
+    hasPortStatus,
     hasPortSubscriptionId,
     hasPortCustomerId,
     hasPortInstalledAt,
+    hasPortUpdatedAt,
     hasSubscriptionId,
     hasSubscriptionServiceNo,
     hasCustomerId,
     hasCustomerCode,
   ] = await Promise.all([
+    hasReviewDbColumn('network_odp_ports', 'port_status'),
     hasReviewDbColumn('network_odp_ports', 'subscription_id'),
     hasReviewDbColumn('network_odp_ports', 'customer_id'),
     hasReviewDbColumn('network_odp_ports', 'installed_at'),
+    hasReviewDbColumn('network_odp_ports', 'updated_at'),
     hasReviewDbColumn('service_subscriptions', 'id'),
     hasReviewDbColumn('service_subscriptions', 'service_no'),
     hasReviewDbColumn('crm_customers', 'id'),
@@ -1251,6 +1258,9 @@ async function getDashboardPortIssueQueryParts(): Promise<DashboardPortIssueQuer
     customerCodeExpression: hasPortCustomerId && hasCustomerId && hasCustomerCode ? 'c.customer_code' : 'NULL',
     serviceNoExpression: hasPortSubscriptionId && hasSubscriptionId && hasSubscriptionServiceNo ? 'ss.service_no' : 'NULL',
     installedAtExpression: hasPortInstalledAt ? 'CAST(nop.installed_at AS CHAR)' : 'NULL',
+    portStatusExpression: hasPortStatus ? 'nop.port_status' : "'UNKNOWN'",
+    issueWhereClause: hasPortStatus ? "nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')" : '1 = 0',
+    orderByExpression: hasPortUpdatedAt ? 'nop.updated_at DESC, nop.id DESC' : 'nop.id DESC',
   }
 }
 
@@ -3226,7 +3236,7 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           nop.id AS portId,
           no.code AS odpCode,
           nop.port_no AS portNo,
-          nop.port_status AS portStatus,
+          ${portIssueQueryParts.portStatusExpression} AS portStatus,
           ${portIssueQueryParts.customerCodeExpression} AS customerCode,
           ${portIssueQueryParts.serviceNoExpression} AS serviceNo,
           ${portIssueQueryParts.installedAtExpression} AS installedAt
@@ -3235,8 +3245,8 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           ON no.id = nop.odp_id
         ${portIssueQueryParts.serviceSubscriptionJoin}
         ${portIssueQueryParts.customerJoin}
-        WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
-        ORDER BY nop.updated_at DESC, nop.id DESC
+        WHERE ${portIssueQueryParts.issueWhereClause}
+        ORDER BY ${portIssueQueryParts.orderByExpression}
         LIMIT 1
       `)
 
@@ -3447,7 +3457,7 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           nop.id AS portId,
           no.code AS odpCode,
           nop.port_no AS portNo,
-          nop.port_status AS portStatus,
+          ${portIssueQueryParts.portStatusExpression} AS portStatus,
           ${portIssueQueryParts.customerCodeExpression} AS customerCode,
           ${portIssueQueryParts.serviceNoExpression} AS serviceNo,
           ${portIssueQueryParts.installedAtExpression} AS installedAt
@@ -3456,8 +3466,8 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           ON no.id = nop.odp_id
         ${portIssueQueryParts.serviceSubscriptionJoin}
         ${portIssueQueryParts.customerJoin}
-        WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
-        ORDER BY nop.updated_at DESC, nop.id DESC
+        WHERE ${portIssueQueryParts.issueWhereClause}
+        ORDER BY ${portIssueQueryParts.orderByExpression}
         LIMIT 1
       `)
 
@@ -3957,7 +3967,7 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           nop.id AS portId,
           no.code AS odpCode,
           nop.port_no AS portNo,
-          nop.port_status AS portStatus,
+          ${portIssueQueryParts.portStatusExpression} AS portStatus,
           ${portIssueQueryParts.customerCodeExpression} AS customerCode,
           ${portIssueQueryParts.serviceNoExpression} AS serviceNo,
           ${portIssueQueryParts.installedAtExpression} AS installedAt
@@ -3966,8 +3976,8 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           ON no.id = nop.odp_id
         ${portIssueQueryParts.serviceSubscriptionJoin}
         ${portIssueQueryParts.customerJoin}
-        WHERE nop.port_status IN ('RESERVED', 'FAULTY', 'DISABLED')
-        ORDER BY nop.updated_at DESC, nop.id DESC
+        WHERE ${portIssueQueryParts.issueWhereClause}
+        ORDER BY ${portIssueQueryParts.orderByExpression}
         LIMIT 2
       `)
 
