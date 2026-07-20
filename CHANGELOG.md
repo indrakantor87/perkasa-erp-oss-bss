@@ -10,6 +10,16 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.60] - 2026-07-20
+
+### Added
+
+- Ditambahkan filter personal eksplisit `Barang saya` pada halaman `Tracking Barang` dan `Request saya` pada halaman `Request Barang` agar operator bisa mempersempit layar inventory tracking ke konteks login mereka sendiri: [stock-movements/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/stock-movements/page.tsx), [inventory-requests/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/inventory-requests/page.tsx), [stock-movement-tracking-filters.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/stock-movement-tracking-filters.tsx), [inventory-request-tracking-filters.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/inventory-request-tracking-filters.tsx)
+
+### Changed
+
+- Service tracking inventory sekarang menerima konteks session login untuk menerapkan filter personal yang lebih presisi, memakai `technician_user_id` pada stock movements dan `requested_by_user_id` pada inventory requests bila kolom tersedia, dengan fallback aman ke pencocokan nama login: [tracking-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/tracking-service.ts)
+
 ## [0.66.59] - 2026-07-20
 
 ### Added

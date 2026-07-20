@@ -13,6 +13,7 @@ export function InventoryRequestTrackingFilters({
     requestType: string
     workOrderId: string
     troubleTicketId: string
+    mine: boolean
   }
 }) {
   const [workOrderRaw, setWorkOrderRaw] = useState(defaultValues.workOrderId)
@@ -84,6 +85,10 @@ export function InventoryRequestTrackingFilters({
       <input type="hidden" name="troubleTicketId" value={troubleTicketId} />
 
       <div className="lg:col-span-6 flex flex-wrap items-center gap-3">
+        <label className="inline-flex items-center gap-2 rounded-2xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink">
+          <input type="checkbox" name="mine" value="1" defaultChecked={defaultValues.mine} className="h-4 w-4" />
+          Request saya
+        </label>
         <button
           type="submit"
           className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition hover:opacity-90"
@@ -101,4 +106,3 @@ export function InventoryRequestTrackingFilters({
     </form>
   )
 }
-

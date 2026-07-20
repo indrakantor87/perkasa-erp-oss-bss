@@ -21,12 +21,13 @@ export default async function InventoryRequestTrackingListPage({
   }
 
   const query = (await searchParams) ?? {}
-  const payload = await getInventoryRequestTrackingList(query)
+  const payload = await getInventoryRequestTrackingList(query, { session })
   const q = resolveSearchParam(query.q) ?? ''
   const status = resolveSearchParam(query.status) ?? ''
   const requestType = resolveSearchParam(query.requestType) ?? ''
   const workOrderId = resolveSearchParam(query.workOrderId) ?? ''
   const troubleTicketId = resolveSearchParam(query.troubleTicketId) ?? ''
+  const mine = ['1', 'true', 'yes', 'on'].includes((resolveSearchParam(query.mine) ?? '').trim().toLowerCase())
 
   return (
     <div className="space-y-6">
@@ -55,12 +56,13 @@ export default async function InventoryRequestTrackingListPage({
             requestType,
             workOrderId,
             troubleTicketId,
+            mine,
           }}
         />
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <span className="solid-chip">{payload.items.length} item</span>
-          {(workOrderId || troubleTicketId) ? (
+          {(workOrderId || troubleTicketId || mine) ? (
             <span className="badge border-transparent" style={{ backgroundColor: 'var(--color-surface-soft)', color: 'var(--color-ink-strong)' }}>
               Filter referensi aktif
             </span>
@@ -133,4 +135,3 @@ export default async function InventoryRequestTrackingListPage({
     </div>
   )
 }
-

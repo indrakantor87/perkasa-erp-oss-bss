@@ -167,6 +167,7 @@ export type StockMovementTrackingQuery = {
   workOrderId?: string | string[]
   troubleTicketId?: string | string[]
   technicianUserId?: string | string[]
+  mine?: string | string[]
   limit?: string | string[]
 }
 
@@ -184,6 +185,7 @@ export type InventoryRequestTrackingQuery = {
   requestType?: string | string[]
   workOrderId?: string | string[]
   troubleTicketId?: string | string[]
+  mine?: string | string[]
   limit?: string | string[]
 }
 
@@ -496,9 +498,10 @@ export async function getWorkOrderTrackingDetail(workOrderId: number) {
   }
 }
 
-export async function getStockMovementTrackingList(query: StockMovementTrackingQuery) {
+export async function getStockMovementTrackingList(query: StockMovementTrackingQuery, options?: { session?: AppSession }) {
   const source = getDataSourceSnapshot()
   const state = resolveStockMovementTrackingState(query)
+  const session = options?.session
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     const items = mockTrackingStockMovements
       .filter((row) => matchesMockSearch([row.itemCode, row.itemName, row.referenceNo], state.q))
@@ -507,6 +510,13 @@ export async function getStockMovementTrackingList(query: StockMovementTrackingQ
       .filter((row) => !state.workOrderId || row.workOrderId === state.workOrderId)
       .filter((row) => !state.troubleTicketId || row.troubleTicketId === state.troubleTicketId)
       .filter((row) => !state.technicianUserId || row.technicianUserId === state.technicianUserId)
+      .filter((row) =>
+        state.mine
+          ? session?.userId
+            ? row.technicianUserId === session.userId
+            : matchesMockSearch([row.technicianUsername, row.technicianFullName], session?.displayName || session?.username || null)
+          : true,
+      )
       .slice(0, state.limit)
 
     return { source, items, error: null as string | null, state }
@@ -549,6 +559,15 @@ export async function getStockMovementTrackingList(query: StockMovementTrackingQ
     if (state.technicianUserId && hasTechnician) {
       where.push('m.technician_user_id = ?')
       values.push(state.technicianUserId)
+    }
+    if (state.mine) {
+      if (session?.userId && hasTechnician) {
+        where.push('m.technician_user_id = ?')
+        values.push(session.userId)
+      } else if (session?.username || session?.displayName) {
+        where.push('(LOWER(tu.username) = ? OR LOWER(tu.full_name) = ?)')
+        values.push(String(session?.username ?? '').trim().toLowerCase(), String(session?.displayName ?? '').trim().toLowerCase())
+      }
     }
 
     values.push(state.limit)
@@ -752,9 +771,10 @@ export async function getTroubleTicketTrackingList(query: TroubleTicketTrackingQ
   }
 }
 
-export async function getInventoryRequestTrackingList(query: InventoryRequestTrackingQuery) {
+export async function getInventoryRequestTrackingList(query: InventoryRequestTrackingQuery, options?: { session?: AppSession }) {
   const source = getDataSourceSnapshot()
   const state = resolveInventoryRequestTrackingState(query)
+  const session = options?.session
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     const items = mockTrackingInventoryRequests
       .filter((row) =>
@@ -767,6 +787,11 @@ export async function getInventoryRequestTrackingList(query: InventoryRequestTra
       .filter((row) => !state.requestType || String(row.requestType ?? '').toUpperCase() === state.requestType)
       .filter((row) => !state.workOrderId || row.workOrderId === state.workOrderId)
       .filter((row) => !state.troubleTicketId || row.troubleTicketId === state.troubleTicketId)
+      .filter((row) =>
+        state.mine
+          ? matchesMockSearch([row.requestedBy, row.requestedFor], session?.displayName || session?.username || null)
+          : true,
+      )
       .slice(0, state.limit)
 
     return { source, items, error: null as string | null, state }
@@ -776,6 +801,7 @@ export async function getInventoryRequestTrackingList(query: InventoryRequestTra
     const hasWorkOrderId = await hasReviewDbColumn('inventory_item_requests', 'work_order_id')
     const hasTroubleTicketId = await hasReviewDbColumn('inventory_item_requests', 'trouble_ticket_id')
     const hasRequestType = await hasReviewDbColumn('inventory_item_requests', 'request_type')
+    const hasRequestedByUserId = await hasReviewDbColumn('inventory_item_requests', 'requested_by_user_id')
 
     const where: string[] = []
     const values: unknown[] = []
@@ -799,6 +825,15 @@ export async function getInventoryRequestTrackingList(query: InventoryRequestTra
     if (state.troubleTicketId && hasTroubleTicketId) {
       where.push('r.trouble_ticket_id = ?')
       values.push(state.troubleTicketId)
+    }
+    if (state.mine) {
+      if (session?.userId && hasRequestedByUserId) {
+        where.push('r.requested_by_user_id = ?')
+        values.push(session.userId)
+      } else if (session?.username || session?.displayName) {
+        where.push('(LOWER(r.requested_by) = ? OR LOWER(r.requested_by) = ?)')
+        values.push(String(session?.username ?? '').trim().toLowerCase(), String(session?.displayName ?? '').trim().toLowerCase())
+      }
     }
 
     values.push(state.limit)
@@ -1223,6 +1258,7 @@ function resolveStockMovementTrackingState(query: StockMovementTrackingQuery) {
   const workOrderId = resolveOptionalInt(resolveSearchParam(query.workOrderId)) ?? null
   const troubleTicketId = resolveOptionalInt(resolveSearchParam(query.troubleTicketId)) ?? null
   const technicianUserId = resolveOptionalInt(resolveSearchParam(query.technicianUserId)) ?? null
+  const mineRaw = resolveSearchParam(query.mine)?.trim().toLowerCase() ?? ''
   const limitRaw = resolveSearchParam(query.limit)?.trim() ?? ''
   const limit = Math.min(Math.max(resolveOptionalInt(limitRaw) ?? 100, 20), 300)
 
@@ -1233,6 +1269,7 @@ function resolveStockMovementTrackingState(query: StockMovementTrackingQuery) {
     workOrderId,
     troubleTicketId,
     technicianUserId,
+    mine: ['1', 'true', 'yes', 'on'].includes(mineRaw),
     limit,
   }
 }
@@ -1260,6 +1297,7 @@ function resolveInventoryRequestTrackingState(query: InventoryRequestTrackingQue
   const requestType = resolveSearchParam(query.requestType)?.trim().toUpperCase() ?? ''
   const workOrderId = resolveOptionalInt(resolveSearchParam(query.workOrderId)) ?? null
   const troubleTicketId = resolveOptionalInt(resolveSearchParam(query.troubleTicketId)) ?? null
+  const mineRaw = resolveSearchParam(query.mine)?.trim().toLowerCase() ?? ''
   const limitRaw = resolveSearchParam(query.limit)?.trim() ?? ''
   const limit = Math.min(Math.max(resolveOptionalInt(limitRaw) ?? 100, 20), 300)
 
@@ -1269,6 +1307,7 @@ function resolveInventoryRequestTrackingState(query: InventoryRequestTrackingQue
     requestType: requestType || null,
     workOrderId,
     troubleTicketId,
+    mine: ['1', 'true', 'yes', 'on'].includes(mineRaw),
     limit,
   }
 }

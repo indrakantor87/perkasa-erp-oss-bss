@@ -15,6 +15,7 @@ export function StockMovementTrackingFilters({
     workOrderId: string
     troubleTicketId: string
     technicianUserId: string
+    mine: boolean
   }
 }) {
   const [workOrderRaw, setWorkOrderRaw] = useState(defaultValues.workOrderId)
@@ -102,6 +103,10 @@ export function StockMovementTrackingFilters({
       <input type="hidden" name="technicianUserId" value={technicianUserId} />
 
       <div className="lg:col-span-6 flex flex-wrap items-center gap-3">
+        <label className="inline-flex items-center gap-2 rounded-2xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink">
+          <input type="checkbox" name="mine" value="1" defaultChecked={defaultValues.mine} className="h-4 w-4" />
+          Barang saya
+        </label>
         <button
           type="submit"
           className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition hover:opacity-90"
@@ -119,4 +124,3 @@ export function StockMovementTrackingFilters({
     </form>
   )
 }
-

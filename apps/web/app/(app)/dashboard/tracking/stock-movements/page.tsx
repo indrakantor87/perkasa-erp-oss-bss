@@ -21,7 +21,7 @@ export default async function StockMovementTrackingListPage({
   }
 
   const query = (await searchParams) ?? {}
-  const payload = await getStockMovementTrackingList(query)
+  const payload = await getStockMovementTrackingList(query, { session })
 
   const q = resolveSearchParam(query.q) ?? ''
   const movementType = resolveSearchParam(query.movementType) ?? ''
@@ -29,6 +29,7 @@ export default async function StockMovementTrackingListPage({
   const workOrderId = resolveSearchParam(query.workOrderId) ?? ''
   const troubleTicketId = resolveSearchParam(query.troubleTicketId) ?? ''
   const technicianUserId = resolveSearchParam(query.technicianUserId) ?? ''
+  const mine = ['1', 'true', 'yes', 'on'].includes((resolveSearchParam(query.mine) ?? '').trim().toLowerCase())
 
   return (
     <div className="space-y-6">
@@ -58,12 +59,13 @@ export default async function StockMovementTrackingListPage({
             workOrderId,
             troubleTicketId,
             technicianUserId,
+            mine,
           }}
         />
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <span className="solid-chip">{payload.items.length} item</span>
-          {(workOrderId || troubleTicketId || technicianUserId) ? (
+          {(workOrderId || troubleTicketId || technicianUserId || mine) ? (
             <span className="badge border-transparent" style={{ backgroundColor: 'var(--color-surface-soft)', color: 'var(--color-ink-strong)' }}>
               Filter referensi aktif
             </span>
