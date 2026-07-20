@@ -10,6 +10,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.59] - 2026-07-20
+
+### Added
+
+- Ditambahkan blok `Akses Cepat Saya` pada landing `Tracking` utama agar user langsung mendapat shortcut personal sesuai role dan session login: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/page.tsx)
+
+### Changed
+
+- Landing `Tracking` untuk `FIELD_TECHNICIAN` sekarang memprioritaskan tautan ke `WO Saya`, `Queue NOC Saya`, dan `Movement Barang Saya`, sehingga teknisi tidak harus mulai dari kartu tracking generik: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/page.tsx)
+- Landing `Tracking` untuk `NOC_OPERATOR` dan `TT_OPERATOR` kini memprioritaskan `Queue NOC Saya`, `Queue Trouble Saya`, dan `WO Saya`, sedangkan role lain tetap melihat shortcut operasional umum: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/page.tsx)
+
 ## [0.66.58] - 2026-07-20
 
 ### Added
