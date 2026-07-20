@@ -6,8 +6,124 @@ import { canPerformAction } from '@/lib/access-control'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
+import { hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import { getDeviceLifecycleLogs, getInventoryDeviceLifecycleItemSuggestions, type DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
 import { getTroubleTicketTrackingDetail } from '@/lib/services/tracking-service'
+import { buildSupportLaneHref } from '@/lib/support-action-links'
+import type { DataSourceSnapshot } from '@/lib/types'
+
+type ReviewDbTroubleTicketDismantleHistoryRow = {
+  historyId: number
+  customerName: string | null
+  serviceNo: string | null
+  closedAt: string | null
+  closeNote: string | null
+  returnedItemCodes: string | null
+}
+
+function parseReturnedItemCodes(value: string | null | undefined) {
+  return Array.from(
+    new Set(
+      String(value ?? '')
+        .split(/[\r\n,;]+/)
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  )
+}
+
+async function getDismantleHistoryRowsForTroubleTicket(itemCodes: string[], source: DataSourceSnapshot) {
+  if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    return [] as ReviewDbTroubleTicketDismantleHistoryRow[]
+  }
+
+  const normalizedItemCodes = Array.from(new Set(itemCodes.map((item) => item.trim().toUpperCase()).filter(Boolean)))
+  if (!normalizedItemCodes.length) {
+    return [] as ReviewDbTroubleTicketDismantleHistoryRow[]
+  }
+
+  const [
+    hasHistoryId,
+    hasCloseNote,
+    hasReturnedItemCodes,
+    hasClosedAt,
+    hasHistoryCustomerName,
+    hasIsolationId,
+    hasIsolationCustomerName,
+    hasIsolationSubscriptionId,
+    hasServiceSubscriptionId,
+    hasServiceSubscriptionNo,
+  ] = await Promise.all([
+    hasReviewDbColumn('support_dismantle_history', 'id'),
+    hasReviewDbColumn('support_dismantle_history', 'close_note'),
+    hasReviewDbColumn('support_dismantle_history', 'returned_item_codes'),
+    hasReviewDbColumn('support_dismantle_history', 'closed_at'),
+    hasReviewDbColumn('support_dismantle_history', 'customer_name'),
+    hasReviewDbColumn('support_dismantle_history', 'isolation_id'),
+    hasReviewDbColumn('support_isolations', 'customer_name'),
+    hasReviewDbColumn('support_isolations', 'subscription_id'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+  ])
+
+  if (!hasHistoryId || (!hasCloseNote && !hasReturnedItemCodes)) {
+    return [] as ReviewDbTroubleTicketDismantleHistoryRow[]
+  }
+
+  const whereClauses = normalizedItemCodes.map(() =>
+    hasReturnedItemCodes && hasCloseNote
+      ? '(dh.returned_item_codes LIKE ? OR dh.close_note LIKE ?)'
+      : hasReturnedItemCodes
+        ? 'dh.returned_item_codes LIKE ?'
+        : 'dh.close_note LIKE ?',
+  )
+  const values = normalizedItemCodes.flatMap((itemCode) =>
+    hasReturnedItemCodes && hasCloseNote ? [`%${itemCode}%`, `%${itemCode}%`] : [`%${itemCode}%`],
+  )
+
+  const rows = await runReviewDbQuery<ReviewDbTroubleTicketDismantleHistoryRow>(
+    `
+      SELECT
+        dh.id AS historyId,
+        ${
+          hasHistoryCustomerName
+            ? 'dh.customer_name'
+            : hasIsolationId && hasIsolationCustomerName
+              ? 'si.customer_name'
+              : "CONCAT('Histori Dismantle #', dh.id)"
+        } AS customerName,
+        ${
+          hasIsolationId && hasIsolationSubscriptionId && hasServiceSubscriptionId && hasServiceSubscriptionNo
+            ? 'ss.service_no'
+            : 'NULL'
+        } AS serviceNo,
+        ${hasClosedAt ? 'dh.closed_at' : 'NULL'} AS closedAt,
+        ${hasCloseNote ? 'dh.close_note' : 'NULL'} AS closeNote,
+        ${hasReturnedItemCodes ? 'dh.returned_item_codes' : 'NULL'} AS returnedItemCodes
+      FROM support_dismantle_history dh
+      ${hasIsolationId ? 'LEFT JOIN support_isolations si ON si.id = dh.isolation_id' : ''}
+      ${
+        hasIsolationId && hasIsolationSubscriptionId && hasServiceSubscriptionId
+          ? 'LEFT JOIN service_subscriptions ss ON ss.id = si.subscription_id'
+          : ''
+      }
+      WHERE ${whereClauses.join(' OR ')}
+      ORDER BY ${hasClosedAt ? 'dh.closed_at' : 'dh.id'} DESC, dh.id DESC
+      LIMIT 10
+    `,
+    values,
+  )
+
+  return rows.filter((row) => {
+    const explicitCodes = parseReturnedItemCodes(row.returnedItemCodes)
+    if (explicitCodes.length) {
+      return explicitCodes.some((itemCode) => normalizedItemCodes.includes(itemCode))
+    }
+
+    const note = row.closeNote?.toUpperCase() ?? ''
+    return normalizedItemCodes.some((itemCode) => note.includes(itemCode))
+  })
+}
 
 function canWriteDeviceLifecycle(role: Awaited<ReturnType<typeof requireSession>>['role']) {
   return (
@@ -81,6 +197,14 @@ export default async function TroubleTicketTrackingDetailPage({
     getInventoryDeviceLifecycleItemSuggestions(200),
   ])
   const tt = payload.troubleTicket
+  const lifecycleItemCodes = Array.from(
+    new Set(
+      lifecyclePayload.items
+        .map((item) => String(item.itemCode ?? '').trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  )
+  const dismantleHistoryRows = await getDismantleHistoryRowsForTroubleTicket(lifecycleItemCodes, payload.source)
   const canCreateDeviceLifecycle = canWriteDeviceLifecycle(session.role)
   const reviewDbReady = payload.source.effectiveMode === 'review-db' && !payload.source.isFallback
 
@@ -117,6 +241,19 @@ export default async function TroubleTicketTrackingDetailPage({
             >
               Buat movement
             </Link>
+            {dismantleHistoryRows[0] ? (
+              <Link
+                href={buildSupportLaneHref('dismantle', {
+                  focus: 'CLOSED_THIS_PERIOD',
+                  customer: dismantleHistoryRows[0].customerName || '',
+                  service: dismantleHistoryRows[0].serviceNo || '',
+                  dismantleHistory: `${dismantleHistoryRows[0].historyId} | ${dismantleHistoryRows[0].customerName || ''} | ${dismantleHistoryRows[0].serviceNo || ''}`,
+                })}
+                className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+              >
+                Buka Histori Dismantle
+              </Link>
+            ) : null}
           </div>
         </div>
 
@@ -345,6 +482,75 @@ export default async function TroubleTicketTrackingDetailPage({
                   ) : (
                     <div className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-mute">
                       Belum ada log lifecycle device untuk trouble ticket ini.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-line bg-surface p-5">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="section-title">Histori Support Dismantle</p>
+                  <span className="solid-chip">{dismantleHistoryRows.length}</span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-mute">
+                  Backlink ke histori close support yang memakai device return atau replace pada ticket gangguan ini,
+                  supaya operator tetap berada di konteks kasus yang sama saat pindah dari tracking ke support.
+                </p>
+                <div className="mt-4 space-y-3">
+                  {dismantleHistoryRows.length ? (
+                    dismantleHistoryRows.map((row) => {
+                      const returnedItemCodes = parseReturnedItemCodes(row.returnedItemCodes)
+                      return (
+                        <div key={row.historyId} className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
+                          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-[var(--color-ink-strong)]">
+                                {row.customerName || `Histori Dismantle #${row.historyId}`} {row.serviceNo ? `• ${row.serviceNo}` : ''}
+                              </p>
+                              <p className="mt-1 text-sm leading-6 text-mute">
+                                {row.closeNote?.split('\n').find((line) => line.trim())?.trim() ||
+                                  'Kasus dismantle close yang memakai item return atau replace dari ticket gangguan ini.'}
+                              </p>
+                            </div>
+                            <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">
+                              {row.closedAt || 'Closed'}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="badge border-slate-200 bg-white text-slate-600">History ID: {row.historyId}</span>
+                            <span className="badge border-slate-200 bg-white text-slate-600">Service: {row.serviceNo || '-'}</span>
+                            <span className="badge border-slate-200 bg-white text-slate-600">
+                              Returned: {returnedItemCodes.length ? returnedItemCodes.join(', ') : lifecycleItemCodes.join(', ') || '-'}
+                            </span>
+                          </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <Link
+                              href={buildSupportLaneHref('dismantle', {
+                                focus: 'CLOSED_THIS_PERIOD',
+                                customer: row.customerName || '',
+                                service: row.serviceNo || '',
+                                dismantleHistory: `${row.historyId} | ${row.customerName || ''} | ${row.serviceNo || ''}`,
+                              })}
+                              className="inline-flex rounded-full border border-slate-950 bg-slate-950 px-3 py-1 text-xs font-semibold text-white transition hover:bg-slate-800"
+                            >
+                              Buka Histori Support
+                            </Link>
+                            {returnedItemCodes.slice(0, 2).map((itemCode) => (
+                              <Link
+                                key={`${row.historyId}-${itemCode}`}
+                                href={buildInventoryBarcodeDetailPath(itemCode)}
+                                className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
+                              >
+                                Buka Barcode {itemCode}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-mute">
+                      Belum ada histori close dismantle yang memakai item dari ticket gangguan ini.
                     </div>
                   )}
                 </div>

@@ -367,16 +367,7 @@ function exportDismantleCsv(rows: DomainReviewRow[]) {
   setTimeout(() => URL.revokeObjectURL(link.href), 500)
 }
 
-export function SupportDismantleQueuePanel({
-  sections,
-  actionLinks = [],
-  role,
-  canCreate = true,
-  canUpdate = true,
-  canApprove = false,
-  supportPrefill,
-  supportDrilldown = null,
-}: {
+type SupportDismantleQueuePanelProps = {
   sections: DomainReviewSection[]
   actionLinks?: SupportActionLink[]
   role: AppRole
@@ -387,7 +378,18 @@ export function SupportDismantleQueuePanel({
     dismantleHistory?: string
   }
   supportDrilldown?: SupportDrilldownContext | null
-}) {
+}
+
+export function SupportDismantleQueuePanel({
+  sections,
+  actionLinks = [],
+  role,
+  canCreate = true,
+  canUpdate = true,
+  canApprove = false,
+  supportPrefill,
+  supportDrilldown = null,
+}: SupportDismantleQueuePanelProps) {
   const openSection =
     sections.find((section) => section.title.toUpperCase().includes('QUEUE DISMANTLE OPEN')) ?? null
   const historySection =

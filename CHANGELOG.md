@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.51] - 2026-07-20
+
+### Added
+
+- Detail `Trouble Ticket` sekarang membaca histori close support dismantle yang relevan berdasarkan item lifecycle pada ticket gangguan, lalu menampilkan section `Histori Support Dismantle` dengan tombol langsung kembali ke lane `/support/dismantle`: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/trouble-tickets/[id]/page.tsx)
+- Header aksi pada detail `Trouble Ticket` kini ikut menyediakan shortcut `Buka Histori Dismantle` bila ticket gangguan memiliki device return atau replace yang sudah muncul pada histori close support: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/trouble-tickets/[id]/page.tsx)
+
+### Changed
+
+- Navigasi flow dismantle sekarang konsisten dua arah pada empat konteks operasional utama: `support close`, `inventory barcode`, `work order`, dan `trouble ticket`.
+- Versioning diselaraskan ke `0.66.51`; batch ini lolos diagnostics dan `npm run check`.
+
 ## [0.66.50] - 2026-07-19
 
 ### Added
