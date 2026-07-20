@@ -1,4 +1,5 @@
 import { getDataSourceSnapshot } from '@/lib/data-source'
+import type { AppSession } from '@/lib/auth-session'
 import { mockTrackingNocQueueItems } from '@/lib/mock-tracking'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import { getLatestDeviceLifecycleMaps } from '@/lib/services/device-lifecycle-service'
@@ -70,6 +71,7 @@ export type NocQueueQuery = {
   ticketType?: string | string[]
   queueStatus?: string | string[]
   slaState?: string | string[]
+  mine?: string | string[]
   limit?: string | string[]
 }
 
@@ -123,6 +125,7 @@ type NocQueueState = {
   ticketType: NocTicketType | null
   queueStatus: NocQueueStatus | null
   slaState: 'ON_TRACK' | 'WARNING' | 'BREACHED' | null
+  mine: boolean
   limit: number
 }
 
@@ -603,6 +606,7 @@ function resolveNocQueueState(query: NocQueueQuery): NocQueueState {
   const ticketTypeRaw = resolveSearchParam(query.ticketType)?.trim().toUpperCase() ?? ''
   const queueStatusRaw = resolveSearchParam(query.queueStatus)?.trim().toUpperCase() ?? ''
   const slaStateRaw = resolveSearchParam(query.slaState)?.trim().toUpperCase() ?? ''
+  const mineRaw = resolveSearchParam(query.mine)?.trim().toLowerCase() ?? ''
   const limitRaw = resolveSearchParam(query.limit)?.trim() ?? ''
   const limit = Math.min(Math.max(resolveOptionalInt(limitRaw) ?? 80, 20), 200)
 
@@ -615,19 +619,22 @@ function resolveNocQueueState(query: NocQueueQuery): NocQueueState {
   const slaState = ['ON_TRACK', 'WARNING', 'BREACHED'].includes(slaStateRaw)
     ? (slaStateRaw as NocQueueState['slaState'])
     : null
+  const mine = ['1', 'true', 'yes', 'on'].includes(mineRaw)
 
   return {
     q: q || null,
     ticketType,
     queueStatus,
     slaState,
+    mine,
     limit,
   }
 }
 
-export async function getNocQueueList(query: NocQueueQuery) {
+export async function getNocQueueList(query: NocQueueQuery, options?: { session?: AppSession }) {
   const source = getDataSourceSnapshot()
   const state = resolveNocQueueState(query)
+  const session = options?.session
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     const searchNeedle = normalizeText(state.q)
     const items = mockTrackingNocQueueItems
@@ -643,6 +650,11 @@ export async function getNocQueueList(query: NocQueueQuery) {
           item.deviceItemLabel,
           item.deviceTicketRef,
         ].some((value) => normalizeText(value).includes(searchNeedle)),
+      )
+      .filter((item) =>
+        state.mine && session?.username
+          ? normalizeText(item.picUsername) === normalizeText(session.username)
+          : true,
       )
       .filter((item) => !state.ticketType || item.ticketType === state.ticketType)
       .filter((item) => !state.queueStatus || item.queueStatus === state.queueStatus)
@@ -680,6 +692,10 @@ export async function getNocQueueList(query: NocQueueQuery) {
 
     const workOrderWhere: string[] = []
     const workOrderValues: unknown[] = []
+    if (state.mine && session?.userId && hasWorkOrderPicUserId) {
+      workOrderWhere.push('wo.current_pic_user_id = ?')
+      workOrderValues.push(session.userId)
+    }
     if (state.q) {
       workOrderWhere.push('(wo.work_order_no LIKE ? OR wo.technician_name LIKE ?)')
       workOrderValues.push(normalizeLike(state.q), normalizeLike(state.q))
@@ -1028,6 +1044,11 @@ export async function getNocQueueList(query: NocQueueQuery) {
         return item
       }),
     ]
+      .filter((item) =>
+        state.mine && session?.username
+          ? normalizeText(item.picUsername) === normalizeText(session.username)
+          : true,
+      )
       .filter((item) => item.ticketType !== 'OTHER')
       .filter((item) => (state.ticketType ? item.ticketType === state.ticketType : true))
       .filter((item) => (state.queueStatus ? item.queueStatus === state.queueStatus : true))

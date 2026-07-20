@@ -57,10 +57,18 @@ function buildWorkOrderHref(session: AppSession, config: TechnicianWorkspaceConf
   return `/dashboard/tracking/work-orders?${params.toString()}`
 }
 
-function buildQueueHref(config: TechnicianWorkspaceConfig) {
+function buildQueueHref(session: AppSession, config: TechnicianWorkspaceConfig) {
   const params = new URLSearchParams()
   if (config.queueTicketType) {
     params.set('ticketType', config.queueTicketType)
+  }
+  if (session.userId) {
+    params.set('mine', '1')
+  } else {
+    const q = buildPersonalWorkOrderSearch(session)
+    if (q) {
+      params.set('q', q)
+    }
   }
   return `/dashboard/tracking/noc-queue?${params.toString()}`
 }
@@ -78,7 +86,7 @@ function personalizeLinkHref(session: AppSession, config: TechnicianWorkspaceCon
     return mergeHrefQuery(buildWorkOrderHref(session, config), href.slice('__AUTO_WORK_ORDERS__'.length))
   }
   if (href.startsWith('__AUTO_QUEUE__')) {
-    return mergeHrefQuery(buildQueueHref(config), href.slice('__AUTO_QUEUE__'.length))
+    return mergeHrefQuery(buildQueueHref(session, config), href.slice('__AUTO_QUEUE__'.length))
   }
   if (href.startsWith('__AUTO_MOVEMENTS__')) {
     return mergeHrefQuery(buildInventoryHref(config), href.slice('__AUTO_MOVEMENTS__'.length))
@@ -115,7 +123,7 @@ export function TechnicianWorkspacePage({
   const secondaryAction: OrganizationWorkspaceLink | undefined = config.queueTicketType
     ? {
         label: config.secondaryActionLabel || 'Buka queue terkait',
-        href: buildQueueHref(config),
+        href: buildQueueHref(session, config),
         description: config.secondaryActionDescription || 'Masuk ke queue ticketing untuk melihat sumber kerja teknis yang relevan.',
       }
     : undefined

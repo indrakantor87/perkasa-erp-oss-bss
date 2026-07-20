@@ -21,10 +21,12 @@ function buildNocQueueFilterHref(params: {
   ticketType?: string
   queueStatus?: string
   slaState?: string
+  mine?: boolean
   patch: Partial<{
     ticketType: string
     queueStatus: string
     slaState: string
+    mine: string
   }>
 }) {
   const search = new URLSearchParams()
@@ -32,11 +34,13 @@ function buildNocQueueFilterHref(params: {
   const ticketType = String(params.patch.ticketType ?? params.ticketType ?? '').trim()
   const queueStatus = String(params.patch.queueStatus ?? params.queueStatus ?? '').trim()
   const slaState = String(params.patch.slaState ?? params.slaState ?? '').trim()
+  const mine = String(params.patch.mine ?? (params.mine ? '1' : '')).trim()
 
   if (q) search.set('q', q)
   if (ticketType) search.set('ticketType', ticketType)
   if (queueStatus) search.set('queueStatus', queueStatus)
   if (slaState) search.set('slaState', slaState)
+  if (mine) search.set('mine', mine)
 
   const query = search.toString()
   return query ? `/dashboard/tracking/noc-queue?${query}` : '/dashboard/tracking/noc-queue'
@@ -155,13 +159,14 @@ export default async function NocQueuePage({
 
   const query = (await searchParams) ?? {}
   const [payload, itemSuggestions] = await Promise.all([
-    getNocQueueList(query),
+    getNocQueueList(query, { session }),
     getInventoryDeviceLifecycleItemSuggestions(200),
   ])
   const q = resolveSearchParam(query.q) ?? ''
   const ticketType = resolveSearchParam(query.ticketType)?.toUpperCase() ?? ''
   const queueStatus = resolveSearchParam(query.queueStatus)?.toUpperCase() ?? ''
   const slaState = resolveSearchParam(query.slaState)?.toUpperCase() ?? ''
+  const mine = ['1', 'true', 'yes', 'on'].includes((resolveSearchParam(query.mine) ?? '').trim().toLowerCase())
   const canCreateDeviceLifecycle =
     session.role === 'FIELD_TECHNICIAN' ||
     canPerformAction(session.role, 'inventory', 'update') ||
@@ -263,6 +268,10 @@ export default async function NocQueuePage({
           </div>
 
           <div className="lg:col-span-5 flex flex-wrap items-center gap-2.5">
+            <label className="inline-flex items-center gap-2 rounded-2xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink">
+              <input type="checkbox" name="mine" value="1" defaultChecked={mine} className="h-4 w-4" />
+              Pekerjaan saya
+            </label>
             <button
               type="submit"
               className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition hover:opacity-90"
@@ -277,7 +286,7 @@ export default async function NocQueuePage({
               Reset
             </Link>
             <span className="solid-chip">{payload.items.length} ticket</span>
-            {ticketType || queueStatus || slaState ? (
+            {ticketType || queueStatus || slaState || mine ? (
               <span className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
                 Filter aktif
               </span>
@@ -300,7 +309,7 @@ export default async function NocQueuePage({
             </summary>
             <div className="absolute left-0 z-10 mt-2 min-w-[230px] rounded-2xl border border-line bg-white p-2 shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
               <Link
-                href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { ticketType: '' } })}
+                href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { ticketType: '' } })}
                 className="flex items-center rounded-xl px-3 py-2.5 text-slate-600 transition hover:bg-slate-50"
               >
                 Semua Jenis
@@ -308,7 +317,7 @@ export default async function NocQueuePage({
               {ticketTypeOptions.map((item) => (
                 <Link
                   key={item}
-                  href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { ticketType: item } })}
+                  href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { ticketType: item } })}
                   className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2.5 text-slate-700 transition hover:bg-slate-50"
                 >
                   {(() => {
@@ -335,7 +344,7 @@ export default async function NocQueuePage({
             </summary>
             <div className="absolute left-0 z-10 mt-2 min-w-[230px] rounded-2xl border border-line bg-white p-2 shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
               <Link
-                href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { queueStatus: '' } })}
+                href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { queueStatus: '' } })}
                 className="flex items-center rounded-xl px-3 py-2.5 text-slate-600 transition hover:bg-slate-50"
               >
                 Semua Status
@@ -343,7 +352,7 @@ export default async function NocQueuePage({
               {queueStatusOptions.map((item) => (
                 <Link
                   key={item}
-                  href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { queueStatus: item } })}
+                  href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { queueStatus: item } })}
                   className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2.5 text-slate-700 transition hover:bg-slate-50"
                 >
                   {(() => {
@@ -370,7 +379,7 @@ export default async function NocQueuePage({
             </summary>
             <div className="absolute left-0 z-10 mt-2 min-w-[230px] rounded-2xl border border-line bg-white p-2 shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
               <Link
-                href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { slaState: '' } })}
+                href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { slaState: '' } })}
                 className="flex items-center rounded-xl px-3 py-2.5 text-slate-600 transition hover:bg-slate-50"
               >
                 Semua SLA
@@ -378,7 +387,7 @@ export default async function NocQueuePage({
               {slaStateOptions.map((item) => (
                 <Link
                   key={item}
-                  href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, patch: { slaState: item } })}
+                  href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { slaState: item } })}
                   className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2.5 text-slate-700 transition hover:bg-slate-50"
                 >
                   <span className={`rounded-full px-2 py-1 text-[10px] ${getSlaBadgeClass(item)}`}>{item}</span>

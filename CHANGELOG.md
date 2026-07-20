@@ -10,6 +10,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.58] - 2026-07-20
+
+### Added
+
+- Ditambahkan filter `Pekerjaan saya` pada `NOC Queue` agar operator bisa menyaring antrean gabungan ke item yang PIC-nya cocok dengan user login: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/noc-queue/page.tsx), [noc-queue-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/noc-queue-service.ts)
+
+### Changed
+
+- Shortcut `queue` dari landing workspace teknisi kini ikut membawa konteks personal (`mine=1` bila `userId` tersedia, atau fallback pencarian nama login) sehingga teknisi mendarat ke antrean NOC yang lebih relevan: [technician-workspace-page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/technician-workspace-page.tsx)
+- Penyaringan personal pada `NOC Queue` diterapkan aman di jalur mock dan review-db dengan memanfaatkan `picUsername/current_pic_user_id`, tanpa memaksa asumsi pada ticket yang belum punya relasi PIC eksplisit: [noc-queue-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/noc-queue-service.ts)
+
 ## [0.66.57] - 2026-07-20
 
 ### Added
