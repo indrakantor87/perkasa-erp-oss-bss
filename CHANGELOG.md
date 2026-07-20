@@ -10,6 +10,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.57] - 2026-07-20
+
+### Added
+
+- Ditambahkan filter `Pekerjaan saya` pada halaman tracking Work Order yang menggunakan `current_pic_user_id` (jika tersedia) untuk memfokuskan daftar work order ke PIC login: [work-orders/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/work-orders/page.tsx), [tracking-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/tracking-service.ts)
+- Landing workspace teknisi kini menghasilkan shortcut status `OPEN` dan `ON_PROGRESS` berbasis placeholder link otomatis agar teknisi bisa langsung memilih status operasional utama per jenis kerja: [technician-workspace-page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/technician-workspace-page.tsx), [technician-workspace-config.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/technician-workspace-config.ts)
+
+### Changed
+
+- Session auth kini menyertakan `userId` (jika tersedia dari review DB) supaya filter PIC/assignment bisa lebih presisi tanpa mengubah engine tracking lain: [auth-session.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/auth-session.ts)
+
 ## [0.66.56] - 2026-07-20
 
 ### Added

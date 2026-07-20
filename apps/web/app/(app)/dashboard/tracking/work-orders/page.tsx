@@ -20,11 +20,12 @@ export default async function WorkOrderTrackingListPage({
   }
 
   const query = (await searchParams) ?? {}
-  const payload = await getWorkOrderTrackingList(query)
+  const payload = await getWorkOrderTrackingList(query, { session })
   const q = resolveSearchParam(query.q) ?? ''
   const status = resolveSearchParam(query.status) ?? ''
   const jobCategory = resolveSearchParam(query.jobCategory) ?? ''
   const priority = resolveSearchParam(query.priority) ?? ''
+  const mine = ['1', 'true', 'yes', 'on'].includes((resolveSearchParam(query.mine) ?? '').trim().toLowerCase())
 
   return (
     <div className="space-y-6">
@@ -88,6 +89,10 @@ export default async function WorkOrderTrackingListPage({
           </label>
 
           <div className="lg:col-span-5 flex flex-wrap items-center gap-3">
+            <label className="inline-flex items-center gap-2 rounded-2xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink">
+              <input type="checkbox" name="mine" value="1" defaultChecked={mine} className="h-4 w-4" />
+              Pekerjaan saya
+            </label>
             <button
               type="submit"
               className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition hover:opacity-90"
@@ -178,4 +183,3 @@ export default async function WorkOrderTrackingListPage({
     </div>
   )
 }
-

@@ -29,10 +29,16 @@ export const teknisiPsbWorkspaceConfig: TechnicianWorkspaceConfig = {
       description: 'Shortcut kerja inti untuk teknisi PSB.',
       links: [
         {
-          label: 'Work Order PSB Saya',
-          href: '__AUTO_WORK_ORDERS__',
-          description: 'Tracking work order PSB yang paling dekat dengan identitas login Anda.',
-          badge: 'psb',
+          label: 'WO PSB OPEN',
+          href: '__AUTO_WORK_ORDERS__?status=OPEN',
+          description: 'Fokus ke pekerjaan PSB yang masih OPEN pada PIC login Anda.',
+          badge: 'open',
+        },
+        {
+          label: 'WO PSB ON PROGRESS',
+          href: '__AUTO_WORK_ORDERS__?status=ON_PROGRESS',
+          description: 'Fokus ke pekerjaan PSB yang sedang berjalan (ON PROGRESS).',
+          badge: 'progress',
         },
         {
           label: 'Movement Barang WO',
@@ -101,10 +107,16 @@ export const teknisiTroubleshootsWorkspaceConfig: TechnicianWorkspaceConfig = {
       description: 'Shortcut kerja inti untuk teknisi trouble.',
       links: [
         {
-          label: 'Work Order Trouble Saya',
-          href: '__AUTO_WORK_ORDERS__',
-          description: 'Tracking work order trouble yang paling dekat dengan identitas login Anda.',
-          badge: 'trouble',
+          label: 'WO Trouble OPEN',
+          href: '__AUTO_WORK_ORDERS__?status=OPEN',
+          description: 'Fokus ke pekerjaan trouble yang masih OPEN pada PIC login Anda.',
+          badge: 'open',
+        },
+        {
+          label: 'WO Trouble ON PROGRESS',
+          href: '__AUTO_WORK_ORDERS__?status=ON_PROGRESS',
+          description: 'Fokus ke pekerjaan trouble yang sedang berjalan (ON PROGRESS).',
+          badge: 'progress',
         },
         {
           label: 'Queue Trouble',
@@ -170,10 +182,16 @@ export const teknisiDismantleWorkspaceConfig: TechnicianWorkspaceConfig = {
       description: 'Shortcut kerja inti untuk teknisi dismantle.',
       links: [
         {
-          label: 'Work Order Dismantle Saya',
-          href: '__AUTO_WORK_ORDERS__',
-          description: 'Tracking work order dismantle yang paling dekat dengan identitas login Anda.',
-          badge: 'dismantle',
+          label: 'WO Dismantle OPEN',
+          href: '__AUTO_WORK_ORDERS__?status=OPEN',
+          description: 'Fokus ke pekerjaan dismantle yang masih OPEN pada PIC login Anda.',
+          badge: 'open',
+        },
+        {
+          label: 'WO Dismantle ON PROGRESS',
+          href: '__AUTO_WORK_ORDERS__?status=ON_PROGRESS',
+          description: 'Fokus ke pekerjaan dismantle yang sedang berjalan (ON PROGRESS).',
+          badge: 'progress',
         },
         {
           label: 'Movement Barang Return',

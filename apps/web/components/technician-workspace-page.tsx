@@ -25,14 +25,34 @@ function buildPersonalWorkOrderSearch(session: AppSession) {
   return session.username.trim()
 }
 
+function mergeHrefQuery(baseHref: string, extraQuery: string) {
+  if (!extraQuery.startsWith('?')) {
+    return baseHref
+  }
+
+  const [basePath, baseQuery = ''] = baseHref.split('?')
+  const merged = new URLSearchParams(baseQuery)
+  const extras = new URLSearchParams(extraQuery.slice(1))
+  extras.forEach((value, key) => {
+    merged.set(key, value)
+  })
+
+  const query = merged.toString()
+  return query ? `${basePath}?${query}` : basePath ?? baseHref
+}
+
 function buildWorkOrderHref(session: AppSession, config: TechnicianWorkspaceConfig) {
   const params = new URLSearchParams()
   if (config.workOrderJobCategory) {
     params.set('jobCategory', config.workOrderJobCategory)
   }
-  const q = buildPersonalWorkOrderSearch(session)
-  if (q) {
-    params.set('q', q)
+  if (session.userId) {
+    params.set('mine', '1')
+  } else {
+    const q = buildPersonalWorkOrderSearch(session)
+    if (q) {
+      params.set('q', q)
+    }
   }
   return `/dashboard/tracking/work-orders?${params.toString()}`
 }
@@ -54,14 +74,14 @@ function buildInventoryHref(config: TechnicianWorkspaceConfig) {
 }
 
 function personalizeLinkHref(session: AppSession, config: TechnicianWorkspaceConfig, href: string) {
-  if (href === '__AUTO_WORK_ORDERS__') {
-    return buildWorkOrderHref(session, config)
+  if (href.startsWith('__AUTO_WORK_ORDERS__')) {
+    return mergeHrefQuery(buildWorkOrderHref(session, config), href.slice('__AUTO_WORK_ORDERS__'.length))
   }
-  if (href === '__AUTO_QUEUE__') {
-    return buildQueueHref(config)
+  if (href.startsWith('__AUTO_QUEUE__')) {
+    return mergeHrefQuery(buildQueueHref(config), href.slice('__AUTO_QUEUE__'.length))
   }
-  if (href === '__AUTO_MOVEMENTS__') {
-    return buildInventoryHref(config)
+  if (href.startsWith('__AUTO_MOVEMENTS__')) {
+    return mergeHrefQuery(buildInventoryHref(config), href.slice('__AUTO_MOVEMENTS__'.length))
   }
   return href
 }

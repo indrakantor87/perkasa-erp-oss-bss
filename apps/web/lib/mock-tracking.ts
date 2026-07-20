@@ -6,7 +6,7 @@ export const mockTrackingWorkOrders = [
     id: 321,
     workOrderNo: 'WO-202607-0321',
     workType: 'FIELD_VISIT',
-    jobCategory: 'TROUBLESHOOTS',
+    jobCategory: 'TROUBLE',
     status: 'ON_PROGRESS',
     priority: 'HIGH',
     scheduledAt: '2026-07-19 09:30:00',

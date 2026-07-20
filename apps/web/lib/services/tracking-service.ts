@@ -1,4 +1,5 @@
 import { getDataSourceSnapshot } from '@/lib/data-source'
+import type { AppSession } from '@/lib/auth-session'
 import {
   mockTrackingInventoryRequests,
   mockTrackingStockMovements,
@@ -155,6 +156,7 @@ export type WorkOrderTrackingQuery = {
   status?: string | string[]
   jobCategory?: string | string[]
   priority?: string | string[]
+  mine?: string | string[]
   limit?: string | string[]
 }
 
@@ -185,12 +187,18 @@ export type InventoryRequestTrackingQuery = {
   limit?: string | string[]
 }
 
-export async function getWorkOrderTrackingList(query: WorkOrderTrackingQuery) {
+export async function getWorkOrderTrackingList(query: WorkOrderTrackingQuery, options?: { session?: AppSession }) {
   const source = getDataSourceSnapshot()
   const state = resolveWorkOrderTrackingState(query)
+  const session = options?.session
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     const items = mockTrackingWorkOrders
       .filter((row) => matchesMockSearch([row.workOrderNo, row.technicianName, row.picFullName, row.picUsername], state.q))
+      .filter((row) =>
+        state.mine && session?.username
+          ? String(row.picUsername ?? '').trim().toLowerCase() === session.username.trim().toLowerCase()
+          : true,
+      )
       .filter((row) => !state.status || String(row.status ?? '').toUpperCase() === state.status)
       .filter((row) => !state.jobCategory || String(row.jobCategory ?? '').toUpperCase() === state.jobCategory)
       .filter((row) => !state.priority || String(row.priority ?? '').toUpperCase() === state.priority)
@@ -273,6 +281,10 @@ export async function getWorkOrderTrackingList(query: WorkOrderTrackingQuery) {
     const where: string[] = []
     const values: unknown[] = []
 
+    if (state.mine && session?.userId && hasPicUserId) {
+      where.push('wo.current_pic_user_id = ?')
+      values.push(session.userId)
+    }
     if (state.q) {
       where.push('(wo.work_order_no LIKE ? OR wo.technician_name LIKE ?)')
       values.push(normalizeLike(state.q), normalizeLike(state.q))
@@ -1189,6 +1201,8 @@ function resolveWorkOrderTrackingState(query: WorkOrderTrackingQuery) {
   const status = resolveSearchParam(query.status)?.trim().toUpperCase() ?? ''
   const jobCategory = resolveSearchParam(query.jobCategory)?.trim().toUpperCase() ?? ''
   const priority = resolveSearchParam(query.priority)?.trim().toUpperCase() ?? ''
+  const mineRaw = resolveSearchParam(query.mine)?.trim().toLowerCase() ?? ''
+  const mine = ['1', 'true', 'yes', 'on'].includes(mineRaw)
   const limitRaw = resolveSearchParam(query.limit)?.trim() ?? ''
   const limit = Math.min(Math.max(resolveOptionalInt(limitRaw) ?? 100, 20), 300)
 
@@ -1197,6 +1211,7 @@ function resolveWorkOrderTrackingState(query: WorkOrderTrackingQuery) {
     status: status || null,
     jobCategory: jobCategory || null,
     priority: priority || null,
+    mine,
     limit,
   }
 }

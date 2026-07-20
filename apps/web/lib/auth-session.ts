@@ -4,6 +4,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { runReviewDbQuery } from '@/lib/review-db'
 
 export type AppSession = {
+  userId?: number
   username: string
   displayName: string
   role: AppRole
@@ -301,6 +302,7 @@ async function authenticateReviewDbUser(username: string, password: string): Pro
 
     return {
       session: {
+        userId: candidate.userId,
         username: candidate.username,
         displayName: candidate.fullName,
         role: resolvedRole,
