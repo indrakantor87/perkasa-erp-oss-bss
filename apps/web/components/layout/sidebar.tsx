@@ -366,23 +366,23 @@ function buildDigitalCreatorSubmenuItems() {
 }
 
 function buildBillingMainItem(role: AppRole | null) {
-  return buildSidebarNavItem('/billing', {
+  return buildSidebarNavItem('/finance', {
     key: 'billing-main',
-    title: 'Billing',
-    description: 'Invoice, payment, collection, dan kontrol suspend',
-    matchPrefixes: ['/billing', '/customers', '/support/isolations'],
-    assignHrefs: ['/billing', '/customers', '/support/isolations'],
+    title: 'Finance',
+    description: 'Workspace finance untuk invoice, payment, collection, dan kontrol suspend',
+    matchPrefixes: ['/finance', '/billing', '/customers', '/support/isolations'],
+    assignHrefs: ['/finance', '/billing', '/customers', '/support/isolations'],
     children: buildBillingSubmenuItems(role),
   })
 }
 
 function buildCompactBillingItem() {
-  return buildSidebarNavItem('/billing', {
+  return buildSidebarNavItem('/finance', {
     key: 'billing-compact',
-    title: 'Billing',
-    description: 'Invoice, payment, collection, dan kontrol suspend',
-    matchPrefixes: ['/billing'],
-    assignHrefs: ['/billing'],
+    title: 'Finance',
+    description: 'Workspace finance untuk invoice, payment, collection, dan kontrol suspend',
+    matchPrefixes: ['/finance', '/billing'],
+    assignHrefs: ['/finance', '/billing'],
   })
 }
 
@@ -394,10 +394,10 @@ function buildBillingSubmenuItems(role: AppRole | null) {
   const items: SidebarNavItem[] = [
     buildSidebarNavItem('/billing', {
       key: 'billing-sub-workspace',
-      title: 'Workspace Billing',
-      description: 'Invoice, payment, collection, dan kontrol operasional billing.',
-      href: '/billing',
-      matchPrefixes: ['/billing'],
+      title: 'Workspace Finance',
+      description: 'Invoice, payment, collection, dan kontrol operasional finance.',
+      href: '/finance',
+      matchPrefixes: ['/finance', '/billing'],
     }),
   ]
 

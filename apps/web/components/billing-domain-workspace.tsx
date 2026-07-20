@@ -32,7 +32,7 @@ function getBillingActionAnchorId(key: BillingActionKey) {
   return `billing-action-${key}`
 }
 
-function buildPrefillHref(anchorId: string, params: Record<string, string | undefined>) {
+function buildPrefillHref(anchorId: string, params: Record<string, string | undefined>, basePath: string) {
   const searchParams = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {
     const normalized = String(value ?? '').trim()
@@ -41,7 +41,7 @@ function buildPrefillHref(anchorId: string, params: Record<string, string | unde
     }
   })
   const queryText = searchParams.toString()
-  return `/billing${queryText ? `?${queryText}` : ''}#${anchorId}`
+  return `${basePath}${queryText ? `?${queryText}` : ''}#${anchorId}`
 }
 
 function pickMeta(meta: string[], prefix: string) {
@@ -100,6 +100,7 @@ function getRowAction(params: {
   row: DomainReviewRow
   canCreate: boolean
   canUpdate: boolean
+  basePath: string
 }) {
   const title = params.sectionTitle.trim().toUpperCase()
   const invoice = params.row.primary.trim()
@@ -110,7 +111,7 @@ function getRowAction(params: {
       label: 'Generate',
       href: buildPrefillHref(getBillingActionAnchorId('invoice-generate'), {
         service,
-      }),
+      }, params.basePath),
     }
   }
   if ((title.includes('SUSPEND READY QUEUE') || title.includes('RECONNECT READY QUEUE')) && params.canUpdate) {
@@ -118,7 +119,7 @@ function getRowAction(params: {
       label: 'Status',
       href: buildPrefillHref(getBillingActionAnchorId('invoice-status'), {
         invoice,
-      }),
+      }, params.basePath),
     }
   }
   if (title.includes('COLLECTION FOLLOW UP QUEUE') && params.canUpdate) {
@@ -126,7 +127,7 @@ function getRowAction(params: {
       label: 'Resolve',
       href: buildPrefillHref(getBillingActionAnchorId('collection-resolve'), {
         invoice,
-      }),
+      }, params.basePath),
     }
   }
   if ((title.includes('PROMISE TO PAY QUEUE') || title.includes('WRITE OFF QUEUE')) && (params.canCreate || params.canUpdate)) {
@@ -134,7 +135,7 @@ function getRowAction(params: {
       label: 'Collection',
       href: buildPrefillHref(getBillingActionAnchorId('collection-action'), {
         invoice,
-      }),
+      }, params.basePath),
     }
   }
   if (title.includes('PAYMENT') && params.canCreate) {
@@ -142,7 +143,7 @@ function getRowAction(params: {
       label: 'Payment',
       href: buildPrefillHref(getBillingActionAnchorId('payment-entry'), {
         invoice,
-      }),
+      }, params.basePath),
     }
   }
   if (title.includes('INVOICE') && params.canCreate) {
@@ -150,7 +151,7 @@ function getRowAction(params: {
       label: 'Tindak',
       href: buildPrefillHref(getBillingActionAnchorId('collection-action'), {
         invoice,
-      }),
+      }, params.basePath),
     }
   }
   return null
@@ -161,12 +162,14 @@ function buildBillingQuickActionPayload(params: {
   row: DomainReviewRow
   canCreate: boolean
   canUpdate: boolean
+  basePath: string
 }): TableQuickActionPayload {
   const action = getRowAction({
     sectionTitle: params.sectionTitle,
     row: params.row,
     canCreate: params.canCreate,
     canUpdate: params.canUpdate,
+    basePath: params.basePath,
   })
   const service = pickMeta(params.row.meta, 'Service: ')
   const invoiceType = pickMeta(params.row.meta, 'Invoice Type: ')
@@ -265,6 +268,9 @@ export function BillingDomainWorkspace({
   role,
   domainPrefill,
   domainDrilldown,
+  basePath = '/billing',
+  workspaceLabel = 'Billing / Collection Workspace',
+  shortLabel = 'Billing',
 }: {
   content: DomainPageContent
   source: DataSourceSnapshot
@@ -279,6 +285,9 @@ export function BillingDomainWorkspace({
     month?: number
     year?: number
   }
+  basePath?: string
+  workspaceLabel?: string
+  shortLabel?: string
 }) {
   const reviewSections = content.reviewSections ?? []
   const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
@@ -405,7 +414,7 @@ export function BillingDomainWorkspace({
         <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-              Billing / Collection Workspace
+              {workspaceLabel}
             </h2>
             <p className="mt-1 text-sm leading-5 text-mute">
               Invoice overdue, follow-up collection, suspend, reconnect, dan payment dalam satu layar kerja yang ringkas.
@@ -482,20 +491,20 @@ export function BillingDomainWorkspace({
       <section className="rounded-xl border border-line bg-slate-50 p-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Toolbar Billing</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Toolbar {shortLabel}</p>
             <p className="mt-1 text-sm text-mute">Shortcut overdue, nominal besar, parsial, dan suspend candidate.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/billing?focus=OVERDUE_INVOICES" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-rose-700">
+            <Link href={`${basePath}?focus=OVERDUE_INVOICES`} className="rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-rose-700">
               Overdue
             </Link>
-            <Link href="/billing?focus=BILLING_OVERDUE_AMOUNT" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-amber-700">
+            <Link href={`${basePath}?focus=BILLING_OVERDUE_AMOUNT`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-amber-700">
               Nominal Besar
             </Link>
-            <Link href="/billing?focus=PARTIAL_INVOICES" className="rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-sky-700">
+            <Link href={`${basePath}?focus=PARTIAL_INVOICES`} className="rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-sky-700">
               Partial
             </Link>
-            <Link href="/billing?focus=SUSPEND_CANDIDATES" className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700">
+            <Link href={`${basePath}?focus=SUSPEND_CANDIDATES`} className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700">
               Suspend
             </Link>
           </div>
@@ -505,7 +514,7 @@ export function BillingDomainWorkspace({
       <section className="panel p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="section-title">Console Billing</p>
+            <p className="section-title">Console {shortLabel}</p>
             <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
               Tabel antrean invoice dan collection
             </h3>
@@ -563,6 +572,7 @@ export function BillingDomainWorkspace({
                       row,
                       canCreate,
                       canUpdate,
+                      basePath,
                     })
                     const service = pickMeta(row.meta, 'Service: ')
                     const invoiceType = pickMeta(row.meta, 'Invoice Type: ')
@@ -610,6 +620,7 @@ export function BillingDomainWorkspace({
                                     row,
                                     canCreate,
                                     canUpdate,
+                                    basePath,
                                   }),
                                 )
                               }
@@ -634,7 +645,7 @@ export function BillingDomainWorkspace({
       {(canCreate || canUpdate) ? (
         <section className="space-y-4">
           <div>
-            <p className="section-title">Aksi Billing</p>
+            <p className="section-title">Aksi {shortLabel}</p>
             <h3 className="mt-2 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
               Form operasional
             </h3>
@@ -644,7 +655,7 @@ export function BillingDomainWorkspace({
           </div>
           <details className="group rounded-2xl border border-line bg-white p-4">
             <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-              Buka panel aksi billing
+              Buka panel aksi {shortLabel.toLowerCase()}
             </summary>
             <p className="mt-2 text-sm text-mute">
               Berisi `Generate Invoice`, `Update Status`, `Collection Action`, `Resolve Follow Up`, dan `Payment Entry`.

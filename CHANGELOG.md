@@ -10,6 +10,20 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.53] - 2026-07-20
+
+### Added
+
+- Ditambahkan route `Finance` baru di `/finance` sebagai entry point domain terpisah yang membungkus `BillingDomainWorkspace` existing tanpa memutus engine billing: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/finance/page.tsx)
+
+### Changed
+
+- `BillingDomainWorkspace` kini bisa dipakai ulang oleh `/billing` dan `/finance` melalui `basePath` serta label workspace yang dapat disesuaikan, sehingga toolbar, aksi cepat, dan fokus KPI tidak lagi memaksa kembali ke route lama: [billing-domain-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/billing-domain-workspace.tsx)
+- Role `FINANCE` sekarang mendarat ke `/finance`, dan akses path untuk owner/admin/super admin turut mengenali route baru ini: [access-control.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/access-control.ts)
+- Navigasi utama dan sidebar kini memakai label `Finance` sebagai pintu masuk utama, tetapi tetap menganggap `/billing` sebagai route engine pendukung agar transisi aman: [navigation.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/navigation.ts), [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx)
+- Workspace organisasi yang sebelumnya masuk ke collection lewat `/billing` kini diarahkan ke `/finance` supaya pintu masuk UI lebih konsisten: [organization-workspaces.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/organization-workspaces.ts)
+- Mock dashboard dan smoke test diperbarui untuk mengenali landing `Finance` baru dan akses role `FINANCE`: [mock-dashboard.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/mock-dashboard.ts), [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+
 ## [0.66.52] - 2026-07-20
 
 ### Added

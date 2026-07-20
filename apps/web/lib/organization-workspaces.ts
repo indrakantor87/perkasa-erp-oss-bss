@@ -252,7 +252,7 @@ export const legalWorkspace: OrganizationWorkspaceDefinition = {
     'Landing ini memunculkan Legal secara eksplisit di struktur ERP sambil tetap terhubung ke domain yang sudah hidup untuk administrasi dokumen, asset, dan tindak lanjut data pelanggan.',
   primaryAction: {
     label: 'Customer & Collection',
-    href: '/billing?focus=OVERDUE_INVOICES',
+    href: '/finance?focus=OVERDUE_INVOICES',
     description: 'Masuk ke customer dan collection yang paling sering menuntut tindak lanjut legal.',
   },
   secondaryAction: {
@@ -280,8 +280,8 @@ export const legalWorkspace: OrganizationWorkspaceDefinition = {
       description: 'Landing Legal sekarang membaca customer, collection, dan terminasi sebagai alur kerja utama.',
       links: [
         {
-          label: 'Billing Overdue',
-          href: '/billing?focus=OVERDUE_INVOICES',
+          label: 'Finance Overdue',
+          href: '/finance?focus=OVERDUE_INVOICES',
           description: 'Tinjau invoice overdue ketika dokumen atau kesepakatan layanan berhubungan dengan penagihan.',
           badge: 'collection',
         },
@@ -403,10 +403,10 @@ export const kantorWorkspace: OrganizationWorkspaceDefinition = {
           badge: 'request',
         },
         {
-          label: 'Billing Customer',
-          href: '/billing?focus=OVERDUE_INVOICES',
+          label: 'Finance Customer',
+          href: '/finance?focus=OVERDUE_INVOICES',
           description: 'Baca kasus collection yang perlu dikoordinasikan dari sisi kantor dan administrasi internal.',
-          badge: 'billing',
+          badge: 'finance',
         },
       ],
     },
@@ -478,8 +478,8 @@ export const tokoWorkspace: OrganizationWorkspaceDefinition = {
           badge: 'sales',
         },
         {
-          label: 'Customer Billing',
-          href: '/billing?focus=OVERDUE_INVOICES',
+          label: 'Customer Finance',
+          href: '/finance?focus=OVERDUE_INVOICES',
           description: 'Lihat customer dan collection yang perlu dibantu follow-up dari titik layanan toko.',
           badge: 'customer',
         },

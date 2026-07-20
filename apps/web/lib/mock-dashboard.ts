@@ -75,8 +75,8 @@ export const moduleCards: ModuleCard[] = [
     accent: 'bg-emerald-50 text-emerald-700',
   },
   {
-    title: 'Billing',
-    href: '/billing',
+    title: 'Finance',
+    href: '/finance',
     description: 'Invoice, pembayaran, collection, dan overdue control dalam satu panel.',
     status: 'Sudah punya fondasi staging dan transform',
     accent: 'bg-rose-50 text-rose-700',
@@ -129,11 +129,11 @@ export function getMockRoleQueues(role: AppRole, summary: DashboardSummary): Das
       return [
         buildQueueItem('Validasi Import', '/import', 3, 'Batch yang perlu direview sebelum transform.', 'bg-blue-50 text-blue-700'),
         buildQueueItem('TT Open', '/support', summary.troubleTickets, 'Ticket teknis aktif lintas divisi.', 'bg-amber-50 text-amber-700'),
-        buildQueueItem('Invoice Overdue', '/billing', summary.overdueInvoices, 'Tagihan yang butuh tindak lanjut cepat.', 'bg-rose-50 text-rose-700'),
+        buildQueueItem('Invoice Overdue', '/finance', summary.overdueInvoices, 'Tagihan yang butuh tindak lanjut cepat.', 'bg-rose-50 text-rose-700'),
       ]
     case 'FINANCE':
       return [
-        buildQueueItem('Invoice Overdue', '/billing', summary.overdueInvoices, 'Tagihan yang butuh tindak lanjut cepat.', 'bg-rose-50 text-rose-700'),
+        buildQueueItem('Invoice Overdue', '/finance', summary.overdueInvoices, 'Tagihan yang butuh tindak lanjut cepat.', 'bg-rose-50 text-rose-700'),
         buildQueueItem('Isolir Aktif', '/support', summary.isolations, 'Suspend aktif yang perlu sinkron billing.', 'bg-amber-50 text-amber-700'),
       ]
     case 'HR':

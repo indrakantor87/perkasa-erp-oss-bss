@@ -105,9 +105,9 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
     icon: ClipboardList,
   },
   {
-    title: 'Billing',
-    href: '/billing',
-    description: 'Invoice, customer, isolir, payment, dan collection',
+    title: 'Finance',
+    href: '/finance',
+    description: 'Workspace finance untuk invoice, collection, payment, dan kontrol suspend',
     tone: 'bg-rose-600 text-white',
     icon: BadgeDollarSign,
   },
@@ -130,7 +130,12 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
 export function findNavigationItem(pathname: string) {
   return (
     navigationItems
-      .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+      .filter((item) => {
+        if (item.href === '/finance') {
+          return pathname === '/finance' || pathname.startsWith('/finance/') || pathname === '/billing' || pathname.startsWith('/billing/')
+        }
+        return pathname === item.href || pathname.startsWith(`${item.href}/`)
+      })
       .sort((left, right) => right.href.length - left.href.length)[0] ??
     navigationItems[0]
   )

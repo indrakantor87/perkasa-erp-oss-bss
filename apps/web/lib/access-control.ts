@@ -11,7 +11,7 @@ function getDbPermissionSets() {
 }
 
 const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
-  OWNER: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing'],
+  OWNER: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing', '/finance'],
   SUPER_ADMIN: [
     '/dashboard',
     '/import',
@@ -23,11 +23,12 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
     '/inventory',
     '/hr',
     '/billing',
+    '/finance',
     '/settings/access',
     '/settings/users',
   ],
-  ADMIN: ['/dashboard', '/import', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing'],
-  FINANCE: ['/dashboard', '/billing', '/list-dismantle', '/sales', '/customers', '/support'],
+  ADMIN: ['/dashboard', '/import', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing', '/finance'],
+  FINANCE: ['/dashboard', '/billing', '/finance', '/list-dismantle', '/sales', '/customers', '/support'],
   HR: ['/dashboard', '/hr'],
   GA: ['/dashboard', '/inventory', '/support'],
   PENJUALAN: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
@@ -45,7 +46,7 @@ const baselineRoleLandingPaths: Record<AppRole, string> = {
   OWNER: '/dashboard/worklist',
   SUPER_ADMIN: '/dashboard/worklist',
   ADMIN: '/dashboard/worklist',
-  FINANCE: '/billing',
+  FINANCE: '/finance',
   HR: '/hr',
   GA: '/inventory',
   PENJUALAN: '/dashboard/worklist',
