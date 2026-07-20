@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { recordHrAudit } from '@/lib/services/hr-audit-service'
+import { getHrEmployeeKpiBonus } from '@/lib/services/hr-employee-kpi-service'
 import { ensureHrSalarySlipVoidTable } from '@/lib/services/hr-salary-slip-void-service'
 
 type EmployeeRow = {
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
     const baseSalaryInput = normalizePrice(payload.baseSalary)
     const attendanceAllowance = normalizeRequiredPrice(payload.attendanceAllowance)
     const overtimeAmount = normalizeRequiredPrice(payload.overtimeAmount)
-    const performanceBonus = normalizeRequiredPrice(payload.performanceBonus)
+    const performanceBonusInput = normalizePrice(payload.performanceBonus)
     const positionAllowance = normalizeRequiredPrice(payload.positionAllowance)
     const loanDeductionInput = normalizePrice(payload.loanDeduction)
     const releasedAtRaw = String(payload.releasedAt ?? '').trim()
@@ -145,6 +146,9 @@ export async function POST(request: Request) {
 
     const baseSalary = baseSalaryInput ?? Number(employee.baseSalary ?? 0)
     const loanDeduction = loanDeductionInput ?? Number(loanDeductionRow?.loanDeduction ?? 0)
+    const kpiPerformanceBonus =
+      performanceBonusInput === null ? await getHrEmployeeKpiBonus({ employeeId: employee.id, month: payrollMonth, year: payrollYear }) : 0
+    const performanceBonus = performanceBonusInput ?? kpiPerformanceBonus
 
     if (baseSalary < 0 || attendanceAllowance < 0 || overtimeAmount < 0 || performanceBonus < 0 || positionAllowance < 0 || loanDeduction < 0) {
       return Response.json({ message: 'Komponen payroll tidak valid.' }, { status: 400 })

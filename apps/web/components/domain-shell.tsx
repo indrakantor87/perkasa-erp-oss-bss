@@ -19,6 +19,7 @@ import { HrAttendanceGeofenceForm } from '@/components/hr-attendance-geofence-fo
 import { HrAttendanceUpdateForm } from '@/components/hr-attendance-update-form'
 import { HrEmployeeArchiveForm } from '@/components/hr-employee-archive-form'
 import { HrEmployeeCreateForm } from '@/components/hr-employee-create-form'
+import { HrEmployeeKpiForm } from '@/components/hr-employee-kpi-form'
 import { HrEmployeeFaceReferenceForm } from '@/components/hr-employee-face-reference-form'
 import { HrEmployeeReactivateForm } from '@/components/hr-employee-reactivate-form'
 import { HrLoanCreateForm } from '@/components/hr-loan-create-form'
@@ -418,6 +419,7 @@ type HrActionKey =
   | 'employee-create'
   | 'employee-archive'
   | 'employee-reactivate'
+  | 'kpi-entry'
   | 'face-reference'
   | 'attendance-create'
   | 'face-config'
@@ -489,6 +491,13 @@ function getHrSectionAction(params: {
       key: 'salary-create' as const,
       label: 'Buat Payroll',
       description: 'Susun slip gaji baru dari employee yang sudah siap diproses.',
+    }
+  }
+  if (title.includes('KPI') && params.canUpdate) {
+    return {
+      key: 'kpi-entry' as const,
+      label: 'Input KPI Manual',
+      description: 'Catat KPI manual per employee dan bonus performa untuk periode payroll.',
     }
   }
   if (title.includes('LOAN') && title.includes('VOID') && params.canUpdate) {
@@ -3659,6 +3668,14 @@ export function DomainShell({
 
       {content.key === 'hr' ? (
         <section className="grid gap-6 xl:grid-cols-2">
+          <div id={getHrActionAnchorId('kpi-entry')} className="scroll-mt-24">
+            <HrEmployeeKpiForm
+              canUpdate={canUpdate}
+              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+              employeeSuggestions={hrEmployeeSuggestions}
+              initialEmployeeValue={hrEmployeePrefillValue}
+            />
+          </div>
           <div id={getHrActionAnchorId('employee-create')} className="scroll-mt-24">
             <HrEmployeeCreateForm
               canCreate={canCreate}

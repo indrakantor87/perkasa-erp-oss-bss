@@ -680,6 +680,22 @@ CREATE TABLE IF NOT EXISTS hr_attendance (
   CONSTRAINT fk_hr_attendance_employee FOREIGN KEY (employee_id) REFERENCES hr_employees(id)
 );
 
+CREATE TABLE IF NOT EXISTS hr_employee_kpis (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  employee_id BIGINT UNSIGNED NOT NULL,
+  kpi_month TINYINT UNSIGNED NOT NULL,
+  kpi_year SMALLINT UNSIGNED NOT NULL,
+  score INT NOT NULL DEFAULT 0,
+  performance_bonus DECIMAL(15,2) NOT NULL DEFAULT 0,
+  notes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_hr_employee_kpis_period (employee_id, kpi_month, kpi_year),
+  KEY idx_hr_employee_kpis_period (kpi_year, kpi_month),
+  CONSTRAINT fk_hr_employee_kpis_employee FOREIGN KEY (employee_id) REFERENCES hr_employees(id)
+);
+
 CREATE TABLE IF NOT EXISTS hr_salary_slips (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   employee_id BIGINT UNSIGNED NOT NULL,

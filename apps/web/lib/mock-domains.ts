@@ -663,6 +663,20 @@ export const domainPages: Record<DomainKey, DomainPageContent> = {
         ],
       },
       {
+        title: 'KPI Bulanan Terbaru',
+        description: 'Sampel KPI manual per employee yang dipakai sebagai acuan bonus performa payroll.',
+        rows: [
+          {
+            id: 'KPI-1',
+            primary: 'Nabila Putri',
+            secondary: '07/2026',
+            status: 'SCORE 92',
+            detail: 'Bonus performa Rp250.000 untuk periode payroll.',
+            meta: ['Employee: EMP-202607-0002', 'Score: 92', 'Bonus: Rp250.000', 'Notes: Closing tepat waktu dan follow up customer.'],
+          },
+        ],
+      },
+      {
         title: 'Slip Gaji Terbaru',
         description: 'Sampel slip gaji terbaru untuk menutup loop HR dari employee, attendance, loan, sampai payroll.',
         rows: [

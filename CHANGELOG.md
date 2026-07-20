@@ -10,6 +10,19 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.54] - 2026-07-20
+
+### Added
+
+- Ditambahkan input `KPI manual` per employee per bulan untuk menjadi acuan bonus performa payroll: [HrEmployeeKpiForm](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/hr-employee-kpi-form.tsx), [route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/employee-kpis/route.ts)
+- Ditambahkan tabel review-db `hr_employee_kpis` dengan `score` dan `performance_bonus` (dibuat otomatis via `CREATE TABLE IF NOT EXISTS` pada write/read path HR): [hr-employee-kpi-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/hr-employee-kpi-service.ts), [xampp_review_schema.sql](file:///d:/trae_projects/perkasa-erp-oss-bss/database/xampp_review_schema.sql)
+
+### Changed
+
+- Write action `Buat slip gaji` sekarang akan mengambil default `bonus performa` dari KPI employee untuk bulan/tahun payroll bila kolom bonus dikosongkan: [salary-slips/route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/hr/salary-slips/route.ts)
+- Domain HR kini menampilkan section `KPI Bulanan Terbaru` pada read-side agar supervisor HR bisa memantau input KPI: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Smoke test HR diperbarui agar tidak bergantung urutan section fixed dan mengenali KPI section baru: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+
 ## [0.66.53] - 2026-07-20
 
 ### Added

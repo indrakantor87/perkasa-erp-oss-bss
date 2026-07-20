@@ -14,6 +14,7 @@ import { getVerifiedHrEmployeeFaceReferenceCandidates } from '@/lib/services/hr-
 import { getHrAttendanceFaceOutcomeAnalytics } from '@/lib/services/hr-attendance-face-service'
 import { getRecentHrAttendanceFaceReviewItems } from '@/lib/services/hr-attendance-face-service'
 import { getHrAttendanceGeofenceConfig } from '@/lib/services/hr-attendance-geofence-service'
+import { ensureHrEmployeeKpiTable, listRecentHrEmployeeKpis } from '@/lib/services/hr-employee-kpi-service'
 import { ensureInventoryLoanTable } from '@/lib/services/inventory-loan-service'
 import { ensureInventoryRequestTable } from '@/lib/services/inventory-request-service'
 import { ensureHrSalarySlipVoidTable } from '@/lib/services/hr-salary-slip-void-service'
@@ -93,7 +94,7 @@ async function ensureDomainInventoryReadTables() {
 
 async function ensureDomainHrReadTables() {
   await runOncePerServer('domain-hr-read-tables', async () => {
-    await ensureHrSalarySlipVoidTable()
+    await Promise.all([ensureHrSalarySlipVoidTable(), ensureHrEmployeeKpiTable()])
   })
 }
 
@@ -5428,6 +5429,7 @@ async function getReviewDbHrSections(filters?: DomainReviewDrilldownFilters): Pr
     faceReviewItems,
     faceOutcomeAnalytics,
     geofenceConfig,
+    recentKpis,
   ] = await Promise.all([
     ensureDomainHrReadTables(),
     getHrAttendanceFaceConfig().catch(() => null),
@@ -5440,6 +5442,7 @@ async function getReviewDbHrSections(filters?: DomainReviewDrilldownFilters): Pr
     getRecentHrAttendanceFaceReviewItems(5).catch(() => []),
     getHrAttendanceFaceOutcomeAnalytics().catch(() => null),
     getHrAttendanceGeofenceConfig().catch(() => null),
+    listRecentHrEmployeeKpis(5).catch(() => []),
   ])
 
 
@@ -6032,6 +6035,25 @@ async function getReviewDbHrSections(filters?: DomainReviewDrilldownFilters): Pr
           `Loan Type: ${item.loanType}`,
           `Amount: ${formatCurrency(item.amount)}`,
           `Installment: ${formatCurrency(item.monthlyInstallment)}`,
+        ],
+      })),
+    },
+    {
+      title: 'KPI Bulanan Terbaru',
+      description:
+        'KPI manual per employee yang dipakai sebagai acuan bonus performa payroll. Isi bonus akan dipakai sebagai default saat slip gaji dibuat.',
+      rows: recentKpis.map((item) => ({
+        id: `KPI-${item.kpiId}`,
+        primary: item.employeeName,
+        secondary: `${String(item.kpiMonth).padStart(2, '0')}/${item.kpiYear}`,
+        status: `SCORE ${formatNumber(item.score)}`,
+        detail: `Bonus performa ${formatCurrency(item.performanceBonus)} untuk periode payroll.`,
+        meta: [
+          `Employee: ${item.employeeCode}`,
+          `Score: ${formatNumber(item.score)}`,
+          `Bonus: ${formatCurrency(item.performanceBonus)}`,
+          `Updated At: ${formatDateTime(item.updatedAt)}`,
+          `Notes: ${item.notes || '-'}`,
         ],
       })),
     },
