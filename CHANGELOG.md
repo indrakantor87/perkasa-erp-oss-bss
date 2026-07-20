@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.49] - 2026-07-19
+
+### Added
+
+- Histori close pada lane `/support/dismantle` kini membaca `Work Order`, `Work Order ID`, `Ticket Ref`, dan `Trouble Ticket ID` dari lifecycle item return, lalu menampilkan action langsung `Buka Work Order` atau `Buka Trouble Ticket` bila referensinya tersedia: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts), [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+- Halaman detail barcode inventory sekarang menyediakan tombol langsung ke `Work Order` atau `Trouble Ticket` dari audit lifecycle terbaru, sehingga operator bisa berpindah dari histori barang ke ticket operasional tanpa mencari manual: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/inventory/barcodes/[itemCode]/page.tsx)
+
+### Changed
+
+- Navigasi flow dismantle sekarang membentuk segitiga operasional yang lebih utuh: histori support close dapat membuka barcode dan work order, sedangkan barcode inventory dapat membuka histori support dan ticketing operasional yang sama.
+- Versioning diselaraskan ke `0.66.49`; batch ini lolos diagnostics dan `npm run check`, sedangkan `npm run build` di sandbox kembali berhenti pada fase `next build` tanpa error eksplisit sebelum dihentikan manual.
+
 ## [0.66.48] - 2026-07-19
 
 ### Added

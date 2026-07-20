@@ -77,6 +77,11 @@ function parseReturnedItemCodes(meta: string[]) {
   )
 }
 
+function parsePositiveIntMeta(meta: string[], prefix: string) {
+  const parsed = Number.parseInt(pickMeta(meta, prefix), 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 function getOpenRowActionItems(params: {
   row: DomainReviewRow
   canProcessDismantle: boolean
@@ -139,8 +144,28 @@ function getHistoryRowActionItems(params: {
 }) {
   const historyId = params.row.id.replace(/^DIS-/, '')
   const historyPrefillValue = `${historyId} | ${params.row.primary} | ${params.row.secondary}`
+  const workOrderId = parsePositiveIntMeta(params.row.meta, 'Work Order ID: ')
+  const troubleTicketId = parsePositiveIntMeta(params.row.meta, 'Trouble Ticket ID: ')
 
   const actions = [
+    ...(workOrderId
+      ? [
+          {
+            key: 'work-order',
+            label: 'Buka Work Order',
+            href: `/dashboard/tracking/work-orders/${workOrderId}`,
+          },
+        ]
+      : []),
+    ...(troubleTicketId
+      ? [
+          {
+            key: 'trouble-ticket',
+            label: 'Buka Trouble Ticket',
+            href: `/dashboard/tracking/trouble-tickets/${troubleTicketId}`,
+          },
+        ]
+      : []),
     ...(params.canProcessDismantle
       ? [
           {
@@ -163,7 +188,13 @@ function getHistoryRowActionItems(params: {
       : []),
   ]
 
-  const recommendedKey = params.canProcessDismantle ? 'reopen' : 'billing'
+  const recommendedKey = workOrderId
+    ? 'work-order'
+    : troubleTicketId
+      ? 'trouble-ticket'
+      : params.canProcessDismantle
+        ? 'reopen'
+        : 'billing'
 
   return actions.sort((left, right) => {
     const leftRank = left.key === recommendedKey ? 0 : 1
@@ -242,6 +273,8 @@ function buildHistoryDismantleQuickActionPayload(params: {
   const closeOutcome = pickMeta(params.row.meta, 'Close Outcome: ')
   const billingDisposition = pickMeta(params.row.meta, 'Billing Disposition: ')
   const returnedItemCodes = parseReturnedItemCodes(params.row.meta)
+  const workOrderLabel = pickMeta(params.row.meta, 'Work Order: ')
+  const ticketRef = pickMeta(params.row.meta, 'Ticket Ref: ')
   const closedBy = pickMeta(params.row.meta, 'Closed By: ')
   const rowActions = getHistoryRowActionItems(params)
 
@@ -274,6 +307,10 @@ function buildHistoryDismantleQuickActionPayload(params: {
       {
         title: 'Billing',
         value: [`Billing: ${billingDisposition}`, 'Owner Histori: CS & Admin CS'].join('\n'),
+      },
+      {
+        title: 'Referensi Ticketing',
+        value: [`Work Order: ${workOrderLabel}`, `Ticket Ref: ${ticketRef}`].join('\n'),
       },
       {
         title: 'Barang Kembali',
@@ -632,6 +669,8 @@ export function SupportDismantleQueuePanel({
               const fieldPic = pickMeta(row.meta, 'Field PIC: ')
               const billingDisposition = pickMeta(row.meta, 'Billing Disposition: ')
               const returnedItemCodes = parseReturnedItemCodes(row.meta)
+              const workOrderLabel = pickMeta(row.meta, 'Work Order: ')
+              const ticketRef = pickMeta(row.meta, 'Ticket Ref: ')
               const rowActions = getHistoryRowActionItems({
                 row,
                 canProcessDismantle,
@@ -661,6 +700,8 @@ export function SupportDismantleQueuePanel({
                   <p className="mt-3 line-clamp-3 text-sm text-slate-100">{row.detail}</p>
                   <div className="mt-3 grid gap-2 text-xs text-slate-300">
                     <p>Field PIC: {fieldPic || '-'}</p>
+                    <p>Work Order: {workOrderLabel || '-'}</p>
+                    <p>Ticket Ref: {ticketRef || '-'}</p>
                     <p>Returned Item Codes: {returnedItemCodes.length ? returnedItemCodes.join(', ') : '-'}</p>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">

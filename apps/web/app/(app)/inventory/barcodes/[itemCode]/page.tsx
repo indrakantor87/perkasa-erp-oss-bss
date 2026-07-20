@@ -391,6 +391,9 @@ export default async function InventoryBarcodeDetailPage({
           : '',
       ])
     : ''
+  const latestWorkOrderId = latestLifecycle?.workOrderId ?? null
+  const latestTroubleTicketId = latestLifecycle?.troubleTicketId ?? null
+  const latestTicketRef = latestLifecycle?.ticketRef ?? ''
   const dismantleBacklinkRows: DomainReviewRow[] = dismantleHistoryRows.map((entry) => ({
     id: `DIS-${entry.historyId}`,
     primary: entry.customerName || `Histori Dismantle #${entry.historyId}`,
@@ -437,6 +440,23 @@ export default async function InventoryBarcodeDetailPage({
             >
               Refresh detail
             </Link>
+            {latestWorkOrderId ? (
+              <Link
+                href={`/dashboard/tracking/work-orders/${latestWorkOrderId}`}
+                className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition hover:opacity-90"
+                style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
+              >
+                Buka Work Order
+              </Link>
+            ) : null}
+            {latestTroubleTicketId ? (
+              <Link
+                href={`/dashboard/tracking/trouble-tickets/${latestTroubleTicketId}`}
+                className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+              >
+                Buka Trouble Ticket
+              </Link>
+            ) : null}
           </div>
         </div>
 
@@ -505,7 +525,15 @@ export default async function InventoryBarcodeDetailPage({
             <dl className="mt-4 grid gap-3 text-sm">
               <div className="flex items-start justify-between gap-4">
                 <dt className="text-mute">Ticket Terakhir</dt>
-                <dd className="font-semibold text-[var(--color-ink-strong)]">{latestLifecycle?.ticketRef || '-'}</dd>
+                <dd className="font-semibold text-[var(--color-ink-strong)]">{latestTicketRef || '-'}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <dt className="text-mute">Work Order</dt>
+                <dd className="font-semibold text-[var(--color-ink-strong)]">{latestWorkOrderId ?? '-'}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <dt className="text-mute">Trouble Ticket</dt>
+                <dd className="font-semibold text-[var(--color-ink-strong)]">{latestTroubleTicketId ?? '-'}</dd>
               </div>
               <div className="flex items-start justify-between gap-4">
                 <dt className="text-mute">Status Lifecycle</dt>

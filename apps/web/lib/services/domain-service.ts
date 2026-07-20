@@ -225,6 +225,11 @@ type ReviewDbSupportDismantleRow = {
   marketingName: string | null
   closeNote: string | null
   closedAt: string | Date | null
+  returnedItemCodes: string | null
+  relatedWorkOrderId?: number | null
+  relatedWorkOrderNo?: string | null
+  relatedTroubleTicketId?: number | null
+  relatedTicketRef?: string | null
 }
 
 type SupportNonTicketReadSchema = {
@@ -254,6 +259,7 @@ type SupportNonTicketReadSchema = {
   dismantleHistoryMarketingName: boolean
   dismantleHistoryCloseNote: boolean
   dismantleHistoryClosedAt: boolean
+  dismantleHistoryReturnedItemCodes: boolean
 }
 
 type BillingReadSchema = {
@@ -857,6 +863,102 @@ function pickStructuredSupportMetadata(note: string | null | undefined, prefix: 
   return parseStructuredSupportNote(note).metadata.get(prefix) ?? '-'
 }
 
+function parseDismantleReturnedItemCodes(value: string | null | undefined) {
+  return Array.from(
+    new Set(
+      String(value ?? '')
+        .split(/[\r\n,;]+/)
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  )
+}
+
+async function attachSupportDismantleWorkOrderLinks(rows: ReviewDbSupportDismantleRow[]) {
+  const sourceRows = rows.filter((row) => parseDismantleReturnedItemCodes(row.returnedItemCodes).length)
+  if (!sourceRows.length) {
+    return rows
+  }
+
+  const [
+    hasLifecycleItemId,
+    hasLifecycleWorkOrderId,
+    hasLifecycleTroubleTicketId,
+    hasLifecycleTicketRef,
+    hasInventoryItemId,
+    hasInventoryItemCode,
+    hasWorkOrderId,
+    hasWorkOrderNo,
+  ] = await Promise.all([
+    hasReviewDbColumn('inventory_device_lifecycle_logs', 'inventory_item_id'),
+    hasReviewDbColumn('inventory_device_lifecycle_logs', 'work_order_id'),
+    hasReviewDbColumn('inventory_device_lifecycle_logs', 'trouble_ticket_id'),
+    hasReviewDbColumn('inventory_device_lifecycle_logs', 'ticket_ref'),
+    hasReviewDbColumn('inventory_items', 'id'),
+    hasReviewDbColumn('inventory_items', 'item_code'),
+    hasReviewDbColumn('service_work_orders', 'id'),
+    hasReviewDbColumn('service_work_orders', 'work_order_no'),
+  ])
+
+  if (!hasLifecycleItemId || !hasInventoryItemId || !hasInventoryItemCode) {
+    return rows
+  }
+
+  const itemCodes = Array.from(new Set(sourceRows.flatMap((row) => parseDismantleReturnedItemCodes(row.returnedItemCodes))))
+  if (!itemCodes.length) {
+    return rows
+  }
+
+  const placeholders = itemCodes.map(() => '?').join(', ')
+  const linkedRows = await runReviewDbQuery<{
+    itemCode: string | null
+    workOrderId: number | null
+    workOrderNo: string | null
+    troubleTicketId: number | null
+    ticketRef: string | null
+  }>(
+    `
+      SELECT
+        i.item_code AS itemCode,
+        ${hasLifecycleWorkOrderId ? 'l.work_order_id' : 'NULL'} AS workOrderId,
+        ${hasWorkOrderId && hasWorkOrderNo && hasLifecycleWorkOrderId ? 'wo.work_order_no' : 'NULL'} AS workOrderNo,
+        ${hasLifecycleTroubleTicketId ? 'l.trouble_ticket_id' : 'NULL'} AS troubleTicketId,
+        ${hasLifecycleTicketRef ? 'l.ticket_ref' : 'NULL'} AS ticketRef
+      FROM inventory_device_lifecycle_logs l
+      INNER JOIN inventory_items i
+        ON i.id = l.inventory_item_id
+      ${hasWorkOrderId && hasWorkOrderNo && hasLifecycleWorkOrderId ? 'LEFT JOIN service_work_orders wo ON wo.id = l.work_order_id' : ''}
+      WHERE i.item_code IN (${placeholders})
+      ORDER BY l.id DESC
+    `,
+    itemCodes,
+  )
+
+  const byItemCode = new Map<string, (typeof linkedRows)[number]>()
+  for (const row of linkedRows) {
+    const key = String(row.itemCode ?? '').trim().toUpperCase()
+    if (key && !byItemCode.has(key)) {
+      byItemCode.set(key, row)
+    }
+  }
+
+  return rows.map((row) => {
+    const matched = parseDismantleReturnedItemCodes(row.returnedItemCodes)
+      .map((itemCode) => byItemCode.get(itemCode))
+      .find(Boolean)
+
+    return matched
+      ? {
+          ...row,
+          relatedWorkOrderId: matched.workOrderId ?? null,
+          relatedWorkOrderNo: matched.workOrderNo ?? null,
+          relatedTroubleTicketId: matched.troubleTicketId ?? null,
+          relatedTicketRef: matched.ticketRef ?? null,
+        }
+      : row
+  })
+}
+
 function formatDateTimeInputValue(value: string | Date | null | undefined) {
   if (!value) return ''
   const date = new Date(value)
@@ -1141,6 +1243,7 @@ async function getSupportNonTicketReadSchema(): Promise<SupportNonTicketReadSche
     dismantleHistoryMarketingName,
     dismantleHistoryCloseNote,
     dismantleHistoryClosedAt,
+    dismantleHistoryReturnedItemCodes,
   ] = await Promise.all([
     hasReviewDbColumn('support_isolations', 'status'),
     hasReviewDbColumn('support_isolations', 'customer_name'),
@@ -1168,6 +1271,7 @@ async function getSupportNonTicketReadSchema(): Promise<SupportNonTicketReadSche
     hasReviewDbColumn('support_dismantle_history', 'marketing_name'),
     hasReviewDbColumn('support_dismantle_history', 'close_note'),
     hasReviewDbColumn('support_dismantle_history', 'closed_at'),
+    hasReviewDbColumn('support_dismantle_history', 'returned_item_codes'),
   ])
 
   return {
@@ -1197,6 +1301,7 @@ async function getSupportNonTicketReadSchema(): Promise<SupportNonTicketReadSche
     dismantleHistoryMarketingName,
     dismantleHistoryCloseNote,
     dismantleHistoryClosedAt,
+    dismantleHistoryReturnedItemCodes,
   }
 }
 
@@ -1591,7 +1696,8 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
       ${supportNonTicketReadSchema.dismantleHistoryCustomerPhone ? 'dh.customer_phone' : 'NULL'} AS customerPhone,
       ${supportNonTicketReadSchema.dismantleHistoryMarketingName ? 'dh.marketing_name' : 'NULL'} AS marketingName,
       ${supportNonTicketReadSchema.dismantleHistoryCloseNote ? 'dh.close_note' : 'NULL'} AS closeNote,
-      ${supportNonTicketReadSchema.dismantleHistoryClosedAt ? 'dh.closed_at' : 'NULL'} AS closedAt
+      ${supportNonTicketReadSchema.dismantleHistoryClosedAt ? 'dh.closed_at' : 'NULL'} AS closedAt,
+      ${supportNonTicketReadSchema.dismantleHistoryReturnedItemCodes ? 'dh.returned_item_codes' : 'NULL'} AS returnedItemCodes
     FROM support_dismantle_history dh
     LEFT JOIN support_isolations si
       ON si.id = ${
@@ -1610,7 +1716,7 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
   const isolations = isolationResult.rows
   const slaRows = slaResult.rows
   const dismantleOpenRows = dismantleOpenResult.rows
-  const dismantles = dismantleHistoryResult.rows
+  const dismantles = await attachSupportDismantleWorkOrderLinks(dismantleHistoryResult.rows)
   const supportSectionFailures = [
     ticketResult,
     isolationResult,
@@ -1871,6 +1977,10 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
             `Close Outcome: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.closeOutcome)}`,
             `Billing Disposition: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.billingDisposition)}`,
             `Returned Item Codes: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.returnedItemCodes)}`,
+            `Work Order ID: ${item.relatedWorkOrderId ?? '-'}`,
+            `Work Order: ${item.relatedWorkOrderNo || '-'}`,
+            `Ticket Ref: ${item.relatedTicketRef || '-'}`,
+            `Trouble Ticket ID: ${item.relatedTroubleTicketId ?? '-'}`,
             `Closed By: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.actor)}`,
           ],
         }
