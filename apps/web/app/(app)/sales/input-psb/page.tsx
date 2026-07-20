@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { SalesDomainWorkspace } from '@/components/sales-domain-workspace'
 import { requireSession } from '@/lib/auth'
 import { canAccessPath } from '@/lib/access-control-server'
@@ -11,6 +11,9 @@ export default async function SalesInputPsbPage() {
   }
 
   const payload = await getDomainPageData('sales', session, {})
+  if (!payload) {
+    notFound()
+  }
 
   return (
     <SalesDomainWorkspace
