@@ -6,6 +6,41 @@ import { requireSession } from '@/lib/auth'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import { getStockMovementTrackingDetail } from '@/lib/services/tracking-service'
 
+function normalizeText(value: string | null | undefined) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function buildPersonalSearch(username: string, displayName: string) {
+  return String(displayName || username).trim()
+}
+
+function buildStockMovementListHref(params?: Record<string, string>) {
+  const search = new URLSearchParams()
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value) {
+      search.set(key, value)
+    }
+  })
+  const query = search.toString()
+  return query ? `/dashboard/tracking/stock-movements?${query}` : '/dashboard/tracking/stock-movements'
+}
+
+function buildWorkOrderMineHref(userId: number | undefined, username: string, displayName: string, workOrderId: number | null | undefined) {
+  const search = new URLSearchParams()
+  if (userId) {
+    search.set('mine', '1')
+  } else {
+    const q = buildPersonalSearch(username, displayName)
+    if (q) {
+      search.set('q', q)
+    }
+  }
+  if (workOrderId) {
+    search.set('selected', String(workOrderId))
+  }
+  return `/dashboard/tracking/work-orders?${search.toString()}`
+}
+
 export default async function StockMovementTrackingDetailPage({
   params,
 }: {
@@ -24,6 +59,15 @@ export default async function StockMovementTrackingDetailPage({
 
   const payload = await getStockMovementTrackingDetail(movementId)
   const m = payload.movement
+  const isMyMovement = Boolean(
+    m &&
+      ((session.userId && m.technicianUserId === session.userId) ||
+        normalizeText(m.technicianUsername) === normalizeText(session.username) ||
+        normalizeText(m.technicianFullName) === normalizeText(session.displayName)),
+  )
+  const backHref = isMyMovement
+    ? buildStockMovementListHref({ mine: '1' })
+    : buildStockMovementListHref()
 
   return (
     <div className="space-y-6">
@@ -39,10 +83,10 @@ export default async function StockMovementTrackingDetailPage({
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/dashboard/tracking/stock-movements"
+              href={backHref}
               className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
             >
-              Kembali ke list
+              {isMyMovement ? 'Kembali ke barang saya' : 'Kembali ke list'}
             </Link>
             {m?.workOrderId ? (
               <Link
@@ -92,7 +136,37 @@ export default async function StockMovementTrackingDetailPage({
             <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Movement tidak ditemukan.</p>
           </div>
         ) : (
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div className="mt-6 space-y-6">
+            <section className="rounded-3xl border border-line bg-surface p-5">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="section-title">Konteks Saya</p>
+                  <p className="mt-3 text-sm leading-6 text-mute">
+                    {isMyMovement
+                      ? 'Movement ini terkait langsung dengan akun login Anda, sehingga tombol kembali diarahkan ke filter personal.'
+                      : 'Movement ini tidak terdeteksi sebagai konteks langsung akun login Anda. Anda tetap bisa lompat ke daftar personal bila diperlukan.'}
+                  </p>
+                </div>
+                <span className="solid-chip">{isMyMovement ? 'TERKAIT LOGIN' : 'UMUM'}</span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href={buildStockMovementListHref({ mine: '1' })}
+                  className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+                >
+                  Buka Barang Saya
+                </Link>
+                {m.workOrderId ? (
+                  <Link
+                    href={buildWorkOrderMineHref(session.userId, session.username, session.displayName, m.workOrderId)}
+                    className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+                  >
+                    Buka WO Saya
+                  </Link>
+                ) : null}
+              </div>
+            </section>
+            <div className="grid gap-6 lg:grid-cols-2">
             <section className="rounded-3xl border border-line bg-surface p-5">
               <p className="section-title">Item</p>
               <p className="mt-3 text-lg font-semibold text-[var(--color-ink-strong)]">{m.itemCode ?? `Item #${m.itemId}`}</p>
@@ -182,6 +256,7 @@ export default async function StockMovementTrackingDetailPage({
                 </div>
               ) : null}
             </section>
+            </div>
           </div>
         )}
       </section>

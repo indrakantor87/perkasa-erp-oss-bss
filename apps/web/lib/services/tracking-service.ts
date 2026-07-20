@@ -118,7 +118,9 @@ type InventoryRequestRow = {
   requestedFor: string | null
   requestNotes: string | null
   pendingReason: string | null
+  requestedByUserId?: number | null
   requestedBy: string | null
+  processedByUserId?: number | null
   processedBy: string | null
   requestedAt: string | null
   processedAt: string | null
@@ -854,7 +856,9 @@ export async function getInventoryRequestTrackingList(query: InventoryRequestTra
           r.requested_for AS requestedFor,
           r.request_notes AS requestNotes,
           r.pending_reason AS pendingReason,
+          ${hasRequestedByUserId ? 'r.requested_by_user_id' : 'NULL'} AS requestedByUserId,
           r.requested_by AS requestedBy,
+          ${await hasReviewDbColumn('inventory_item_requests', 'processed_by_user_id') ? 'r.processed_by_user_id' : 'NULL'} AS processedByUserId,
           r.processed_by AS processedBy,
           r.requested_at AS requestedAt,
           r.processed_at AS processedAt,
@@ -1056,6 +1060,8 @@ export async function getInventoryRequestTrackingDetail(requestId: number) {
     const hasRequestWorkOrderId = await hasReviewDbColumn('inventory_item_requests', 'work_order_id')
     const hasRequestTroubleTicketId = await hasReviewDbColumn('inventory_item_requests', 'trouble_ticket_id')
     const hasRequestType = await hasReviewDbColumn('inventory_item_requests', 'request_type')
+    const hasRequestedByUserId = await hasReviewDbColumn('inventory_item_requests', 'requested_by_user_id')
+    const hasProcessedByUserId = await hasReviewDbColumn('inventory_item_requests', 'processed_by_user_id')
     const hasMovementRequestId = await hasReviewDbColumn('inventory_stock_movements', 'request_id')
     const hasMovementTroubleTicketId = await hasReviewDbColumn('inventory_stock_movements', 'trouble_ticket_id')
     const hasMovementRefType = await hasReviewDbColumn('inventory_stock_movements', 'reference_type')
@@ -1082,7 +1088,9 @@ export async function getInventoryRequestTrackingDetail(requestId: number) {
           r.requested_for AS requestedFor,
           r.request_notes AS requestNotes,
           r.pending_reason AS pendingReason,
+          ${hasRequestedByUserId ? 'r.requested_by_user_id' : 'NULL'} AS requestedByUserId,
           r.requested_by AS requestedBy,
+          ${hasProcessedByUserId ? 'r.processed_by_user_id' : 'NULL'} AS processedByUserId,
           r.processed_by AS processedBy,
           r.requested_at AS requestedAt,
           r.processed_at AS processedAt,

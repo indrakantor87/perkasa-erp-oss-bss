@@ -6,6 +6,41 @@ import { requireSession } from '@/lib/auth'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import { getInventoryRequestTrackingDetail } from '@/lib/services/tracking-service'
 
+function normalizeText(value: string | null | undefined) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function buildPersonalSearch(username: string, displayName: string) {
+  return String(displayName || username).trim()
+}
+
+function buildInventoryRequestListHref(params?: Record<string, string>) {
+  const search = new URLSearchParams()
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value) {
+      search.set(key, value)
+    }
+  })
+  const query = search.toString()
+  return query ? `/dashboard/tracking/inventory-requests?${query}` : '/dashboard/tracking/inventory-requests'
+}
+
+function buildWorkOrderMineHref(userId: number | undefined, username: string, displayName: string, workOrderId: number | null | undefined) {
+  const search = new URLSearchParams()
+  if (userId) {
+    search.set('mine', '1')
+  } else {
+    const q = buildPersonalSearch(username, displayName)
+    if (q) {
+      search.set('q', q)
+    }
+  }
+  if (workOrderId) {
+    search.set('selected', String(workOrderId))
+  }
+  return `/dashboard/tracking/work-orders?${search.toString()}`
+}
+
 export default async function InventoryRequestTrackingDetailPage({
   params,
 }: {
@@ -24,6 +59,14 @@ export default async function InventoryRequestTrackingDetailPage({
 
   const payload = await getInventoryRequestTrackingDetail(requestId)
   const request = payload.request
+  const requestOwnerUserId = request && 'requestedByUserId' in request ? (request.requestedByUserId ?? null) : null
+  const isMyRequest = Boolean(
+    request &&
+      ((session.userId && requestOwnerUserId === session.userId) ||
+        normalizeText(request.requestedBy) === normalizeText(session.username) ||
+        normalizeText(request.requestedBy) === normalizeText(session.displayName)),
+  )
+  const backHref = isMyRequest ? buildInventoryRequestListHref({ mine: '1' }) : '/dashboard/tracking'
 
   return (
     <div className="space-y-6">
@@ -42,10 +85,10 @@ export default async function InventoryRequestTrackingDetailPage({
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/dashboard/tracking"
+              href={backHref}
               className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
             >
-              Kembali ke tracking
+              {isMyRequest ? 'Kembali ke request saya' : 'Kembali ke tracking'}
             </Link>
             <Link
               href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=REQUEST&requestId=${requestId}#inventory-action-stock-movement`}
@@ -76,7 +119,42 @@ export default async function InventoryRequestTrackingDetailPage({
             <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Request barang tidak ditemukan.</p>
           </div>
         ) : (
-          <div className="mt-6 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="mt-6 space-y-6">
+            <section className="rounded-3xl border border-line bg-surface p-5">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="section-title">Konteks Saya</p>
+                  <p className="mt-3 text-sm leading-6 text-mute">
+                    {isMyRequest
+                      ? 'Request ini diajukan oleh akun login Anda, sehingga tombol kembali dan shortcut diarahkan ke konteks personal.'
+                      : 'Request ini tidak terdeteksi sebagai request milik akun login Anda. Anda tetap bisa membuka daftar request personal untuk audit cepat.'}
+                  </p>
+                </div>
+                <span className="solid-chip">{isMyRequest ? 'TERKAIT LOGIN' : 'UMUM'}</span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href={buildInventoryRequestListHref({ mine: '1' })}
+                  className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+                >
+                  Buka Request Saya
+                </Link>
+                {payload.linkedWorkOrder ? (
+                  <Link
+                    href={buildWorkOrderMineHref(
+                      session.userId,
+                      session.username,
+                      session.displayName,
+                      payload.linkedWorkOrder.id,
+                    )}
+                    className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+                  >
+                    Buka WO Saya
+                  </Link>
+                ) : null}
+              </div>
+            </section>
+            <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
             <section className="rounded-3xl border border-line bg-surface p-5">
               <p className="section-title">Ringkasan Request</p>
               <dl className="mt-4 grid gap-3 text-sm">
@@ -207,6 +285,7 @@ export default async function InventoryRequestTrackingDetailPage({
                 </div>
               </div>
             </section>
+            </div>
           </div>
         )}
       </section>

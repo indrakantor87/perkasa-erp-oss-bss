@@ -10,6 +10,17 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.61] - 2026-07-20
+
+### Added
+
+- Ditambahkan panel `Konteks Saya` pada detail `Tracking Barang` dan `Request Barang` untuk menunjukkan apakah item/detail terkait langsung dengan akun login, sekaligus memberi shortcut balik cepat ke list personal: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/stock-movements/[id]/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/inventory-requests/[id]/page.tsx)
+
+### Changed
+
+- Tombol kembali di detail inventory tracking sekarang otomatis mengarah ke `Barang Saya` atau `Request Saya` bila konteks detail cocok dengan akun login, sehingga alur audit personal lebih cepat: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/stock-movements/[id]/page.tsx), [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/inventory-requests/[id]/page.tsx)
+- Detail `Inventory Request` sekarang membaca `requested_by_user_id` bila tersedia agar penentuan konteks personal lebih presisi dan tetap kompatibel dengan mock existing: [tracking-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/tracking-service.ts)
+
 ## [0.66.60] - 2026-07-20
 
 ### Added
