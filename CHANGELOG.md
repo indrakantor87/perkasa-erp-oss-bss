@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.50] - 2026-07-19
+
+### Added
+
+- Detail `Work Order` sekarang membaca histori close support dismantle yang relevan berdasarkan item return di lifecycle work order, lalu menampilkan section `Histori Support Dismantle` dengan tombol langsung kembali ke lane `/support/dismantle`: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/work-orders/[id]/page.tsx)
+- Header aksi pada detail `Work Order` kini ikut menyediakan shortcut `Buka Histori Dismantle` bila work order punya jejak barang return yang sudah muncul pada histori close support: [page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/dashboard/tracking/work-orders/[id]/page.tsx)
+
+### Changed
+
+- Navigasi flow dismantle kini benar-benar saling membuka dua arah antara tiga konteks utama: `support close`, `inventory barcode`, dan `work order/ticket`.
+- Versioning diselaraskan ke `0.66.50`; batch ini lolos diagnostics dan `npm run check`, sedangkan `npm run build` di sandbox kembali berhenti pada fase `next build` tanpa error eksplisit sebelum dihentikan manual.
+
 ## [0.66.49] - 2026-07-19
 
 ### Added
