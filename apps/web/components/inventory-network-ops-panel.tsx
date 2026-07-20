@@ -403,6 +403,7 @@ export function InventoryNetworkOpsPanel({
   assignmentSuggestions,
   lifecycleItems,
   showDeviceReturnForm,
+  mode = 'full',
 }: {
   sections: DomainReviewSection[]
   canCreate: boolean
@@ -413,6 +414,7 @@ export function InventoryNetworkOpsPanel({
   assignmentSuggestions: string[]
   lifecycleItems: DeviceLifecycleLogRow[]
   showDeviceReturnForm: boolean
+  mode?: 'full' | 'sales-odp-focus'
 }) {
   const odpSection = findSection(sections, 'ODP TERBARU')
   const usedPortSection = findSection(sections, 'PORT TERPAKAI')
@@ -449,6 +451,7 @@ export function InventoryNetworkOpsPanel({
   const [prospectQuery, setProspectQuery] = useState('')
   const [prospectPoint, setProspectPoint] = useState<{ lat: number; lng: number; label: string; sourceLabel: string } | null>(null)
   const [prospectMessage, setProspectMessage] = useState<string>('')
+  const isSalesOdpFocus = mode === 'sales-odp-focus'
   const canWrite = canCreate && reviewDbReady
 
   const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
@@ -659,24 +662,6 @@ export function InventoryNetworkOpsPanel({
             <Map className="h-4 w-4" />
             {showMap ? 'Tutup Peta' : 'Lihat Peta'}
           </button>
-          {canWrite ? (
-            <Link
-              href="/inventory#inventory-action-odp-create"
-              className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-            >
-              <Plus className="h-4 w-4" />
-              Tambah ODP
-            </Link>
-          ) : (
-            <button
-              type="button"
-              disabled
-              className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm font-semibold text-slate-400"
-            >
-              <Plus className="h-4 w-4" />
-              Tambah ODP
-            </button>
-          )}
           <button
             type="button"
             onClick={() => exportOdpCsv(visibleOdpRows)}
@@ -685,7 +670,26 @@ export function InventoryNetworkOpsPanel({
             <Download className="h-4 w-4" />
             Export Excel
           </button>
-          {canWrite ? (
+          {!isSalesOdpFocus && canWrite ? (
+            <Link
+              href="/inventory#inventory-action-odp-create"
+              className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              <Plus className="h-4 w-4" />
+              Tambah ODP
+            </Link>
+          ) : null}
+          {!isSalesOdpFocus && !canWrite ? (
+            <button
+              type="button"
+              disabled
+              className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm font-semibold text-slate-400"
+            >
+              <Plus className="h-4 w-4" />
+              Tambah ODP
+            </button>
+          ) : null}
+          {!isSalesOdpFocus && canWrite ? (
             <button
               type="button"
               onClick={() => setShowImportModal(true)}
@@ -694,7 +698,8 @@ export function InventoryNetworkOpsPanel({
               <Upload className="h-4 w-4" />
               Import Excel
             </button>
-          ) : (
+          ) : null}
+          {!isSalesOdpFocus && !canWrite ? (
             <button
               type="button"
               disabled
@@ -703,194 +708,200 @@ export function InventoryNetworkOpsPanel({
               <Upload className="h-4 w-4" />
               Import Excel
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
       <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
-        Fokus ke data PORT ODP untuk kebutuhan operasional sales, CS, dan Admin CS: baca detail ODP, lihat marker di peta, lalu ukur jarak prospek ke titik ODP terdekat.
+        {isSalesOdpFocus
+          ? 'Menu ini sengaja difokuskan hanya untuk pembacaan ODP dan coverage area prospek. Backend tetap memakai engine ERP yang sama, tetapi UI tidak lagi membawa blok inventory yang tidak relevan.'
+          : 'Fokus ke data PORT ODP untuk kebutuhan operasional sales, CS, dan Admin CS: baca detail ODP, lihat marker di peta, lalu ukur jarak prospek ke titik ODP terdekat.'}
       </div>
 
-      <div className="mt-4 grid gap-3 xl:grid-cols-4">
-        <article className="rounded-2xl border border-slate-700 bg-slate-900/25 px-4 py-4 text-slate-100">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">ODP dan Port</p>
-          <p className="mt-2 text-3xl font-semibold text-white">{odpRows.length}</p>
-          <p className="mt-2 text-sm leading-6 text-slate-200">
-            Total {totalPorts || 0} port dengan {totalActivePorts || 0} port aktif untuk pembacaan kapasitas.
-          </p>
-        </article>
-        <article className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-50">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-100">Port Butuh Tindak Lanjut</p>
-          <p className="mt-2 text-3xl font-semibold text-white">{issuePortRows.length}</p>
-          <p className="mt-2 text-sm leading-6 text-amber-100">
-            Port issue yang perlu dicek ulang agar order, assignment, dan layanan tidak tertahan.
-          </p>
-        </article>
-        <article className="rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-4 text-sky-50">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">Assignment Device</p>
-          <p className="mt-2 text-3xl font-semibold text-white">{assignmentRows.length}</p>
-          <p className="mt-2 text-sm leading-6 text-sky-100">
-            {pendingAssignments} assignment masih perlu follow up, termasuk {accessoryAssignments.length} assignment aksesoris.
-          </p>
-        </article>
-        <article className="rounded-2xl border border-violet-500/40 bg-violet-500/10 px-4 py-4 text-violet-50">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-100">Return Perangkat</p>
-          <p className="mt-2 text-3xl font-semibold text-white">{returnRows.length}</p>
-          <p className="mt-2 text-sm leading-6 text-violet-100">
-            {pendingReturns} histori return masih perlu pengecekan atau verifikasi lanjutan.
-          </p>
-        </article>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Antrian Rekonsiliasi</p>
-            <h4 className="mt-2 text-lg font-semibold text-white">Port, assignment, dan return yang perlu dibaca berurutan</h4>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
-              Blok ini membantu inventory membaca titik yang paling berpotensi memutus alur antara kapasitas ODP, assignment perangkat,
-              dan barang return sebelum diteruskan ke NOC atau tim lapangan.
-            </p>
-          </div>
-          <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
-            {reconciliationItems.length} item prioritas
-          </span>
-        </div>
-        <div className="mt-4 grid gap-3 xl:grid-cols-3">
-          {reconciliationItems.map((item) => (
-            <article key={item.id} className={`rounded-2xl border px-4 py-3 ${item.tone}`}>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">{item.lane}</span>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  {[item.title, item.subtitle, item.detail]
-                    .map((value) => extractInventoryItemCodeFromScan(value))
-                    .find(Boolean) ? (
-                    <Link
-                      href={buildInventoryBarcodeDetailPath(
-                        [item.title, item.subtitle, item.detail]
-                          .map((value) => extractInventoryItemCodeFromScan(value))
-                          .find(Boolean) ?? '',
-                      )}
-                      className="badge border-slate-300 bg-white text-slate-700 transition hover:border-slate-400"
-                    >
-                      Buka Barcode
-                    </Link>
-                  ) : null}
-                  <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
-                </div>
-              </div>
-              <p className="mt-3 text-sm font-semibold">{item.title}</p>
-              <p className="mt-1 text-sm opacity-85">{item.subtitle}</p>
-              <p className="mt-2 text-sm leading-6 opacity-90">{item.detail}</p>
-            </article>
-          ))}
-          {!reconciliationItems.length ? (
-            <div className="rounded-2xl border border-dashed border-slate-600 bg-slate-900/20 px-4 py-5 text-sm leading-6 text-slate-300 xl:col-span-3">
-              Belum ada port issue, assignment, atau return yang perlu direkonsiliasi pada review saat ini.
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Lifecycle Device</p>
-            <h4 className="mt-2 text-lg font-semibold text-white">Status perangkat terbaru dari inventory ke NOC dan tim lapangan</h4>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
-              Ringkasan ini membantu inventory membaca apakah perangkat masih di gudang, sudah didelegasikan,
-              menunggu validasi NOC, terpasang, atau sudah kembali.
-            </p>
-          </div>
-          <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
-            {lifecycleItems.length} histori terbaru
-          </span>
-        </div>
-
-        <div className="mt-4 grid gap-3 xl:grid-cols-4">
-          <article className="rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-4 text-sky-50">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">Delegasi Teknisi</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{delegatedLifecycleCount}</p>
-            <p className="mt-2 text-sm leading-6 text-sky-100">Perangkat yang sedang berada di jalur tim PSB, Troubleshoots, Jalur, atau Dismantle.</p>
-          </article>
-          <article className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-50">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-100">Pending Validasi</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{pendingValidationLifecycleCount}</p>
-            <p className="mt-2 text-sm leading-6 text-amber-100">Scan lapangan sudah masuk, tetapi masih menunggu validasi akhir dari NOC.</p>
-          </article>
-          <article className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-4 text-emerald-50">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-100">Terpasang</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{installedLifecycleCount}</p>
-            <p className="mt-2 text-sm leading-6 text-emerald-100">Perangkat yang sudah dinyatakan terpasang dan tidak lagi menunggu handoff berikutnya.</p>
-          </article>
-          <article className="rounded-2xl border border-violet-500/40 bg-violet-500/10 px-4 py-4 text-violet-50">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-100">Kembali ke Inventory</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{returnedLifecycleCount}</p>
-            <p className="mt-2 text-sm leading-6 text-violet-100">Perangkat yang kembali dari lapangan atau sudah selesai melalui proses return.</p>
-          </article>
-        </div>
-
-        <div className="mt-4 grid gap-3 xl:grid-cols-2">
-          {visibleLifecycleItems.map((item) => (
-            <article key={item.id} className="rounded-2xl border border-slate-700 bg-slate-950/35 p-4 text-slate-100">
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-white">
-                    {item.itemCode || `Item #${item.inventoryItemId}`}
-                    {item.itemName ? ` · ${item.itemName}` : ''}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-300">
-                    {item.ticketRef || 'Tanpa ticket'} {item.ticketType ? `· ${item.ticketType}` : ''}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  {getLifecycleBarcodeHref(item) ? (
-                    <Link
-                      href={getLifecycleBarcodeHref(item)}
-                      className="badge border-slate-500 bg-white/10 text-white transition hover:bg-white/20"
-                    >
-                      Buka Barcode
-                    </Link>
-                  ) : null}
-                  <span className={`badge ${getLifecycleStatusTone(item.lifecycleStatus)}`}>
-                    {getLifecycleStatusLabel(item.lifecycleStatus)}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {item.validationStatus ? (
-                  <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">Validasi: {item.validationStatus}</span>
-                ) : null}
-                {item.targetTeam ? (
-                  <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">Tim: {item.targetTeam}</span>
-                ) : null}
-                {item.locationCode || item.locationName ? (
-                  <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
-                    Lokasi: {[item.locationCode, item.locationName].filter(Boolean).join(' · ')}
-                  </span>
-                ) : null}
-                {item.handoverFromLabel || item.handoverToLabel ? (
-                  <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
-                    Handover: {[item.handoverFromLabel, item.handoverToLabel].filter(Boolean).join(' -> ')}
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
-                {item.notes || item.eventType || 'Belum ada catatan tambahan untuk lifecycle ini.'}
+      {!isSalesOdpFocus ? (
+        <>
+          <div className="mt-4 grid gap-3 xl:grid-cols-4">
+            <article className="rounded-2xl border border-slate-700 bg-slate-900/25 px-4 py-4 text-slate-100">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">ODP dan Port</p>
+              <p className="mt-2 text-3xl font-semibold text-white">{odpRows.length}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-200">
+                Total {totalPorts || 0} port dengan {totalActivePorts || 0} port aktif untuk pembacaan kapasitas.
               </p>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400">
-                <span>Actor: {item.actorName || item.actorRole || '-'}</span>
-                <span>Waktu: {formatLifecycleTimestamp(item.createdAt)}</span>
-              </div>
             </article>
-          ))}
-          {!visibleLifecycleItems.length ? (
-            <div className="rounded-2xl border border-dashed border-slate-600 bg-slate-900/20 px-4 py-5 text-sm leading-6 text-slate-300 xl:col-span-2">
-              Belum ada histori lifecycle perangkat yang bisa dibaca pada workspace inventory network.
+            <article className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-50">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-100">Port Butuh Tindak Lanjut</p>
+              <p className="mt-2 text-3xl font-semibold text-white">{issuePortRows.length}</p>
+              <p className="mt-2 text-sm leading-6 text-amber-100">
+                Port issue yang perlu dicek ulang agar order, assignment, dan layanan tidak tertahan.
+              </p>
+            </article>
+            <article className="rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-4 text-sky-50">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">Assignment Device</p>
+              <p className="mt-2 text-3xl font-semibold text-white">{assignmentRows.length}</p>
+              <p className="mt-2 text-sm leading-6 text-sky-100">
+                {pendingAssignments} assignment masih perlu follow up, termasuk {accessoryAssignments.length} assignment aksesoris.
+              </p>
+            </article>
+            <article className="rounded-2xl border border-violet-500/40 bg-violet-500/10 px-4 py-4 text-violet-50">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-100">Return Perangkat</p>
+              <p className="mt-2 text-3xl font-semibold text-white">{returnRows.length}</p>
+              <p className="mt-2 text-sm leading-6 text-violet-100">
+                {pendingReturns} histori return masih perlu pengecekan atau verifikasi lanjutan.
+              </p>
+            </article>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Antrian Rekonsiliasi</p>
+                <h4 className="mt-2 text-lg font-semibold text-white">Port, assignment, dan return yang perlu dibaca berurutan</h4>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+                  Blok ini membantu inventory membaca titik yang paling berpotensi memutus alur antara kapasitas ODP, assignment perangkat,
+                  dan barang return sebelum diteruskan ke NOC atau tim lapangan.
+                </p>
+              </div>
+              <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
+                {reconciliationItems.length} item prioritas
+              </span>
             </div>
-          ) : null}
-        </div>
-      </div>
+            <div className="mt-4 grid gap-3 xl:grid-cols-3">
+              {reconciliationItems.map((item) => (
+                <article key={item.id} className={`rounded-2xl border px-4 py-3 ${item.tone}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">{item.lane}</span>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {[item.title, item.subtitle, item.detail]
+                        .map((value) => extractInventoryItemCodeFromScan(value))
+                        .find(Boolean) ? (
+                        <Link
+                          href={buildInventoryBarcodeDetailPath(
+                            [item.title, item.subtitle, item.detail]
+                              .map((value) => extractInventoryItemCodeFromScan(value))
+                              .find(Boolean) ?? '',
+                          )}
+                          className="badge border-slate-300 bg-white text-slate-700 transition hover:border-slate-400"
+                        >
+                          Buka Barcode
+                        </Link>
+                      ) : null}
+                      <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold">{item.title}</p>
+                  <p className="mt-1 text-sm opacity-85">{item.subtitle}</p>
+                  <p className="mt-2 text-sm leading-6 opacity-90">{item.detail}</p>
+                </article>
+              ))}
+              {!reconciliationItems.length ? (
+                <div className="rounded-2xl border border-dashed border-slate-600 bg-slate-900/20 px-4 py-5 text-sm leading-6 text-slate-300 xl:col-span-3">
+                  Belum ada port issue, assignment, atau return yang perlu direkonsiliasi pada review saat ini.
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Lifecycle Device</p>
+                <h4 className="mt-2 text-lg font-semibold text-white">Status perangkat terbaru dari inventory ke NOC dan tim lapangan</h4>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+                  Ringkasan ini membantu inventory membaca apakah perangkat masih di gudang, sudah didelegasikan,
+                  menunggu validasi NOC, terpasang, atau sudah kembali.
+                </p>
+              </div>
+              <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
+                {lifecycleItems.length} histori terbaru
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-3 xl:grid-cols-4">
+              <article className="rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-4 text-sky-50">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">Delegasi Teknisi</p>
+                <p className="mt-2 text-3xl font-semibold text-white">{delegatedLifecycleCount}</p>
+                <p className="mt-2 text-sm leading-6 text-sky-100">Perangkat yang sedang berada di jalur tim PSB, Troubleshoots, Jalur, atau Dismantle.</p>
+              </article>
+              <article className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-50">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-100">Pending Validasi</p>
+                <p className="mt-2 text-3xl font-semibold text-white">{pendingValidationLifecycleCount}</p>
+                <p className="mt-2 text-sm leading-6 text-amber-100">Scan lapangan sudah masuk, tetapi masih menunggu validasi akhir dari NOC.</p>
+              </article>
+              <article className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-4 text-emerald-50">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-100">Terpasang</p>
+                <p className="mt-2 text-3xl font-semibold text-white">{installedLifecycleCount}</p>
+                <p className="mt-2 text-sm leading-6 text-emerald-100">Perangkat yang sudah dinyatakan terpasang dan tidak lagi menunggu handoff berikutnya.</p>
+              </article>
+              <article className="rounded-2xl border border-violet-500/40 bg-violet-500/10 px-4 py-4 text-violet-50">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-100">Kembali ke Inventory</p>
+                <p className="mt-2 text-3xl font-semibold text-white">{returnedLifecycleCount}</p>
+                <p className="mt-2 text-sm leading-6 text-violet-100">Perangkat yang kembali dari lapangan atau sudah selesai melalui proses return.</p>
+              </article>
+            </div>
+
+            <div className="mt-4 grid gap-3 xl:grid-cols-2">
+              {visibleLifecycleItems.map((item) => (
+                <article key={item.id} className="rounded-2xl border border-slate-700 bg-slate-950/35 p-4 text-slate-100">
+                  <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {item.itemCode || `Item #${item.inventoryItemId}`}
+                        {item.itemName ? ` · ${item.itemName}` : ''}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-300">
+                        {item.ticketRef || 'Tanpa ticket'} {item.ticketType ? `· ${item.ticketType}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {getLifecycleBarcodeHref(item) ? (
+                        <Link
+                          href={getLifecycleBarcodeHref(item)}
+                          className="badge border-slate-500 bg-white/10 text-white transition hover:bg-white/20"
+                        >
+                          Buka Barcode
+                        </Link>
+                      ) : null}
+                      <span className={`badge ${getLifecycleStatusTone(item.lifecycleStatus)}`}>
+                        {getLifecycleStatusLabel(item.lifecycleStatus)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {item.validationStatus ? (
+                      <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">Validasi: {item.validationStatus}</span>
+                    ) : null}
+                    {item.targetTeam ? (
+                      <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">Tim: {item.targetTeam}</span>
+                    ) : null}
+                    {item.locationCode || item.locationName ? (
+                      <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
+                        Lokasi: {[item.locationCode, item.locationName].filter(Boolean).join(' · ')}
+                      </span>
+                    ) : null}
+                    {item.handoverFromLabel || item.handoverToLabel ? (
+                      <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">
+                        Handover: {[item.handoverFromLabel, item.handoverToLabel].filter(Boolean).join(' -> ')}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">
+                    {item.notes || item.eventType || 'Belum ada catatan tambahan untuk lifecycle ini.'}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                    <span>Actor: {item.actorName || item.actorRole || '-'}</span>
+                    <span>Waktu: {formatLifecycleTimestamp(item.createdAt)}</span>
+                  </div>
+                </article>
+              ))}
+              {!visibleLifecycleItems.length ? (
+                <div className="rounded-2xl border border-dashed border-slate-600 bg-slate-900/20 px-4 py-5 text-sm leading-6 text-slate-300 xl:col-span-2">
+                  Belum ada histori lifecycle perangkat yang bisa dibaca pada workspace inventory network.
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </>
+      ) : null}
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
         <article className="rounded-2xl border border-slate-700 bg-slate-900/25 p-4 text-slate-100">
@@ -1252,7 +1263,7 @@ export function InventoryNetworkOpsPanel({
           <table className="min-w-[1180px] w-full border-collapse">
             <thead className="bg-[#162d66]">
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-100">
-                <th className="w-[44px] px-3 py-3"></th>
+                {!isSalesOdpFocus ? <th className="w-[44px] px-3 py-3"></th> : null}
                 <th className="w-[60px] px-3 py-3">#</th>
                 <th className="w-[200px] px-3 py-3">Nama ODP</th>
                 <th className="w-[140px] px-3 py-3">POP</th>
@@ -1279,7 +1290,7 @@ export function InventoryNetworkOpsPanel({
                     key={row.id}
                     className={isSelected ? 'align-top bg-[#24395c] transition-colors' : 'align-top transition-colors hover:bg-[#24395c]'}
                   >
-                    <td className="px-3 py-2 text-sm text-slate-100"></td>
+                    {!isSalesOdpFocus ? <td className="px-3 py-2 text-sm text-slate-100"></td> : null}
                     <td className="px-3 py-2 text-sm text-slate-100">{index + 1}</td>
                     <td className="px-3 py-2 text-sm font-semibold text-white">
                       <button
@@ -1317,20 +1328,29 @@ export function InventoryNetworkOpsPanel({
                       >
                         Detail
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedOdpId(row.id)
-                          setQuickActionItem(buildInventoryQuickActionPayload(row))
-                        }}
-                        className="inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 p-2 text-white transition hover:bg-slate-700"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
                       {mapHref ? (
-                        <Link href={mapHref} target="_blank" rel="noreferrer" className="sr-only">
-                          Buka Maps
+                        <Link
+                          href={mapHref}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700 ${
+                            isSalesOdpFocus ? '' : 'sr-only'
+                          }`}
+                        >
+                          {isSalesOdpFocus ? 'Maps' : 'Buka Maps'}
                         </Link>
+                      ) : null}
+                      {!isSalesOdpFocus ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOdpId(row.id)
+                            setQuickActionItem(buildInventoryQuickActionPayload(row))
+                          }}
+                          className="inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 p-2 text-white transition hover:bg-slate-700"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
                       ) : null}
                     </td>
                   </tr>
@@ -1338,7 +1358,7 @@ export function InventoryNetworkOpsPanel({
               })}
               {!visibleOdpRows.length ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-6 text-sm text-slate-300">
+                  <td colSpan={isSalesOdpFocus ? 10 : 11} className="px-4 py-6 text-sm text-slate-300">
                     Belum ada ODP yang bisa direview.
                   </td>
                 </tr>
@@ -1348,7 +1368,8 @@ export function InventoryNetworkOpsPanel({
         </div>
       </div>
 
-      <details className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
+      {!isSalesOdpFocus ? (
+        <details className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
         <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-white">Data Pendukung</summary>
         <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr_1fr]">
         <article className="rounded-xl border border-line bg-slate-50 p-4 xl:col-span-3">
@@ -1521,13 +1542,16 @@ export function InventoryNetworkOpsPanel({
           </div>
         </article>
       </div>
-      </details>
+        </details>
+      ) : null}
 
-      <TableQuickActionModal
-        item={quickActionItem}
-        onClose={() => setQuickActionItem(null)}
-        heading="Aksi cepat dari tabel ODP"
-      />
+      {!isSalesOdpFocus ? (
+        <TableQuickActionModal
+          item={quickActionItem}
+          onClose={() => setQuickActionItem(null)}
+          heading="Aksi cepat dari tabel ODP"
+        />
+      ) : null}
     </section>
   )
 }

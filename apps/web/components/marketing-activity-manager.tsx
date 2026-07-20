@@ -17,6 +17,7 @@ type MarketingActivityManagerProps = {
   displayName: string
   marketingOptions: Array<{ username: string; fullName: string }>
   coveredAreas: MarketingCoveredAreaOption[]
+  displayMode?: 'default' | 'sales-focus'
 }
 
 type FormState = {
@@ -70,9 +71,11 @@ export function MarketingActivityManager({
   displayName,
   marketingOptions,
   coveredAreas,
+  displayMode = 'default',
 }: MarketingActivityManagerProps) {
   const canMutate = role === 'SUPER_ADMIN' || role === 'SALES_MARKETING' || role === 'PENJUALAN'
   const isMarketingRole = role === 'SALES_MARKETING' || role === 'PENJUALAN'
+  const isSalesFocus = displayMode === 'sales-focus'
   const initialMarketingName = isMarketingRole ? displayName : marketingOptions[0]?.fullName ?? ''
 
   const [activities, setActivities] = useState<MarketingActivityRecord[]>([])
@@ -363,91 +366,119 @@ export function MarketingActivityManager({
 
   return (
     <div className="space-y-6">
-      <section className="panel p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="section-title">Penjualan</p>
-            <h2 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
-              Aktivitas Marketing
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-              Modul ini membantu mencatat aktivitas harian marketing per area, membaca
-              produktivitas per marketing, dan menganalisis distribusi kunjungan area.
-            </p>
+      {isSalesFocus ? (
+        <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Penjualan</p>
+              <h2 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">
+                Aktivitas Marketing
+              </h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">
+                Halaman ini mengikuti pola tabel `web-psb-perkasa` untuk membaca aktivitas harian marketing milik user login tanpa membawa analisis tambahan yang belum perlu.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full border border-slate-600 bg-slate-900/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-100">
+                User aktif: {displayName}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="badge border-slate-200 bg-white text-slate-600">
-              User aktif: {displayName}
-            </span>
-            <span className="badge border-slate-200 bg-white text-slate-600">
-              Owner data: {isMarketingRole ? username : 'lintas marketing'}
-            </span>
+        </section>
+      ) : (
+        <section className="panel p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="section-title">Penjualan</p>
+              <h2 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
+                Aktivitas Marketing
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
+                Modul ini membantu mencatat aktivitas harian marketing per area, membaca
+                produktivitas per marketing, dan menganalisis distribusi kunjungan area.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className="badge border-slate-200 bg-white text-slate-600">
+                User aktif: {displayName}
+              </span>
+              <span className="badge border-slate-200 bg-white text-slate-600">
+                Owner data: {isMarketingRole ? username : 'lintas marketing'}
+              </span>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <section className="grid gap-4 xl:grid-cols-4">
-        <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
-          <p className="text-sm font-medium text-emerald-700">Ada Aktivitas</p>
-          <p className="mt-2 text-4xl font-semibold tracking-tight text-emerald-900">{summaryStats.activeDays}</p>
-          <p className="mt-2 text-sm text-emerald-700">Hari kerja marketing dengan aktivitas tercatat.</p>
-        </article>
-        <article className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
-          <p className="text-sm font-medium text-amber-700">Tidak Ada</p>
-          <p className="mt-2 text-4xl font-semibold tracking-tight text-amber-900">{summaryStats.emptyDays}</p>
-          <p className="mt-2 text-sm text-amber-700">Hari yang tercatat tanpa aktivitas lapangan tertulis.</p>
-        </article>
-        <article className="rounded-3xl border border-sky-200 bg-sky-50 p-6">
-          <p className="text-sm font-medium text-sky-700">Marketing Aktif</p>
-          <p className="mt-2 text-4xl font-semibold tracking-tight text-sky-900">{summaryStats.totalMarketing}</p>
-          <p className="mt-2 text-sm text-sky-700">Nama marketing yang muncul pada periode terpilih.</p>
-        </article>
-        <article className="rounded-3xl border border-violet-200 bg-violet-50 p-6">
-          <p className="text-sm font-medium text-violet-700">Total Kunjungan Area</p>
-          <p className="mt-2 text-4xl font-semibold tracking-tight text-violet-900">{summaryStats.totalVisits}</p>
-          <p className="mt-2 text-sm text-violet-700">Akumulasi coverage area yang benar-benar disentuh marketing.</p>
-        </article>
-      </section>
+      {!isSalesFocus ? (
+        <section className="grid gap-4 xl:grid-cols-4">
+          <article className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
+            <p className="text-sm font-medium text-emerald-700">Ada Aktivitas</p>
+            <p className="mt-2 text-4xl font-semibold tracking-tight text-emerald-900">{summaryStats.activeDays}</p>
+            <p className="mt-2 text-sm text-emerald-700">Hari kerja marketing dengan aktivitas tercatat.</p>
+          </article>
+          <article className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
+            <p className="text-sm font-medium text-amber-700">Tidak Ada</p>
+            <p className="mt-2 text-4xl font-semibold tracking-tight text-amber-900">{summaryStats.emptyDays}</p>
+            <p className="mt-2 text-sm text-amber-700">Hari yang tercatat tanpa aktivitas lapangan tertulis.</p>
+          </article>
+          <article className="rounded-3xl border border-sky-200 bg-sky-50 p-6">
+            <p className="text-sm font-medium text-sky-700">Marketing Aktif</p>
+            <p className="mt-2 text-4xl font-semibold tracking-tight text-sky-900">{summaryStats.totalMarketing}</p>
+            <p className="mt-2 text-sm text-sky-700">Nama marketing yang muncul pada periode terpilih.</p>
+          </article>
+          <article className="rounded-3xl border border-violet-200 bg-violet-50 p-6">
+            <p className="text-sm font-medium text-violet-700">Total Kunjungan Area</p>
+            <p className="mt-2 text-4xl font-semibold tracking-tight text-violet-900">{summaryStats.totalVisits}</p>
+            <p className="mt-2 text-sm text-violet-700">Akumulasi coverage area yang benar-benar disentuh marketing.</p>
+          </article>
+        </section>
+      ) : null}
 
-      <section className="panel p-6">
+      <section className={isSalesFocus ? 'overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]' : 'panel p-6'}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex-1 space-y-4">
-            <div className="flex w-fit rounded-2xl border border-line bg-slate-50 p-1">
-              <button
-                type="button"
-                onClick={() => setViewMode('marketing')}
-                className={classNames(
-                  'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition',
-                  viewMode === 'marketing'
-                    ? 'bg-white text-slate-950 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700',
-                )}
-              >
-                <Users className="h-4 w-4" />
-                Per Marketing
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('area')}
-                className={classNames(
-                  'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition',
-                  viewMode === 'area'
-                    ? 'bg-white text-slate-950 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700',
-                )}
-              >
-                <span className="text-base leading-none">+</span>
-                Analisis Area
-              </button>
-            </div>
+            {!isSalesFocus ? (
+              <div className="flex w-fit rounded-2xl border border-line bg-slate-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('marketing')}
+                  className={classNames(
+                    'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition',
+                    viewMode === 'marketing'
+                      ? 'bg-white text-slate-950 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700',
+                  )}
+                >
+                  <Users className="h-4 w-4" />
+                  Per Marketing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('area')}
+                  className={classNames(
+                    'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition',
+                    viewMode === 'area'
+                      ? 'bg-white text-slate-950 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700',
+                  )}
+                >
+                  <span className="text-base leading-none">+</span>
+                  Analisis Area
+                </button>
+              </div>
+            ) : null}
 
             <div className="grid gap-4 md:grid-cols-3">
-              <label className="flex flex-col gap-2 text-sm text-slate-700">
-                <span className="font-semibold text-slate-950">Bulan</span>
+              <label className={classNames('flex flex-col gap-2 text-sm', isSalesFocus ? 'text-slate-100' : 'text-slate-700')}>
+                <span className={classNames('font-semibold', isSalesFocus ? 'text-white' : 'text-slate-950')}>Bulan</span>
                 <select
                   value={month}
                   onChange={(event) => setMonth(Number(event.target.value))}
-                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                  className={classNames(
+                    'rounded-2xl px-4 py-3 outline-none transition focus:border-slate-400',
+                    isSalesFocus ? 'border border-slate-700 bg-slate-900/30 text-white' : 'border border-line bg-white',
+                  )}
                 >
                   {months.map((item, index) => (
                     <option key={item} value={index + 1}>
@@ -457,12 +488,15 @@ export function MarketingActivityManager({
                 </select>
               </label>
 
-              <label className="flex flex-col gap-2 text-sm text-slate-700">
-                <span className="font-semibold text-slate-950">Tahun</span>
+              <label className={classNames('flex flex-col gap-2 text-sm', isSalesFocus ? 'text-slate-100' : 'text-slate-700')}>
+                <span className={classNames('font-semibold', isSalesFocus ? 'text-white' : 'text-slate-950')}>Tahun</span>
                 <select
                   value={year}
                   onChange={(event) => setYear(Number(event.target.value))}
-                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                  className={classNames(
+                    'rounded-2xl px-4 py-3 outline-none transition focus:border-slate-400',
+                    isSalesFocus ? 'border border-slate-700 bg-slate-900/30 text-white' : 'border border-line bg-white',
+                  )}
                 >
                   {years.map((item) => (
                     <option key={item} value={item}>
@@ -473,15 +507,18 @@ export function MarketingActivityManager({
               </label>
 
               {!isMarketingRole ? (
-                <label className="flex flex-col gap-2 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-950">Cari Marketing</span>
+                <label className={classNames('flex flex-col gap-2 text-sm', isSalesFocus ? 'text-slate-100' : 'text-slate-700')}>
+                  <span className={classNames('font-semibold', isSalesFocus ? 'text-white' : 'text-slate-950')}>Cari Marketing</span>
                   <div className="relative">
-                    <Search className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
+                    <Search className={classNames('pointer-events-none absolute left-4 top-3.5 h-4 w-4', isSalesFocus ? 'text-slate-400' : 'text-slate-400')} />
                     <input
                       value={marketingSearch}
                       onChange={(event) => setMarketingSearch(event.target.value)}
                       placeholder="Nama marketing atau username"
-                      className="w-full rounded-2xl border border-line bg-white py-3 pl-11 pr-4 outline-none transition focus:border-slate-400"
+                      className={classNames(
+                        'w-full rounded-2xl py-3 pl-11 pr-4 outline-none transition focus:border-slate-400',
+                        isSalesFocus ? 'border border-slate-700 bg-slate-900/30 text-white' : 'border border-line bg-white',
+                      )}
                     />
                   </div>
                 </label>
@@ -494,7 +531,10 @@ export function MarketingActivityManager({
               type="button"
               onClick={() => void handleExport()}
               disabled={isExporting || activities.length === 0}
-              className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className={classNames(
+                'rounded-full px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60',
+                isSalesFocus ? 'border border-slate-600 bg-slate-800/80 text-white' : 'border border-line bg-white text-slate-700',
+              )}
             >
               <span className="inline-flex items-center gap-2">
                 {isExporting ? 'Menyiapkan Export...' : 'Export Excel'}
@@ -504,7 +544,10 @@ export function MarketingActivityManager({
               type="button"
               onClick={openCreateModal}
               disabled={!canMutate}
-              className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+              className={classNames(
+                'rounded-full px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300',
+                isSalesFocus ? 'bg-white text-slate-950' : 'bg-slate-950',
+              )}
             >
               <span className="inline-flex items-center gap-2">
                 Tambah Aktivitas
@@ -514,7 +557,7 @@ export function MarketingActivityManager({
         </div>
 
         {!canMutate ? (
-          <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+          <div className={classNames('mt-4 rounded-2xl border px-4 py-3 text-sm', isSalesFocus ? 'border-slate-700 bg-slate-900/20 text-slate-100' : 'border-sky-200 bg-sky-50 text-sky-700')}>
             Role aktif saat ini hanya membaca modul Aktivitas Marketing tanpa tambah, edit, atau hapus.
           </div>
         ) : null}
@@ -524,44 +567,50 @@ export function MarketingActivityManager({
             className={classNames(
               'mt-4 rounded-2xl border px-4 py-3 text-sm',
               feedback.tone === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : 'border-rose-200 bg-rose-50 text-rose-700',
+                ? isSalesFocus
+                  ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : isSalesFocus
+                  ? 'border-rose-400/40 bg-rose-500/10 text-rose-100'
+                  : 'border-rose-200 bg-rose-50 text-rose-700',
             )}
           >
             {feedback.message}
           </div>
         ) : null}
 
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          {viewMode === 'marketing'
+        <div className={classNames('mt-4 rounded-2xl border px-4 py-3 text-sm', isSalesFocus ? 'border-slate-700 bg-slate-900/20 text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-600')}>
+          {isSalesFocus
             ? 'Menampilkan pembacaan aktivitas asli tim Penjualan/Marketing per marketing pada periode terpilih.'
-            : 'Menampilkan distribusi area coverage agar ERP tetap bisa membaca jalur aktivitas lapangan per wilayah.'}
+            : viewMode === 'marketing'
+              ? 'Menampilkan pembacaan aktivitas asli tim Penjualan/Marketing per marketing pada periode terpilih.'
+              : 'Menampilkan distribusi area coverage agar ERP tetap bisa membaca jalur aktivitas lapangan per wilayah.'}
         </div>
       </section>
 
-      {viewMode === 'marketing' ? (
-        <section className="panel overflow-hidden p-0">
+      {viewMode === 'marketing' || isSalesFocus ? (
+        <section className={isSalesFocus ? 'overflow-hidden rounded-[28px] border border-slate-800 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]' : 'panel overflow-hidden p-0'}>
           <div className="overflow-x-auto">
-            <table className="min-w-[760px] w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
+            <table className={classNames('w-full', isSalesFocus ? 'min-w-[860px] border-collapse' : 'min-w-[760px] divide-y divide-slate-200')}>
+              <thead className={isSalesFocus ? 'bg-[#162d66]' : 'bg-slate-50'}>
                 <tr>
-                  <th className="w-14 px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500" />
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Marketing</th>
-                  <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Ada Aktivitas</th>
-                  <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Tidak Ada</th>
-                  <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Total Hari</th>
+                  <th className={classNames('w-14 px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide', isSalesFocus ? 'text-slate-100' : 'text-slate-500')} />
+                  <th className={classNames('px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide', isSalesFocus ? 'text-slate-100' : 'text-slate-500')}>Marketing</th>
+                  <th className={classNames('px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide', isSalesFocus ? 'text-slate-100' : 'text-slate-500')}>Ada Aktivitas</th>
+                  <th className={classNames('px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide', isSalesFocus ? 'text-slate-100' : 'text-slate-500')}>Tidak Ada</th>
+                  <th className={classNames('px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide', isSalesFocus ? 'text-slate-100' : 'text-slate-500')}>Total Hari</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
+              <tbody className={isSalesFocus ? 'divide-y divide-slate-700 bg-[#1c2b45]' : 'divide-y divide-slate-200 bg-white'}>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
+                    <td colSpan={5} className={classNames('px-6 py-8 text-center text-sm', isSalesFocus ? 'text-slate-300' : 'text-slate-500')}>
                       Memuat aktivitas marketing...
                     </td>
                   </tr>
                 ) : sortedMarketingNames.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
+                    <td colSpan={5} className={classNames('px-6 py-8 text-center text-sm', isSalesFocus ? 'text-slate-300' : 'text-slate-500')}>
                       Belum ada aktivitas marketing pada periode terpilih.
                     </td>
                   </tr>
@@ -572,48 +621,48 @@ export function MarketingActivityManager({
                     return (
                       <Fragment key={name}>
                         <tr
-                          className="cursor-pointer transition hover:bg-slate-50"
+                          className={classNames('cursor-pointer transition', isSalesFocus ? 'hover:bg-[#24395c]' : 'hover:bg-slate-50')}
                           onClick={() => setExpandedMarketing(isExpanded ? null : name)}
                         >
-                          <td className="px-6 py-4 text-slate-500">
+                          <td className={classNames('px-6 py-4', isSalesFocus ? 'text-slate-300' : 'text-slate-500')}>
                             <span className="text-xs font-semibold">{isExpanded ? '▼' : '▶'}</span>
                           </td>
-                          <td className="px-6 py-4 text-sm font-semibold text-slate-950">{name}</td>
-                          <td className="px-6 py-4 text-center text-sm text-slate-700">{group.activeDays}</td>
-                          <td className="px-6 py-4 text-center text-sm text-slate-700">{group.emptyDays}</td>
-                          <td className="px-6 py-4 text-center text-sm text-slate-700">{group.items.length}</td>
+                          <td className={classNames('px-6 py-4 text-sm font-semibold', isSalesFocus ? 'text-white' : 'text-slate-950')}>{name}</td>
+                          <td className={classNames('px-6 py-4 text-center text-sm', isSalesFocus ? 'text-slate-100' : 'text-slate-700')}>{group.activeDays}</td>
+                          <td className={classNames('px-6 py-4 text-center text-sm', isSalesFocus ? 'text-slate-100' : 'text-slate-700')}>{group.emptyDays}</td>
+                          <td className={classNames('px-6 py-4 text-center text-sm', isSalesFocus ? 'text-slate-100' : 'text-slate-700')}>{group.items.length}</td>
                         </tr>
                         {isExpanded ? (
                           <tr>
-                            <td colSpan={5} className="bg-slate-50 px-4 py-4">
-                              <div className="overflow-hidden rounded-2xl border border-line bg-white">
-                                <table className="min-w-full divide-y divide-slate-200">
-                                  <thead className="bg-slate-50">
+                            <td colSpan={5} className={classNames('px-4 py-4', isSalesFocus ? 'bg-[#24395c]' : 'bg-slate-50')}>
+                              <div className={classNames('overflow-hidden rounded-2xl', isSalesFocus ? 'border border-slate-700 bg-[#152643]' : 'border border-line bg-white')}>
+                                <table className={classNames('min-w-full', isSalesFocus ? 'border-collapse' : 'divide-y divide-slate-200')}>
+                                  <thead className={isSalesFocus ? 'bg-[#162d66]' : 'bg-slate-50'}>
                                     <tr>
-                                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tanggal</th>
-                                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Area</th>
-                                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Aktivitas</th>
-                                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Keterangan</th>
-                                      <th className="w-28 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</th>
+                                      <th className={classNames('px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide', isSalesFocus ? 'text-slate-100' : 'text-slate-500')}>Tanggal</th>
+                                      <th className={classNames('px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide', isSalesFocus ? 'text-slate-100' : 'text-slate-500')}>Area</th>
+                                      <th className={classNames('px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide', isSalesFocus ? 'text-slate-100' : 'text-slate-500')}>Aktivitas</th>
+                                      <th className={classNames('px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide', isSalesFocus ? 'text-slate-100' : 'text-slate-500')}>Keterangan</th>
+                                      <th className={classNames('w-28 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide', isSalesFocus ? 'text-slate-100' : 'text-slate-500')}>Aksi</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-slate-200">
+                                  <tbody className={isSalesFocus ? 'divide-y divide-slate-700 bg-[#1c2b45]' : 'divide-y divide-slate-200'}>
                                     {group.items.map((item) => (
-                                      <tr key={item.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 text-xs text-slate-600">{formatDateLabel(item.date)}</td>
-                                        <td className="px-4 py-3 text-xs text-slate-700">
+                                      <tr key={item.id} className={classNames(isSalesFocus ? 'hover:bg-[#24395c]' : 'hover:bg-slate-50')}>
+                                        <td className={classNames('px-4 py-3 text-xs', isSalesFocus ? 'text-slate-200' : 'text-slate-600')}>{formatDateLabel(item.date)}</td>
+                                        <td className={classNames('px-4 py-3 text-xs', isSalesFocus ? 'text-slate-100' : 'text-slate-700')}>
                                           {[item.area?.name, item.area2?.name, item.area3?.name, item.area4?.name]
                                             .filter(Boolean)
                                             .join(', ') || '-'}
                                         </td>
-                                        <td className="px-4 py-3 text-xs text-slate-950">
+                                        <td className={classNames('px-4 py-3 text-xs', isSalesFocus ? 'text-white' : 'text-slate-950')}>
                                           {item.activity.trim() === '-' ? (
-                                            <span className="font-medium italic text-rose-600">Tidak ada aktivitas</span>
+                                            <span className={classNames('font-medium italic', isSalesFocus ? 'text-rose-300' : 'text-rose-600')}>Tidak ada aktivitas</span>
                                           ) : (
                                             item.activity
                                           )}
                                         </td>
-                                        <td className="px-4 py-3 text-xs italic text-slate-500">{item.notes || '-'}</td>
+                                        <td className={classNames('px-4 py-3 text-xs italic', isSalesFocus ? 'text-slate-300' : 'text-slate-500')}>{item.notes || '-'}</td>
                                         <td className="px-4 py-3">
                                           <div className="flex items-center justify-center gap-1">
                                             {canMutate ? (
@@ -623,7 +672,10 @@ export function MarketingActivityManager({
                                                   event.stopPropagation()
                                                   openEditModal(item)
                                                 }}
-                                                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+                                                className={classNames(
+                                                  'rounded-lg p-2 transition',
+                                                  isSalesFocus ? 'text-slate-200 hover:bg-slate-700 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-950',
+                                                )}
                                                 title="Edit aktivitas"
                                               >
                                                 <span className="text-xs font-semibold">Edit</span>
@@ -636,7 +688,10 @@ export function MarketingActivityManager({
                                                   event.stopPropagation()
                                                   void handleDelete(item.id)
                                                 }}
-                                                className="rounded-lg p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700"
+                                                className={classNames(
+                                                  'rounded-lg p-2 transition',
+                                                  isSalesFocus ? 'text-rose-300 hover:bg-rose-500/10 hover:text-rose-100' : 'text-rose-500 hover:bg-rose-50 hover:text-rose-700',
+                                                )}
                                                 title="Hapus aktivitas"
                                               >
                                                 <span className="text-xs font-semibold">Hapus</span>
