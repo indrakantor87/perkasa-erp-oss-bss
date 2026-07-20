@@ -135,7 +135,9 @@ export async function GET() {
       reviewDb,
     },
     {
-      status: isOk ? 200 : 503,
+      // Keep the container liveness green for hosting platforms; strict readiness
+      // is still exposed through `ok` and `deployment.ready` in the payload.
+      status: 200,
       headers: {
         'Cache-Control': 'no-store',
       },
