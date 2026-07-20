@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { Download, Pencil, Trash2, Upload } from 'lucide-react'
 import { canAccessPath } from '@/lib/access-control'
+import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import { buildSupportActionHref, buildSupportLaneHref } from '@/lib/support-action-links'
 import { canAccessSupportLane, canProcessSupportDismantle } from '@/lib/support-lanes'
 import type { AppRole, DomainReviewSection, DomainReviewRow, SupportActionLink, SupportDrilldownContext } from '@/lib/types'
@@ -58,6 +59,22 @@ function getActionButtonClass(isPrimary: boolean) {
   }
 
   return 'rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium uppercase tracking-[0.08em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50'
+}
+
+function parseReturnedItemCodes(meta: string[]) {
+  const raw = pickMeta(meta, 'Returned Item Codes: ')
+  if (!raw || raw === '-') {
+    return [] as string[]
+  }
+
+  return Array.from(
+    new Set(
+      raw
+        .split(/[\r\n,;]+/)
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  )
 }
 
 function getOpenRowActionItems(params: {
@@ -224,6 +241,7 @@ function buildHistoryDismantleQuickActionPayload(params: {
   const pickupStatus = pickMeta(params.row.meta, 'Pickup Status: ')
   const closeOutcome = pickMeta(params.row.meta, 'Close Outcome: ')
   const billingDisposition = pickMeta(params.row.meta, 'Billing Disposition: ')
+  const returnedItemCodes = parseReturnedItemCodes(params.row.meta)
   const closedBy = pickMeta(params.row.meta, 'Closed By: ')
   const rowActions = getHistoryRowActionItems(params)
 
@@ -258,15 +276,29 @@ function buildHistoryDismantleQuickActionPayload(params: {
         value: [`Billing: ${billingDisposition}`, 'Owner Histori: CS & Admin CS'].join('\n'),
       },
       {
+        title: 'Barang Kembali',
+        value: returnedItemCodes.length ? returnedItemCodes.join('\n') : 'Belum ada item code return yang tercatat.',
+      },
+      {
         title: 'Ringkasan',
         value: [`Phone: ${phone}`, `Marketing: ${marketing}`, params.row.detail].join('\n'),
       },
     ],
-    actions: rowActions.map((action, index) => ({
-      label: action.label,
-      href: action.href,
-      tone: index === 0 ? 'primary' : 'secondary',
-    })),
+    actions: [
+      ...returnedItemCodes.slice(0, 3).map((itemCode, index) => ({
+        label: `Histori Barang ${index + 1}`,
+        href: buildInventoryBarcodeDetailPath(itemCode),
+        tone: index === 0 ? ('primary' as const) : ('secondary' as const),
+      })),
+      ...rowActions.map((action, index) => ({
+        label: action.label,
+        href: action.href,
+        tone:
+          !returnedItemCodes.length && index === 0
+            ? ('primary' as const)
+            : ('secondary' as const),
+      })),
+    ],
   }
 }
 
@@ -577,6 +609,68 @@ export function SupportDismantleQueuePanel({
             <Link href={buildSupportLaneHref('dismantle', { focus: 'MONTHLY_DISMANTLES' })} className="rounded-md border border-slate-500 bg-slate-700/90 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-600">
               Buka Histori
             </Link>
+          </div>
+          <div className="mt-4 grid gap-3 xl:grid-cols-2">
+            {historySection.rows.map((row) => {
+              const closedAt = pickMeta(row.meta, 'Closed: ')
+              const fieldPic = pickMeta(row.meta, 'Field PIC: ')
+              const billingDisposition = pickMeta(row.meta, 'Billing Disposition: ')
+              const returnedItemCodes = parseReturnedItemCodes(row.meta)
+              const rowActions = getHistoryRowActionItems({
+                row,
+                canProcessDismantle,
+                canOpenBillingDecision,
+              })
+
+              return (
+                <article key={row.id} className="rounded-2xl border border-slate-700 bg-[#152643] p-4 shadow-[0_10px_30px_rgba(2,6,23,0.18)]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="badge border-emerald-400/40 bg-emerald-500/10 text-emerald-100">{row.status}</span>
+                    <span className="badge border-slate-600 bg-slate-800 text-slate-100">{closedAt || '-'}</span>
+                    <span className="badge border-violet-400/40 bg-violet-500/10 text-violet-100">{billingDisposition || '-'}</span>
+                  </div>
+                  <p className="mt-3 text-base font-semibold text-white">{row.primary}</p>
+                  <p className="mt-1 text-sm text-slate-300">{row.secondary}</p>
+                  <p className="mt-3 line-clamp-3 text-sm text-slate-100">{row.detail}</p>
+                  <div className="mt-3 grid gap-2 text-xs text-slate-300">
+                    <p>Field PIC: {fieldPic || '-'}</p>
+                    <p>Returned Item Codes: {returnedItemCodes.length ? returnedItemCodes.join(', ') : '-'}</p>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQuickActionItem(
+                          buildHistoryDismantleQuickActionPayload({
+                            row,
+                            canProcessDismantle,
+                            canOpenBillingDecision,
+                          }),
+                        )
+                      }
+                      className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Detail Histori
+                    </button>
+                    {rowActions.map((action, index) => (
+                      <Link key={`${row.id}-${action.key}`} href={action.href} className={getActionButtonClass(index === 0)}>
+                        {action.label}
+                      </Link>
+                    ))}
+                    {returnedItemCodes.slice(0, 3).map((itemCode) => (
+                      <Link
+                        key={`${row.id}-${itemCode}`}
+                        href={buildInventoryBarcodeDetailPath(itemCode)}
+                        className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-700 transition hover:bg-emerald-100"
+                      >
+                        Histori Barang {itemCode}
+                      </Link>
+                    ))}
+                  </div>
+                </article>
+              )
+            })}
           </div>
         </details>
       ) : null}

@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.47] - 2026-07-19
+
+### Added
+
+- Ditambahkan daftar histori close yang benar-benar tampil di panel histori lane `/support/dismantle`, lengkap dengan kartu kasus ringkas, tombol `Detail Histori`, `Reopen`, `Cek Billing`, dan tombol langsung ke halaman barcode inventory saat `Returned Item Codes` tersedia: [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+- Modal aksi cepat histori dismantle kini ikut membawa section `Barang Kembali` dan action `Histori Barang` sehingga operator bisa lompat ke audit barcode inventory langsung dari context histori close: [support-dismantle-queue-panel.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-queue-panel.tsx)
+
+### Changed
+
+- Workspace support dismantle tidak lagi berhenti di ringkasan jumlah histori saja; operator sekarang bisa membaca kasus close per item dari lane yang sama tanpa pindah dulu ke domain lain untuk menemukan jejak perangkat return.
+- Versioning diselaraskan ke `0.66.47`; batch ini lolos diagnostics, `npm run check`, dan `npm run build`.
+
 ## [0.66.46] - 2026-07-19
 
 ### Added
