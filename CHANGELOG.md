@@ -10,6 +10,21 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.55] - 2026-07-20
+
+### Added
+
+- Ditambahkan workspace teknisi terpisah untuk `Troubleshoots` dan `Dismantle` sebagai entry point khusus di bawah `/support`:
+  - [teknisi-troubleshoots/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-troubleshoots/page.tsx)
+  - [teknisi-dismantle/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-dismantle/page.tsx)
+- Ditambahkan definisi workspace organisasi teknisi untuk `Troubleshoots` dan `Dismantle` (link tracking, queue ticketing, inventory, SLA): [organization-workspaces.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/organization-workspaces.ts)
+
+### Changed
+
+- Sidebar `Teknisi Lapangan` sekarang menampilkan submenu terpisah `PSB`, `Troubleshoots`, `Dismantle`, `Expan`, `Jointer` agar sumber kerja teknisi tidak tercampur: [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx)
+- Akses workspace organisasi ditambah untuk key baru `teknisi-troubleshoots` dan `teknisi-dismantle`: [organization-workspace-access.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/organization-workspace-access.ts)
+- Smoke test diperkuat untuk memastikan role `FIELD_TECHNICIAN` bisa mengakses route workspace baru: [mock-data.test.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/tests/mock-data.test.ts)
+
 ## [0.66.54] - 2026-07-20
 
 ### Added

@@ -625,12 +625,24 @@ function buildTeknisiLapanganItem() {
   return buildSidebarNavItem('/support', {
     key: 'support-teknisi-lapangan',
     title: 'Teknisi Lapangan',
-    description: 'PSB, expan, jointer, dan tindak lanjut lapangan',
+    description: 'PSB, trouble, dismantle, expan, dan jointer',
     href: '/support/teknisi-psb',
     requiredPath: '/support/teknisi-psb',
     allowedRoles: ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
-    assignHrefs: ['/support/teknisi-psb', '/support/teknisi-expan', '/support/teknisi-jointer'],
-    matchPrefixes: ['/support/teknisi-psb', '/support/teknisi-expan', '/support/teknisi-jointer'],
+    assignHrefs: [
+      '/support/teknisi-psb',
+      '/support/teknisi-troubleshoots',
+      '/support/teknisi-dismantle',
+      '/support/teknisi-expan',
+      '/support/teknisi-jointer',
+    ],
+    matchPrefixes: [
+      '/support/teknisi-psb',
+      '/support/teknisi-troubleshoots',
+      '/support/teknisi-dismantle',
+      '/support/teknisi-expan',
+      '/support/teknisi-jointer',
+    ],
     children: buildTeknisiLapanganSubmenuItems(),
   })
 }
@@ -643,6 +655,20 @@ function buildTeknisiLapanganSubmenuItems() {
       description: 'Pekerjaan pasang baru dan aktivasi pelanggan baru.',
       href: '/support/teknisi-psb',
       matchPrefixes: ['/support/teknisi-psb'],
+    }),
+    buildSidebarNavItem('/support', {
+      key: 'support-sub-teknisi-troubleshoots',
+      title: 'Troubleshoots',
+      description: 'Pekerjaan gangguan lapangan yang bersumber dari NOC dan ticketing.',
+      href: '/support/teknisi-troubleshoots',
+      matchPrefixes: ['/support/teknisi-troubleshoots'],
+    }),
+    buildSidebarNavItem('/support', {
+      key: 'support-sub-teknisi-dismantle',
+      title: 'Dismantle',
+      description: 'Pembongkaran perangkat yang bersumber dari CS (isolir 1 bulan).',
+      href: '/support/teknisi-dismantle',
+      matchPrefixes: ['/support/teknisi-dismantle'],
     }),
     buildSidebarNavItem('/support', {
       key: 'support-sub-teknisi-expan',

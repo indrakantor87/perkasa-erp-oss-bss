@@ -86,6 +86,8 @@ async function main() {
   assert.equal(getDefaultLandingPath('DISMANTLE_OPERATOR'), '/support/dismantle')
   assert.equal(canAccessPath('FINANCE', '/finance'), true)
   assert.equal(canAccessPath('FINANCE', '/billing'), true)
+  assert.equal(canAccessPath('FIELD_TECHNICIAN', '/support/teknisi-troubleshoots'), true)
+  assert.equal(canAccessPath('FIELD_TECHNICIAN', '/support/teknisi-dismantle'), true)
   assert.equal(canAccessPath('CS_ADMIN', '/customers/cs-admin/odp-port'), true)
   assert.equal(canAccessPath('CS_ADMIN', '/hr'), false)
   assert.equal(canAccessPath('SUPER_ADMIN', '/settings/users'), true)

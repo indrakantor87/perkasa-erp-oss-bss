@@ -6,6 +6,8 @@ export type OrganizationWorkspaceKey =
   | 'teknisi-psb'
   | 'teknisi-expan'
   | 'teknisi-jointer'
+  | 'teknisi-troubleshoots'
+  | 'teknisi-dismantle'
   | 'legal'
   | 'kantor'
   | 'toko'
@@ -16,6 +18,8 @@ const organizationWorkspaceRoles: Record<OrganizationWorkspaceKey, AppRole[]> = 
   'teknisi-psb': ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
   'teknisi-expan': ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
   'teknisi-jointer': ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
+  'teknisi-troubleshoots': ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
+  'teknisi-dismantle': ['SUPER_ADMIN', 'FIELD_TECHNICIAN'],
   legal: ['SUPER_ADMIN'],
   kantor: ['SUPER_ADMIN'],
   toko: ['SUPER_ADMIN'],
@@ -24,4 +28,3 @@ const organizationWorkspaceRoles: Record<OrganizationWorkspaceKey, AppRole[]> = 
 export function canAccessOrganizationWorkspace(role: AppRole, workspace: OrganizationWorkspaceKey) {
   return organizationWorkspaceRoles[workspace].includes(role)
 }
-

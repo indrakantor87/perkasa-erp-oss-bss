@@ -742,3 +742,165 @@ export const teknisiJointerWorkspace: OrganizationWorkspaceDefinition = {
     },
   ],
 }
+
+export const teknisiTroubleshootsWorkspace: OrganizationWorkspaceDefinition = {
+  eyebrow: 'Teknisi & Troubleshoots',
+  title: 'Teknisi Troubleshoots',
+  description:
+    'Landing ini memisahkan tindak lanjut gangguan dari pekerjaan PSB agar teknisi bisa fokus pada sumber kerja dari NOC dan ticketing.',
+  primaryAction: {
+    label: 'Tracking WO Trouble',
+    href: '/dashboard/tracking/work-orders?jobCategory=TROUBLE',
+    description: 'Masuk ke daftar work order trouble untuk melihat assignment, status, dan histori perangkat.',
+  },
+  secondaryAction: {
+    label: 'Buka Queue Ticketing',
+    href: '/dashboard/tracking/noc-queue?ticketType=TROUBLESHOOTS',
+    description: 'Masuk ke queue ticketing gabungan dengan filter trouble agar konteks NOC tetap terbaca.',
+  },
+  steps: [
+    {
+      title: 'Terima Job Trouble',
+      detail: 'Baca work order trouble atau queue ticketing yang sudah didelegasikan agar gangguan tidak menumpuk.',
+    },
+    {
+      title: 'Eksekusi Lapangan',
+      detail: 'Pastikan perangkat lama dan perangkat pengganti terekam pada lifecycle barcode sebelum validasi NOC.',
+    },
+    {
+      title: 'Kunci Validasi',
+      detail: 'Hubungkan hasil trouble ke status work order dan evidence agar keputusan final NOC lebih cepat.',
+    },
+  ],
+  sections: [
+    {
+      title: 'Fokus gangguan lapangan',
+      description: 'Entry point trouble dipisah dari PSB agar teknisi punya pola kerja yang lebih tegas.',
+      links: [
+        {
+          label: 'Tracking WO Trouble',
+          href: '/dashboard/tracking/work-orders?jobCategory=TROUBLE',
+          description: 'Lihat histori assignment, status log, dan pergerakan barang untuk work order trouble.',
+          badge: 'trouble',
+        },
+        {
+          label: 'Queue Ticketing Trouble',
+          href: '/dashboard/tracking/noc-queue?ticketType=TROUBLESHOOTS',
+          description: 'Baca antrean ticketing khusus trouble untuk memantau status OPEN, ON PROGRESS, dan CLOSE.',
+          badge: 'ticket',
+        },
+        {
+          label: 'Request Inventory',
+          href: '/inventory?focus=PENDING_REQUESTS',
+          description: 'Pastikan kebutuhan material trouble tidak tertahan di request inventory.',
+          badge: 'material',
+        },
+        {
+          label: 'Tracking Barang Trouble',
+          href: '/dashboard/tracking/stock-movements?referenceType=TROUBLE_TICKET',
+          description: 'Pantau movement barang yang terkait trouble ticket dan work order lapangan.',
+          badge: 'barang',
+        },
+      ],
+    },
+    {
+      title: 'Kontrol tindak lanjut',
+      description: 'Jalur pendukung untuk menjaga ticket trouble tetap sinkron dengan SLA dan status customer.',
+      links: [
+        {
+          label: 'Kontrol SLA',
+          href: '/support/sla',
+          description: 'Pastikan gangguan yang mendekati overdue tetap punya prioritas jelas.',
+          badge: 'sla',
+        },
+        {
+          label: 'Customer Master',
+          href: '/customers',
+          description: 'Pastikan hasil trouble kembali ke customer dan layanan yang benar.',
+          badge: 'customer',
+        },
+      ],
+    },
+  ],
+}
+
+export const teknisiDismantleWorkspace: OrganizationWorkspaceDefinition = {
+  eyebrow: 'Teknisi & Dismantle',
+  title: 'Teknisi Dismantle',
+  description:
+    'Landing ini memisahkan pembongkaran perangkat dari PSB dan trouble agar teknisi bisa fokus pada job yang berasal dari CS (isolir 1 bulan).',
+  primaryAction: {
+    label: 'Tracking WO Dismantle',
+    href: '/dashboard/tracking/work-orders?jobCategory=DISMANTLE',
+    description: 'Masuk ke daftar work order dismantle untuk memantau assignment teknisi dan bukti pengembalian barang.',
+  },
+  secondaryAction: {
+    label: 'Buka Support Dismantle',
+    href: '/support/dismantle',
+    description: 'Masuk ke lane support dismantle untuk melihat histori close dan referensi ticketing.',
+  },
+  steps: [
+    {
+      title: 'Terima Job Dismantle',
+      detail: 'Baca work order dismantle yang sudah ditransfer agar pembongkaran perangkat mengikuti rencana isolir.',
+    },
+    {
+      title: 'Scan Barang Return',
+      detail: 'Scan barcode perangkat yang diambil agar histori inventory dan support close sinkron.',
+    },
+    {
+      title: 'Tutup Loop',
+      detail: 'Pastikan hasil dismantle kembali ke histori support dan inventory agar audit barang tidak putus.',
+    },
+  ],
+  sections: [
+    {
+      title: 'Fokus pembongkaran',
+      description: 'Entry point dismantle dipisah agar teknisi fokus ke pengembalian perangkat dan bukti lapangan.',
+      links: [
+        {
+          label: 'Tracking WO Dismantle',
+          href: '/dashboard/tracking/work-orders?jobCategory=DISMANTLE',
+          description: 'Lihat histori assignment, status log, dan item lifecycle untuk work order dismantle.',
+          badge: 'dismantle',
+        },
+        {
+          label: 'Support Dismantle',
+          href: '/support/dismantle',
+          description: 'Buka lane support dismantle untuk cek histori close, catatan, dan referensi ticketing.',
+          badge: 'support',
+        },
+        {
+          label: 'Inventory Barcode Audit',
+          href: '/inventory/barcodes',
+          description: 'Buka histori barcode untuk memastikan perangkat return masuk ke inventory.',
+          badge: 'barcode',
+        },
+        {
+          label: 'Tracking Barang Return',
+          href: '/dashboard/tracking/stock-movements?referenceType=WORK_ORDER',
+          description: 'Pantau movement barang yang berhubungan dengan pembongkaran dan return perangkat.',
+          badge: 'barang',
+        },
+      ],
+    },
+    {
+      title: 'Kontrol tindak lanjut',
+      description: 'Jalur pendukung untuk memastikan close support dan status customer ikut sinkron.',
+      links: [
+        {
+          label: 'Support Dismantle',
+          href: '/support/dismantle',
+          description: 'Buka lane support dismantle untuk cek histori close dan referensi ticketing.',
+          badge: 'support',
+        },
+        {
+          label: 'Customer Master',
+          href: '/customers',
+          description: 'Pastikan hasil dismantle kembali ke customer dan layanan yang benar.',
+          badge: 'customer',
+        },
+      ],
+    },
+  ],
+}
