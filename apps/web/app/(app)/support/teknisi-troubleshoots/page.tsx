@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation'
+import { TechnicianWorkspacePage } from '@/components/technician-workspace-page'
 import { requireSession } from '@/lib/auth'
 import { canAccessOrganizationWorkspace } from '@/lib/organization-workspace-access'
-import { teknisiTroubleshootsWorkspace } from '@/lib/organization-workspaces'
+import { teknisiTroubleshootsWorkspaceConfig } from '@/lib/technician-workspace-config'
 
 export default async function TeknisiTroubleshootsWorkspacePage() {
   const session = await requireSession()
@@ -9,5 +10,5 @@ export default async function TeknisiTroubleshootsWorkspacePage() {
     redirect('/dashboard')
   }
 
-  redirect(teknisiTroubleshootsWorkspace.primaryAction.href)
+  return <TechnicianWorkspacePage session={session} role={session.role} config={teknisiTroubleshootsWorkspaceConfig} />
 }

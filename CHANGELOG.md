@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.56] - 2026-07-20
+
+### Added
+
+- Ditambahkan landing kerja personal untuk `Teknisi PSB`, `Teknisi Troubleshoots`, dan `Teknisi Dismantle` yang merender workspace spesifik per jenis kerja langsung dari route `/support/teknisi-*`, sehingga teknisi tidak lagi langsung dilempar ke tracking generik: [technician-workspace-page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/technician-workspace-page.tsx), [teknisi-psb/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-psb/page.tsx), [teknisi-troubleshoots/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-troubleshoots/page.tsx), [teknisi-dismantle/page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/(app)/support/teknisi-dismantle/page.tsx)
+- Ditambahkan konfigurasi workspace teknisi terpisah untuk `PSB`, `Troubleshoots`, dan `Dismantle`, lengkap dengan langkah kerja ringkas dan shortcut aksi yang disesuaikan per sumber kerja: [technician-workspace-config.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/technician-workspace-config.ts)
+
+### Changed
+
+- Shortcut utama workspace teknisi sekarang otomatis membangun tautan work order berdasarkan `jobCategory` dan nama login teknisi, sehingga default filter lebih dekat ke assignment pribadi tanpa mengubah engine tracking yang ada: [technician-workspace-page.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/technician-workspace-page.tsx)
+- Aksi pendukung per workspace diringkas agar teknisi PSB fokus ke List PSB dan material, teknisi Trouble fokus ke queue/SLA NOC, dan teknisi Dismantle fokus ke return inventory dan histori support: [technician-workspace-config.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/technician-workspace-config.ts)
+
 ## [0.66.55] - 2026-07-20
 
 ### Added
