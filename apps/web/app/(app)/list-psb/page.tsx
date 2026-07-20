@@ -24,7 +24,7 @@ export default async function ListPsbPage({
   }
 
   const resolvedSearchParams = (await searchParams) ?? {}
-  const payload = await getPsbListPageData(resolvedSearchParams)
+  const payload = await getPsbListPageData(resolvedSearchParams, session)
   const language = await getServerUiLanguage()
   const roleMeta = getRoleMeta(session.role, language)
   const writeSource = getDataSourceSnapshot()

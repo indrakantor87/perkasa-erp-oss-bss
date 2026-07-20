@@ -155,9 +155,41 @@ function buildSalesSubmenuItems(role: AppRole | null) {
       buildSidebarNavItem('/list-psb', {
         key: 'sales-sub-list-psb',
         title: 'List PSB',
-        description: 'Antrean PSB yang dipilih CS, dijadwalkan, dan diteruskan ke ticketing.',
+        description: 'List PSB milik user login untuk dipantau sampai diproses CS.',
         href: '/list-psb',
         matchPrefixes: ['/list-psb'],
+      }),
+      buildSidebarNavItem('/dashboard/tracking', {
+        key: 'sales-sub-ticketing',
+        title: 'Ticketing',
+        description: 'Ticketing milik user login untuk memantau progres operasional.',
+        href: '/dashboard/tracking/noc-queue?mine=1',
+        requiredPath: '/dashboard/tracking',
+        assignHrefs: ['/dashboard/tracking/noc-queue'],
+        matchPrefixes: ['/dashboard/tracking/noc-queue'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-marketing-activities',
+        title: 'Aktivitas Marketing',
+        description: 'Aktivitas marketing milik user login pada periode aktif.',
+        href: '/sales/marketing-activities',
+        matchPrefixes: ['/sales/marketing-activities'],
+      }),
+      buildSidebarNavItem('/support', {
+        key: 'sales-sub-isolations',
+        title: 'List Data Isolir',
+        description: 'Data isolir sesuai user login untuk tindak lanjut customer prospek berjalan.',
+        href: '/support/isolations?focus=ACTIVE_ISOLATIONS',
+        requiredPath: '/support',
+        assignHrefs: ['/support/isolations'],
+        matchPrefixes: ['/support/isolations'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'sales-sub-odp-port',
+        title: 'Port ODP',
+        description: 'Cek coverage area, sisa port ODP, dan pembacaan area prospek terdekat.',
+        href: '/inventory/network',
+        matchPrefixes: ['/inventory/network'],
       }),
     ]
   }
@@ -927,7 +959,9 @@ function buildSidebarSections(params: {
   const supportingBaseItems =
     params.role === 'SUPER_ADMIN' && params.superAdminMode === 'compact'
       ? []
-      : coreItems.filter((item) => !assignedBaseHrefs.has(item.href)).map(mapNavigationItemToSidebarNavItem)
+      : params.role === 'PENJUALAN'
+        ? []
+        : coreItems.filter((item) => !assignedBaseHrefs.has(item.href)).map(mapNavigationItemToSidebarNavItem)
 
   const primaryTitle =
     params.role === 'SUPER_ADMIN' ? 'Control Center' : 'Utama'

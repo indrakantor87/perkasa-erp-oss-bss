@@ -120,6 +120,35 @@ function filterSupportReviewSections(
     .filter((section) => section.rows.length > 0)
 }
 
+function filterSupportReviewSectionsByMarketingOwner(
+  sections: NonNullable<Awaited<ReturnType<typeof getDomainPageData>>>['content']['reviewSections'],
+  ownerCandidates: string[],
+) {
+  const normalizedCandidates = ownerCandidates
+    .map((item) => String(item ?? '').trim().toUpperCase())
+    .filter(Boolean)
+
+  if (!normalizedCandidates.length) {
+    return sections
+  }
+
+  return (sections ?? [])
+    .map((section) => ({
+      ...section,
+      rows: section.rows.filter((row) => {
+        const marketingName =
+          row.meta
+            .find((item) => item.startsWith('Marketing: '))
+            ?.replace('Marketing: ', '')
+            .trim()
+            .toUpperCase() ?? ''
+
+        return marketingName ? normalizedCandidates.includes(marketingName) : false
+      }),
+    }))
+    .filter((section) => section.rows.length > 0)
+}
+
 function resolveSupportDrilldown(
   lane: SupportLaneKey,
   focus: string | undefined,
@@ -321,6 +350,16 @@ export default async function SupportLanePage({
           reviewSections: filteredReviewSections,
         }
       : payload.content
+  const roleScopedContent =
+    session.role === 'PENJUALAN' && (normalizedLane as SupportLaneKey) === 'isolations'
+      ? {
+          ...filteredContent,
+          reviewSections: filterSupportReviewSectionsByMarketingOwner(filteredContent.reviewSections, [
+            session.displayName,
+            session.username,
+          ]),
+        }
+      : filteredContent
 
   const resolvedSupportDrilldown = resolveSupportDrilldown(
     normalizedLane as SupportLaneKey,
@@ -332,7 +371,7 @@ export default async function SupportLanePage({
   if ((normalizedLane as SupportLaneKey) === 'isolations') {
     return (
       <SupportIsolationWorkspace
-        content={filteredContent}
+        content={roleScopedContent}
         source={payload.source}
         capabilities={payload.capabilities}
         role={session.role}
@@ -355,7 +394,7 @@ export default async function SupportLanePage({
   if ((normalizedLane as SupportLaneKey) === 'tt') {
     return (
       <SupportTroubleTicketWorkspace
-        content={filteredContent}
+        content={roleScopedContent}
         source={payload.source}
         capabilities={payload.capabilities}
         role={session.role}
@@ -375,7 +414,7 @@ export default async function SupportLanePage({
   if ((normalizedLane as SupportLaneKey) === 'dismantle') {
     return (
       <SupportDismantleWorkspace
-        content={filteredContent}
+        content={roleScopedContent}
         source={payload.source}
         capabilities={payload.capabilities}
         role={session.role}
@@ -396,7 +435,7 @@ export default async function SupportLanePage({
   if ((normalizedLane as SupportLaneKey) === 'sla') {
     return (
       <SupportSlaWorkspace
-        content={filteredContent}
+        content={roleScopedContent}
         source={payload.source}
         capabilities={payload.capabilities}
         role={session.role}
@@ -413,7 +452,7 @@ export default async function SupportLanePage({
 
   return (
     <DomainShell
-      content={filteredContent}
+      content={roleScopedContent}
       source={payload.source}
       capabilities={payload.capabilities}
       role={session.role}

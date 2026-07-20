@@ -71,8 +71,8 @@ export function MarketingActivityManager({
   marketingOptions,
   coveredAreas,
 }: MarketingActivityManagerProps) {
-  const canMutate = role === 'SUPER_ADMIN' || role === 'SALES_MARKETING'
-  const isMarketingRole = role === 'SALES_MARKETING'
+  const canMutate = role === 'SUPER_ADMIN' || role === 'SALES_MARKETING' || role === 'PENJUALAN'
+  const isMarketingRole = role === 'SALES_MARKETING' || role === 'PENJUALAN'
   const initialMarketingName = isMarketingRole ? displayName : marketingOptions[0]?.fullName ?? ''
 
   const [activities, setActivities] = useState<MarketingActivityRecord[]>([])

@@ -1,4 +1,5 @@
 import { getConfiguredDataMode, getFallbackDataSourceSnapshot, getDataSourceSnapshot } from '@/lib/data-source'
+import type { AppSession } from '@/lib/auth-session'
 import {
   type PsbListItem,
   type PsbListPagePayload,
@@ -613,7 +614,39 @@ async function getOwnerOptionsFromReviewDb() {
     .filter(Boolean)
 }
 
-async function getReviewDbPsbListPageData(query: PsbListQuery, source: DataSourceSnapshot): Promise<PsbListPagePayload> {
+function resolveOwnedPsbListOwnerAliases(session?: AppSession) {
+  if (!session || session.role !== 'PENJUALAN') {
+    return []
+  }
+
+  return Array.from(
+    new Set(
+      [
+        session.displayName,
+        session.username,
+        `${session.displayName} (${session.username})`,
+      ]
+        .map((item) => normalizeText(item))
+        .filter(Boolean),
+    ),
+  )
+}
+
+function filterVisiblePsbListOwnerOptions(items: PsbListItem[], ownerOptions: string[], session?: AppSession) {
+  if (session?.role !== 'PENJUALAN') {
+    return ownerOptions
+  }
+
+  return Array.from(
+    new Set(items.map((item) => String(item.salesOwnerName ?? '').trim()).filter(Boolean)),
+  ).sort((left, right) => left.localeCompare(right))
+}
+
+async function getReviewDbPsbListPageData(
+  query: PsbListQuery,
+  source: DataSourceSnapshot,
+  session?: AppSession,
+): Promise<PsbListPagePayload> {
   await ensurePsbListBaselineSeeds()
 
   const state = {
@@ -625,11 +658,15 @@ async function getReviewDbPsbListPageData(query: PsbListQuery, source: DataSourc
 
   const where: string[] = []
   const values: unknown[] = []
+  const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
   if (state.status) {
     where.push('status = ?')
     values.push(state.status)
   }
-  if (state.owner) {
+  if (ownerAliases.length) {
+    where.push(`LOWER(COALESCE(sales_owner_name, '')) IN (${ownerAliases.map(() => '?').join(', ')})`)
+    values.push(...ownerAliases)
+  } else if (state.owner) {
     where.push('sales_owner_name = ?')
     values.push(state.owner)
   }
@@ -706,7 +743,7 @@ async function getReviewDbPsbListPageData(query: PsbListQuery, source: DataSourc
       rejectedCount: items.filter((item) => item.status === 'DITOLAK').length,
       transferredCount: items.filter((item) => item.status === 'DITRANSFER_KE_TICKETING').length,
     },
-    ownerOptions: await getOwnerOptionsFromReviewDb(),
+    ownerOptions: filterVisiblePsbListOwnerOptions(items, await getOwnerOptionsFromReviewDb(), session),
     state,
   }
 }
@@ -714,6 +751,7 @@ async function getReviewDbPsbListPageData(query: PsbListQuery, source: DataSourc
 async function getPsbListPageDataWithMock(
   query: PsbListQuery,
   source: DataSourceSnapshot,
+  session?: AppSession,
 ): Promise<PsbListPagePayload> {
   const state = {
     status: resolveSearchParam(query.status)?.trim().toUpperCase() || null,
@@ -723,9 +761,16 @@ async function getPsbListPageDataWithMock(
   }
 
   const searchNeedle = normalizeText(state.q)
+  const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
   const filteredItems = mockPsbListItems
     .filter((item) => !state.status || item.status === state.status)
-    .filter((item) => !state.owner || item.salesOwnerName === state.owner)
+    .filter((item) => {
+      const ownerName = normalizeText(item.salesOwnerName)
+      if (ownerAliases.length) {
+        return ownerAliases.includes(ownerName)
+      }
+      return !state.owner || item.salesOwnerName === state.owner
+    })
     .filter((item) => {
       if (!searchNeedle) {
         return true
@@ -763,8 +808,12 @@ async function getPsbListPageDataWithMock(
       rejectedCount: filteredItems.filter((item) => item.status === 'DITOLAK').length,
       transferredCount: filteredItems.filter((item) => item.status === 'DITRANSFER_KE_TICKETING').length,
     },
-    ownerOptions: Array.from(new Set(mockPsbListItems.map((item) => item.salesOwnerName).filter(Boolean) as string[])).sort((a, b) =>
-      a.localeCompare(b),
+    ownerOptions: filterVisiblePsbListOwnerOptions(
+      filteredItems,
+      Array.from(new Set(mockPsbListItems.map((item) => item.salesOwnerName).filter(Boolean) as string[])).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+      session,
     ),
     state,
   }
@@ -1188,18 +1237,18 @@ export async function transferPsbListToTicket(params: {
   }
 }
 
-export async function getPsbListPageData(query: PsbListQuery): Promise<PsbListPagePayload> {
+export async function getPsbListPageData(query: PsbListQuery, session?: AppSession): Promise<PsbListPagePayload> {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode === 'review-db' && !source.isFallback) {
     try {
-      return await getReviewDbPsbListPageData(query, source)
+      return await getReviewDbPsbListPageData(query, source, session)
     } catch (error) {
-      return getPsbListPageDataWithMock(query, buildFallbackSnapshot(getReviewDbErrorDetail(error)))
+      return getPsbListPageDataWithMock(query, buildFallbackSnapshot(getReviewDbErrorDetail(error)), session)
     }
   }
 
   if (getConfiguredDataMode() === 'mock') {
-    return getPsbListPageDataWithMock(query, source)
+    return getPsbListPageDataWithMock(query, source, session)
   }
 
   return getPsbListPageDataWithMock(
@@ -1207,5 +1256,6 @@ export async function getPsbListPageData(query: PsbListQuery): Promise<PsbListPa
     buildFallbackSnapshot(
       'List PSB sementara memakai mock operasional karena sumber review DB khusus untuk domain ini belum dibuka.',
     ),
+    session,
   )
 }

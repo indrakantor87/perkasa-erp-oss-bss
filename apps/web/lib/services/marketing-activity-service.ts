@@ -118,11 +118,11 @@ function buildMockMarketingUsers() {
 }
 
 function resolveReadScopeRole(role: AppRole) {
-  return role === 'SALES_MARKETING' || role === 'SUPER_ADMIN' || role === 'CS_ADMIN' || role === 'DIGITAL_CREATOR'
+  return role === 'PENJUALAN' || role === 'SALES_MARKETING' || role === 'SUPER_ADMIN' || role === 'CS_ADMIN' || role === 'DIGITAL_CREATOR'
 }
 
 export function canMutateMarketingActivities(role: AppRole) {
-  return role === 'SUPER_ADMIN' || role === 'SALES_MARKETING'
+  return role === 'SUPER_ADMIN' || role === 'SALES_MARKETING' || role === 'PENJUALAN'
 }
 
 export async function ensureMarketingActivitiesTable() {
@@ -268,7 +268,7 @@ export async function getMarketingActivities(params: {
     values.push(year, month)
   }
 
-  if (params.session.role === 'SALES_MARKETING') {
+  if (params.session.role === 'SALES_MARKETING' || params.session.role === 'PENJUALAN') {
     filters.push('LOWER(ma.marketing_username) = ?')
     values.push(params.session.username.trim().toLowerCase())
   } else if (marketing) {
@@ -399,7 +399,7 @@ export async function createMarketingActivity(params: {
 
   let marketingUsername = params.session.username
   let marketingName = params.session.displayName
-  if (params.session.role !== 'SALES_MARKETING') {
+  if (params.session.role !== 'SALES_MARKETING' && params.session.role !== 'PENJUALAN') {
     const resolvedMarketing = await resolveMarketingIdentity(normalizeText(params.payload.marketingName))
     if (!resolvedMarketing) {
       throw new Error('Marketing harus dipilih dari user marketing yang valid.')
@@ -467,7 +467,10 @@ export async function updateMarketingActivity(params: {
   if (!existing) {
     throw new Error('Aktivitas marketing tidak ditemukan.')
   }
-  if (params.session.role === 'SALES_MARKETING' && existing.marketingUsername !== params.session.username) {
+  if (
+    (params.session.role === 'SALES_MARKETING' || params.session.role === 'PENJUALAN') &&
+    existing.marketingUsername !== params.session.username
+  ) {
     throw new Error('Anda hanya bisa mengubah aktivitas milik sendiri.')
   }
 
@@ -478,7 +481,7 @@ export async function updateMarketingActivity(params: {
 
   let marketingUsername = existing.marketingUsername
   let marketingName = existing.marketingName
-  if (params.session.role !== 'SALES_MARKETING') {
+  if (params.session.role !== 'SALES_MARKETING' && params.session.role !== 'PENJUALAN') {
     const resolvedMarketing = await resolveMarketingIdentity(normalizeText(params.payload.marketingName))
     if (!resolvedMarketing) {
       throw new Error('Marketing harus dipilih dari user marketing yang valid.')
@@ -541,7 +544,10 @@ export async function deleteMarketingActivity(params: { id: number; session: App
   if (!existing) {
     throw new Error('Aktivitas marketing tidak ditemukan.')
   }
-  if (params.session.role === 'SALES_MARKETING' && existing.marketingUsername !== params.session.username) {
+  if (
+    (params.session.role === 'SALES_MARKETING' || params.session.role === 'PENJUALAN') &&
+    existing.marketingUsername !== params.session.username
+  ) {
     throw new Error('Anda hanya bisa menghapus aktivitas milik sendiri.')
   }
 

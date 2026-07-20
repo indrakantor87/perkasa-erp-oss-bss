@@ -158,15 +158,22 @@ export default async function NocQueuePage({
   }
 
   const query = (await searchParams) ?? {}
+  const effectiveQuery =
+    session.role === 'PENJUALAN'
+      ? {
+          ...query,
+          mine: '1',
+        }
+      : query
   const [payload, itemSuggestions] = await Promise.all([
-    getNocQueueList(query, { session }),
+    getNocQueueList(effectiveQuery, { session }),
     getInventoryDeviceLifecycleItemSuggestions(200),
   ])
-  const q = resolveSearchParam(query.q) ?? ''
-  const ticketType = resolveSearchParam(query.ticketType)?.toUpperCase() ?? ''
-  const queueStatus = resolveSearchParam(query.queueStatus)?.toUpperCase() ?? ''
-  const slaState = resolveSearchParam(query.slaState)?.toUpperCase() ?? ''
-  const mine = ['1', 'true', 'yes', 'on'].includes((resolveSearchParam(query.mine) ?? '').trim().toLowerCase())
+  const q = resolveSearchParam(effectiveQuery.q) ?? ''
+  const ticketType = resolveSearchParam(effectiveQuery.ticketType)?.toUpperCase() ?? ''
+  const queueStatus = resolveSearchParam(effectiveQuery.queueStatus)?.toUpperCase() ?? ''
+  const slaState = resolveSearchParam(effectiveQuery.slaState)?.toUpperCase() ?? ''
+  const mine = ['1', 'true', 'yes', 'on'].includes((resolveSearchParam(effectiveQuery.mine) ?? '').trim().toLowerCase())
   const canCreateDeviceLifecycle =
     session.role === 'FIELD_TECHNICIAN' ||
     canPerformAction(session.role, 'inventory', 'update') ||
