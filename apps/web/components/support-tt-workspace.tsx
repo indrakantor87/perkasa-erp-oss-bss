@@ -61,6 +61,40 @@ function buildTicketSuggestion(
   return `${ticketCode} | ${row.secondary} | ${row.status} | ${type} | ${slaDays} | ${slaDue} | ${slaState} | ${owner} | ${followUp} | ${latestProgress} | ${escalationTarget} | ${escalationLevel} | ${escalationAt} | ${escalationReason}`
 }
 
+function getTroubleWorkspaceCopy(role: AppRole) {
+  if (role === 'NOC_OPERATOR') {
+    return {
+      laneDescription:
+        'Lane utama NOC untuk intake ticket teknis, dispatch progres, eskalasi cepat, dan kontrol SLA.',
+      helperTitle: 'Gunakan lane ini sebagai board kerja NOC: baca antrean teknis, saring prioritas, lalu tindak dari tabel.',
+      helperDetail:
+        'Ringkasan di atas membantu membaca beban gangguan hari ini. Filter dipakai untuk menyempitkan kasus aktif, lalu aksi utama tetap dibuka langsung dari tabel tanpa perlu berpindah konteks.',
+      boardDetail:
+        'Board TT difokuskan untuk lane NOC dan troubleshoots. Gunakan filter di sini, lalu jalankan aksi input, progress, close, dan eskalasi langsung dari tabel.',
+    }
+  }
+
+  if (role === 'TT_OPERATOR') {
+    return {
+      laneDescription: 'Lane utama untuk intake ticket, follow-up cepat, eskalasi, dan kontrol SLA.',
+      helperTitle: 'Gunakan lane ini sebagai board kerja TT: lihat angka dulu, saring ticket, lalu tindak dari tabel.',
+      helperDetail:
+        'Urutannya dibuat lebih praktis untuk operasional harian. Ringkasan di atas membantu membaca beban hari ini, filter dipakai untuk menyempitkan kasus, lalu aksi utama tetap dibuka dari tabel tanpa perlu mencari form ke bawah.',
+      boardDetail:
+        'Seluruh board TT difokuskan untuk lane TT dan troubleshoots. Gunakan filter di sini, lalu aksi input, progress, close, dan eskalasi langsung dari tabel.',
+    }
+  }
+
+  return {
+    laneDescription: 'Lane utama untuk intake ticket, follow-up cepat, eskalasi, dan kontrol SLA.',
+    helperTitle: 'Gunakan lane ini seperti board support: lihat angka dulu, saring ticket, lalu tindak dari tabel.',
+    helperDetail:
+      'Urutannya dibuat lebih praktis untuk operasional harian. Ringkasan di atas membantu membaca beban hari ini, filter dipakai untuk menyempitkan kasus, lalu aksi utama tetap dibuka dari tabel tanpa perlu mencari form ke bawah.',
+    boardDetail:
+      'Seluruh board TT difokuskan untuk lane support teknis dan troubleshoots. Gunakan filter di sini, lalu aksi input, progress, close, dan eskalasi langsung dari tabel.',
+  }
+}
+
 export function SupportTroubleTicketWorkspace({
   content,
   source,
@@ -190,6 +224,7 @@ export function SupportTroubleTicketWorkspace({
       canApprove,
     }),
   )
+  const workspaceCopy = getTroubleWorkspaceCopy(role)
   const supportActionModalItems: SupportActionModalItem[] = []
   if (canUseSupportAction({ role, actionKey: 'ticket-create', canCreate, canUpdate, canApprove })) {
     supportActionModalItems.push({
@@ -277,7 +312,7 @@ export function SupportTroubleTicketWorkspace({
               Trouble Ticket
             </h2>
             <p className="mt-1 text-sm leading-5 text-mute">
-              Lane utama untuk intake ticket, follow-up cepat, eskalasi, dan kontrol SLA.
+              {workspaceCopy.laneDescription}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -309,8 +344,8 @@ export function SupportTroubleTicketWorkspace({
       </section>
 
       <SupportWorkspaceHelperNote
-        title="Gunakan lane ini seperti board laporan CS: lihat angka dulu, saring ticket, lalu tindak dari tabel."
-        detail="Urutannya dibuat lebih praktis untuk operasional harian. Ringkasan di atas membantu membaca beban hari ini, filter dipakai untuk menyempitkan kasus, lalu aksi utama tetap dibuka dari tabel tanpa perlu mencari form ke bawah."
+        title={workspaceCopy.helperTitle}
+        detail={workspaceCopy.helperDetail}
         badges={[
           { label: `${troubleRows.length} trouble open`, tone: 'neutral' },
           { label: `${preventiveOpenCount} preventive open`, tone: 'info' },
@@ -387,7 +422,7 @@ export function SupportTroubleTicketWorkspace({
           </div>
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-              Seluruh board TT difokuskan untuk lane NOC & Troubleshoots. Gunakan filter di sini, lalu aksi `input`, `progress`, `close`, dan `eskalasi` langsung dari tabel.
+              {workspaceCopy.boardDetail}
             </div>
             <div className="flex flex-wrap gap-2 xl:justify-end">
               {visibleActionLinks.map((action) => (

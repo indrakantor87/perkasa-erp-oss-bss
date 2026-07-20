@@ -93,12 +93,14 @@ export function SupportRoleQueueBoard({
     <section className="panel p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="section-title">Micro Queue Support</p>
+          <p className="section-title">{role === 'NOC_OPERATOR' ? 'Micro Queue NOC' : 'Micro Queue Support'}</p>
           <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
             Prioritas support untuk {roleMeta.label}
           </h3>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-            Queue ini memecah domain support menjadi jalur kerja trouble ticket, isolir, dismantle, dan kontrol SLA agar role operasional tidak melihat daftar campur aduk.
+            {role === 'NOC_OPERATOR'
+              ? 'Queue ini memecah area kerja NOC menjadi jalur ticket teknis, prioritas SLA, dan monitoring isolir agar operator fokus ke antrean yang benar-benar relevan.'
+              : 'Queue ini memecah domain support menjadi jalur kerja trouble ticket, isolir, dismantle, dan kontrol SLA agar role operasional tidak melihat daftar campur aduk.'}
           </p>
         </div>
         <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.shortLabel}</span>

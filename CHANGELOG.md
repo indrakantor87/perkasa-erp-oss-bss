@@ -10,6 +10,14 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.62] - 2026-07-20
+
+### Changed
+
+- Sidebar role `NOC Operator` sekarang lebih spesifik ke operasional NOC dengan label workspace `NOC & Ticketing`, urutan submenu yang mengikuti prioritas lane NOC, serta penamaan submenu yang lebih kontekstual seperti `Ticketing NOC`, `Prioritas SLA`, dan `Monitoring Isolir`: [sidebar.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/layout/sidebar.tsx)
+- Workspace `Trouble Ticket` tidak lagi memakai wording yang mengacu ke board laporan CS; copy helper, deskripsi lane, dan ringkasan tindakan kini menyesuaikan konteks `NOC Operator` dan `TT Operator`: [support-tt-workspace.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-tt-workspace.tsx)
+- Kartu ringkasan lane support dan metadata role aktif untuk `NOC Operator` kini memakai bahasa yang lebih selaras dengan ticketing teknis, kontrol SLA, dan monitoring jaringan operasional: [support-role-queue-board.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-role-queue-board.tsx), [role-meta.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/role-meta.ts)
+
 ## [0.66.61] - 2026-07-20
 
 ### Added

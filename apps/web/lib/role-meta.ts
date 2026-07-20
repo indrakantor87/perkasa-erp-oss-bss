@@ -95,8 +95,8 @@ const roleMetaMap: Record<AppRole, RoleMeta> = {
     label: 'NOC Operator',
     shortLabel: 'NOC',
     tone: 'bg-emerald-600 text-white',
-    scope: 'Trouble ticket teknis, monitoring jaringan, dan ODP operasional.',
-    division: 'Pemasaran dan Pelayanan',
+    scope: 'Ticketing teknis, kontrol SLA, validasi progres lapangan, dan monitoring jaringan operasional.',
+    division: 'Operasional Teknis',
     subdivision: 'NOC',
   },
   FIELD_TECHNICIAN: {

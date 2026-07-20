@@ -9,7 +9,7 @@ import type { AppSession } from '@/lib/auth-session'
 import { useUiLanguage } from '@/components/layout/ui-language'
 import { navigationItems } from '@/lib/navigation'
 import { getRoleMeta } from '@/lib/role-meta'
-import { canAccessSupportLane, getSupportLanePath } from '@/lib/support-lanes'
+import { canAccessSupportLane, getSupportLaneOrder, getSupportLanePath } from '@/lib/support-lanes'
 import type { AppRole } from '@/lib/types'
 import { translateUiText } from '@/lib/ui-language'
 
@@ -182,8 +182,11 @@ function buildSalesSubmenuItems(role: AppRole | null) {
 function buildSupportMainItem(role: AppRole | null) {
   return buildSidebarNavItem('/support', {
     key: 'support-noc-tt',
-    title: 'Support Teknis',
-    description: 'Queue teknis, TT, monitoring ticket, dan kontrol SLA operasional',
+    title: role === 'NOC_OPERATOR' ? 'NOC & Ticketing' : 'Support Teknis',
+    description:
+      role === 'NOC_OPERATOR'
+        ? 'Queue ticket teknis, prioritas SLA, monitoring isolir, dan tindak lanjut operasional NOC'
+        : 'Queue teknis, TT, monitoring ticket, dan kontrol SLA operasional',
     excludePrefixes: ['/support/isolations', '/support/dismantle'],
     children: buildSupportSubmenuItems(role),
   })
@@ -194,47 +197,55 @@ function buildSupportSubmenuItems(role: AppRole | null) {
     return []
   }
 
-  const supportLaneItems: Array<{
-    lane: 'tt' | 'isolations' | 'dismantle' | 'sla'
-    key: string
-    title: string
-    description: string
-  }> = [
+  const supportLaneItems: Record<
+    'tt' | 'isolations' | 'dismantle' | 'sla',
     {
-      lane: 'tt',
+      key: string
+      title: string
+      description: string
+    }
+  > = {
+    tt: {
       key: 'support-sub-tt',
-      title: 'Trouble Ticket',
-      description: 'Queue ticket open, progress, ready close, dan tindak lanjut teknis.',
+      title: role === 'NOC_OPERATOR' ? 'Ticketing NOC' : 'Trouble Ticket',
+      description:
+        role === 'NOC_OPERATOR'
+          ? 'Queue ticket teknis aktif untuk intake, dispatch, update progres, dan validasi penutupan.'
+          : 'Queue ticket open, progress, ready close, dan tindak lanjut teknis.',
     },
-    {
-      lane: 'isolations',
+    isolations: {
       key: 'support-sub-isolations',
-      title: 'Isolir',
-      description: 'Monitoring pelanggan suspend, restore, dan sinkron support-billing.',
+      title: role === 'NOC_OPERATOR' ? 'Monitoring Isolir' : 'Isolir',
+      description:
+        role === 'NOC_OPERATOR'
+          ? 'Pantau pelanggan suspend yang perlu awareness teknis, koordinasi restore, atau kandidat tindak lanjut.'
+          : 'Monitoring pelanggan suspend, restore, dan sinkron support-billing.',
     },
-    {
-      lane: 'dismantle',
+    dismantle: {
       key: 'support-sub-dismantle',
       title: 'Dismantle',
       description: 'Queue pembongkaran perangkat dan tindak lanjut terminasi lapangan.',
     },
-    {
-      lane: 'sla',
+    sla: {
       key: 'support-sub-sla',
-      title: 'Kontrol SLA',
-      description: 'Pantau overdue, kedisiplinan progres, dan ticket yang perlu eskalasi.',
+      title: role === 'NOC_OPERATOR' ? 'Prioritas SLA' : 'Kontrol SLA',
+      description:
+        role === 'NOC_OPERATOR'
+          ? 'Pantau overdue, disiplin progres, dan ticket teknis yang perlu eskalasi cepat.'
+          : 'Pantau overdue, kedisiplinan progres, dan ticket yang perlu eskalasi.',
     },
-  ]
+  }
 
-  const items = supportLaneItems
-    .filter((item) => canAccessSupportLane(role, item.lane))
+  const orderedLanes = getSupportLaneOrder(role)
+  const items = orderedLanes
+    .filter((lane) => canAccessSupportLane(role, lane))
     .map((item) =>
       buildSidebarNavItem('/support', {
-        key: item.key,
-        title: item.title,
-        description: item.description,
-        href: getSupportLanePath(item.lane),
-        matchPrefixes: [getSupportLanePath(item.lane)],
+        key: supportLaneItems[item].key,
+        title: supportLaneItems[item].title,
+        description: supportLaneItems[item].description,
+        href: getSupportLanePath(item),
+        matchPrefixes: [getSupportLanePath(item)],
       }),
     )
 
