@@ -139,7 +139,21 @@ function buildSalesSubmenuItems(role: AppRole | null) {
     return []
   }
 
-  const items: SidebarNavItem[] = [
+  const items: SidebarNavItem[] = []
+
+  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING'].includes(role)) {
+    items.push(
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-input-psb',
+        title: 'Input PSB',
+        description: 'Buka panel input PSB baru untuk lead, coverage, survey, dan order awal.',
+        href: '/sales/input-psb#sales-action-lead-create',
+        matchPrefixes: ['/sales/input-psb'],
+      }),
+    )
+  }
+
+  items.push(
     buildSidebarNavItem('/sales', {
       key: 'sales-sub-workspace',
       title: 'Workspace Sales',
@@ -153,9 +167,10 @@ function buildSalesSubmenuItems(role: AppRole | null) {
         '/sales/content-calendar',
         '/sales/content-analytics',
         '/sales/marketing-activities',
+        '/sales/input-psb',
       ],
     }),
-  ]
+  )
 
   if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING'].includes(role)) {
     items.push(

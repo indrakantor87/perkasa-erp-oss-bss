@@ -544,6 +544,7 @@ export function SalesDomainWorkspace({
   role,
   domainPrefill,
   domainDrilldown,
+  initialActionPanelOpen = false,
 }: {
   content: DomainPageContent
   source: DataSourceSnapshot
@@ -558,6 +559,7 @@ export function SalesDomainWorkspace({
     month?: number
     year?: number
   }
+  initialActionPanelOpen?: boolean
 }) {
   const reviewSections = content.reviewSections ?? []
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
@@ -608,6 +610,7 @@ export function SalesDomainWorkspace({
   )
   const totalRows = reviewSections.reduce((sum, section) => sum + section.rows.length, 0)
   const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
+  const [isActionPanelOpen, setIsActionPanelOpen] = useState(initialActionPanelOpen)
   const openRows = reviewSections.reduce(
     (sum, section) =>
       sum +
@@ -1054,7 +1057,11 @@ export function SalesDomainWorkspace({
               Default layar tetap fokus ke tabel. Buka panel ini hanya saat operator perlu menulis aksi.
             </p>
           </div>
-          <details className="group rounded-2xl border border-line bg-white p-4">
+          <details
+            className="group rounded-2xl border border-line bg-white p-4"
+            open={isActionPanelOpen}
+            onToggle={(event) => setIsActionPanelOpen(event.currentTarget.open)}
+          >
             <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
               Buka panel aksi penjualan
             </summary>

@@ -235,7 +235,7 @@ export function PsbListWorkspace({
         </form>
       </section>
 
-      <section className="grid items-start gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+      <section className="space-y-6">
         <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-6 py-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Antrean Operasional</p>
