@@ -5,15 +5,24 @@ import { CaseEvidencePanelCard } from '@/components/case-evidence-panel'
 import { CaseHealthSignalCard } from '@/components/case-health-signal'
 import { CaseNextActionMatrixCard } from '@/components/case-next-action-matrix'
 import { CaseCorrelationSummaryPanel } from '@/components/case-correlation-summary'
-import type { WorklistItem } from '@/lib/types'
+import type { AppRole, WorklistItem } from '@/lib/types'
 
-export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
+type WorklistDetailPanelProps = {
+  item: WorklistItem | null
+  role?: AppRole
+}
+
+export function WorklistDetailPanel({ item, role }: WorklistDetailPanelProps) {
+  const compactForNoc = role === 'NOC_OPERATOR'
+
   return (
     <section className="panel p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="section-title">Panel Detail</p>
-          <h3 className="mt-2 text-xl font-semibold text-[var(--color-ink-strong)]">Item aktif dan CTA tindak lanjut</h3>
+          <h3 className="mt-2 text-xl font-semibold text-[var(--color-ink-strong)]">
+            {compactForNoc ? 'Ringkasan item aktif dan tindak lanjut NOC' : 'Item aktif dan CTA tindak lanjut'}
+          </h3>
         </div>
         {item ? <span className="solid-chip">{item.queue}</span> : null}
       </div>
@@ -33,25 +42,45 @@ export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
             <p className="text-sm leading-6 text-mute">{item.detail}</p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <article className="surface-soft rounded-3xl border p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Alasan Muncul</p>
-              <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.reason || '-'}</p>
-            </article>
-            <article className="surface-soft rounded-3xl border p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Langkah Berikut</p>
-              <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.nextAction || '-'}</p>
-            </article>
-            <article className="surface-soft rounded-3xl border p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">PIC / Target</p>
-              <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.owner || '-'}</p>
-              <p className="mt-1 text-sm leading-6 text-mute">{item.dueLabel || 'Belum ada target eksplisit'}</p>
-            </article>
-            <article className="surface-soft rounded-3xl border p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Blocker</p>
-              <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.blockingInfo || 'Belum ada blocker eksplisit.'}</p>
-            </article>
-          </div>
+          {compactForNoc ? (
+            <div className="grid gap-4 lg:grid-cols-3">
+              <article className="surface-soft rounded-3xl border p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Yang Perlu Dipahami</p>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.reason || item.detail || '-'}</p>
+              </article>
+              <article className="surface-soft rounded-3xl border p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Tindak Lanjut NOC</p>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.nextAction || '-'}</p>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-mute">Blocker</p>
+                <p className="mt-2 text-sm leading-6 text-mute">{item.blockingInfo || 'Belum ada blocker eksplisit.'}</p>
+              </article>
+              <article className="surface-soft rounded-3xl border p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">PIC / Target</p>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.owner || '-'}</p>
+                <p className="mt-1 text-sm leading-6 text-mute">{item.dueLabel || 'Belum ada target eksplisit'}</p>
+              </article>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              <article className="surface-soft rounded-3xl border p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Alasan Muncul</p>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.reason || '-'}</p>
+              </article>
+              <article className="surface-soft rounded-3xl border p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Langkah Berikut</p>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.nextAction || '-'}</p>
+              </article>
+              <article className="surface-soft rounded-3xl border p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">PIC / Target</p>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.owner || '-'}</p>
+                <p className="mt-1 text-sm leading-6 text-mute">{item.dueLabel || 'Belum ada target eksplisit'}</p>
+              </article>
+              <article className="surface-soft rounded-3xl border p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Blocker</p>
+                <p className="mt-3 text-sm leading-6 text-[var(--color-mute-strong)]">{item.blockingInfo || 'Belum ada blocker eksplisit.'}</p>
+              </article>
+            </div>
+          )}
 
           {item.healthSignal ? <CaseHealthSignalCard signal={item.healthSignal} /> : null}
 
@@ -69,7 +98,7 @@ export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
 
           <div className="surface-elevated rounded-3xl border p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">CTA</p>
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className={compactForNoc ? 'mt-4 flex flex-col gap-3 sm:flex-row' : 'mt-4 flex flex-wrap gap-3'}>
               <Link
                 href={item.href}
                 className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition hover:opacity-90"
@@ -82,7 +111,7 @@ export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
               </span>
             </div>
             {item.handoffLinks?.length ? (
-              <div className="mt-4 flex flex-wrap gap-3">
+              <div className={compactForNoc ? 'mt-4 grid gap-3 md:grid-cols-2' : 'mt-4 flex flex-wrap gap-3'}>
                 {item.handoffLinks.map((link) => (
                   <Link
                     key={`${item.id}-${link.label}`}
@@ -98,8 +127,9 @@ export function WorklistDetailPanel({ item }: { item: WorklistItem | null }) {
         </div>
       ) : (
         <div className="surface-soft mt-6 rounded-3xl border border-dashed p-6 text-sm leading-6 text-mute">
-          Belum ada item yang terpilih. Pilih salah satu baris pada daftar item untuk melihat konteks
-          lintas domain dan CTA utamanya.
+          {compactForNoc
+            ? 'Belum ada item yang terpilih. Pilih salah satu baris pada daftar item agar ringkasan tindak lanjut NOC muncul di blok ini.'
+            : 'Belum ada item yang terpilih. Pilih salah satu baris pada daftar item untuk melihat konteks lintas domain dan CTA utamanya.'}
         </div>
       )}
     </section>

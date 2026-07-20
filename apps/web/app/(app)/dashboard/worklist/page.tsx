@@ -49,6 +49,7 @@ export default async function DashboardWorklistPage({
   const payload = await getWorklistPageData(session, state)
   const language = await getServerUiLanguage()
   const roleMeta = getRoleMeta(session.role, language)
+  const useStackedWorklistLayout = session.role === 'NOC_OPERATOR'
   const readOnly =
     !canPerformAction(session.role, 'sales', 'update') &&
     !canPerformAction(session.role, 'customers', 'update') &&
@@ -75,9 +76,9 @@ export default async function DashboardWorklistPage({
       />
       <WorklistFilters state={{ ...state, queue: payload.selectedQueue }} queueOptions={payload.queueOptions} />
       <WorklistTabs queueOptions={payload.queueOptions} state={{ ...state, queue: payload.selectedQueue }} />
-      <section className="grid items-start gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+      <section className={useStackedWorklistLayout ? 'grid items-start gap-6' : 'grid items-start gap-6 xl:grid-cols-[1.25fr_0.75fr]'}>
         <WorklistTable items={payload.items} selectedItemId={payload.selectedItem?.id} state={{ ...state, queue: payload.selectedQueue }} />
-        <WorklistDetailPanel item={payload.selectedItem} />
+        <WorklistDetailPanel item={payload.selectedItem} role={session.role} />
       </section>
     </div>
   )
