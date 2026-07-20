@@ -468,7 +468,7 @@ function buildCompactIsolirItem() {
     description: 'Monitoring pelanggan suspend, restore, dan sinkron billing operasional',
     href: '/support/isolations',
     requiredPath: '/support',
-    assignHrefs: ['/support/isolations'],
+    assignHrefs: ['/support', '/support/isolations'],
     matchPrefixes: ['/support/isolations'],
   })
 }
@@ -797,7 +797,7 @@ function getWorkspaceCustomItems(role: AppRole | null) {
     case 'CS_ADMIN':
       return [buildCsAdminItem()]
     case 'NOC_OPERATOR':
-      return [buildCompactTicketingItem()]
+      return [buildCompactTicketingItem(), buildCompactIsolirItem(), buildInventoryMainItem(role)]
     case 'FIELD_TECHNICIAN':
       return [buildTeknisiLapanganItem()]
     case 'TT_OPERATOR':
@@ -839,7 +839,7 @@ function getSupportingCustomItems(role: AppRole | null) {
     case 'SALES_MARKETING':
       return [buildCustomersMainItem(role)]
     case 'NOC_OPERATOR':
-      return [buildCompactIsolirItem(), buildInventoryMainItem(role)]
+      return []
     default:
       return []
   }
@@ -898,6 +898,8 @@ function buildSidebarSections(params: {
       ? params.superAdminMode === 'compact'
         ? 'Operasional Inti'
         : 'Lintas Divisi'
+      : params.role === 'NOC_OPERATOR'
+        ? 'Operasional'
       : 'Workspace'
   const supportingTitle =
     params.role === 'SUPER_ADMIN' ? 'Pengawasan' : 'Pendukung'
