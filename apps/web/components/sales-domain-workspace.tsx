@@ -545,6 +545,7 @@ export function SalesDomainWorkspace({
   domainPrefill,
   domainDrilldown,
   initialActionPanelOpen = false,
+  displayMode = 'full',
 }: {
   content: DomainPageContent
   source: DataSourceSnapshot
@@ -560,7 +561,9 @@ export function SalesDomainWorkspace({
     year?: number
   }
   initialActionPanelOpen?: boolean
+  displayMode?: 'full' | 'input'
 }) {
+  const isInputOnly = displayMode === 'input'
   const reviewSections = content.reviewSections ?? []
   const canCreate = capabilities.some((item) => item.action === 'create' && item.enabled)
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
@@ -684,7 +687,44 @@ export function SalesDomainWorkspace({
 
   return (
     <div className="space-y-3">
-      <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+      {isInputOnly ? (
+        <section className="rounded-[28px] border border-line bg-white p-5 shadow-sm">
+          <p className="section-title">Input PSB</p>
+          <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <h2 className="font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+                Form input penjualan
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-mute">
+                Halaman ini khusus untuk input lead, coverage, survey, dan order awal PSB. Tabel monitoring dan ringkasan pipeline dipindahkan ke menu lain agar operator tetap fokus saat mengisi data.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/list-psb" className="rounded-md border border-line bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-100">
+                Buka List PSB
+              </Link>
+              <Link href="/sales/marketing-activities" className="rounded-md border border-line bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-100">
+                Aktivitas Marketing
+              </Link>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href={`#${getSalesActionAnchorId('lead-create')}`} className="badge border-sky-200 bg-sky-50 text-sky-700">
+              Lead Baru
+            </Link>
+            <Link href={`#${getSalesActionAnchorId('coverage-create')}`} className="badge border-violet-200 bg-violet-50 text-violet-700">
+              Coverage
+            </Link>
+            <Link href={`#${getSalesActionAnchorId('survey-create')}`} className="badge border-amber-200 bg-amber-50 text-amber-700">
+              Survey
+            </Link>
+            <Link href={`#${getSalesActionAnchorId('order-create')}`} className="badge border-emerald-200 bg-emerald-50 text-emerald-700">
+              Order
+            </Link>
+          </div>
+        </section>
+      ) : (
+        <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">{content.eyebrow}</p>
         <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -707,9 +747,12 @@ export function SalesDomainWorkspace({
           <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{openRows.toLocaleString('id-ID')} item aktif</span>
           <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{consoleStats.marketingCount} marketing</span>
         </div>
-      </section>
+        </section>
+      )}
 
-      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+      {!isInputOnly ? (
+        <>
+          <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <article className="rounded-xl border border-red-700/70 bg-[#7a0000] px-3 py-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
           <p className="text-sm font-medium tracking-tight text-red-100">Open</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-[2rem] font-bold leading-none text-white">{listStats.openCount}</p>
@@ -722,9 +765,9 @@ export function SalesDomainWorkspace({
           <p className="text-sm font-medium tracking-tight text-green-100">Close</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-[2rem] font-bold leading-none text-white">{listStats.closeCount}</p>
         </article>
-      </section>
+          </section>
 
-      <section className="grid grid-cols-2 gap-2 xl:grid-cols-5">
+          <section className="grid grid-cols-2 gap-2 xl:grid-cols-5">
         <article className="rounded-xl border border-slate-700 bg-[#132647] px-3 py-2.5 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Lead</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-white">{consoleStats.leadCount}</p>
@@ -745,9 +788,9 @@ export function SalesDomainWorkspace({
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Aktivasi</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-white">{consoleStats.activationCount}</p>
         </article>
-      </section>
+          </section>
 
-      <section className="rounded-2xl border border-slate-600/80 bg-[#1c2b45] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <section className="rounded-2xl border border-slate-600/80 bg-[#1c2b45] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Toolbar Ticket PSB</p>
@@ -854,9 +897,9 @@ export function SalesDomainWorkspace({
             <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{visibleCountLabel}</span>
           </div>
         </div>
-      </section>
+          </section>
 
-      <section className="rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+          <section className="rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Console Ticket PSB</p>
@@ -1044,31 +1087,25 @@ export function SalesDomainWorkspace({
             </article>
           ))}
         </div>
-      </section>
+          </section>
+        </>
+      ) : null}
 
       {canCreate || canUpdate ? (
         <section className="space-y-4">
           <div>
             <p className="section-title">Aksi Penjualan</p>
             <h3 className="mt-2 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-              Form operasional
+              {isInputOnly ? 'Form input PSB' : 'Form operasional'}
             </h3>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
-              Default layar tetap fokus ke tabel. Buka panel ini hanya saat operator perlu menulis aksi.
+              {isInputOnly
+                ? 'Halaman ini memang dikhususkan untuk penulisan data baru, jadi form tampil langsung tanpa panel monitoring lain.'
+                : 'Default layar tetap fokus ke tabel. Buka panel ini hanya saat operator perlu menulis aksi.'}
             </p>
           </div>
-          <details
-            className="group rounded-2xl border border-line bg-white p-4"
-            open={isActionPanelOpen}
-            onToggle={(event) => setIsActionPanelOpen(event.currentTarget.open)}
-          >
-            <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
-              Buka panel aksi penjualan
-            </summary>
-            <p className="mt-2 text-sm text-mute">
-              Berisi `Lead`, `Coverage`, `Survey`, `Order`, `Work Order`, `Aktivasi`, serta flow corporate (quotation, kontrak, delivery, acceptance).
-            </p>
-            <div className="mt-4 grid gap-6 xl:grid-cols-2">
+          {isInputOnly ? (
+            <div className="grid gap-6 xl:grid-cols-2">
               <div id={getSalesActionAnchorId('lead-create')} className="scroll-mt-24">
                 <SalesLeadCreateForm
                   canCreate={canCreate}
@@ -1101,66 +1138,115 @@ export function SalesDomainWorkspace({
                   initialLeadValue={domainPrefill?.lead}
                 />
               </div>
-              <div id={getSalesActionAnchorId('work-order-create')} className="scroll-mt-24">
-                <SalesWorkOrderCreateForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  orderSuggestions={salesOrderSuggestions}
-                  initialOrderValue={domainPrefill?.order}
-                />
-              </div>
-              <div id={getSalesActionAnchorId('subscription-activate')} className="scroll-mt-24">
-                <SalesSubscriptionActivateForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  orderSuggestions={salesOrderSuggestions}
-                  initialOrderValue={domainPrefill?.order}
-                />
-              </div>
-              <div id={getSalesActionAnchorId('corporate-quotation-create')} className="scroll-mt-24">
-                <SalesCorporateQuotationCreateForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                  leadSuggestions={salesLeadSuggestions}
-                  initialLeadValue={domainPrefill?.lead}
-                />
-              </div>
-              <div id={getSalesActionAnchorId('corporate-quotation-approval')} className="scroll-mt-24">
-                <SalesCorporateQuotationApprovalForm
-                  canApprove={capabilities.some((item) => item.action === 'update' && item.enabled)}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                />
-              </div>
-              <div id={getSalesActionAnchorId('corporate-contract-create')} className="scroll-mt-24">
-                <SalesCorporateContractCreateForm
-                  canSign={capabilities.some((item) => item.action === 'update' && item.enabled)}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                />
-              </div>
-              <div id={getSalesActionAnchorId('corporate-delivery-create')} className="scroll-mt-24">
-                <SalesCorporateDeliveryCreateForm
-                  canCreate={canCreate}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                />
-              </div>
-              <div id={getSalesActionAnchorId('corporate-acceptance-create')} className="scroll-mt-24">
-                <SalesCorporateAcceptanceCreateForm
-                  canUpdate={capabilities.some((item) => item.action === 'update' && item.enabled)}
-                  reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-                />
-              </div>
             </div>
-          </details>
+          ) : (
+            <details
+              className="group rounded-2xl border border-line bg-white p-4"
+              open={isActionPanelOpen}
+              onToggle={(event) => setIsActionPanelOpen(event.currentTarget.open)}
+            >
+              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
+                Buka panel aksi penjualan
+              </summary>
+              <p className="mt-2 text-sm text-mute">
+                Berisi `Lead`, `Coverage`, `Survey`, `Order`, `Work Order`, `Aktivasi`, serta flow corporate (quotation, kontrak, delivery, acceptance).
+              </p>
+              <div className="mt-4 grid gap-6 xl:grid-cols-2">
+                <div id={getSalesActionAnchorId('lead-create')} className="scroll-mt-24">
+                  <SalesLeadCreateForm
+                    canCreate={canCreate}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                    marketingSuggestions={salesMarketingSuggestions}
+                  />
+                </div>
+                <div id={getSalesActionAnchorId('coverage-create')} className="scroll-mt-24">
+                  <SalesCoverageCreateForm
+                    canCreate={canCreate}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                    leadSuggestions={salesLeadSuggestions}
+                    initialLeadValue={domainPrefill?.lead}
+                  />
+                </div>
+                <div id={getSalesActionAnchorId('survey-create')} className="scroll-mt-24">
+                  <SalesSurveyCreateForm
+                    canCreate={canCreate}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                    leadSuggestions={salesLeadSuggestions}
+                    initialLeadValue={domainPrefill?.lead}
+                  />
+                </div>
+                <div id={getSalesActionAnchorId('order-create')} className="scroll-mt-24">
+                  <SalesOrderCreateForm
+                    canCreate={canCreate}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                    leadSuggestions={salesLeadSuggestions}
+                    marketingSuggestions={salesMarketingSuggestions}
+                    initialLeadValue={domainPrefill?.lead}
+                  />
+                </div>
+                <div id={getSalesActionAnchorId('work-order-create')} className="scroll-mt-24">
+                  <SalesWorkOrderCreateForm
+                    canCreate={canCreate}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                    orderSuggestions={salesOrderSuggestions}
+                    initialOrderValue={domainPrefill?.order}
+                  />
+                </div>
+                <div id={getSalesActionAnchorId('subscription-activate')} className="scroll-mt-24">
+                  <SalesSubscriptionActivateForm
+                    canCreate={canCreate}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                    orderSuggestions={salesOrderSuggestions}
+                    initialOrderValue={domainPrefill?.order}
+                  />
+                </div>
+                <div id={getSalesActionAnchorId('corporate-quotation-create')} className="scroll-mt-24">
+                  <SalesCorporateQuotationCreateForm
+                    canCreate={canCreate}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                    leadSuggestions={salesLeadSuggestions}
+                    initialLeadValue={domainPrefill?.lead}
+                  />
+                </div>
+                <div id={getSalesActionAnchorId('corporate-quotation-approval')} className="scroll-mt-24">
+                  <SalesCorporateQuotationApprovalForm
+                    canApprove={capabilities.some((item) => item.action === 'update' && item.enabled)}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                  />
+                </div>
+                <div id={getSalesActionAnchorId('corporate-contract-create')} className="scroll-mt-24">
+                  <SalesCorporateContractCreateForm
+                    canSign={capabilities.some((item) => item.action === 'update' && item.enabled)}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                  />
+                </div>
+                <div id={getSalesActionAnchorId('corporate-delivery-create')} className="scroll-mt-24">
+                  <SalesCorporateDeliveryCreateForm
+                    canCreate={canCreate}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                  />
+                </div>
+                <div id={getSalesActionAnchorId('corporate-acceptance-create')} className="scroll-mt-24">
+                  <SalesCorporateAcceptanceCreateForm
+                    canUpdate={capabilities.some((item) => item.action === 'update' && item.enabled)}
+                    reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+                  />
+                </div>
+              </div>
+            </details>
+          )}
         </section>
       ) : null}
 
-      <TableQuickActionModal
-        item={quickActionItem}
-        onClose={() => setQuickActionItem(null)}
-        heading="Aksi cepat dari tabel PSB"
-      />
+      {!isInputOnly ? (
+        <TableQuickActionModal
+          item={quickActionItem}
+          onClose={() => setQuickActionItem(null)}
+          heading="Aksi cepat dari tabel PSB"
+        />
+      ) : null}
 
-      {content.highlights.length ? (
+      {!isInputOnly && content.highlights.length ? (
         <details className="rounded-2xl border border-line bg-white p-4">
           <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
             Buka info integrasi ERP / OSS / BSS

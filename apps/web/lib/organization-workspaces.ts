@@ -35,6 +35,97 @@ export type OrganizationWorkspaceDefinition = {
   sections: OrganizationWorkspaceSection[]
 }
 
+export const salesWorkspace: OrganizationWorkspaceDefinition = {
+  eyebrow: 'Lead, Survey, dan Order',
+  title: 'Workspace Sales',
+  description:
+    'Halaman ini menjadi meja ringkas penjualan agar setiap menu punya fokus yang jelas: input PSB, validasi List PSB, aktivitas marketing, dan monitoring progres tidak lagi bercampur dalam satu layar.',
+  primaryAction: {
+    label: 'Buka Input PSB',
+    href: '/sales/input-psb',
+    description: 'Masuk langsung ke form input lead, coverage, survey, dan order awal.',
+  },
+  secondaryAction: {
+    label: 'Buka List PSB',
+    href: '/list-psb',
+    description: 'Lanjutkan validasi item PSB yang sudah masuk antrean operasional.',
+  },
+  steps: [
+    {
+      title: 'Input PSB',
+      detail: 'Catat lead baru, coverage, survey, dan order awal tanpa terdistraksi tabel monitoring.',
+    },
+    {
+      title: 'Validasi List',
+      detail: 'Review item PSB yang sudah masuk jalur validasi sebelum diteruskan ke ticketing operasional.',
+    },
+    {
+      title: 'Aktivitas Marketing',
+      detail: 'Pisahkan aktivitas canvassing dan covered area ke menu marketing agar ritme lapangan mudah dibaca.',
+    },
+    {
+      title: 'Monitoring Progres',
+      detail: 'Buka fokus KPI saat perlu membaca lead aktif, order periode ini, atau aktivasi periode berjalan.',
+    },
+  ],
+  sections: [
+    {
+      title: 'Menu inti penjualan',
+      description: 'Setiap menu dibatasi ke satu tujuan kerja agar operator tidak kehilangan fokus.',
+      links: [
+        {
+          label: 'Input PSB',
+          href: '/sales/input-psb',
+          description: 'Form khusus untuk input lead, coverage, survey, dan order awal.',
+          badge: 'form',
+        },
+        {
+          label: 'List PSB',
+          href: '/list-psb',
+          description: 'Antrean validasi PSB yang siap direview, disetujui, atau diteruskan ke ticketing.',
+          badge: 'validasi',
+        },
+        {
+          label: 'Aktivitas Marketing',
+          href: '/sales/marketing-activities',
+          description: 'Halaman khusus agenda lapangan, covered area, dan ritme aktivitas marketing.',
+          badge: 'marketing',
+        },
+      ],
+    },
+    {
+      title: 'Monitoring cepat',
+      description: 'Shortcut untuk membaca progres penjualan tanpa mencampur layar input utama.',
+      links: [
+        {
+          label: 'Lead Aktif',
+          href: '/sales?focus=ACTIVE_LEADS',
+          description: 'Buka funnel sales yang dipersempit ke lead aktif terbaru.',
+          badge: 'lead',
+        },
+        {
+          label: 'Order Periode Ini',
+          href: '/sales?focus=MONTHLY_ORDERS',
+          description: 'Baca order PSB yang tercatat pada periode aktif dashboard.',
+          badge: 'order',
+        },
+        {
+          label: 'Aktivasi Periode Ini',
+          href: '/sales?focus=MONTHLY_ACTIVATIONS',
+          description: 'Pantau subscription yang sudah aktif pada periode berjalan.',
+          badge: 'aktivasi',
+        },
+        {
+          label: 'List Kerja Penjualan',
+          href: buildWorklistHref({ domain: 'Sales' }),
+          description: 'Tinjau antrean lintas domain yang masih membutuhkan follow-up tim penjualan.',
+          badge: 'worklist',
+        },
+      ],
+    },
+  ],
+}
+
 export const digitalCreatorWorkspace: OrganizationWorkspaceDefinition = {
   eyebrow: 'Pemasaran dan Pelayanan',
   title: 'Digital Creator',

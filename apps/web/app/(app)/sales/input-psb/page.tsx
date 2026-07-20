@@ -22,6 +22,7 @@ export default async function SalesInputPsbPage() {
       capabilities={payload.capabilities}
       role={session.role}
       initialActionPanelOpen
+      displayMode="input"
     />
   )
 }

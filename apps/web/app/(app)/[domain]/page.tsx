@@ -2,7 +2,9 @@ import dynamic from 'next/dynamic'
 import { notFound, redirect } from 'next/navigation'
 import { canAccessPath } from '@/lib/access-control-server'
 import { DomainShell } from '@/components/domain-shell'
+import { OrganizationWorkspacePage } from '@/components/organization-workspace-page'
 import { requireSession } from '@/lib/auth'
+import { salesWorkspace } from '@/lib/organization-workspaces'
 import { getDomainPageData } from '@/lib/services/domain-service'
 import { normalizeSupportLane } from '@/lib/support-lanes'
 import type { DomainFormPrefill, DomainKey, SupportDrilldownContext, SupportLaneKey } from '@/lib/types'
@@ -367,8 +369,26 @@ export default async function DomainPage({
     payroll: resolveSearchParam(resolvedSearchParams.payroll),
   }
   const resolvedDomainDrilldown = resolveDomainDrilldown(domain as DomainKey, resolveSearchParam(resolvedSearchParams.focus))
+  const salesFocus = resolveSearchParam(resolvedSearchParams.focus)
+  const salesLead = resolveSearchParam(resolvedSearchParams.lead)
+  const salesOrder = resolveSearchParam(resolvedSearchParams.order)
 
   if ((domain as DomainKey) === 'sales') {
+    if (!salesFocus && !salesLead && !salesOrder) {
+      return (
+        <OrganizationWorkspacePage
+          role={session.role}
+          eyebrow={salesWorkspace.eyebrow}
+          title={salesWorkspace.title}
+          description={salesWorkspace.description}
+          primaryAction={salesWorkspace.primaryAction}
+          secondaryAction={salesWorkspace.secondaryAction}
+          steps={salesWorkspace.steps}
+          sections={salesWorkspace.sections}
+        />
+      )
+    }
+
     return (
       <SalesDomainWorkspace
         content={payload.content}
