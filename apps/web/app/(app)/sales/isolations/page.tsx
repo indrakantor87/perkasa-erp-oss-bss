@@ -63,7 +63,8 @@ export default async function SalesIsolationsPage({
     notFound()
   }
 
-  const isolationSection = payload.content.reviewSections.find((section) => section.title.trim().toUpperCase().includes('ISOLIR AKTIF'))
+  const reviewSections = payload.content.reviewSections ?? []
+  const isolationSection = reviewSections.find((section) => section.title.trim().toUpperCase().includes('ISOLIR AKTIF'))
   const scopedRows = filterRowsByMarketingOwner(isolationSection?.rows ?? [], [session.displayName, session.username])
   const q = String(resolveSearchParam(resolvedSearchParams.q) ?? '').trim().toUpperCase()
   const radboox = String(resolveSearchParam(resolvedSearchParams.radboox) ?? '').trim().toUpperCase()
