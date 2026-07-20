@@ -1870,6 +1870,7 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
             `Pickup Status: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.pickupStatus)}`,
             `Close Outcome: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.closeOutcome)}`,
             `Billing Disposition: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.billingDisposition)}`,
+            `Returned Item Codes: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.returnedItemCodes)}`,
             `Closed By: ${pickStructuredSupportMetadata(item.closeNote, SUPPORT_DISMANTLE_METADATA_PREFIXES.actor)}`,
           ],
         }

@@ -12,6 +12,7 @@ type SupportDismantleCloseMetadataInput = {
   pickupStatus: string
   closeOutcome: string
   billingDisposition: string
+  returnedItemCodes: string[]
 }
 
 export const SUPPORT_DISMANTLE_METADATA_PREFIXES = {
@@ -21,6 +22,7 @@ export const SUPPORT_DISMANTLE_METADATA_PREFIXES = {
   pickupStatus: 'Pickup Status: ',
   closeOutcome: 'Close Outcome: ',
   billingDisposition: 'Billing Disposition: ',
+  returnedItemCodes: 'Returned Item Codes: ',
 } as const
 
 async function ensureSupportDismantleQueueColumn(
@@ -39,6 +41,24 @@ async function ensureSupportDismantleQueueColumn(
     `,
   )
   invalidateReviewDbColumnCache('support_dismantle_queue', columnName)
+}
+
+async function ensureSupportDismantleHistoryColumn(
+  columnName: string,
+  definitionSql: string,
+  afterColumn: string,
+) {
+  if (await hasReviewDbColumn('support_dismantle_history', columnName)) {
+    return
+  }
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      ALTER TABLE support_dismantle_history
+      ADD COLUMN ${definitionSql} AFTER ${afterColumn}
+    `,
+  )
+  invalidateReviewDbColumnCache('support_dismantle_history', columnName)
 }
 
 export async function ensureSupportDismantleQueueTable() {
@@ -79,6 +99,14 @@ export async function ensureSupportDismantleQueueTable() {
   )
 }
 
+export async function ensureSupportDismantleHistoryColumns() {
+  await ensureSupportDismantleHistoryColumn(
+    'returned_item_codes',
+    'returned_item_codes TEXT NULL',
+    'close_note',
+  )
+}
+
 export function buildSupportDismantleTransferNote(session: AppSession, note: string) {
   return `[Transferred to dismantle queue] ${session.displayName} (${session.username}) - ${note.trim()}`
 }
@@ -87,6 +115,14 @@ export function buildSupportDismantleCloseNote(
   session: AppSession,
   metadata: SupportDismantleCloseMetadataInput,
 ) {
+  const normalizedReturnedItemCodes = Array.from(
+    new Set(
+      metadata.returnedItemCodes
+        .map((item) => String(item ?? '').trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  )
+
   return [
     `[Dismantled via web] ${metadata.closeNote.trim()}`,
     `${SUPPORT_DISMANTLE_METADATA_PREFIXES.actor}${session.displayName} (${session.username})`,
@@ -95,6 +131,11 @@ export function buildSupportDismantleCloseNote(
     `${SUPPORT_DISMANTLE_METADATA_PREFIXES.pickupStatus}${metadata.pickupStatus.trim()}`,
     `${SUPPORT_DISMANTLE_METADATA_PREFIXES.closeOutcome}${metadata.closeOutcome.trim()}`,
     `${SUPPORT_DISMANTLE_METADATA_PREFIXES.billingDisposition}${metadata.billingDisposition.trim()}`,
+    ...(normalizedReturnedItemCodes.length
+      ? [
+          `${SUPPORT_DISMANTLE_METADATA_PREFIXES.returnedItemCodes}${normalizedReturnedItemCodes.join(', ')}`,
+        ]
+      : []),
   ].join('\n')
 }
 

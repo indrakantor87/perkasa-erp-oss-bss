@@ -1,9 +1,11 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
+import { extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 import {
   buildSupportDismantleCloseNote,
+  ensureSupportDismantleHistoryColumns,
   ensureSupportDismantleQueueTable,
 } from '@/lib/services/support-dismantle-service'
 import { canProcessSupportDismantle } from '@/lib/support-lanes'
@@ -27,6 +29,20 @@ type ReviewIsolationCloseStateRow = {
 
 function normalizeRequiredText(value: unknown) {
   return String(value ?? '').trim()
+}
+
+function normalizeReturnedItemCodes(value: unknown) {
+  const raw = String(value ?? '').trim()
+  if (!raw) {
+    return [] as string[]
+  }
+
+  const items = raw
+    .split(/[\r\n,;]+/)
+    .map((item) => extractInventoryItemCodeFromScan(item))
+    .filter(Boolean)
+
+  return Array.from(new Set(items))
 }
 
 async function getDismantleQueueById(id: string) {
@@ -109,6 +125,7 @@ async function buildDismantleHistoryInsertPayload(params: {
   marketingName: string | null
   radboxName: string | null
   historyCloseNote: string
+  returnedItemCodes: string[]
 }) {
   const [
     hasIsolationId,
@@ -119,6 +136,7 @@ async function buildDismantleHistoryInsertPayload(params: {
     hasRadboxName,
     hasClosedAt,
     hasCloseNote,
+    hasReturnedItemCodes,
   ] = await Promise.all([
     hasReviewDbColumn('support_dismantle_history', 'isolation_id'),
     hasReviewDbColumn('support_dismantle_history', 'customer_name'),
@@ -128,6 +146,7 @@ async function buildDismantleHistoryInsertPayload(params: {
     hasReviewDbColumn('support_dismantle_history', 'radbox_name'),
     hasReviewDbColumn('support_dismantle_history', 'closed_at'),
     hasReviewDbColumn('support_dismantle_history', 'close_note'),
+    hasReviewDbColumn('support_dismantle_history', 'returned_item_codes'),
   ])
 
   const columns: string[] = []
@@ -163,6 +182,10 @@ async function buildDismantleHistoryInsertPayload(params: {
   if (hasCloseNote) {
     columns.push('close_note')
     values.push(params.historyCloseNote)
+  }
+  if (hasReturnedItemCodes) {
+    columns.push('returned_item_codes')
+    values.push(params.returnedItemCodes.length ? params.returnedItemCodes.join('\n') : null)
   }
 
   if (!columns.length) {
@@ -236,6 +259,7 @@ export async function POST(
 
   try {
     await ensureSupportDismantleQueueTable()
+    await ensureSupportDismantleHistoryColumns()
 
     const resolvedParams = await params
     const queueId = String(resolvedParams.id ?? '').trim()
@@ -250,6 +274,7 @@ export async function POST(
       pickupStatus?: unknown
       closeOutcome?: unknown
       billingDisposition?: unknown
+      returnedItemCodes?: unknown
     }
     const closeNote = normalizeRequiredText(payload.closeNote)
     if (!closeNote) {
@@ -260,6 +285,7 @@ export async function POST(
     const pickupStatus = normalizeRequiredText(payload.pickupStatus)
     const closeOutcome = normalizeRequiredText(payload.closeOutcome)
     const billingDisposition = normalizeRequiredText(payload.billingDisposition)
+    const returnedItemCodes = normalizeReturnedItemCodes(payload.returnedItemCodes)
     if (!fieldPic || !deviceStatus || !pickupStatus || !closeOutcome || !billingDisposition) {
       return Response.json({ message: 'Metadata close dismantle wajib diisi lengkap.' }, { status: 400 })
     }
@@ -288,6 +314,7 @@ export async function POST(
       pickupStatus,
       closeOutcome,
       billingDisposition,
+      returnedItemCodes,
     })
     const historyCloseNote = queue.transferNote
       ? `${queue.transferNote}\n${normalizedCloseNote}`
@@ -300,6 +327,7 @@ export async function POST(
       marketingName: queue.marketingName,
       radboxName: queue.radboxName,
       historyCloseNote,
+      returnedItemCodes,
     })
     const isolationClosePayload = await buildIsolationCloseAssignments(normalizedCloseNote)
 

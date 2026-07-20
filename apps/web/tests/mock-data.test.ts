@@ -178,6 +178,7 @@ async function main() {
     pickupStatus: '  Sudah pickup ',
     closeOutcome: '  Terminasi selesai ',
     billingDisposition: '  Final invoice tetap berjalan ',
+    returnedItemCodes: ['INV-ONT-ZTE-F670L-000301', ' INV-ADP-ZTE-12V-000301 '],
   })
   const parsedCloseAuditNote = parseStructuredSupportNote(closeAuditNote)
   assert.equal(parsedCloseAuditNote.summary, '[Dismantled via web] perangkat sudah diambil')
@@ -192,6 +193,10 @@ async function main() {
   assert.equal(
     parsedCloseAuditNote.metadata.get(SUPPORT_DISMANTLE_METADATA_PREFIXES.billingDisposition),
     'Final invoice tetap berjalan',
+  )
+  assert.equal(
+    parsedCloseAuditNote.metadata.get(SUPPORT_DISMANTLE_METADATA_PREFIXES.returnedItemCodes),
+    'INV-ONT-ZTE-F670L-000301, INV-ADP-ZTE-12V-000301',
   )
 
   delete process.env.APP_DATA_MODE

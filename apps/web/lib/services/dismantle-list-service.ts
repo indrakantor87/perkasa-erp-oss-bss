@@ -20,6 +20,10 @@ import {
   generateServiceWorkOrderNo,
   resolveReviewAuthUserIdByUsername,
 } from '@/lib/services/field-ops-service'
+import {
+  parseStructuredSupportNote,
+  SUPPORT_DISMANTLE_METADATA_PREFIXES,
+} from '@/lib/services/support-dismantle-service'
 import type { AppRole, DataSourceSnapshot } from '@/lib/types'
 
 type ExecuteResult = {
@@ -88,6 +92,8 @@ type ReviewDbHistoryStateRow = {
   historyId: number
   isolationId: number
   closedAt: string | null
+  closeNote: string | null
+  returnedItemCodes: string | null
 }
 
 type ReviewDbWorkOrderInventoryRow = {
@@ -324,16 +330,29 @@ function parseIsolationIdFromRef(value: string | null) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
+function parseReturnedItemCodes(value: string | null | undefined) {
+  return Array.from(
+    new Set(
+      String(value ?? '')
+        .split(/[\r\n,;]+/)
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  )
+}
+
 async function getSupportHistoryStateMap(isolationIds: number[]) {
   const uniqueIsolationIds = Array.from(new Set(isolationIds.filter((value) => Number.isFinite(value) && value > 0)))
   if (!uniqueIsolationIds.length) {
     return new Map<number, ReviewDbHistoryStateRow>()
   }
 
-  const [hasHistoryId, hasIsolationId, hasClosedAt] = await Promise.all([
+  const [hasHistoryId, hasIsolationId, hasClosedAt, hasCloseNote, hasReturnedItemCodes] = await Promise.all([
     hasReviewDbColumn('support_dismantle_history', 'id'),
     hasReviewDbColumn('support_dismantle_history', 'isolation_id'),
     hasReviewDbColumn('support_dismantle_history', 'closed_at'),
+    hasReviewDbColumn('support_dismantle_history', 'close_note'),
+    hasReviewDbColumn('support_dismantle_history', 'returned_item_codes'),
   ])
   if (!hasHistoryId || !hasIsolationId) {
     return new Map<number, ReviewDbHistoryStateRow>()
@@ -345,7 +364,9 @@ async function getSupportHistoryStateMap(isolationIds: number[]) {
       SELECT
         id AS historyId,
         isolation_id AS isolationId,
-        ${hasClosedAt ? 'closed_at' : 'NULL'} AS closedAt
+        ${hasClosedAt ? 'closed_at' : 'NULL'} AS closedAt,
+        ${hasCloseNote ? 'close_note' : 'NULL'} AS closeNote,
+        ${hasReturnedItemCodes ? 'returned_item_codes' : 'NULL'} AS returnedItemCodes
       FROM support_dismantle_history
       WHERE isolation_id IN (${placeholders})
       ORDER BY id DESC
@@ -431,8 +452,22 @@ async function enrichDismantleListItems(items: DismantleListItem[]) {
   return items.map((item) => {
     const isolationId = parseIsolationIdFromRef(item.sourceIsolationRef)
     const historyState = isolationId ? historyStateMap.get(isolationId) ?? null : null
+    const historyItemCodes = parseReturnedItemCodes(historyState?.returnedItemCodes)
+    const fallbackItemCodesFromNote = historyItemCodes.length
+      ? []
+      : parseReturnedItemCodes(
+          parseStructuredSupportNote(historyState?.closeNote).metadata.get(
+            SUPPORT_DISMANTLE_METADATA_PREFIXES.returnedItemCodes,
+          ) ?? '',
+        )
     const inventoryItemCodes =
-      item.transferredWorkOrderId != null ? inventoryItemCodesMap.get(item.transferredWorkOrderId) ?? [] : []
+      historyItemCodes.length || fallbackItemCodesFromNote.length
+        ? [...historyItemCodes, ...fallbackItemCodesFromNote].filter(
+            (value, index, collection) => collection.indexOf(value) === index,
+          )
+        : item.transferredWorkOrderId != null
+          ? inventoryItemCodesMap.get(item.transferredWorkOrderId) ?? []
+          : []
 
     return {
       ...item,

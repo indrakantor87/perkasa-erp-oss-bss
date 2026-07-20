@@ -39,6 +39,7 @@ export function SupportDismantleCloseForm({
   const [closeOutcome, setCloseOutcome] = useState<(typeof closeOutcomeOptions)[number]>('TERMINATE FINAL')
   const [billingDisposition, setBillingDisposition] =
     useState<(typeof billingDispositionOptions)[number]>('STOP BILLING')
+  const [returnedItemCodes, setReturnedItemCodes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
@@ -79,6 +80,7 @@ export function SupportDismantleCloseForm({
           pickupStatus,
           closeOutcome,
           billingDisposition,
+          returnedItemCodes,
         }),
       })
 
@@ -102,6 +104,7 @@ export function SupportDismantleCloseForm({
       setPickupStatus('DIAMBIL LENGKAP')
       setCloseOutcome('TERMINATE FINAL')
       setBillingDisposition('STOP BILLING')
+      setReturnedItemCodes('')
       router.refresh()
     } finally {
       setSubmitting(false)
@@ -233,6 +236,21 @@ export function SupportDismantleCloseForm({
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
+          <span className="font-semibold text-slate-950">Item / Barcode Return</span>
+          <textarea
+            value={returnedItemCodes}
+            onChange={(event) => setReturnedItemCodes(event.target.value)}
+            className="min-h-24 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder={'Tempel hasil scan atau item code inventory, satu per baris.\nContoh: INV-ONT-ZTE-F670L-000301'}
+            disabled={isDisabled}
+          />
+          <span className="text-xs text-mute">
+            Opsional, tetapi sangat disarankan saat perangkat benar-benar kembali agar histori inventory bisa ditaut langsung
+            tanpa hanya mengandalkan lookup work order.
+          </span>
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">

@@ -10,6 +10,19 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.46] - 2026-07-19
+
+### Added
+
+- Ditambahkan field `Item / Barcode Return` pada form close dismantle agar operator bisa menempel hasil scan atau `item_code` inventory yang benar-benar kembali saat kasus ditutup ke histori: [support-dismantle-close-form.tsx](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/components/support-dismantle-close-form.tsx)
+- Ditambahkan dukungan penyimpanan `returned_item_codes` pada `support_dismantle_history` beserta fallback metadata `Returned Item Codes` di `close_note`, sehingga histori close menyimpan referensi barang return secara eksplisit dan tidak lagi hanya mengandalkan pembacaan movement work order: [support-dismantle-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/support-dismantle-service.ts), [close route.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/app/api/support/dismantle/[id]/close/route.ts)
+
+### Changed
+
+- Enrichment `List Dismantle` kini memprioritaskan referensi item return langsung dari histori close sebelum fallback ke `inventory_stock_movements`, sehingga backlink histori inventory lebih presisi untuk kasus multi-device: [dismantle-list-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/dismantle-list-service.ts)
+- Lane histori support dismantle kini ikut menampilkan metadata `Returned Item Codes` dari `close_note` terstruktur agar jejak close barang tetap terbaca dari workspace support lama: [domain-service.ts](file:///d:/trae_projects/perkasa-erp-oss-bss/apps/web/lib/services/domain-service.ts)
+- Versioning diselaraskan ke `0.66.46`; batch ini lolos diagnostics dan `npm run check`, sedangkan `npm run build` di sandbox kembali berhenti pada fase `next build` tanpa error eksplisit sebelum proses dihentikan manual.
+
 ## [0.66.45] - 2026-07-19
 
 ### Added
