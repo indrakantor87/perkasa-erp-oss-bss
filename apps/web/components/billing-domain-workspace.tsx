@@ -184,6 +184,22 @@ function buildBillingQuickActionPayload(params: {
     subtitle: params.row.secondary,
     description: params.row.detail,
     draftLabel: 'Invoice',
+    copyLabel: 'Salin detail invoice',
+    copyText: [
+      `Invoice: ${params.row.primary}`,
+      `Customer: ${params.row.secondary}`,
+      service ? `Service: ${service}` : null,
+      `Status: ${params.row.status}`,
+      invoiceType ? `Invoice Type: ${invoiceType}` : null,
+      remaining ? `Remaining: ${remaining}` : null,
+      invoiceDue ? `Due: ${invoiceDue}` : null,
+      followUp ? `Follow Up: ${followUp}` : null,
+      collectionStatus ? `Collection: ${collectionStatus}` : null,
+      `Section Billing: ${params.sectionTitle}`,
+      `Keterangan: ${params.row.detail}`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
     draftSeed: [
       service ? `Service: ${service}` : null,
       remaining ? `Remaining: ${remaining}` : null,
@@ -203,10 +219,6 @@ function buildBillingQuickActionPayload(params: {
         value: [params.row.secondary, service || '-'].filter(Boolean).join('\n'),
       },
       {
-        title: 'Keterangan',
-        value: params.row.detail,
-      },
-      {
         title: 'Tagihan / Follow Up',
         value: [
           remaining ? `Remaining: ${remaining}` : null,
@@ -220,6 +232,10 @@ function buildBillingQuickActionPayload(params: {
       {
         title: 'Section Billing',
         value: params.sectionTitle,
+      },
+      {
+        title: 'Keterangan',
+        value: params.row.detail,
       },
     ],
     actions: action

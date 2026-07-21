@@ -433,6 +433,25 @@ type HrActionKey =
   | 'salary-release'
   | 'salary-void'
 
+const HR_ACTION_ORDER: HrActionKey[] = [
+  'face-review',
+  'attendance-update',
+  'attendance-create',
+  'face-reference',
+  'face-config',
+  'geofence-config',
+  'employee-create',
+  'employee-archive',
+  'employee-reactivate',
+  'loan-status',
+  'loan-void',
+  'loan-create',
+  'salary-release',
+  'salary-void',
+  'salary-create',
+  'kpi-entry',
+]
+
 function getHrActionAnchorId(key: HrActionKey) {
   return `hr-action-${key}`
 }
@@ -2313,6 +2332,7 @@ export function DomainShell({
               .map((item) => [item.key, item]),
           ).values(),
         )
+          .sort((left, right) => HR_ACTION_ORDER.indexOf(left.key) - HR_ACTION_ORDER.indexOf(right.key))
       : []
   const salesLeadSuggestions =
     content.key === 'sales'

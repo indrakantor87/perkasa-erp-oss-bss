@@ -335,6 +335,17 @@ function buildInventoryQuickActionPayload(row: DomainReviewRow): TableQuickActio
     subtitle: row.secondary,
     description: row.detail,
     draftLabel: 'ODP',
+    copyLabel: 'Salin detail ODP',
+    copyText: [
+      `ODP: ${row.primary}`,
+      `Referensi: ${row.secondary}`,
+      `Status: ${row.status}`,
+      `Lokasi: ${row.detail}`,
+      `Total Ports: ${totalPorts || '-'}`,
+      `Active Ports: ${activePorts || '-'}`,
+      `Latitude: ${latitude || '-'}`,
+      `Longitude: ${longitude || '-'}`,
+    ].join('\n'),
     draftSeed: [
       totalPorts ? `Total Ports: ${totalPorts}` : null,
       activePorts ? `Active Ports: ${activePorts}` : null,
@@ -350,6 +361,10 @@ function buildInventoryQuickActionPayload(row: DomainReviewRow): TableQuickActio
     ],
     sections: [
       {
+        title: 'Referensi',
+        value: row.secondary,
+      },
+      {
         title: 'Lokasi',
         value: row.detail,
       },
@@ -360,10 +375,6 @@ function buildInventoryQuickActionPayload(row: DomainReviewRow): TableQuickActio
       {
         title: 'Koordinat',
         value: [`Lat: ${latitude || '-'}`, `Lng: ${longitude || '-'}`].join('\n'),
-      },
-      {
-        title: 'Referensi',
-        value: row.secondary,
       },
     ],
     actions: mapHref
