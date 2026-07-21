@@ -107,7 +107,7 @@ function buildDashboardCommandLinks(role: AppRole) {
   }
 
   if (canAccessPath(role, '/inventory')) {
-    pushLink('Lihat Inventory', '/inventory', 'secondary')
+    pushLink('Lihat Inventory', role === 'SUPER_ADMIN' ? '/inventory' : '/inventory/network', 'secondary')
   }
 
   return links.slice(0, 3)

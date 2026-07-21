@@ -708,13 +708,13 @@ export const teknisiExpanWorkspace: OrganizationWorkspaceDefinition = {
         },
         {
           label: 'Inventory Network Ops',
-          href: '/inventory',
+          href: '/inventory/network',
           description: 'Kelola ODP, port, assignment perangkat, dan stok yang berkaitan dengan expan jaringan.',
           badge: 'jaringan',
         },
         {
           label: 'Mutasi Bulan Ini',
-          href: '/inventory?focus=MONTHLY_MOVEMENTS',
+          href: '/inventory/network?focus=MONTHLY_MOVEMENTS',
           description: 'Audit barang keluar masuk yang mendukung pekerjaan ekspan periode berjalan.',
           badge: 'mutasi',
         },
@@ -738,7 +738,7 @@ export const teknisiExpanWorkspace: OrganizationWorkspaceDefinition = {
         },
         {
           label: 'Request Inventory',
-          href: '/inventory?focus=PENDING_REQUESTS',
+          href: '/inventory/network?focus=PENDING_REQUESTS',
           description: 'Pantau kebutuhan material yang masih menunggu proses sebelum eksekusi expan dilanjutkan.',
           badge: 'request',
         },
@@ -819,7 +819,7 @@ export const teknisiJointerWorkspace: OrganizationWorkspaceDefinition = {
       links: [
         {
           label: 'Inventory Network Ops',
-          href: '/inventory',
+          href: '/inventory/network',
           description: 'Gunakan data ODP, port, dan perangkat untuk menutup kebutuhan pekerjaan jointer.',
           badge: 'ops',
         },

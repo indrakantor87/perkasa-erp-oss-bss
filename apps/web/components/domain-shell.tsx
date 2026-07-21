@@ -1596,7 +1596,7 @@ const domainMenuLinks: Array<{
   { key: 'sales', label: 'Penjualan', href: '/sales' },
   { key: 'customers', label: 'Customer', href: '/customers' },
   { key: 'support', label: 'Support', href: '/support' },
-  { key: 'inventory', label: 'Inventory', href: '/inventory' },
+  { key: 'inventory', label: 'Inventory', href: '/inventory/network' },
   { key: 'hr', label: 'HR', href: '/hr' },
   { key: 'billing', label: 'Billing', href: '/billing' },
 ]
@@ -1621,7 +1621,7 @@ const domainOperationalBlueprints: Record<
     ],
     integrations: [
       { label: 'Customer', href: '/customers', description: 'Customer master dan alamat terbentuk setelah order tervalidasi.' },
-      { label: 'Inventory', href: '/inventory', description: 'ODP, port, dan perangkat mengikuti kebutuhan instalasi lapangan.' },
+      { label: 'Inventory', href: '/inventory/network', description: 'ODP, port, dan perangkat mengikuti kebutuhan instalasi lapangan.' },
       { label: 'Billing', href: '/billing', description: 'Subscription aktif menjadi sumber invoice recurring dan one-time.' },
     ],
   },
@@ -1652,7 +1652,7 @@ const domainOperationalBlueprints: Record<
     integrations: [
       { label: 'Customer', href: '/customers', description: 'TT dan isolir memakai identitas customer dan service yang konsisten.' },
       { label: 'Billing', href: '/billing', description: 'Isolir, suspend, dan reconnect perlu sinkron dengan collection billing.' },
-      { label: 'Inventory', href: '/inventory', description: 'Dismantle dan gangguan jaringan terkait ODP, port, dan perangkat.' },
+      { label: 'Inventory', href: '/inventory/network', description: 'Dismantle dan gangguan jaringan terkait ODP, port, dan perangkat.' },
     ],
   },
   inventory: {
@@ -1680,7 +1680,7 @@ const domainOperationalBlueprints: Record<
       { title: 'Loan -> Payroll', detail: 'Jaga pinjaman dan slip gaji tetap sinkron dengan status karyawan aktif.' },
     ],
     integrations: [
-      { label: 'Inventory', href: '/inventory', description: 'Teknisi dan divisi memengaruhi request dan pinjaman barang lapangan.' },
+      { label: 'Inventory', href: '/inventory/network', description: 'Teknisi dan divisi memengaruhi request dan pinjaman barang lapangan.' },
       { label: 'Dashboard', href: '/dashboard/daily-activity', description: 'Daily Activity dan approval manager menutup ritme kerja harian.' },
       { label: 'Settings Users', href: '/settings/users', description: 'Profil user internal mengikat role, divisi, dan approval scope.' },
     ],

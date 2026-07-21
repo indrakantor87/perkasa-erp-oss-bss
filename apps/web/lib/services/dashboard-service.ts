@@ -380,7 +380,7 @@ function getDashboardOperationalCardHref(role: AppRole, card: DashboardOperation
       break
     case 'INVENTORY':
       if (canAccessDashboardHref(role, '/inventory')) {
-        return '/inventory'
+        return role === 'SUPER_ADMIN' ? '/inventory' : '/inventory/network'
       }
       break
   }
@@ -609,7 +609,7 @@ function getDashboardQueueFallbackHref(role: AppRole, item: DashboardQueueItem) 
     return buildSupportLaneHref('dismantle')
   }
   if ((title.includes('odp') || title.includes('port') || title.includes('inventory')) && canAccessDashboardHref(role, '/inventory')) {
-    return '/inventory'
+    return role === 'SUPER_ADMIN' ? '/inventory' : '/inventory/network'
   }
   if ((title.includes('lead') || title.includes('order') || title.includes('coverage')) && canAccessDashboardHref(role, '/sales')) {
     return '/sales'
@@ -670,7 +670,7 @@ function getDashboardAlertFallback(role: AppRole, item: DashboardAlertItem) {
   }
 
   const fallbackHref =
-    ['/dashboard', '/support/tt', '/support/isolations', '/inventory', '/sales']
+    ['/dashboard', '/support/tt', '/support/isolations', role === 'SUPER_ADMIN' ? '/inventory' : '/inventory/network', '/sales']
       .find((candidate) => canAccessDashboardHref(role, candidate))
       ?? getDefaultLandingPath(role)
 
@@ -1839,7 +1839,7 @@ function buildMockOperationalCards(summary: DashboardSummary, filters: Dashboard
       title: 'Inventory',
       description: 'Pantau item aktif, pergerakan stok, dan request gudang yang mendukung operasi lintas divisi.',
       badge: 'Inventory',
-      href: '/inventory',
+      href: '/inventory/network',
       tone: 'border-emerald-200 bg-emerald-50 text-emerald-900',
       metrics: [
         { label: 'Item Aktif', value: formatNumber(summary.inventoryItems) },
@@ -2730,7 +2730,7 @@ async function getReviewDbOperationalCards(
       title: 'Inventory',
       description: 'Pantau item aktif, pergerakan stok, dan request gudang yang mendukung operasi lintas divisi.',
       badge: 'Inventory',
-      href: '/inventory',
+      href: '/inventory/network',
       tone: 'border-emerald-200 bg-emerald-50 text-emerald-900',
       metrics: [
         { label: 'Item Aktif', value: formatNumber(Number(inventory.activeItems ?? 0)) },
