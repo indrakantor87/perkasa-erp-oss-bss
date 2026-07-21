@@ -9,9 +9,7 @@ import { SupportTicketCreateForm } from '@/components/support-ticket-create-form
 import { SupportTicketEscalateForm } from '@/components/support-ticket-escalate-form'
 import { SupportTicketProgressForm } from '@/components/support-ticket-progress-form'
 import { SupportTroubleTicketQueuePanel } from '@/components/support-tt-queue-panel'
-import { SupportWorkspaceHelperNote } from '@/components/support-workspace-helper-note'
 import {
-  buildSupportActionHref,
   buildSupportLaneActionHref,
   buildSupportLaneHref,
   getSupportActionAnchorId,
@@ -343,17 +341,30 @@ export function SupportTroubleTicketWorkspace({
         </div>
       </section>
 
-      <SupportWorkspaceHelperNote
-        title={workspaceCopy.helperTitle}
-        detail={workspaceCopy.helperDetail}
-        badges={[
-          { label: `${troubleRows.length} trouble open`, tone: 'neutral' },
-          { label: `${preventiveOpenCount} preventive open`, tone: 'info' },
-          { label: `${readyCloseCount} siap close`, tone: 'success' },
-        ]}
-      />
-
       <DataSourceStatus source={source} />
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <article className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Ticket Aktif</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{troubleRows.length}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Semua ticket yang sedang terbaca pada lane TT saat ini.</p>
+        </article>
+        <article className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Preventive Open</p>
+          <p className="mt-2 text-3xl font-semibold text-sky-950">{preventiveOpenCount}</p>
+          <p className="mt-2 text-sm leading-6 text-sky-800">Pekerjaan preventive yang masih aktif dan tetap perlu dipantau.</p>
+        </article>
+        <article className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Siap Close</p>
+          <p className="mt-2 text-3xl font-semibold text-emerald-950">{readyCloseCount}</p>
+          <p className="mt-2 text-sm leading-6 text-emerald-800">Ticket yang sudah dekat ke penutupan formal.</p>
+        </article>
+        <article className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Tipe Trouble</p>
+          <p className="mt-2 text-3xl font-semibold text-violet-950">{supportTypeSuggestions.length}</p>
+          <p className="mt-2 text-sm leading-6 text-violet-800">Daftar tipe gangguan yang sekarang aktif dipakai operator.</p>
+        </article>
+      </section>
 
       <section className="rounded-2xl border border-line bg-slate-50 p-3">
         <form action="/support/tt" className="flex flex-col gap-3">
@@ -422,7 +433,7 @@ export function SupportTroubleTicketWorkspace({
           </div>
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-              {workspaceCopy.boardDetail}
+              Filter dipakai untuk menyempitkan antrean. Aksi utama tetap dijalankan langsung dari tabel ticket di bawah.
             </div>
             <div className="flex flex-wrap gap-2 xl:justify-end">
               {visibleActionLinks.map((action) => (

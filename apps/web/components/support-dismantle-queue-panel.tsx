@@ -459,17 +459,17 @@ export function SupportDismantleQueuePanel({
         <article className="rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
           <p className="text-xs font-semibold text-slate-300">Total Data</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-white">{openCount + historySummary.total}</p>
-          <p className="mt-2 text-sm text-slate-300">Data isolir aktif dengan ticket dismantle status open.</p>
+          <p className="mt-2 text-sm text-slate-300">Antrean aktif dan histori terminate yang sedang terbaca pada lane dismantle.</p>
         </article>
         <article className="rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
-          <p className="text-xs font-semibold text-slate-300">Sudah Ada Ticket</p>
+          <p className="text-xs font-semibold text-slate-300">Antrean Aktif</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-white">{openCount}</p>
-          <p className="mt-2 text-sm text-slate-300">Jumlah seluruh data sesuai filter yang sudah memiliki nomor ticket.</p>
+          <p className="mt-2 text-sm text-slate-300">Ticket dismantle yang masih berada pada antrean kerja aktif.</p>
         </article>
         <article className="rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
-          <p className="text-xs font-semibold text-slate-300">Belum Ada Ticket</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-white">0</p>
-          <p className="mt-2 text-sm text-slate-300">Data tanpa ticket tetap dipantau dari menu Isolir.</p>
+          <p className="text-xs font-semibold text-slate-300">Pickup Pending</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-white">{pickupPendingCount}</p>
+          <p className="mt-2 text-sm text-slate-300">Histori close yang masih menyisakan tindak lanjut pengambilan perangkat.</p>
         </article>
       </div>
 
@@ -491,7 +491,7 @@ export function SupportDismantleQueuePanel({
               onChange={(event) => setStatusFilter(event.target.value)}
               className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none"
             >
-              <option>Sudah Ada Ticket</option>
+              <option>Semua Status</option>
               <option>Open</option>
             </select>
           </div>
@@ -510,17 +510,9 @@ export function SupportDismantleQueuePanel({
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Divisi</span>
-            <select className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none">
-              <option>CS & Admin CS</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Status Data</span>
-            <select className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none">
-              <option>Open</option>
-            </select>
+          <div className="flex flex-wrap gap-2">
+            <span className="badge border-slate-600 bg-slate-800 text-slate-100">{visibleRows.length} antrean tampil</span>
+            <span className="badge border-slate-600 bg-slate-800 text-slate-100">{historySummary.total} histori close</span>
           </div>
         </div>
 
@@ -554,7 +546,7 @@ export function SupportDismantleQueuePanel({
 
       <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
         {supportDrilldown?.detail ||
-          'Menu open membaca data isolir aktif yang sudah berticket. Data suspend bulanan yang belum punya ticket tetap berada di menu isolir dengan indikator “Belum”.'}
+          'Menu ini fokus ke antrean terminate aktif dan histori close; kandidat tanpa ticket tetap dibaca dari lane isolir.'}
       </div>
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]">

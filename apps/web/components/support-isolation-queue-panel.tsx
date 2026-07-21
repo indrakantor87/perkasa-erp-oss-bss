@@ -386,9 +386,10 @@ export function SupportIsolationQueuePanel({
               </option>
             ))}
           </select>
-          <select className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none">
-            <option>CS & Admin CS</option>
-          </select>
+          <div className="flex flex-wrap gap-2">
+            <span className="badge border-slate-600 bg-slate-800 text-slate-100">{visibleRows.length} baris tampil</span>
+            <span className="badge border-slate-600 bg-slate-800 text-slate-100">{selectedCount} terpilih</span>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -429,7 +430,7 @@ export function SupportIsolationQueuePanel({
 
       <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
         {supportDrilldown?.detail ||
-          'Fokus ke pelanggan yang masih berstatus isolir aktif (OPEN), cocok untuk follow up CS & Admin CS.'}
+          'Fokus ke pelanggan isolir aktif untuk keputusan restore atau transfer terminate.'}
       </div>
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]">

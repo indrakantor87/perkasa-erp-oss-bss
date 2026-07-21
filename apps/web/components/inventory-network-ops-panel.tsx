@@ -414,7 +414,7 @@ export function InventoryNetworkOpsPanel({
   assignmentSuggestions: string[]
   lifecycleItems: DeviceLifecycleLogRow[]
   showDeviceReturnForm: boolean
-  mode?: 'full' | 'sales-odp-focus'
+  mode?: 'full' | 'sales-odp-focus' | 'ops-odp-focus'
 }) {
   const odpSection = findSection(sections, 'ODP TERBARU')
   const usedPortSection = findSection(sections, 'PORT TERPAKAI')
@@ -452,6 +452,8 @@ export function InventoryNetworkOpsPanel({
   const [prospectPoint, setProspectPoint] = useState<{ lat: number; lng: number; label: string; sourceLabel: string } | null>(null)
   const [prospectMessage, setProspectMessage] = useState<string>('')
   const isSalesOdpFocus = mode === 'sales-odp-focus'
+  const isOpsOdpFocus = mode === 'ops-odp-focus'
+  const isFocusedOdpMode = isSalesOdpFocus || isOpsOdpFocus
   const canWrite = canCreate && reviewDbReady
 
   const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
@@ -670,7 +672,7 @@ export function InventoryNetworkOpsPanel({
             <Download className="h-4 w-4" />
             Export Excel
           </button>
-          {!isSalesOdpFocus && canWrite ? (
+          {!isFocusedOdpMode && canWrite ? (
             <Link
               href="/inventory#inventory-action-odp-create"
               className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
@@ -679,7 +681,7 @@ export function InventoryNetworkOpsPanel({
               Tambah ODP
             </Link>
           ) : null}
-          {!isSalesOdpFocus && !canWrite ? (
+          {!isFocusedOdpMode && !canWrite ? (
             <button
               type="button"
               disabled
@@ -689,7 +691,7 @@ export function InventoryNetworkOpsPanel({
               Tambah ODP
             </button>
           ) : null}
-          {!isSalesOdpFocus && canWrite ? (
+          {!isFocusedOdpMode && canWrite ? (
             <button
               type="button"
               onClick={() => setShowImportModal(true)}
@@ -699,7 +701,7 @@ export function InventoryNetworkOpsPanel({
               Import Excel
             </button>
           ) : null}
-          {!isSalesOdpFocus && !canWrite ? (
+          {!isFocusedOdpMode && !canWrite ? (
             <button
               type="button"
               disabled
@@ -715,10 +717,12 @@ export function InventoryNetworkOpsPanel({
       <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
         {isSalesOdpFocus
           ? 'Menu ini sengaja difokuskan hanya untuk pembacaan ODP dan coverage area prospek. Backend tetap memakai engine ERP yang sama, tetapi UI tidak lagi membawa blok inventory yang tidak relevan.'
+          : isOpsOdpFocus
+            ? 'Menu ini sengaja difokuskan untuk pembacaan kapasitas ODP, marker peta, dan status port oleh CS maupun NOC. Backend tetap memakai engine ERP yang sama, tetapi UI tidak lagi membawa blok inventory yang tidak relevan.'
           : 'Fokus ke data PORT ODP untuk kebutuhan operasional sales, CS, dan Admin CS: baca detail ODP, lihat marker di peta, lalu ukur jarak prospek ke titik ODP terdekat.'}
       </div>
 
-      {!isSalesOdpFocus ? (
+      {!isFocusedOdpMode ? (
         <>
           <div className="mt-4 grid gap-3 xl:grid-cols-4">
             <article className="rounded-2xl border border-slate-700 bg-slate-900/25 px-4 py-4 text-slate-100">
@@ -1263,7 +1267,7 @@ export function InventoryNetworkOpsPanel({
           <table className="min-w-[1180px] w-full border-collapse">
             <thead className="bg-[#162d66]">
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-100">
-                {!isSalesOdpFocus ? <th className="w-[44px] px-3 py-3"></th> : null}
+                {!isFocusedOdpMode ? <th className="w-[44px] px-3 py-3"></th> : null}
                 <th className="w-[60px] px-3 py-3">#</th>
                 <th className="w-[200px] px-3 py-3">Nama ODP</th>
                 <th className="w-[140px] px-3 py-3">POP</th>
@@ -1290,7 +1294,7 @@ export function InventoryNetworkOpsPanel({
                     key={row.id}
                     className={isSelected ? 'align-top bg-[#24395c] transition-colors' : 'align-top transition-colors hover:bg-[#24395c]'}
                   >
-                    {!isSalesOdpFocus ? <td className="px-3 py-2 text-sm text-slate-100"></td> : null}
+                    {!isFocusedOdpMode ? <td className="px-3 py-2 text-sm text-slate-100"></td> : null}
                     <td className="px-3 py-2 text-sm text-slate-100">{index + 1}</td>
                     <td className="px-3 py-2 text-sm font-semibold text-white">
                       <button
@@ -1334,13 +1338,13 @@ export function InventoryNetworkOpsPanel({
                           target="_blank"
                           rel="noreferrer"
                           className={`inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700 ${
-                            isSalesOdpFocus ? '' : 'sr-only'
+                            isFocusedOdpMode ? '' : 'sr-only'
                           }`}
                         >
-                          {isSalesOdpFocus ? 'Maps' : 'Buka Maps'}
+                          {isFocusedOdpMode ? 'Maps' : 'Buka Maps'}
                         </Link>
                       ) : null}
-                      {!isSalesOdpFocus ? (
+                      {!isFocusedOdpMode ? (
                         <button
                           type="button"
                           onClick={() => {
@@ -1358,7 +1362,7 @@ export function InventoryNetworkOpsPanel({
               })}
               {!visibleOdpRows.length ? (
                 <tr>
-                  <td colSpan={isSalesOdpFocus ? 10 : 11} className="px-4 py-6 text-sm text-slate-300">
+                  <td colSpan={isFocusedOdpMode ? 10 : 11} className="px-4 py-6 text-sm text-slate-300">
                     Belum ada ODP yang bisa direview.
                   </td>
                 </tr>
@@ -1368,7 +1372,7 @@ export function InventoryNetworkOpsPanel({
         </div>
       </div>
 
-      {!isSalesOdpFocus ? (
+      {!isFocusedOdpMode ? (
         <details className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
         <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-white">Data Pendukung</summary>
         <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr_1fr]">
@@ -1545,7 +1549,7 @@ export function InventoryNetworkOpsPanel({
         </details>
       ) : null}
 
-      {!isSalesOdpFocus ? (
+      {!isFocusedOdpMode ? (
         <TableQuickActionModal
           item={quickActionItem}
           onClose={() => setQuickActionItem(null)}

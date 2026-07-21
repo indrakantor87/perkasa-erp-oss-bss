@@ -46,11 +46,6 @@ function buildNocQueueFilterHref(params: {
   return query ? `/dashboard/tracking/noc-queue?${query}` : '/dashboard/tracking/noc-queue'
 }
 
-function getCompactFilterLabel(value: string, fallback: string) {
-  const normalized = String(value ?? '').trim()
-  return normalized || fallback
-}
-
 const ticketTypeOptions: NocTicketType[] = ['PSB', 'TROUBLESHOOTS', 'DISMANTLE', 'JALUR']
 const queueStatusOptions: NocQueueStatus[] = ['OPEN', 'ON_PROGRESS', 'TEMPORARY', 'CLOSE']
 const slaStateOptions = ['BREACHED', 'WARNING', 'ON_TRACK'] as const
@@ -147,6 +142,13 @@ function getQueueItemBarcodeHref(item: NocQueueItem) {
   return itemCode ? buildInventoryBarcodeDetailPath(itemCode) : null
 }
 
+function getWorkspaceLabel(role: string) {
+  if (role === 'CS_OPERATOR' || role === 'CS_ADMIN') return 'CS & Admin CS'
+  if (role === 'NOC_OPERATOR') return 'NOC'
+  if (role === 'PENJUALAN') return 'Penjualan'
+  return 'Operasional'
+}
+
 export default async function NocQueuePage({
   searchParams,
 }: {
@@ -182,6 +184,19 @@ export default async function NocQueuePage({
   const canUpdateSupport = canPerformAction(session.role, 'support', 'update')
   const canUpdateWorkOrder = canPerformAction(session.role, 'support', 'update')
   const reviewDbReady = payload.source.effectiveMode === 'review-db' && !payload.source.isFallback
+  const totalTickets = payload.items.length
+  const activeTickets = payload.items.filter((item) => item.queueStatus === 'OPEN' || item.queueStatus === 'ON_PROGRESS').length
+  const riskTickets = payload.items.filter((item) => item.slaState === 'BREACHED' || item.slaState === 'WARNING').length
+  const mineTickets = mine
+    ? totalTickets
+    : payload.items.filter((item) => item.picUsername && item.picUsername.toLowerCase() === session.username.toLowerCase()).length
+  const typeCounts = {
+    PSB: payload.items.filter((item) => item.ticketType === 'PSB').length,
+    TROUBLESHOOTS: payload.items.filter((item) => item.ticketType === 'TROUBLESHOOTS').length,
+    DISMANTLE: payload.items.filter((item) => item.ticketType === 'DISMANTLE').length,
+    JALUR: payload.items.filter((item) => item.ticketType === 'JALUR').length,
+    OTHER: payload.items.filter((item) => item.ticketType === 'OTHER').length,
+  } satisfies Record<NocTicketType, number>
 
   return (
     <div className="space-y-6">
@@ -189,12 +204,11 @@ export default async function NocQueuePage({
       <section className="panel p-6">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="section-title">NOC Workspace</p>
+            <p className="section-title">{getWorkspaceLabel(session.role)}</p>
             <h2 className="mt-2 text-2xl font-semibold text-[var(--color-ink-strong)]">Ticketing Perkasa</h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
-              Tabel ini menyatukan ticket PSB, Troubleshoots, Dismantle, dan Jalur dalam satu antrean
-              NOC. Status device sekarang memprioritaskan lifecycle scan terbaru, lalu fallback ke
-              movement/request barang jika log lifecycle belum ada.
+              Tabel ini memusatkan ticket PSB, Troubleshoots, Dismantle, dan Jalur dalam satu antrean
+              operasional yang tetap ringkas. Detail penuh tetap dibuka dari menu ticket masing-masing.
             </p>
           </div>
           <Link
@@ -203,6 +217,29 @@ export default async function NocQueuePage({
           >
             Kembali
           </Link>
+        </div>
+
+        <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Total Ticket</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-950">{totalTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Semua ticket yang muncul pada kombinasi filter saat ini.</p>
+          </article>
+          <article className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Masih Berjalan</p>
+            <p className="mt-2 text-3xl font-semibold text-sky-950">{activeTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-sky-800">Ticket open atau on progress yang masih perlu dikawal.</p>
+          </article>
+          <article className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Perlu Perhatian</p>
+            <p className="mt-2 text-3xl font-semibold text-amber-950">{riskTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-amber-800">Ticket dengan SLA warning atau breached.</p>
+          </article>
+          <article className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Pekerjaan Saya</p>
+            <p className="mt-2 text-3xl font-semibold text-violet-950">{mineTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-violet-800">Jumlah ticket yang terkait PIC user login.</p>
+          </article>
         </div>
 
         <form className="mt-6 grid gap-4 lg:grid-cols-6" action="/dashboard/tracking/noc-queue" method="get">
@@ -301,107 +338,55 @@ export default async function NocQueuePage({
           </div>
         </form>
 
-        <div className="mt-4 flex flex-wrap gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em]">
-          <details className="group relative">
-            <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-line bg-white px-3.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
-              <span className="text-[11px]">Jenis</span>
-              <span
-                className={`rounded-full px-2 py-1 text-[10px] ${
-                  ticketType ? getTypeBadgeClass(ticketType as NocTicketType) : 'bg-slate-100 text-slate-500'
-                }`}
-              >
-                {getCompactFilterLabel(ticketType, 'Semua')}
-              </span>
-              <span className="text-[12px] leading-none text-slate-500 transition group-open:rotate-180">⌄</span>
-            </summary>
-            <div className="absolute left-0 z-10 mt-2 min-w-[230px] rounded-2xl border border-line bg-white p-2 shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Jenis Cepat</span>
               <Link
                 href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { ticketType: '' } })}
-                className="flex items-center rounded-xl px-3 py-2.5 text-slate-600 transition hover:bg-slate-50"
+                className={`rounded-full px-3 py-1.5 ${ticketType ? 'border border-slate-200 bg-white text-slate-600' : 'bg-slate-900 text-white'}`}
               >
-                Semua Jenis
+                Semua
               </Link>
               {ticketTypeOptions.map((item) => (
                 <Link
                   key={item}
                   href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { ticketType: item } })}
-                  className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2.5 text-slate-700 transition hover:bg-slate-50"
+                  className={`rounded-full px-3 py-1.5 ${ticketType === item ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}
                 >
-                  {(() => {
-                    const Icon = getTicketTypeIcon(item)
-                    return <Icon className="h-3.5 w-3.5" />
-                  })()}
-                  <span className={`rounded-full px-2 py-1 text-[10px] ${getTypeBadgeClass(item)}`}>{item}</span>
+                  {item} {typeCounts[item]}
                 </Link>
               ))}
             </div>
-          </details>
 
-          <details className="group relative">
-            <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-line bg-white px-3.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
-              <span className="text-[11px]">Status</span>
-              <span
-                className={`rounded-full px-2 py-1 text-[10px] ${
-                  queueStatus ? getStatusBadgeClass(queueStatus as NocQueueStatus) : 'bg-slate-100 text-slate-500'
-                }`}
-              >
-                {getCompactFilterLabel(queueStatus, 'Semua')}
-              </span>
-              <span className="text-[12px] leading-none text-slate-500 transition group-open:rotate-180">⌄</span>
-            </summary>
-            <div className="absolute left-0 z-10 mt-2 min-w-[230px] rounded-2xl border border-line bg-white p-2 shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
+            <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Status Cepat</span>
               <Link
                 href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { queueStatus: '' } })}
-                className="flex items-center rounded-xl px-3 py-2.5 text-slate-600 transition hover:bg-slate-50"
+                className={`rounded-full px-3 py-1.5 ${queueStatus ? 'border border-slate-200 bg-white text-slate-600' : 'bg-slate-900 text-white'}`}
               >
-                Semua Status
+                Semua
               </Link>
               {queueStatusOptions.map((item) => (
                 <Link
                   key={item}
                   href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { queueStatus: item } })}
-                  className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2.5 text-slate-700 transition hover:bg-slate-50"
+                  className={`rounded-full px-3 py-1.5 ${queueStatus === item ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}
                 >
-                  {(() => {
-                    const Icon = getQueueStatusIcon(item)
-                    return <Icon className="h-3.5 w-3.5" />
-                  })()}
-                  <span className={`rounded-full px-2 py-1 text-[10px] ${getStatusBadgeClass(item)}`}>{item}</span>
+                  {item}
                 </Link>
               ))}
-            </div>
-          </details>
-
-          <details className="group relative">
-            <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-xl border border-line bg-white px-3.5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
-              <span className="text-[11px]">SLA</span>
-              <span
-                className={`rounded-full px-2 py-1 text-[10px] ${
-                  slaState ? getSlaBadgeClass(slaState as NocQueueItem['slaState']) : 'bg-slate-100 text-slate-500'
-                }`}
-              >
-                {getCompactFilterLabel(slaState, 'Semua')}
-              </span>
-              <span className="text-[12px] leading-none text-slate-500 transition group-open:rotate-180">⌄</span>
-            </summary>
-            <div className="absolute left-0 z-10 mt-2 min-w-[230px] rounded-2xl border border-line bg-white p-2 shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
-              <Link
-                href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { slaState: '' } })}
-                className="flex items-center rounded-xl px-3 py-2.5 text-slate-600 transition hover:bg-slate-50"
-              >
-                Semua SLA
-              </Link>
               {slaStateOptions.map((item) => (
                 <Link
                   key={item}
                   href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { slaState: item } })}
-                  className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2.5 text-slate-700 transition hover:bg-slate-50"
+                  className={`rounded-full px-3 py-1.5 ${slaState === item ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}
                 >
-                  <span className={`rounded-full px-2 py-1 text-[10px] ${getSlaBadgeClass(item)}`}>{item}</span>
+                  SLA {item}
                 </Link>
               ))}
             </div>
-          </details>
+          </div>
         </div>
 
         {payload.error ? (
@@ -420,8 +405,7 @@ export default async function NocQueuePage({
                 <th className="px-4 py-3">Jenis</th>
                 <th className="px-4 py-3">Status Antrean</th>
                 <th className="px-4 py-3">PIC / Teknisi</th>
-                <th className="px-4 py-3">Request Barang</th>
-                <th className="px-4 py-3">Status Device</th>
+                <th className="px-4 py-3">Keterangan Operasional</th>
                 <th className="px-4 py-3">Update</th>
                 <th className="px-4 py-3">Aksi Cepat</th>
               </tr>
@@ -474,9 +458,9 @@ export default async function NocQueuePage({
                     {item.picUsername ? <p className="text-xs uppercase tracking-[0.18em] text-mute">@{item.picUsername}</p> : null}
                   </td>
                   <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
-                    <p className="font-semibold text-[var(--color-ink-strong)]">{item.requestCode ?? '-'}</p>
-                    <p>{item.requestStatus ?? 'Belum ada request'}</p>
-                    <p>{item.requestRequestedFor ?? ''}</p>
+                    <p className="font-semibold text-[var(--color-ink-strong)]">{item.requestCode ?? item.deviceState ?? '-'}</p>
+                    <p>{item.requestStatus ?? item.supportLaneLabel}</p>
+                    <p>{item.requestRequestedFor ?? item.deviceLocationLabel ?? ''}</p>
                     {item.operationalBadges.length ? (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {item.operationalBadges.map((badge) => (
@@ -489,8 +473,6 @@ export default async function NocQueuePage({
                         ))}
                       </div>
                     ) : null}
-                  </td>
-                  <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
                     {getQueueItemBarcodeHref(item) ? (
                       <p className="mb-2">
                         <Link
@@ -501,7 +483,6 @@ export default async function NocQueuePage({
                         </Link>
                       </p>
                     ) : null}
-                    <p className="font-semibold text-[var(--color-ink-strong)]">{item.deviceState ?? '-'}</p>
                     {item.deviceLifecycleStatus ? (
                       <p className="mt-2">
                         <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getLifecycleBadgeClass(item.deviceLifecycleStatus)}`}>
@@ -577,7 +558,7 @@ export default async function NocQueuePage({
               ))}
               {!payload.items.length ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-mute" colSpan={9}>
+                  <td className="px-4 py-6 text-sm text-mute" colSpan={8}>
                     Tidak ada ticket pada kombinasi filter ini.
                   </td>
                 </tr>

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { DataSourceStatus } from '@/components/data-source-status'
 import { SupportActionFormModal, type SupportActionModalItem } from '@/components/support-action-form-modal'
 import { SupportDismantleCloseForm } from '@/components/support-dismantle-close-form'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
@@ -66,6 +67,9 @@ export function SupportDismantleWorkspace({
     .filter((section) => section.title.toUpperCase().includes('HISTORI DISMANTLE'))
     .flatMap((section) => section.rows)
     .map((row) => `${row.id.replace(/^DIS-/, '')} | ${row.primary} | ${row.secondary}`)
+  const dismantleBacklog = supportDismantleQueueSuggestions.length
+  const dismantleHistoryCount = supportDismantleHistorySuggestions.length
+  const pendingTicketCount = Math.max(supportIsolationSuggestions.length - dismantleBacklog, 0)
 
   const actionLinks = [
     {
@@ -173,7 +177,7 @@ export function SupportDismantleWorkspace({
           <div>
             <h2 className="font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">Dismantle Perangkat</h2>
             <p className="mt-1 text-sm leading-5 text-slate-200">
-              Pantau ticket dismantle aktif tanpa menarik otomatis seluruh data isolir bulanan ke menu ini.
+              Menu ini difokuskan untuk antrean terminate aktif, penutupan histori, dan reopen bila ada koreksi lapangan.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -197,6 +201,31 @@ export function SupportDismantleWorkspace({
           </span>
           {!reviewDbReady ? <span className="badge border-amber-500/60 bg-amber-500/10 text-amber-100">Review DB belum aktif</span> : null}
         </div>
+      </section>
+
+      <DataSourceStatus source={source} />
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <article className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Total Kandidat</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{supportIsolationSuggestions.length}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Semua kandidat terminate yang masih terbaca dari jalur isolir.</p>
+        </article>
+        <article className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">Antrean Aktif</p>
+          <p className="mt-2 text-3xl font-semibold text-rose-950">{dismantleBacklog}</p>
+          <p className="mt-2 text-sm leading-6 text-rose-800">Ticket dismantle yang sedang dikerjakan pada antrean aktif.</p>
+        </article>
+        <article className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Belum Ada Ticket</p>
+          <p className="mt-2 text-3xl font-semibold text-amber-950">{pendingTicketCount}</p>
+          <p className="mt-2 text-sm leading-6 text-amber-800">Kandidat terminate yang belum dipindahkan ke antrean dismantle.</p>
+        </article>
+        <article className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Histori Close</p>
+          <p className="mt-2 text-3xl font-semibold text-violet-950">{dismantleHistoryCount}</p>
+          <p className="mt-2 text-sm leading-6 text-violet-800">Data terminate yang sudah benar-benar masuk histori penutupan.</p>
+        </article>
       </section>
 
       <SupportDismantleQueuePanel

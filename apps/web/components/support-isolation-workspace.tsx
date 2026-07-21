@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { DataSourceStatus } from '@/components/data-source-status'
 import { SupportActionFormModal, type SupportActionModalItem } from '@/components/support-action-form-modal'
 import { SupportDismantleForm } from '@/components/support-dismantle-form'
 import { SupportIsolationForm } from '@/components/support-isolation-form'
@@ -196,7 +197,9 @@ export function SupportIsolationWorkspace({
             <h2 className="font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">
               Monitoring Isolir Pelanggan
             </h2>
-            <p className="mt-1 text-sm leading-5 text-slate-200">Daftar pelanggan yang status layanannya sedang diisolir.</p>
+            <p className="mt-1 text-sm leading-5 text-slate-200">
+              Lane ini dipakai untuk membaca isolir aktif, memutuskan restore, atau meneruskan terminate ke dismantle.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {canOpenBillingDecision ? (
@@ -222,6 +225,31 @@ export function SupportIsolationWorkspace({
             <span className="badge border-amber-500/60 bg-amber-500/10 text-amber-100">Review DB belum aktif</span>
           ) : null}
         </div>
+      </section>
+
+      <DataSourceStatus source={source} />
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <article className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Total Isolir</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{summary.total}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Semua pelanggan yang sedang terbaca pada lane isolir aktif.</p>
+        </article>
+        <article className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Jalur Restore</p>
+          <p className="mt-2 text-3xl font-semibold text-sky-950">{summary.restoreCount}</p>
+          <p className="mt-2 text-sm leading-6 text-sky-800">Kasus yang masih menunggu keputusan pemulihan billing.</p>
+        </article>
+        <article className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">Jalur Dismantle</p>
+          <p className="mt-2 text-3xl font-semibold text-rose-950">{summary.terminateCount}</p>
+          <p className="mt-2 text-sm leading-6 text-rose-800">Kasus yang sudah bergerak ke terminate permanen.</p>
+        </article>
+        <article className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Marketing Aktif</p>
+          <p className="mt-2 text-3xl font-semibold text-violet-950">{summary.marketingCount}</p>
+          <p className="mt-2 text-sm leading-6 text-violet-800">Jumlah owner marketing yang masih muncul pada antrean isolir.</p>
+        </article>
       </section>
 
       <SupportIsolationQueuePanel

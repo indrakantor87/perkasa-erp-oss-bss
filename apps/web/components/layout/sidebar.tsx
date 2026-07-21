@@ -545,6 +545,66 @@ function buildCompactIsolirItem() {
   })
 }
 
+function buildCompactSlaItem() {
+  return buildSidebarNavItem('/support', {
+    key: 'support-sla-compact',
+    title: 'Prioritas SLA',
+    description: 'Pantau ticket overdue, warning, dan disiplin progres operasional.',
+    href: '/support/sla',
+    requiredPath: '/support',
+    assignHrefs: ['/support/sla'],
+    matchPrefixes: ['/support/sla'],
+  })
+}
+
+function buildCompactPsbListItem() {
+  return buildSidebarNavItem('/list-psb', {
+    key: 'list-psb-compact',
+    title: 'List PSB',
+    description: 'Antrean PSB untuk review, jadwal, dan transfer ke ticketing.',
+    href: '/list-psb',
+    matchPrefixes: ['/list-psb'],
+  })
+}
+
+function buildCompactDismantleListItem() {
+  return buildSidebarNavItem('/list-dismantle', {
+    key: 'list-dismantle-compact',
+    title: 'List Dismantle',
+    description: 'Antrean validasi dismantle sebelum diteruskan ke tiket operasional.',
+    href: '/list-dismantle',
+    matchPrefixes: ['/list-dismantle'],
+  })
+}
+
+function buildCompactOdpPortItem() {
+  return buildSidebarNavItem('/dashboard/tracking', {
+    key: 'tracking-odp-port-compact',
+    title: 'Port ODP',
+    description: 'Baca kapasitas ODP, status port, peta marker, dan coverage area operasional.',
+    href: '/dashboard/tracking/port-odp',
+    requiredPath: '/dashboard/tracking',
+    assignHrefs: ['/dashboard/tracking/port-odp'],
+    matchPrefixes: ['/dashboard/tracking/port-odp'],
+  })
+}
+
+function buildCompactCsCustomerItem(role: AppRole) {
+  return buildSidebarNavItem('/customers', {
+    key: role === 'CS_ADMIN' ? 'customers-cs-admin-compact' : 'customers-cs-compact',
+    title: role === 'CS_ADMIN' ? 'CS & Admin CS' : 'Customer',
+    description:
+      role === 'CS_ADMIN'
+        ? 'Approval, koreksi, restore, dan pembacaan customer service.'
+        : 'Data pelanggan, layanan aktif, dan tindak lanjut customer service.',
+    href: role === 'CS_ADMIN' ? '/customers/cs-admin' : '/customers',
+    requiredPath: '/customers',
+    assignHrefs: role === 'CS_ADMIN' ? ['/customers/cs-admin', '/customers/cs-admin/odp-port'] : ['/customers'],
+    matchPrefixes: role === 'CS_ADMIN' ? ['/customers/cs-admin', '/customers/cs-admin/odp-port'] : ['/customers'],
+    excludePrefixes: role === 'CS_ADMIN' ? undefined : ['/customers/cs-admin'],
+  })
+}
+
 function buildCompactInventoryItem() {
   return buildSidebarNavItem('/inventory', {
     key: 'inventory-compact',
@@ -865,11 +925,25 @@ function getWorkspaceCustomItems(role: AppRole | null) {
     case 'SALES_MARKETING':
       return [buildSalesMainItem(role)]
     case 'CS_OPERATOR':
-      return [buildCustomersMainItem(role)]
+      return [
+        buildCompactCsCustomerItem(role),
+        buildCompactPsbListItem(),
+        buildCompactTicketingItem(),
+        buildCompactIsolirItem(),
+        buildCompactDismantleListItem(),
+        buildCompactOdpPortItem(),
+      ]
     case 'CS_ADMIN':
-      return [buildCsAdminItem()]
+      return [
+        buildCompactCsCustomerItem(role),
+        buildCompactPsbListItem(),
+        buildCompactTicketingItem(),
+        buildCompactIsolirItem(),
+        buildCompactDismantleListItem(),
+        buildCompactOdpPortItem(),
+      ]
     case 'NOC_OPERATOR':
-      return [buildCompactTicketingItem(), buildCompactIsolirItem(), buildInventoryMainItem(role)]
+      return [buildCompactTicketingItem(), buildCompactSlaItem(), buildCompactIsolirItem(), buildCompactOdpPortItem()]
     case 'FIELD_TECHNICIAN':
       return [buildTeknisiLapanganItem()]
     case 'TT_OPERATOR':
@@ -961,7 +1035,7 @@ function buildSidebarSections(params: {
   const supportingBaseItems =
     params.role === 'SUPER_ADMIN' && params.superAdminMode === 'compact'
       ? []
-      : params.role === 'PENJUALAN'
+      : ['PENJUALAN', 'CS_OPERATOR', 'CS_ADMIN', 'NOC_OPERATOR'].includes(params.role ?? '')
         ? []
         : coreItems.filter((item) => !assignedBaseHrefs.has(item.href)).map(mapNavigationItemToSidebarNavItem)
 
