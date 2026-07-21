@@ -16,6 +16,7 @@ import { HrLoanVoidForm } from '@/components/hr-loan-void-form'
 import { HrSalarySlipForm } from '@/components/hr-salary-slip-form'
 import { HrSalarySlipReleaseForm } from '@/components/hr-salary-slip-release-form'
 import { HrSalarySlipVoidForm } from '@/components/hr-salary-slip-void-form'
+import { getHrWorkspaceInsightSections } from '@/lib/services/hr-workspace-insight-service'
 import type { AppRole, DataSourceSnapshot, DomainCapability, DomainPageContent, DomainReviewRow, DomainReviewSection } from '@/lib/types'
 
 export type HrWorkspaceKey = 'overview' | 'employees' | 'attendance' | 'salary' | 'loans' | 'permissions' | 'disciplinary'
@@ -475,76 +476,25 @@ function renderWorkspaceForms(params: {
         </div>
       )
     case 'permissions':
-      return (
-        <div className="grid gap-4 xl:grid-cols-2">
-          <article className="panel p-5">
-            <p className="section-title">Perizinan Karyawan</p>
-            <h3 className="mt-2 text-lg font-semibold text-slate-950">Approval dan pengajuan izin/cuti</h3>
-            <p className="mt-3 text-sm leading-6 text-mute">
-              Workspace ini menjadi landing operasional untuk jalur `Perizinan`. Integrasi form approval penuh belum dibuat, tetapi jalur kerja, ringkasan employee, dan review data HR sudah disiapkan agar struktur menu 1:1 mulai terbentuk.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="badge border-slate-200 bg-white text-slate-600">cuti tahunan</span>
-              <span className="badge border-slate-200 bg-white text-slate-600">izin sakit</span>
-              <span className="badge border-slate-200 bg-white text-slate-600">approval manager</span>
-            </div>
-            <div className="mt-5 rounded-2xl border border-dashed border-line bg-slate-50 p-4 text-sm leading-6 text-mute">
-              Tahap berikutnya: sambungkan ke endpoint pengajuan izin/cuti dan action approval per role.
-            </div>
-          </article>
-          <article className="panel p-5">
-            <p className="section-title">Checklist Implementasi</p>
-            <ul className="mt-3 space-y-3 text-sm leading-6 text-mute">
-              <li>1. Tambahkan endpoint pengajuan izin/cuti.</li>
-              <li>2. Tambahkan tabel riwayat pengajuan per karyawan.</li>
-              <li>3. Tambahkan approval atasan dan finalisasi HR.</li>
-              <li>4. Sinkronkan ke absensi dan payroll saat pengajuan disetujui.</li>
-            </ul>
-          </article>
-        </div>
-      )
+      return null
     case 'disciplinary':
-      return (
-        <div className="grid gap-4 xl:grid-cols-2">
-          <article className="panel p-5">
-            <p className="section-title">Sanksi Disiplin</p>
-            <h3 className="mt-2 text-lg font-semibold text-slate-950">Surat peringatan dan tindak lanjut</h3>
-            <p className="mt-3 text-sm leading-6 text-mute">
-              Workspace ini menyiapkan jalur `Sanksi` agar terpisah dari data employee umum. Fokus utamanya adalah SP bertingkat, alasan pelanggaran, masa berlaku, dan arsip disipliner.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="badge border-slate-200 bg-white text-slate-600">SP 1</span>
-              <span className="badge border-slate-200 bg-white text-slate-600">SP 2</span>
-              <span className="badge border-slate-200 bg-white text-slate-600">SP 3</span>
-              <span className="badge border-slate-200 bg-white text-slate-600">arsip disiplin</span>
-            </div>
-            <div className="mt-5 rounded-2xl border border-dashed border-line bg-slate-50 p-4 text-sm leading-6 text-mute">
-              Tahap berikutnya: sambungkan ke endpoint surat peringatan dan notifikasi internal/WhatsApp bila diperlukan.
-            </div>
-          </article>
-          <article className="panel p-5">
-            <p className="section-title">Checklist Implementasi</p>
-            <ul className="mt-3 space-y-3 text-sm leading-6 text-mute">
-              <li>1. Tambahkan endpoint surat peringatan dengan level SP.</li>
-              <li>2. Tambahkan riwayat pelanggaran dan status aktif/nonaktif.</li>
-              <li>3. Tambahkan template notifikasi ke karyawan dan atasan.</li>
-              <li>4. Hubungkan ke KPI dan evaluasi performa bila diperlukan.</li>
-            </ul>
-          </article>
-        </div>
-      )
+      return null
     case 'overview':
     default:
       return null
   }
 }
 
-export function HrWorkspacePage({ content, source, capabilities, role, activeWorkspace }: HrWorkspacePageProps) {
+export async function HrWorkspacePage({ content, source, capabilities, role, activeWorkspace }: HrWorkspacePageProps) {
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
   const canCreate = enabledCapabilities.some((item) => item.action === 'create')
   const canUpdate = enabledCapabilities.some((item) => item.action === 'update')
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
-  const visibleSections = getVisibleSections(activeWorkspace, content.reviewSections ?? [])
+  const workspaceInsightSections =
+    activeWorkspace === 'permissions' || activeWorkspace === 'disciplinary'
+      ? await getHrWorkspaceInsightSections(activeWorkspace)
+      : []
+  const visibleSections = [...workspaceInsightSections, ...getVisibleSections(activeWorkspace, content.reviewSections ?? [])]
 
   return (
     <div className="space-y-6">

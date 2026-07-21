@@ -15,11 +15,7 @@ type UnitRow = {
   code: string
 }
 
-type ItemCodeRow = {
-  itemCode: string | null
-}
-
-type InventoryItemListRow = {
+type InventoryItemRow = {
   itemCode: string
   itemName: string
   categoryCode: string | null
@@ -31,16 +27,10 @@ type InventoryItemListRow = {
   currentStock: number
   minimumStock: number
   status: string
-  updatedAt: string | null
 }
 
-type InsertResult = {
-  insertId?: number
+type ExecuteResult = {
   affectedRows?: number
-}
-
-function padSequence(value: number) {
-  return String(value).padStart(4, '0')
 }
 
 function normalizePrice(value: unknown) {
@@ -50,27 +40,6 @@ function normalizePrice(value: unknown) {
   const normalized = raw.replace(/rp/gi, '').replace(/\s+/g, '').replace(/\./g, '').replace(/,/g, '.')
   const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : null
-}
-
-async function generateItemCode() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const likePrefix = `INV-${year}${month}-%`
-  const rows = await runReviewDbQuery<ItemCodeRow>(
-    `
-      SELECT item_code AS itemCode
-      FROM inventory_items
-      WHERE item_code LIKE ?
-      ORDER BY id DESC
-      LIMIT 1
-    `,
-    [likePrefix],
-  )
-
-  const currentCode = rows[0]?.itemCode ?? ''
-  const lastSequence = Number.parseInt(currentCode.split('-').pop() ?? '0', 10)
-  return `INV-${year}${month}-${padSequence(Number.isFinite(lastSequence) ? lastSequence + 1 : 1)}`
 }
 
 async function ensureInventoryRackColumns() {
@@ -98,104 +67,46 @@ async function ensureInventoryRackColumns() {
   }
 }
 
-export async function GET(request: Request) {
-  const session = await getSession()
-  if (!session) {
-    return Response.json({ message: 'Unauthorized' }, { status: 401 })
-  }
-  if (!canPerformAction(session.role, 'inventory', 'view')) {
-    return Response.json({ message: 'Forbidden' }, { status: 403 })
-  }
+async function getInventoryItemByCode(itemCode: string) {
+  const [hasRackCode, hasRackBarcode] = await Promise.all([
+    hasReviewDbColumn('inventory_items', 'rack_code'),
+    hasReviewDbColumn('inventory_items', 'rack_barcode'),
+  ])
 
-  const source = getDataSourceSnapshot()
-  if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return Response.json(
-      { message: 'Daftar item inventory hanya aktif saat review DB benar-benar tersedia.' },
-      { status: 503 },
-    )
-  }
+  const rows = await runReviewDbQuery<InventoryItemRow>(
+    `
+      SELECT
+        ii.item_code AS itemCode,
+        ii.item_name AS itemName,
+        ic.code AS categoryCode,
+        iu.code AS unitCode,
+        ii.barcode AS barcode,
+        ${hasRackCode ? 'ii.rack_code' : 'NULL'} AS rackCode,
+        ${hasRackBarcode ? 'ii.rack_barcode' : 'NULL'} AS rackBarcode,
+        ii.default_price AS defaultPrice,
+        ii.current_stock AS currentStock,
+        ii.minimum_stock AS minimumStock,
+        ii.status AS status
+      FROM inventory_items ii
+      LEFT JOIN inventory_categories ic
+        ON ic.id = ii.category_id
+      LEFT JOIN inventory_units iu
+        ON iu.id = ii.unit_id
+      WHERE ii.item_code = ?
+      LIMIT 1
+    `,
+    [itemCode],
+  )
 
-  try {
-    const url = new URL(request.url)
-    const rawQuery = String(url.searchParams.get('query') ?? '').trim()
-    const rawStatus = String(url.searchParams.get('status') ?? '').trim().toUpperCase()
-    const limitRaw = Number.parseInt(String(url.searchParams.get('limit') ?? '60').trim() || '60', 10)
-    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 200)) : 60
-
-    const [hasRackCode, hasRackBarcode, hasUpdatedAt] = await Promise.all([
-      hasReviewDbColumn('inventory_items', 'rack_code'),
-      hasReviewDbColumn('inventory_items', 'rack_barcode'),
-      hasReviewDbColumn('inventory_items', 'updated_at'),
-    ])
-
-    const values: unknown[] = []
-    const searchConditions: string[] = []
-    const filters: string[] = []
-
-    if (rawQuery) {
-      const like = `%${rawQuery}%`
-      searchConditions.push('UPPER(ii.item_code) LIKE UPPER(?)', 'UPPER(ii.item_name) LIKE UPPER(?)', 'UPPER(COALESCE(ii.barcode, \'\')) LIKE UPPER(?)')
-      values.push(like, like, like)
-
-      if (hasRackCode) {
-        searchConditions.push('UPPER(ii.rack_code) LIKE UPPER(?)')
-        values.push(like)
-      }
-      if (hasRackBarcode) {
-        searchConditions.push('UPPER(ii.rack_barcode) LIKE UPPER(?)')
-        values.push(like)
-      }
-    }
-    if (searchConditions.length) {
-      filters.push(`(${searchConditions.join(' OR ')})`)
-    }
-    if (allowedStatuses.has(rawStatus)) {
-      filters.push('UPPER(ii.status) = ?')
-      values.push(rawStatus)
-    }
-
-    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : ''
-    values.push(limit)
-
-    const items = await runReviewDbQuery<InventoryItemListRow>(
-      `
-        SELECT
-          ii.item_code AS itemCode,
-          ii.item_name AS itemName,
-          ic.code AS categoryCode,
-          iu.code AS unitCode,
-          ii.barcode AS barcode,
-          ${hasRackCode ? 'ii.rack_code' : 'NULL'} AS rackCode,
-          ${hasRackBarcode ? 'ii.rack_barcode' : 'NULL'} AS rackBarcode,
-          ii.default_price AS defaultPrice,
-          ii.current_stock AS currentStock,
-          ii.minimum_stock AS minimumStock,
-          ii.status AS status,
-          ${hasUpdatedAt ? 'ii.updated_at' : 'NULL'} AS updatedAt
-        FROM inventory_items ii
-        LEFT JOIN inventory_categories ic
-          ON ic.id = ii.category_id
-        LEFT JOIN inventory_units iu
-          ON iu.id = ii.unit_id
-        ${whereClause}
-        ORDER BY ${hasUpdatedAt ? 'ii.updated_at DESC,' : ''} ii.id DESC
-        LIMIT ?
-      `,
-      values,
-    )
-
-    return Response.json({ items })
-  } catch (error) {
-    return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
-  }
+  return rows[0] ?? null
 }
 
-export async function POST(request: Request) {
+export async function PUT(request: Request, { params }: { params: Promise<{ itemCode: string }> }) {
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
-  if (!canPerformAction(session.role, 'inventory', 'create')) {
+  if (!canPerformAction(session.role, 'inventory', 'update')) {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
 
@@ -208,6 +119,17 @@ export async function POST(request: Request) {
   }
 
   try {
+    const resolvedParams = await params
+    const itemCode = decodeURIComponent(String(resolvedParams.itemCode ?? '')).trim()
+    if (!itemCode) {
+      return Response.json({ message: 'Kode item tidak valid.' }, { status: 400 })
+    }
+
+    const existing = await getInventoryItemByCode(itemCode)
+    if (!existing) {
+      return Response.json({ message: 'Item inventory tidak ditemukan.' }, { status: 404 })
+    }
+
     const payload = (await request.json()) as {
       categoryCode?: unknown
       unitCode?: unknown
@@ -283,29 +205,26 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Satuan inventory tidak ditemukan di review DB.' }, { status: 404 })
     }
 
-    const itemCode = await generateItemCode()
-    await runReviewDbExecute<InsertResult>(
+    await runReviewDbExecute<ExecuteResult>(
       `
-        INSERT INTO inventory_items (
-          category_id,
-          unit_id,
-          item_code,
-          item_name,
-          barcode,
-          rack_code,
-          rack_barcode,
-          default_price,
-          minimum_stock,
-          current_stock,
-          photo_path,
-          status
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+        UPDATE inventory_items
+        SET
+          category_id = ?,
+          unit_id = ?,
+          item_name = ?,
+          barcode = ?,
+          rack_code = ?,
+          rack_barcode = ?,
+          default_price = ?,
+          minimum_stock = ?,
+          current_stock = ?,
+          status = ?
+        WHERE item_code = ?
+        LIMIT 1
       `,
       [
         category.id,
         unit.id,
-        itemCode,
         itemName,
         barcode || null,
         rackCode || null,
@@ -314,11 +233,15 @@ export async function POST(request: Request) {
         minimumStock,
         currentStock,
         status,
+        itemCode,
       ],
     )
 
+    const updated = await getInventoryItemByCode(itemCode)
+
     return Response.json({
-      message: `Item inventory ${itemCode} untuk ${itemName} berhasil disimpan${rackCode ? ` di rak ${rackCode}` : ''}.`,
+      message: `Item inventory ${itemCode} berhasil diperbarui${status === 'INACTIVE' ? ' dan dinonaktifkan' : ''}.`,
+      item: updated,
     })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
