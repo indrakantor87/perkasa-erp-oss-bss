@@ -6,7 +6,6 @@ import { DataSourceStatus } from '@/components/data-source-status'
 import { InventoryItemBarcodePanel } from '@/components/inventory-item-barcode-panel'
 import { InventoryItemCreateForm } from '@/components/inventory-item-create-form'
 import { InventoryItemEditForm, type InventoryEditableItem } from '@/components/inventory-item-edit-form'
-import { InventoryRackLayoutPanel } from '@/components/inventory-rack-layout-panel'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import type { DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
 import type { DataSourceSnapshot, DomainReviewSection } from '@/lib/types'
@@ -182,36 +181,16 @@ export function InventoryItemsWorkspacePage({
       <DataSourceStatus source={source} />
 
       <section className="panel p-6">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div>
           <div>
             <p className="section-title">Data Barang Inventory</p>
             <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
-              Master item dengan pola kerja yang lebih dekat ke CRUD
+              Master item inventory untuk input data dan generate barcode
             </h1>
             <p className="mt-3 max-w-4xl text-sm leading-6 text-mute">
-              Halaman ini memisahkan `Data Barang` dari shell generik, tetapi tetap mempertahankan form tambah item, penataan rak,
-              dan audit barcode agar operator inventory bisa bekerja dari satu titik yang lebih terstruktur.
+              Halaman ini difokuskan ke data master inventory: tambah item, edit item, deactivate item, dan buka detail barcode
+              tanpa membawa panel menu lain ke dalam workspace ini.
             </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/inventory/master/categories"
-              className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700"
-            >
-              Jenis Barang
-            </Link>
-            <Link
-              href="/inventory/master/units"
-              className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700"
-            >
-              Satuan
-            </Link>
-            <Link
-              href="/inventory/reports/stock"
-              className="rounded-full border border-slate-950 bg-slate-950 px-5 py-3 text-sm font-semibold text-white"
-            >
-              Laporan Stok
-            </Link>
           </div>
         </div>
       </section>
@@ -373,10 +352,6 @@ export function InventoryItemsWorkspacePage({
             onCancel={() => setSelectedItemCode(null)}
           />
         </div>
-      </section>
-
-      <section className="rounded-3xl border border-line bg-white p-5">
-        <InventoryRackLayoutPanel canUpdate={canUpdate} reviewDbReady={reviewDbReady} embedded />
       </section>
 
       <InventoryItemBarcodePanel

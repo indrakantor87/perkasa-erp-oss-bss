@@ -11,13 +11,6 @@ type InventoryShortcut = {
   href: string
 }
 
-type InventoryFocusCard = {
-  title: string
-  description: string
-  href: string
-  badge: string
-}
-
 function buildInventoryShortcuts(role: AppRole): InventoryShortcut[] {
   const canCreate = ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'GA', 'CS_ADMIN'].includes(role)
   const canUpdate = ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'GA', 'CS_ADMIN', 'CS_OPERATOR', 'NOC_OPERATOR', 'FIELD_TECHNICIAN'].includes(role)
@@ -34,6 +27,26 @@ function buildInventoryShortcuts(role: AppRole): InventoryShortcut[] {
 
   const shortcuts: InventoryShortcut[] = []
 
+  if (canCreate) {
+    shortcuts.push(
+      {
+        title: 'Data Barang',
+        description: 'Input data master inventory dan generate barcode item dari satu halaman inti.',
+        href: '/inventory/items',
+      },
+      {
+        title: 'Barang Masuk',
+        description: 'Fokus ke receipt stok gudang untuk menambah stok aktif.',
+        href: '/inventory/receipts',
+      },
+      {
+        title: 'Barang Keluar',
+        description: 'Fokus ke barang keluar, retur, dan adjustment stok.',
+        href: '/inventory/movements',
+      },
+    )
+  }
+
   if (canUpdate) {
     shortcuts.push(
       {
@@ -42,9 +55,9 @@ function buildInventoryShortcuts(role: AppRole): InventoryShortcut[] {
         href: '/inventory/requests',
       },
       {
-        title: 'Log Aktivitas',
-        description: 'Ringkasan pergerakan stok dan request inventory yang sedang berjalan.',
-        href: '/inventory/logs',
+        title: 'Pinjaman Barang',
+        description: 'Pinjamkan barang dan proses pengembalian dalam satu workspace.',
+        href: '/inventory/loans',
       },
       {
         title: 'Penataan Rak',
@@ -52,112 +65,19 @@ function buildInventoryShortcuts(role: AppRole): InventoryShortcut[] {
         href: '/inventory/racks',
       },
       {
-        title: 'Pinjaman',
-        description: 'Pinjamkan barang dan proses pengembalian dalam satu workspace.',
-        href: '/inventory/loans',
+        title: 'Log Aktivitas',
+        description: 'Fokus ke log pergerakan stok dan status request inventory.',
+        href: '/inventory/logs',
       },
       {
-        title: 'Network & ODP',
+        title: 'Networks & ODP',
         description: 'Kelola ODP, port, assignment, dan return perangkat.',
         href: '/inventory/network',
       },
     )
   }
 
-  if (canCreate) {
-    shortcuts.push(
-      {
-        title: 'Jenis Barang',
-        description: 'Ringkasan kategori inventory yang aktif dipakai item master.',
-        href: '/inventory/master/categories',
-      },
-      {
-        title: 'Satuan',
-        description: 'Ringkasan satuan inventory yang aktif dipakai item master.',
-        href: '/inventory/master/units',
-      },
-      {
-        title: 'Barang Masuk',
-        description: 'Fokus ke receipt stok gudang.',
-        href: '/inventory/receipts',
-      },
-      {
-        title: 'Barang Keluar',
-        description: 'Barang keluar, retur, dan adjustment stok.',
-        href: '/inventory/movements',
-      },
-      {
-        title: 'Data Barang',
-        description: 'Master item inventory, barcode item, dan data stok dasar.',
-        href: '/inventory/items',
-      },
-      {
-        title: 'Laporan Stok',
-        description: 'Pantau stok aktif dan item yang mendekati minimum.',
-        href: '/inventory/reports/stock',
-      },
-      {
-        title: 'Laporan Barang Masuk',
-        description: 'Riwayat receipt dan movement masuk yang menambah stok.',
-        href: '/inventory/reports/in',
-      },
-      {
-        title: 'Laporan Barang Keluar',
-        description: 'Riwayat barang keluar dan adjustment stok.',
-        href: '/inventory/reports/out',
-      },
-    )
-  }
-
   return shortcuts
-}
-
-function buildInventoryFocusCards(role: AppRole): InventoryFocusCard[] {
-  const canCreate = ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'GA', 'CS_ADMIN'].includes(role)
-  const canUpdate = ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'GA', 'CS_ADMIN', 'CS_OPERATOR', 'NOC_OPERATOR', 'FIELD_TECHNICIAN'].includes(role)
-
-  const cards: InventoryFocusCard[] = [
-    {
-      title: 'ODP dan Port',
-      description: 'Pantau kapasitas ODP, status port, dan kondisi titik jaringan yang berdampak ke order dan ticket.',
-      href: '/inventory/network',
-      badge: 'utama',
-    },
-  ]
-
-  if (canUpdate) {
-    cards.push(
-      {
-        title: 'Assignment Device',
-        description: 'Pasangkan perangkat ke ODP atau layanan aktif, lalu sinkronkan return perangkat dari lapangan.',
-        href: '/inventory/network?inventoryAction=device-assignment#inventory-action-device-assignment',
-        badge: 'tracking device',
-      },
-      {
-        title: 'Request Barang',
-        description: 'Masuk ke request material lapangan dan proses permintaan barang yang masih berjalan.',
-        href: '/inventory/requests?inventoryAction=item-request#inventory-action-item-request',
-        badge: 'permintaan',
-      },
-      {
-        title: 'Stock Movement',
-        description: 'Baca barang keluar, barang kembali, dan adjustment stok yang memengaruhi kesiapan operasional.',
-        href: '/inventory/movements?inventoryAction=stock-movement#inventory-action-stock-movement',
-        badge: 'mutasi',
-      },
-    )
-  }
-
-  if (canCreate) {
-    cards.push({
-      title: 'Barcode dan Rak',
-      description: 'Kelola penataan rak, barcode rak, dan item master agar lokasi fisik barang tetap mudah diaudit.',
-      href: '/inventory/racks?inventoryAction=rack-layout#inventory-action-rack-layout',
-      badge: 'lokasi fisik',
-    })
-  }
-
-  return cards
 }
 
 export default async function InventoryOverviewPage() {
@@ -172,7 +92,6 @@ export default async function InventoryOverviewPage() {
   }
 
   const shortcuts = buildInventoryShortcuts(session.role)
-  const focusCards = buildInventoryFocusCards(session.role)
   const requestHref =
     session.role === 'FIELD_TECHNICIAN' ? '/inventory/requests?inventoryAction=item-request' : '/inventory/requests'
 
@@ -192,7 +111,7 @@ export default async function InventoryOverviewPage() {
               href="/inventory/items"
               className="inline-flex rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
             >
-              Lihat Item
+              Buka Data Barang
             </Link>
             <Link
               href={requestHref}
@@ -215,54 +134,16 @@ export default async function InventoryOverviewPage() {
         ))}
       </section>
 
-      {focusCards.length > 0 ? (
-        <section className="panel p-4">
-          <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
-            <div>
-              <p className="section-title">Fokus Inventory</p>
-              <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-                Jalur kerja prioritas untuk inventory operasional
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-mute">
-                Fokus ini memadatkan alur yang paling dekat dengan pekerjaan lapangan: ODP dan port,
-                assignment device, request barang, stock movement, dan penataan lokasi fisik.
-              </p>
-            </div>
-            <span className="badge border-slate-200 bg-white text-slate-600">{focusCards.length} fokus</span>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            {focusCards.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="group block overflow-hidden rounded-3xl border border-line bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <span className="badge border-slate-200 bg-white text-slate-600">{item.badge}</span>
-                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 transition group-hover:border-slate-300">
-                    buka
-                  </span>
-                </div>
-                <h3 className="mt-4 font-[family-name:var(--font-heading)] text-lg font-semibold tracking-tight text-slate-950">
-                  {item.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-mute">{item.description}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       {shortcuts.length > 0 ? (
         <section className="panel p-4">
           <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
             <div>
-              <p className="section-title">Shortcut Inventory</p>
+              <p className="section-title">Menu Inventory</p>
               <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-                Masuk ke sub menu kerja
+                Jalur kerja inventory yang dipakai harian
               </h2>
               <p className="mt-1 text-sm leading-6 text-mute">
-                Menu utama Inventory dipadatkan menjadi ringkasan; eksekusi harian dilakukan dari sub menu yang sudah berdiri sendiri.
+                Halaman ini hanya menampilkan menu inti inventory agar user langsung masuk ke workspace yang spesifik tanpa menu tambahan.
               </p>
             </div>
             <span className="badge border-slate-200 bg-white text-slate-600">{shortcuts.length} menu</span>

@@ -726,61 +726,14 @@ function buildInventorySubmenuItems(role: AppRole | null) {
     return items
   }
 
-  if (canUpdate) {
-    items.push(
-      buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-request',
-        title: 'Request Barang',
-        description: 'Antrean request teknisi dan proses pengambilan barang.',
-        href: '/inventory/requests',
-        matchPrefixes: ['/inventory/requests'],
-      }),
-      buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-logs',
-        title: 'Log Aktivitas',
-        description: 'Ringkasan pergerakan stok dan request inventory yang sedang berjalan.',
-        href: '/inventory/logs',
-        matchPrefixes: ['/inventory/logs'],
-      }),
-      buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-rack-layout',
-        title: 'Penataan Rak',
-        description: 'Kelola rak, barcode rak, dan struktur lokasi barang.',
-        href: '/inventory/racks',
-        matchPrefixes: ['/inventory/racks'],
-      }),
-      buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-loans',
-        title: 'Pinjaman',
-        description: 'Pinjamkan barang dan proses pengembalian dalam satu workspace.',
-        href: '/inventory/loans',
-        matchPrefixes: ['/inventory/loans'],
-      }),
-      buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-network',
-        title: 'Network & ODP',
-        description: 'Kelola ODP, port, assignment, dan return perangkat.',
-        href: '/inventory/network',
-        matchPrefixes: ['/inventory/network'],
-      }),
-    )
-  }
-
   if (canCreate) {
     items.push(
       buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-categories',
-        title: 'Jenis Barang',
-        description: 'Lihat kategori inventory yang aktif dipakai item master.',
-        href: '/inventory/master/categories',
-        matchPrefixes: ['/inventory/master/categories'],
-      }),
-      buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-units',
-        title: 'Satuan',
-        description: 'Lihat satuan inventory yang aktif dipakai item master.',
-        href: '/inventory/master/units',
-        matchPrefixes: ['/inventory/master/units'],
+        key: 'inventory-sub-items',
+        title: 'Data Barang',
+        description: 'Master item inventory dan generate barcode item.',
+        href: '/inventory/items',
+        matchPrefixes: ['/inventory/items'],
       }),
       buildSidebarNavItem('/inventory', {
         key: 'inventory-sub-receipt',
@@ -792,37 +745,49 @@ function buildInventorySubmenuItems(role: AppRole | null) {
       buildSidebarNavItem('/inventory', {
         key: 'inventory-sub-stock-movement',
         title: 'Barang Keluar',
-        description: 'Barang keluar, retur, dan adjustment stok.',
+        description: 'Fokus ke barang keluar, retur, dan adjustment stok.',
         href: '/inventory/movements',
         matchPrefixes: ['/inventory/movements'],
       }),
+    )
+  }
+
+  if (canUpdate) {
+    items.push(
       buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-items',
-        title: 'Data Barang',
-        description: 'Master item inventory, barcode item, dan data stok dasar.',
-        href: '/inventory/items',
-        matchPrefixes: ['/inventory/items'],
+        key: 'inventory-sub-request',
+        title: 'Request Barang',
+        description: 'Antrean request teknisi dan proses pengambilan barang.',
+        href: '/inventory/requests',
+        matchPrefixes: ['/inventory/requests'],
       }),
       buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-report-stock',
-        title: 'Laporan Stok',
-        description: 'Pantau stok aktif dan item yang sudah mendekati minimum.',
-        href: '/inventory/reports/stock',
-        matchPrefixes: ['/inventory/reports/stock'],
+        key: 'inventory-sub-loans',
+        title: 'Pinjaman Barang',
+        description: 'Pinjamkan barang dan proses pengembalian dalam satu workspace.',
+        href: '/inventory/loans',
+        matchPrefixes: ['/inventory/loans'],
       }),
       buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-report-in',
-        title: 'Laporan Barang Masuk',
-        description: 'Riwayat receipt dan movement masuk yang menambah stok.',
-        href: '/inventory/reports/in',
-        matchPrefixes: ['/inventory/reports/in'],
+        key: 'inventory-sub-rack-layout',
+        title: 'Penataan Rak',
+        description: 'Kelola rak, barcode rak, dan struktur lokasi barang.',
+        href: '/inventory/racks',
+        matchPrefixes: ['/inventory/racks'],
       }),
       buildSidebarNavItem('/inventory', {
-        key: 'inventory-sub-report-out',
-        title: 'Laporan Barang Keluar',
-        description: 'Riwayat barang keluar dan adjustment stok.',
-        href: '/inventory/reports/out',
-        matchPrefixes: ['/inventory/reports/out'],
+        key: 'inventory-sub-logs',
+        title: 'Log Aktivitas',
+        description: 'Fokus ke log request barang dan pergerakan stok inventory.',
+        href: '/inventory/logs',
+        matchPrefixes: ['/inventory/logs'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-network',
+        title: 'Networks & ODP',
+        description: 'Kelola ODP, port, assignment, dan return perangkat.',
+        href: '/inventory/network',
+        matchPrefixes: ['/inventory/network'],
       }),
     )
   }
