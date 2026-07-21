@@ -670,20 +670,16 @@ export function SupportTroubleTicketQueuePanel({
         <>
           <div className="mt-3 hidden overflow-hidden rounded-xl border border-line bg-white lg:block">
             <div className="overflow-x-auto">
-              <table className="min-w-[1640px] w-full divide-y divide-slate-200 text-sm">
+              <table className="min-w-[1260px] w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-100/90">
                   <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                     <th className="px-3 py-3">ID Ticket</th>
                     <th className="px-3 py-3">Pelanggan</th>
-                    <th className="px-3 py-3">User / Layanan</th>
-                    <th className="px-3 py-3">No WA</th>
+                    <th className="px-3 py-3">User / Kontak</th>
                     <th className="px-3 py-3">Gangguan</th>
                     <th className="px-3 py-3">Tindakan / PIC</th>
-                    <th className="px-3 py-3">Open</th>
-                    <th className="px-3 py-3">Close</th>
                     <th className="px-3 py-3">Target / SLA</th>
-                    <th className="px-3 py-3">Durasi</th>
-                    <th className="px-3 py-3">Keterangan</th>
+                    <th className="px-3 py-3">Waktu Ticket</th>
                     <th className="px-3 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -743,15 +739,10 @@ export function SupportTroubleTicketQueuePanel({
                               <p className="mt-0.5 break-all text-sm leading-5 text-slate-700">{normalizeCellValue(customerUser)}</p>
                             </div>
                             <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Layanan</p>
-                              <p className="mt-0.5 font-mono text-xs text-slate-500">{normalizeCellValue(serviceNo)}</p>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Kontak / Layanan</p>
+                              <p className="mt-0.5 font-mono text-xs text-slate-500">{normalizeCellValue(phone)}</p>
+                              <p className="mt-1 font-mono text-xs text-slate-500">{normalizeCellValue(serviceNo)}</p>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3.5">
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">No WA</p>
-                            <p className="mt-0.5 font-mono text-sm text-slate-700">{normalizeCellValue(phone)}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
@@ -783,24 +774,6 @@ export function SupportTroubleTicketQueuePanel({
                         </td>
                         <td className="px-3 py-3.5">
                           <div className="space-y-2">
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Dibuka</p>
-                              <p className="mt-0.5 text-sm text-slate-700">{formatCompactDateTime(opened)}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Update terakhir</p>
-                              <p className="mt-0.5 text-xs text-slate-500">{formatCompactDateTime(progressUpdated)}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3.5">
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Close</p>
-                            <p className="mt-0.5 text-sm text-slate-700">{closeLabel}</p>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3.5">
-                          <div className="space-y-2">
                             <div className="flex flex-wrap gap-1.5">
                               <span className={`badge ${getPriorityTone(queuePriority)}`}>{queuePriority}</span>
                               <span className={`badge ${getSlaTone(slaState)}`}>{slaState}</span>
@@ -814,17 +787,17 @@ export function SupportTroubleTicketQueuePanel({
                         <td className="px-3 py-3.5">
                           <div className="space-y-2">
                             <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Durasi aktif</p>
-                              <p className="mt-0.5 text-sm font-medium text-slate-900">{aging}</p>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Dibuka</p>
+                              <p className="mt-0.5 text-sm text-slate-700">{formatCompactDateTime(opened)}</p>
                             </div>
-                            <p className="text-xs text-slate-500">{queueReason === 'READY_CLOSE' ? 'Siap ditutup' : 'Masih aktif'}</p>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3.5">
-                          <div className="space-y-2">
                             <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Catatan</p>
-                              <p className="mt-0.5 text-sm leading-5 text-slate-700">{getQueueReasonLabel(queueReason)}</p>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Update terakhir</p>
+                              <p className="mt-0.5 text-xs text-slate-500">{formatCompactDateTime(progressUpdated)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Durasi / Close</p>
+                              <p className="mt-0.5 text-sm font-medium text-slate-900">{aging}</p>
+                              <p className="mt-1 text-xs text-slate-500">{closeLabel}</p>
                             </div>
                           </div>
                         </td>

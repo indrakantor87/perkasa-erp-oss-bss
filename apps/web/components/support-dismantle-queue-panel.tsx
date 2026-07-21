@@ -551,19 +551,17 @@ export function SupportDismantleQueuePanel({
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]">
         <div className="overflow-x-auto">
-          <table className="min-w-[1180px] w-full border-collapse">
+          <table className="min-w-[1020px] w-full border-collapse">
             <thead className="bg-[#162d66]">
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-100">
                 <th className="w-[44px] px-3 py-3"></th>
                 <th className="w-[210px] px-3 py-3">Nomor Ticket</th>
                 <th className="w-[220px] px-3 py-3">Nama</th>
-                <th className="w-[240px] px-3 py-3">User</th>
-                <th className="w-[160px] px-3 py-3">No. HP</th>
-                <th className="w-[80px] px-3 py-3">Maps</th>
+                <th className="w-[240px] px-3 py-3">User / Kontak</th>
                 <th className="w-[120px] px-3 py-3">Marketing</th>
-                <th className="px-3 py-3">Keterangan</th>
                 <th className="w-[140px] px-3 py-3">Problem</th>
                 <th className="w-[120px] px-3 py-3">Status</th>
+                <th className="px-3 py-3">Keterangan</th>
                 <th className="w-[240px] px-3 py-3">Aksi</th>
               </tr>
             </thead>
@@ -587,16 +585,17 @@ export function SupportDismantleQueuePanel({
                       </span>
                     </td>
                     <td className="px-3 py-2 text-sm font-semibold text-white">{row.primary}</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{user || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-white">{phone || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-slate-300">-</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{marketing || '-'}</td>
                     <td className="px-3 py-2 text-sm text-slate-100">
-                      <p className="line-clamp-2">{row.detail}</p>
+                      <p>{user || '-'}</p>
+                      <p className="mt-1 font-mono text-xs text-slate-300">{phone || '-'}</p>
                     </td>
+                    <td className="px-3 py-2 text-sm text-slate-100">{marketing || '-'}</td>
                     <td className="px-3 py-2 text-sm text-slate-100">{row.secondary}</td>
                     <td className="px-3 py-2 text-sm">
                       <span className="badge border-red-500/60 bg-red-500/10 text-red-100">OPEN</span>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-slate-100">
+                      <p className="line-clamp-2">{row.detail}</p>
                     </td>
                     <td className="px-3 py-2 text-sm">
                       <div className="flex flex-wrap items-center gap-2">
@@ -629,7 +628,7 @@ export function SupportDismantleQueuePanel({
               })}
               {!visibleRows.length ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-6 text-sm text-slate-300">
+                  <td colSpan={9} className="px-4 py-6 text-sm text-slate-300">
                     Tidak ada data yang cocok dengan filter.
                   </td>
                 </tr>

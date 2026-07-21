@@ -443,13 +443,11 @@ export function SupportIsolationQueuePanel({
                 </th>
                 <th className="w-[60px] px-3 py-3">No</th>
                 <th className="w-[220px] px-3 py-3">Nama Pelanggan</th>
-                <th className="w-[130px] px-3 py-3">Active Date</th>
                 <th className="w-[220px] px-3 py-3">User</th>
                 <th className="w-[160px] px-3 py-3">No. HP</th>
                 <th className="w-[120px] px-3 py-3">Marketing</th>
                 <th className="w-[120px] px-3 py-3">Radboox</th>
                 <th className="w-[110px] px-3 py-3">Suspend</th>
-                <th className="w-[140px] px-3 py-3">Harga</th>
                 <th className="px-3 py-3">Keterangan</th>
                 <th className="w-[180px] px-3 py-3">Ticket</th>
                 <th className="w-[70px] px-3 py-3">Aksi</th>
@@ -471,8 +469,10 @@ export function SupportIsolationQueuePanel({
                       <input type="checkbox" checked={isSelected} onChange={() => toggleRow(row.id)} />
                     </td>
                     <td className="px-3 py-2 text-sm text-slate-100">{index + 1}</td>
-                    <td className="px-3 py-2 text-sm font-semibold text-white">{row.primary}</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{activeDate || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-slate-100">
+                      <p className="font-semibold text-white">{row.primary}</p>
+                      <p className="mt-1 text-xs text-slate-300">Aktif isolir: {activeDate || '-'}</p>
+                    </td>
                     <td className="px-3 py-2 text-sm text-slate-100">{customerUser || '-'}</td>
                     <td className="px-3 py-2 text-sm text-sky-300">{phone || '-'}</td>
                     <td className="px-3 py-2 text-sm text-slate-100">{marketing || '-'}</td>
@@ -480,7 +480,6 @@ export function SupportIsolationQueuePanel({
                     <td className="px-3 py-2 text-sm">
                       <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-100">-</td>
                     <td className="px-3 py-2 text-sm text-slate-100">
                       <p className="line-clamp-2">{row.detail}</p>
                     </td>
@@ -526,7 +525,7 @@ export function SupportIsolationQueuePanel({
               })}
               {!visibleRows.length ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-6 text-sm text-slate-300">
+                  <td colSpan={11} className="px-4 py-6 text-sm text-slate-300">
                     Tidak ada data yang cocok dengan filter.
                   </td>
                 </tr>
