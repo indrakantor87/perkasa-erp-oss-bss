@@ -425,7 +425,7 @@ export function InventoryNetworkOpsPanel({
   assignmentSuggestions: string[]
   lifecycleItems: DeviceLifecycleLogRow[]
   showDeviceReturnForm: boolean
-  mode?: 'full' | 'sales-odp-focus' | 'ops-odp-focus'
+  mode?: 'full' | 'sales-odp-focus' | 'ops-odp-focus' | 'inventory-odp-focus'
 }) {
   const odpSection = findSection(sections, 'ODP TERBARU')
   const usedPortSection = findSection(sections, 'PORT TERPAKAI')
@@ -447,6 +447,7 @@ export function InventoryNetworkOpsPanel({
   const assignmentRows = assignmentSection?.rows ?? []
   const returnRows = returnSection?.rows ?? []
   const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [showMap, setShowMap] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [pageSize, setPageSize] = useState(10)
@@ -464,8 +465,10 @@ export function InventoryNetworkOpsPanel({
   const [prospectMessage, setProspectMessage] = useState<string>('')
   const isSalesOdpFocus = mode === 'sales-odp-focus'
   const isOpsOdpFocus = mode === 'ops-odp-focus'
-  const isFocusedOdpMode = isSalesOdpFocus || isOpsOdpFocus
+  const isInventoryOdpFocus = mode === 'inventory-odp-focus'
+  const isFocusedOdpMode = isSalesOdpFocus || isOpsOdpFocus || isInventoryOdpFocus
   const canWrite = canCreate && reviewDbReady
+  const useReferenceLikeLayout = isInventoryOdpFocus
 
   const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
   const filteredOdpRows = useMemo(
@@ -660,63 +663,102 @@ export function InventoryNetworkOpsPanel({
   }
 
   return (
-    <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+    <section
+      className={
+        useReferenceLikeLayout
+          ? 'space-y-4'
+          : 'overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]'
+      }
+    >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h3 className="font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">PORT ODP</h3>
-          <p className="mt-1 text-sm leading-5 text-slate-200">Kapasitas ODP bisa berbeda. Merah (penuh), Kuning (&gt; 50%), Hijau (&lt; 50%).</p>
+          <h3
+            className={`font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight ${
+              useReferenceLikeLayout ? 'text-slate-950' : 'text-white'
+            }`}
+          >
+            PORT ODP
+          </h3>
+          <p className={`mt-1 text-sm leading-5 ${useReferenceLikeLayout ? 'text-slate-500' : 'text-slate-200'}`}>
+            Kapasitas ODP bisa berbeda. Merah (penuh), Kuning (&gt; 50%), Hijau (&lt; 50%).
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setShowMap((current) => !current)}
-            className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-950"
+            className={
+              useReferenceLikeLayout
+                ? 'inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white'
+                : 'inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-950'
+            }
           >
             <Map className="h-4 w-4" />
             {showMap ? 'Tutup Peta' : 'Lihat Peta'}
           </button>
-          <button
-            type="button"
-            onClick={() => exportOdpCsv(visibleOdpRows)}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-          >
-            <Download className="h-4 w-4" />
-            Export Excel
-          </button>
-          {!isFocusedOdpMode && canWrite ? (
-            <Link
-              href="/inventory#inventory-action-odp-create"
-              className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-            >
-              <Plus className="h-4 w-4" />
-              Tambah ODP
-            </Link>
-          ) : null}
-          {!isFocusedOdpMode && !canWrite ? (
+          {(useReferenceLikeLayout || !isFocusedOdpMode) && canWrite ? (
             <button
               type="button"
-              disabled
-              className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm font-semibold text-slate-400"
+              onClick={() => setShowCreateModal(true)}
+              className={
+                useReferenceLikeLayout
+                  ? 'inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white'
+                  : 'inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700'
+              }
             >
               <Plus className="h-4 w-4" />
               Tambah ODP
             </button>
           ) : null}
-          {!isFocusedOdpMode && canWrite ? (
+          {(useReferenceLikeLayout || !isFocusedOdpMode) && !canWrite ? (
+            <button
+              type="button"
+              disabled
+              className={
+                useReferenceLikeLayout
+                  ? 'inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-300'
+                  : 'inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm font-semibold text-slate-400'
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Tambah ODP
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => exportOdpCsv(visibleOdpRows)}
+            className={
+              useReferenceLikeLayout
+                ? 'inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
+                : 'inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700'
+            }
+          >
+            <Download className="h-4 w-4" />
+            Export Excel
+          </button>
+          {(useReferenceLikeLayout || !isFocusedOdpMode) && canWrite ? (
             <button
               type="button"
               onClick={() => setShowImportModal(true)}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+              className={
+                useReferenceLikeLayout
+                  ? 'inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50'
+                  : 'inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700'
+              }
             >
               <Upload className="h-4 w-4" />
               Import Excel
             </button>
           ) : null}
-          {!isFocusedOdpMode && !canWrite ? (
+          {(useReferenceLikeLayout || !isFocusedOdpMode) && !canWrite ? (
             <button
               type="button"
               disabled
-              className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm font-semibold text-slate-400"
+              className={
+                useReferenceLikeLayout
+                  ? 'inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-300'
+                  : 'inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm font-semibold text-slate-400'
+              }
             >
               <Upload className="h-4 w-4" />
               Import Excel
@@ -725,9 +767,15 @@ export function InventoryNetworkOpsPanel({
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
+      <div
+        className={`mt-4 rounded-xl px-4 py-3 text-sm ${
+          useReferenceLikeLayout ? 'border border-slate-200 bg-slate-50 text-slate-500' : 'border border-slate-700 bg-slate-900/20 text-slate-100'
+        }`}
+      >
         {isSalesOdpFocus
           ? 'Menu ini sengaja difokuskan hanya untuk pembacaan ODP dan coverage area prospek. Backend tetap memakai engine ERP yang sama, tetapi UI tidak lagi membawa blok inventory yang tidak relevan.'
+          : isInventoryOdpFocus
+            ? 'Fokus ke data PORT ODP untuk kebutuhan operasional CS & Admin CS sesuai struktur menu terbaru.'
           : isOpsOdpFocus
             ? 'Menu ini sengaja difokuskan untuk pembacaan kapasitas ODP, marker peta, dan status port oleh CS maupun NOC. Backend tetap memakai engine ERP yang sama, tetapi UI tidak lagi membawa blok inventory yang tidak relevan.'
           : 'Fokus ke data PORT ODP untuk kebutuhan operasional sales, CS, dan Admin CS: baca detail ODP, lihat marker di peta, lalu ukur jarak prospek ke titik ODP terdekat.'}
@@ -918,6 +966,7 @@ export function InventoryNetworkOpsPanel({
         </>
       ) : null}
 
+      {!isInventoryOdpFocus ? (
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
         <article className="rounded-2xl border border-slate-700 bg-slate-900/25 p-4 text-slate-100">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1073,15 +1122,60 @@ export function InventoryNetworkOpsPanel({
           </div>
         </article>
       </div>
+      ) : null}
+
+      {isInventoryOdpFocus ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={String(pageSize)}
+                onChange={(event) => setPageSize(Number.parseInt(event.target.value, 10))}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+              >
+                <option value="10">Tampil 10</option>
+                <option value="25">Tampil 25</option>
+                <option value="50">Tampil 50</option>
+              </select>
+              <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none">
+                <option>Semua POP</option>
+              </select>
+              <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none">
+                <option>CS &amp; Admin CS</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Cari ODP / lokasi... (paste link Google Maps)"
+                className="w-full min-w-[260px] bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showMap ? (
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/20">
-          <div className="flex flex-col gap-2 border-b border-slate-700 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className={`mt-4 overflow-hidden rounded-2xl ${
+            useReferenceLikeLayout ? 'border border-slate-200 bg-white' : 'border border-slate-700 bg-slate-900/20'
+          }`}
+        >
+          <div
+            className={`flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between ${
+              useReferenceLikeLayout ? 'border-b border-slate-200' : 'border-b border-slate-700'
+            }`}
+          >
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setRouteMode((current) => !current)}
-                className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                className={
+                  useReferenceLikeLayout
+                    ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                    : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                }
               >
                 Mode Rute: {routeMode ? 'ON' : 'OFF'}
               </button>
@@ -1190,7 +1284,9 @@ export function InventoryNetworkOpsPanel({
                 {mapFullscreenActive ? 'Keluar Fullscreen' : 'Fullscreen'}
               </button>
             </div>
-            <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">{filteredOdpRows.length} marker</span>
+              <span className={useReferenceLikeLayout ? 'text-sm text-slate-500' : 'badge border-slate-600 bg-slate-800/70 text-slate-100'}>
+                {useReferenceLikeLayout ? `Marker: ${filteredOdpRows.length}` : `${filteredOdpRows.length} marker`}
+              </span>
           </div>
           {routeMode ? (
             <div className="border-b border-slate-700 bg-slate-950/30 px-3 py-2 text-xs text-slate-200">
@@ -1271,13 +1367,41 @@ export function InventoryNetworkOpsPanel({
         </div>
       ) : null}
 
+      {showCreateModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <button type="button" aria-label="Tutup modal tambah ODP" className="absolute inset-0" onClick={() => setShowCreateModal(false)} />
+          <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="section-title">PORT ODP</p>
+                <h4 className="mt-2 text-xl font-semibold text-slate-950">Tambah ODP</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+              >
+                Tutup
+              </button>
+            </div>
+            <InventoryOdpCreateForm canCreate={canCreate} reviewDbReady={reviewDbReady} embedded />
+          </div>
+        </div>
+      ) : null}
+
       {showImportModal ? <InventoryOdpImportExcelModal open onClose={() => setShowImportModal(false)} /> : null}
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]">
+      <div
+        className={`mt-4 overflow-hidden rounded-2xl ${
+          useReferenceLikeLayout
+            ? 'border border-slate-200 bg-white shadow-none'
+            : 'border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]'
+        }`}
+      >
         <div className="overflow-x-auto">
           <table className="min-w-[1180px] w-full border-collapse">
-            <thead className="bg-[#162d66]">
-              <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-100">
+            <thead className={useReferenceLikeLayout ? 'bg-[#dbeafe]' : 'bg-[#162d66]'}>
+              <tr className={`text-left text-[11px] font-bold uppercase tracking-[0.14em] ${useReferenceLikeLayout ? 'text-slate-500' : 'text-slate-100'}`}>
                 {!isFocusedOdpMode ? <th className="w-[44px] px-3 py-3"></th> : null}
                 <th className="w-[60px] px-3 py-3">#</th>
                 <th className="w-[200px] px-3 py-3">Nama ODP</th>
@@ -1291,7 +1415,7 @@ export function InventoryNetworkOpsPanel({
                 <th className="w-[90px] px-3 py-3">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700 bg-[#1c2b45]">
+            <tbody className={useReferenceLikeLayout ? 'divide-y divide-slate-200 bg-white' : 'divide-y divide-slate-700 bg-[#1c2b45]'}>
               {visibleOdpRows.map((row, index) => {
                 const totalPorts = Number.parseInt(pickMeta(row.meta, 'Total Ports: ') || '0', 10) || 0
                 const activePorts = Number.parseInt(pickMeta(row.meta, 'Active Ports: ') || '0', 10) || 0
@@ -1303,11 +1427,19 @@ export function InventoryNetworkOpsPanel({
                 return (
                   <tr
                     key={row.id}
-                    className={isSelected ? 'align-top bg-[#24395c] transition-colors' : 'align-top transition-colors hover:bg-[#24395c]'}
+                    className={
+                      useReferenceLikeLayout
+                        ? isSelected
+                          ? 'align-top bg-slate-50 transition-colors'
+                          : 'align-top transition-colors hover:bg-slate-50'
+                        : isSelected
+                          ? 'align-top bg-[#24395c] transition-colors'
+                          : 'align-top transition-colors hover:bg-[#24395c]'
+                    }
                   >
-                    {!isFocusedOdpMode ? <td className="px-3 py-2 text-sm text-slate-100"></td> : null}
-                    <td className="px-3 py-2 text-sm text-slate-100">{index + 1}</td>
-                    <td className="px-3 py-2 text-sm font-semibold text-white">
+                    {!isFocusedOdpMode ? <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-700' : 'text-slate-100'}`}></td> : null}
+                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-500' : 'text-slate-100'}`}>{index + 1}</td>
+                    <td className={`px-3 py-2 text-sm font-semibold ${useReferenceLikeLayout ? 'text-slate-950' : 'text-white'}`}>
                       <button
                         type="button"
                         onClick={() => {
@@ -1315,22 +1447,22 @@ export function InventoryNetworkOpsPanel({
                           setShowMap(true)
                           setMapFitKey((current) => current + 1)
                         }}
-                        className="text-left text-white transition hover:text-sky-200"
+                        className={`text-left transition ${useReferenceLikeLayout ? 'text-slate-950 hover:text-slate-700' : 'text-white hover:text-sky-200'}`}
                       >
                         {row.primary}
                       </button>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{row.secondary}</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">
+                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-800' : 'text-slate-100'}`}>{row.secondary}</td>
+                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-800' : 'text-slate-100'}`}>
                       <p className="line-clamp-2">{row.detail}</p>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{totalPorts || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{activePorts || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{remaining || '-'}</td>
+                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-800' : 'text-slate-100'}`}>{totalPorts || '-'}</td>
+                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? activePorts >= totalPorts && totalPorts > 0 ? 'text-rose-500' : 'text-slate-800' : 'text-slate-100'}`}>{activePorts || '-'}</td>
+                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? remaining === 0 && totalPorts > 0 ? 'text-rose-500' : 'text-slate-800' : 'text-slate-100'}`}>{remaining || '-'}</td>
                     <td className="px-3 py-2 text-sm">
                       <span className={`badge ${statusTone}`}>{getPortCapacityLabel({ totalPorts, activePorts })}</span>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-100">n/a</td>
+                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-800' : 'text-slate-100'}`}>n/a</td>
                     <td className="px-3 py-2 text-sm">
                       <button
                         type="button"
