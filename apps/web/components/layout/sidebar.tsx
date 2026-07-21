@@ -518,7 +518,64 @@ function buildHrMainItem() {
     key: 'hr-main',
     title: 'HR',
     description: 'Employee, attendance, payroll, dan pinjaman karyawan',
+    excludePrefixes: ['/hr/employees', '/hr/attendance', '/hr/salary', '/hr/loans', '/hr/permissions', '/hr/disciplinary'],
+    children: buildHrSubmenuItems(),
   })
+}
+
+function buildHrSubmenuItems() {
+  return [
+    buildSidebarNavItem('/hr', {
+      key: 'hr-sub-overview',
+      title: 'HR Overview',
+      description: 'Ringkasan HR dan jalur masuk ke workspace utama.',
+      href: '/hr',
+      matchPrefixes: ['/hr'],
+      excludePrefixes: ['/hr/employees', '/hr/attendance', '/hr/salary', '/hr/loans', '/hr/permissions', '/hr/disciplinary'],
+    }),
+    buildSidebarNavItem('/hr', {
+      key: 'hr-sub-employees',
+      title: 'Data Karyawan',
+      description: 'Master employee, arsip, face reference, dan KPI.',
+      href: '/hr/employees',
+      matchPrefixes: ['/hr/employees'],
+    }),
+    buildSidebarNavItem('/hr', {
+      key: 'hr-sub-attendance',
+      title: 'Absensi',
+      description: 'Input attendance, koreksi, geofence, dan face review.',
+      href: '/hr/attendance',
+      matchPrefixes: ['/hr/attendance'],
+    }),
+    buildSidebarNavItem('/hr', {
+      key: 'hr-sub-salary',
+      title: 'Gaji',
+      description: 'Buat payroll, rilis slip gaji, dan void slip.',
+      href: '/hr/salary',
+      matchPrefixes: ['/hr/salary'],
+    }),
+    buildSidebarNavItem('/hr', {
+      key: 'hr-sub-loans',
+      title: 'Pinjaman',
+      description: 'Buat loan, update status, dan void pinjaman.',
+      href: '/hr/loans',
+      matchPrefixes: ['/hr/loans'],
+    }),
+    buildSidebarNavItem('/hr', {
+      key: 'hr-sub-permissions',
+      title: 'Perizinan',
+      description: 'Kelola pengajuan izin, cuti, dan approval HR.',
+      href: '/hr/permissions',
+      matchPrefixes: ['/hr/permissions'],
+    }),
+    buildSidebarNavItem('/hr', {
+      key: 'hr-sub-disciplinary',
+      title: 'Sanksi',
+      description: 'Kelola surat peringatan dan tindak lanjut disiplin.',
+      href: '/hr/disciplinary',
+      matchPrefixes: ['/hr/disciplinary'],
+    }),
+  ]
 }
 
 function buildCompactTicketingItem() {
@@ -679,6 +736,13 @@ function buildInventorySubmenuItems(role: AppRole | null) {
         matchPrefixes: ['/inventory/requests'],
       }),
       buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-logs',
+        title: 'Log Aktivitas',
+        description: 'Ringkasan pergerakan stok dan request inventory yang sedang berjalan.',
+        href: '/inventory/logs',
+        matchPrefixes: ['/inventory/logs'],
+      }),
+      buildSidebarNavItem('/inventory', {
         key: 'inventory-sub-rack-layout',
         title: 'Penataan Rak',
         description: 'Kelola rak, barcode rak, dan struktur lokasi barang.',
@@ -705,6 +769,20 @@ function buildInventorySubmenuItems(role: AppRole | null) {
   if (canCreate) {
     items.push(
       buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-categories',
+        title: 'Jenis Barang',
+        description: 'Lihat kategori inventory yang aktif dipakai item master.',
+        href: '/inventory/master/categories',
+        matchPrefixes: ['/inventory/master/categories'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-units',
+        title: 'Satuan',
+        description: 'Lihat satuan inventory yang aktif dipakai item master.',
+        href: '/inventory/master/units',
+        matchPrefixes: ['/inventory/master/units'],
+      }),
+      buildSidebarNavItem('/inventory', {
         key: 'inventory-sub-receipt',
         title: 'Barang Masuk',
         description: 'Fokus ke receipt stok gudang.',
@@ -713,17 +791,38 @@ function buildInventorySubmenuItems(role: AppRole | null) {
       }),
       buildSidebarNavItem('/inventory', {
         key: 'inventory-sub-stock-movement',
-        title: 'Stock Movement',
-        description: 'Barang keluar dan adjustment stok.',
+        title: 'Barang Keluar',
+        description: 'Barang keluar, retur, dan adjustment stok.',
         href: '/inventory/movements',
         matchPrefixes: ['/inventory/movements'],
       }),
       buildSidebarNavItem('/inventory', {
         key: 'inventory-sub-items',
-        title: 'Item Master',
+        title: 'Data Barang',
         description: 'Master item inventory, barcode item, dan data stok dasar.',
         href: '/inventory/items',
         matchPrefixes: ['/inventory/items'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-report-stock',
+        title: 'Laporan Stok',
+        description: 'Pantau stok aktif dan item yang sudah mendekati minimum.',
+        href: '/inventory/reports/stock',
+        matchPrefixes: ['/inventory/reports/stock'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-report-in',
+        title: 'Laporan Barang Masuk',
+        description: 'Riwayat receipt dan movement masuk yang menambah stok.',
+        href: '/inventory/reports/in',
+        matchPrefixes: ['/inventory/reports/in'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-report-out',
+        title: 'Laporan Barang Keluar',
+        description: 'Riwayat barang keluar dan adjustment stok.',
+        href: '/inventory/reports/out',
+        matchPrefixes: ['/inventory/reports/out'],
       }),
     )
   }

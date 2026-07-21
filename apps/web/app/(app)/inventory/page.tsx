@@ -42,6 +42,11 @@ function buildInventoryShortcuts(role: AppRole): InventoryShortcut[] {
         href: '/inventory/requests',
       },
       {
+        title: 'Log Aktivitas',
+        description: 'Ringkasan pergerakan stok dan request inventory yang sedang berjalan.',
+        href: '/inventory/logs',
+      },
+      {
         title: 'Penataan Rak',
         description: 'Kelola rak, barcode rak, dan struktur lokasi barang.',
         href: '/inventory/racks',
@@ -62,19 +67,44 @@ function buildInventoryShortcuts(role: AppRole): InventoryShortcut[] {
   if (canCreate) {
     shortcuts.push(
       {
+        title: 'Jenis Barang',
+        description: 'Ringkasan kategori inventory yang aktif dipakai item master.',
+        href: '/inventory/master/categories',
+      },
+      {
+        title: 'Satuan',
+        description: 'Ringkasan satuan inventory yang aktif dipakai item master.',
+        href: '/inventory/master/units',
+      },
+      {
         title: 'Barang Masuk',
         description: 'Fokus ke receipt stok gudang.',
         href: '/inventory/receipts',
       },
       {
-        title: 'Stock Movement',
-        description: 'Barang keluar dan adjustment stok.',
+        title: 'Barang Keluar',
+        description: 'Barang keluar, retur, dan adjustment stok.',
         href: '/inventory/movements',
       },
       {
-        title: 'Item Master',
+        title: 'Data Barang',
         description: 'Master item inventory, barcode item, dan data stok dasar.',
         href: '/inventory/items',
+      },
+      {
+        title: 'Laporan Stok',
+        description: 'Pantau stok aktif dan item yang mendekati minimum.',
+        href: '/inventory/reports/stock',
+      },
+      {
+        title: 'Laporan Barang Masuk',
+        description: 'Riwayat receipt dan movement masuk yang menambah stok.',
+        href: '/inventory/reports/in',
+      },
+      {
+        title: 'Laporan Barang Keluar',
+        description: 'Riwayat barang keluar dan adjustment stok.',
+        href: '/inventory/reports/out',
       },
     )
   }
