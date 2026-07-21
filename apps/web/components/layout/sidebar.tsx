@@ -639,10 +639,10 @@ function buildCompactOdpPortItem() {
     key: 'tracking-odp-port-compact',
     title: 'Port ODP',
     description: 'Baca kapasitas ODP, status port, peta marker, dan coverage area operasional.',
-    href: '/dashboard/tracking/port-odp',
-    requiredPath: '/dashboard/tracking',
-    assignHrefs: ['/dashboard/tracking/port-odp'],
-    matchPrefixes: ['/dashboard/tracking/port-odp'],
+    href: '/inventory/network',
+    requiredPath: '/inventory',
+    assignHrefs: ['/inventory/network'],
+    matchPrefixes: ['/inventory/network'],
   })
 }
 
@@ -667,9 +667,10 @@ function buildCompactInventoryItem() {
     key: 'inventory-compact',
     title: 'Inventory',
     description: 'Ringkasan stok, request, pinjaman, rack, dan network inventory',
+    href: '/inventory/network',
     matchPrefixes: ['/inventory'],
     excludePrefixes: ['/inventory/legal', '/inventory/kantor', '/inventory/toko'],
-    assignHrefs: ['/inventory'],
+    assignHrefs: ['/inventory', '/inventory/network'],
   })
 }
 
@@ -699,7 +700,9 @@ function buildInventoryMainItem(role: AppRole | null) {
     key: 'inventory-main',
     title: 'Inventory',
     description: 'Ringkasan stok, request, pinjaman, rack, dan network inventory',
+    href: '/inventory/network',
     excludePrefixes: ['/inventory/legal', '/inventory/kantor', '/inventory/toko'],
+    assignHrefs: ['/inventory', '/inventory/network'],
     children: buildInventorySubmenuItems(role),
   })
 }
