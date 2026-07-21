@@ -433,10 +433,6 @@ export function InventoryNetworkOpsPanel({
   const assignmentSection = findSection(sections, 'DEVICE ASSIGNMENT')
   const returnSection = findSection(sections, 'DEVICE RETURN')
 
-  if (!odpSection && !usedPortSection && !issuePortSection && !assignmentSection) {
-    return null
-  }
-
   const accessoryAssignments = useMemo(
     () => (assignmentSection?.rows ?? []).filter((row) => isAccessoryCategory(pickMeta(row.meta, 'Category: '))),
     [assignmentSection],
@@ -469,6 +465,7 @@ export function InventoryNetworkOpsPanel({
   const isFocusedOdpMode = isSalesOdpFocus || isOpsOdpFocus || isInventoryOdpFocus
   const canWrite = canCreate && reviewDbReady
   const useReferenceLikeLayout = isInventoryOdpFocus
+  const hasInventoryNetworkData = Boolean(odpSection || usedPortSection || issuePortSection || assignmentSection || returnSection)
 
   const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
   const filteredOdpRows = useMemo(
@@ -780,6 +777,17 @@ export function InventoryNetworkOpsPanel({
             ? 'Menu ini sengaja difokuskan untuk pembacaan kapasitas ODP, marker peta, dan status port oleh CS maupun NOC. Backend tetap memakai engine ERP yang sama, tetapi UI tidak lagi membawa blok inventory yang tidak relevan.'
           : 'Fokus ke data PORT ODP untuk kebutuhan operasional sales, CS, dan Admin CS: baca detail ODP, lihat marker di peta, lalu ukur jarak prospek ke titik ODP terdekat.'}
       </div>
+
+      {!hasInventoryNetworkData ? (
+        <div
+          className={`mt-4 rounded-2xl border px-4 py-4 text-sm leading-6 ${
+            useReferenceLikeLayout ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-amber-400/30 bg-amber-500/10 text-amber-100'
+          }`}
+        >
+          Data section `Port ODP` belum terbaca dari review DB. Halaman tetap dibuka supaya tombol, filter, dan tabel tidak hilang total
+          saat data jaringan belum siap atau schema belum lengkap.
+        </div>
+      ) : null}
 
       {!isFocusedOdpMode ? (
         <>
