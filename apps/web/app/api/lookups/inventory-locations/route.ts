@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { ensureInventoryLocationsTable } from '@/lib/services/inventory-location-service'
 
 type InventoryLocationRow = {
   id: number
@@ -21,6 +22,8 @@ export async function GET() {
   }
 
   try {
+    await ensureInventoryLocationsTable()
+
     const rows = await runReviewDbQuery<InventoryLocationRow>(
       `
         SELECT
@@ -46,4 +49,3 @@ export async function GET() {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
   }
 }
-

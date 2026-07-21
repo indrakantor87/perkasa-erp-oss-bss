@@ -9,6 +9,7 @@ import {
   mockTrackingWorkOrders,
 } from '@/lib/mock-tracking'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
+import { ensureInventoryLocationsTable } from '@/lib/services/inventory-location-service'
 import type { DataSourceSnapshot } from '@/lib/types'
 
 type WorkOrderRow = {
@@ -349,6 +350,7 @@ export async function getWorkOrderTrackingDetail(workOrderId: number) {
   }
 
   try {
+    await ensureInventoryLocationsTable()
     const hasAssignments = await hasReviewDbColumn('service_work_order_assignments', 'work_order_id')
     const hasStatusLogs = await hasReviewDbColumn('service_work_order_status_logs', 'work_order_id')
     const hasMovementWorkOrderId = await hasReviewDbColumn('inventory_stock_movements', 'work_order_id')
@@ -899,6 +901,7 @@ export async function getTroubleTicketTrackingDetail(troubleTicketId: number) {
   }
 
   try {
+    await ensureInventoryLocationsTable()
     const hasWorkOrderTicketId = await hasReviewDbColumn('service_work_orders', 'trouble_ticket_id')
     const hasMovementTicketId = await hasReviewDbColumn('inventory_stock_movements', 'trouble_ticket_id')
     const hasMovementRefType = await hasReviewDbColumn('inventory_stock_movements', 'reference_type')
@@ -1057,6 +1060,7 @@ export async function getInventoryRequestTrackingDetail(requestId: number) {
   }
 
   try {
+    await ensureInventoryLocationsTable()
     const hasRequestWorkOrderId = await hasReviewDbColumn('inventory_item_requests', 'work_order_id')
     const hasRequestTroubleTicketId = await hasReviewDbColumn('inventory_item_requests', 'trouble_ticket_id')
     const hasRequestType = await hasReviewDbColumn('inventory_item_requests', 'request_type')

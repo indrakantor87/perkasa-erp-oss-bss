@@ -3,6 +3,7 @@ import type { AppSession } from '@/lib/auth-session'
 import { mockTrackingNocQueueItems } from '@/lib/mock-tracking'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import { getLatestDeviceLifecycleMaps } from '@/lib/services/device-lifecycle-service'
+import { ensureInventoryLocationsTable } from '@/lib/services/inventory-location-service'
 import type { DataSourceSnapshot } from '@/lib/types'
 
 type WorkOrderQueueRow = {
@@ -665,6 +666,7 @@ export async function getNocQueueList(query: NocQueueQuery, options?: { session?
   }
 
   try {
+    await ensureInventoryLocationsTable()
     const fetchLimit = Math.min(state.limit * 3, 400)
     const hasWorkOrderJobCategory = await hasReviewDbColumn('service_work_orders', 'job_category')
     const hasWorkOrderPriority = await hasReviewDbColumn('service_work_orders', 'priority')
