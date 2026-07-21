@@ -475,6 +475,8 @@ function buildTroubleTicketQuickActionPayload(params: {
   const progressUpdated = pickMeta(params.row.meta, 'Progress Updated: ')
   const queuePriority = pickMeta(params.row.meta, 'Queue Priority: ')
   const queueReason = pickMeta(params.row.meta, 'Queue Reason: ')
+  const serviceNo = pickMeta(params.row.meta, 'Service No: ')
+  const phone = pickMeta(params.row.meta, 'Phone: ')
   const rowActions = getRowActionItems({
     queueReason,
     ticket: params.row.primary,
@@ -490,6 +492,24 @@ function buildTroubleTicketQuickActionPayload(params: {
     subtitle: params.row.secondary,
     description: params.row.detail,
     draftLabel: 'Ticket',
+    copyLabel: 'Salin detail ticket',
+    copyText: [
+      `ID Ticket: ${params.row.primary}`,
+      `Pelanggan: ${params.row.secondary}`,
+      `User: ${customerUser}`,
+      `Gangguan: ${type}`,
+      `Status: ${params.row.status}`,
+      `Queue: ${getQueueReasonLabel(queueReason)}`,
+      `No WA: ${phone}`,
+      `Layanan: ${serviceNo}`,
+      `PIC: ${owner}`,
+      `Follow-up: ${followUp}`,
+      `Update terakhir: ${progressUpdated}`,
+      `Prioritas: ${queuePriority}`,
+      `SLA: ${slaState}`,
+      `Opened: ${opened}`,
+      `Keterangan: ${params.row.detail}`,
+    ].join('\n'),
     draftSeed: [
       `Queue: ${getQueueReasonLabel(queueReason)}`,
       `Follow-up: ${followUp}`,
@@ -512,12 +532,12 @@ function buildTroubleTicketQuickActionPayload(params: {
         value: [type, params.row.detail].filter(Boolean).join('\n'),
       },
       {
-        title: 'Prioritas / SLA',
-        value: [`Prioritas: ${queuePriority}`, `SLA: ${slaState}`, `Due: ${slaDue}`].join('\n'),
-      },
-      {
         title: 'PIC / Follow Up',
         value: [`PIC: ${owner}`, `Follow-up: ${followUp}`, `Update: ${progressUpdated}`, `Opened: ${opened}`].join('\n'),
+      },
+      {
+        title: 'Prioritas / SLA',
+        value: [`Prioritas: ${queuePriority}`, `SLA: ${slaState}`, `Due: ${slaDue}`].join('\n'),
       },
     ],
     actions: rowActions.map((action) => ({

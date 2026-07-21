@@ -31,6 +31,8 @@ export type TableQuickActionPayload = {
   actions?: TableQuickActionLink[]
   draftLabel?: string
   draftSeed?: string
+  copyLabel?: string
+  copyText?: string
 }
 
 const quickActionStatusOptions = [
@@ -95,6 +97,16 @@ export function TableQuickActionModal({
       setCopyFeedback('Ringkasan tindak lanjut berhasil disalin.')
     } catch {
       setCopyFeedback('Clipboard browser tidak tersedia. Salin manual dari kolom catatan.')
+    }
+  }
+
+  async function handleCopyDetail() {
+    if (!item) return
+    try {
+      await navigator.clipboard.writeText(item.copyText || draftSummary)
+      setCopyFeedback(`${item.copyLabel ?? 'Detail item'} berhasil disalin.`)
+    } catch {
+      setCopyFeedback('Clipboard browser tidak tersedia. Salin manual dari detail item di sisi kiri.')
     }
   }
 
@@ -186,6 +198,13 @@ export function TableQuickActionModal({
               </div>
 
               <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleCopyDetail()}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                >
+                  {item.copyLabel ?? 'Salin detail item'}
+                </button>
                 <button
                   type="button"
                   onClick={() => void handleCopyDraft()}

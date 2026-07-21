@@ -222,6 +222,18 @@ function buildOpenDismantleQuickActionPayload(params: {
     subtitle: params.row.secondary,
     description: params.row.detail,
     draftLabel: 'Dismantle',
+    copyLabel: 'Salin detail dismantle',
+    copyText: [
+      `Nama Pelanggan: ${params.row.primary}`,
+      `Problem: ${params.row.secondary}`,
+      `No HP: ${phone}`,
+      `Marketing: ${marketing}`,
+      `Transferred: ${transferredAt}`,
+      `Aging: ${aging}`,
+      `Status: ${params.row.status}`,
+      'Owner Close: CS & Admin CS',
+      `Keterangan: ${params.row.detail}`,
+    ].join('\n'),
     draftSeed: [
       `Transferred: ${transferredAt}`,
       `Aging: ${aging}`,
@@ -284,6 +296,22 @@ function buildHistoryDismantleQuickActionPayload(params: {
     subtitle: params.row.secondary,
     description: params.row.detail,
     draftLabel: 'Histori dismantle',
+    copyLabel: 'Salin detail histori',
+    copyText: [
+      `Nama Pelanggan: ${params.row.primary}`,
+      `Problem: ${params.row.secondary}`,
+      `Closed: ${closedAt}`,
+      `Closed By: ${closedBy}`,
+      `Ticket Ref: ${ticketRef}`,
+      `Work Order: ${workOrderLabel}`,
+      `Field PIC: ${fieldPic}`,
+      `Pickup: ${pickupStatus}`,
+      `Barang Kembali: ${returnedItemCodes.length ? returnedItemCodes.join(', ') : '-'}`,
+      `Billing: ${billingDisposition}`,
+      `No HP: ${phone}`,
+      `Marketing: ${marketing}`,
+      `Keterangan: ${params.row.detail}`,
+    ].join('\n'),
     draftSeed: [
       `Closed: ${closedAt}`,
       `Closed By: ${closedBy}`,
@@ -301,20 +329,20 @@ function buildHistoryDismantleQuickActionPayload(params: {
         value: [`Closed: ${closedAt}`, `Closed By: ${closedBy}`, `Field PIC: ${fieldPic}`].join('\n'),
       },
       {
-        title: 'Field Metadata',
-        value: [`Device: ${deviceStatus}`, `Pickup: ${pickupStatus}`, `Outcome: ${closeOutcome}`].join('\n'),
-      },
-      {
-        title: 'Billing',
-        value: [`Billing: ${billingDisposition}`, 'Owner Histori: CS & Admin CS'].join('\n'),
-      },
-      {
         title: 'Referensi Ticketing',
         value: [`Work Order: ${workOrderLabel}`, `Ticket Ref: ${ticketRef}`].join('\n'),
       },
       {
+        title: 'Field Metadata',
+        value: [`Device: ${deviceStatus}`, `Pickup: ${pickupStatus}`, `Outcome: ${closeOutcome}`].join('\n'),
+      },
+      {
         title: 'Barang Kembali',
         value: returnedItemCodes.length ? returnedItemCodes.join('\n') : 'Belum ada item code return yang tercatat.',
+      },
+      {
+        title: 'Billing',
+        value: [`Billing: ${billingDisposition}`, 'Owner Histori: CS & Admin CS'].join('\n'),
       },
       {
         title: 'Ringkasan',
