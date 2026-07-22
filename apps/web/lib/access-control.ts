@@ -26,6 +26,7 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
     '/finance',
     '/settings/access',
     '/settings/users',
+    '/settings/preferences',
   ],
   ADMIN: ['/dashboard', '/import', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing', '/finance'],
   FINANCE: ['/dashboard', '/billing', '/finance', '/list-dismantle', '/sales', '/customers', '/support'],

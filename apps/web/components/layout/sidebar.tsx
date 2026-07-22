@@ -122,8 +122,6 @@ type SidebarSectionData = {
   items: SidebarNavItem[]
 }
 
-type SuperAdminSidebarMode = 'compact' | 'full'
-
 function buildSalesMainItem(role: AppRole | null) {
   return buildSidebarNavItem('/sales', {
     key: 'sales-main',
@@ -962,11 +960,8 @@ function getPrimaryNavHrefs(role: AppRole | null) {
   return base
 }
 
-function getSuperAdminPrimaryHrefs(mode: SuperAdminSidebarMode) {
-  if (mode === 'compact') {
-    return ['/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard', '/import']
-  }
-  return ['/dashboard', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/import']
+function getSuperAdminPrimaryHrefs() {
+  return ['/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard', '/import']
 }
 
 function getWorkspaceCustomItems(role: AppRole | null) {
@@ -1076,7 +1071,6 @@ function buildSidebarSections(params: {
   allowedItems: typeof navigationItems
   allowedPrefixes: string[]
   role: AppRole | null
-  superAdminMode: SuperAdminSidebarMode
 }) {
   const sortedItems = sortByPreferredOrder({ items: params.allowedItems, role: params.role })
   const coreItems = sortedItems.filter((item) => !item.href.startsWith('/settings'))
@@ -1086,7 +1080,7 @@ function buildSidebarSections(params: {
 
   const primaryHrefs = new Set(
     params.role === 'SUPER_ADMIN'
-      ? getSuperAdminPrimaryHrefs(params.superAdminMode)
+      ? getSuperAdminPrimaryHrefs()
       : getPrimaryNavHrefs(params.role),
   )
   const primaryItems = coreItems
@@ -1094,16 +1088,14 @@ function buildSidebarSections(params: {
     .map(mapNavigationItemToSidebarNavItem)
 
   const rawWorkspaceItems =
-    params.role === 'SUPER_ADMIN' && params.superAdminMode === 'compact'
-      ? getSuperAdminCompactWorkspaceItems()
-      : getWorkspaceCustomItems(params.role)
+    params.role === 'SUPER_ADMIN' ? getSuperAdminCompactWorkspaceItems() : getWorkspaceCustomItems(params.role)
 
   const workspaceItems = dedupeSidebarItems(
     filterCustomItems(rawWorkspaceItems, params.allowedPrefixes, params.role),
   )
 
   const supportingCustomItems =
-    params.role === 'SUPER_ADMIN' && params.superAdminMode === 'compact'
+    params.role === 'SUPER_ADMIN'
       ? []
       : dedupeSidebarItems(filterCustomItems(getSupportingCustomItems(params.role), params.allowedPrefixes, params.role))
 
@@ -1114,7 +1106,7 @@ function buildSidebarSections(params: {
   )
 
   const supportingBaseItems =
-    params.role === 'SUPER_ADMIN' && params.superAdminMode === 'compact'
+    params.role === 'SUPER_ADMIN'
       ? []
       : ['PENJUALAN', 'CS_OPERATOR', 'CS_ADMIN', 'NOC_OPERATOR'].includes(params.role ?? '')
         ? []
@@ -1124,9 +1116,7 @@ function buildSidebarSections(params: {
     params.role === 'SUPER_ADMIN' ? 'Control Center' : 'Utama'
   const workspaceTitle =
     params.role === 'SUPER_ADMIN'
-      ? params.superAdminMode === 'compact'
-        ? 'Operasional Inti'
-        : 'Lintas Divisi'
+      ? 'Operasional Inti'
       : params.role === 'NOC_OPERATOR'
         ? 'Operasional'
       : 'Workspace'
@@ -1383,72 +1373,6 @@ function SidebarSection({
   )
 }
 
-function SuperAdminModeSwitch({
-  mode,
-  collapsed,
-  language,
-  onChange,
-}: {
-  mode: SuperAdminSidebarMode
-  collapsed: boolean
-  language: 'id' | 'en'
-  onChange: (mode: SuperAdminSidebarMode) => void
-}) {
-  if (collapsed) {
-    return (
-      <div className="mt-4 flex justify-center">
-        <button
-          type="button"
-          onClick={() => onChange(mode === 'compact' ? 'full' : 'compact')}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300 transition hover:border-slate-700 hover:text-white"
-          aria-label={
-            mode === 'compact'
-              ? translateUiText('Mode Kontrol', language)
-              : translateUiText('Mode Harian', language)
-          }
-          title={
-            mode === 'compact'
-              ? translateUiText('Mode Harian', language)
-              : translateUiText('Mode Kontrol', language)
-          }
-        >
-          {mode === 'compact' ? 'H' : 'K'}
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-1">
-      <div className="flex items-center gap-1">
-        {([
-          ['compact', 'Mode Harian'],
-          ['full', 'Mode Kontrol'],
-        ] as const).map(([value, label]) => {
-          const active = mode === value
-          return (
-            <button
-              key={value}
-              type="button"
-              onClick={() => onChange(value)}
-              className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                active ? 'bg-white text-slate-950' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {translateUiText(label, language)}
-            </button>
-          )
-        })}
-      </div>
-      <p className="px-3 pb-2 pt-2 text-[11px] leading-4 text-slate-400">
-        {mode === 'compact'
-          ? translateUiText('Fokus ke queue cepat, daily activity, dan workspace inti.', language)
-          : translateUiText('Tampilkan area lintas divisi dan menu pengawasan yang lebih lengkap.', language)}
-      </p>
-    </div>
-  )
-}
-
 export function Sidebar({
   session,
   allowedPrefixes,
@@ -1464,16 +1388,13 @@ export function Sidebar({
       .trim()
       .toUpperCase()
   const roleMeta = session ? getRoleMeta(session.role, language) : null
-  const isSuperAdmin = session?.role === 'SUPER_ADMIN'
   const allowedItems = navigationItems.filter((item) =>
     allowedPrefixes.some((prefix) => matchesPrefix(item.href, prefix))
   )
-  const [superAdminMode, setSuperAdminMode] = useState<SuperAdminSidebarMode>('compact')
   const { coreSections, settingsItems } = buildSidebarSections({
     allowedItems,
     allowedPrefixes,
     role: session?.role ?? null,
-    superAdminMode,
   })
   const mobileQuickItems = coreSections.flatMap((section) => section.items).slice(0, 5)
   const [collapsed, setCollapsed] = useState(false)
@@ -1507,17 +1428,6 @@ export function Sidebar({
   useEffect(() => {
     window.localStorage.setItem('perkasa.sidebar.expanded-items', JSON.stringify(expandedItems))
   }, [expandedItems])
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem('perkasa.sidebar.superadmin-mode')
-    if (stored === 'full' || stored === 'compact') {
-      setSuperAdminMode(stored)
-    }
-  }, [])
-
-  useEffect(() => {
-    window.localStorage.setItem('perkasa.sidebar.superadmin-mode', superAdminMode)
-  }, [superAdminMode])
 
   useEffect(() => {
     setMobileOpen(false)
@@ -1571,15 +1481,6 @@ export function Sidebar({
               </span>
             </button>
           </div>
-        ) : null}
-
-        {isSuperAdmin ? (
-          <SuperAdminModeSwitch
-            mode={superAdminMode}
-            collapsed={collapsed}
-            language={language}
-            onChange={setSuperAdminMode}
-          />
         ) : null}
 
         <nav className="mt-10 space-y-6">
@@ -1695,15 +1596,6 @@ export function Sidebar({
                 </span>
               </button>
             </div>
-
-            {isSuperAdmin ? (
-              <SuperAdminModeSwitch
-                mode={superAdminMode}
-                collapsed={false}
-                language={language}
-                onChange={setSuperAdminMode}
-              />
-            ) : null}
 
             <nav className="mt-8 space-y-6 overflow-y-auto pr-1">
               {coreSections.map((section) => (

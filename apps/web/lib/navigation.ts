@@ -112,6 +112,13 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
     icon: BadgeDollarSign,
   },
   {
+    title: 'Pengaturan',
+    href: '/settings/preferences',
+    description: 'Tema, bahasa, akses cepat import, dan aksi keluar akun',
+    tone: 'bg-slate-950 text-white',
+    icon: ShieldCheck,
+  },
+  {
     title: 'Akses',
     href: '/settings/access',
     description: 'Role, permission, dan pengaturan akses',

@@ -24,6 +24,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
   const { theme, setTheme } = useUiTheme()
   const canReviewImport =
     session ? allowedPrefixes.some((prefix) => matchesPrefix('/import', prefix)) : false
+  const hideQuickControls = session?.role === 'SUPER_ADMIN'
   const roleMeta = session ? getRoleMeta(session.role, language) : null
   const activeTitle = translateUiText(activeItem.title, language)
   const activeDescription = translateUiText(activeItem.description, language)
@@ -67,55 +68,63 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
         ) : null}
 
         <div className="flex items-center gap-3">
-          <div className="surface-soft inline-flex items-center rounded-full border p-1">
-            <span className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">
-              {themeLabel}
-            </span>
-            {([
-              ['light', 'Light'],
-              ['dark', 'Dark'],
-            ] as const).map(([value, label]) => {
-              const active = theme === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setTheme(value)}
-                  className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-                    active ? 'text-[var(--color-accent-ink)]' : 'text-mute hover:text-[var(--color-ink-strong)]'
-                  }`}
-                  style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
-                  aria-label={label}
-                  title={label}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          <div className="surface-soft inline-flex items-center rounded-full border p-1">
-            {([
-              ['id', 'ID'],
-              ['en', 'EN'],
-            ] as const).map(([value, label]) => {
-              const active = language === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setLanguage(value)}
-                  className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-                    active ? 'text-[var(--color-accent-ink)]' : 'text-mute hover:text-[var(--color-ink-strong)]'
-                  }`}
-                  style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
-                  aria-label={value === 'id' ? 'Gunakan Bahasa Indonesia' : 'Use English'}
-                  title={value === 'id' ? 'Bahasa Indonesia' : 'English'}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
+          {!hideQuickControls ? (
+            <div className="surface-soft inline-flex items-center rounded-full border p-1">
+              <span className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">
+                {themeLabel}
+              </span>
+              {([
+                ['light', 'Light'],
+                ['dark', 'Dark'],
+              ] as const).map(([value, label]) => {
+                const active = theme === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setTheme(value)}
+                    className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                      active
+                        ? 'text-[var(--color-accent-ink)]'
+                        : 'text-mute hover:text-[var(--color-ink-strong)]'
+                    }`}
+                    style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
+                    aria-label={label}
+                    title={label}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+          {!hideQuickControls ? (
+            <div className="surface-soft inline-flex items-center rounded-full border p-1">
+              {([
+                ['id', 'ID'],
+                ['en', 'EN'],
+              ] as const).map(([value, label]) => {
+                const active = language === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setLanguage(value)}
+                    className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                      active
+                        ? 'text-[var(--color-accent-ink)]'
+                        : 'text-mute hover:text-[var(--color-ink-strong)]'
+                    }`}
+                    style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
+                    aria-label={value === 'id' ? 'Gunakan Bahasa Indonesia' : 'Use English'}
+                    title={value === 'id' ? 'Bahasa Indonesia' : 'English'}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
           {session ? (
             <div className="surface-soft hidden items-center gap-3 rounded-full border px-4 py-2.5 sm:flex">
               <div
@@ -137,7 +146,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
             </div>
           ) : null}
 
-          {canReviewImport ? (
+          {!hideQuickControls && canReviewImport ? (
             <Link
               href="/import"
               prefetch={false}
@@ -146,14 +155,16 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
               {importLabel}
             </Link>
           ) : null}
-          <form action="/api/auth/logout" method="post">
-            <button
-              type="submit"
-              className="surface-soft rounded-full border px-4 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)]"
-            >
-              {logoutLabel}
-            </button>
-          </form>
+          {!hideQuickControls ? (
+            <form action="/api/auth/logout" method="post">
+              <button
+                type="submit"
+                className="surface-soft rounded-full border px-4 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)]"
+              >
+                {logoutLabel}
+              </button>
+            </form>
+          ) : null}
         </div>
       </div>
     </header>
