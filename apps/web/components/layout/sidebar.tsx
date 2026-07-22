@@ -752,6 +752,20 @@ function buildInventorySubmenuItems(role: AppRole | null) {
         href: '/inventory/movements',
         matchPrefixes: ['/inventory/movements'],
       }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-damaged-items',
+        title: 'Barang Rusak',
+        description: 'Catatan barang rusak beserta harga beli, harga jual, dan keterangannya.',
+        href: '/inventory/damaged',
+        matchPrefixes: ['/inventory/damaged'],
+      }),
+      buildSidebarNavItem('/inventory', {
+        key: 'inventory-sub-assets',
+        title: 'Total Asset',
+        description: 'Akumulasi nilai asset elektronik, operasional, dan perlengkapan teknisi.',
+        href: '/inventory/assets',
+        matchPrefixes: ['/inventory/assets'],
+      }),
     )
   }
 
