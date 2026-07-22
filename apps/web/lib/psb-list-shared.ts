@@ -26,6 +26,7 @@ export type PsbListItem = {
   createdAt: string | null
   updatedAt: string | null
   areaLabel: string | null
+  googleMapsLink: string | null
   escortNotes: string | null
   activityNotes: string | null
   csPicName: string | null

@@ -46,6 +46,7 @@ type ReviewDbPsbListRow = {
   createdAt: string | null
   updatedAt: string | null
   areaLabel: string | null
+  googleMapsLink: string | null
   escortNotes: string | null
   activityNotes: string | null
   csPicName: string | null
@@ -89,6 +90,7 @@ const mockPsbListItems: PsbListItem[] = [
     createdAt: '2026-07-19T08:12:00+07:00',
     updatedAt: '2026-07-19T08:12:00+07:00',
     areaLabel: 'Pati Kota',
+    googleMapsLink: 'https://maps.google.com/?q=-6.745204,111.038785',
     escortNotes: 'Marketing meminta pemasangan pagi karena customer standby di rumah.',
     activityNotes: 'Lead sudah lolos coverage dan menunggu review awal CS.',
     csPicName: null,
@@ -113,6 +115,7 @@ const mockPsbListItems: PsbListItem[] = [
     createdAt: '2026-07-18T14:10:00+07:00',
     updatedAt: '2026-07-19T09:45:00+07:00',
     areaLabel: 'Margorejo',
+    googleMapsLink: 'https://maps.google.com/?q=-6.748800,111.021700',
     escortNotes: 'Sudah dikawal oleh penjualan, customer responsif via WhatsApp.',
     activityNotes: 'Perlu cek ulang ketersediaan port sebelum transfer ke ticketing.',
     csPicName: 'Admin CS Pagi',
@@ -137,6 +140,7 @@ const mockPsbListItems: PsbListItem[] = [
     createdAt: '2026-07-18T11:20:00+07:00',
     updatedAt: '2026-07-19T10:20:00+07:00',
     areaLabel: 'Margorejo Industri',
+    googleMapsLink: 'https://maps.google.com/?q=-6.752100,111.018400',
     escortNotes: 'Customer corporate minta teknisi datang setelah jam 10 pagi.',
     activityNotes: 'Dokumen akses site belum lengkap.',
     csPicName: 'CS Operator 02',
@@ -161,6 +165,7 @@ const mockPsbListItems: PsbListItem[] = [
     createdAt: '2026-07-18T16:35:00+07:00',
     updatedAt: '2026-07-19T11:05:00+07:00',
     areaLabel: 'Pati Lor',
+    googleMapsLink: 'https://maps.google.com/?q=-6.747950,111.036540',
     escortNotes: 'Rumah mudah ditemukan, titik maps sudah dibagikan.',
     activityNotes: 'Menunggu transfer ke ticketing PSB.',
     csPicName: 'Admin CS Pagi',
@@ -185,6 +190,7 @@ const mockPsbListItems: PsbListItem[] = [
     createdAt: '2026-07-17T09:00:00+07:00',
     updatedAt: '2026-07-19T07:40:00+07:00',
     areaLabel: 'Tlogowungu',
+    googleMapsLink: 'https://maps.google.com/?q=-6.677430,111.019840',
     escortNotes: 'Customer sudah konfirmasi pemasangan minggu ini.',
     activityNotes: 'Ticket PSB sudah dibuat dan siap diteruskan ke teknisi.',
     csPicName: 'CS Operator 01',
@@ -209,6 +215,7 @@ const mockPsbListItems: PsbListItem[] = [
     createdAt: '2026-07-17T13:15:00+07:00',
     updatedAt: '2026-07-18T10:10:00+07:00',
     areaLabel: 'Tayu',
+    googleMapsLink: 'https://maps.google.com/?q=-6.539970,111.113620',
     escortNotes: 'Masih menunggu alamat final dari penjualan.',
     activityNotes: 'Jalur instalasi belum layak.',
     csPicName: 'Admin CS Sore',
@@ -362,6 +369,7 @@ function mapReviewDbRowToPsbListItem(row: ReviewDbPsbListRow): PsbListItem {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     areaLabel: row.areaLabel,
+    googleMapsLink: row.googleMapsLink,
     escortNotes: row.escortNotes,
     activityNotes: row.activityNotes,
     csPicName: row.csPicName,
@@ -416,6 +424,7 @@ export async function ensurePsbListTables() {
         correction_notes TEXT NULL,
         transferred_ticket_ref VARCHAR(80) NULL,
         area_label VARCHAR(120) NULL,
+        google_maps_link TEXT NULL,
         escort_notes TEXT NULL,
         activity_notes TEXT NULL,
         cs_pic_name VARCHAR(120) NULL,
@@ -454,7 +463,8 @@ export async function ensurePsbListTables() {
   )
 
   await ensurePsbListColumn('area_label', 'area_label VARCHAR(120) NULL', 'transferred_ticket_ref')
-  await ensurePsbListColumn('escort_notes', 'escort_notes TEXT NULL', 'area_label')
+  await ensurePsbListColumn('google_maps_link', 'google_maps_link TEXT NULL', 'area_label')
+  await ensurePsbListColumn('escort_notes', 'escort_notes TEXT NULL', 'google_maps_link')
   await ensurePsbListColumn('activity_notes', 'activity_notes TEXT NULL', 'escort_notes')
   await ensurePsbListColumn('cs_pic_name', 'cs_pic_name VARCHAR(120) NULL', 'activity_notes')
   await ensurePsbListColumn('next_action_label', 'next_action_label VARCHAR(150) NULL', 'cs_pic_name')
@@ -485,7 +495,7 @@ export async function ensurePsbListBaselineSeeds() {
     return
   }
 
-  const itemPlaceholders = mockPsbListItems.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')
+  const itemPlaceholders = mockPsbListItems.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')
   const itemValues: Array<number | string | null> = []
   for (const item of mockPsbListItems) {
     itemValues.push(
@@ -503,6 +513,7 @@ export async function ensurePsbListBaselineSeeds() {
       item.correctionNotes,
       item.transferredTicketRef,
       item.areaLabel,
+      item.googleMapsLink,
       item.escortNotes,
       item.activityNotes,
       item.csPicName,
@@ -530,6 +541,7 @@ export async function ensurePsbListBaselineSeeds() {
         correction_notes,
         transferred_ticket_ref,
         area_label,
+        google_maps_link,
         escort_notes,
         activity_notes,
         cs_pic_name,
@@ -682,8 +694,9 @@ async function getReviewDbPsbListPageData(
       OR sales_owner_name LIKE ?
       OR transferred_ticket_ref LIKE ?
       OR area_label LIKE ?
+      OR google_maps_link LIKE ?
     )`)
-    values.push(like, like, like, like, like, like, like, like, like)
+    values.push(like, like, like, like, like, like, like, like, like, like)
   }
 
   const rows = await runReviewDbQuery<ReviewDbPsbListRow>(
@@ -706,6 +719,7 @@ async function getReviewDbPsbListPageData(
         created_at AS createdAt,
         updated_at AS updatedAt,
         area_label AS areaLabel,
+        google_maps_link AS googleMapsLink,
         escort_notes AS escortNotes,
         activity_notes AS activityNotes,
         cs_pic_name AS csPicName,
@@ -836,6 +850,7 @@ export async function createPsbListItem(params: {
   salesOwnerName?: string | null
   requestedInstallDate?: string | null
   areaLabel?: string | null
+  googleMapsLink?: string | null
   escortNotes?: string | null
   activityNotes?: string | null
   actorName: string
@@ -859,6 +874,7 @@ export async function createPsbListItem(params: {
   const salesOwnerName = normalizeNullableText(params.salesOwnerName) ?? params.actorName
   const requestedInstallDate = normalizeRequestedInstallDate(params.requestedInstallDate)
   const areaLabel = normalizeNullableText(params.areaLabel)
+  const googleMapsLink = normalizeNullableText(params.googleMapsLink)
   const escortNotes = normalizeNullableText(params.escortNotes)
   const activityNotes = normalizeNullableText(params.activityNotes)
   const nextActionLabel = buildNextActionLabel('BARU')
@@ -880,11 +896,12 @@ export async function createPsbListItem(params: {
         requested_install_date,
         status,
         area_label,
+        google_maps_link,
         escort_notes,
         activity_notes,
         next_action_label
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'BARU', ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'BARU', ?, ?, ?, ?, ?)
     `,
     [
       psbListCode,
@@ -896,6 +913,7 @@ export async function createPsbListItem(params: {
       salesOwnerName,
       requestedInstallDate,
       areaLabel,
+      googleMapsLink,
       escortNotes,
       activityNotes,
       nextActionLabel,
@@ -1094,6 +1112,7 @@ export async function transferPsbListToTicket(params: {
         created_at AS createdAt,
         updated_at AS updatedAt,
         area_label AS areaLabel,
+        google_maps_link AS googleMapsLink,
         escort_notes AS escortNotes,
         activity_notes AS activityNotes,
         cs_pic_name AS csPicName,

@@ -94,6 +94,28 @@ function renderMetaBadge(label: string, value: string | null | undefined) {
   )
 }
 
+function renderAreaBadge(item: PsbListItem) {
+  if (!item.areaLabel) {
+    return null
+  }
+
+  if (item.googleMapsLink) {
+    return (
+      <a
+        href={item.googleMapsLink}
+        target="_blank"
+        rel="noreferrer"
+        className="badge border-sky-200 bg-sky-50 text-sky-700 transition hover:border-sky-300 hover:bg-sky-100"
+        title="Buka lokasi di Google Maps"
+      >
+        Area: {item.areaLabel}
+      </a>
+    )
+  }
+
+  return renderMetaBadge('Area', item.areaLabel)
+}
+
 function renderWorkOrderLinks(item: PsbListItem) {
   if (item.status !== 'DITRANSFER_KE_TICKETING') {
     return null
@@ -268,7 +290,7 @@ export function PsbListWorkspace({
                         <td className="px-4 py-4 align-top">
                           <p className="text-sm text-slate-700">{item.addressText}</p>
                           <div className="mt-2 flex flex-wrap gap-2">
-                            {renderMetaBadge('Area', item.areaLabel)}
+                            {renderAreaBadge(item)}
                             {renderMetaBadge('Ticket', item.transferredTicketRef)}
                           </div>
                         </td>

@@ -21,6 +21,7 @@ export function SalesPsbInputForm({
   const [customerPhone, setCustomerPhone] = useState('')
   const [addressText, setAddressText] = useState('')
   const [areaLabel, setAreaLabel] = useState('')
+  const [googleMapsLink, setGoogleMapsLink] = useState('')
   const [packageLabel, setPackageLabel] = useState('')
   const [odpCode, setOdpCode] = useState('')
   const [requestedInstallDate, setRequestedInstallDate] = useState('')
@@ -52,6 +53,7 @@ export function SalesPsbInputForm({
           customerPhone,
           addressText,
           areaLabel,
+          googleMapsLink,
           packageLabel,
           odpCode,
           requestedInstallDate,
@@ -175,6 +177,17 @@ export function SalesPsbInputForm({
               onChange={(event) => setAreaLabel(event.target.value)}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-slate-400"
               placeholder="Contoh: Pati Kota"
+              disabled={isDisabled}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm text-slate-700">
+            <span className="font-semibold text-slate-950">Link Google Maps</span>
+            <input
+              value={googleMapsLink}
+              onChange={(event) => setGoogleMapsLink(event.target.value)}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+              placeholder="https://maps.google.com/... atau koordinat/link lokasi"
               disabled={isDisabled}
             />
           </label>

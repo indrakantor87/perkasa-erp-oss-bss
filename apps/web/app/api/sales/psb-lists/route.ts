@@ -53,6 +53,7 @@ export async function POST(request: Request) {
       salesOwnerName: normalizeString(payload.salesOwnerName) || `${session.displayName} (${session.username})`,
       requestedInstallDate: normalizeString(payload.requestedInstallDate) || null,
       areaLabel: normalizeString(payload.areaLabel) || null,
+      googleMapsLink: normalizeString(payload.googleMapsLink) || null,
       escortNotes: normalizeString(payload.escortNotes) || null,
       activityNotes: normalizeString(payload.activityNotes) || null,
       actorName: `${session.displayName} (${session.username})`,
