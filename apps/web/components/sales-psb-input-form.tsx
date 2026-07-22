@@ -5,6 +5,78 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
+function parseCoordinatePair(value: string) {
+  const match = value.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/)
+  if (!match) return null
+  const lat = Number(match[1])
+  const lng = Number(match[2])
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
+  return { lat, lng }
+}
+
+function normalizeGoogleMapsInput(rawValue: string) {
+  const value = rawValue.trim()
+  if (!value) {
+    return { normalized: '', valid: true, helper: 'Kosongkan jika belum ada titik lokasi.' }
+  }
+
+  const directPair = parseCoordinatePair(value)
+  if (directPair) {
+    return {
+      normalized: `https://maps.google.com/?q=${encodeURIComponent(`${directPair.lat},${directPair.lng}`)}`,
+      valid: true,
+      helper: 'Koordinat akan otomatis diubah menjadi link Google Maps.',
+    }
+  }
+
+  const normalizedUrl = value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`
+
+  try {
+    const url = new URL(normalizedUrl)
+    const hostname = url.hostname.toLowerCase()
+    const isGoogleMapsHost =
+      hostname === 'maps.google.com' ||
+      hostname === 'maps.app.goo.gl' ||
+      hostname.endsWith('.google.com') ||
+      hostname === 'google.com' ||
+      hostname.endsWith('.google.co.id') ||
+      hostname === 'goo.gl'
+
+    const pathname = url.pathname.toLowerCase()
+    const hasMapSignal =
+      hostname === 'maps.google.com' ||
+      hostname === 'maps.app.goo.gl' ||
+      pathname.startsWith('/maps') ||
+      pathname.includes('/place') ||
+      pathname.includes('/search') ||
+      url.searchParams.has('q') ||
+      url.searchParams.has('query') ||
+      url.searchParams.has('ll') ||
+      url.searchParams.has('destination')
+
+    if (!isGoogleMapsHost || !hasMapSignal) {
+      return {
+        normalized: value,
+        valid: false,
+        helper: 'Gunakan URL Google Maps yang valid atau isi koordinat `latitude,longitude`.',
+      }
+    }
+
+    return {
+      normalized: url.toString(),
+      valid: true,
+      helper: 'Link lokasi siap dipakai pada daftar PSB.',
+    }
+  } catch {
+    return {
+      normalized: value,
+      valid: false,
+      helper: 'Format link belum valid. Gunakan URL Google Maps atau koordinat `latitude,longitude`.',
+    }
+  }
+}
+
 type SalesPsbInputFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
@@ -32,10 +104,19 @@ export function SalesPsbInputForm({
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+  const mapsInputState = normalizeGoogleMapsInput(googleMapsLink)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (isDisabled) {
+      return
+    }
+
+    if (!mapsInputState.valid) {
+      setFeedback({
+        tone: 'error',
+        message: mapsInputState.helper,
+      })
       return
     }
 
@@ -53,7 +134,7 @@ export function SalesPsbInputForm({
           customerPhone,
           addressText,
           areaLabel,
-          googleMapsLink,
+          googleMapsLink: mapsInputState.normalized,
           packageLabel,
           odpCode,
           requestedInstallDate,
@@ -186,10 +267,20 @@ export function SalesPsbInputForm({
             <input
               value={googleMapsLink}
               onChange={(event) => setGoogleMapsLink(event.target.value)}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+              className={`rounded-2xl border bg-white px-4 py-3 outline-none transition ${
+                googleMapsLink && !mapsInputState.valid
+                  ? 'border-rose-300 focus:border-rose-400'
+                  : 'border-slate-200 focus:border-slate-400'
+              }`}
               placeholder="https://maps.google.com/... atau koordinat/link lokasi"
               disabled={isDisabled}
             />
+            <span className={`text-xs ${mapsInputState.valid ? 'text-slate-500' : 'text-rose-600'}`}>
+              {mapsInputState.helper}
+            </span>
+            {mapsInputState.valid && mapsInputState.normalized && mapsInputState.normalized !== googleMapsLink.trim() ? (
+              <span className="text-xs text-sky-700">Normalisasi otomatis: {mapsInputState.normalized}</span>
+            ) : null}
           </label>
 
           <label className="flex flex-col gap-2 text-sm text-slate-700">

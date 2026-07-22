@@ -105,10 +105,13 @@ function renderAreaBadge(item: PsbListItem) {
         href={item.googleMapsLink}
         target="_blank"
         rel="noreferrer"
-        className="badge border-sky-200 bg-sky-50 text-sky-700 transition hover:border-sky-300 hover:bg-sky-100"
+        className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700 transition hover:border-sky-300 hover:bg-sky-100"
         title="Buka lokasi di Google Maps"
       >
-        Area: {item.areaLabel}
+        <span>Lokasi</span>
+        <span>•</span>
+        <span>Area: {item.areaLabel}</span>
+        <span aria-hidden="true">↗</span>
       </a>
     )
   }
