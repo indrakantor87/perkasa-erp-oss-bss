@@ -144,18 +144,41 @@ function buildSalesSubmenuItems(role: AppRole | null) {
   if (role === 'PENJUALAN') {
     return [
       buildSidebarNavItem('/sales', {
+        key: 'sales-sub-workspace',
+        title: 'Workspace Penjualan',
+        description: 'Ringkasan input PSB, antrean PSB, dan shortcut monitoring komersial.',
+        href: '/sales',
+        matchPrefixes: ['/sales'],
+        excludePrefixes: [
+          '/sales/digital-creator',
+          '/sales/campaigns',
+          '/sales/digital-leads',
+          '/sales/content-calendar',
+          '/sales/content-analytics',
+          '/sales/marketing-activities',
+          '/sales/input-psb',
+        ],
+      }),
+      buildSidebarNavItem('/sales', {
         key: 'sales-sub-input-psb',
         title: 'Input PSB',
-        description: 'Form input prospek lapangan yang langsung masuk ke List PSB.',
+        description: 'Form input prospek lapangan yang langsung masuk ke Data PSB.',
         href: '/sales/input-psb',
         matchPrefixes: ['/sales/input-psb'],
       }),
       buildSidebarNavItem('/list-psb', {
         key: 'sales-sub-list-psb',
-        title: 'List PSB',
-        description: 'List PSB milik user login untuk dipantau sampai diproses CS.',
+        title: 'Data PSB',
+        description: 'Data PSB milik user login untuk dipantau sampai diproses CS.',
         href: '/list-psb',
         matchPrefixes: ['/list-psb'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-marketing-activities',
+        title: 'Aktivitas Tim',
+        description: 'Aktivitas tim penjualan/marketing milik user login pada periode aktif.',
+        href: '/sales/marketing-activities',
+        matchPrefixes: ['/sales/marketing-activities'],
       }),
       buildSidebarNavItem('/dashboard/tracking', {
         key: 'sales-sub-ticketing',
@@ -165,13 +188,6 @@ function buildSalesSubmenuItems(role: AppRole | null) {
         requiredPath: '/sales',
         assignHrefs: ['/sales/ticketing'],
         matchPrefixes: ['/sales/ticketing'],
-      }),
-      buildSidebarNavItem('/sales', {
-        key: 'sales-sub-marketing-activities',
-        title: 'Aktivitas Marketing',
-        description: 'Aktivitas marketing milik user login pada periode aktif.',
-        href: '/sales/marketing-activities',
-        matchPrefixes: ['/sales/marketing-activities'],
       }),
       buildSidebarNavItem('/support', {
         key: 'sales-sub-isolations',
@@ -196,22 +212,10 @@ function buildSalesSubmenuItems(role: AppRole | null) {
 
   const items: SidebarNavItem[] = []
 
-  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING'].includes(role)) {
-    items.push(
-      buildSidebarNavItem('/sales', {
-        key: 'sales-sub-input-psb',
-        title: 'Input PSB',
-        description: 'Form input prospek lapangan yang langsung masuk ke List PSB.',
-        href: '/sales/input-psb',
-        matchPrefixes: ['/sales/input-psb'],
-      }),
-    )
-  }
-
   items.push(
     buildSidebarNavItem('/sales', {
       key: 'sales-sub-workspace',
-      title: 'Workspace Sales',
+      title: 'Workspace Penjualan',
       description: 'Ringkasan input PSB, antrean PSB, dan shortcut monitoring komersial.',
       href: '/sales',
       matchPrefixes: ['/sales'],
@@ -229,17 +233,29 @@ function buildSalesSubmenuItems(role: AppRole | null) {
 
   if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING'].includes(role)) {
     items.push(
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-input-psb',
+        title: 'Input PSB',
+        description: 'Form input prospek lapangan yang langsung masuk ke Data PSB.',
+        href: '/sales/input-psb',
+        matchPrefixes: ['/sales/input-psb'],
+      }),
+    )
+  }
+
+  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING'].includes(role)) {
+    items.push(
       buildSidebarNavItem('/list-psb', {
         key: 'sales-sub-list-psb',
-        title: 'List PSB',
+        title: 'Data PSB',
         description: 'Antrean validasi PSB sebelum diteruskan ke ticketing operasional.',
         href: '/list-psb',
         matchPrefixes: ['/list-psb'],
       }),
       buildSidebarNavItem('/sales', {
         key: 'sales-sub-marketing-activities',
-        title: 'Aktivitas Marketing',
-        description: 'Agenda canvassing, covered area, dan ritme aktivitas marketing.',
+        title: 'Aktivitas Tim',
+        description: 'Agenda canvassing, covered area, dan ritme aktivitas tim.',
         href: '/sales/marketing-activities',
         matchPrefixes: ['/sales/marketing-activities'],
       }),
@@ -1083,9 +1099,17 @@ function buildSidebarSections(params: {
       ? getSuperAdminPrimaryHrefs()
       : getPrimaryNavHrefs(params.role),
   )
-  const primaryItems = coreItems
+  const rawPrimaryItems = coreItems
     .filter((item) => primaryHrefs.has(item.href))
     .map(mapNavigationItemToSidebarNavItem)
+
+  const utamaOrder = ['/dashboard', '/dashboard/daily-activity', '/dashboard/worklist', '/dashboard/tracking', '/import']
+  const primaryItems =
+    params.role === 'SUPER_ADMIN'
+      ? rawPrimaryItems
+      : utamaOrder
+          .map((href) => rawPrimaryItems.find((item) => item.href === href))
+          .filter((item): item is SidebarNavItem => Boolean(item))
 
   const rawWorkspaceItems =
     params.role === 'SUPER_ADMIN' ? getSuperAdminCompactWorkspaceItems() : getWorkspaceCustomItems(params.role)

@@ -66,6 +66,39 @@ function normalizeGoogleMapsLink(rawValue: string) {
   }
 }
 
+function buildActivityNotes(params: {
+  description: string
+  birthDate: string
+  housePhotoFileName: string
+}) {
+  const pieces: string[] = []
+  if (params.birthDate) {
+    pieces.push(`Tgl Lahir: ${params.birthDate}`)
+  }
+  if (params.housePhotoFileName) {
+    pieces.push(`Foto Rumah: ${params.housePhotoFileName}`)
+  }
+  if (params.description) {
+    pieces.push(params.description)
+  }
+  return pieces.join('\n') || null
+}
+
+function buildAddressText(params: {
+  description: string
+  googleMapsLink: string | null
+  customerName: string
+}) {
+  const fromDescription = params.description.trim()
+  if (fromDescription) {
+    return fromDescription
+  }
+  if (params.googleMapsLink) {
+    return `Maps: ${params.googleMapsLink}`
+  }
+  return `Alamat PSB ${params.customerName}`
+}
+
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) {
@@ -87,41 +120,43 @@ export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as Record<string, unknown>
     const customerName = normalizeString(payload.customerName)
-    const addressText = normalizeString(payload.addressText)
     const packageLabel = normalizeString(payload.packageLabel)
-    const googleMapsLink = normalizeGoogleMapsLink(normalizeString(payload.googleMapsLink))
+    const description = normalizeString(payload.activityNotes)
+    const birthDate = normalizeString(payload.birthDate)
+    const housePhotoFileName = normalizeString(payload.housePhotoFileName)
+    const mapsRaw = normalizeString(payload.googleMapsLink)
+    const googleMapsLink = normalizeGoogleMapsLink(mapsRaw)
 
     if (!customerName) {
-      return Response.json({ message: 'Nama customer wajib diisi.' }, { status: 400 })
-    }
-
-    if (!addressText) {
-      return Response.json({ message: 'Alamat pemasangan wajib diisi.' }, { status: 400 })
+      return Response.json({ message: 'Nama Pelanggan wajib diisi.' }, { status: 400 })
     }
 
     if (!packageLabel) {
       return Response.json({ message: 'Paket layanan wajib diisi.' }, { status: 400 })
     }
 
-    if (normalizeString(payload.googleMapsLink) && !googleMapsLink) {
+    if (mapsRaw && !googleMapsLink) {
       return Response.json(
         { message: 'Link lokasi harus berupa URL Google Maps yang valid atau koordinat `latitude,longitude`.' },
         { status: 400 },
       )
     }
 
+    const activityNotes = buildActivityNotes({ description, birthDate, housePhotoFileName })
+    const addressText = buildAddressText({ description, googleMapsLink, customerName })
+
     const result = await createPsbListItem({
       customerName,
       customerPhone: normalizeString(payload.customerPhone) || null,
       addressText,
-      odpCode: normalizeString(payload.odpCode) || null,
+      odpCode: null,
       packageLabel,
       salesOwnerName: normalizeString(payload.salesOwnerName) || `${session.displayName} (${session.username})`,
-      requestedInstallDate: normalizeString(payload.requestedInstallDate) || null,
-      areaLabel: normalizeString(payload.areaLabel) || null,
+      requestedInstallDate: null,
+      areaLabel: null,
       googleMapsLink,
-      escortNotes: normalizeString(payload.escortNotes) || null,
-      activityNotes: normalizeString(payload.activityNotes) || null,
+      escortNotes: null,
+      activityNotes,
       actorName: `${session.displayName} (${session.username})`,
       actorRole: session.role,
     })

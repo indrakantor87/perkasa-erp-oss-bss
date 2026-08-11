@@ -74,7 +74,7 @@ type TransferablePsbListRow = ReviewDbPsbListRow & {
 const mockPsbListItems: PsbListItem[] = [
   {
     id: 101,
-    psbListCode: 'PSBL-202607-0001',
+    psbListCode: 'PSB/19.07.2026/0001',
     customerName: 'Ahmad Hidayat',
     customerPhone: '628523110022',
     addressText: 'Perum Griya Pati Indah Blok C2 No. 8, Pati Kidul',
@@ -99,7 +99,7 @@ const mockPsbListItems: PsbListItem[] = [
   },
   {
     id: 102,
-    psbListCode: 'PSBL-202607-0002',
+    psbListCode: 'PSB/18.07.2026/0002',
     customerName: 'Rina Setyawati',
     customerPhone: '628133445566',
     addressText: 'Ds. Sukoharjo RT 03 RW 01, Margorejo',
@@ -124,7 +124,7 @@ const mockPsbListItems: PsbListItem[] = [
   },
   {
     id: 103,
-    psbListCode: 'PSBL-202607-0003',
+    psbListCode: 'PSB/18.07.2026/0003',
     customerName: 'PT Maju Lancar Abadi',
     customerPhone: '62295214567',
     addressText: 'Kawasan Industri Margorejo Blok C2',
@@ -149,7 +149,7 @@ const mockPsbListItems: PsbListItem[] = [
   },
   {
     id: 104,
-    psbListCode: 'PSBL-202607-0004',
+    psbListCode: 'PSB/18.07.2026/0004',
     customerName: 'Budi Santoso',
     customerPhone: '628987654321',
     addressText: 'Jl. Melati No. 12, Pati Lor',
@@ -174,7 +174,7 @@ const mockPsbListItems: PsbListItem[] = [
   },
   {
     id: 105,
-    psbListCode: 'PSBL-202607-0005',
+    psbListCode: 'PSB/17.07.2026/0005',
     customerName: 'Lina Maharani',
     customerPhone: '628111000222',
     addressText: 'Perumahan Graha Asri Blok B7, Tlogowungu',
@@ -185,7 +185,7 @@ const mockPsbListItems: PsbListItem[] = [
     status: 'DITRANSFER_KE_TICKETING',
     reviewNotes: 'Data lengkap dan sudah diteruskan ke ticketing.',
     correctionNotes: null,
-    transferredTicketRef: 'PSB-202607-0188',
+    transferredTicketRef: 'PSB/19.07.2026/0188',
     transferredWorkOrderId: null,
     createdAt: '2026-07-17T09:00:00+07:00',
     updatedAt: '2026-07-19T07:40:00+07:00',
@@ -199,7 +199,7 @@ const mockPsbListItems: PsbListItem[] = [
   },
   {
     id: 106,
-    psbListCode: 'PSBL-202607-0006',
+    psbListCode: 'PSB/17.07.2026/0006',
     customerName: 'Toko Berkah Jaya',
     customerPhone: '628123456789',
     addressText: 'Jl. Raya Tayu Km. 3, Tayu',
@@ -323,7 +323,7 @@ function normalizeRequestedInstallDate(value: string | null | undefined) {
 
 async function generatePsbListCode() {
   const now = new Date()
-  const period = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+  const datePart = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
   const rows = await runReviewDbQuery<{ psbListCode: string | null }>(
     `
       SELECT psb_list_code AS psbListCode
@@ -332,16 +332,16 @@ async function generatePsbListCode() {
       ORDER BY id DESC
       LIMIT 1
     `,
-    [`PSBL-${period}-%`],
+    ['PSB/%'],
   )
 
   const latestCode = String(rows[0]?.psbListCode ?? '').trim()
-  const latestParts = latestCode.split('-')
-  const latestSequenceText = latestParts[latestParts.length - 1] ?? '0'
+  const lastSlashIndex = latestCode.lastIndexOf('/')
+  const latestSequenceText = lastSlashIndex >= 0 ? latestCode.slice(lastSlashIndex + 1) : '0'
   const latestSequence = Number.parseInt(latestSequenceText, 10)
   const nextSequence = Number.isFinite(latestSequence) && latestSequence > 0 ? latestSequence + 1 : 1
 
-  return `PSBL-${period}-${String(nextSequence).padStart(4, '0')}`
+  return `PSB/${datePart}/${String(nextSequence).padStart(4, '0')}`
 }
 
 function buildFallbackSnapshot(detail: string) {

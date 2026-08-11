@@ -31,11 +31,22 @@ const englishTextMap: Record<string, string> = {
   'Invoice, customer, isolir, payment, dan collection': 'Invoices, customers, suspensions, payments, and collections',
   'Role, permission, dan pengaturan akses': 'Roles, permissions, and access settings',
   'Daftar user auth internal dan status review': 'Internal auth users and review status',
-  'Workspace Sales': 'Sales Workspace',
-  'Ringkasan lead, survey, order, dan progres aktivasi.': 'Lead, survey, order, and activation progress summary.',
-  'Aktivitas Marketing': 'Marketing Activities',
+  'Workspace Penjualan': 'Sales Workspace',
+  'Ringkasan input PSB, antrean PSB, dan shortcut monitoring komersial.':
+    'Input PSB summary, PSB queue, and commercial monitoring shortcuts.',
+  'Input PSB': 'PSB Input',
+  'Form input prospek lapangan yang langsung masuk ke Data PSB.':
+    'Field prospect input form that goes directly to PSB Data.',
+  'Data PSB': 'PSB Data',
+  'Antrean validasi PSB sebelum diteruskan ke ticketing operasional.':
+    'PSB validation queue before forwarding to operational ticketing.',
+  'List PSB': 'PSB Data',
+  'Aktivitas Tim': 'Team Activities',
+  'Agenda canvassing, covered area, dan ritme aktivitas tim.':
+    'Canvassing schedule, covered area, and team activity rhythm.',
+  'Aktivitas Marketing': 'Team Activities',
   'Agenda canvassing, covered area, dan ritme aktivitas marketing.':
-    'Canvassing schedule, covered area, and marketing activity rhythm.',
+    'Canvassing schedule, covered area, and team activity rhythm.',
   'Support Teknis': 'Technical Support',
   'Antrean teknis, TT, monitoring ticket, dan kontrol SLA operasional':
     'Technical queue, TT, ticket monitoring, and operational SLA control',

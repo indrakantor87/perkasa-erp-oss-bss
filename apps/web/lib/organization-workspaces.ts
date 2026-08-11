@@ -37,16 +37,16 @@ export type OrganizationWorkspaceDefinition = {
 
 export const salesWorkspace: OrganizationWorkspaceDefinition = {
   eyebrow: 'Input PSB dan Tindak Lanjut',
-  title: 'Workspace Sales',
+  title: 'Workspace Penjualan',
   description:
-    'Halaman ini menjadi meja ringkas penjualan agar menu utama tetap fokus pada alur PSB: input prospek lapangan, masuk ke List PSB, lalu diteruskan oleh CS ke ticketing operasional.',
+    'Halaman ini menjadi meja ringkas penjualan agar menu utama tetap fokus pada alur PSB: input prospek lapangan, masuk ke Data PSB, lalu diteruskan oleh CS ke ticketing operasional.',
   primaryAction: {
     label: 'Buka Input PSB',
     href: '/sales/input-psb',
-    description: 'Masuk langsung ke form input prospek lapangan yang akan masuk ke List PSB.',
+    description: 'Masuk langsung ke form input prospek lapangan yang akan masuk ke Data PSB.',
   },
   secondaryAction: {
-    label: 'Buka List PSB',
+    label: 'Buka Data PSB',
     href: '/list-psb',
     description: 'Lanjutkan review CS terhadap item PSB yang sudah diajukan penjualan.',
   },
@@ -56,8 +56,8 @@ export const salesWorkspace: OrganizationWorkspaceDefinition = {
       detail: 'Catat customer prospek lapangan beserta data inti pemasangan tanpa layar tambahan lain.',
     },
     {
-      title: 'Masuk List PSB',
-      detail: 'Setelah disimpan, item masuk ke List PSB agar bisa dipilih dan dibaca oleh CS.',
+      title: 'Masuk Data PSB',
+      detail: 'Setelah disimpan, item masuk ke Data PSB agar bisa dipilih dan dibaca oleh CS.',
     },
     {
       title: 'Review dan Jadwal CS',
@@ -74,22 +74,28 @@ export const salesWorkspace: OrganizationWorkspaceDefinition = {
       description: 'Setiap menu dibatasi ke satu tujuan kerja agar operator tidak kehilangan fokus.',
       links: [
         {
+          label: 'Workspace Penjualan',
+          href: '/sales',
+          description: 'Ringkasan input PSB, antrean PSB, dan shortcut monitoring komersial.',
+          badge: 'workspace',
+        },
+        {
           label: 'Input PSB',
           href: '/sales/input-psb',
-          description: 'Form khusus untuk prospek lapangan yang siap diajukan ke List PSB.',
+          description: 'Form khusus untuk prospek lapangan yang siap diajukan ke Data PSB.',
           badge: 'form',
         },
         {
-          label: 'List PSB',
+          label: 'Data PSB',
           href: '/list-psb',
           description: 'Antrean PSB yang dipilih CS, direview, dijadwalkan, lalu diteruskan ke ticketing.',
           badge: 'validasi',
         },
         {
-          label: 'Aktivitas Marketing',
+          label: 'Aktivitas Tim',
           href: '/sales/marketing-activities',
-          description: 'Halaman pendukung untuk role yang memang memakai agenda marketing terpisah.',
-          badge: 'marketing',
+          description: 'Halaman pendukung untuk role yang memang memakai agenda tim terpisah.',
+          badge: 'tim',
         },
       ],
     },
