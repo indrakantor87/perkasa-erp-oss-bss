@@ -1,28 +1,32 @@
-FROM node:20-slim AS deps
+FROM --platform=linux/amd64 node:20-slim AS deps
 WORKDIR /app/apps/web
 COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-FROM node:20-slim AS builder
+FROM --platform=linux/amd64 node:20-slim AS builder
 WORKDIR /app/apps/web
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_OPTIONS=--max-old-space-size=3072
+ENV NODE_OPTIONS=--max-old-space-size=4096
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_PRIORITY=critical
 COPY apps/web/package.json apps/web/package-lock.json ./
 COPY --from=deps /app/apps/web/node_modules ./node_modules
 COPY apps/web ./
 RUN npm run build
 
-FROM node:20-slim AS runner
+FROM --platform=linux/amd64 node:20-slim AS runner
 WORKDIR /app/apps/web
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_PRIORITY=critical
 ADD --chmod=755 https://github.com/moparisthebest/static-curl/releases/download/v8.12.1/curl-amd64 /usr/local/bin/curl
 COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./.next/static
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 CMD curl -fsS -m 5 http://127.0.0.1:3000/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 CMD curl -fsS -m 5 http://127.0.0.1:3000/api/health || exit 1
 CMD ["node", "server.js"]
