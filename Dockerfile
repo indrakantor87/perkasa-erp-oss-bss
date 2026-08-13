@@ -1,32 +1,29 @@
-FROM --platform=linux/amd64 node:20-slim AS deps
+FROM --platform=linux/amd64 node:20-bookworm-slim AS deps
 WORKDIR /app/apps/web
-COPY apps/web/package.json apps/web/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY apps/web/package.json apps/web/package-lock.json* ./
+RUN npm ci --ignore-scripts
 
-FROM --platform=linux/amd64 node:20-slim AS builder
+FROM --platform=linux/amd64 node:20-bookworm-slim AS builder
 WORKDIR /app/apps/web
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_OPTIONS=--max-old-space-size=4096
-ENV DEBIAN_FRONTEND=noninteractive
-ENV DEBIAN_PRIORITY=critical
-COPY apps/web/package.json apps/web/package-lock.json ./
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/apps/web/node_modules ./node_modules
 COPY apps/web ./
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS=--max-old-space-size=2048
 RUN npm run build
 
-FROM --platform=linux/amd64 node:20-slim AS runner
+FROM --platform=linux/amd64 node:20-bookworm-slim AS runner
 WORKDIR /app/apps/web
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-ENV DEBIAN_FRONTEND=noninteractive
-ENV DEBIAN_PRIORITY=critical
-ADD --chmod=755 https://github.com/moparisthebest/static-curl/releases/download/v8.12.1/curl-amd64 /usr/local/bin/curl
+
 COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./.next/static
+
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 CMD curl -fsS -m 5 http://127.0.0.1:3000/api/health || exit 1
-CMD ["node", "server.js"]
+CMD ["node","server.js"]
