@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
+import { Suspense } from 'react'
 import './globals.css'
 import { getServerUiTheme } from '@/lib/ui-theme-server'
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
@@ -8,12 +9,35 @@ const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-inter',
+  adjustFontFallback: true,
+  preload: true,
+  fallback: [
+    'ui-sans-serif',
+    'system-ui',
+    '-apple-system',
+    'Segoe UI',
+    'Roboto',
+    'Helvetica',
+    'Arial',
+  ],
 })
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-plus-jakarta',
+  adjustFontFallback: true,
+  preload: true,
+  weight: ['400', '500', '600', '700', '800'],
+  fallback: [
+    'ui-sans-serif',
+    'system-ui',
+    '-apple-system',
+    'Segoe UI',
+    'Roboto',
+    'Helvetica',
+    'Arial',
+  ],
 })
 
 const FONT_STACK_BODY =
@@ -21,9 +45,86 @@ const FONT_STACK_BODY =
 const FONT_STACK_HEADING =
   "'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'"
 
+const metadataBaseUrl =
+  process.env.NEXT_PUBLIC_APP_URL
+    ? new URL(process.env.NEXT_PUBLIC_APP_URL)
+    : process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? new URL(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
+      : new URL('http://localhost:3000')
+
 export const metadata: Metadata = {
-  title: 'Perkasa ERP OSS BSS',
+  metadataBase: metadataBaseUrl,
+  title: {
+    default: 'Perkasa ERP OSS BSS',
+    template: '%s | Perkasa ERP OSS BSS',
+  },
   description: 'Satu website operasional ISP untuk sales, support, inventory, HR, dan billing.',
+  applicationName: 'Perkasa ERP OSS BSS',
+  keywords: [
+    'Perkasa ERP',
+    'ISP OSS BSS',
+    'Perkasa Networks',
+    'PSB Pelanggan Baru',
+    'Aktivasi Radius',
+    'Inventory ONT',
+    'Billing ISP',
+    'HR Payroll',
+  ],
+  authors: [{ name: 'Perkasa Networks', url: 'https://perkasa.net' }],
+  creator: 'Perkasa Networks',
+  publisher: 'Perkasa Networks',
+  category: 'business',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+
+  alternates: {
+    canonical: '/',
+  },
+
+  openGraph: {
+    type: 'website',
+    locale: 'id_ID',
+    url: metadataBaseUrl.href,
+    siteName: 'Perkasa ERP OSS BSS',
+    title: 'Perkasa ERP OSS BSS',
+    description:
+      'Satu website operasional ISP untuk sales, support, inventory, HR, dan billing.',
+    emails: ['support@perkasa.net'],
+  },
+
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Perkasa ERP OSS BSS',
+    description:
+      'Satu website operasional ISP untuk sales, support, inventory, HR, dan billing.',
+    creator: '@perkasanet',
+  },
+
+  appleWebApp: {
+    capable: true,
+    title: 'Perkasa ERP OSS BSS',
+    statusBarStyle: 'default',
+  },
+
+  icons: {
+    icon: [{ url: '/favicon.ico', sizes: 'any' }],
+    apple: [{ url: '/favicon.ico', sizes: '180x180' }],
+  },
+
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: {
+      index: false,
+      follow: false,
+      'max-image-preview': 'none',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
 }
 
 export const viewport: Viewport = {
@@ -31,7 +132,33 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: 'cover',
-  themeColor: '#0f172a',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f8fafc' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f172a' },
+  ],
+  colorScheme: 'light dark',
+}
+
+const PRECONNECT_ORIGINS = [
+  'https://fonts.googleapis.com',
+  'https://fonts.gstatic.com',
+  'https://nominatim.openstreetmap.org',
+  'https://cdn.jsdelivr.net',
+]
+
+function LoadingSkeleton() {
+  return (
+    <div className="min-h-[70vh] w-full animate-pulse flex flex-col gap-6 p-6">
+      <div className="h-12 w-1/3 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="h-32 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
+        <div className="h-32 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
+        <div className="h-32 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
+        <div className="h-32 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
+      </div>
+      <div className="h-96 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
+    </div>
+  )
 }
 
 export default async function RootLayout({
@@ -48,6 +175,17 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={`${inter.variable} ${plusJakarta.variable}`}
     >
+      <head>
+        {PRECONNECT_ORIGINS.map((origin) => (
+          <link key={`preconnect-${origin}`} rel="preconnect" href={origin} crossOrigin="anonymous" />
+        ))}
+        {PRECONNECT_ORIGINS.map((origin) => (
+          <link key={`dns-${origin}`} rel="dns-prefetch" href={origin} />
+        ))}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+      </head>
       <body
         style={
           {
@@ -55,9 +193,9 @@ export default async function RootLayout({
             ['--font-heading']: FONT_STACK_HEADING,
           } as Record<string, string>
         }
-        className="font-[family-name:var(--font-body)] antialiased"
+        className="font-[family-name:var(--font-body)] antialiased min-h-screen bg-surface text-ink selection:bg-accent/20"
       >
-        {children}
+        <Suspense fallback={<LoadingSkeleton />}>{children}</Suspense>
       </body>
     </html>
   )
