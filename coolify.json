@@ -1,10 +1,16 @@
 {
   "version": 1,
   "build": {
+    "build_pack": "dockerfile",
     "engine": "dockerfile",
     "docker_buildkit": false,
+    "buildkit": false,
     "use_helper": false,
+    "helper_disabled": true,
     "disable_buildx": true,
+    "buildx_disabled": true,
+    "prepare_builder_image": false,
+    "skip_prepare_builder": true,
     "dockerfile": "Dockerfile",
     "context": "."
   },
