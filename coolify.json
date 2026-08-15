@@ -6,8 +6,7 @@
     "use_helper": false,
     "disable_buildx": true,
     "dockerfile": "Dockerfile",
-    "context": ".",
-    "custom_build_script": ".coolify/build.sh"
+    "context": "."
   },
   "deploy": {
     "network_mode": "bridge",
