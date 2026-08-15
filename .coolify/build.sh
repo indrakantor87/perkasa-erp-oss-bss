@@ -20,6 +20,10 @@ export DOCKER_BUILDX=0
 export BUILDX_DISABLED=true
 export COMPOSE_DOCKER_CLI_BUILD=0
 export DOCKER_CLI_EXPERIMENTAL=disabled
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+export TMPDIR="/tmp"
+export BUILDKIT_PROGRESS=plain
 
 echo "========================================================================"
 echo " [Coolify Build Script] MODE: DIRECT DOCKER BUILD (NO HELPER, NO BUILDKIT)"
@@ -40,10 +44,13 @@ which docker >/dev/null 2>&1 || {
 }
 
 echo ""
-echo "==> Step 1/2: docker build -f ${DOCKERFILE_PATH} -t ${DOCKER_IMAGE_FULL} ${BUILD_CONTEXT}"
+echo "==> Step 1/2: docker build --progress=plain -f ${DOCKERFILE_PATH} -t ${DOCKER_IMAGE_FULL} ${BUILD_CONTEXT}"
+echo "    (progress=plain = selalu ada stdout, hindari Coolify timeout 'no output >10menit')"
 echo ""
 
-if DOCKER_BUILDKIT=0 docker build \
+if DOCKER_BUILDKIT=0 DEBIAN_FRONTEND=noninteractive docker build \
+  --progress=plain \
+  --build-arg DEBIAN_FRONTEND=noninteractive \
   -f "${DOCKERFILE_PATH}" \
   -t "${DOCKER_IMAGE_FULL}" \
   "${BUILD_CONTEXT}"; then
@@ -58,9 +65,10 @@ else
   echo ""
   echo "[WARN] docker build pertama gagal (exit ${BUILD_EXIT}). Retry dengan --no-cache + verbose."
   echo ""
-  if DOCKER_BUILDKIT=0 docker build \
+  if DOCKER_BUILDKIT=0 DEBIAN_FRONTEND=noninteractive docker build \
     --no-cache \
     --progress=plain \
+    --build-arg DEBIAN_FRONTEND=noninteractive \
     -f "${DOCKERFILE_PATH}" \
     -t "${DOCKER_IMAGE_FULL}" \
     "${BUILD_CONTEXT}"; then
