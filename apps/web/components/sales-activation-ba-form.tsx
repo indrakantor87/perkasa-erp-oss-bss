@@ -1,4 +1,5 @@
 'use client'
+/// <reference path="../shims.d.ts" />
 
 import type { ChangeEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'

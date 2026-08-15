@@ -589,7 +589,6 @@ class MikrotikSshProvider implements IRadiusActivationProvider {
 
     this.ssh2Promise = (async () => {
       try {
-        // @ts-expect-error - ssh2 adalah dependency optional, di-install hanya jika provider mikrotik-ssh dipakai
         const mod = (await import('ssh2')) as unknown as Ssh2ClientModule
         this.ssh2Module = mod
         return mod
@@ -620,7 +619,7 @@ class MikrotikSshProvider implements IRadiusActivationProvider {
               return reject(err)
             }
             stream
-              .on('close', (code: number) => {
+              .on('close', (code: number | null) => {
                 conn.end()
                 resolve({ output, exitCode: code ?? 0 })
               })

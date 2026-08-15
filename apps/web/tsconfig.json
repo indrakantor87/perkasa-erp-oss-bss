@@ -30,8 +30,8 @@
     }
   },
   "include": [
-    "next-env.d.ts",
     "shims.d.ts",
+    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",

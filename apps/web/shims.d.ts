@@ -117,6 +117,14 @@ declare module 'jspdf' {
     line(x1: number, y1: number, x2: number, y2: number): this
     rect(x: number, y: number, w: number, h: number, style?: 'S' | 'F' | 'DF' | 'FD'): this
 
+    splitTextToSize(
+      text: string,
+      maxWidth: number,
+      options?: unknown,
+    ): string[]
+
+    setPage(targetPage: number): this
+
     addImage(
       imageData: string | HTMLImageElement | HTMLCanvasElement | Uint8Array | unknown,
       format: string,
@@ -164,17 +172,30 @@ declare module 'ssh2' {
     debug?: (info: string) => void
   }
 
-  export interface ClientChannel {
+  export interface ClientChannel extends NodeJS.ReadWriteStream {
     write(data: string | Buffer): boolean
     end(data?: string | Buffer): void
+
+    on(event: 'close', listener: (code: number | null) => void): this
     on(event: 'close', listener: (hadError: boolean) => void): this
-    on(event: 'data', listener: (data: Buffer | string) => void): this
     on(event: 'exit', listener: (code: number | null, signalName: string | null, didCoreDump: boolean, description: string | null) => void): this
+    on(event: 'data', listener: (data: Buffer | string) => void): this
     on(event: 'end', listener: () => void): this
+    on(event: 'error', listener: (err: Error) => void): this
+    on(event: 'drain', listener: () => void): this
+    on(event: 'finish', listener: () => void): this
     on(event: string, listener: (...args: unknown[]) => void): this
-    stderr?: {
+
+    once(event: 'close', listener: (code: number | null) => void): this
+    once(event: 'close', listener: (hadError: boolean) => void): this
+    once(event: string, listener: (...args: unknown[]) => void): this
+
+    stderr: {
       on(event: 'data', listener: (data: Buffer | string) => void): this
-    }
+      on(event: 'close', listener: () => void): this
+      on(event: 'end', listener: () => void): this
+      on(event: 'error', listener: (err: Error) => void): this
+    } & NodeJS.ReadableStream
   }
 
   export class Client {
