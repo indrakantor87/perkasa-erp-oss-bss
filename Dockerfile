@@ -41,7 +41,19 @@ WORKDIR /app/apps/web
 COPY --from=deps /app/apps/web/node_modules ./node_modules
 COPY apps/web ./
 ENV NODE_OPTIONS=--max-old-space-size=2048
-RUN npm run build
+RUN npm run build \
+ && echo "=== VERIFY OUTPUT STANDALONE (next.config output: standalone) ===" \
+ && pwd \
+ && echo "--- ls .next ---" \
+ && ls -la .next || (echo "ERROR: .next TIDAK TERGENERATE" && exit 1) \
+ && echo "--- ls .next/standalone ---" \
+ && (ls -la .next/standalone 2>&1 || (echo "ERROR: .next/standalone TIDAK TERGENERATE. Pastikan next.config.ts output:'standalone' diaktifkan." && exit 2)) \
+ && echo "--- ls .next/standalone/server.js (wajib ada entry point) ---" \
+ && (ls -la .next/standalone/server.js 2>&1 || (echo "ERROR: .next/standalone/server.js TIDAK ADA. Command start = node .next/standalone/server.js." && exit 3)) \
+ && echo "--- STANDALONE VERIFICATION OK ---" \
+ && sync \
+ && sleep 2 \
+ && echo "disk sync OK (prevent layer copy missing files legacy builder cache bug)"
 
 FROM --platform=linux/amd64 node:20-bookworm-slim AS runner
 LABEL coolify.engine="dockerfile"
@@ -65,10 +77,19 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 WORKDIR /app/apps/web
 
-COPY --from=builder /app/apps/web/public ./public
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./.next/static
+RUN mkdir -p /app/apps/web/public /app/apps/web/.next/static && echo "=== RUNNER INIT DIRS ===" && ls -la /app/apps/web/
+
+COPY --from=builder /app/apps/web/public /app/apps/web/public
+COPY --from=builder /app/apps/web/.next/standalone /app/apps/web/
+COPY --from=builder /app/apps/web/.next/static /app/apps/web/.next/static
+
+RUN echo "=== VERIFY COPY CONTENTS TO RUNNER ===" \
+ && ls -la /app/apps/web/ \
+ && (ls -la /app/apps/web/server.js 2>&1 || (echo "ERROR: COPY standalone TIDAK BERHASIL! server.js TIDAK ADA di /app/apps/web/" && exit 11)) \
+ && ls -la /app/apps/web/public/ | head \
+ && ls -la /app/apps/web/.next/static/ | head \
+ && echo "=== RUNNER VERIFICATION OK, READY TO START ==="
 
 EXPOSE 3000
 HEALTHCHECK --interval=300s --timeout=10s --start-period=120s --retries=3 CMD exit 0
-CMD ["node","server.js"]
+CMD ["node","/app/apps/web/server.js"]
