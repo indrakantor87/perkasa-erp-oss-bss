@@ -21,7 +21,7 @@ const config: Config = {
         panel: 'var(--shadow-panel)',
       },
       borderRadius: {
-        xl2: '1.5rem',
+        xl2: '1rem',
       },
     },
   },

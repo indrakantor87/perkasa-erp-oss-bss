@@ -8,7 +8,6 @@ import { useEffect, useState } from 'react'
 import type { AppSession } from '@/lib/auth-session'
 import { useUiLanguage } from '@/components/layout/ui-language'
 import { navigationItems } from '@/lib/navigation'
-import { getRoleMeta } from '@/lib/role-meta'
 import { canAccessSupportLane, getSupportLaneOrder, getSupportLanePath } from '@/lib/support-lanes'
 import type { AppRole } from '@/lib/types'
 import { translateUiText } from '@/lib/ui-language'
@@ -1214,7 +1213,7 @@ function SidebarBrand({
     >
       <div
         className={`overflow-hidden border border-slate-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.24)] ${
-          collapsed ? 'flex h-12 w-12 items-center justify-center rounded-2xl p-2' : 'max-w-[11.5rem] rounded-2xl px-2 py-0.5'
+          collapsed ? 'flex h-12 w-12 items-center justify-center rounded-xl p-2' : 'max-w-[11.5rem] rounded-xl px-2 py-0.5'
         }`}
       >
         <Image
@@ -1322,7 +1321,7 @@ function SidebarSection({
               prefetch={false}
               onClick={handleItemClick}
               title={itemTitle}
-              className={`relative block overflow-hidden rounded-2xl border transition ${
+              className={`relative block overflow-hidden rounded-xl border transition ${
                 collapsed ? 'px-3 py-3' : 'px-3.5 py-2.5'
               } ${
                 active
@@ -1336,7 +1335,7 @@ function SidebarSection({
                 <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-white/90" aria-hidden="true" />
               ) : null}
               <div className={`flex ${collapsed ? 'justify-center' : 'items-center gap-3'}`}>
-                <span className={`shrink-0 rounded-xl ${collapsed ? 'p-2' : 'p-1.5'} ${item.tone}`}>
+                <span className={`shrink-0 rounded-lg ${collapsed ? 'p-2' : 'p-1.5'} ${item.tone}`}>
                   <Icon className="h-4 w-4" />
                 </span>
                 {!collapsed ? (
@@ -1375,7 +1374,7 @@ function SidebarSection({
                       prefetch={false}
                       onClick={onNavigate}
                       title={childTitle}
-                      className={`block rounded-xl border px-3 py-1.5 text-sm transition ${
+                      className={`block rounded-lg border px-3 py-1.5 text-sm transition ${
                         childActive
                           ? 'border-slate-800 bg-slate-900 font-semibold text-white'
                           : 'border-transparent text-slate-400 hover:border-slate-900 hover:bg-slate-900 hover:text-slate-200'
@@ -1411,7 +1410,6 @@ export function Sidebar({
     String(currentQueryParams.get('focus') ?? '')
       .trim()
       .toUpperCase()
-  const roleMeta = session ? getRoleMeta(session.role, language) : null
   const allowedItems = navigationItems.filter((item) =>
     allowedPrefixes.some((prefix) => matchesPrefix(item.href, prefix))
   )
@@ -1472,6 +1470,7 @@ export function Sidebar({
           backgroundColor: 'var(--color-sidebar)',
           color: 'var(--color-sidebar-ink)',
         }}
+        suppressHydrationWarning
       >
         <div className={`flex ${collapsed ? 'justify-center' : 'items-start justify-between gap-4'}`}>
           <SidebarBrand collapsed={collapsed} language={language} />
@@ -1534,42 +1533,22 @@ export function Sidebar({
             onToggleExpanded={handleToggleExpanded}
           />
         </nav>
-
-        <div className={`mt-auto rounded-2xl border border-slate-800 bg-slate-900 ${collapsed ? 'p-3' : 'p-4'}`}>
-          <p className={`text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 ${collapsed ? 'text-center' : ''}`}>
-            {session ? translateUiText('Role Aktif', language) : 'Review DB'}
-          </p>
-          {session && roleMeta ? (
-            <div className={`mt-3 ${collapsed ? 'space-y-2 text-center' : 'space-y-2.5'}`}>
-              <span className={`badge border-transparent ${roleMeta.tone}`}>{collapsed ? roleMeta.shortLabel : roleMeta.label}</span>
-              {!collapsed ? (
-                <p className="truncate text-xs uppercase tracking-[0.18em] text-slate-500">
-                  {roleMeta.division} / {roleMeta.subdivision}
-                </p>
-              ) : null}
-            </div>
-          ) : !collapsed ? (
-            <p className="mt-3 text-xs leading-5 text-slate-300">
-              {translateUiText('Shell review DB untuk uji alur harian sebelum hosting.', language)}
-            </p>
-          ) : null}
-        </div>
       </aside>
 
       <nav
-        className="sticky top-0 z-30 border-b border-line px-4 py-3 backdrop-blur lg:hidden"
+        className="sticky top-0 z-30 border-b border-line px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 backdrop-blur lg:hidden"
         style={{ backgroundColor: 'var(--color-topbar)' }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink"
+            className="inline-flex h-11 min-w-[3rem] items-center justify-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink"
             aria-label={translateUiText('Tampilkan menu', language)}
           >
             {translateUiText('Menu', language)}
           </button>
-          <div className="flex gap-3 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto pb-1">
           {mobileQuickItems.map((item) => {
             const active = isSidebarItemActive(item, pathname, focus, currentQueryParams)
 
@@ -1578,8 +1557,8 @@ export function Sidebar({
                 key={item.key}
                 href={item.href}
                 prefetch={false}
-                className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
-                    active ? 'bg-panel text-surface' : 'text-mute'
+                className={`whitespace-nowrap inline-flex h-11 items-center rounded-full px-4 text-sm font-medium transition ${
+                    active ? 'bg-panel text-surface shadow-[0_2px_12px_rgba(15,23,42,0.12)]' : 'text-mute'
                 }`}
                 style={active ? undefined : { backgroundColor: 'var(--color-card-subtle)' }}
               >
@@ -1595,12 +1574,12 @@ export function Sidebar({
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-950/60"
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
             aria-label={translateUiText('Tutup menu', language)}
           />
           <aside
-            className="relative flex h-full w-80 max-w-[88vw] flex-col px-6 py-6 shadow-2xl"
+            className="relative flex h-full w-80 max-w-[88vw] flex-col px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl"
             style={{
               borderRight: '1px solid var(--color-sidebar-line)',
               backgroundColor: 'var(--color-sidebar)',
@@ -1612,7 +1591,7 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-slate-300"
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-slate-300 transition hover:border-slate-700 hover:text-white"
                 aria-label={translateUiText('Tutup menu', language)}
               >
                 <span aria-hidden="true" className="text-lg leading-none">
@@ -1621,7 +1600,7 @@ export function Sidebar({
               </button>
             </div>
 
-            <nav className="mt-8 space-y-6 overflow-y-auto pr-1">
+            <nav className="mt-8 space-y-6 overflow-y-auto pr-1 pb-6">
               {coreSections.map((section) => (
                 <SidebarSection
                   key={section.title}
@@ -1650,28 +1629,6 @@ export function Sidebar({
                 onNavigate={() => setMobileOpen(false)}
               />
             </nav>
-
-            <div className="mt-auto rounded-2xl border border-slate-800 bg-slate-900 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                {session ? translateUiText('Role Aktif', language) : 'Review DB'}
-              </p>
-              {session && roleMeta ? (
-                <div className="mt-3 space-y-3">
-                  <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.label}</span>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    {roleMeta.division} / {roleMeta.subdivision}
-                  </p>
-                  <p className="text-sm leading-6 text-slate-300">{roleMeta.scope}</p>
-                </div>
-              ) : (
-                <p className="mt-3 text-sm leading-6 text-slate-300">
-                  {translateUiText(
-                    'Shell ini dipakai untuk review DB dan uji alur harian sebelum masuk ke tahap hosting.',
-                    language,
-                  )}
-                </p>
-              )}
-            </div>
           </aside>
         </div>
       ) : null}

@@ -28,7 +28,6 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
   const roleMeta = session ? getRoleMeta(session.role, language) : null
   const activeTitle = translateUiText(activeItem.title, language)
   const activeDescription = translateUiText(activeItem.description, language)
-  const activeRoleLabel = translateUiText('Peran Aktif', language)
   const importLabel = translateUiText('Buka Import', language)
   const logoutLabel = translateUiText('Keluar', language)
   const themeLabel = translateUiText('Tema', language)
@@ -42,11 +41,11 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
         : 'Buka area kerja utama, antrean prioritas, dan modul operasional dari satu shell yang lebih ringkas.'
 
   return (
-    <header className="flex flex-col gap-4 border-b border-line pb-6 lg:flex-row lg:items-end lg:justify-between">
-      <div className="space-y-3">
+    <header className="flex flex-col gap-5 border-b border-line pb-8 lg:flex-row lg:items-end lg:justify-between" suppressHydrationWarning>
+      <div className="space-y-2.5">
         <span className="section-title">{activeDescription}</span>
         <div>
-          <h1 className="font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
+          <h1 className="font-[family-name:var(--font-heading)] text-[28px] font-bold tracking-tight text-[var(--color-ink-strong)] lg:text-3xl">
             {activeTitle}
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">{workspaceDescription}</p>
@@ -54,19 +53,6 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        {session && roleMeta ? (
-          <div className="surface-soft rounded-2xl border px-4 py-3 text-sm text-mute">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">{activeRoleLabel}</p>
-              <span className={`badge border-transparent ${roleMeta.tone}`}>{roleMeta.label}</span>
-            </div>
-            <p className="mt-2 font-medium text-ink">
-              {roleMeta.division} / {roleMeta.subdivision}
-            </p>
-            <p className="mt-1 max-w-sm text-xs leading-5 text-mute">{roleMeta.scope}</p>
-          </div>
-        ) : null}
-
         <div className="flex items-center gap-3">
           {!hideQuickControls ? (
             <div className="surface-soft inline-flex items-center rounded-full border p-1">

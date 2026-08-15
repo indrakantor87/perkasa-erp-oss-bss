@@ -2,15 +2,29 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import './globals.css'
 import { getServerUiTheme } from '@/lib/ui-theme-server'
+import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+})
+
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-plus-jakarta',
+})
 
 const FONT_STACK_BODY =
-  "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'"
+  "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'"
 const FONT_STACK_HEADING =
-  "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'"
+  "'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'"
 
 export const metadata: Metadata = {
   title: 'Perkasa ERP OSS BSS',
   description: 'Satu website operasional ISP untuk sales, support, inventory, HR, dan billing.',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, theme-color=#0f172a',
 }
 
 export default async function RootLayout({
@@ -21,7 +35,12 @@ export default async function RootLayout({
   const initialTheme = await getServerUiTheme()
 
   return (
-    <html lang="id" data-theme={initialTheme} suppressHydrationWarning>
+    <html
+      lang="id"
+      data-theme={initialTheme}
+      suppressHydrationWarning
+      className={`${inter.variable} ${plusJakarta.variable}`}
+    >
       <body
         style={
           {

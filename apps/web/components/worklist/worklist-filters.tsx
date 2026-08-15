@@ -33,11 +33,11 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
 
       <form className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Antrean</span>
+          <span className="form-field-label">Antrean</span>
           <select
             name="queue"
             defaultValue={state.queue}
-            className="surface-elevated h-11 w-full rounded-2xl border px-4 text-sm text-ink outline-none transition focus:[border-color:var(--color-line-strong)]"
+            className="form-field"
           >
             {queueOptions.map((item) => (
               <option key={item} value={item}>
@@ -48,11 +48,11 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
         </label>
 
         <label className="space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Domain</span>
+          <span className="form-field-label">Domain</span>
           <select
             name="domain"
             defaultValue={state.domain || ''}
-            className="surface-elevated h-11 w-full rounded-2xl border px-4 text-sm text-ink outline-none transition focus:[border-color:var(--color-line-strong)]"
+            className="form-field"
           >
             <option value="">Semua domain</option>
             {domainOptions.map((item) => (
@@ -64,11 +64,11 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
         </label>
 
         <label className="space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Prioritas</span>
+          <span className="form-field-label">Prioritas</span>
           <select
             name="priority"
             defaultValue={state.priority || ''}
-            className="surface-elevated h-11 w-full rounded-2xl border px-4 text-sm text-ink outline-none transition focus:[border-color:var(--color-line-strong)]"
+            className="form-field"
           >
             <option value="">Semua prioritas</option>
             {priorityOptions.map((item) => (
@@ -80,11 +80,11 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
         </label>
 
         <label className="space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Status</span>
+          <span className="form-field-label">Status</span>
           <select
             name="status"
             defaultValue={state.status || ''}
-            className="surface-elevated h-11 w-full rounded-2xl border px-4 text-sm text-ink outline-none transition focus:[border-color:var(--color-line-strong)]"
+            className="form-field"
           >
             <option value="">Semua status</option>
             {statusOptions.map((item) => (
@@ -96,28 +96,28 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
         </label>
 
         <label className="space-y-2 xl:col-span-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Customer atau keyword</span>
+          <span className="form-field-label">Customer atau keyword</span>
           <input
             type="text"
             name="q"
             defaultValue={state.q || ''}
             placeholder="Nama customer, kode ticket, work order, lead"
-            className="surface-elevated h-11 w-full rounded-2xl border px-4 text-sm text-ink outline-none transition placeholder:text-mute focus:[border-color:var(--color-line-strong)]"
+            className="form-field placeholder:text-mute"
           />
         </label>
 
-        <label className="surface-soft flex items-center gap-3 rounded-2xl border px-4 py-3">
-          <input type="checkbox" name="mine" value="1" defaultChecked={state.mine} className="h-4 w-4 rounded border-slate-300" />
+        <label className="surface-soft flex items-center gap-3 rounded-xl border px-4 py-3">
+          <input type="checkbox" name="mine" value="1" defaultChecked={state.mine} className="h-4 w-4 rounded accent-[var(--color-accent)]" />
           <span className="text-sm text-[var(--color-mute-strong)]">Hanya item saya</span>
         </label>
 
-        <label className="surface-soft flex items-center gap-3 rounded-2xl border px-4 py-3">
+        <label className="surface-soft flex items-center gap-3 rounded-xl border px-4 py-3">
           <input
             type="checkbox"
             name="overdue"
             value="1"
             defaultChecked={state.overdue}
-            className="h-4 w-4 rounded border-slate-300"
+            className="h-4 w-4 rounded accent-[var(--color-accent)]"
           />
           <span className="text-sm text-[var(--color-mute-strong)]">Hanya item overdue / kritikal</span>
         </label>
@@ -125,7 +125,7 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
         <div className="xl:col-span-4">
           <button
             type="submit"
-            className="inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold transition hover:opacity-90"
+            className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition hover:opacity-90"
             style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
           >
             Terapkan filter

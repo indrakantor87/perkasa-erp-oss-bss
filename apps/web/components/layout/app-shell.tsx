@@ -28,12 +28,12 @@ export function AppShell({
   return (
     <ThemeProvider initialTheme={initialTheme}>
       <LanguageProvider initialLanguage={initialLanguage}>
-        <div className="min-h-screen lg:flex">
+        <div className="min-h-screen lg:flex" suppressHydrationWarning>
           <Sidebar session={session} allowedPrefixes={allowedPrefixes} />
           <main className="min-w-0 flex-1">
             <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
               <Topbar pathname={pathname} session={session} allowedPrefixes={allowedPrefixes} />
-              <div className="mt-8">{children}</div>
+              <div className="mt-10">{children}</div>
             </div>
           </main>
         </div>

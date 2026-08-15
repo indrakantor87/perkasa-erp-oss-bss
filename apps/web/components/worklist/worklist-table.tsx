@@ -50,20 +50,20 @@ export function WorklistTable({ items, selectedItemId, state }: WorklistTablePro
         <span className="solid-chip">{items.length} item</span>
       </div>
 
-      <div className="mt-6 hidden overflow-hidden rounded-3xl border border-line xl:block">
-        <table className="min-w-full divide-y divide-line">
-          <thead style={{ backgroundColor: 'var(--color-surface-soft)' }}>
-            <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-mute">
-              <th className="px-4 py-3">Prioritas</th>
-              <th className="px-4 py-3">Domain</th>
-              <th className="px-4 py-3">Queue</th>
-              <th className="px-4 py-3">Judul</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Detail</th>
-              <th className="px-4 py-3">Aksi</th>
+      <div className="mt-6 data-table-wrapper hidden xl:block">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Prioritas</th>
+              <th>Domain</th>
+              <th>Queue</th>
+              <th>Judul</th>
+              <th>Status</th>
+              <th>Detail</th>
+              <th>Aksi</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line bg-surface">
+          <tbody>
             {items.map((item) => {
               const active = item.id === selectedItemId
               const selectHref = buildWorklistQueryHref({
@@ -72,7 +72,7 @@ export function WorklistTable({ items, selectedItemId, state }: WorklistTablePro
               })
 
               return (
-                <tr key={item.id} style={active ? { backgroundColor: 'var(--color-surface-soft)' } : undefined}>
+                <tr key={item.id} style={active ? { backgroundColor: 'var(--color-accent-soft)' } : undefined}>
                   <td className="px-4 py-4 align-top">
                     <span className={`badge ${priorityTone[item.priority]}`}>{item.priority}</span>
                   </td>
@@ -92,20 +92,20 @@ export function WorklistTable({ items, selectedItemId, state }: WorklistTablePro
                     <div className="flex flex-col gap-2">
                       <Link
                         href={selectHref}
-                        className="surface-soft inline-flex items-center justify-center rounded-2xl border px-3 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+                        className="surface-soft inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
                       >
                         Lihat detail
                       </Link>
                       <button
                         type="button"
                         onClick={() => setQuickActionItem(item)}
-                        className="surface-soft inline-flex items-center justify-center rounded-2xl border px-3 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:bg-surface hover:text-[var(--color-ink-strong)]"
+                        className="surface-soft inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:bg-surface hover:text-[var(--color-ink-strong)]"
                       >
                         Aksi cepat
                       </button>
                       <Link
                         href={item.href}
-                        className="inline-flex items-center justify-center rounded-2xl px-3 py-2 text-sm font-semibold transition hover:opacity-90"
+                        className="inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold transition hover:opacity-90"
                         style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
                       >
                         {item.actionLabel}
@@ -130,7 +130,7 @@ export function WorklistTable({ items, selectedItemId, state }: WorklistTablePro
           return (
             <article
               key={item.id}
-              className="rounded-3xl border p-5"
+              className="rounded-xl border p-5"
               style={
                 active
                   ? { borderColor: 'var(--color-accent)', backgroundColor: 'var(--color-surface-soft)' }
