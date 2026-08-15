@@ -8,26 +8,35 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  DOCKER_BUILDKIT: "0"
+  DOCKER_BUILDX: "0"
+  BUILDX_DISABLED: "true"
+  COMPOSE_DOCKER_CLI_BUILD: "0"
+  DOCKER_CLI_EXPERIMENTAL: "disabled"
+  DEBIAN_FRONTEND: "noninteractive"
+  NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
       packages: write
+      attestations: write
+      id-token: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          buildkitd-flags: --debug
+      - name: Disable Docker BuildKit (force legacy builder, same as production Coolify proven)
+        run: |
+          echo "DOCKER_BUILDKIT=0" >> "$GITHUB_ENV"
+          echo "COMPOSE_DOCKER_CLI_BUILD=0" >> "$GITHUB_ENV"
+          echo "BUILDX_DISABLED=true" >> "$GITHUB_ENV"
+          sudo systemctl is-active --quiet docker || sudo systemctl start docker
+          docker info 2>&1 | head -n 20 || true
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -45,18 +54,26 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short,prefix=
             type=ref,event=branch
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.title=Perkasa ERP OSS BSS
+            org.opencontainers.image.description=Satu website operasional ISP untuk sales, support, inventory, HR, dan billing.
+            org.opencontainers.image.vendor=Perkasa Networks
+            org.opencontainers.image.licenses=proprietary
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image (legacy builder, no buildx, no qemu)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
+          load: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           no-cache: ${{ github.event_name == 'workflow_dispatch' }}
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+            NEXT_TELEMETRY_DISABLED=1
+            DEBIAN_FRONTEND=noninteractive

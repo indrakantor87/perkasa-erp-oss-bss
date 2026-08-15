@@ -2,31 +2,44 @@ FROM --platform=linux/amd64 node:20-bookworm-slim AS deps
 LABEL coolify.engine="dockerfile"
 LABEL org.opencontainers.image.title="Perkasa ERP OSS BSS"
 LABEL org.opencontainers.image.description="Satu website operasional ISP untuk sales, support, inventory, HR, dan billing."
+LABEL org.opencontainers.image.vendor="Perkasa Networks"
+LABEL org.opencontainers.image.source="https://github.com/indrakantor87/perkasa-erp-oss-bss"
+LABEL org.opencontainers.image.licenses="proprietary"
+ARG BUILDKIT_INLINE_CACHE=1
 ENV DEBIAN_FRONTEND=noninteractive
+ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/apps/web
 COPY apps/web/package.json apps/web/package-lock.json* ./
 RUN npm ci --ignore-scripts
 
 FROM --platform=linux/amd64 node:20-bookworm-slim AS builder
 LABEL coolify.engine="dockerfile"
+LABEL org.opencontainers.image.title="Perkasa ERP OSS BSS"
+LABEL org.opencontainers.image.vendor="Perkasa Networks"
+LABEL org.opencontainers.image.source="https://github.com/indrakantor87/perkasa-erp-oss-bss"
+LABEL org.opencontainers.image.licenses="proprietary"
+ARG BUILDKIT_INLINE_CACHE=1
 ENV DEBIAN_FRONTEND=noninteractive
+ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/apps/web
 COPY --from=deps /app/apps/web/node_modules ./node_modules
 COPY apps/web ./
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS=--max-old-space-size=2048
 RUN npm run build
 
 FROM --platform=linux/amd64 node:20-bookworm-slim AS runner
 LABEL coolify.engine="dockerfile"
 LABEL org.opencontainers.image.title="Perkasa ERP OSS BSS"
+LABEL org.opencontainers.image.description="Satu website operasional ISP untuk sales, support, inventory, HR, dan billing."
 LABEL org.opencontainers.image.vendor="Perkasa Networks"
+LABEL org.opencontainers.image.source="https://github.com/indrakantor87/perkasa-erp-oss-bss"
+LABEL org.opencontainers.image.licenses="proprietary"
 ENV DEBIAN_FRONTEND=noninteractive
-WORKDIR /app/apps/web
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+WORKDIR /app/apps/web
 
 COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder /app/apps/web/.next/standalone ./
