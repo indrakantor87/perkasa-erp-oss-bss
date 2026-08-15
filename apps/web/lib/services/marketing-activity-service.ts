@@ -153,13 +153,6 @@ export async function ensureMarketingActivitiesTable() {
       )
     `,
   )
-
-  await runReviewDbExecute<ExecuteResult>(
-    `
-      ALTER TABLE sales_marketing_activities
-      ADD COLUMN IF NOT EXISTS updated_by_username VARCHAR(120) NULL AFTER created_by_username
-    `,
-  )
 }
 
 export async function getMarketingCoveredAreaOptions() {

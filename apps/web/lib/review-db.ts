@@ -121,6 +121,28 @@ export async function runReviewDbTransaction<T>(handler: (connection: ReviewDbCo
   }
 }
 
+export async function addColumnIfMissing(
+  tableName: string,
+  columnName: string,
+  columnDefinition: string,
+  afterColumnName?: string,
+) {
+  const exists = await hasReviewDbColumn(tableName, columnName)
+  if (exists) {
+    return
+  }
+
+  const afterClause = afterColumnName?.trim()
+    ? ` AFTER ${afterColumnName}`
+    : ''
+
+  await runReviewDbExecute(
+    `ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}${afterClause}`,
+  )
+
+  invalidateReviewDbColumnCache(tableName, columnName)
+}
+
 export function getReviewDbErrorDetail(error: unknown) {
   if (error instanceof Error && error.message.trim()) {
     return `Review DB belum bisa dibaca. ${error.message.trim()}`
