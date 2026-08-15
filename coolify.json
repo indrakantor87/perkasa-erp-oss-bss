@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "build": {
+    "engine": "dockerfile",
+    "docker_buildkit": false,
+    "use_helper": false,
+    "disable_buildx": true,
+    "dockerfile": "Dockerfile",
+    "context": ".",
+    "custom_build_script": ".coolify/build.sh"
+  },
+  "deploy": {
+    "network_mode": "bridge",
+    "ports": [
+      {
+        "container": 3000,
+        "type": "http"
+      }
+    ],
+    "expose": 3000,
+    "healthcheck": {
+      "test": ["CMD-SHELL", "exit 0"],
+      "interval": 120000000000,
+      "timeout": 10000000000,
+      "retries": 3,
+      "start_period": 30000000000
+    },
+    "environment": {
+      "NODE_ENV": "production",
+      "PORT": "3000",
+      "HOSTNAME": "0.0.0.0"
+    }
+  }
+}

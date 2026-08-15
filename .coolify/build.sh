@@ -1,28 +1,77 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# =============================================================================
+# Coolify Custom Build Script - FORCE BYPASS COOLIFY-HELPER 100%
+# =============================================================================
+# ROOT CAUSE: coolify-helper:1.0.14 exit 255 saat dijalankan pada server
+# tipe "localhost" karena mount /root/.docker/buildx tidak exist
+# (Coolify berjalan sebagai user non-root, home user bukan /root).
+#
+# SOLUSI: Lewati TOTAL coolify-helper. Jalankan docker build LEGACY
+#         (DOCKER_BUILDKIT=0) secara DIRECT dari host docker socket.
+#
+# PREREQUISITE: File ini HARUS punya mode executable (chmod +x).
+#               Git mode: 100755 (bukan 100644).
+# =============================================================================
+set -o pipefail
 
-# Coolify Custom Build Script - FORCE LEGACY DOCKER BUILD (TANPA BuildKit / coolify-helper)
-# Problem: coolify-helper:1.0.14 (BuildKit buildx) DI SERVER localhost RUSAK PERMANEN
-# exit code 255 saat start container helper. User tidak punya akses restart server Docker.
-# Solusi: Lewati TOTAL coolify-helper, jalankan docker build LEGACY biasa (DOCKER_BUILDKIT=0).
-
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 export DOCKER_BUILDKIT=0
 export DOCKER_BUILDX=0
 export BUILDX_DISABLED=true
 export COMPOSE_DOCKER_CLI_BUILD=0
+export DOCKER_CLI_EXPERIMENTAL=disabled
 
-echo "==> [coolify/build.sh] FORCE DOCKER_BUILDKIT=0 LEGACY BUILD MODE (no coolify-helper, no buildx)"
-echo "==> Image tag: ${COOLIFY_IMAGE_FULL_TAG:-unknown}"
+echo "========================================================================"
+echo " [Coolify Build Script] MODE: DIRECT DOCKER BUILD (NO HELPER, NO BUILDKIT)"
+echo "========================================================================"
+echo " Image target     : ${COOLIFY_IMAGE_FULL_TAG:-perkasa-erp-oss-bss:latest}"
+echo " Dockerfile path  : ${COOLIFY_DOCKERFILE_PATH:-Dockerfile}"
+echo " Build context    : ${COOLIFY_BUILD_CONTEXT:-.}"
+echo " DOCKER_BUILDKIT  : ${DOCKER_BUILDKIT}"
+echo " Platform force   : linux/amd64 (dari Dockerfile --platform)"
 
 DOCKER_IMAGE_FULL="${COOLIFY_IMAGE_FULL_TAG:-perkasa-erp-oss-bss:latest}"
 DOCKERFILE_PATH="${COOLIFY_DOCKERFILE_PATH:-Dockerfile}"
 BUILD_CONTEXT="${COOLIFY_BUILD_CONTEXT:-.}"
 
-echo "==> docker build -f ${DOCKERFILE_PATH} -t ${DOCKER_IMAGE_FULL} ${BUILD_CONTEXT}"
-DOCKER_BUILDKIT=0 docker build \
-  --no-cache \
+which docker >/dev/null 2>&1 || {
+  echo "[ERROR] docker binary tidak ditemukan di PATH. Exit 1."
+  exit 1
+}
+
+echo ""
+echo "==> Step 1/2: docker build -f ${DOCKERFILE_PATH} -t ${DOCKER_IMAGE_FULL} ${BUILD_CONTEXT}"
+echo ""
+
+if DOCKER_BUILDKIT=0 docker build \
   -f "${DOCKERFILE_PATH}" \
   -t "${DOCKER_IMAGE_FULL}" \
-  "${BUILD_CONTEXT}"
-
-echo "==> ✅ Legacy Docker build SUCCESS (tanpa coolify-helper / BuildKit)."
+  "${BUILD_CONTEXT}"; then
+  echo ""
+  echo "=========================================================================="
+  echo " ✅ Direct Legacy Docker Build BERHASIL (tanpa coolify-helper / BuildKit)."
+  echo " Image siap dijalankan: ${DOCKER_IMAGE_FULL}"
+  echo "=========================================================================="
+  exit 0
+else
+  BUILD_EXIT=$?
+  echo ""
+  echo "[WARN] docker build pertama gagal (exit ${BUILD_EXIT}). Retry dengan --no-cache + verbose."
+  echo ""
+  if DOCKER_BUILDKIT=0 docker build \
+    --no-cache \
+    --progress=plain \
+    -f "${DOCKERFILE_PATH}" \
+    -t "${DOCKER_IMAGE_FULL}" \
+    "${BUILD_CONTEXT}"; then
+    echo ""
+    echo "========================================================================"
+    echo " ✅ Retry Legacy Docker Build BERHASIL (--no-cache)."
+    echo "========================================================================"
+    exit 0
+  else
+    RETRY_EXIT=$?
+    echo "[FATAL] Docker build GAGAL setelah retry. Exit code: ${RETRY_EXIT}"
+    exit "${RETRY_EXIT}"
+  fi
+fi
