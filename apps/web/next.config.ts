@@ -10,47 +10,18 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
   generateEtags: true,
-  swcMinify: true,
   productionBrowserSourceMaps: false,
-
-  compiler: isProduction
-    ? {
-        removeConsole: {
-          exclude: ['error', 'warn'],
-        },
-        reactRemoveProperties: isProduction
-          ? { properties: ['^data-testid$', '^aria-testid$'] }
-          : false,
-      }
-    : undefined,
-
-  optimizePackageImports: [
-    'lucide-react',
-    'leaflet',
-    'xlsx',
-    'qrcode',
-    'jsbarcode',
-    'recharts',
-    'clsx',
-    'tailwind-merge',
-  ],
 
   images: {
     formats: ['image/avif', 'image/webp'],
     contentSecurityPolicy: "default-src 'self'; img-src 'self' data: https: blob:",
-    remotePatterns: [
-      { protocol: 'https', hostname: '**' },
-    ],
-    minimumCacheTTL: 86400,
+    remotePatterns: [{ protocol: 'https', hostname: '**' }],
+    minimumCacheTTL: isProduction ? 14400 : 60,
   },
 
   experimental: {
     optimizeCss: true,
-    cssMinify: 'lightningcss',
     workerThreads: true,
-    serverMinification: true,
-    serverSourceMaps: false,
-    clientRouterFilter: true,
   },
 
   async headers() {
@@ -61,7 +32,8 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, stale-if-error=604800, immutable',
+            value:
+              'public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, stale-if-error=604800, immutable',
           },
         ],
       },
