@@ -52,6 +52,9 @@ RUN npm run build \
  && (ls -la .next/standalone/server.js 2>&1 || (echo "ERROR: .next/standalone/server.js TIDAK ADA. Command start = node .next/standalone/server.js." && exit 3)) \
  && echo "--- ls source public (untuk COPY runner) ---" \
  && (ls -la public/ 2>&1 | head -n 15 || (echo "ERROR: folder public/ TIDAK ADA di builder." && exit 4)) \
+ && echo "--- PACK public/ KE TARBALL (fix legacy builder COPY subfolder kecil parse path salah) ---" \
+ && tar -cf /tmp/public.tar -C /app/apps/web public \
+ && (ls -la /tmp/public.tar 2>&1 || (echo "ERROR: public.tar gagal dibuat di builder." && exit 6)) \
  && echo "--- ls source .next/static (untuk COPY runner) ---" \
  && (ls -la .next/static/ 2>&1 | head -n 15 || (echo "ERROR: folder .next/static TIDAK ADA di builder." && exit 5)) \
  && echo "--- STANDALONE VERIFICATION OK ---" \
@@ -92,9 +95,11 @@ RUN echo "=== [2/3] COPY .next/static (kedua, ISI KE FOLDER .next YANG SUDAH ADA
 COPY --from=builder /app/apps/web/.next/static /app/apps/web/.next/static
 RUN echo "--- verify after copy static ---" && ls -la /app/apps/web/.next/static/ | head -n 15
 
-RUN echo "=== [3/3] COPY public folder (ketiga, folder terpisah TIDAK KONFLIK dengan .next) ==="
-COPY --from=builder /app/apps/web/public /app/apps/web/public
-RUN echo "--- verify after copy public ---" && ls -la /app/apps/web/public/ | head -n 15
+RUN echo "=== [3/3] EXTRACT public.tar TARBALL (fix legacy builder COPY subfolder kecil parse path salah) ==="
+COPY --from=builder /tmp/public.tar /tmp/public.tar
+RUN tar -xf /tmp/public.tar -C /app/apps/web \
+ && rm -f /tmp/public.tar \
+ && echo "--- verify after extract public ---" && ls -la /app/apps/web/public/ | head -n 15
 
 RUN echo "=== RUNNER FINAL VERIFICATION ALL COPY OK, READY TO START ===" \
  && ls -la /app/apps/web/
