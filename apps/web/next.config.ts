@@ -12,11 +12,6 @@ const nextConfig: NextConfig = {
   generateEtags: true,
   productionBrowserSourceMaps: false,
 
-  typescript: {
-    ignoreBuildErrors: false,
-    tsconfigPath: './tsconfig.json',
-  },
-
   images: {
     formats: ['image/avif', 'image/webp'],
     contentSecurityPolicy: "default-src 'self'; img-src 'self' data: https: blob:",
