@@ -50,10 +50,15 @@ RUN npm run build \
  && (ls -la .next/standalone 2>&1 || (echo "ERROR: .next/standalone TIDAK TERGENERATE. Pastikan next.config.ts output:'standalone' diaktifkan." && exit 2)) \
  && echo "--- ls .next/standalone/server.js (wajib ada entry point) ---" \
  && (ls -la .next/standalone/server.js 2>&1 || (echo "ERROR: .next/standalone/server.js TIDAK ADA. Command start = node .next/standalone/server.js." && exit 3)) \
+ && echo "--- ls source public (untuk COPY runner) ---" \
+ && (ls -la public/ 2>&1 | head -n 15 || (echo "ERROR: folder public/ TIDAK ADA di builder." && exit 4)) \
+ && echo "--- ls source .next/static (untuk COPY runner) ---" \
+ && (ls -la .next/static/ 2>&1 | head -n 15 || (echo "ERROR: folder .next/static TIDAK ADA di builder." && exit 5)) \
  && echo "--- STANDALONE VERIFICATION OK ---" \
  && sync \
  && sleep 2 \
- && echo "disk sync OK (prevent layer copy missing files legacy builder cache bug)"
+ && sync \
+ && echo "disk sync x2 OK (prevent layer copy missing files legacy builder cache bug)"
 
 FROM --platform=linux/amd64 node:20-bookworm-slim AS runner
 LABEL coolify.engine="dockerfile"
@@ -77,18 +82,22 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 WORKDIR /app/apps/web
 
-RUN mkdir -p /app/apps/web/public /app/apps/web/.next/static && echo "=== RUNNER INIT DIRS ===" && ls -la /app/apps/web/
+RUN mkdir -p /app/apps/web /app/apps/web/.next && echo "=== RUNNER INIT DIRS ===" && ls -la /app/apps/web/
 
-COPY --from=builder /app/apps/web/public /app/apps/web/public
+RUN echo "=== [1/3] COPY STANDALONE (pertama, agar .next base folder exist) ==="
 COPY --from=builder /app/apps/web/.next/standalone /app/apps/web/
-COPY --from=builder /app/apps/web/.next/static /app/apps/web/.next/static
+RUN echo "--- verify after copy standalone ---" && (ls -la /app/apps/web/server.js 2>&1 || (echo "ERROR: COPY standalone TIDAK BERHASIL! server.js TIDAK ADA di /app/apps/web/" && exit 11)) && ls -la /app/apps/web/ | head -n 20
 
-RUN echo "=== VERIFY COPY CONTENTS TO RUNNER ===" \
- && ls -la /app/apps/web/ \
- && (ls -la /app/apps/web/server.js 2>&1 || (echo "ERROR: COPY standalone TIDAK BERHASIL! server.js TIDAK ADA di /app/apps/web/" && exit 11)) \
- && ls -la /app/apps/web/public/ | head \
- && ls -la /app/apps/web/.next/static/ | head \
- && echo "=== RUNNER VERIFICATION OK, READY TO START ==="
+RUN echo "=== [2/3] COPY .next/static (kedua, ISI KE FOLDER .next YANG SUDAH ADA dari standalone, JANGAN overwrite base .next) ==="
+COPY --from=builder /app/apps/web/.next/static /app/apps/web/.next/static
+RUN echo "--- verify after copy static ---" && ls -la /app/apps/web/.next/static/ | head -n 15
+
+RUN echo "=== [3/3] COPY public folder (ketiga, folder terpisah TIDAK KONFLIK dengan .next) ==="
+COPY --from=builder /app/apps/web/public /app/apps/web/public
+RUN echo "--- verify after copy public ---" && ls -la /app/apps/web/public/ | head -n 15
+
+RUN echo "=== RUNNER FINAL VERIFICATION ALL COPY OK, READY TO START ===" \
+ && ls -la /app/apps/web/
 
 EXPOSE 3000
 HEALTHCHECK --interval=300s --timeout=10s --start-period=120s --retries=3 CMD exit 0
