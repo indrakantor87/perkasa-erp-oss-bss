@@ -164,7 +164,7 @@ export async function POST(request: Request) {
     return Response.json({
       id: result.id,
       psbListCode: result.psbListCode,
-      message: `Input PSB ${result.psbListCode} untuk ${result.customerName} berhasil masuk ke List PSB.`,
+      message: `Input PSB ${result.psbListCode} untuk ${result.customerName} berhasil masuk ke Data PSB.`,
     })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })

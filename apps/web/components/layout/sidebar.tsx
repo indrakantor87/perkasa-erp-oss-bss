@@ -128,7 +128,7 @@ function buildSalesMainItem(role: AppRole | null) {
     href: role === 'PENJUALAN' ? '/sales/input-psb' : undefined,
     description:
       role === 'PENJUALAN'
-        ? 'Input prospek lapangan ke List PSB sampai siap diproses CS'
+        ? 'Input prospek lapangan ke Data PSB sampai siap diproses CS'
         : 'Input PSB, monitoring komersial, dan progres aktivasi',
     excludeFocusPrefix: 'DIGITAL_',
     children: buildSalesSubmenuItems(role),
@@ -630,7 +630,7 @@ function buildCompactSlaItem() {
 function buildCompactPsbListItem() {
   return buildSidebarNavItem('/list-psb', {
     key: 'list-psb-compact',
-    title: 'List PSB',
+    title: 'Data PSB',
     description: 'Antrean PSB untuk review, jadwal, dan transfer ke ticketing.',
     href: '/list-psb',
     matchPrefixes: ['/list-psb'],

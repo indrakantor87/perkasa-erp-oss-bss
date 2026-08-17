@@ -35,7 +35,7 @@ export async function POST(
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     return Response.json(
-      { message: 'Aksi write-side List PSB hanya aktif saat review DB benar-benar tersedia.' },
+      { message: 'Aksi write-side Data PSB hanya aktif saat review DB benar-benar tersedia.' },
       { status: 503 },
     )
   }
@@ -44,7 +44,7 @@ export async function POST(
     const resolvedParams = await params
     const psbListId = resolvePositiveInt(String(resolvedParams.id ?? ''))
     if (!psbListId) {
-      return Response.json({ message: 'ID List PSB tidak valid.' }, { status: 400 })
+      return Response.json({ message: 'ID Data PSB tidak valid.' }, { status: 400 })
     }
 
     const payload = (await request.json()) as {
@@ -55,7 +55,7 @@ export async function POST(
     const notes = String(payload.notes ?? '').trim()
 
     if (!allowedActions.has(action)) {
-      return Response.json({ message: 'Aksi transisi List PSB tidak valid.' }, { status: 400 })
+      return Response.json({ message: 'Aksi transisi Data PSB tidak valid.' }, { status: 400 })
     }
 
     const hasUpdatePermission =
@@ -67,7 +67,7 @@ export async function POST(
 
     if (action === 'TRANSFER') {
       if (!hasApprovePermission) {
-        return Response.json({ message: 'Role aktif belum memiliki izin transfer List PSB ke ticketing.' }, { status: 403 })
+        return Response.json({ message: 'Role aktif belum memiliki izin transfer Data PSB ke ticketing.' }, { status: 403 })
       }
 
       const result = await transferPsbListToTicket({
@@ -80,16 +80,16 @@ export async function POST(
       })
 
       return Response.json({
-        message: `List PSB ${result.psbListCode} (${result.customerName}) berhasil ditransfer ke ticket operasional ${result.workOrderNo}.`,
+        message: `Data PSB ${result.psbListCode} (${result.customerName}) berhasil ditransfer ke ticket operasional ${result.workOrderNo}.`,
       })
     }
 
     if (action === 'APPROVE' || action === 'REJECT') {
       if (!hasApprovePermission) {
-        return Response.json({ message: 'Role aktif belum memiliki izin approval List PSB.' }, { status: 403 })
+        return Response.json({ message: 'Role aktif belum memiliki izin approval Data PSB.' }, { status: 403 })
       }
     } else if (!hasUpdatePermission) {
-      return Response.json({ message: 'Role aktif belum memiliki izin update List PSB.' }, { status: 403 })
+      return Response.json({ message: 'Role aktif belum memiliki izin update Data PSB.' }, { status: 403 })
     }
 
     const result = await transitionPsbListStatus({
@@ -101,7 +101,7 @@ export async function POST(
     })
 
     return Response.json({
-      message: `List PSB ${result.psbListCode} (${result.customerName}) berhasil diubah dari ${result.previousStatus} ke ${result.nextStatus}.`,
+      message: `Data PSB ${result.psbListCode} (${result.customerName}) berhasil diubah dari ${result.previousStatus} ke ${result.nextStatus}.`,
     })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })

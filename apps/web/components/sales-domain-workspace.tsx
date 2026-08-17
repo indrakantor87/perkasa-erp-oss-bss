@@ -701,7 +701,7 @@ export function SalesDomainWorkspace({
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/list-psb" className="rounded-md border border-line bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-100">
-                Buka List PSB
+                Buka Data PSB
               </Link>
               <Link href="/sales/marketing-activities" className="rounded-md border border-line bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-100">
                 Aktivitas Marketing

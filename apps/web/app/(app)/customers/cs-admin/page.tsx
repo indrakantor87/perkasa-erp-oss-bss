@@ -125,7 +125,7 @@ export default async function CsAdminWorkspacePage() {
               href="/list-psb"
               className="rounded-md border border-slate-500 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
             >
-              Buka List PSB
+              Buka Data PSB
             </Link>
             <Link
               href="/dashboard/tracking/noc-queue"

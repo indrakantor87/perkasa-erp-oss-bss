@@ -56,7 +56,7 @@ export const navigationItems: Array<NavItem & { icon: LucideIcon }> = [
     icon: BriefcaseBusiness,
   },
   {
-    title: 'List PSB',
+    title: 'Data PSB',
     href: '/list-psb',
     description: 'Antrean validasi PSB antara penjualan, CS, dan ticketing',
     tone: 'bg-cyan-700 text-white',

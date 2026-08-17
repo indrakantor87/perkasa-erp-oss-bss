@@ -40,7 +40,6 @@ const englishTextMap: Record<string, string> = {
   'Data PSB': 'PSB Data',
   'Antrean validasi PSB sebelum diteruskan ke ticketing operasional.':
     'PSB validation queue before forwarding to operational ticketing.',
-  'List PSB': 'PSB Data',
   'Aktivitas Tim': 'Team Activities',
   'Agenda canvassing, covered area, dan ritme aktivitas tim.':
     'Canvassing schedule, covered area, and team activity rhythm.',

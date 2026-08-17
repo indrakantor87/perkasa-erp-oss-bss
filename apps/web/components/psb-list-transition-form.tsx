@@ -72,14 +72,14 @@ export function PsbListTransitionForm({
       if (!response.ok) {
         setFeedback({
           tone: 'error',
-          message: payload?.message || 'Aksi List PSB gagal diproses.',
+          message: payload?.message || 'Aksi Data PSB gagal diproses.',
         })
         return
       }
 
       setFeedback({
         tone: 'success',
-        message: payload?.message || 'Aksi List PSB berhasil diproses.',
+        message: payload?.message || 'Aksi Data PSB berhasil diproses.',
       })
       setNotes('')
       router.refresh()
@@ -91,7 +91,7 @@ export function PsbListTransitionForm({
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Aksi Review</p>
-      <h3 className="mt-2 text-lg font-semibold text-slate-950">Transisi List PSB</h3>
+      <h3 className="mt-2 text-lg font-semibold text-slate-950">Transisi Data PSB</h3>
       <p className="mt-2 text-sm leading-6 text-slate-600">
         {!availableActions.length
           ? `Status ${currentStatus} belum punya aksi review lanjutan pada batch ini.`

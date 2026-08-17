@@ -922,7 +922,7 @@ export async function createPsbListItem(params: {
 
   const psbListId = Number((insertResult as ExecuteResult).insertId ?? 0)
   if (!Number.isInteger(psbListId) || psbListId <= 0) {
-    throw new Error('Input PSB berhasil disimpan tetapi ID List PSB tidak terbaca.')
+    throw new Error('Input PSB berhasil disimpan tetapi ID Data PSB tidak terbaca.')
   }
 
   await runReviewDbExecute<ExecuteResult>(
@@ -992,7 +992,7 @@ export async function transitionPsbListStatus(params: {
   )
 
   if (!row) {
-    throw new Error('Item List PSB tidak ditemukan.')
+    throw new Error('Item Data PSB tidak ditemukan.')
   }
 
   const currentStatus = normalizeStatus(row.status)
@@ -1126,12 +1126,12 @@ export async function transferPsbListToTicket(params: {
   )
 
   if (!row) {
-    throw new Error('Item List PSB tidak ditemukan.')
+    throw new Error('Item Data PSB tidak ditemukan.')
   }
 
   const currentStatus = normalizeStatus(row.status)
   if (currentStatus === 'DITRANSFER_KE_TICKETING') {
-    throw new Error('Item List PSB ini sudah pernah ditransfer ke ticketing.')
+    throw new Error('Item Data PSB ini sudah pernah ditransfer ke ticketing.')
   }
   if (currentStatus !== 'DISETUJUI') {
     throw new Error(`Hanya item dengan status DISETUJUI yang bisa ditransfer. Status saat ini: ${currentStatus}.`)
@@ -1201,7 +1201,7 @@ export async function transferPsbListToTicket(params: {
         null,
         'OPEN',
         'AUTO_CREATED',
-        `WO PSB dibuat dari List PSB ${row.psbListCode ?? '-'}.`,
+        `WO PSB dibuat dari Data PSB ${row.psbListCode ?? '-'}.`,
         actorUserId,
       ],
     )
@@ -1273,7 +1273,7 @@ export async function getPsbListPageData(query: PsbListQuery, session?: AppSessi
   return getPsbListPageDataWithMock(
     query,
     buildFallbackSnapshot(
-      'List PSB sementara memakai mock operasional karena sumber review DB khusus untuk domain ini belum dibuka.',
+      'Data PSB sementara memakai mock operasional karena sumber review DB khusus untuk domain ini belum dibuka.',
     ),
     session,
   )

@@ -65,9 +65,9 @@ export const teknisiPsbWorkspaceConfig: TechnicianWorkspaceConfig = {
           badge: 'ticket',
         },
         {
-          label: 'Customer / List PSB',
+          label: 'Customer / Data PSB',
           href: '/list-psb',
-          description: 'Buka domain List PSB untuk membaca konteks data pemasangan baru.',
+          description: 'Buka domain Data PSB untuk membaca konteks data pemasangan baru.',
           badge: 'customer',
         },
       ],

@@ -1,6 +1,120 @@
 import Link from 'next/link'
+import type { ChangeEvent } from 'react'
+import { useMemo, useState } from 'react'
 import { PsbListTransitionForm } from '@/components/psb-list-transition-form'
 import type { PsbListItem, PsbListPagePayload, PsbListStatus } from '@/lib/psb-list-shared'
+import { getPsbListActionLabel, resolvePsbListAvailableActions } from '@/lib/psb-list-shared'
+import { PsbListImportExcelModal } from '@/components/psb-list-import-excel-modal'
+
+const MAX_EXPORT_ROWS_EXCEL = 10000
+let xlsxModulePsbPromise: Promise<typeof import('xlsx')> | null = null
+
+async function loadXlsxPsb() {
+  if (!xlsxModulePsbPromise) {
+    xlsxModulePsbPromise = import('xlsx')
+  }
+  const mod = await xlsxModulePsbPromise
+  return (mod as { default?: typeof import('xlsx') }).default ?? mod
+}
+
+async function exportPsbListToExcel(items: PsbListItem[]) {
+  const XLSX = await loadXlsxPsb()
+  const rows = items.slice(0, MAX_EXPORT_ROWS_EXCEL).map((item) => ({
+    'Kode Data PSB': item.psbListCode,
+    'Nama Customer': item.customerName,
+    'No. HP Customer': item.customerPhone ?? '',
+    'Alamat': item.addressText,
+    'Area / Kelurahan': item.areaLabel ?? '',
+    'Link Google Maps': item.googleMapsLink ?? '',
+    'Paket Berlangganan': item.packageLabel ?? '',
+    'Kode ODP': item.odpCode ?? '',
+    'Marketing / Sales PIC': item.salesOwnerName ?? '',
+    'Tanggal Target Pasang': item.requestedInstallDate ?? '',
+    Status: (() => {
+      switch (item.status) {
+        case 'BARU':
+          return 'Baru'
+        case 'REVIEW_CS':
+          return 'Review CS'
+        case 'PERLU_KOREKSI':
+          return 'Perlu Koreksi'
+        case 'DISETUJUI':
+          return 'Disetujui'
+        case 'DITOLAK':
+          return 'Ditolak'
+        case 'DITRANSFER_KE_TICKETING':
+          return 'Sudah ke Ticketing'
+        default:
+          return item.status
+      }
+    })(),
+    'Catatan Review CS': item.reviewNotes ?? '',
+    'Catatan Koreksi': item.correctionNotes ?? '',
+    'No. Ticket Operasional': item.transferredTicketRef ?? '',
+    'ID Work Order': item.transferredWorkOrderId ?? '',
+    'PIC CS Saat Ini': item.csPicName ?? '',
+    'Tindak Lanjut Saat Ini': item.nextActionLabel,
+    'Dibuat Pada': item.createdAt ?? '',
+    'Terakhir Diperbarui': item.updatedAt ?? '',
+    'Catatan Escort / Lokasi': item.escortNotes ?? '',
+    'Catatan Aktivitas Sales': item.activityNotes ?? '',
+  }))
+
+  const sheet = XLSX.utils.json_to_sheet(rows, {
+    header: [
+      'Kode Data PSB',
+      'Nama Customer',
+      'No. HP Customer',
+      'Alamat',
+      'Area / Kelurahan',
+      'Link Google Maps',
+      'Paket Berlangganan',
+      'Kode ODP',
+      'Marketing / Sales PIC',
+      'Tanggal Target Pasang',
+      'Status',
+      'Catatan Review CS',
+      'Catatan Koreksi',
+      'No. Ticket Operasional',
+      'ID Work Order',
+      'PIC CS Saat Ini',
+      'Tindak Lanjut Saat Ini',
+      'Dibuat Pada',
+      'Terakhir Diperbarui',
+      'Catatan Escort / Lokasi',
+      'Catatan Aktivitas Sales',
+    ],
+  })
+  sheet['!cols'] = [
+    { wch: 18 },
+    { wch: 28 },
+    { wch: 18 },
+    { wch: 48 },
+    { wch: 22 },
+    { wch: 42 },
+    { wch: 28 },
+    { wch: 18 },
+    { wch: 22 },
+    { wch: 20 },
+    { wch: 20 },
+    { wch: 40 },
+    { wch: 40 },
+    { wch: 22 },
+    { wch: 14 },
+    { wch: 22 },
+    { wch: 36 },
+    { wch: 22 },
+    { wch: 22 },
+    { wch: 40 },
+    { wch: 40 },
+  ]
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Data PSB')
+  const stamp = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const filename = `data-psb-${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}-${pad(stamp.getHours())}${pad(stamp.getMinutes())}.xlsx`
+  XLSX.writeFile(workbook, filename, { compression: true })
+}
 
 function formatDateTime(value: string | null) {
   if (!value) {
@@ -160,6 +274,34 @@ export function PsbListWorkspace({
   reviewDbReady: boolean
 }) {
   const { state, summary, items, selectedItem } = payload
+  const [importOpen, setImportOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error' | 'warning'; message: string } | null>(null)
+
+  async function handleExportExcel(event: ChangeEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault()
+    if (exporting) return
+    setFeedback(null)
+    setExporting(true)
+    try {
+      if (!items.length) {
+        setFeedback({ tone: 'warning', message: 'Tidak ada baris data PSB untuk diekspor saat filter ini. Coba reset filter terlebih dahulu.' })
+        return
+      }
+      await exportPsbListToExcel(items)
+      setFeedback({
+        tone: 'success',
+        message: `Berhasil ekspor ${items.length.toLocaleString('id-ID')} baris Data PSB ke file Excel.`,
+      })
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Gagal mengekspor Excel.',
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -168,12 +310,12 @@ export function PsbListWorkspace({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Domain Baru</p>
             <h1 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
-              List PSB
+              Data PSB
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
               Antrean validasi PSB di antara penjualan, CS, dan ticketing. Batch saat ini sudah membuka review dasar
               sampai transfer ke ticket operasional, dengan fallback aman agar tidak mengganggu jalur NOC, CS, dan
-              inventory yang sudah stabil.
+              inventory yang sudah stabil. Didukung import & export Excel untuk batch operasional.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -192,7 +334,7 @@ export function PsbListWorkspace({
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        {buildSummaryCard('Total List PSB', summary.totalCount, 'border-slate-200 bg-white text-slate-900', buildHref(state, { status: null, selected: state.selected }))}
+        {buildSummaryCard('Total Data PSB', summary.totalCount, 'border-slate-200 bg-white text-slate-900', buildHref(state, { status: null, selected: state.selected }))}
         {buildSummaryCard('Baru', summary.baruCount, 'border-sky-200 bg-sky-50 text-sky-800', buildHref(state, { status: 'BARU', selected: state.selected }))}
         {buildSummaryCard('Review CS', summary.reviewCount, 'border-amber-200 bg-amber-50 text-amber-800', buildHref(state, { status: 'REVIEW_CS', selected: state.selected }))}
         {buildSummaryCard('Perlu Koreksi', summary.correctionCount, 'border-orange-200 bg-orange-50 text-orange-800', buildHref(state, { status: 'PERLU_KOREKSI', selected: state.selected }))}
@@ -208,7 +350,7 @@ export function PsbListWorkspace({
               type="search"
               name="q"
               defaultValue={state.q ?? ''}
-              placeholder="Cari kode list, nama customer, alamat, ODP, marketing..."
+              placeholder="Cari kode, nama customer, alamat, ODP, marketing..."
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-400"
             />
           </label>
@@ -243,10 +385,10 @@ export function PsbListWorkspace({
               ))}
             </select>
           </label>
-          <div className="flex items-end gap-3">
+          <div className="flex items-end gap-3 flex-wrap">
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-900 bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-900 bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
               Terapkan
             </button>
@@ -256,15 +398,46 @@ export function PsbListWorkspace({
             >
               Reset
             </Link>
+            <button
+              type="button"
+              onClick={(e) => void handleExportExcel(e)}
+              disabled={exporting}
+              className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              {exporting ? 'Mengekspor...' : 'Export Excel'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              disabled={!canUpdate}
+              className="inline-flex items-center justify-center rounded-2xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              title={canUpdate ? 'Import batch Data PSB via Excel' : 'Role aktif tidak memiliki izin tulis Data PSB'}
+            >
+              Import Excel
+            </button>
           </div>
         </form>
+
+        {feedback ? (
+          <div
+            className={`mt-5 rounded-2xl border px-4 py-3 text-sm ${
+              feedback.tone === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : feedback.tone === 'warning'
+                  ? 'border-amber-200 bg-amber-50 text-amber-900'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+            }`}
+          >
+            {feedback.message}
+          </div>
+        ) : null}
       </section>
 
       <section className="space-y-6">
         <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-6 py-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Antrean Operasional</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">Daftar List PSB</h2>
+            <h2 className="mt-2 text-xl font-semibold text-slate-950">Daftar Data PSB</h2>
           </div>
           <div className="hidden overflow-x-auto xl:block">
             <table className="min-w-[980px] w-full border-collapse">
@@ -467,6 +640,8 @@ export function PsbListWorkspace({
             </div>
           )}
         </aside>
+
+        <PsbListImportExcelModal open={importOpen} onClose={() => setImportOpen(false)} />
       </section>
     </div>
   )
