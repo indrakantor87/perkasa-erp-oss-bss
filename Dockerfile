@@ -35,6 +35,8 @@ LABEL org.opencontainers.image.vendor="Perkasa Networks"
 LABEL org.opencontainers.image.source="https://github.com/indrakantor87/perkasa-erp-oss-bss"
 LABEL org.opencontainers.image.licenses="proprietary"
 ARG BUILDKIT_INLINE_CACHE=1
+ARG PSB_ERP_BUILD_SENTINEL=20260817-data-psb-import-export-v4
+ARG CACHEBUST=1
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/apps/web
@@ -50,18 +52,19 @@ RUN npm run build \
  && (ls -la .next/standalone 2>&1 || (echo "ERROR: .next/standalone TIDAK TERGENERATE. Pastikan next.config.ts output:'standalone' diaktifkan." && exit 2)) \
  && echo "--- ls .next/standalone/server.js (wajib ada entry point) ---" \
  && (ls -la .next/standalone/server.js 2>&1 || (echo "ERROR: .next/standalone/server.js TIDAK ADA. Command start = node .next/standalone/server.js." && exit 3)) \
- && echo "--- ls source public (untuk COPY runner) ---" \
- && (ls -la public/ 2>&1 | head -n 15 || (echo "ERROR: folder public/ TIDAK ADA di builder." && exit 4)) \
- && echo "--- PACK public/ KE TARBALL (fix legacy builder COPY subfolder kecil parse path salah) ---" \
- && tar -cf /tmp/public.tar -C /app/apps/web public \
- && (ls -la /tmp/public.tar 2>&1 || (echo "ERROR: public.tar gagal dibuat di builder." && exit 6)) \
- && echo "--- ls source .next/static (untuk COPY runner) ---" \
- && (ls -la .next/static/ 2>&1 | head -n 15 || (echo "ERROR: folder .next/static TIDAK ADA di builder." && exit 5)) \
- && echo "--- STANDALONE VERIFICATION OK ---" \
+ && echo "--- PACK public/ KE TARBALL public.tar di builder root (fix legacy builder COPY subfolder kecil parse path salah) ---" \
+ && tar -cf /app/apps/web/public.tar -C /app/apps/web public \
+ && (ls -la /app/apps/web/public.tar 2>&1 || (echo "ERROR: public.tar gagal dibuat di builder root /app/apps/web/" && exit 6)) \
+ && echo "--- VERIFY BUILDER OUTPUT LENGKAP ---" \
+ && ls -la /app/apps/web/ | head -n 20 \
+ && ls -la /app/apps/web/.next/static/ | head -n 8 \
+ && echo "--- BUILDER LAYER SELESAI ---" \
  && sync \
  && sleep 2 \
  && sync \
- && echo "disk sync x2 OK (prevent layer copy missing files legacy builder cache bug)"
+ && sleep 1 \
+ && sync \
+ && echo "disk sync x3 OK (flush overlay2 agar file tidak hilang saat copy ke runner)"
 
 FROM --platform=linux/amd64 node:20-bookworm-slim AS runner
 LABEL coolify.engine="dockerfile"
@@ -85,24 +88,29 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 WORKDIR /app/apps/web
 
-RUN mkdir -p /app/apps/web /app/apps/web/.next && echo "=== RUNNER INIT DIRS ===" && ls -la /app/apps/web/
+RUN mkdir -p /app/apps/web /app/apps/web/.next
 
-RUN echo "=== [1/3] COPY STANDALONE (pertama, agar .next base folder exist) ==="
 COPY --from=builder /app/apps/web/.next/standalone /app/apps/web/
-RUN echo "--- verify after copy standalone ---" && (ls -la /app/apps/web/server.js 2>&1 || (echo "ERROR: COPY standalone TIDAK BERHASIL! server.js TIDAK ADA di /app/apps/web/" && exit 11)) && ls -la /app/apps/web/ | head -n 20
-
-RUN echo "=== [2/3] COPY .next/static (kedua, ISI KE FOLDER .next YANG SUDAH ADA dari standalone, JANGAN overwrite base .next) ==="
 COPY --from=builder /app/apps/web/.next/static /app/apps/web/.next/static
-RUN echo "--- verify after copy static ---" && ls -la /app/apps/web/.next/static/ | head -n 15
+COPY --from=builder /app/apps/web/public.tar /tmp/public.tar
 
-RUN echo "=== [3/3] EXTRACT public.tar TARBALL (fix legacy builder COPY subfolder kecil parse path salah) ==="
-COPY --from=builder /tmp/public.tar /tmp/public.tar
-RUN tar -xf /tmp/public.tar -C /app/apps/web \
+RUN echo "=== FINAL RUNNER: extract public.tar + verify SEMUA copy BERHASIL SEKALIGUS ===" \
+ && tar -xf /tmp/public.tar -C /app/apps/web \
  && rm -f /tmp/public.tar \
- && echo "--- verify after extract public ---" && ls -la /app/apps/web/public/ | head -n 15
-
-RUN echo "=== RUNNER FINAL VERIFICATION ALL COPY OK, READY TO START ===" \
- && ls -la /app/apps/web/
+ && echo "--- [1/5] Verify server.js ---" \
+ && (ls -la /app/apps/web/server.js 2>&1 || (echo "ERROR: server.js TIDAK ADA di /app/apps/web/ - COPY standalone GAGAL!" && exit 11)) \
+ && echo "--- [2/5] Verify package.json runner ---" \
+ && (ls -la /app/apps/web/package.json 2>&1 || (echo "ERROR: package.json TIDAK ADA di runner root" && exit 12)) \
+ && echo "--- [3/5] Verify .next/static folder ---" \
+ && (ls -la /app/apps/web/.next/static/ 2>&1 | head -n 8 || (echo "ERROR: .next/static TIDAK ADA / KOSONG" && exit 13)) \
+ && echo "--- [4/5] Verify public/branding folder ---" \
+ && (ls -la /app/apps/web/public/ 2>&1 | head -n 8 || (echo "ERROR: public folder TIDAK ADA / KOSONG" && exit 14)) \
+ && (ls -la /app/apps/web/public/branding/ 2>&1 | head -n 8 || (echo "ERROR: public/branding TIDAK ADA (extract tar salah)" && exit 15)) \
+ && echo "--- [5/5] ls root runner final ---" \
+ && ls -la /app/apps/web/ \
+ && sync \
+ && sleep 1 \
+ && echo "=== RUNNER LAYER FINAL OK, SEMUA COPY TERCOPY DENGAN BENAR ==="
 
 EXPOSE 3000
 HEALTHCHECK --interval=300s --timeout=10s --start-period=120s --retries=3 CMD exit 0
