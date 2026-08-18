@@ -114,5 +114,5 @@ RUN echo "=== FINAL RUNNER: extract public.tar + verify SEMUA copy BERHASIL SEKA
  && echo "=== RUNNER LAYER FINAL OK, SEMUA COPY TERCOPY DENGAN BENAR ==="
 
 EXPOSE 3000
-HEALTHCHECK --interval=300s --timeout=10s --start-period=120s --retries=3 CMD exit 0
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 CMD node /app/apps/web/healthcheck.js || exit 1
 CMD ["node","/app/apps/web/server.js"]
