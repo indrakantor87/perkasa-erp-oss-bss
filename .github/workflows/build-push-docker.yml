@@ -29,45 +29,54 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Force disable BuildKit and BuildX (daemon.json level, restart docker)
+      - name: Force disable BuildKit at DAEMON level
         run: |
-          echo "=== Force disable BuildKit at DAEMON level (most reliable) ==="
+          echo "=== Force disable BuildKit at DAEMON level ==="
           sudo mkdir -p /etc/docker
           echo '{"features":{"buildkit":false},"storage-driver":"overlay2"}' | sudo tee /etc/docker/daemon.json
           sudo systemctl restart docker || sudo service docker restart
           sleep 6
           echo "=== Docker version ==="
           docker --version
-          echo "=== Docker info: Check builder version ==="
-          docker info 2>&1 | grep -iE "version|builder|buildkit|server" | head -20
-          echo ""
-          echo "=== ENV final confirm ==="
+          echo "=== Docker info (builder check) ==="
+          docker info 2>&1 | grep -iE "version|builder|buildkit|server" | head -20 || true
           echo "  DOCKER_BUILDKIT=$DOCKER_BUILDKIT"
-          echo "  DOCKER_BUILDX=$DOCKER_BUILDX"
           echo "  COMPOSE_DOCKER_CLI_BUILD=$COMPOSE_DOCKER_CLI_BUILD"
-          echo "  NODE_OPTIONS=$NODE_OPTIONS"
 
-      - name: Sanity check: verify required files exist in workspace
+      - name: Sanity check: required files in workspace
         run: |
+          FILES_REQUIRED=(
+            "Dockerfile"
+            "apps/web/package.json"
+            "apps/web/package-lock.json"
+            "apps/web/next.config.ts"
+            "apps/web/next-env.d.ts"
+            "apps/web/shims.d.ts"
+            "apps/web/tsconfig.json"
+            "apps/web/postcss.config.js"
+            "apps/web/tailwind.config.ts"
+            "apps/web/app/layout.tsx"
+            "apps/web/healthcheck.js"
+            "apps/web/public"
+            "apps/web/components"
+            "apps/web/lib"
+            "apps/web/app"
+            "apps/web/public/branding/perkasa-networks-original.png"
+          )
           missing=0
-          for f in \
-            Dockerfile \
-            apps/web/package.json apps/web/package-lock.json \
-            apps/web/next.config.ts apps/web/next-env.d.ts apps/web/shims.d.ts \
-            apps/web/tsconfig.json apps/web/postcss.config.js apps/web/tailwind.config.ts \
-            apps/web/app/layout.tsx apps/web/healthcheck.js \
-            apps/web/public apps/web/components apps/web/lib apps/web/app \
-            apps/web/public/branding/perkasa-networks-original.png
-          do
+          for f in "${FILES_REQUIRED[@]}"; do
             if [ -e "$GITHUB_WORKSPACE/$f" ]; then
               echo "  ✓ $f"
             else
-              echo "  ✗ MISSING: $f" ; missing=1
+              echo "  ✗ MISSING: $f"
+              missing=1
             fi
           done
           if [ "$missing" -ne 0 ]; then
-            echo "FATAL: missing required file(s)."; exit 255
+            echo "FATAL: required file(s) missing"
+            exit 255
           fi
+          echo "OK - sanity check passed"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -76,7 +85,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image via `docker build` CLI (legacy builder, 3 stages ~3-6 min)
+      - name: Build image via docker build CLI directly
         id: build
         run: |
           SHORT_SHA="${GITHUB_SHA:0:7}"
@@ -84,8 +93,7 @@ jobs:
           IMG_SHA="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}"
           echo "IMG_LATEST=$IMG_LATEST" >> "$GITHUB_OUTPUT"
           echo "IMG_SHA=$IMG_SHA" >> "$GITHUB_OUTPUT"
-          echo ""
-          echo "=== Build image (legacy docker daemon, DOCKER_BUILDKIT=0) ==="
+          echo "=== docker build: legacy CLI mode, DOCKER_BUILDKIT=0 ==="
           docker build \
             --file ./Dockerfile \
             --build-arg BUILDKIT_INLINE_CACHE=0 \
@@ -97,60 +105,57 @@ jobs:
             . 2>&1 | tee /tmp/docker-build.log | tail -n 150
           BUILD_RC=${PIPESTATUS[0]}
           if [ "$BUILD_RC" -ne 0 ]; then
-            echo "FATAL: docker build CLI exit=$BUILD_RC" ; exit 255
+            echo "FATAL: docker build exit=$BUILD_RC"
+            exit 255
           fi
-          echo ""
-          echo "=== Built image summary ==="
-          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" | grep -E "perkasa-erp-oss-bss|IMAGE" | head -10
+          echo "OK - build successful"
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" | grep -E "perkasa-erp-oss-bss|REPOSITORY" | head -10 || true
 
-      - name: GATEKEEPER: create container from image, docker cp verify 4 critical files
+      - name: GATEKEEPER - verify runner image files via docker cp
         run: |
           IMG_LATEST="${{ steps.build.outputs.IMG_LATEST }}"
-          TEST_CONTAINER="perkasa-gatekeeper-cli-$$"
-          CID=$(docker create --name "$TEST_CONTAINER" "$IMG_LATEST" /bin/true 2>&1)
+          TEST_CONTAINER="perkasa-gatekeeper-$$"
+          CID=$(docker create --name "$TEST_CONTAINER" "$IMG_LATEST" /bin/true 2>&1 || true)
           if [ -z "$CID" ]; then
-            echo "FATAL: cannot create container from image. Image broken?" ; exit 255
+            echo "FATAL: cannot create container from $IMG_LATEST"
+            exit 255
           fi
           echo "Container ID: $CID"
-          echo ""
-          echo "=== Docker copy runner /app/apps/web to /tmp/verify ==="
           rm -rf /tmp/verify ; mkdir -p /tmp/verify
-          docker cp "$CID:/app/apps/web" /tmp/verify/root 2>&1 | head -10
-          COPY_RC=${PIPESTATUS[0]}
+          docker cp "$CID:/app/apps/web" /tmp/verify/root > /tmp/cp.log 2>&1 ; COPY_RC=$?
           failed=0
           if [ "$COPY_RC" -ne 0 ]; then
-            echo "WARN: docker cp /app/apps/web failed, fallback to /app"
-            docker cp "$CID:/app" /tmp/verify/app 2>&1 | head -10
-            ls -laR /tmp/verify/app | head -80
+            echo "WARN: cp /app/apps/web failed ($COPY_RC). Trying /app."
+            cat /tmp/cp.log || true
+            docker cp "$CID:/app" /tmp/verify/app || true
+            ls -laR /tmp/verify/app | head -80 || true
           else
-            echo ""
             echo "--- runner /app/apps/web top level ---"
             ls -la /tmp/verify/root | head -30
-            echo ""
-            for expected in \
-              "server.js|/tmp/verify/root/server.js" \
-              "healthcheck.js|/tmp/verify/root/healthcheck.js" \
-              ".next/static/|/tmp/verify/root/.next/static" \
-              "public/|/tmp/verify/root/public"
-            do
-              name="${expected%%|*}"
-              path="${expected##*|}"
+            CHECKS=(
+              "server.js|/tmp/verify/root/server.js"
+              "healthcheck.js|/tmp/verify/root/healthcheck.js"
+              ".next/static|/tmp/verify/root/.next/static"
+              "public|/tmp/verify/root/public"
+            )
+            for item in "${CHECKS[@]}"; do
+              name="${item%%|*}"
+              path="${item##*|}"
               if [ -e "$path" ]; then
                 echo "  ✓ $name"
               else
-                echo "  ✗ MISSING CRITICAL: $name @ $path" ; failed=1
+                echo "  ✗ MISSING CRITICAL: $name @ $path"
+                failed=1
               fi
             done
           fi
-          echo ""
-          echo "=== cleanup test container ==="
           docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true
           if [ "$failed" -ne 0 ]; then
-            echo "FATAL GATEKEEPER FAIL: critical file(s) missing. Printing build log tail for debug..."
+            echo "FATAL GATEKEEPER FAIL. Printing last 200 lines of build log..."
             tail -n 200 /tmp/docker-build.log || true
             exit 255
           fi
-          echo "✅ GATEKEEPER PASSED: all 4 critical files verified inside runner image."
+          echo "OK - GATEKEEPER PASSED"
 
       - name: Push tags (sha + latest) to GHCR
         run: |
@@ -160,7 +165,7 @@ jobs:
           docker push "$IMG_SHA" 2>&1 | tail -10
           echo "=== docker push $IMG_LATEST ==="
           docker push "$IMG_LATEST" 2>&1 | tail -10
-          echo "✅ Both images pushed to GHCR successfully."
+          echo "OK - push successful"
           echo ""
           echo "=== Final image digest ==="
           docker inspect "$IMG_LATEST" --format '{{index .RepoDigests 0}}' 2>&1 || true
