@@ -1,76 +1,69 @@
-FROM --platform=linux/amd64 node:20-bookworm-slim AS deps
-LABEL coolify.engine="dockerfile"
-LABEL coolify.build_pack="dockerfile"
-LABEL coolify.helper="disabled"
-LABEL coolify.use_helper="0"
-LABEL coolify.buildkit="0"
-LABEL coolify.buildx="0"
-LABEL coolify.disable_buildx="true"
-LABEL coolify.disable_helper="true"
-LABEL coolify.skip_prepare_builder="true"
-LABEL org.opencontainers.image.title="Perkasa ERP OSS BSS"
-LABEL org.opencontainers.image.description="Satu website operasional ISP untuk sales, support, inventory, HR, dan billing."
-LABEL org.opencontainers.image.vendor="Perkasa Networks"
-LABEL org.opencontainers.image.source="https://github.com/indrakantor87/perkasa-erp-oss-bss"
-LABEL org.opencontainers.image.licenses="proprietary"
-ARG BUILDKIT_INLINE_CACHE=1
+# ============================================================
+# PERKASA ERP - GOLDEN STABLE DOCKERFILE (No Tar, No BuildKit)
+# 3 stages: deps -> builder -> runner
+# ============================================================
+
+# ---------- STAGE 1/3: deps - install npm packages only ----------
+FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:20-bookworm-slim AS deps
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NEXT_TELEMETRY_DISABLED=1
+
 WORKDIR /app/apps/web
 COPY apps/web/package.json apps/web/package-lock.json* ./
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --no-audit --no-fund \
+ && npm cache clean --force 2>/dev/null || true
 
-FROM --platform=linux/amd64 node:20-bookworm-slim AS builder
-LABEL coolify.engine="dockerfile"
-LABEL coolify.build_pack="dockerfile"
-LABEL coolify.helper="disabled"
-LABEL coolify.use_helper="0"
-LABEL coolify.buildkit="0"
-LABEL coolify.buildx="0"
-LABEL coolify.disable_buildx="true"
-LABEL coolify.disable_helper="true"
-LABEL coolify.skip_prepare_builder="true"
-LABEL org.opencontainers.image.title="Perkasa ERP OSS BSS"
-LABEL org.opencontainers.image.vendor="Perkasa Networks"
-LABEL org.opencontainers.image.source="https://github.com/indrakantor87/perkasa-erp-oss-bss"
-LABEL org.opencontainers.image.licenses="proprietary"
-ARG BUILDKIT_INLINE_CACHE=1
-ARG PSB_ERP_BUILD_SENTINEL=20260817-data-psb-import-export-v4
-ARG CACHEBUST=1
+# ---------- STAGE 2/3: builder - run next build and assemble standalone ----------
+FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:20-bookworm-slim AS builder
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS=--max-old-space-size=4096
+
 WORKDIR /app/apps/web
+
 COPY --from=deps /app/apps/web/node_modules ./node_modules
 COPY apps/web ./
-ENV NODE_OPTIONS=--max-old-space-size=2048
-RUN npm run build \
- && tar -cf /app/apps/web/.next/output-build.tar -C /app/apps/web/.next standalone static \
- && tar -rf /app/apps/web/.next/output-build.tar -C /app/apps/web public healthcheck.js \
- && ls -lh /app/apps/web/.next/output-build.tar
 
-FROM --platform=linux/amd64 node:20-bookworm-slim AS runner
-LABEL coolify.engine="dockerfile"
-LABEL coolify.build_pack="dockerfile"
-LABEL coolify.helper="disabled"
-LABEL coolify.use_helper="0"
-LABEL coolify.buildkit="0"
-LABEL coolify.buildx="0"
-LABEL coolify.disable_buildx="true"
-LABEL coolify.disable_helper="true"
-LABEL coolify.skip_prepare_builder="true"
-LABEL org.opencontainers.image.title="Perkasa ERP OSS BSS"
-LABEL org.opencontainers.image.description="Satu website operasional ISP untuk sales, support, inventory, HR, dan billing."
-LABEL org.opencontainers.image.vendor="Perkasa Networks"
-LABEL org.opencontainers.image.source="https://github.com/indrakantor87/perkasa-erp-oss-bss"
-LABEL org.opencontainers.image.licenses="proprietary"
+RUN echo "=== [1/3 builder] Start next build ===" \
+ && npm run build 2>&1 | tail -80 \
+ && echo "=== [2/3 builder] Verify .next/standalone exists ===" \
+ && test -d ".next/standalone" \
+ && mkdir -p ".next/standalone/.next" \
+ && echo "=== [3/3 builder] Assemble standalone: copy static + public + healthcheck ===" \
+ && cp -a ".next/static" ".next/standalone/.next/static" \
+ && if [ -d "public" ]; then cp -a "public" ".next/standalone/public"; fi \
+ && cp "healthcheck.js" ".next/standalone/healthcheck.js" \
+ && echo "=== Standalone verification ===" \
+ && ls -la ".next/standalone" | head -30 \
+ && test -f ".next/standalone/server.js" \
+ && test -f ".next/standalone/healthcheck.js" \
+ && test -d ".next/standalone/.next/static" \
+ && test -d ".next/standalone/public"
+
+# ---------- STAGE 3/3: runner - production image, only standalone output ----------
+FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:20-bookworm-slim AS runner
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+
 WORKDIR /app/apps/web
-COPY --from=builder /app/apps/web/.next/output-build.tar /tmp/output-build.tar
-RUN tar -xf /tmp/output-build.tar -C /app/apps/web && rm -f /tmp/output-build.tar
+COPY --from=builder /app/apps/web/.next/standalone ./
+
+RUN echo "=== Runner post-copy verification ===" \
+ && test -f "/app/apps/web/server.js"          && echo "  ✓ server.js" \
+ && test -f "/app/apps/web/healthcheck.js"     && echo "  ✓ healthcheck.js" \
+ && test -d "/app/apps/web/.next/static"       && echo "  ✓ .next/static" \
+ && test -d "/app/apps/web/public"             && echo "  ✓ public" \
+ && echo "=== All runner checks passed ==="
+
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 CMD node /app/apps/web/healthcheck.js || exit 1
-CMD ["node","/app/apps/web/server.js"]
+
+HEALTHCHECK --interval=60s --timeout=10s --start-period=240s --retries=5 \
+  CMD node /app/apps/web/healthcheck.js || exit 1
+
+CMD ["node", "/app/apps/web/server.js"]
