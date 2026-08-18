@@ -92,6 +92,7 @@ RUN mkdir -p /app/apps/web /app/apps/web/.next
 
 COPY --from=builder /app/apps/web/.next/standalone /app/apps/web/
 COPY --from=builder /app/apps/web/.next/static /app/apps/web/.next/static
+COPY --from=builder /app/apps/web/healthcheck.js /app/apps/web/healthcheck.js
 COPY --from=builder /app/apps/web/public.tar /tmp/public.tar
 
 RUN echo "=== FINAL RUNNER: extract public.tar + verify SEMUA copy BERHASIL SEKALIGUS ===" \
