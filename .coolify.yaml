@@ -3,17 +3,25 @@ version: '1'
 build:
   method: direct
   engine: dockerfile
+  dockerfile: Dockerfile
+  context: .
   disable_helper: true
   disable_buildx: true
-  disable_buildkit: true
-  helper_image: ghcr.io/coollabsio/coolify-helper:1.0.13
-  buildkit_inline_cache: false
+  disable_buildkit: false
+  buildkit_inline_cache: true
   nested_container: false
   docker_socket_build: true
+  force_recreate: true
+  no_cache: false
+  pull_images: false
+  custom_build_scripts: true
+  build_command: ".coolify/build.sh"
 
 deploy:
   restart: unless-stopped
-  healthcheck_retries: 3
-  healthcheck_start_period: 120
-  healthcheck_interval: 300
+  healthcheck_retries: 5
+  healthcheck_start_period: 180
+  healthcheck_interval: 60
   healthcheck_timeout: 10
+  pull_request: false
+  auto_deploy: false
