@@ -1,81 +1,54 @@
-# =========================================================
-# DOCKERIGNORE WHITELIST STRATEGY v6-golden
-# =========================================================
-# DEFAULT: IGNORE SEMUA. HANYA files di bawah YANG DI-ALLOW.
-# Tujuan: Build context 300KB bukan 100MB. Cache hit tinggi.
-# =========================================================
+node_modules
+.next
+.git
+.env
+.env.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+**/.DS_Store
+android
+mobile-build
+.gradle
+.idea
+dev.db
+database_dump.sql
+debug-isolations-fetch-abort.md
+build_apk.ps1
+README_MOBILE.md
+supabase_fixes.sql
+tsconfig.tsbuildinfo
+*.log
 
-# --- IGNORE SEMUA DI ROOT REPO ---
-**/*
-!.dockerignore
-
-# --- ALLOW ONLY: ROOT REPO: Dockerfile docker-compose (dibutuhkan Coolify / docker build context) ---
-!/Dockerfile
-!/docker-compose.yaml
-!/docker-compose.yml
-!/coolify.json
-!/.coolify.yaml
-!/.coolify/**
-
-# --- ALLOW ONLY: apps/web NEXT.JS SOURCE BENERAN YANG DIBUTUHKAN BUILD ---
-# --- Configs WAJIB next build (JANGAN SAMPAI TER-IGNORE INI!) ---
-!/apps/web/package.json
-!/apps/web/package-lock.json
-!/apps/web/next.config.ts
-!/apps/web/next-env.d.ts
-!/apps/web/shims.d.ts
-!/apps/web/tsconfig.json
-!/apps/web/postcss.config.js
-!/apps/web/tailwind.config.ts
-!/apps/web/healthcheck.js
-
-# --- Source code next.js WAJIB ---
-!/apps/web/app/**
-!/apps/web/components/**
-!/apps/web/lib/**
-
-# --- Public assets: HANYA SVG BRANDING SAJA! PNG ORIGINAL 608KB TIDAK DIBUTUHKAN ---
-!/apps/web/public/**
-
-# --- EXPLICITLY BLOCK SAMPAH YANG MUNGKIN MASUK TANPA DISADARI ---
-# (Double protection walaupun udah default ignore **/*)
-apps/web/scripts/
-apps/web/tests/
-apps/web/docs/
-apps/web/coverage/
-apps/web/out/
-apps/web/dist/
-apps/web/storage/
-apps/web/node_modules/
-apps/web/.next/
-apps/web/tsconfig.tsbuildinfo
+apps/web/.next
+apps/web/node_modules
+apps/web/coverage
+apps/web/out
+apps/web/dist
+apps/web/storage
 apps/web/*.log
-apps/web/.env
-apps/web/.env.*
+
+production-data
+database/generated
+.github
+CHANGELOG.md
+README.md
+docs
+.trae
+.vscode
+
+apps/web/scripts
+apps/web/tests
+apps/web/docs
 apps/web/README.md
 apps/web/ecosystem.config.cjs
 apps/web/proxy.ts
 apps/web/sandbox-verify.ps1
-apps/web/lib/mock-*.ts
+apps/web/.env.example
+apps/web/.env.production.example
+apps/web/.env.production.final.template
+apps/web/lib/mock-domains.ts
+apps/web/lib/mock-dashboard.ts
+apps/web/lib/mock-import.ts
+apps/web/lib/mock-tracking.ts
 apps/web/public/branding/perkasa-networks-original.png
-
-# --- Ignore global sampah (safety net) ---
-.git
-.github
-.gradle
-.idea
-.trae
-.vscode
-*.log
-*.sql
-dev.db
-database
-docs
-CHANGELOG.md
-README.md
-production-data
-android
-mobile-build
-.DS_Store
-node_modules
-.next
