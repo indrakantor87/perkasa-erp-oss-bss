@@ -18,8 +18,6 @@ LABEL org.opencontainers.image.vendor="Perkasa Networks"
 LABEL org.opencontainers.image.source="https://github.com/indrakantor87/perkasa-erp-oss-bss"
 LABEL org.opencontainers.image.licenses="proprietary"
 ARG BUILDKIT_INLINE_CACHE=0
-ENV DOCKER_BUILDKIT=0
-ENV BUILDX_NO_BUILDER=1
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/apps/web
@@ -47,8 +45,6 @@ LABEL org.opencontainers.image.licenses="proprietary"
 ARG BUILDKIT_INLINE_CACHE=0
 ARG PSB_ERP_BUILD_SENTINEL=20260817-data-psb-import-export-v4
 ARG CACHEBUST=1
-ENV DOCKER_BUILDKIT=0
-ENV BUILDX_NO_BUILDER=1
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/apps/web
@@ -97,8 +93,6 @@ LABEL org.opencontainers.image.description="Satu website operasional ISP untuk s
 LABEL org.opencontainers.image.vendor="Perkasa Networks"
 LABEL org.opencontainers.image.source="https://github.com/indrakantor87/perkasa-erp-oss-bss"
 LABEL org.opencontainers.image.licenses="proprietary"
-ENV DOCKER_BUILDKIT=0
-ENV BUILDX_NO_BUILDER=1
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
