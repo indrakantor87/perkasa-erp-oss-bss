@@ -8,11 +8,10 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  DOCKER_BUILDKIT: "1"
-  DOCKER_BUILDX: "1"
-  COMPOSE_DOCKER_CLI_BUILD: "1"
-  BUILDKIT_PROGRESS: plain
-  BUILDKIT_INLINE_CACHE: "1"
+  DOCKER_BUILDKIT: "0"
+  DOCKER_BUILDX: "0"
+  COMPOSE_DOCKER_CLI_BUILD: "0"
+  BUILDX_DISABLED: "true"
   DEBIAN_FRONTEND: "noninteractive"
   NEXT_TELEMETRY_DISABLED: "1"
   NODE_OPTIONS: "--max-old-space-size=4096"
@@ -20,7 +19,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
@@ -31,35 +30,43 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify Dockerfile and apps/web source exist
+      - name: Force disable BuildKit / buildx (legacy builder = GOLDEN)
         run: |
-          echo "=== Check workspace structure ==="
-          ls -la "${{ github.workspace }}/" | head -40
-          echo ""
-          echo "=== Check critical files ==="
-          for f in Dockerfile docker-compose.yaml apps/web/package.json apps/web/next.config.ts apps/web/healthcheck.js apps/web/shims.d.ts; do
-            if [ -f "${{ github.workspace }}/${f}" ]; then
-              echo "  ✓ ${f}"
+          echo "DOCKER_BUILDKIT=0" >> "$GITHUB_ENV"
+          echo "DOCKER_BUILDX=0" >> "$GITHUB_ENV"
+          echo "COMPOSE_DOCKER_CLI_BUILD=0" >> "$GITHUB_ENV"
+          echo "BUILDX_DISABLED=true" >> "$GITHUB_ENV"
+          sudo systemctl is-active --quiet docker || sudo systemctl start docker
+          echo "=== Docker version (no buildx) ==="
+          docker --version || true
+          echo "=== Docker daemon info ==="
+          docker info 2>&1 | head -n 25 || true
+
+      - name: Verify required build context files
+        run: |
+          echo "=== Required files in workspace ==="
+          missing=0
+          for f in \
+            Dockerfile \
+            apps/web/package.json apps/web/package-lock.json \
+            apps/web/next.config.ts apps/web/next-env.d.ts apps/web/shims.d.ts \
+            apps/web/tsconfig.json apps/web/postcss.config.js apps/web/tailwind.config.ts \
+            apps/web/app/layout.tsx \
+            apps/web/healthcheck.js \
+            apps/web/public
+          do
+            if [ -e "$GITHUB_WORKSPACE/$f" ]; then
+              echo "  ✓ $f"
             else
-              echo "  ✗ MISSING: ${f}"
-              exit 255
+              echo "  ✗ MISSING: $f" ; missing=1
             fi
           done
-
-      - name: Set up Docker Buildx (stable, default driver)
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker
-          install: true
-          use: true
-
-      - name: Docker daemon info and BuildKit readiness
-        run: |
-          sudo systemctl is-active --quiet docker || sudo systemctl start docker
-          docker info 2>&1 | head -n 20 || true
+          if [ "$missing" -ne 0 ]; then
+            echo "FATAL: $missing required file(s) missing." ; exit 255
+          fi
           echo ""
-          echo "=== DOCKER_BUILDKIT=$DOCKER_BUILDKIT ==="
-          docker buildx version 2>&1 | head -5
+          echo "=== apps/web root listing ==="
+          ls -la "$GITHUB_WORKSPACE/apps/web" | head -30
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -68,7 +75,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -84,23 +91,94 @@ jobs:
             org.opencontainers.image.vendor=Perkasa Networks
             org.opencontainers.image.licenses=proprietary
 
-      - name: Build and push Docker image (BuildKit, provenance false for small manifest)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64
-          push: true
-          provenance: false
-          sbom: false
-          load: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-            NEXT_TELEMETRY_DISABLED=1
-            DEBIAN_FRONTEND=noninteractive
-            CACHEBUST=gha-${{ github.sha }}
-          outputs: type=registry
+      - name: Build image via `docker build` CLI (legacy builder, NO buildx, provenance=none)
+        id: build
+        run: |
+          echo "=== TAGS to apply ==="
+          echo "TAGS: ${{ steps.meta.outputs.tags }}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          IMG_LATEST="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          IMG_SHA="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}"
+          echo "IMG_LATEST=$IMG_LATEST" >> "$GITHUB_OUTPUT"
+          echo "IMG_SHA=$IMG_SHA" >> "$GITHUB_OUTPUT"
+          echo ""
+          echo "=== Running docker build (LEGACY BUILDER, ~3-5 min) ==="
+          docker build \
+            --file ./Dockerfile \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --build-arg NEXT_TELEMETRY_DISABLED=1 \
+            --build-arg DEBIAN_FRONTEND=noninteractive \
+            --build-arg "CACHEBUST=gha-golden-$SHORT_SHA" \
+            --tag "$IMG_LATEST" \
+            --tag "$IMG_SHA" \
+            . 2>&1 | tee /tmp/docker-build.log | tail -n 120
+          BUILD_RC=${PIPESTATUS[0]}
+          if [ "$BUILD_RC" -ne 0 ]; then
+            echo "FATAL: docker build exit=$BUILD_RC" ; exit 255
+          fi
+          echo ""
+          echo "=== Built image size ==="
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" | grep -E "perkasa-erp-oss-bss|IMAGE"
+
+      - name: GATEKEEPER: Load built image, verify 4 critical files (server.js, healthcheck, static, public)
+        run: |
+          IMG_LATEST="${{ steps.build.outputs.IMG_LATEST }}"
+          echo "=== Gatekeeper: Create test container (no start, just copy files) ==="
+          TEST_CONTAINER="perkasa-gatekeeper-$$"
+          CID=$(docker create --name "$TEST_CONTAINER" "$IMG_LATEST" /bin/true 2>&1) || true
+          if [ -z "$CID" ]; then
+            echo "FATAL: cannot create container from image. Image broken?" ; exit 255
+          fi
+          echo "Container ID: $CID"
+          echo ""
+          echo "=== Gatekeeper: Verify critical files inside runner image ==="
+          mkdir -p /tmp/gatekeeper
+          docker cp "$CID:/app/apps/web" /tmp/gatekeeper/root 2>&1 | head -20
+          COPY_RC=${PIPESTATUS[0]}
+          failed=0
+          if [ "$COPY_RC" -ne 0 ]; then
+            echo "WARN: docker cp /app/apps/web failed, try alternate path /app"
+            docker cp "$CID:/app" /tmp/gatekeeper/app 2>&1 | head -20
+            ls -laR /tmp/gatekeeper/app | head -80
+          else
+            echo "--- /tmp/gatekeeper/root listing (apps/web inside runner) ---"
+            ls -la /tmp/gatekeeper/root | head -40
+            echo ""
+            for expected in \
+              "server.js|/tmp/gatekeeper/root/server.js" \
+              "healthcheck.js|/tmp/gatekeeper/root/healthcheck.js" \
+              ".next/static dir|/tmp/gatekeeper/root/.next/static" \
+              "public dir|/tmp/gatekeeper/root/public"
+            do
+              name="${expected%%|*}"
+              path="${expected##*|}"
+              if [ -e "$path" ]; then
+                echo "  ✓ $name  @  $path"
+              else
+                echo "  ✗ MISSING CRITICAL: $name  @  $path" ; failed=1
+              fi
+            done
+          fi
+          echo ""
+          echo "=== Gatekeeper: cleanup test container ==="
+          docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true
+          if [ "$failed" -ne 0 ]; then
+            echo "FATAL GATEKEEPER FAIL: $failed critical file(s) missing inside image. PUSH CANCELED."
+            echo "Printing build log tail for debugging:"
+            tail -n 200 /tmp/docker-build.log
+            exit 255
+          fi
+          echo "✅ GATEKEEPER PASSED: all 4 critical files verified inside runner image. Safe to push."
+
+      - name: Push image tags (latest + sha) to GHCR
+        run: |
+          IMG_LATEST="${{ steps.build.outputs.IMG_LATEST }}"
+          IMG_SHA="${{ steps.build.outputs.IMG_SHA }}"
+          echo "=== Pushing $IMG_SHA ==="
+          docker push "$IMG_SHA" 2>&1 | tail -15
+          echo "=== Pushing $IMG_LATEST ==="
+          docker push "$IMG_LATEST" 2>&1 | tail -15
+          echo "✅ Both images pushed successfully."
+          echo ""
+          echo "=== Final digest / manifest confirm ==="
+          docker manifest inspect "$IMG_LATEST" --verbose 2>/dev/null | head -30 || docker inspect "$IMG_LATEST" --format '{{index .RepoDigests 0}}' || true
