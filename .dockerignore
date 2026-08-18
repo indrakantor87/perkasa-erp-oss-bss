@@ -1,26 +1,81 @@
+# =========================================================
+# DOCKERIGNORE WHITELIST STRATEGY v6-golden
+# =========================================================
+# DEFAULT: IGNORE SEMUA. HANYA files di bawah YANG DI-ALLOW.
+# Tujuan: Build context 300KB bukan 100MB. Cache hit tinggi.
+# =========================================================
+
+# --- IGNORE SEMUA DI ROOT REPO ---
+**/*
+!.dockerignore
+
+# --- ALLOW ONLY: ROOT REPO: Dockerfile docker-compose (dibutuhkan Coolify / docker build context) ---
+!/Dockerfile
+!/docker-compose.yaml
+!/docker-compose.yml
+!/coolify.json
+!/.coolify.yaml
+!/.coolify/**
+
+# --- ALLOW ONLY: apps/web NEXT.JS SOURCE BENERAN YANG DIBUTUHKAN BUILD ---
+# --- Configs WAJIB next build (JANGAN SAMPAI TER-IGNORE INI!) ---
+!/apps/web/package.json
+!/apps/web/package-lock.json
+!/apps/web/next.config.ts
+!/apps/web/next-env.d.ts
+!/apps/web/shims.d.ts
+!/apps/web/tsconfig.json
+!/apps/web/postcss.config.js
+!/apps/web/tailwind.config.ts
+!/apps/web/healthcheck.js
+
+# --- Source code next.js WAJIB ---
+!/apps/web/app/**
+!/apps/web/components/**
+!/apps/web/lib/**
+
+# --- Public assets: HANYA SVG BRANDING SAJA! PNG ORIGINAL 608KB TIDAK DIBUTUHKAN ---
+!/apps/web/public/**
+
+# --- EXPLICITLY BLOCK SAMPAH YANG MUNGKIN MASUK TANPA DISADARI ---
+# (Double protection walaupun udah default ignore **/*)
+apps/web/scripts/
+apps/web/tests/
+apps/web/docs/
+apps/web/coverage/
+apps/web/out/
+apps/web/dist/
+apps/web/storage/
+apps/web/node_modules/
+apps/web/.next/
+apps/web/tsconfig.tsbuildinfo
+apps/web/*.log
+apps/web/.env
+apps/web/.env.*
+apps/web/README.md
+apps/web/ecosystem.config.cjs
+apps/web/proxy.ts
+apps/web/sandbox-verify.ps1
+apps/web/lib/mock-*.ts
+apps/web/public/branding/perkasa-networks-original.png
+
+# --- Ignore global sampah (safety net) ---
 .git
-.env
-.env.*
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.DS_Store
-android
-mobile-build
+.github
 .gradle
 .idea
-*.log
 .trae
 .vscode
-production-data
-.github
+*.log
+*.sql
+dev.db
 database
 docs
 CHANGELOG.md
 README.md
-*.sql
-dev.db
+production-data
+android
+mobile-build
+.DS_Store
 node_modules
 .next
-apps/web/.next
-apps/web/node_modules
