@@ -1,23 +1,92 @@
+'use client'
+
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { DataSourceStatus } from '@/components/data-source-status'
-import { HrAttendanceFaceConfigForm } from '@/components/hr-attendance-face-config-form'
-import { HrAttendanceFaceReviewForm } from '@/components/hr-attendance-face-review-form'
-import { HrAttendanceForm } from '@/components/hr-attendance-form'
-import { HrAttendanceGeofenceForm } from '@/components/hr-attendance-geofence-form'
-import { HrAttendanceUpdateForm } from '@/components/hr-attendance-update-form'
-import { HrEmployeeArchiveForm } from '@/components/hr-employee-archive-form'
-import { HrEmployeeCreateForm } from '@/components/hr-employee-create-form'
-import { HrEmployeeFaceReferenceForm } from '@/components/hr-employee-face-reference-form'
-import { HrEmployeeKpiForm } from '@/components/hr-employee-kpi-form'
-import { HrEmployeeReactivateForm } from '@/components/hr-employee-reactivate-form'
-import { HrLoanCreateForm } from '@/components/hr-loan-create-form'
-import { HrLoanStatusForm } from '@/components/hr-loan-status-form'
-import { HrLoanVoidForm } from '@/components/hr-loan-void-form'
-import { HrSalarySlipForm } from '@/components/hr-salary-slip-form'
-import { HrSalarySlipReleaseForm } from '@/components/hr-salary-slip-release-form'
-import { HrSalarySlipVoidForm } from '@/components/hr-salary-slip-void-form'
-import { getHrWorkspaceInsightSections } from '@/lib/services/hr-workspace-insight-service'
 import type { AppRole, DataSourceSnapshot, DomainCapability, DomainPageContent, DomainReviewRow, DomainReviewSection } from '@/lib/types'
+
+function FormModalSkeleton() {
+  return (
+    <div className="w-full animate-pulse rounded-2xl border border-slate-200/70 bg-white/60 p-6 dark:border-slate-700/70 dark:bg-slate-900/60">
+      <div className="mb-4 h-8 w-1/3 rounded-xl bg-slate-200/70 dark:bg-slate-700/70" />
+      <div className="space-y-3">
+        <div className="h-12 w-full rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-12 w-2/3 rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-32 w-full rounded-lg bg-slate-200/50 dark:bg-slate-700/50" />
+        <div className="flex justify-end gap-3">
+          <div className="h-11 w-24 rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+          <div className="h-11 w-36 rounded-lg bg-slate-200/70 dark:bg-slate-700/70" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const HrAttendanceForm = dynamic(
+  () => import('@/components/hr-attendance-form').then((mod) => mod.HrAttendanceForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrAttendanceFaceConfigForm = dynamic(
+  () => import('@/components/hr-attendance-face-config-form').then((mod) => mod.HrAttendanceFaceConfigForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrAttendanceFaceReviewForm = dynamic(
+  () => import('@/components/hr-attendance-face-review-form').then((mod) => mod.HrAttendanceFaceReviewForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrAttendanceGeofenceForm = dynamic(
+  () => import('@/components/hr-attendance-geofence-form').then((mod) => mod.HrAttendanceGeofenceForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrAttendanceUpdateForm = dynamic(
+  () => import('@/components/hr-attendance-update-form').then((mod) => mod.HrAttendanceUpdateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrEmployeeArchiveForm = dynamic(
+  () => import('@/components/hr-employee-archive-form').then((mod) => mod.HrEmployeeArchiveForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrEmployeeCreateForm = dynamic(
+  () => import('@/components/hr-employee-create-form').then((mod) => mod.HrEmployeeCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrEmployeeFaceReferenceForm = dynamic(
+  () => import('@/components/hr-employee-face-reference-form').then((mod) => mod.HrEmployeeFaceReferenceForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrEmployeeKpiForm = dynamic(
+  () => import('@/components/hr-employee-kpi-form').then((mod) => mod.HrEmployeeKpiForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrEmployeeReactivateForm = dynamic(
+  () => import('@/components/hr-employee-reactivate-form').then((mod) => mod.HrEmployeeReactivateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrLoanCreateForm = dynamic(
+  () => import('@/components/hr-loan-create-form').then((mod) => mod.HrLoanCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrLoanStatusForm = dynamic(
+  () => import('@/components/hr-loan-status-form').then((mod) => mod.HrLoanStatusForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrLoanVoidForm = dynamic(
+  () => import('@/components/hr-loan-void-form').then((mod) => mod.HrLoanVoidForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrSalarySlipForm = dynamic(
+  () => import('@/components/hr-salary-slip-form').then((mod) => mod.HrSalarySlipForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrSalarySlipReleaseForm = dynamic(
+  () => import('@/components/hr-salary-slip-release-form').then((mod) => mod.HrSalarySlipReleaseForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrSalarySlipVoidForm = dynamic(
+  () => import('@/components/hr-salary-slip-void-form').then((mod) => mod.HrSalarySlipVoidForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
 
 export type HrWorkspaceKey = 'overview' | 'employees' | 'attendance' | 'salary' | 'loans' | 'permissions' | 'disciplinary'
 
@@ -387,6 +456,8 @@ function renderReviewSection(section: DomainReviewSection) {
   )
 }
 
+export type HrWorkspaceInsightLoader = (workspace: HrWorkspaceKey) => Promise<DomainReviewSection[]>
+
 function renderWorkspaceForms(params: {
   workspace: HrWorkspaceKey
   canCreate: boolean
@@ -406,73 +477,105 @@ function renderWorkspaceForms(params: {
     case 'employees':
       return (
         <div className="grid gap-4 xl:grid-cols-2">
-          <HrEmployeeCreateForm canCreate={canCreate} reviewDbReady={reviewDbReady} />
-          <HrEmployeeArchiveForm
-            canUpdate={canUpdate}
-            reviewDbReady={reviewDbReady}
-            employeeSuggestions={employeeData.employeeArchiveSuggestions}
-          />
-          <HrEmployeeReactivateForm
-            canUpdate={canUpdate}
-            reviewDbReady={reviewDbReady}
-            employeeSuggestions={employeeData.employeeReactivateSuggestions}
-          />
-          <HrEmployeeKpiForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} employeeSuggestions={employeeData.employeeSuggestions} />
-          <HrEmployeeFaceReferenceForm
-            canUpdate={canUpdate}
-            reviewDbReady={reviewDbReady}
-            employeeSuggestions={employeeData.employeeFaceReferenceSuggestions}
-            trendSuggestions={faceTrendSuggestions}
-            verifiedCaptureSuggestions={verifiedFaceCandidateSuggestions}
-          />
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrEmployeeCreateForm canCreate={canCreate} reviewDbReady={reviewDbReady} />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrEmployeeArchiveForm
+              canUpdate={canUpdate}
+              reviewDbReady={reviewDbReady}
+              employeeSuggestions={employeeData.employeeArchiveSuggestions}
+            />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrEmployeeReactivateForm
+              canUpdate={canUpdate}
+              reviewDbReady={reviewDbReady}
+              employeeSuggestions={employeeData.employeeReactivateSuggestions}
+            />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrEmployeeKpiForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} employeeSuggestions={employeeData.employeeSuggestions} />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrEmployeeFaceReferenceForm
+              canUpdate={canUpdate}
+              reviewDbReady={reviewDbReady}
+              employeeSuggestions={employeeData.employeeFaceReferenceSuggestions}
+              trendSuggestions={faceTrendSuggestions}
+              verifiedCaptureSuggestions={verifiedFaceCandidateSuggestions}
+            />
+          </Suspense>
         </div>
       )
     case 'attendance':
       return (
         <div className="grid gap-4 xl:grid-cols-2">
-          <HrAttendanceForm
-            canCreate={canCreate}
-            reviewDbReady={reviewDbReady}
-            employeeSuggestions={employeeData.employeeSuggestions}
-            geofenceConfig={attendanceData.geofenceConfig}
-            faceConfig={attendanceData.faceConfig}
-          />
-          <HrAttendanceUpdateForm
-            canUpdate={canUpdate}
-            reviewDbReady={reviewDbReady}
-            attendanceSuggestions={attendanceData.attendanceSuggestions}
-          />
-          <HrAttendanceGeofenceForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} initialConfig={attendanceData.geofenceConfig} />
-          <HrAttendanceFaceConfigForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} initialConfig={attendanceData.faceConfig} />
-          <HrAttendanceFaceReviewForm
-            canUpdate={canUpdate}
-            reviewDbReady={reviewDbReady}
-            reviewSuggestions={attendanceData.faceReviewSuggestions}
-          />
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrAttendanceForm
+              canCreate={canCreate}
+              reviewDbReady={reviewDbReady}
+              employeeSuggestions={employeeData.employeeSuggestions}
+              geofenceConfig={attendanceData.geofenceConfig}
+              faceConfig={attendanceData.faceConfig}
+            />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrAttendanceUpdateForm
+              canUpdate={canUpdate}
+              reviewDbReady={reviewDbReady}
+              attendanceSuggestions={attendanceData.attendanceSuggestions}
+            />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrAttendanceGeofenceForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} initialConfig={attendanceData.geofenceConfig} />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrAttendanceFaceConfigForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} initialConfig={attendanceData.faceConfig} />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrAttendanceFaceReviewForm
+              canUpdate={canUpdate}
+              reviewDbReady={reviewDbReady}
+              reviewSuggestions={attendanceData.faceReviewSuggestions}
+            />
+          </Suspense>
         </div>
       )
     case 'salary':
       return (
         <div className="grid gap-4 xl:grid-cols-2">
-          <HrSalarySlipForm canCreate={canCreate} reviewDbReady={reviewDbReady} employeeSuggestions={employeeData.employeeSuggestions} />
-          <HrSalarySlipReleaseForm
-            canUpdate={canUpdate}
-            reviewDbReady={reviewDbReady}
-            salarySlipSuggestions={salaryData.salarySlipSuggestions}
-          />
-          <HrSalarySlipVoidForm
-            canUpdate={canUpdate}
-            reviewDbReady={reviewDbReady}
-            salarySlipSuggestions={salaryData.salarySlipVoidSuggestions}
-          />
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrSalarySlipForm canCreate={canCreate} reviewDbReady={reviewDbReady} employeeSuggestions={employeeData.employeeSuggestions} />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrSalarySlipReleaseForm
+              canUpdate={canUpdate}
+              reviewDbReady={reviewDbReady}
+              salarySlipSuggestions={salaryData.salarySlipSuggestions}
+            />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrSalarySlipVoidForm
+              canUpdate={canUpdate}
+              reviewDbReady={reviewDbReady}
+              salarySlipSuggestions={salaryData.salarySlipVoidSuggestions}
+            />
+          </Suspense>
         </div>
       )
     case 'loans':
       return (
         <div className="grid gap-4 xl:grid-cols-2">
-          <HrLoanCreateForm canCreate={canCreate} reviewDbReady={reviewDbReady} employeeSuggestions={employeeData.employeeSuggestions} />
-          <HrLoanStatusForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} loanSuggestions={loanData.loanSuggestions} />
-          <HrLoanVoidForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} loanSuggestions={loanData.loanVoidSuggestions} />
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrLoanCreateForm canCreate={canCreate} reviewDbReady={reviewDbReady} employeeSuggestions={employeeData.employeeSuggestions} />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrLoanStatusForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} loanSuggestions={loanData.loanSuggestions} />
+          </Suspense>
+          <Suspense fallback={<FormModalSkeleton />}>
+            <HrLoanVoidForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} loanSuggestions={loanData.loanVoidSuggestions} />
+          </Suspense>
         </div>
       )
     case 'permissions':
@@ -485,15 +588,11 @@ function renderWorkspaceForms(params: {
   }
 }
 
-export async function HrWorkspacePage({ content, source, capabilities, role, activeWorkspace }: HrWorkspacePageProps) {
+export function HrWorkspacePage({ content, source, capabilities, role, activeWorkspace, workspaceInsightSections = [] }: HrWorkspacePageProps & { workspaceInsightSections?: DomainReviewSection[] }) {
   const enabledCapabilities = capabilities.filter((item) => item.enabled)
   const canCreate = enabledCapabilities.some((item) => item.action === 'create')
   const canUpdate = enabledCapabilities.some((item) => item.action === 'update')
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
-  const workspaceInsightSections =
-    activeWorkspace === 'permissions' || activeWorkspace === 'disciplinary'
-      ? await getHrWorkspaceInsightSections(activeWorkspace)
-      : []
   const visibleSections = [...workspaceInsightSections, ...getVisibleSections(activeWorkspace, content.reviewSections ?? [])]
 
   return (

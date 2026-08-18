@@ -1,58 +1,22 @@
+'use client'
+
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { Fragment, type ReactNode } from 'react'
+import { Fragment, Suspense, type ReactNode } from 'react'
 import { CaseActionOutcomeSummaryCard } from '@/components/case-action-outcome-summary'
-import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
-import { BillingCollectionResolveForm } from '@/components/billing-collection-resolve-form'
 import { CaseDecisionTrailPanel } from '@/components/case-decision-trail'
 import { CaseEvidencePanelCard } from '@/components/case-evidence-panel'
 import { CaseHealthSignalCard } from '@/components/case-health-signal'
 import { CaseNextActionMatrixCard } from '@/components/case-next-action-matrix'
 import { CaseCorrelationSummaryPanel } from '@/components/case-correlation-summary'
-import { BillingInvoiceGenerateForm } from '@/components/billing-invoice-generate-form'
-import { BillingInvoiceStatusForm } from '@/components/billing-invoice-status-form'
-import { BillingPaymentForm } from '@/components/billing-payment-form'
-import { CustomerCreateForm } from '@/components/customer-create-form'
-import { HrAttendanceForm } from '@/components/hr-attendance-form'
-import { HrAttendanceFaceConfigForm } from '@/components/hr-attendance-face-config-form'
-import { HrAttendanceFaceReviewForm } from '@/components/hr-attendance-face-review-form'
-import { HrAttendanceGeofenceForm } from '@/components/hr-attendance-geofence-form'
-import { HrAttendanceUpdateForm } from '@/components/hr-attendance-update-form'
-import { HrEmployeeArchiveForm } from '@/components/hr-employee-archive-form'
-import { HrEmployeeCreateForm } from '@/components/hr-employee-create-form'
-import { HrEmployeeKpiForm } from '@/components/hr-employee-kpi-form'
-import { HrEmployeeFaceReferenceForm } from '@/components/hr-employee-face-reference-form'
-import { HrEmployeeReactivateForm } from '@/components/hr-employee-reactivate-form'
-import { HrLoanCreateForm } from '@/components/hr-loan-create-form'
-import { HrLoanStatusForm } from '@/components/hr-loan-status-form'
-import { HrLoanVoidForm } from '@/components/hr-loan-void-form'
-import { HrSalarySlipReleaseForm } from '@/components/hr-salary-slip-release-form'
-import { HrSalarySlipForm } from '@/components/hr-salary-slip-form'
-import { HrSalarySlipVoidForm } from '@/components/hr-salary-slip-void-form'
 import { InventoryNetworkOpsPanel } from '@/components/inventory-network-ops-panel'
 import { InventoryItemBarcodePanel } from '@/components/inventory-item-barcode-panel'
 import { InventoryLoanOpsPanel } from '@/components/inventory-loan-ops-panel'
 import { InventoryRequestOpsPanel } from '@/components/inventory-request-ops-panel'
 import { InventoryStockReceiptPanel } from '@/components/inventory-stock-receipt-panel'
-import { SalesCoverageCreateForm } from '@/components/sales-coverage-create-form'
-import { SalesLeadCreateForm } from '@/components/sales-lead-create-form'
-import { SalesOrderCreateForm } from '@/components/sales-order-create-form'
-import { SalesSubscriptionActivateForm } from '@/components/sales-subscription-activate-form'
-import { SalesSurveyCreateForm } from '@/components/sales-survey-create-form'
-import { SalesWorkOrderCreateForm } from '@/components/sales-work-order-create-form'
-import { SupportDismantleCloseForm } from '@/components/support-dismantle-close-form'
-import { SupportDismantleForm } from '@/components/support-dismantle-form'
-import { SupportDismantleReopenForm } from '@/components/support-dismantle-reopen-form'
-import { SupportActionFormModal } from '@/components/support-action-form-modal'
 import { SupportLaneDetailPanel } from '@/components/support-lane-detail-panel'
-import { SupportIsolationForm } from '@/components/support-isolation-form'
-import { SupportIsolationRestoreForm } from '@/components/support-isolation-restore-form'
-import { SupportTicketCloseForm } from '@/components/support-ticket-close-form'
-import { SupportTicketCreateForm } from '@/components/support-ticket-create-form'
-import { SupportTicketEscalateForm } from '@/components/support-ticket-escalate-form'
-import { SupportTicketProgressForm } from '@/components/support-ticket-progress-form'
 import { SupportLaneWorkspacePanel } from '@/components/support-lane-workspace-panel'
 import { SupportRoleQueueBoard } from '@/components/support-role-queue-board'
-import { SupportSlaForm } from '@/components/support-sla-form'
 import { SupportDismantleQueuePanel } from '@/components/support-dismantle-queue-panel'
 import { SupportIsolationQueuePanel } from '@/components/support-isolation-queue-panel'
 import { SupportSlaQueuePanel } from '@/components/support-sla-queue-panel'
@@ -85,6 +49,199 @@ import type {
   SupportLaneActionKey,
   SupportLaneKey,
 } from '@/lib/types'
+
+function FormModalSkeleton() {
+  return (
+    <div className="w-full animate-pulse rounded-2xl border border-slate-200/70 bg-white/60 p-6 dark:border-slate-700/70 dark:bg-slate-900/60">
+      <div className="mb-4 h-8 w-1/3 rounded-xl bg-slate-200/70 dark:bg-slate-700/70" />
+      <div className="space-y-3">
+        <div className="h-12 w-full rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-12 w-full rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-12 w-2/3 rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-32 w-full rounded-lg bg-slate-200/50 dark:bg-slate-700/50" />
+        <div className="flex justify-end gap-3">
+          <div className="h-11 w-24 rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+          <div className="h-11 w-36 rounded-lg bg-slate-200/70 dark:bg-slate-700/70" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OpsPanelSkeleton() {
+  return (
+    <div className="w-full animate-pulse rounded-2xl border border-slate-200/70 bg-white/60 p-5 dark:border-slate-700/70 dark:bg-slate-900/60">
+      <div className="mb-4 h-7 w-1/2 rounded-lg bg-slate-200/70 dark:bg-slate-700/70" />
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="h-16 rounded-xl bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-16 rounded-xl bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-16 rounded-xl bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-16 rounded-xl bg-slate-200/60 dark:bg-slate-700/60" />
+      </div>
+    </div>
+  )
+}
+
+const BillingCollectionActionForm = dynamic(
+  () => import('@/components/billing-collection-action-form').then((mod) => mod.BillingCollectionActionForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const BillingCollectionResolveForm = dynamic(
+  () => import('@/components/billing-collection-resolve-form').then((mod) => mod.BillingCollectionResolveForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const BillingInvoiceGenerateForm = dynamic(
+  () => import('@/components/billing-invoice-generate-form').then((mod) => mod.BillingInvoiceGenerateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const BillingInvoiceStatusForm = dynamic(
+  () => import('@/components/billing-invoice-status-form').then((mod) => mod.BillingInvoiceStatusForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const BillingPaymentForm = dynamic(
+  () => import('@/components/billing-payment-form').then((mod) => mod.BillingPaymentForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const CustomerCreateForm = dynamic(
+  () => import('@/components/customer-create-form').then((mod) => mod.CustomerCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrAttendanceForm = dynamic(
+  () => import('@/components/hr-attendance-form').then((mod) => mod.HrAttendanceForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrAttendanceFaceConfigForm = dynamic(
+  () => import('@/components/hr-attendance-face-config-form').then((mod) => mod.HrAttendanceFaceConfigForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrAttendanceFaceReviewForm = dynamic(
+  () => import('@/components/hr-attendance-face-review-form').then((mod) => mod.HrAttendanceFaceReviewForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrAttendanceGeofenceForm = dynamic(
+  () => import('@/components/hr-attendance-geofence-form').then((mod) => mod.HrAttendanceGeofenceForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrAttendanceUpdateForm = dynamic(
+  () => import('@/components/hr-attendance-update-form').then((mod) => mod.HrAttendanceUpdateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrEmployeeArchiveForm = dynamic(
+  () => import('@/components/hr-employee-archive-form').then((mod) => mod.HrEmployeeArchiveForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrEmployeeCreateForm = dynamic(
+  () => import('@/components/hr-employee-create-form').then((mod) => mod.HrEmployeeCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrEmployeeKpiForm = dynamic(
+  () => import('@/components/hr-employee-kpi-form').then((mod) => mod.HrEmployeeKpiForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrEmployeeFaceReferenceForm = dynamic(
+  () => import('@/components/hr-employee-face-reference-form').then((mod) => mod.HrEmployeeFaceReferenceForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrEmployeeReactivateForm = dynamic(
+  () => import('@/components/hr-employee-reactivate-form').then((mod) => mod.HrEmployeeReactivateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrLoanCreateForm = dynamic(
+  () => import('@/components/hr-loan-create-form').then((mod) => mod.HrLoanCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrLoanStatusForm = dynamic(
+  () => import('@/components/hr-loan-status-form').then((mod) => mod.HrLoanStatusForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrLoanVoidForm = dynamic(
+  () => import('@/components/hr-loan-void-form').then((mod) => mod.HrLoanVoidForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrSalarySlipReleaseForm = dynamic(
+  () => import('@/components/hr-salary-slip-release-form').then((mod) => mod.HrSalarySlipReleaseForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrSalarySlipForm = dynamic(
+  () => import('@/components/hr-salary-slip-form').then((mod) => mod.HrSalarySlipForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const HrSalarySlipVoidForm = dynamic(
+  () => import('@/components/hr-salary-slip-void-form').then((mod) => mod.HrSalarySlipVoidForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SalesCoverageCreateForm = dynamic(
+  () => import('@/components/sales-coverage-create-form').then((mod) => mod.SalesCoverageCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SalesLeadCreateForm = dynamic(
+  () => import('@/components/sales-lead-create-form').then((mod) => mod.SalesLeadCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SalesOrderCreateForm = dynamic(
+  () => import('@/components/sales-order-create-form').then((mod) => mod.SalesOrderCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SalesSubscriptionActivateForm = dynamic(
+  () => import('@/components/sales-subscription-activate-form').then((mod) => mod.SalesSubscriptionActivateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SalesSurveyCreateForm = dynamic(
+  () => import('@/components/sales-survey-create-form').then((mod) => mod.SalesSurveyCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SalesWorkOrderCreateForm = dynamic(
+  () => import('@/components/sales-work-order-create-form').then((mod) => mod.SalesWorkOrderCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportDismantleCloseForm = dynamic(
+  () => import('@/components/support-dismantle-close-form').then((mod) => mod.SupportDismantleCloseForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportDismantleForm = dynamic(
+  () => import('@/components/support-dismantle-form').then((mod) => mod.SupportDismantleForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportDismantleReopenForm = dynamic(
+  () => import('@/components/support-dismantle-reopen-form').then((mod) => mod.SupportDismantleReopenForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportActionFormModal = dynamic(
+  () => import('@/components/support-action-form-modal').then((mod) => mod.SupportActionFormModal),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportIsolationForm = dynamic(
+  () => import('@/components/support-isolation-form').then((mod) => mod.SupportIsolationForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportIsolationRestoreForm = dynamic(
+  () => import('@/components/support-isolation-restore-form').then((mod) => mod.SupportIsolationRestoreForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportTicketCloseForm = dynamic(
+  () => import('@/components/support-ticket-close-form').then((mod) => mod.SupportTicketCloseForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportTicketCreateForm = dynamic(
+  () => import('@/components/support-ticket-create-form').then((mod) => mod.SupportTicketCreateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportTicketEscalateForm = dynamic(
+  () => import('@/components/support-ticket-escalate-form').then((mod) => mod.SupportTicketEscalateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportTicketProgressForm = dynamic(
+  () => import('@/components/support-ticket-progress-form').then((mod) => mod.SupportTicketProgressForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const SupportSlaForm = dynamic(
+  () => import('@/components/support-sla-form').then((mod) => mod.SupportSlaForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const LazySupportTroubleTicketQueuePanel = dynamic(
+  () => import('@/components/support-tt-queue-panel').then((mod) => mod.SupportTroubleTicketQueuePanel),
+  { ssr: false, loading: OpsPanelSkeleton },
+)
 
 function getSupportLaneFocusCopy(lane: SupportLaneKey) {
   switch (lane) {

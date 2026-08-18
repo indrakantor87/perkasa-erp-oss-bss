@@ -7,6 +7,7 @@ import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 
 const inter = Inter({
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
   variable: '--font-inter',
   adjustFontFallback: true,
@@ -24,11 +25,11 @@ const inter = Inter({
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
+  weight: ['500', '600', '700', '800'],
   display: 'swap',
   variable: '--font-plus-jakarta',
   adjustFontFallback: true,
   preload: true,
-  weight: ['400', '500', '600', '700', '800'],
   fallback: [
     'ui-sans-serif',
     'system-ui',

@@ -1,16 +1,9 @@
 'use client'
 
-'use client'
-
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { DataSourceStatus } from '@/components/data-source-status'
-import { BillingCollectionActionForm } from '@/components/billing-collection-action-form'
-import { BillingCollectionResolveForm } from '@/components/billing-collection-resolve-form'
-import { BillingInvoiceGenerateForm } from '@/components/billing-invoice-generate-form'
-import { BillingInvoiceStatusForm } from '@/components/billing-invoice-status-form'
-import { BillingPaymentForm } from '@/components/billing-payment-form'
-import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import type {
   AppRole,
   DataSourceSnapshot,
@@ -20,6 +13,49 @@ import type {
   DomainReviewRow,
   DomainReviewSection,
 } from '@/lib/types'
+
+function FormModalSkeleton() {
+  return (
+    <div className="w-full animate-pulse rounded-2xl border border-slate-200/70 bg-white/60 p-6 dark:border-slate-700/70 dark:bg-slate-900/60">
+      <div className="mb-4 h-8 w-1/3 rounded-xl bg-slate-200/70 dark:bg-slate-700/70" />
+      <div className="space-y-3">
+        <div className="h-12 w-full rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-12 w-2/3 rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-32 w-full rounded-lg bg-slate-200/50 dark:bg-slate-700/50" />
+        <div className="flex justify-end gap-3">
+          <div className="h-11 w-24 rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+          <div className="h-11 w-36 rounded-lg bg-slate-200/70 dark:bg-slate-700/70" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const BillingCollectionActionForm = dynamic(
+  () => import('@/components/billing-collection-action-form').then((mod) => mod.BillingCollectionActionForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const BillingCollectionResolveForm = dynamic(
+  () => import('@/components/billing-collection-resolve-form').then((mod) => mod.BillingCollectionResolveForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const BillingInvoiceGenerateForm = dynamic(
+  () => import('@/components/billing-invoice-generate-form').then((mod) => mod.BillingInvoiceGenerateForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const BillingInvoiceStatusForm = dynamic(
+  () => import('@/components/billing-invoice-status-form').then((mod) => mod.BillingInvoiceStatusForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const BillingPaymentForm = dynamic(
+  () => import('@/components/billing-payment-form').then((mod) => mod.BillingPaymentForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
+const TableQuickActionModal = dynamic(
+  () => import('@/components/table-quick-action-modal').then((mod) => mod.TableQuickActionModal),
+  { ssr: false, loading: FormModalSkeleton },
+)
+import type { TableQuickActionPayload } from '@/components/table-quick-action-modal'
 
 type BillingActionKey =
   | 'invoice-generate'
@@ -679,62 +715,72 @@ export function BillingDomainWorkspace({
             <div className="mt-4 grid gap-6 xl:grid-cols-2">
               {canCreate ? (
                 <div id={getBillingActionAnchorId('invoice-generate')} className="scroll-mt-24">
-                  <BillingInvoiceGenerateForm
-                    canCreate={canCreate}
-                    reviewDbReady={reviewDbReady}
-                    subscriptionSuggestions={billingSubscriptionSuggestions}
-                    initialServiceNo={domainPrefill?.service}
-                  />
+                  <Suspense fallback={<FormModalSkeleton />}>
+                    <BillingInvoiceGenerateForm
+                      canCreate={canCreate}
+                      reviewDbReady={reviewDbReady}
+                      subscriptionSuggestions={billingSubscriptionSuggestions}
+                      initialServiceNo={domainPrefill?.service}
+                    />
+                  </Suspense>
                 </div>
               ) : null}
               {canUpdate ? (
                 <div id={getBillingActionAnchorId('invoice-status')} className="scroll-mt-24">
-                  <BillingInvoiceStatusForm
-                    canUpdate={canUpdate}
-                    reviewDbReady={reviewDbReady}
-        invoiceSuggestions={billingStatusInvoiceSuggestions}
-                    followUpSuggestions={billingCollectionFollowUpSuggestions}
-                    reconnectSuggestions={billingReconnectContextSuggestions}
-                    suspendBatchSuggestions={billingSuspendReadySuggestions}
-                    reconnectBatchSuggestions={billingReconnectReadySuggestions}
-                    initialInvoiceNo={domainPrefill?.invoice}
-                  />
+                  <Suspense fallback={<FormModalSkeleton />}>
+                    <BillingInvoiceStatusForm
+                      canUpdate={canUpdate}
+                      reviewDbReady={reviewDbReady}
+                      invoiceSuggestions={billingStatusInvoiceSuggestions}
+                      followUpSuggestions={billingCollectionFollowUpSuggestions}
+                      reconnectSuggestions={billingReconnectContextSuggestions}
+                      suspendBatchSuggestions={billingSuspendReadySuggestions}
+                      reconnectBatchSuggestions={billingReconnectReadySuggestions}
+                      initialInvoiceNo={domainPrefill?.invoice}
+                    />
+                  </Suspense>
                 </div>
               ) : null}
               {canCreate ? (
                 <div id={getBillingActionAnchorId('collection-action')} className="scroll-mt-24">
-                  <BillingCollectionActionForm
-                    canCreate={canCreate}
-                    reviewDbReady={reviewDbReady}
-                    invoiceSuggestions={billingInvoiceSuggestions}
-                    batchInvoiceSuggestions={billingCollectionSuggestions}
-                    followUpSuggestions={billingCollectionFollowUpSuggestions}
-                    promiseToPayBatchSuggestions={billingPromiseToPaySuggestions}
-                    suspendBatchSuggestions={billingSuspendReadySuggestions}
-                    reconnectBatchSuggestions={billingReconnectReadySuggestions}
-                    initialInvoiceNo={domainPrefill?.invoice}
-                  />
+                  <Suspense fallback={<FormModalSkeleton />}>
+                    <BillingCollectionActionForm
+                      canCreate={canCreate}
+                      reviewDbReady={reviewDbReady}
+                      invoiceSuggestions={billingInvoiceSuggestions}
+                      batchInvoiceSuggestions={billingCollectionSuggestions}
+                      followUpSuggestions={billingCollectionFollowUpSuggestions}
+                      promiseToPayBatchSuggestions={billingPromiseToPaySuggestions}
+                      suspendBatchSuggestions={billingSuspendReadySuggestions}
+                      reconnectBatchSuggestions={billingReconnectReadySuggestions}
+                      initialInvoiceNo={domainPrefill?.invoice}
+                    />
+                  </Suspense>
                 </div>
               ) : null}
               {canUpdate ? (
                 <div id={getBillingActionAnchorId('collection-resolve')} className="scroll-mt-24">
-                  <BillingCollectionResolveForm
-                    canUpdate={canUpdate}
-                    reviewDbReady={reviewDbReady}
-                    followUpSuggestions={billingCollectionFollowUpSuggestions}
-                    initialInvoiceNo={domainPrefill?.invoice}
-                  />
+                  <Suspense fallback={<FormModalSkeleton />}>
+                    <BillingCollectionResolveForm
+                      canUpdate={canUpdate}
+                      reviewDbReady={reviewDbReady}
+                      followUpSuggestions={billingCollectionFollowUpSuggestions}
+                      initialInvoiceNo={domainPrefill?.invoice}
+                    />
+                  </Suspense>
                 </div>
               ) : null}
               {canCreate ? (
                 <div id={getBillingActionAnchorId('payment-entry')} className="scroll-mt-24">
-                  <BillingPaymentForm
-                    canCreate={canCreate}
-                    reviewDbReady={reviewDbReady}
-                    invoiceSuggestions={billingInvoiceSuggestions}
-                    followUpSuggestions={billingCollectionFollowUpSuggestions}
-                    initialInvoiceNo={domainPrefill?.invoice}
-                  />
+                  <Suspense fallback={<FormModalSkeleton />}>
+                    <BillingPaymentForm
+                      canCreate={canCreate}
+                      reviewDbReady={reviewDbReady}
+                      invoiceSuggestions={billingInvoiceSuggestions}
+                      followUpSuggestions={billingCollectionFollowUpSuggestions}
+                      initialInvoiceNo={domainPrefill?.invoice}
+                    />
+                  </Suspense>
                 </div>
               ) : null}
             </div>
@@ -742,11 +788,13 @@ export function BillingDomainWorkspace({
         </section>
       ) : null}
 
-      <TableQuickActionModal
-        item={quickActionItem}
-        onClose={() => setQuickActionItem(null)}
-        heading="Aksi cepat dari tabel billing"
-      />
+      <Suspense fallback={<FormModalSkeleton />}>
+        <TableQuickActionModal
+          item={quickActionItem}
+          onClose={() => setQuickActionItem(null)}
+          heading="Aksi cepat dari tabel billing"
+        />
+      </Suspense>
 
       {content.highlights.length ? (
         <details className="rounded-2xl border border-line bg-white p-4">

@@ -4,6 +4,7 @@ import type { HrWorkspaceKey } from '@/components/hr-workspace-page'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
+import { getHrWorkspaceInsightSections } from '@/lib/services/hr-workspace-insight-service'
 
 const validHrWorkspaces: HrWorkspaceKey[] = ['overview', 'employees', 'attendance', 'salary', 'loans', 'permissions', 'disciplinary']
 
@@ -48,6 +49,10 @@ export default async function HrWorkspaceRoutePage({
     month: resolvePositiveIntegerParam(resolvedSearchParams.month),
     year: resolvePositiveIntegerParam(resolvedSearchParams.year),
   })
+  const workspaceInsightSections =
+    workspace === 'permissions' || workspace === 'disciplinary'
+      ? await getHrWorkspaceInsightSections(workspace)
+      : []
 
   if (!payload) {
     notFound()
@@ -60,6 +65,7 @@ export default async function HrWorkspaceRoutePage({
       capabilities={payload.capabilities}
       role={session.role}
       activeWorkspace={workspace}
+      workspaceInsightSections={workspaceInsightSections}
     />
   )
 }

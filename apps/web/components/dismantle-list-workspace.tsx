@@ -1,7 +1,32 @@
+'use client'
+
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { DismantleListTransitionForm } from '@/components/dismantle-list-transition-form'
+import { Suspense } from 'react'
 import type { DismantleListItem, DismantleListPagePayload, DismantleListStatus } from '@/lib/dismantle-list-shared'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
+
+function FormModalSkeleton() {
+  return (
+    <div className="w-full animate-pulse rounded-2xl border border-slate-200/70 bg-white/60 p-6 dark:border-slate-700/70 dark:bg-slate-900/60">
+      <div className="mb-4 h-8 w-1/3 rounded-xl bg-slate-200/70 dark:bg-slate-700/70" />
+      <div className="space-y-3">
+        <div className="h-12 w-full rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-12 w-2/3 rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+        <div className="h-32 w-full rounded-lg bg-slate-200/50 dark:bg-slate-700/50" />
+        <div className="flex justify-end gap-3">
+          <div className="h-11 w-24 rounded-lg bg-slate-200/60 dark:bg-slate-700/60" />
+          <div className="h-11 w-36 rounded-lg bg-slate-200/70 dark:bg-slate-700/70" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const DismantleListTransitionForm = dynamic(
+  () => import('@/components/dismantle-list-transition-form').then((mod) => mod.DismantleListTransitionForm),
+  { ssr: false, loading: FormModalSkeleton },
+)
 
 function formatDateTime(value: string | null) {
   if (!value) {
@@ -488,14 +513,16 @@ export function DismantleListWorkspace({
                 </div>
               </div>
 
-              <DismantleListTransitionForm
-                itemId={selectedItem.id}
-                itemCode={selectedItem.dismantleListCode}
-                currentStatus={selectedItem.status}
-                canUpdate={canUpdate}
-                canApprove={canApprove}
-                reviewDbReady={reviewDbReady}
-              />
+              <Suspense fallback={<FormModalSkeleton />}>
+                <DismantleListTransitionForm
+                  itemId={selectedItem.id}
+                  itemCode={selectedItem.dismantleListCode}
+                  currentStatus={selectedItem.status}
+                  canUpdate={canUpdate}
+                  canApprove={canApprove}
+                  reviewDbReady={reviewDbReady}
+                />
+              </Suspense>
             </div>
           ) : (
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
