@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 node:20-bookworm-slim AS deps
+FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:20-bookworm-slim AS deps
 LABEL coolify.engine="dockerfile"
 LABEL coolify.build_pack="dockerfile"
 LABEL coolify.helper="disabled"
@@ -20,7 +20,7 @@ WORKDIR /app/apps/web
 COPY apps/web/package.json apps/web/package-lock.json* ./
 RUN npm ci --ignore-scripts
 
-FROM --platform=linux/amd64 node:20-bookworm-slim AS builder
+FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:20-bookworm-slim AS builder
 LABEL coolify.engine="dockerfile"
 LABEL coolify.build_pack="dockerfile"
 LABEL coolify.helper="disabled"
@@ -66,7 +66,7 @@ RUN npm run build \
  && sync \
  && echo "disk sync x3 OK (flush overlay2 agar file tidak hilang saat copy ke runner)"
 
-FROM --platform=linux/amd64 node:20-bookworm-slim AS runner
+FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:20-bookworm-slim AS runner
 LABEL coolify.engine="dockerfile"
 LABEL coolify.build_pack="dockerfile"
 LABEL coolify.helper="disabled"
