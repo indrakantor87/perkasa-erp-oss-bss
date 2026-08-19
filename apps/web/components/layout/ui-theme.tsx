@@ -29,7 +29,7 @@ export function ThemeProvider({
   const setTheme = useCallback((nextTheme: UiTheme) => {
     const normalized = normalizeUiTheme(nextTheme)
     userInteractedRef.current = true
-    setThemeState(normalized)
+
     try {
       window.localStorage.setItem(UI_THEME_STORAGE_KEY, normalized)
     } catch {
@@ -44,6 +44,8 @@ export function ThemeProvider({
       document.documentElement.dataset.theme = normalized
       document.documentElement.style.colorScheme = normalized
     }
+
+    setThemeState(normalized)
   }, [])
 
   useEffect(() => {

@@ -47,13 +47,26 @@ export function LanguageProvider({
   const setLanguage = useCallback((nextLanguage: UiLanguage) => {
     const normalized = normalizeUiLanguage(nextLanguage)
     userInteractedRef.current = true
-    setLanguageState((prev) => {
-      if (prev === normalized) return prev
-      persistLanguage(normalized)
-      void router.refresh()
-      return normalized
-    })
-  }, [persistLanguage, router])
+
+    if (language === normalized) return
+
+    try {
+      window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, normalized)
+    } catch {
+      /* ignore storage errors */
+    }
+    try {
+      document.cookie = `${UI_LANGUAGE_COOKIE_KEY}=${normalized}; path=/; max-age=31536000; samesite=lax`
+    } catch {
+      /* ignore cookie write errors */
+    }
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.lang = normalized
+    }
+
+    setLanguageState(normalized)
+    void router.refresh()
+  }, [language, router])
 
   useEffect(() => {
     if (mountedRef.current) return

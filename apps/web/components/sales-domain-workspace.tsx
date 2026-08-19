@@ -416,9 +416,9 @@ function getSalesBucketTone(bucket: 'OPEN' | 'ON_PROGRESS' | 'CLOSE') {
 }
 
 function getSalesBucketPillTone(bucket: 'OPEN' | 'ON_PROGRESS' | 'CLOSE') {
-  if (bucket === 'OPEN') return 'border-red-500/60 bg-red-500/10 text-red-100'
-  if (bucket === 'ON_PROGRESS') return 'border-blue-500/60 bg-blue-500/10 text-blue-100'
-  return 'border-green-500/60 bg-green-500/10 text-green-100'
+  if (bucket === 'OPEN') return 'border-red-200 bg-red-50 text-red-700'
+  if (bucket === 'ON_PROGRESS') return 'border-blue-200 bg-blue-50 text-blue-700'
+  return 'border-emerald-200 bg-emerald-50 text-emerald-700'
 }
 
 function getSalesBucketLabel(bucket: 'OPEN' | 'ON_PROGRESS' | 'CLOSE') {
@@ -724,28 +724,28 @@ export function SalesDomainWorkspace({
           </div>
         </section>
       ) : (
-        <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">{content.eyebrow}</p>
+        <section className="panel p-5 shadow-sm">
+        <p className="section-title">{content.eyebrow}</p>
         <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">
+            <h2 className="font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-ink">
               PSB Ticket List
             </h2>
-            <p className="mt-1 text-sm leading-5 text-slate-200">Daftar kerja PSB untuk follow-up harian.</p>
+            <p className="mt-1 text-sm leading-5 text-mute">Daftar kerja PSB untuk follow-up harian.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={content.primaryAction.href} className="rounded-md bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-950">
+            <Link href={content.primaryAction.href} className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white hover:bg-slate-800 transition">
               {content.primaryAction.label}
             </Link>
-            <Link href={content.secondaryAction.href} className="rounded-md border border-slate-500 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+            <Link href={content.secondaryAction.href} className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50">
               {content.secondaryAction.label}
             </Link>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
-          <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{totalRows.toLocaleString('id-ID')} baris pipeline</span>
-          <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{openRows.toLocaleString('id-ID')} item aktif</span>
-          <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{consoleStats.marketingCount} marketing</span>
+          <span className="badge border-line surface-soft text-mute">{totalRows.toLocaleString('id-ID')} baris pipeline</span>
+          <span className="badge border-line surface-soft text-mute">{openRows.toLocaleString('id-ID')} item aktif</span>
+          <span className="badge border-line surface-soft text-mute">{consoleStats.marketingCount} marketing</span>
         </div>
         </section>
       )}
@@ -753,48 +753,48 @@ export function SalesDomainWorkspace({
       {!isInputOnly ? (
         <>
           <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <article className="rounded-xl border border-red-700/70 bg-[#7a0000] px-3 py-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-          <p className="text-sm font-medium tracking-tight text-red-100">Open</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-[2rem] font-bold leading-none text-white">{listStats.openCount}</p>
+        <article className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-center shadow-sm">
+          <p className="text-sm font-medium tracking-tight text-rose-700">Open</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-[2rem] font-bold leading-none text-rose-900">{listStats.openCount}</p>
         </article>
-        <article className="rounded-xl border border-blue-600/70 bg-[#1b2f78] px-3 py-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-          <p className="text-sm font-medium tracking-tight text-blue-100">On Progress</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-[2rem] font-bold leading-none text-white">{listStats.onProgressCount}</p>
+        <article className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-center shadow-sm">
+          <p className="text-sm font-medium tracking-tight text-blue-700">On Progress</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-[2rem] font-bold leading-none text-blue-900">{listStats.onProgressCount}</p>
         </article>
-        <article className="rounded-xl border border-green-700/70 bg-[#004d1f] px-3 py-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-          <p className="text-sm font-medium tracking-tight text-green-100">Close</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-[2rem] font-bold leading-none text-white">{listStats.closeCount}</p>
+        <article className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-center shadow-sm">
+          <p className="text-sm font-medium tracking-tight text-emerald-700">Close</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-[2rem] font-bold leading-none text-emerald-900">{listStats.closeCount}</p>
         </article>
           </section>
 
           <section className="grid grid-cols-2 gap-2 xl:grid-cols-5">
-        <article className="rounded-xl border border-slate-700 bg-[#132647] px-3 py-2.5 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Lead</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-white">{consoleStats.leadCount}</p>
+        <article className="panel-surface rounded-xl px-3 py-2.5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">Lead</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-ink">{consoleStats.leadCount}</p>
         </article>
-        <article className="rounded-xl border border-slate-700 bg-[#132647] px-3 py-2.5 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Coverage</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-white">{consoleStats.coverageCount}</p>
+        <article className="panel-surface rounded-xl px-3 py-2.5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">Coverage</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-ink">{consoleStats.coverageCount}</p>
         </article>
-        <article className="rounded-xl border border-slate-700 bg-[#132647] px-3 py-2.5 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Survey / Order</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-white">{consoleStats.flowCount}</p>
+        <article className="panel-surface rounded-xl px-3 py-2.5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">Survey / Order</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-ink">{consoleStats.flowCount}</p>
         </article>
-        <article className="rounded-xl border border-slate-700 bg-[#132647] px-3 py-2.5 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Work Order</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-white">{consoleStats.workOrderCount}</p>
+        <article className="panel-surface rounded-xl px-3 py-2.5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">Work Order</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-ink">{consoleStats.workOrderCount}</p>
         </article>
-        <article className="rounded-xl border border-slate-700 bg-[#132647] px-3 py-2.5 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Aktivasi</p>
-          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-white">{consoleStats.activationCount}</p>
+        <article className="panel-surface rounded-xl px-3 py-2.5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">Aktivasi</p>
+          <p className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-ink">{consoleStats.activationCount}</p>
         </article>
           </section>
 
-          <section className="rounded-2xl border border-slate-600/80 bg-[#1c2b45] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <section className="panel p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Toolbar Ticket PSB</p>
-            <p className="mt-1 text-sm text-slate-200">Filter cepat, pencarian, ekspor, dan shortcut kerja utama.</p>
+            <p className="section-title">Toolbar Ticket PSB</p>
+            <p className="mt-1 text-sm text-mute">Filter cepat, pencarian, ekspor, dan shortcut kerja utama.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {canExport ? (
@@ -817,39 +817,39 @@ export function SalesDomainWorkspace({
                     })),
                   )
                 }
-                className="rounded-md border border-slate-500/80 bg-slate-700/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-600"
+                className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50"
               >
                 Ekspor List
               </button>
             ) : null}
             <Link
               href="/sales?focus=ACTIVE_LEADS"
-              className="rounded-md border border-slate-500/80 bg-slate-700/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-600"
+              className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50"
             >
               Lead Aktif
             </Link>
             <Link
               href="/sales?focus=MONTHLY_ORDERS"
-              className="rounded-md border border-slate-500/80 bg-slate-700/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-600"
+              className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50"
             >
               Order Periode Ini
             </Link>
             <Link
               href="/sales?focus=MONTHLY_ACTIVATIONS"
-              className="rounded-md border border-slate-500/80 bg-slate-700/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-600"
+              className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50"
             >
               Aktivasi Periode Ini
             </Link>
             <Link
               href="/sales/marketing-activities"
-              className="rounded-md border border-slate-500/80 bg-slate-700/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-600"
+              className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50"
             >
               Aktivitas Marketing
             </Link>
             {domainDrilldown ? (
               <Link
                 href={domainDrilldown.clearHref}
-                className="rounded-md border border-amber-500/60 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-amber-100 transition hover:bg-amber-500/20"
+                className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-amber-700 transition hover:bg-amber-100"
               >
                 Reset Fokus
               </Link>
@@ -857,8 +857,8 @@ export function SalesDomainWorkspace({
           </div>
         </div>
         {domainDrilldown ? (
-          <div className="mt-3 rounded-xl border border-slate-500/70 bg-slate-900/30 px-3 py-2 text-xs text-slate-100">
-            <span className="font-semibold text-white">{domainDrilldown.label}:</span> {domainDrilldown.detail}
+          <div className="mt-3 rounded-xl border border-line surface-soft px-3 py-2 text-xs text-ink">
+            <span className="font-semibold text-ink">{domainDrilldown.label}:</span> {domainDrilldown.detail}
           </div>
         ) : null}
         <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -877,8 +877,8 @@ export function SalesDomainWorkspace({
                   onClick={() => setActiveBucketFilter(item.key)}
                   className={
                     active
-                      ? 'rounded-md border border-white bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-950'
-                      : 'rounded-md border border-slate-500/80 bg-slate-700/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-600'
+                      ? 'rounded-md border border-slate-950 bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white'
+                      : 'rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50'
                   }
                 >
                   {item.label} ({item.count})
@@ -892,30 +892,30 @@ export function SalesDomainWorkspace({
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Cari nama, no WA, order, marketing..."
-              className="w-full rounded-md border border-slate-500/80 bg-slate-800/90 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-400 focus:border-slate-300 sm:w-[320px]"
+              className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-slate-400 focus:border-slate-400 sm:w-[320px]"
             />
-            <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{visibleCountLabel}</span>
+            <span className="badge border-line surface-soft text-mute">{visibleCountLabel}</span>
           </div>
         </div>
           </section>
 
-          <section className="rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+          <section className="panel p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Console Ticket PSB</p>
-            <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-white">
+            <p className="section-title">Console Ticket PSB</p>
+            <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-ink">
               Daftar Ticket PSB
             </h3>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{reviewSections.length} section</span>
-            <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{visibleCountLabel}</span>
+            <span className="badge border-line surface-soft text-mute">{reviewSections.length} section</span>
+            <span className="badge border-line surface-soft text-mute">{visibleCountLabel}</span>
           </div>
         </div>
 
         {sectionActions.length ? (
-          <details className="mt-4 rounded-2xl border border-slate-700/80 bg-slate-900/20 px-3 py-2">
-            <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-white">
+          <details className="mt-4 rounded-2xl border border-line bg-slate-50 px-3 py-2">
+            <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-700">
               Aksi Input
             </summary>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -923,7 +923,7 @@ export function SalesDomainWorkspace({
                 <Link
                   key={item.key}
                   href={`#${getSalesActionAnchorId(item.key)}`}
-                  className="rounded-md border border-slate-500/80 bg-slate-700/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-600"
+                  className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50"
                 >
                   {item.label}
                 </Link>
@@ -932,10 +932,10 @@ export function SalesDomainWorkspace({
           </details>
         ) : null}
 
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700/80 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)] lg:block hidden">
-          <table className="min-w-[1280px] w-full border-collapse">
-            <thead className="bg-[#162d66]">
-              <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-100">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white shadow-sm lg:block hidden">
+          <table className="min-w-[1280px] w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
+              <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 <th className="w-[120px] px-3 py-3">Tahap</th>
                 <th className="w-[170px] px-3 py-3">Referensi</th>
                 <th className="w-[220px] px-3 py-3">Nama Pelanggan / Area</th>
@@ -949,39 +949,39 @@ export function SalesDomainWorkspace({
                 <th className="w-[110px] px-3 py-3 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700 bg-[#1c2b45]">
+            <tbody className="divide-y divide-slate-200 bg-white">
               {visibleRows.map(({ sectionTitle, row, action, primaryMeta, marketingName, bucket, phone, referenceValue, dateLabel, dateValue, stageLabel }) => (
-                <tr key={`${sectionTitle}-${row.id}`} className={`align-top transition-colors hover:bg-[#24395c] ${getSalesBucketTone(bucket)}`}>
-                  <td className="px-3 py-2 text-xs text-slate-200">
-                    <p className="font-medium text-white">{stageLabel}</p>
-                    <p className="mt-1 text-slate-300">{sectionTitle}</p>
+                <tr key={`${sectionTitle}-${row.id}`} className={`align-top transition-colors hover:bg-slate-50 ${getSalesBucketTone(bucket)}`}>
+                  <td className="px-3 py-2 text-xs text-slate-600">
+                    <p className="font-medium text-slate-950">{stageLabel}</p>
+                    <p className="mt-1 text-slate-500">{sectionTitle}</p>
                   </td>
-                  <td className="px-3 py-2 text-xs text-slate-200">
-                    <p className="font-semibold text-white">{row.primary}</p>
+                  <td className="px-3 py-2 text-xs text-slate-600">
+                    <p className="font-semibold text-slate-950">{row.primary}</p>
                     <div className="mt-1 flex flex-wrap gap-2">
                       <span className={`badge ${getSalesBucketPillTone(bucket)}`}>{getSalesBucketLabel(bucket)}</span>
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-xs text-slate-100">
+                  <td className="px-3 py-2 text-xs text-slate-700">
                     <p className="leading-5">{row.secondary}</p>
                   </td>
-                  <td className="px-3 py-2 text-xs text-sky-300">{marketingName || '-'}</td>
-                  <td className="px-3 py-2 text-xs text-slate-100">{phone || '-'}</td>
-                  <td className="px-3 py-2 text-xs text-slate-100">
-                    <p className="text-slate-300">{dateLabel}</p>
+                  <td className="px-3 py-2 text-xs text-sky-700">{marketingName || '-'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-700">{phone || '-'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-700">
+                    <p className="text-slate-500">{dateLabel}</p>
                     <p className="mt-1">{dateValue || '-'}</p>
                   </td>
-                  <td className="px-3 py-2 text-xs text-slate-100">{referenceValue || '-'}</td>
+                  <td className="px-3 py-2 text-xs text-slate-700">{referenceValue || '-'}</td>
                   <td className="px-3 py-2 text-xs">
                     <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
                   </td>
-                  <td className="px-3 py-2 text-xs text-slate-100">
+                  <td className="px-3 py-2 text-xs text-slate-700">
                     <p className="line-clamp-2 leading-5">{row.detail}</p>
                   </td>
-                  <td className="px-3 py-2 text-xs text-slate-200">
+                  <td className="px-3 py-2 text-xs text-slate-600">
                     <div className="flex max-w-sm flex-wrap gap-2">
                       {primaryMeta.map((item) => (
-                        <span key={`${row.id}-${item}`} className="badge border-slate-500 bg-slate-800/70 text-slate-100">
+                        <span key={`${row.id}-${item}`} className="badge border-line surface-soft text-mute">
                           {item}
                         </span>
                       ))}
@@ -1000,7 +1000,7 @@ export function SalesDomainWorkspace({
                             }),
                           )
                         }
-                        className="inline-flex items-center justify-center rounded-md border border-slate-500/80 bg-slate-700/90 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-600"
+                        className="inline-flex items-center justify-center rounded-md border border-line bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50"
                       >
                         Aksi cepat
                       </button>
@@ -1018,44 +1018,44 @@ export function SalesDomainWorkspace({
           {visibleRows.map(({ sectionTitle, row, action, primaryMeta, marketingName, bucket, phone, referenceValue, dateLabel, dateValue, stageLabel }) => (
             <article
               key={`mobile-${sectionTitle}-${row.id}`}
-              className={`rounded-2xl border p-3 shadow-[0_10px_30px_rgba(2,6,23,0.18)] ${getSalesBucketTone(bucket)}`}
+              className={`rounded-2xl border p-3 shadow-sm bg-white ${getSalesBucketTone(bucket)}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-white">{row.primary}</p>
-                  <p className="mt-1 text-sm text-slate-100">{row.secondary}</p>
+                  <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
+                  <p className="mt-1 text-sm text-slate-700">{row.secondary}</p>
                 </div>
                 <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{stageLabel}</span>
+                <span className="badge border-line surface-soft text-mute">{stageLabel}</span>
                 <span className={`badge ${getSalesBucketPillTone(bucket)}`}>{getSalesBucketLabel(bucket)}</span>
-                {marketingName ? <span className="badge border-slate-500 bg-slate-800/70 text-slate-100">{marketingName}</span> : null}
+                {marketingName ? <span className="badge border-line surface-soft text-mute">{marketingName}</span> : null}
               </div>
 
-              <p className="mt-3 text-sm leading-5 text-slate-100">{row.detail}</p>
+              <p className="mt-3 text-sm leading-5 text-slate-700">{row.detail}</p>
 
               <div className="mt-3 space-y-2">
-                <div className="grid grid-cols-2 gap-3 text-xs text-slate-100">
+                <div className="grid grid-cols-2 gap-3 text-xs text-slate-700">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">No WA</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">No WA</p>
                     <p className="mt-1">{phone || '-'}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">{dateLabel}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">{dateLabel}</p>
                     <p className="mt-1">{dateValue || '-'}</p>
                   </div>
                   <div className="col-span-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">Ref Lanjutan</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">Ref Lanjutan</p>
                     <p className="mt-1">{referenceValue || '-'}</p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">PIC / Konteks</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">PIC / Konteks</p>
                   <div className="mt-1 flex flex-wrap gap-2">
                     {primaryMeta.map((item) => (
-                      <span key={`mobile-meta-${row.id}-${item}`} className="badge border-slate-500 bg-slate-800/70 text-slate-100">
+                      <span key={`mobile-meta-${row.id}-${item}`} className="badge border-line surface-soft text-mute">
                         {item}
                       </span>
                     ))}
@@ -1076,7 +1076,7 @@ export function SalesDomainWorkspace({
                         }),
                       )
                     }
-                    className="inline-flex items-center justify-center rounded-md border border-slate-500/80 bg-slate-700/90 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-600"
+                    className="inline-flex items-center justify-center rounded-md border border-line bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50"
                   >
                     Aksi cepat
                   </button>
