@@ -25,7 +25,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install SSH Key + Auto Fix Format (4 strip to 5 strip OPENSSH)
+      - name: Install SSH Key + FORCE Auto Fix Format (always overwrite 1st & last line)
         env:
           SSH_PRIVATE_KEY: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
         run: |
@@ -35,45 +35,47 @@ jobs:
           RAW_KEY="$HOME/.ssh/id_ed25519_coolify_raw"
           FINAL_KEY="$HOME/.ssh/id_ed25519_coolify"
           echo "$SSH_PRIVATE_KEY" > "$RAW_KEY"
+          echo "  Raw key size: $(wc -c < $RAW_KEY) bytes"
+          echo "  [BEFORE FIX] Line 1    : $(head -n 1 $RAW_KEY)"
+          echo "  [BEFORE FIX] Line end  : $(tail -n 1 $RAW_KEY)"
 
-          # AUTO FIX: Coolify ssh-keygen sometimes generates 4 hyphens (----) instead 5 (-----)
-          # Also handle OPENSSH typo 'OPENNSSH' to standard 'OPENSSH'
-          sed -i \
-            -e 's/^-----BEGIN/-----BEGIN/' \
-            -e 's/^----BEGIN/-----BEGIN/' \
-            -e 's/PRIVATE KEY-----$/PRIVATE KEY-----/' \
-            -e 's/PRIVATE KEY----$/PRIVATE KEY-----/' \
-            -e 's/OPENNSSH/OPENSSH/g' \
-            -e 's/OPENSSSH/OPENSSH/g' \
-            "$RAW_KEY"
+          # (1) Extract KEY BODY (remove existing FIRST & LAST lines header/footer)
+          # - always force, regardless format (4 hyphen or 5 hyphen or typo OPENNSSH)
+          # - sed delete FIRST line & delete LAST line (2 times if content blank after)
+          KEY_BODY_FILE="${RAW_KEY}.body"
+          tail -n +2 "$RAW_KEY" | head -n -1 > "$KEY_BODY_FILE"
 
-          # Pastikan line 1 & terakhir = format standard 5 hyphen
-          FIRST_LINE=$(head -n 1 "$RAW_KEY")
-          LAST_LINE=$(tail -n 1 "$RAW_KEY")
-          if [ "$FIRST_LINE" != "-----BEGIN OPENSSH PRIVATE KEY-----" ]; then
-            echo "  ⚠️  Force overwrite first line (was: $FIRST_LINE)"
-            REST_KEY=$(tail -n +2 "$RAW_KEY")
-            echo "-----BEGIN OPENSSH PRIVATE KEY-----" > "$FINAL_KEY"
-            echo "$REST_KEY" >> "$FINAL_KEY"
-          else
-            cp "$RAW_KEY" "$FINAL_KEY"
-          fi
-          if [ "$(tail -n 1 "$FINAL_KEY")" != "-----END OPENSSH PRIVATE KEY-----" ]; then
-            echo "  ⚠️  Force overwrite last line"
-            head -n -1 "$FINAL_KEY" > "${FINAL_KEY}.tmp"
-            mv "${FINAL_KEY}.tmp" "$FINAL_KEY"
-            echo "-----END OPENSSH PRIVATE KEY-----" >> "$FINAL_KEY"
-          fi
+          # (2) Clean body from empty lines top/bottom
+          TMPBODY="${KEY_BODY_FILE}.trim"
+          grep -v '^[[:space:]]*$' "$KEY_BODY_FILE" > "$TMPBODY" || true
+          mv "$TMPBODY" "$KEY_BODY_FILE"
+
+          # (3) BUILD FINAL KEY: FORCE WRITE 5 hyphen, 2 huruf N (OPENSSH) STANDARD
+          # + line 1 = "-----BEGIN OPENSSH PRIVATE KEY-----" (5 strip! = 5 tanda hubung!)
+          # + line terakhir = "-----END OPENSSH PRIVATE KEY-----"
+          {
+            echo "-----BEGIN OPENSSH PRIVATE KEY-----"
+            cat "$KEY_BODY_FILE"
+            echo "-----END OPENSSH PRIVATE KEY-----"
+          } > "$FINAL_KEY"
 
           chmod 600 "$FINAL_KEY"
-          rm -f "$RAW_KEY"
-          echo "  ✓ SSH private key installed & formatted: $(wc -c < $FINAL_KEY) bytes"
-          echo "  Line 1     : $(head -n 1 $FINAL_KEY)"
-          echo "  Line akhir : $(tail -n 1 $FINAL_KEY)"
+          rm -f "$RAW_KEY" "$KEY_BODY_FILE"
+
+          echo ""
+          echo "  ===== AFTER FORCE FIX ====="
+          echo "  Final key size: $(wc -c < $FINAL_KEY) bytes"
+          echo "  Line 1    : $(head -n 1 $FINAL_KEY)"
+          echo "  Line akhir: $(tail -n 1 $FINAL_KEY)"
+          echo "  [Line count total: $(wc -l < $FINAL_KEY)]"
           ls -la "$FINAL_KEY"
           echo ""
-          echo "  Test parse key (ssh-keygen -l):"
-          ssh-keygen -l -f "$FINAL_KEY" 2>&1 || echo "  (If passphrase or warning, but OK — will still work)"
+          echo "  ==== SSH-KEYGEN TEST PARSE (should show 256 SHA256 fingerprint): ==="
+          if ssh-keygen -l -f "$FINAL_KEY" 2>&1; then
+            echo "  ✅ Key parsed OK!"
+          else
+            echo "  ⚠️  ssh-keygen parse failed, but SSH may still work. Continuing..."
+          fi
 
       - name: Test koneksi SSH ke Server Coolify (preflight)
         env:
