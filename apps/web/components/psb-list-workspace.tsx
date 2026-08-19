@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import type { ChangeEvent } from 'react'
-import { Suspense, useState } from 'react'
+import { memo, Suspense, useDeferredValue, useMemo, useState } from 'react'
 import type { PsbListItem, PsbListPagePayload, PsbListStatus } from '@/lib/psb-list-shared'
 import { resolvePsbListAvailableActions } from '@/lib/psb-list-shared'
 
@@ -287,6 +287,123 @@ function renderWorkOrderLinks(item: PsbListItem) {
   )
 }
 
+type PsbTableRowsProps = {
+  items: PsbListItem[]
+  selectedId: number | null | undefined
+  state: PsbListPagePayload['state']
+}
+
+const PsbTableRows = memo(function PsbTableRows({ items, selectedId, state }: PsbTableRowsProps) {
+  if (!items.length) {
+    return (
+      <tr>
+        <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">
+          Tidak ada item yang cocok dengan filter saat ini.
+        </td>
+      </tr>
+    )
+  }
+  return (
+    <>
+      {items.map((item) => {
+        const active = selectedId === item.id
+        return (
+          <tr key={item.id} className={active ? 'bg-sky-50/70' : 'bg-white'}>
+            <td className="px-4 py-4 align-top">
+              <p className="text-sm font-semibold text-slate-950">{item.psbListCode}</p>
+              <p className="mt-1 text-sm text-slate-700">{item.customerName}</p>
+              <p className="mt-2 text-xs text-slate-500">{item.customerPhone || '-'}</p>
+            </td>
+            <td className="px-4 py-4 align-top">
+              <p className="text-sm text-slate-700">{item.addressText}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {renderAreaBadge(item)}
+                {renderMetaBadge('Ticket', item.transferredTicketRef)}
+              </div>
+            </td>
+            <td className="px-4 py-4 align-top">
+              <p className="text-sm text-slate-800">{item.packageLabel || '-'}</p>
+              <p className="mt-2 text-xs text-slate-500">{item.odpCode || 'ODP belum dipilih'}</p>
+            </td>
+            <td className="px-4 py-4 align-top">
+              <p className="text-sm text-slate-800">{item.salesOwnerName || '-'}</p>
+              <p className="mt-2 text-xs text-slate-500">{formatDateTime(item.requestedInstallDate)}</p>
+            </td>
+            <td className="px-4 py-4 align-top">
+              <span className={`badge ${getStatusTone(item.status)}`}>{getStatusLabel(item.status)}</span>
+            </td>
+            <td className="px-4 py-4 align-top">
+              <p className="text-sm text-slate-800">{item.nextActionLabel}</p>
+              <p className="mt-2 text-xs text-slate-500">
+                {item.csPicName ? `PIC CS: ${item.csPicName}` : 'Belum ada PIC CS'}
+              </p>
+            </td>
+            <td className="px-4 py-4 text-right align-top">
+              <Link
+                href={buildHref(state, { selected: String(item.id) })}
+                className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Buka Detail
+              </Link>
+            </td>
+          </tr>
+        )
+      })}
+    </>
+  )
+})
+
+type PsbCardListProps = {
+  items: PsbListItem[]
+  selectedId: number | null | undefined
+  state: PsbListPagePayload['state']
+}
+
+const PsbCardList = memo(function PsbCardList({ items, selectedId, state }: PsbCardListProps) {
+  if (!items.length) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+        Tidak ada item yang cocok dengan filter saat ini.
+      </div>
+    )
+  }
+  return (
+    <>
+      {items.map((item) => {
+        const active = selectedId === item.id
+        return (
+          <article
+            key={item.id}
+            className={`rounded-2xl border p-4 ${active ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white'}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-950">{item.psbListCode}</p>
+                <p className="mt-1 text-sm text-slate-700">{item.customerName}</p>
+              </div>
+              <span className={`badge ${getStatusTone(item.status)}`}>{getStatusLabel(item.status)}</span>
+            </div>
+            <p className="mt-3 text-sm text-slate-700">{item.addressText}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {renderMetaBadge('Paket', item.packageLabel)}
+              {renderMetaBadge('ODP', item.odpCode)}
+              {renderMetaBadge('Marketing', item.salesOwnerName)}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Link
+                href={buildHref(state, { selected: String(item.id) })}
+                className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+              >
+                Buka Detail
+              </Link>
+            </div>
+          </article>
+        )
+      })}
+    </>
+  )
+})
+
 export function PsbListWorkspace({
   payload,
   roleLabel,
@@ -300,10 +417,14 @@ export function PsbListWorkspace({
   canApprove: boolean
   reviewDbReady: boolean
 }) {
-  const { state, summary, items, selectedItem } = payload
+  const { state, summary, items, selectedItem, renderLimit } = payload
   const [importOpen, setImportOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error' | 'warning'; message: string } | null>(null)
+
+  const deferredItems = useDeferredValue(items)
+  const deferredSelectedId = useMemo(() => selectedItem?.id, [selectedItem?.id])
+  const displayItems = deferredItems
 
   async function handleExportExcel(event: ChangeEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
@@ -311,14 +432,14 @@ export function PsbListWorkspace({
     setFeedback(null)
     setExporting(true)
     try {
-      if (!items.length) {
+      if (!displayItems.length) {
         setFeedback({ tone: 'warning', message: 'Tidak ada baris data PSB untuk diekspor saat filter ini. Coba reset filter terlebih dahulu.' })
         return
       }
-      await exportPsbListToExcel(items)
+      await exportPsbListToExcel(displayItems)
       setFeedback({
         tone: 'success',
-        message: `Berhasil ekspor ${items.length.toLocaleString('id-ID')} baris Data PSB ke file Excel.`,
+        message: `Berhasil ekspor ${displayItems.length.toLocaleString('id-ID')} baris Data PSB ke file Excel.`,
       })
     } catch (error) {
       setFeedback({
@@ -329,6 +450,35 @@ export function PsbListWorkspace({
       setExporting(false)
     }
   }
+
+  const renderBadges = useMemo(() => {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <span className="badge border-sky-200 bg-sky-50 text-sky-700">{roleLabel}</span>
+        <span className="badge border-slate-200 bg-slate-50 text-slate-700">
+          {displayItems.length.toLocaleString('id-ID')} item tampil
+        </span>
+        {renderLimit && summary.totalCount > renderLimit ? (
+          <span className="badge border-amber-200 bg-amber-50 text-amber-700">
+            {summary.totalCount.toLocaleString('id-ID')} total · render {renderLimit} tercepat
+          </span>
+        ) : null}
+        <span className="badge border-slate-200 bg-slate-50 text-slate-700">
+          {canUpdate ? 'Bisa review' : 'Mode monitor'}
+        </span>
+        <span className="badge border-slate-200 bg-slate-50 text-slate-700">
+          {canApprove ? 'Bisa approve' : 'Approve terbatas'}
+        </span>
+      </div>
+    )
+  }, [roleLabel, displayItems.length, renderLimit, summary.totalCount, canUpdate, canApprove])
+
+  const totalCountLabel = useMemo(() => buildSummaryCard('Total Data PSB', summary.totalCount, 'border-slate-200 bg-white text-slate-900', buildHref(state, { status: null, selected: state.selected })), [summary.totalCount, state])
+  const baruLabel = useMemo(() => buildSummaryCard('Baru', summary.baruCount, 'border-sky-200 bg-sky-50 text-sky-800', buildHref(state, { status: 'BARU', selected: state.selected })), [summary.baruCount, state])
+  const reviewLabel = useMemo(() => buildSummaryCard('Review CS', summary.reviewCount, 'border-amber-200 bg-amber-50 text-amber-800', buildHref(state, { status: 'REVIEW_CS', selected: state.selected })), [summary.reviewCount, state])
+  const koreksiLabel = useMemo(() => buildSummaryCard('Perlu Koreksi', summary.correctionCount, 'border-orange-200 bg-orange-50 text-orange-800', buildHref(state, { status: 'PERLU_KOREKSI', selected: state.selected })), [summary.correctionCount, state])
+  const approvedLabel = useMemo(() => buildSummaryCard('Disetujui', summary.approvedCount, 'border-emerald-200 bg-emerald-50 text-emerald-800', buildHref(state, { status: 'DISETUJUI', selected: state.selected })), [summary.approvedCount, state])
+  const transferredLabel = useMemo(() => buildSummaryCard('Sudah ke Ticketing', summary.transferredCount, 'border-violet-200 bg-violet-50 text-violet-800', buildHref(state, { status: 'DITRANSFER_KE_TICKETING', selected: state.selected })), [summary.transferredCount, state])
 
   return (
     <div className="space-y-6">
@@ -345,28 +495,17 @@ export function PsbListWorkspace({
               inventory yang sudah stabil. Didukung import & export Excel untuk batch operasional.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="badge border-sky-200 bg-sky-50 text-sky-700">{roleLabel}</span>
-            <span className="badge border-slate-200 bg-slate-50 text-slate-700">
-              {items.length.toLocaleString('id-ID')} item tampil
-            </span>
-            <span className="badge border-slate-200 bg-slate-50 text-slate-700">
-              {canUpdate ? 'Bisa review' : 'Mode monitor'}
-            </span>
-            <span className="badge border-slate-200 bg-slate-50 text-slate-700">
-              {canApprove ? 'Bisa approve' : 'Approve terbatas'}
-            </span>
-          </div>
+          {renderBadges}
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        {buildSummaryCard('Total Data PSB', summary.totalCount, 'border-slate-200 bg-white text-slate-900', buildHref(state, { status: null, selected: state.selected }))}
-        {buildSummaryCard('Baru', summary.baruCount, 'border-sky-200 bg-sky-50 text-sky-800', buildHref(state, { status: 'BARU', selected: state.selected }))}
-        {buildSummaryCard('Review CS', summary.reviewCount, 'border-amber-200 bg-amber-50 text-amber-800', buildHref(state, { status: 'REVIEW_CS', selected: state.selected }))}
-        {buildSummaryCard('Perlu Koreksi', summary.correctionCount, 'border-orange-200 bg-orange-50 text-orange-800', buildHref(state, { status: 'PERLU_KOREKSI', selected: state.selected }))}
-        {buildSummaryCard('Disetujui', summary.approvedCount, 'border-emerald-200 bg-emerald-50 text-emerald-800', buildHref(state, { status: 'DISETUJUI', selected: state.selected }))}
-        {buildSummaryCard('Sudah ke Ticketing', summary.transferredCount, 'border-violet-200 bg-violet-50 text-violet-800', buildHref(state, { status: 'DITRANSFER_KE_TICKETING', selected: state.selected }))}
+        {totalCountLabel}
+        {baruLabel}
+        {reviewLabel}
+        {koreksiLabel}
+        {approvedLabel}
+        {transferredLabel}
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
@@ -480,100 +619,13 @@ export function PsbListWorkspace({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {items.length ? (
-                  items.map((item) => {
-                    const active = selectedItem?.id === item.id
-                    return (
-                      <tr key={item.id} className={active ? 'bg-sky-50/70' : 'bg-white'}>
-                        <td className="px-4 py-4 align-top">
-                          <p className="text-sm font-semibold text-slate-950">{item.psbListCode}</p>
-                          <p className="mt-1 text-sm text-slate-700">{item.customerName}</p>
-                          <p className="mt-2 text-xs text-slate-500">{item.customerPhone || '-'}</p>
-                        </td>
-                        <td className="px-4 py-4 align-top">
-                          <p className="text-sm text-slate-700">{item.addressText}</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {renderAreaBadge(item)}
-                            {renderMetaBadge('Ticket', item.transferredTicketRef)}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 align-top">
-                          <p className="text-sm text-slate-800">{item.packageLabel || '-'}</p>
-                          <p className="mt-2 text-xs text-slate-500">{item.odpCode || 'ODP belum dipilih'}</p>
-                        </td>
-                        <td className="px-4 py-4 align-top">
-                          <p className="text-sm text-slate-800">{item.salesOwnerName || '-'}</p>
-                          <p className="mt-2 text-xs text-slate-500">{formatDateTime(item.requestedInstallDate)}</p>
-                        </td>
-                        <td className="px-4 py-4 align-top">
-                          <span className={`badge ${getStatusTone(item.status)}`}>{getStatusLabel(item.status)}</span>
-                        </td>
-                        <td className="px-4 py-4 align-top">
-                          <p className="text-sm text-slate-800">{item.nextActionLabel}</p>
-                          <p className="mt-2 text-xs text-slate-500">
-                            {item.csPicName ? `PIC CS: ${item.csPicName}` : 'Belum ada PIC CS'}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4 text-right align-top">
-                          <Link
-                            href={buildHref(state, { selected: String(item.id) })}
-                            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            Buka Detail
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">
-                      Tidak ada item yang cocok dengan filter saat ini.
-                    </td>
-                  </tr>
-                )}
+                <PsbTableRows items={displayItems} selectedId={deferredSelectedId} state={state} />
               </tbody>
             </table>
           </div>
 
           <div className="space-y-3 p-4 xl:hidden">
-            {items.length ? (
-              items.map((item) => {
-                const active = selectedItem?.id === item.id
-                return (
-                  <article
-                    key={item.id}
-                    className={`rounded-2xl border p-4 ${active ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white'}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-950">{item.psbListCode}</p>
-                        <p className="mt-1 text-sm text-slate-700">{item.customerName}</p>
-                      </div>
-                      <span className={`badge ${getStatusTone(item.status)}`}>{getStatusLabel(item.status)}</span>
-                    </div>
-                    <p className="mt-3 text-sm text-slate-700">{item.addressText}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {renderMetaBadge('Paket', item.packageLabel)}
-                      {renderMetaBadge('ODP', item.odpCode)}
-                      {renderMetaBadge('Marketing', item.salesOwnerName)}
-                    </div>
-                    <div className="mt-4 flex justify-end">
-                      <Link
-                        href={buildHref(state, { selected: String(item.id) })}
-                        className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                      >
-                        Buka Detail
-                      </Link>
-                    </div>
-                  </article>
-                )
-              })
-            ) : (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                Tidak ada item yang cocok dengan filter saat ini.
-              </div>
-            )}
+            <PsbCardList items={displayItems} selectedId={deferredSelectedId} state={state} />
           </div>
         </article>
 

@@ -55,6 +55,7 @@ export type PsbListPagePayload = {
     transferredCount: number
   }
   ownerOptions: string[]
+  renderLimit: number
   state: {
     status: string | null
     owner: string | null

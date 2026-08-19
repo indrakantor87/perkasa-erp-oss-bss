@@ -583,6 +583,18 @@ export async function ensurePsbListBaselineSeeds() {
   }
 }
 
+type ReviewDbStatusSummaryRow = {
+  totalCount: number | string
+  baruCount: number | string
+  reviewCount: number | string
+  correctionCount: number | string
+  approvedCount: number | string
+  rejectedCount: number | string
+  transferredCount: number | string
+}
+
+const PSB_LIST_RENDER_LIMIT = 200
+
 async function getPsbListAuditSummary(psbListId: number) {
   const rows = await runReviewDbQuery<ReviewDbAuditRow>(
     `
@@ -608,6 +620,57 @@ async function getPsbListAuditSummary(psbListId: number) {
     const notes = String(row.notes ?? '').trim()
     return notes || `${eventType}${toStatus ? ` -> ${toStatus}` : ''}`
   })
+}
+
+async function batchGetPsbListAuditSummary(ids: number[]) {
+  if (!ids.length) {
+    return new Map<number, string[]>()
+  }
+  const placeholders = ids.map(() => '?').join(', ')
+  const rows = await runReviewDbQuery<
+    ReviewDbAuditRow & { psbListId: number | string }
+  >(
+    `
+      SELECT
+        psb_list_id AS psbListId,
+        event_type AS eventType,
+        to_status AS toStatus,
+        notes
+      FROM (
+        SELECT
+          audits.psb_list_id,
+          audits.event_type,
+          audits.to_status,
+          audits.notes,
+          audits.id,
+          ROW_NUMBER() OVER (PARTITION BY audits.psb_list_id ORDER BY audits.id DESC) AS rn
+        FROM sales_psb_list_audits audits
+        WHERE audits.psb_list_id IN (${placeholders})
+      ) ranked
+      WHERE rn <= 3
+      ORDER BY psb_list_id ASC, id DESC
+    `,
+    ids,
+  )
+
+  const result = new Map<number, string[]>()
+  for (const row of rows) {
+    const id = Number(row.psbListId)
+    const eventType = String(row.eventType ?? 'UPDATE').trim().toUpperCase()
+    const toStatus = String(row.toStatus ?? '').trim().toUpperCase()
+    const notes = String(row.notes ?? '').trim()
+    const summaryText = notes || `${eventType}${toStatus ? ` -> ${toStatus}` : ''}`
+    const prev = result.get(id)
+    if (prev) prev.push(summaryText)
+    else result.set(id, [summaryText])
+  }
+
+  for (const id of ids) {
+    if (!result.has(id)) {
+      result.set(id, ['Belum ada audit tambahan di review DB.'])
+    }
+  }
+  return result
 }
 
 async function getOwnerOptionsFromReviewDb() {
@@ -699,7 +762,45 @@ async function getReviewDbPsbListPageData(
     values.push(like, like, like, like, like, like, like, like, like, like)
   }
 
-  const rows = await runReviewDbQuery<ReviewDbPsbListRow>(
+  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+
+  const summaryRows = await runReviewDbQuery<ReviewDbStatusSummaryRow>(
+    `
+      SELECT
+        COUNT(*)                                              AS totalCount,
+        SUM(CASE WHEN status = 'BARU' THEN 1 ELSE 0 END)                    AS baruCount,
+        SUM(CASE WHEN status = 'REVIEW_CS' THEN 1 ELSE 0 END)               AS reviewCount,
+        SUM(CASE WHEN status = 'PERLU_KOREKSI' THEN 1 ELSE 0 END)          AS correctionCount,
+        SUM(CASE WHEN status = 'DISETUJUI' THEN 1 ELSE 0 END)              AS approvedCount,
+        SUM(CASE WHEN status = 'DITOLAK' THEN 1 ELSE 0 END)                 AS rejectedCount,
+        SUM(CASE WHEN status = 'DITRANSFER_KE_TICKETING' THEN 1 ELSE 0 END) AS transferredCount
+      FROM sales_psb_lists
+      ${whereClause}
+    `,
+    values,
+  )
+  const summaryRow = summaryRows[0] ?? {
+    totalCount: 0,
+    baruCount: 0,
+    reviewCount: 0,
+    correctionCount: 0,
+    approvedCount: 0,
+    rejectedCount: 0,
+    transferredCount: 0,
+  }
+  const summary = {
+    totalCount: Number(summaryRow.totalCount ?? 0),
+    baruCount: Number(summaryRow.baruCount ?? 0),
+    reviewCount: Number(summaryRow.reviewCount ?? 0),
+    correctionCount: Number(summaryRow.correctionCount ?? 0),
+    approvedCount: Number(summaryRow.approvedCount ?? 0),
+    rejectedCount: Number(summaryRow.rejectedCount ?? 0),
+    transferredCount: Number(summaryRow.transferredCount ?? 0),
+  }
+
+  const selectedId = resolvePositiveInt(state.selected)
+
+  const baseRows = await runReviewDbQuery<ReviewDbPsbListRow>(
     `
       SELECT
         id,
@@ -725,22 +826,42 @@ async function getReviewDbPsbListPageData(
         cs_pic_name AS csPicName,
         next_action_label AS nextActionLabel
       FROM sales_psb_lists
-      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ${whereClause}
       ORDER BY requested_install_date IS NULL, requested_install_date ASC, id DESC
+      LIMIT ?
     `,
-    values,
+    [...values, PSB_LIST_RENDER_LIMIT * 2],
   )
 
-  const items = rows.map((row) => mapReviewDbRowToPsbListItem(row))
-  const selectedId = resolvePositiveInt(state.selected)
+  const baseItems = baseRows.map((row) => mapReviewDbRowToPsbListItem(row))
+
+  const hasSelectionFilter = selectedId != null
+  let renderItems: PsbListItem[]
+  if (hasSelectionFilter) {
+    const selectedFromList = baseItems.find((item) => item.id === selectedId)
+    const others = baseItems.filter((item) => item.id !== selectedId).slice(0, PSB_LIST_RENDER_LIMIT - 1)
+    renderItems = selectedFromList ? [selectedFromList, ...others] : others
+  } else {
+    renderItems = baseItems.slice(0, PSB_LIST_RENDER_LIMIT)
+  }
+
+  const renderIds = renderItems.map((item) => item.id)
+  const auditMap = await batchGetPsbListAuditSummary(renderIds)
+
+  const items = renderItems.map((item) => ({
+    ...item,
+    auditSummary: auditMap.get(item.id) ?? ['Belum ada audit tambahan di review DB.'],
+  }))
+
   const selectedBase =
-    items.find((item) => item.id === selectedId) ??
-    items[0] ??
-    null
+    (selectedId != null ? items.find((item) => item.id === selectedId) : undefined) ?? items[0] ?? null
   const selectedItem = selectedBase
     ? {
         ...selectedBase,
-        auditSummary: await getPsbListAuditSummary(selectedBase.id),
+        auditSummary:
+          selectedBase.auditSummary?.length
+            ? selectedBase.auditSummary
+            : await getPsbListAuditSummary(selectedBase.id),
       }
     : null
 
@@ -748,16 +869,9 @@ async function getReviewDbPsbListPageData(
     source,
     items,
     selectedItem,
-    summary: {
-      totalCount: items.length,
-      baruCount: items.filter((item) => item.status === 'BARU').length,
-      reviewCount: items.filter((item) => item.status === 'REVIEW_CS').length,
-      correctionCount: items.filter((item) => item.status === 'PERLU_KOREKSI').length,
-      approvedCount: items.filter((item) => item.status === 'DISETUJUI').length,
-      rejectedCount: items.filter((item) => item.status === 'DITOLAK').length,
-      transferredCount: items.filter((item) => item.status === 'DITRANSFER_KE_TICKETING').length,
-    },
+    summary,
     ownerOptions: filterVisiblePsbListOwnerOptions(items, await getOwnerOptionsFromReviewDb(), session),
+    renderLimit: PSB_LIST_RENDER_LIMIT,
     state,
   }
 }
@@ -811,7 +925,7 @@ async function getPsbListPageDataWithMock(
 
   return {
     source,
-    items: filteredItems,
+    items: filteredItems.slice(0, PSB_LIST_RENDER_LIMIT),
     selectedItem,
     summary: {
       totalCount: filteredItems.length,
@@ -829,6 +943,7 @@ async function getPsbListPageDataWithMock(
       ),
       session,
     ),
+    renderLimit: PSB_LIST_RENDER_LIMIT,
     state,
   }
 }
