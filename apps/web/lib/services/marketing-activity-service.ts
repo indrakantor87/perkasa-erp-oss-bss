@@ -67,6 +67,18 @@ export type MarketingActivityMutationInput = {
   areaId4?: unknown
 }
 
+export type MarketingActivityImportRowError = {
+  row: number
+  errors: string[]
+}
+
+export type MarketingActivityImportResult = {
+  successCount: number
+  errorCount: number
+  totalCount: number
+  rowErrors: MarketingActivityImportRowError[]
+}
+
 function toIsoDate(value: string | Date) {
   const parsed = value instanceof Date ? value : new Date(value)
   if (!Number.isFinite(parsed.getTime())) {
@@ -559,4 +571,207 @@ export function getMarketingActivityErrorMessage(error: unknown) {
     return error.message.trim()
   }
   return getReviewDbErrorDetail(error)
+}
+
+function validateAndNormalizeBatchRow(
+  rawRow: unknown,
+  rowNumber: number,
+  marketingUserOptions: Array<{ username: string; fullName: string }>,
+  areaOptions: MarketingCoveredAreaOption[],
+  sessionRole: AppSession['role'],
+  sessionDisplayName: string,
+  sessionUsername: string,
+): { valid: MarketingActivityMutationInput | null; errors: string[] } {
+  const errors: string[] = []
+  const record = (rawRow ?? {}) as Record<string, unknown>
+
+  const dateRaw = record['Tanggal'] ?? record['date'] ?? record['Date'] ?? record['tanggal']
+  const marketingRaw = record['Marketing'] ?? record['marketing'] ?? record['marketingName'] ?? record['Nama Marketing']
+  const area1Raw = record['Area 1'] ?? record['area1'] ?? record['Area'] ?? record['area'] ?? record['areaId']
+  const area2Raw = record['Area 2'] ?? record['area2'] ?? record['areaId2']
+  const area3Raw = record['Area 3'] ?? record['area3'] ?? record['areaId3']
+  const area4Raw = record['Area 4'] ?? record['area4'] ?? record['areaId4']
+  const activityRaw = record['Aktivitas'] ?? record['activity'] ?? record['Kegiatan']
+  const notesRaw = record['Keterangan'] ?? record['notes'] ?? record['catatan'] ?? record['Note']
+
+  const dateValue = toIsoDate(String(dateRaw ?? ''))
+  if (!dateValue) {
+    errors.push('Tanggal tidak valid (format: YYYY-MM-DD atau DD/MM/YYYY).')
+  }
+
+  let marketingUsername = sessionUsername
+  let marketingName = sessionDisplayName
+  if (sessionRole !== 'SALES_MARKETING' && sessionRole !== 'PENJUALAN') {
+    const marketingLookup = String(marketingRaw ?? '').trim().toLowerCase()
+    if (!marketingLookup) {
+      errors.push('Kolom Marketing wajib diisi untuk import lintas marketing.')
+    } else {
+      const matched = marketingUserOptions.find(
+        (item) =>
+          item.fullName.trim().toLowerCase() === marketingLookup ||
+          item.username.trim().toLowerCase() === marketingLookup,
+      )
+      if (matched) {
+        marketingUsername = matched.username
+        marketingName = matched.fullName
+      } else {
+        errors.push(`Marketing "${String(marketingRaw).trim()}" tidak ditemukan di daftar user marketing.`)
+      }
+    }
+  }
+
+  const areaNameToIdMap = new Map(areaOptions.map((item) => [item.name.trim().toLowerCase(), item.id]))
+  function resolveAreaId(value: unknown): number | '' {
+    if (value === null || value === undefined) return ''
+    const stringValue = String(value).trim()
+    if (!stringValue || stringValue === '-') return ''
+    const numeric = Number(stringValue)
+    if (Number.isInteger(numeric) && numeric > 0 && areaOptions.some((item) => item.id === numeric)) {
+      return numeric
+    }
+    const lookupId = areaNameToIdMap.get(stringValue.toLowerCase())
+    return lookupId ?? ''
+  }
+
+  const areaId1 = resolveAreaId(area1Raw)
+  const areaId2 = resolveAreaId(area2Raw)
+  const areaId3 = resolveAreaId(area3Raw)
+  const areaId4 = resolveAreaId(area4Raw)
+  const areaIdsWithValues = [areaId1, areaId2, areaId3, areaId4].filter((value) => value !== '') as number[]
+  const uniqueAreaIds = Array.from(new Set(areaIdsWithValues))
+  if (areaIdsWithValues.length !== uniqueAreaIds.length) {
+    errors.push('Area 1 s/d Area 4 tidak boleh ada duplikat dalam satu baris.')
+  }
+  void rowNumber
+  return {
+    valid: errors.length === 0 ? {
+      date: dateValue,
+      marketingName,
+      activity: activityRaw,
+      notes: notesRaw,
+      areaId: areaId1 || undefined,
+      areaId2: areaId2 || undefined,
+      areaId3: areaId3 || undefined,
+      areaId4: areaId4 || undefined,
+    } : null,
+    errors,
+  }
+}
+
+export async function batchCreateMarketingActivities(params: {
+  session: AppSession
+  rows: unknown[]
+}): Promise<MarketingActivityImportResult> {
+  assertWriteReady()
+  assertCanMutate(params.session)
+  await ensureMarketingActivitiesTable()
+
+  const marketingOptions = await getMarketingUserOptions()
+  const areaOptions = await getMarketingCoveredAreaOptions()
+
+  const rowErrors: MarketingActivityImportRowError[] = []
+  const validPayloads: MarketingActivityMutationInput[] = []
+
+  params.rows.forEach((rawRow, zeroIndex) => {
+    const rowNumber = zeroIndex + 2
+    const { valid, errors } = validateAndNormalizeBatchRow(
+      rawRow,
+      rowNumber,
+      marketingOptions,
+      areaOptions,
+      params.session.role,
+      params.session.displayName,
+      params.session.username,
+    )
+    if (errors.length) {
+      rowErrors.push({ row: rowNumber, errors })
+    } else if (valid) {
+      validPayloads.push(valid)
+    }
+  })
+
+  let successCount = 0
+  if (validPayloads.length) {
+    const isSelfScopedRole = params.session.role === 'SALES_MARKETING' || params.session.role === 'PENJUALAN'
+    const baseMarketingUsername = params.session.username
+    const baseMarketingName = params.session.displayName
+    const userMap = new Map(marketingOptions.map((item) => [item.fullName.trim().toLowerCase(), { username: item.username, fullName: item.fullName }]))
+    const allUniqueAreaIds = Array.from(
+      new Set(
+        validPayloads.flatMap((payload) =>
+          [payload.areaId, payload.areaId2, payload.areaId3, payload.areaId4]
+            .filter((value): value is number => typeof value === 'number' && value > 0),
+        ),
+      ),
+    )
+    if (allUniqueAreaIds.length) {
+      await validateAreaIds([...allUniqueAreaIds])
+    }
+    const insertPlaceholders: string[] = []
+    const insertValues: unknown[] = []
+    for (const payload of validPayloads) {
+      const date = normalizeText(payload.date)
+      let marketingUsername = baseMarketingUsername
+      let marketingName = baseMarketingName
+      if (!isSelfScopedRole) {
+        const resolved = userMap.get(normalizeText(payload.marketingName).toLowerCase())
+        if (resolved) {
+          marketingUsername = resolved.username
+          marketingName = resolved.fullName
+        }
+      }
+      const areaIds = dedupeAreaIds([
+        normalizeOptionalInt(payload.areaId),
+        normalizeOptionalInt(payload.areaId2),
+        normalizeOptionalInt(payload.areaId3),
+        normalizeOptionalInt(payload.areaId4),
+      ])
+      const activity = normalizeText(payload.activity) || '-'
+      const notes = normalizeOptionalText(payload.notes)
+      insertPlaceholders.push('(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      insertValues.push(
+        date,
+        marketingUsername,
+        marketingName,
+        areaIds[0],
+        areaIds[1],
+        areaIds[2],
+        areaIds[3],
+        activity,
+        notes,
+        params.session.username,
+        params.session.username,
+      )
+    }
+
+    if (insertPlaceholders.length) {
+      const result = await runReviewDbExecute<ExecuteResult>(
+        `
+          INSERT INTO sales_marketing_activities (
+            activity_date,
+            marketing_username,
+            marketing_name,
+            area_id,
+            area_id_2,
+            area_id_3,
+            area_id_4,
+            activity_text,
+            notes,
+            created_by_username,
+            updated_by_username
+          )
+          VALUES ${insertPlaceholders.join(', ')}
+        `,
+        insertValues,
+      )
+      successCount = Number(result.affectedRows ?? 0)
+    }
+  }
+
+  return {
+    successCount,
+    errorCount: rowErrors.length,
+    totalCount: params.rows.length,
+    rowErrors,
+  }
 }

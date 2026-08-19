@@ -82,6 +82,7 @@ export function MarketingActivityManager({
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<MarketingActivityRecord | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('marketing')
@@ -89,7 +90,7 @@ export function MarketingActivityManager({
   const [marketingSearch, setMarketingSearch] = useState('')
   const [month, setMonth] = useState(new Date().getMonth() + 1)
   const [year, setYear] = useState(new Date().getFullYear())
-  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string; rowErrors?: Array<{ row: number; errors: string[] }> } | null>(null)
   const [formData, setFormData] = useState<FormState>(buildDefaultForm(initialMarketingName))
 
   const areaFields = ['areaId', 'areaId2', 'areaId3', 'areaId4'] as const
@@ -378,6 +379,91 @@ export function MarketingActivityManager({
     }
   }
 
+  function handleDownloadTemplate() {
+    const exampleRows = [
+      {
+        Tanggal: getTodayIsoDate(),
+        Marketing: initialMarketingName || 'Nama Marketing / Username',
+        'Area 1': coveredAreas[0]?.name || 'Nama Area atau ID Area',
+        'Area 2': coveredAreas[1]?.name || '',
+        'Area 3': '',
+        'Area 4': '',
+        Aktivitas: 'Survey lokasi baru Perumahan Green Valley, follow up 3 customer',
+        Keterangan: 'Keterangan tambahan (opsional)',
+      },
+    ]
+    void (async () => {
+      const XLSX = await import('xlsx')
+      const worksheet = XLSX.utils.json_to_sheet(exampleRows)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Template Import')
+      XLSX.writeFile(workbook, 'template-import-aktivitas-marketing.xlsx')
+    })()
+  }
+
+  async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !canMutate) return
+    setIsImporting(true)
+    setFeedback(null)
+    try {
+      const XLSX = await import('xlsx')
+      const workbookBuffer = await file.arrayBuffer()
+      const workbook = XLSX.read(workbookBuffer, { type: 'array' })
+      const firstSheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[firstSheetName]
+      const rawRows: unknown[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false })
+      if (!rawRows.length) {
+        setFeedback({
+          tone: 'error',
+          message: 'File Excel kosong. Isi minimal 1 baris data sesuai template.',
+        })
+        return
+      }
+      const response = await fetch('/api/sales/marketing-activities/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: rawRows }),
+      })
+      const payload = (await response.json().catch(() => null)) as
+        | { message?: string; successCount?: number; errorCount?: number; totalCount?: number; rowErrors?: Array<{ row: number; errors: string[] }> }
+        | null
+      if (!response.ok) {
+          const rowErrors = Array.isArray(payload?.rowErrors) ? payload.rowErrors : undefined
+          setFeedback({
+            tone: 'error',
+            message: payload?.message || 'Import Excel gagal.',
+            rowErrors,
+          })
+          return
+        }
+      const rowErrors = Array.isArray(payload?.rowErrors) ? payload.rowErrors : undefined
+      const successCount = payload?.successCount ?? 0
+      const totalCount = payload?.totalCount ?? rawRows.length
+      if (rowErrors?.length) {
+        setFeedback({
+          tone: 'success',
+          message: payload?.message || `Import selesai: ${successCount.toLocaleString('id-ID')} dari ${totalCount.toLocaleString('id-ID')} baris tersimpan.`,
+          rowErrors,
+        })
+      } else {
+        setFeedback({
+          tone: 'success',
+          message: payload?.message || `Berhasil import ${successCount.toLocaleString('id-ID')} baris Aktivitas Marketing dari Excel.`,
+        })
+      }
+      await fetchActivities()
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error instanceof Error ? `Import Excel gagal: ${error.message}` : 'Import Excel gagal.',
+      })
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {isSalesFocus ? (
@@ -532,6 +618,35 @@ export function MarketingActivityManager({
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImport}
+              className="hidden"
+              id="aktivitas-marketing-import-file"
+              disabled={!canMutate || isImporting}
+            />
+            <button
+              type="button"
+              onClick={() => document.getElementById('aktivitas-marketing-import-file')?.click()}
+              disabled={isImporting || !canMutate}
+              className="rounded-full border border-indigo-300 bg-indigo-50 px-5 py-3 text-sm font-semibold text-indigo-800 disabled:cursor-not-allowed disabled:opacity-60 hover:bg-indigo-100 transition"
+              title={canMutate ? 'Import batch Aktivitas Marketing via Excel' : 'Role aktif tidak memiliki izin tulis Aktivitas Marketing'}
+            >
+              <span className="inline-flex items-center gap-2">
+                {isImporting ? 'Mengimport...' : 'Import Excel'}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+              title="Download template Excel kosong untuk format import Aktivitas Marketing"
+            >
+              <span className="inline-flex items-center gap-2">
+                Template Excel
+              </span>
+            </button>
             <button
               type="button"
               onClick={() => void handleExport()}
@@ -573,7 +688,24 @@ export function MarketingActivityManager({
                 : 'border-rose-200 bg-rose-50 text-rose-700',
             )}
           >
-            {feedback.message}
+            <p>{feedback.message}</p>
+            {feedback.rowErrors && feedback.rowErrors.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                <p className="font-semibold">Detail error per baris Excel:</p>
+                <ul className="max-h-60 list-disc space-y-1 overflow-y-auto pl-6 text-xs">
+                  {feedback.rowErrors.slice(0, 50).map((item, index) => (
+                    <li key={index}>
+                      Baris {item.row.toLocaleString('id-ID')}: {item.errors.join(' | ')}
+                    </li>
+                  ))}
+                  {feedback.rowErrors.length > 50 ? (
+                    <li className="italic">
+                      +{feedback.rowErrors.length - 50} baris error lainnya. Perbaiki 50 teratas terlebih dahulu.
+                    </li>
+                  ) : null}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
