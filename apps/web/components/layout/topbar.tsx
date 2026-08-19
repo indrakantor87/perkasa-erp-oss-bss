@@ -52,11 +52,11 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="relative z-50 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
           {!hideQuickControls ? (
             <div className="surface-soft inline-flex items-center rounded-full border p-1">
-              <span className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">
+              <span className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute select-none">
                 {themeLabel}
               </span>
               {([
@@ -68,8 +68,8 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setTheme(value)}
-                    className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                    onClick={() => { setTheme(value) }}
+                    className={`cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold transition ${
                       active
                         ? 'text-[var(--color-accent-ink)]'
                         : 'text-mute hover:text-[var(--color-ink-strong)]'
@@ -87,8 +87,8 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
             <div className="surface-soft inline-flex items-center rounded-full border p-1 sm:hidden">
               <button
                 type="button"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="rounded-full px-3 py-2 text-xs font-semibold text-mute transition hover:text-[var(--color-ink-strong)]"
+                onClick={() => { setTheme(theme === 'dark' ? 'light' : 'dark') }}
+                className="cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold text-mute transition hover:text-[var(--color-ink-strong)]"
                 aria-label={theme === 'dark' ? 'Gunakan tema terang' : 'Gunakan tema gelap'}
                 title={themeLabel}
               >
@@ -107,8 +107,8 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setLanguage(value)}
-                    className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                    onClick={() => { setLanguage(value) }}
+                    className={`cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold transition ${
                       active
                         ? 'text-[var(--color-accent-ink)]'
                         : 'text-mute hover:text-[var(--color-ink-strong)]'
@@ -151,7 +151,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
             <Link
               href="/import"
               prefetch={false}
-              className="surface-soft rounded-full border px-4 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)]"
+              className="surface-soft rounded-full border px-4 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] cursor-pointer select-none"
             >
               {importLabel}
             </Link>
@@ -160,7 +160,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
           <form action="/api/auth/logout" method="post">
             <button
               type="submit"
-              className="surface-soft inline-flex items-center gap-2 rounded-full border px-3 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] sm:px-4"
+              className="surface-soft inline-flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] sm:px-4"
               title={logoutLabel}
             >
               <span aria-hidden="true" className="sm:hidden">
