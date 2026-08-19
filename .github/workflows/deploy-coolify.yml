@@ -136,22 +136,36 @@ jobs:
             CONTAINER_NAME="perkasa-erp-oss-bss"
 
             echo ""
-            echo "--- [REMOTE 1/5] Pull image terbaru $IMAGE ---"
+            echo "--- [REMOTE 1/6] Pull image terbaru $IMAGE ---"
             docker pull "$IMAGE" 2>&1 | tail -8
 
             echo ""
-            echo "--- [REMOTE 2/5] Stop & hapus container lama $CONTAINER_NAME (jika ada) ---"
+            echo "--- [REMOTE 2/6] Stop & hapus container lama $CONTAINER_NAME (jika ada) ---"
             docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
             sleep 2
 
             echo ""
-            echo "--- [REMOTE 3/5] Jalankan container production BARU ---"
+            echo "--- [REMOTE 3/6] DIAGNOSE PATH server.js YANG BENAR DI DALAM IMAGE (SAFETY NET!) ---"
+            SERVER_JS_PATH=$(docker run --rm --entrypoint=/bin/sh "$IMAGE" -c "find / -name server.js -type f 2>/dev/null | grep -v node_modules | head -1 | tr -d '\r'")
+            if [ -z "$SERVER_JS_PATH" ]; then
+              echo "❌ FATAL: server.js TIDAK DITEMUKAN di dalam image!"
+              docker run --rm --entrypoint=/bin/sh "$IMAGE" -c "ls -laR /app 2>&1 | head -100"
+              exit 8
+            fi
+            WORKDIR_CORRECT=$(dirname "$SERVER_JS_PATH")
+            echo "  PATH server.js BENAR : $SERVER_JS_PATH"
+            echo "  WORKDIR BENAR       : $WORKDIR_CORRECT"
+            echo "  CMD FINAL            : node $SERVER_JS_PATH"
+
+            echo ""
+            echo "--- [REMOTE 4/6] Jalankan container production BARU (OVERRIDE WORKDIR & CMD GUNAKAN PATH BENAR!) ---"
             docker run -d \
               --name "$CONTAINER_NAME" \
               --network coolify \
               --restart unless-stopped \
               --memory 2g --cpus 2 \
               -p 3000:3000 \
+              -w "$WORKDIR_CORRECT" \
               -e PORT="3000" \
               -e HOSTNAME="0.0.0.0" \
               -e NODE_ENV="production" \
@@ -166,14 +180,15 @@ jobs:
               -l "traefik.http.routers.perkasa.entryPoints=http" \
               -l "traefik.http.routers.perkasa.rule=Host(\`__DOMAIN__\`)" \
               -l "traefik.http.services.perkasa.loadbalancer.server.port=3000" \
-              "$IMAGE"
+              "$IMAGE" \
+              node "$SERVER_JS_PATH"
 
             echo ""
-            echo "--- [REMOTE 4/5] Tunggu 55 detik startup Next.js + koneksi MySQL ---"
+            echo "--- [REMOTE 5/6] Tunggu 55 detik startup Next.js + koneksi MySQL ---"
             sleep 55
 
             echo ""
-            echo "--- [REMOTE 5/5] Final status check ---"
+            echo "--- [REMOTE 6/6] Final status check ---"
             echo "docker ps:"
             docker ps --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             echo ""
