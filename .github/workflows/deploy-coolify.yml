@@ -134,32 +134,52 @@ jobs:
             set -e
             IMAGE="ghcr.io/indrakantor87/perkasa-erp-oss-bss:latest"
             CONTAINER_NAME="perkasa-erp-oss-bss"
+            DEPLOY_ID=$(date '+%Y%m%d%H%M%S')
 
             echo ""
-            echo "--- [REMOTE 1/6] Pull image terbaru $IMAGE ---"
-            docker pull "$IMAGE" 2>&1 | tail -8
+            echo "====================================================================="
+            echo "  🚀 DEPLOY AUTO-PRODUCTION (PURE DOCKER — SKIP COOLIFY HELPER!)"
+            echo "  Deploy ID    : $DEPLOY_ID"
+            echo "  Target Image : $IMAGE"
+            echo "  Container    : $CONTAINER_NAME"
+            echo "====================================================================="
 
             echo ""
-            echo "--- [REMOTE 2/6] Stop & hapus container lama $CONTAINER_NAME (jika ada) ---"
-            docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
-            sleep 2
+            echo "--- [REMOTE 1/7] Pull image terbaru + cetak DIGEST untuk verifikasi ---"
+            PULL_OUTPUT=$(docker pull "$IMAGE" 2>&1 | tail -15)
+            echo "$PULL_OUTPUT"
+            IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "N/A")
+            IMAGE_CREATED=$(docker inspect --format='{{.Created}}' "$IMAGE" 2>/dev/null || echo "N/A")
+            echo "  📦 IMAGE DIGEST AKTIF: $IMAGE_DIGEST"
+            echo "  📦 IMAGE CREATED AT  : $IMAGE_CREATED"
 
             echo ""
-            echo "--- [REMOTE 3/6] DIAGNOSE PATH server.js YANG BENAR DI DALAM IMAGE (SAFETY NET!) ---"
+            echo "--- [REMOTE 2/7] Stop & hapus container lama $CONTAINER_NAME (jika ada) ---"
+            OLD_ID=$(docker ps -aq --filter "name=$CONTAINER_NAME")
+            if [ -n "$OLD_ID" ]; then
+              echo "  🗑️  Container lama ditemukan (ID=$OLD_ID), menghapus..."
+              docker rm -f "$CONTAINER_NAME" 2>&1 || true
+              sleep 3
+            else
+              echo "  ℹ️  Tidak ada container lama dengan nama $CONTAINER_NAME"
+            fi
+
+            echo ""
+            echo "--- [REMOTE 3/7] DIAGNOSE PATH server.js YANG BENAR DI DALAM IMAGE (SAFETY NET!) ---"
             SERVER_JS_PATH=$(docker run --rm --entrypoint=/bin/sh "$IMAGE" -c "find / -name server.js -type f 2>/dev/null | grep -v node_modules | head -1 | tr -d '\r'")
             if [ -z "$SERVER_JS_PATH" ]; then
-              echo "❌ FATAL: server.js TIDAK DITEMUKAN di dalam image!"
-              docker run --rm --entrypoint=/bin/sh "$IMAGE" -c "ls -laR /app 2>&1 | head -100"
+              echo "  ❌ FATAL: server.js TIDAK DITEMUKAN di dalam image!"
+              docker run --rm --entrypoint=/bin/sh "$IMAGE" -c "ls -laR /app 2>&1 | head -120"
               exit 8
             fi
             WORKDIR_CORRECT=$(dirname "$SERVER_JS_PATH")
-            echo "  PATH server.js BENAR : $SERVER_JS_PATH"
-            echo "  WORKDIR BENAR       : $WORKDIR_CORRECT"
-            echo "  CMD FINAL            : node $SERVER_JS_PATH"
+            echo "  ✅ PATH server.js BENAR : $SERVER_JS_PATH"
+            echo "  ✅ WORKDIR BENAR       : $WORKDIR_CORRECT"
+            echo "  ✅ CMD FINAL            : node $SERVER_JS_PATH"
 
             echo ""
-            echo "--- [REMOTE 4/6] Jalankan container production BARU (OVERRIDE WORKDIR & CMD GUNAKAN PATH BENAR!) ---"
-            docker run -d \
+            echo "--- [REMOTE 4/7] Jalankan container production BARU + label Traefik ---"
+            NEW_CONTAINER_ID=$(docker run -d \
               --name "$CONTAINER_NAME" \
               --network coolify \
               --restart unless-stopped \
@@ -180,20 +200,68 @@ jobs:
               -l "traefik.http.routers.perkasa.entryPoints=http" \
               -l "traefik.http.routers.perkasa.rule=Host(\`__DOMAIN__\`)" \
               -l "traefik.http.services.perkasa.loadbalancer.server.port=3000" \
+              -l "deploy.id=$DEPLOY_ID" \
               "$IMAGE" \
-              node "$SERVER_JS_PATH"
+              node "$SERVER_JS_PATH")
+            echo "  ✅ Container BARU dibuat dengan ID: $NEW_CONTAINER_ID"
 
             echo ""
-            echo "--- [REMOTE 5/6] Tunggu 55 detik startup Next.js + koneksi MySQL ---"
-            sleep 55
+            echo "--- [REMOTE 5/7] Health Check LOOP 75s (fail immediately jika container crash) ---"
+            MAX_WAIT=75
+            CHECK_INTERVAL=5
+            ELAPSED=0
+            HEALTH_OK=0
+            while [ $ELAPSED -lt $MAX_WAIT ]; do
+              CURRENT_STATE=$(docker inspect --format='{{.State.Status}}' "$NEW_CONTAINER_ID" 2>/dev/null || echo "missing")
+              CURRENT_EXITCODE=$(docker inspect --format='{{.State.ExitCode}}' "$NEW_CONTAINER_ID" 2>/dev/null || echo "?")
+              echo "  [${ELAPSED}s/$MAX_WAIT s] State=$CURRENT_STATE Exit=$CURRENT_EXITCODE"
+              if [ "$CURRENT_STATE" = "running" ]; then
+                HEALTH_OK=1
+              fi
+              if [ "$CURRENT_STATE" = "exited" ] || [ "$CURRENT_STATE" = "dead" ]; then
+                echo "  ❌ FATAL: Container CRASH / EXIT (state=$CURRENT_STATE exit=$CURRENT_EXITCODE) — deploy GAGAL!"
+                echo "  ====== FULL LOG (sejak container start): ======"
+                docker logs "$NEW_CONTAINER_ID" 2>&1 | tail -80
+                exit 17
+              fi
+              if [ "$CURRENT_STATE" = "missing" ]; then
+                echo "  ❌ FATAL: Container HILANG (docker ps tidak ditemukan)"
+                exit 19
+              fi
+              sleep $CHECK_INTERVAL
+              ELAPSED=$((ELAPSED + CHECK_INTERVAL))
+            done
+            if [ "$HEALTH_OK" -ne 1 ]; then
+              echo "  ❌ TIMEOUT: Container tidak pernah mencapai status running dalam $MAX_WAIT s!"
+              docker logs "$NEW_CONTAINER_ID" 2>&1 | tail -80
+              exit 18
+            fi
+            echo "  ✅ HEALTH OK: container stay running selama >70s (tidak crash-loop)"
 
             echo ""
-            echo "--- [REMOTE 6/6] Final status check ---"
-            echo "docker ps:"
-            docker ps --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            echo "--- [REMOTE 6/7] Cleanup old dangling images (hemat disk) ---"
+            PRUNE_BEFORE=$(docker system df --format '{{.Size}}' | head -1 || echo "0")
+            docker image prune -f --filter "until=48h" > /dev/null 2>&1 || true
+            echo "  ℹ️  Prune selesai (keep image 48h terakhir)"
+
             echo ""
-            echo "Last 35 log (Next.js + DB connection):"
-            docker logs --tail 35 "$CONTAINER_NAME" 2>&1 | grep -v "^$" | tail -45
+            echo "--- [REMOTE 7/7] FINAL VERIFY SUMMARY ---"
+            echo ""
+            echo "  🐳 docker ps:"
+            docker ps --filter "id=$NEW_CONTAINER_ID" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.RunningFor}}"
+            echo ""
+            echo "  🏷️  Traefik label (pastikan host rule benar):"
+            docker inspect --format='{{range $k,$v := .Config.Labels}}{{printf "%s=%s\n" $k $v}}{{end}}' "$NEW_CONTAINER_ID" | grep -E "(^traefik|^deploy.id)" || echo "  ⚠️  Traefik label verify skipped"
+            echo ""
+            echo "  📜 LAST 40 LOG lines (Next.js startup + DB connection):"
+            docker logs --tail 40 "$NEW_CONTAINER_ID" 2>&1 | grep -v "^$" | tail -50
+            echo ""
+            echo "====================================================================="
+            echo "  ✅ DEPLOY SELESAI! Deploy ID = $DEPLOY_ID"
+            echo "  Container ID : $NEW_CONTAINER_ID"
+            echo "  Image Digest : $IMAGE_DIGEST"
+            echo "  Akses App    : http://__DOMAIN__/login"
+            echo "====================================================================="
           REMOTE_EOF
           )
 
