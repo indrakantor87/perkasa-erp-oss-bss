@@ -39,12 +39,29 @@ echo "      - PORT      : 3000"
 echo "      - NETWORK   : coolify"
 echo "      - RESOURCES : 2 CPU / 2 GB RAM"
 
+echo ""
+echo "[3/7] 🔍 AUTO FIND PATH server.js BENAR di dalam image (SAFETY NET!)"
+SERVER_JS_PATH=$(docker run --rm --entrypoint=/bin/sh "$IMAGE" -c "find / -name server.js -type f 2>/dev/null | grep -v node_modules | head -1 | tr -d '\r'")
+if [ -z "$SERVER_JS_PATH" ]; then
+  echo "❌ FATAL: server.js TIDAK DITEMUKAN di dalam image!"
+  docker run --rm --entrypoint=/bin/sh "$IMAGE" -c "ls -laR /app 2>&1 | head -100"
+  exit 8
+fi
+WORKDIR_CORRECT=$(dirname "$SERVER_JS_PATH")
+echo "   PATH server.js BENAR : $SERVER_JS_PATH"
+echo "   WORKDIR BENAR       : $WORKDIR_CORRECT"
+echo "   CMD FINAL            : node $SERVER_JS_PATH"
+
+echo ""
+echo "[4/7] Buat container BARU dengan parameter production"
+
 docker run -d \
   --name "$CONTAINER_NAME" \
   --network coolify \
   --restart unless-stopped \
   --memory 2g --cpus 2 \
   -p 3000:3000 \
+  -w "$WORKDIR_CORRECT" \
   -e PORT="$PORT" \
   -e HOSTNAME="$HOSTNAME_ENV" \
   -e NODE_ENV="$NODE_ENV" \
@@ -59,16 +76,17 @@ docker run -d \
   -l "traefik.http.routers.perkasa.entryPoints=http" \
   -l "traefik.http.routers.perkasa.rule=Host(\`$DOMAIN\`)" \
   -l "traefik.http.services.perkasa.loadbalancer.server.port=3000" \
-  "$IMAGE"
+  "$IMAGE" \
+  node "$SERVER_JS_PATH"
 
 NEW_ID=$(docker ps --filter "name=$CONTAINER_NAME" --format "{{.ID}}")
 echo ""
-echo "[4/6] Container berhasil dibuat! ID: $NEW_ID"
+echo "[5/7] Container berhasil dibuat! ID: $NEW_ID"
 echo ""
-echo "[5/6] Menunggu 50 detik untuk startup Next.js + koneksi MySQL..."
+echo "[6/7] Menunggu 50 detik untuk startup Next.js + koneksi MySQL..."
 sleep 50
 echo ""
-echo "[6/6] Final status check:"
+echo "[7/7] Final status check:"
 echo "--------------------------------------------------------"
 docker ps --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 echo "--------------------------------------------------------"
