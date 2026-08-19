@@ -85,9 +85,7 @@ export function LanguageProvider({
 
   useEffect(() => {
     if (typeof document === 'undefined' || !document.documentElement) return
-    if (!document.documentElement.lang) {
-      document.documentElement.lang = language
-    }
+    document.documentElement.lang = language
   }, [language])
 
   const value = useMemo(() => ({ language, setLanguage }), [language, setLanguage])
