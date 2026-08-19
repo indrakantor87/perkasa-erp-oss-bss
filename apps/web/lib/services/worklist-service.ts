@@ -737,6 +737,8 @@ async function getWorklistBaseData(session: AppSession) {
   )
 }
 
+const WORKLIST_RENDER_LIMIT = 200
+
 export async function getWorklistPageData(session: AppSession, filters: WorklistPageFilters) {
   const baseData = await getWorklistBaseData(session)
   const requestedQueue = String(filters.queue ?? '').trim()
@@ -746,17 +748,29 @@ export async function getWorklistPageData(session: AppSession, filters: Worklist
       : getDefaultWorklistQueue(session.role)
   const filteredItems = filterItems(session.role, baseData.items, { ...filters, queue: selectedQueue })
   const selectedItemId = String(filters.selected ?? '').trim()
-  const selectedItem = filteredItems.find((item) => item.id === selectedItemId) ?? filteredItems[0] ?? null
+  const hasSelectionFilter = Boolean(selectedItemId)
+
+  let renderItems: WorklistItem[]
+  if (hasSelectionFilter) {
+    const selectedFromList = filteredItems.find((item) => item.id === selectedItemId)
+    const others = filteredItems.filter((item) => item.id !== selectedItemId).slice(0, WORKLIST_RENDER_LIMIT - 1)
+    renderItems = selectedFromList ? [selectedFromList, ...others] : others
+  } else {
+    renderItems = filteredItems.slice(0, WORKLIST_RENDER_LIMIT)
+  }
+  const selectedItem =
+    filteredItems.find((item) => item.id === selectedItemId) ?? filteredItems[0] ?? null
 
   return {
     source: baseData.source,
     queueOptions: baseData.queueOptions,
     selectedQueue,
-    items: filteredItems,
+    items: renderItems,
     selectedItem,
     summary: getWorklistSummary(filteredItems),
     totalCount: filteredItems.length,
     baseCount: baseData.items.length,
+    renderLimit: WORKLIST_RENDER_LIMIT,
   }
 }
 

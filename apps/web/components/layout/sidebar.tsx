@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { MouseEvent as ReactMouseEvent } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { AppSession } from '@/lib/auth-session'
 import { useUiLanguage } from '@/components/layout/ui-language'
 import { navigationItems } from '@/lib/navigation'
@@ -1405,20 +1405,31 @@ export function Sidebar({
 }) {
   const { language } = useUiLanguage()
   const pathname = usePathname()
+  const role = session?.role ?? null
+
   const [currentQueryParams, setCurrentQueryParams] = useState(() => new URLSearchParams())
   const focus =
     String(currentQueryParams.get('focus') ?? '')
       .trim()
       .toUpperCase()
-  const allowedItems = navigationItems.filter((item) =>
-    allowedPrefixes.some((prefix) => matchesPrefix(item.href, prefix))
-  )
-  const { coreSections, settingsItems } = buildSidebarSections({
-    allowedItems,
-    allowedPrefixes,
-    role: session?.role ?? null,
-  })
-  const mobileQuickItems = coreSections.flatMap((section) => section.items).slice(0, 5)
+
+  const { coreSections, settingsItems, mobileQuickItems } = useMemo(() => {
+    const allowedItems = navigationItems.filter((item) =>
+      allowedPrefixes.some((prefix) => matchesPrefix(item.href, prefix))
+    )
+    const sections = buildSidebarSections({
+      allowedItems,
+      allowedPrefixes,
+      role,
+    })
+    const quickItems = sections.coreSections.flatMap((section) => section.items).slice(0, 5)
+    return {
+      coreSections: sections.coreSections,
+      settingsItems: sections.settingsItems,
+      mobileQuickItems: quickItems,
+    }
+  }, [allowedPrefixes, role])
+
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
@@ -1536,7 +1547,7 @@ export function Sidebar({
       </aside>
 
       <nav
-        className="sticky top-0 z-30 border-b border-line px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 backdrop-blur lg:hidden"
+        className="sticky top-0 z-30 border-b border-line px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 lg:hidden"
         style={{ backgroundColor: 'var(--color-topbar)' }}
       >
         <div className="flex items-center gap-2.5">

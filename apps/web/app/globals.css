@@ -84,7 +84,15 @@ html[data-theme='dark'] {
 }
 
 html {
-  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -124,10 +132,51 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body {
+    transition:
+      background-color 0.18s ease,
+      color 0.18s ease,
+      border-color 0.18s ease;
+  }
+}
+
+.panel,
+.data-table-wrapper,
+section.panel,
+article.panel {
+  content-visibility: auto;
+  contain-intrinsic-size: 200px 640px;
+  contain: layout style;
+}
+
+button,
+a[role='button'],
+.panel,
+.badge,
+.solid-chip,
+.form-field,
+.surface-soft,
+.surface-elevated {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @supports not (padding: env(safe-area-inset-top)) {
@@ -199,7 +248,14 @@ textarea {
   .data-table thead {
     @apply sticky top-0 z-10;
     background-color: var(--color-surface-soft);
-    backdrop-filter: blur(8px);
+  }
+
+  @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .data-table thead {
+      -webkit-backdrop-filter: saturate(180%) blur(6px);
+      backdrop-filter: saturate(180%) blur(6px);
+      background-color: color-mix(in srgb, var(--color-surface-soft) 92%, transparent);
+    }
   }
 
   .data-table thead tr {

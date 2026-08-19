@@ -6,22 +6,29 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
 
-  reactStrictMode: !isProduction,
+  reactStrictMode: false,
   poweredByHeader: false,
   compress: true,
   generateEtags: true,
   productionBrowserSourceMaps: false,
+  crossOrigin: 'anonymous',
 
   images: {
     formats: ['image/avif', 'image/webp'],
     contentSecurityPolicy: "default-src 'self'; img-src 'self' data: https: blob:",
     remotePatterns: [{ protocol: 'https', hostname: '**' }],
-    minimumCacheTTL: isProduction ? 14400 : 60,
+    minimumCacheTTL: isProduction ? 259200 : 60,
+    unoptimized: !isProduction,
   },
 
   experimental: {
     optimizeCss: true,
     workerThreads: true,
+    optimizePackageImports: [
+      'lucide-react',
+      'clsx',
+      'tailwind-merge',
+    ],
   },
 
   async headers() {
@@ -33,8 +40,21 @@ const nextConfig: NextConfig = {
           {
             key: 'Cache-Control',
             value:
-              'public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, stale-if-error=604800, immutable',
+              'public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=2592000, stale-if-error=2592000, immutable',
           },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+        ],
+      },
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value:
+              'public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=2592000, immutable',
+          },
+          { key: 'Accept-Ranges', value: 'bytes' },
         ],
       },
       {
@@ -48,6 +68,8 @@ const nextConfig: NextConfig = {
             key: 'Strict-Transport-Security',
             value: 'max-age=31536000; includeSubDomains; preload',
           },
+          { key: 'X-DNS-Prefetch-Control', value: 'on' },
+          { key: 'X-XSS-Protection', value: '1; mode=block' },
         ],
       },
     ]
