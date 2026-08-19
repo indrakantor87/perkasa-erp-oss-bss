@@ -1,10 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   normalizeUiLanguage,
-  translateUiText,
   UI_LANGUAGE_COOKIE_KEY,
   UI_LANGUAGE_STORAGE_KEY,
   type UiLanguage,
@@ -25,26 +24,73 @@ export function LanguageProvider({
   initialLanguage: UiLanguage
 }) {
   const router = useRouter()
-  const [language, setLanguage] = useState<UiLanguage>(initialLanguage)
+  const [language, setLanguageState] = useState<UiLanguage>(initialLanguage)
+  const userInteractedRef = useRef(false)
+  const mountedRef = useRef(false)
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY)
-    const normalized = normalizeUiLanguage(stored)
-    if (normalized !== language) {
-      setLanguage(normalized)
+  const persistLanguage = useCallback((nextLanguage: UiLanguage) => {
+    try {
+      window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, nextLanguage)
+    } catch {
+      /* ignore storage errors */
+    }
+    try {
+      document.cookie = `${UI_LANGUAGE_COOKIE_KEY}=${nextLanguage}; path=/; max-age=31536000; samesite=lax`
+    } catch {
+      /* ignore cookie write errors */
+    }
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.lang = nextLanguage
     }
   }, [])
 
-  useEffect(() => {
-    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, language)
-    document.cookie = `${UI_LANGUAGE_COOKIE_KEY}=${language}; path=/; max-age=31536000; samesite=lax`
-    document.documentElement.lang = language
-    if (language !== initialLanguage) {
-      router.refresh()
-    }
-  }, [initialLanguage, language, router])
+  const setLanguage = useCallback((nextLanguage: UiLanguage) => {
+    const normalized = normalizeUiLanguage(nextLanguage)
+    userInteractedRef.current = true
+    setLanguageState((prev) => {
+      if (prev === normalized) return prev
+      persistLanguage(normalized)
+      void router.refresh()
+      return normalized
+    })
+  }, [persistLanguage, router])
 
-  const value = useMemo(() => ({ language, setLanguage }), [language])
+  useEffect(() => {
+    if (mountedRef.current) return
+    mountedRef.current = true
+
+    if (userInteractedRef.current) return
+    try {
+      const stored = window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY)
+      if (!stored) {
+        if (document.documentElement && !document.documentElement.lang) {
+          document.documentElement.lang = initialLanguage
+        }
+        return
+      }
+      const normalized = normalizeUiLanguage(stored)
+      if (normalized !== initialLanguage) {
+        setLanguageState(normalized)
+        persistLanguage(normalized)
+      } else if (document.documentElement && !document.documentElement.lang) {
+        document.documentElement.lang = initialLanguage
+      }
+    } catch {
+      /* ignore storage read errors */
+      if (document.documentElement && !document.documentElement.lang) {
+        document.documentElement.lang = initialLanguage
+      }
+    }
+  }, [initialLanguage, persistLanguage])
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || !document.documentElement) return
+    if (!document.documentElement.lang) {
+      document.documentElement.lang = language
+    }
+  }, [language])
+
+  const value = useMemo(() => ({ language, setLanguage }), [language, setLanguage])
 
   return <UiLanguageContext.Provider value={value}>{children}</UiLanguageContext.Provider>
 }
