@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
 import { buildWorklistQueryHref, type WorklistQueryState } from '@/components/worklist/worklist-query'
 
 type WorklistFiltersProps = {
@@ -12,14 +15,35 @@ const statusOptions = ['OPEN', 'PENDING', 'REVIEW', 'READY', 'MONITOR', 'CLOSED'
 
 export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
   const resetHref = buildWorklistQueryHref({ queue: state.queue })
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const anyActiveFilter =
+    state.domain ||
+    state.priority ||
+    state.status ||
+    state.q ||
+    state.mine ||
+    state.overdue
 
   return (
-    <section className="panel p-6">
+    <section className="panel p-4 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+        <div className="flex-1">
           <p className="section-title">Filter Global</p>
-          <h3 className="mt-2 text-xl font-semibold text-[var(--color-ink-strong)]">Kunci tampilan antrean melalui URL</h3>
-          <p className="mt-2 text-sm leading-6 text-mute">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="mt-1 text-lg font-semibold text-[var(--color-ink-strong)] sm:text-xl">
+              Kunci tampilan antrean melalui URL
+            </h3>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((prev) => !prev)}
+              className="surface-soft inline-flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] md:hidden"
+              aria-expanded={filtersOpen}
+              aria-controls="worklist-filters-form-panel"
+            >
+              {filtersOpen ? 'Tutup filter' : anyActiveFilter ? 'Filter aktif ▾' : 'Buka filter ▸'}
+            </button>
+          </div>
+          <p className="mt-2 hidden text-sm leading-6 text-mute sm:block">
             Semua filter memakai query parameter agar tautan bisa dibagikan ke tim dengan konteks yang sama.
           </p>
         </div>
@@ -31,7 +55,10 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
         </Link>
       </div>
 
-      <form className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <form
+        id="worklist-filters-form-panel"
+        className={`grid gap-4 md:grid-cols-2 xl:grid-cols-4 ${filtersOpen ? 'mt-5' : 'hidden mt-0 md:mt-6 md:grid'}`}
+      >
         <label className="space-y-2">
           <span className="form-field-label">Antrean</span>
           <select

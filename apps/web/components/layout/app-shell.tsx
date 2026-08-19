@@ -31,9 +31,9 @@ export function AppShell({
         <div className="min-h-screen lg:flex" suppressHydrationWarning>
           <Sidebar session={session} allowedPrefixes={allowedPrefixes} />
           <main className="min-w-0 flex-1">
-            <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+            <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-6 sm:py-5 lg:px-10 lg:py-10">
               <Topbar pathname={pathname} session={session} allowedPrefixes={allowedPrefixes} />
-              <div className="mt-10">{children}</div>
+              <div className="mt-6 sm:mt-8 lg:mt-10">{children}</div>
             </div>
           </main>
         </div>

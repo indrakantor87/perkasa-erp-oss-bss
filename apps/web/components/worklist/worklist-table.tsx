@@ -50,8 +50,8 @@ export function WorklistTable({ items, selectedItemId, state }: WorklistTablePro
         <span className="solid-chip">{items.length} item</span>
       </div>
 
-      <div className="mt-6 data-table-wrapper hidden xl:block">
-        <table className="data-table">
+      <div className="mt-6 data-table-wrapper hidden overflow-x-auto sm:block">
+        <table className="data-table min-w-[820px]">
           <thead>
             <tr>
               <th>Prioritas</th>
@@ -119,7 +119,7 @@ export function WorklistTable({ items, selectedItemId, state }: WorklistTablePro
         </table>
       </div>
 
-      <div className="mt-6 grid gap-4 xl:hidden">
+      <div className="mt-6 grid gap-4 sm:hidden">
         {items.map((item) => {
           const active = item.id === selectedItemId
           const selectHref = buildWorklistQueryHref({

@@ -53,7 +53,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
           {!hideQuickControls ? (
             <div className="surface-soft inline-flex items-center rounded-full border p-1">
               <span className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">
@@ -83,7 +83,19 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
                 )
               })}
             </div>
-          ) : null}
+          ) : (
+            <div className="surface-soft inline-flex items-center rounded-full border p-1 sm:hidden">
+              <button
+                type="button"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="rounded-full px-3 py-2 text-xs font-semibold text-mute transition hover:text-[var(--color-ink-strong)]"
+                aria-label={theme === 'dark' ? 'Gunakan tema terang' : 'Gunakan tema gelap'}
+                title={themeLabel}
+              >
+                {theme === 'dark' ? '☀️' : '🌙'}
+              </button>
+            </div>
+          )}
           {!hideQuickControls ? (
             <div className="surface-soft inline-flex items-center rounded-full border p-1">
               {([
@@ -112,9 +124,12 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
             </div>
           ) : null}
           {session ? (
-            <div className="surface-soft hidden items-center gap-3 rounded-full border px-4 py-2.5 sm:flex">
+            <div
+              className="surface-soft flex items-center gap-2 rounded-full border px-2 py-2 sm:gap-3 sm:px-4 sm:py-2.5"
+              title={session.displayName}
+            >
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
                 style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
               >
                 {session.displayName
@@ -123,7 +138,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
                   .map((part) => part[0] ?? '')
                   .join('')}
               </div>
-              <div className="min-w-0">
+              <div className="hidden min-w-0 sm:block">
                 <p className="truncate text-sm font-semibold text-ink">{session.displayName}</p>
                 <p className="truncate text-xs text-mute">
                   {roleMeta ? `${roleMeta.division} / ${roleMeta.subdivision}` : null}
@@ -141,16 +156,19 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
               {importLabel}
             </Link>
           ) : null}
-          {!hideQuickControls ? (
-            <form action="/api/auth/logout" method="post">
-              <button
-                type="submit"
-                className="surface-soft rounded-full border px-4 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)]"
-              >
-                {logoutLabel}
-              </button>
-            </form>
-          ) : null}
+
+          <form action="/api/auth/logout" method="post">
+            <button
+              type="submit"
+              className="surface-soft inline-flex items-center gap-2 rounded-full border px-3 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] sm:px-4"
+              title={logoutLabel}
+            >
+              <span aria-hidden="true" className="sm:hidden">
+                🚪
+              </span>
+              <span className="hidden sm:inline">{logoutLabel}</span>
+            </button>
+          </form>
         </div>
       </div>
     </header>

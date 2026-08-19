@@ -57,7 +57,7 @@ export function WorklistHeader({
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-5">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
         <article className="surface-elevated rounded-md border px-3 py-2 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">
             {translateUiText('Item Aktif', language)}

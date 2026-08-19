@@ -1543,10 +1543,15 @@ export function Sidebar({
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="inline-flex h-11 min-w-[3rem] items-center justify-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink"
-            aria-label={translateUiText('Tampilkan menu', language)}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink transition hover:[border-color:var(--color-line-strong)]"
+            aria-label={translateUiText('Tampilkan menu navigasi', language)}
+            title={translateUiText('Menu Navigasi', language)}
           >
-            {translateUiText('Menu', language)}
+            <span aria-hidden="true" className="flex flex-col gap-[5px]">
+              <span className="block h-0.5 w-5 rounded-full bg-current" />
+              <span className="block h-0.5 w-5 rounded-full bg-current" />
+              <span className="block h-0.5 w-5 rounded-full bg-current" />
+            </span>
           </button>
           <div className="flex gap-2 overflow-x-auto pb-1">
           {mobileQuickItems.map((item) => {
