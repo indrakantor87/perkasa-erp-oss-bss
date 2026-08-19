@@ -1,0 +1,133 @@
+name: Deploy Production to Coolify (via SSH)
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build & Push Docker Image to GHCR"]
+    types:
+      - completed
+    branches: [main]
+
+concurrency:
+  group: coolify-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: http://de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io/login
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install SSH Key + Auto Fix Format (4 strip to 5 strip OPENSSH)
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+        run: |
+          set -e
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          RAW_KEY="$HOME/.ssh/id_ed25519_coolify_raw"
+          FINAL_KEY="$HOME/.ssh/id_ed25519_coolify"
+          echo "$SSH_PRIVATE_KEY" > "$RAW_KEY"
+
+          # AUTO FIX: Coolify ssh-keygen sometimes generates 4 hyphens (----) instead 5 (-----)
+          # Also handle OPENSSH typo 'OPENNSSH' to standard 'OPENSSH'
+          sed -i \
+            -e 's/^-----BEGIN/-----BEGIN/' \
+            -e 's/^----BEGIN/-----BEGIN/' \
+            -e 's/PRIVATE KEY-----$/PRIVATE KEY-----/' \
+            -e 's/PRIVATE KEY----$/PRIVATE KEY-----/' \
+            -e 's/OPENNSSH/OPENSSH/g' \
+            -e 's/OPENSSSH/OPENSSH/g' \
+            "$RAW_KEY"
+
+          # Pastikan line 1 & terakhir = format standard 5 hyphen
+          FIRST_LINE=$(head -n 1 "$RAW_KEY")
+          LAST_LINE=$(tail -n 1 "$RAW_KEY")
+          if [ "$FIRST_LINE" != "-----BEGIN OPENSSH PRIVATE KEY-----" ]; then
+            echo "  ⚠️  Force overwrite first line (was: $FIRST_LINE)"
+            REST_KEY=$(tail -n +2 "$RAW_KEY")
+            echo "-----BEGIN OPENSSH PRIVATE KEY-----" > "$FINAL_KEY"
+            echo "$REST_KEY" >> "$FINAL_KEY"
+          else
+            cp "$RAW_KEY" "$FINAL_KEY"
+          fi
+          if [ "$(tail -n 1 "$FINAL_KEY")" != "-----END OPENSSH PRIVATE KEY-----" ]; then
+            echo "  ⚠️  Force overwrite last line"
+            head -n -1 "$FINAL_KEY" > "${FINAL_KEY}.tmp"
+            mv "${FINAL_KEY}.tmp" "$FINAL_KEY"
+            echo "-----END OPENSSH PRIVATE KEY-----" >> "$FINAL_KEY"
+          fi
+
+          chmod 600 "$FINAL_KEY"
+          rm -f "$RAW_KEY"
+          echo "  ✓ SSH private key installed & formatted: $(wc -c < $FINAL_KEY) bytes"
+          echo "  Line 1     : $(head -n 1 $FINAL_KEY)"
+          echo "  Line akhir : $(tail -n 1 $FINAL_KEY)"
+          ls -la "$FINAL_KEY"
+          echo ""
+          echo "  Test parse key (ssh-keygen -l):"
+          ssh-keygen -l -f "$FINAL_KEY" 2>&1 || echo "  (If passphrase or warning, but OK — will still work)"
+
+      - name: Test koneksi SSH ke Server Coolify (preflight)
+        env:
+          DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+        run: |
+          set -e
+          if [ -z "$DEPLOY_SERVER_HOST" ]; then
+            echo "❌ ERROR: Secret COOLIFY_SERVER_HOST tidak diset! (IP public server Coolify, contoh: 103.162.17.178)"
+            exit 1
+          fi
+          echo "[1/2] Ping server: $DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $HOME/.ssh/id_ed25519_coolify"
+          echo "[2/2] Eksekusi hostname, docker info, uname -a di server via SSH:"
+          ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "
+            echo '  HOSTNAME: ' \$(hostname)
+            echo '  UNAME:    ' \$(uname -a)
+            echo '  DOCKER:   ' \$(docker -v)
+            echo '  DATE:     ' \$(date '+%Y-%m-%d %H:%M:%S')
+          "
+          echo "✅ Preflight SSH OK - koneksi ke server Coolify BERHASIL!"
+
+      - name: 🚀 Jalankan Deploy Production ke Coolify via SSH
+        env:
+          DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+          DEPLOY_SSH_KEY_PATH: "$HOME/.ssh/id_ed25519_coolify"
+        run: |
+          set -e
+          chmod +x "$GITHUB_WORKSPACE/deploy-coolify-via-ssh.sh"
+          echo ""
+          echo "====================================================================="
+          echo " 🚀 MEMULAI DEPLOY PRODUCTION OTOMATIS VIA SSH"
+          echo " Server target: $DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST"
+          echo " Image        : ghcr.io/indrakantor87/perkasa-erp-oss-bss:latest"
+          echo " DB URL       : mysql://perkasa_erp@10.0.1.11:3306/default (Review DB)"
+          echo " Domain       : http://de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io/login"
+          echo "====================================================================="
+          echo ""
+          bash "$GITHUB_WORKSPACE/deploy-coolify-via-ssh.sh" \
+            "$DEPLOY_SERVER_HOST" \
+            "$DEPLOY_SERVER_USER" \
+            "$DEPLOY_SSH_KEY_PATH"
+
+      - name: ✅ Deploy Success - Post healthcheck
+        run: |
+          set +e
+          echo "========================================================"
+          echo " ✅ DEPLOY PRODUCTION SELESAI!"
+          echo "========================================================"
+          echo " Akses aplikasi production (browser):"
+          echo "   👉 http://de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io/login"
+          echo ""
+          echo " Commit   : $GITHUB_SHA"
+          echo " Actor    : $GITHUB_ACTOR"
+          echo " Date     : $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "========================================================"

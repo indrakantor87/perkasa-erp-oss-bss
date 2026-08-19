@@ -51,19 +51,19 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-WORKDIR /app/apps/web
-COPY --from=builder /app/apps/web/.next/standalone ./
+WORKDIR /app/apps/web/standalone
+COPY --from=builder /app/apps/web/.next/standalone/ /app/apps/web/standalone/
 
 RUN echo "=== Runner post-copy verification ===" \
- && test -f "/app/apps/web/server.js"          && echo "  ✓ server.js" \
- && test -f "/app/apps/web/healthcheck.js"     && echo "  ✓ healthcheck.js" \
- && test -d "/app/apps/web/.next/static"       && echo "  ✓ .next/static" \
- && test -d "/app/apps/web/public"             && echo "  ✓ public" \
+ && test -f "/app/apps/web/standalone/server.js"          && echo "  ✓ server.js" \
+ && test -f "/app/apps/web/standalone/healthcheck.js"     && echo "  ✓ healthcheck.js" \
+ && test -d "/app/apps/web/standalone/.next/static"       && echo "  ✓ .next/static" \
+ && test -d "/app/apps/web/standalone/public"             && echo "  ✓ public" \
  && echo "=== All runner checks passed ==="
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=60s --timeout=10s --start-period=240s --retries=5 \
-  CMD node /app/apps/web/healthcheck.js || exit 1
+  CMD node /app/apps/web/standalone/healthcheck.js || exit 1
 
-CMD ["node", "/app/apps/web/server.js"]
+CMD ["node", "server.js"]
