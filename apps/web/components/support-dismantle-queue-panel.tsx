@@ -482,53 +482,53 @@ export function SupportDismantleQueuePanel({
   }
 
   return (
-    <section className="rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+    <section className="panel p-4 shadow-sm">
       <div className="grid gap-3 lg:grid-cols-3">
-        <article className="rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
-          <p className="text-xs font-semibold text-slate-300">Total Data</p>
+        <article className="rounded-2xl border border-line surface-soft p-4">
+          <p className="text-xs font-semibold text-mute">Total Data</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-white">{openCount + historySummary.total}</p>
-          <p className="mt-2 text-sm text-slate-300">Antrean aktif dan histori terminate yang sedang terbaca pada lane dismantle.</p>
+          <p className="mt-2 text-sm text-mute">Antrean aktif dan histori terminate yang sedang terbaca pada lane dismantle.</p>
         </article>
-        <article className="rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
-          <p className="text-xs font-semibold text-slate-300">Antrean Aktif</p>
+        <article className="rounded-2xl border border-line surface-soft p-4">
+          <p className="text-xs font-semibold text-mute">Antrean Aktif</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-white">{openCount}</p>
-          <p className="mt-2 text-sm text-slate-300">Ticket dismantle yang masih berada pada antrean kerja aktif.</p>
+          <p className="mt-2 text-sm text-mute">Ticket dismantle yang masih berada pada antrean kerja aktif.</p>
         </article>
-        <article className="rounded-2xl border border-slate-700 bg-slate-900/20 p-4">
-          <p className="text-xs font-semibold text-slate-300">Pickup Pending</p>
+        <article className="rounded-2xl border border-line surface-soft p-4">
+          <p className="text-xs font-semibold text-mute">Pickup Pending</p>
           <p className="mt-1 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-white">{pickupPendingCount}</p>
-          <p className="mt-2 text-sm text-slate-300">Histori close yang masih menyisakan tindak lanjut pengambilan perangkat.</p>
+          <p className="mt-2 text-sm text-mute">Histori close yang masih menyisakan tindak lanjut pengambilan perangkat.</p>
         </article>
       </div>
 
       <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-          <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-slate-100">
-            <span className="text-slate-300">Cari</span>
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink">
+            <span className="text-mute">Cari</span>
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Nama pelanggan / alamat / nomor WA"
-              className="w-[260px] bg-transparent text-sm text-white outline-none placeholder:text-slate-400"
+              className="w-[260px] bg-transparent text-sm text-ink outline-none placeholder:text-slate-400"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Status Ticket</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">Status Ticket</span>
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none"
+              className="rounded-xl border border-line bg-white px-3 py-2 text-sm text-slate-900 outline-none"
             >
               <option>Semua Status</option>
               <option>Open</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Radboox</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">Radboox</span>
             <select
               value={radboxFilter}
               onChange={(event) => setRadboxFilter(event.target.value)}
-              className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none"
+              className="rounded-xl border border-line bg-white px-3 py-2 text-sm text-slate-900 outline-none"
             >
               <option value="">Semua Radboox</option>
               {radboxOptions.map((item) => (
@@ -539,8 +539,8 @@ export function SupportDismantleQueuePanel({
             </select>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className="badge border-slate-600 bg-slate-800 text-slate-100">{visibleRows.length} antrean tampil</span>
-            <span className="badge border-slate-600 bg-slate-800 text-slate-100">{historySummary.total} histori close</span>
+            <span className="badge border-line surface-soft text-mute">{visibleRows.length} antrean tampil</span>
+            <span className="badge border-line surface-soft text-mute">{historySummary.total} histori close</span>
           </div>
         </div>
 
@@ -548,7 +548,7 @@ export function SupportDismantleQueuePanel({
           <button
             type="button"
             disabled
-            className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm font-semibold text-slate-400"
+            className="inline-flex items-center gap-2 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500"
           >
             <Trash2 className="h-4 w-4" />
             Hapus Terpilih ({selectedCount})
@@ -556,7 +556,7 @@ export function SupportDismantleQueuePanel({
           <button
             type="button"
             disabled
-            className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm font-semibold text-slate-400"
+            className="inline-flex items-center gap-2 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500"
           >
             <Upload className="h-4 w-4" />
             Import Excel
@@ -564,7 +564,7 @@ export function SupportDismantleQueuePanel({
           <button
             type="button"
             onClick={() => exportDismantleCsv(visibleRows)}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            className="inline-flex items-center gap-2 rounded-md border border-line bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             <Download className="h-4 w-4" />
             Export Excel
@@ -572,16 +572,16 @@ export function SupportDismantleQueuePanel({
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
+      <div className="mt-4 rounded-xl border-line surface-soft px-4 py-3 text-sm text-ink">
         {supportDrilldown?.detail ||
           'Menu ini fokus ke antrean terminate aktif dan histori close; kandidat tanpa ticket tetap dibaca dari lane isolir.'}
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-[1020px] w-full border-collapse">
-            <thead className="bg-[#162d66]">
-              <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-100">
+            <thead className="bg-slate-50">
+              <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 <th className="w-[44px] px-3 py-3"></th>
                 <th className="w-[210px] px-3 py-3">Nomor Ticket</th>
                 <th className="w-[220px] px-3 py-3">Nama</th>
@@ -593,7 +593,7 @@ export function SupportDismantleQueuePanel({
                 <th className="w-[240px] px-3 py-3">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700 bg-[#1c2b45]">
+            <tbody className="divide-y divide-slate-200 bg-white">
               {visibleRows.map((row) => {
                 const ticketNo = pickMeta(row.meta, 'Queue ID: ')
                 const user = pickMeta(row.meta, 'Customer Code: ')
@@ -603,8 +603,8 @@ export function SupportDismantleQueuePanel({
                 const isSelected = selectedIds.has(row.id)
 
                 return (
-                  <tr key={row.id} className="align-top transition-colors hover:bg-[#24395c]">
-                    <td className="px-3 py-2 text-sm text-slate-100">
+                  <tr key={row.id} className="align-top transition-colors hover:bg-slate-50">
+                    <td className="px-3 py-2 text-sm text-slate-700">
                       <input type="checkbox" checked={isSelected} onChange={() => toggleRow(row.id)} />
                     </td>
                     <td className="px-3 py-2 text-sm">
@@ -612,17 +612,17 @@ export function SupportDismantleQueuePanel({
                         {ticketNo || row.id.replace(/^DISMANTLE-QUEUE-/, '')}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-sm font-semibold text-white">{row.primary}</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">
+                    <td className="px-3 py-2 text-sm font-semibold text-slate-950">{row.primary}</td>
+                    <td className="px-3 py-2 text-sm text-slate-700">
                       <p>{user || '-'}</p>
-                      <p className="mt-1 font-mono text-xs text-slate-300">{phone || '-'}</p>
+                      <p className="mt-1 font-mono text-xs text-mute">{phone || '-'}</p>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{marketing || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{row.secondary}</td>
+                    <td className="px-3 py-2 text-sm text-slate-700">{marketing || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-slate-700">{row.secondary}</td>
                     <td className="px-3 py-2 text-sm">
-                      <span className="badge border-red-500/60 bg-red-500/10 text-red-100">OPEN</span>
+                      <span className="badge border-red-200 bg-red-50 text-red-700">OPEN</span>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-100">
+                    <td className="px-3 py-2 text-sm text-slate-700">
                       <p className="line-clamp-2">{row.detail}</p>
                     </td>
                     <td className="px-3 py-2 text-sm">
@@ -656,7 +656,7 @@ export function SupportDismantleQueuePanel({
               })}
               {!visibleRows.length ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-6 text-sm text-slate-300">
+                  <td colSpan={9} className="px-4 py-6 text-sm text-mute">
                     Tidak ada data yang cocok dengan filter.
                   </td>
                 </tr>
@@ -669,18 +669,18 @@ export function SupportDismantleQueuePanel({
       {historySection?.rows.length ? (
         <details
           open={Boolean(focusedHistoryRowId)}
-          className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100"
+          className="mt-4 rounded-2xl border-line surface-soft px-4 py-3 text-sm text-ink"
         >
-          <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-white">
+          <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-950">
             Histori Penutupan ({historySummary.total})
           </summary>
           {focusedHistoryRowId ? (
-            <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               Kasus histori yang datang dari backlink barcode sedang disorot pada daftar di bawah.
             </div>
           ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link href={buildSupportLaneHref('dismantle', { focus: 'MONTHLY_DISMANTLES' })} className="rounded-md border border-slate-500 bg-slate-700/90 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-600">
+            <Link href={buildSupportLaneHref('dismantle', { focus: 'MONTHLY_DISMANTLES' })} className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
               Buka Histori
             </Link>
           </div>
@@ -702,24 +702,24 @@ export function SupportDismantleQueuePanel({
               return (
                 <article
                   key={row.id}
-                  className={`rounded-2xl border p-4 shadow-[0_10px_30px_rgba(2,6,23,0.18)] ${
+                  className={`rounded-2xl border p-4 shadow-sm ${
                     isFocusedHistory
-                      ? 'border-amber-300 bg-amber-500/10 ring-1 ring-amber-300/70'
-                      : 'border-slate-700 bg-[#152643]'
+                      ? 'border-amber-300 bg-amber-50 ring-1 ring-amber-300/70'
+                      : 'border-line bg-white'
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     {isFocusedHistory ? (
-                      <span className="badge border-amber-300/70 bg-amber-500/20 text-amber-100">Kasus Barcode</span>
+                      <span className="badge border-amber-300/70 bg-amber-100 text-amber-800">Kasus Barcode</span>
                     ) : null}
-                    <span className="badge border-emerald-400/40 bg-emerald-500/10 text-emerald-100">{row.status}</span>
-                    <span className="badge border-slate-600 bg-slate-800 text-slate-100">{closedAt || '-'}</span>
-                    <span className="badge border-violet-400/40 bg-violet-500/10 text-violet-100">{billingDisposition || '-'}</span>
+                    <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">{row.status}</span>
+                    <span className="badge border-line surface-soft text-mute">{closedAt || '-'}</span>
+                    <span className="badge border-violet-200 bg-violet-50 text-violet-700">{billingDisposition || '-'}</span>
                   </div>
-                  <p className="mt-3 text-base font-semibold text-white">{row.primary}</p>
-                  <p className="mt-1 text-sm text-slate-300">{row.secondary}</p>
-                  <p className="mt-3 line-clamp-3 text-sm text-slate-100">{row.detail}</p>
-                  <div className="mt-3 grid gap-2 text-xs text-slate-300">
+                  <p className="mt-3 text-base font-semibold text-slate-950">{row.primary}</p>
+                  <p className="mt-1 text-sm text-slate-700">{row.secondary}</p>
+                  <p className="mt-3 line-clamp-3 text-sm text-slate-700">{row.detail}</p>
+                  <div className="mt-3 grid gap-2 text-xs text-mute">
                     <p>Field PIC: {fieldPic || '-'}</p>
                     <p>Work Order: {workOrderLabel || '-'}</p>
                     <p>Ticket Ref: {ticketRef || '-'}</p>

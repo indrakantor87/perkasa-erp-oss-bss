@@ -464,7 +464,7 @@ export function InventoryNetworkOpsPanel({
   const isInventoryOdpFocus = mode === 'inventory-odp-focus'
   const isFocusedOdpMode = isSalesOdpFocus || isOpsOdpFocus || isInventoryOdpFocus
   const canWrite = canCreate && reviewDbReady
-  const useReferenceLikeLayout = isInventoryOdpFocus
+  const useReferenceLikeLayout = true // isInventoryOdpFocus — Override: selalu pakai light theme layout standar agar theme-aware & readable (tidak ada navy hardcode)
   const hasInventoryNetworkData = Boolean(odpSection || usedPortSection || issuePortSection || assignmentSection || returnSection)
 
   const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
@@ -1403,13 +1403,13 @@ export function InventoryNetworkOpsPanel({
         className={`mt-4 overflow-hidden rounded-2xl ${
           useReferenceLikeLayout
             ? 'border border-slate-200 bg-white shadow-none'
-            : 'border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]'
+            : 'border border-line bg-white shadow-sm'
         }`}
       >
         <div className="overflow-x-auto">
           <table className="min-w-[1180px] w-full border-collapse">
-            <thead className={useReferenceLikeLayout ? 'bg-[#dbeafe]' : 'bg-[#162d66]'}>
-              <tr className={`text-left text-[11px] font-bold uppercase tracking-[0.14em] ${useReferenceLikeLayout ? 'text-slate-500' : 'text-slate-100'}`}>
+            <thead className={useReferenceLikeLayout ? 'bg-[#dbeafe]' : 'bg-slate-50'}>
+              <tr className={`text-left text-[11px] font-bold uppercase tracking-[0.14em] ${useReferenceLikeLayout ? 'text-slate-500' : 'text-slate-500'}`}>
                 {!isFocusedOdpMode ? <th className="w-[44px] px-3 py-3"></th> : null}
                 <th className="w-[60px] px-3 py-3">#</th>
                 <th className="w-[200px] px-3 py-3">Nama ODP</th>
@@ -1423,7 +1423,7 @@ export function InventoryNetworkOpsPanel({
                 <th className="w-[90px] px-3 py-3">Aksi</th>
               </tr>
             </thead>
-            <tbody className={useReferenceLikeLayout ? 'divide-y divide-slate-200 bg-white' : 'divide-y divide-slate-700 bg-[#1c2b45]'}>
+            <tbody className={useReferenceLikeLayout ? 'divide-y divide-slate-200 bg-white' : 'divide-y divide-slate-200 bg-white'}>
               {visibleOdpRows.map((row, index) => {
                 const totalPorts = Number.parseInt(pickMeta(row.meta, 'Total Ports: ') || '0', 10) || 0
                 const activePorts = Number.parseInt(pickMeta(row.meta, 'Active Ports: ') || '0', 10) || 0

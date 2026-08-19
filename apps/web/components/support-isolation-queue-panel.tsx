@@ -375,11 +375,11 @@ export function SupportIsolationQueuePanel({
   }
 
   return (
-    <section className="rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+    <section className="panel p-4 shadow-sm">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-          <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-slate-100">
-            <span className="text-slate-300">Cari</span>
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink">
+            <span className="text-mute">Cari</span>
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
@@ -390,7 +390,7 @@ export function SupportIsolationQueuePanel({
           <select
             value={radboxFilter}
             onChange={(event) => setRadboxFilter(event.target.value)}
-            className="rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm text-white outline-none"
+            className="rounded-xl border border-line bg-white px-3 py-2 text-sm text-slate-900 outline-none"
           >
             <option value="">Semua Radboox</option>
             {radboxOptions.map((item) => (
@@ -400,15 +400,15 @@ export function SupportIsolationQueuePanel({
             ))}
           </select>
           <div className="flex flex-wrap gap-2">
-            <span className="badge border-slate-600 bg-slate-800 text-slate-100">{visibleRows.length} baris tampil</span>
-            <span className="badge border-slate-600 bg-slate-800 text-slate-100">{selectedCount} terpilih</span>
+            <span className="badge border-line surface-soft text-mute">{visibleRows.length} baris tampil</span>
+            <span className="badge border-line surface-soft text-mute">{selectedCount} terpilih</span>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => exportIsolationCsv(visibleRows)}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            className="inline-flex items-center gap-2 rounded-md border border-slate-950 bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             <Download className="h-4 w-4" />
             Export Excel
@@ -416,7 +416,7 @@ export function SupportIsolationQueuePanel({
           <button
             type="button"
             disabled
-            className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm font-semibold text-slate-400"
+            className="inline-flex items-center gap-2 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500"
           >
             <Upload className="h-4 w-4" />
             Import Excel
@@ -424,7 +424,7 @@ export function SupportIsolationQueuePanel({
           <button
             type="button"
             disabled
-            className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-sm font-semibold text-slate-400"
+            className="inline-flex items-center gap-2 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500"
           >
             <Trash2 className="h-4 w-4" />
             Hapus Terpilih ({selectedCount})
@@ -441,16 +441,16 @@ export function SupportIsolationQueuePanel({
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
+      <div className="mt-4 rounded-xl border-line surface-soft px-4 py-3 text-sm text-ink">
         {supportDrilldown?.detail ||
           'Fokus ke pelanggan isolir aktif untuk keputusan restore atau transfer terminate.'}
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-[1280px] w-full border-collapse">
-            <thead className="bg-[#162d66]">
-              <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-100">
+            <thead className="bg-slate-50">
+              <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 <th className="w-[44px] px-3 py-3">
                   <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
                 </th>
@@ -466,7 +466,7 @@ export function SupportIsolationQueuePanel({
                 <th className="w-[70px] px-3 py-3">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700 bg-[#1c2b45]">
+            <tbody className="divide-y divide-slate-200 bg-white">
               {visibleRows.map((row, index) => {
                 const activeDate = pickMeta(row.meta, 'Isolasi: ')
                 const customerUser = pickMeta(row.meta, 'Customer User: ')
@@ -477,40 +477,40 @@ export function SupportIsolationQueuePanel({
                 const canTransfer = dismantleTicket !== 'Sudah' && canTransferToDismantle
 
                 return (
-                  <tr key={row.id} className="align-top transition-colors hover:bg-[#24395c]">
-                    <td className="px-3 py-2 text-sm text-slate-100">
+                  <tr key={row.id} className="align-top transition-colors hover:bg-slate-50">
+                    <td className="px-3 py-2 text-sm text-slate-700">
                       <input type="checkbox" checked={isSelected} onChange={() => toggleRow(row.id)} />
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{index + 1}</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">
-                      <p className="font-semibold text-white">{row.primary}</p>
-                      <p className="mt-1 text-xs text-slate-300">Aktif isolir: {activeDate || '-'}</p>
+                    <td className="px-3 py-2 text-sm text-slate-700">{index + 1}</td>
+                    <td className="px-3 py-2 text-sm text-slate-700">
+                      <p className="font-semibold text-slate-950">{row.primary}</p>
+                      <p className="mt-1 text-xs text-mute">Aktif isolir: {activeDate || '-'}</p>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{customerUser || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-sky-300">{phone || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{marketing || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-slate-100">{row.secondary}</td>
+                    <td className="px-3 py-2 text-sm text-slate-700">{customerUser || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-sky-700">{phone || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-slate-700">{marketing || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-slate-700">{row.secondary}</td>
                     <td className="px-3 py-2 text-sm">
                       <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-100">
+                    <td className="px-3 py-2 text-sm text-slate-700">
                       <p className="line-clamp-2">{row.detail}</p>
                     </td>
                     <td className="px-3 py-2 text-sm">
                       {dismantleTicket === 'Sudah' ? (
-                        <span className="badge border-emerald-500/60 bg-emerald-500/10 text-emerald-100">Sudah</span>
+                        <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">Sudah</span>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="badge border-amber-500/60 bg-amber-500/10 text-amber-100">Belum</span>
+                          <span className="badge border-amber-200 bg-amber-50 text-amber-700">Belum</span>
                           {canTransfer ? (
                             <Link
                               href={buildSupportActionHref('dismantle-approve', { isolation: buildIsolationPrefillValue(row) })}
-                              className="rounded-md border border-slate-500 bg-slate-700/90 px-3 py-1 text-xs font-semibold text-white transition hover:bg-slate-600"
+                              className="rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                             >
                               Transfer
                             </Link>
                           ) : (
-                            <span className="text-xs text-slate-400">-</span>
+                            <span className="text-xs text-mute">-</span>
                           )}
                         </div>
                       )}
@@ -528,7 +528,7 @@ export function SupportIsolationQueuePanel({
                             }),
                           )
                         }
-                        className="inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 p-2 text-white transition hover:bg-slate-700"
+                        className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-950 p-2 text-white transition hover:bg-slate-800"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -538,7 +538,7 @@ export function SupportIsolationQueuePanel({
               })}
               {!visibleRows.length ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-6 text-sm text-slate-300">
+                  <td colSpan={11} className="px-4 py-6 text-sm text-mute">
                     Tidak ada data yang cocok dengan filter.
                   </td>
                 </tr>
