@@ -1,14 +1,32 @@
 import type { DataSourceSnapshot } from '@/lib/types'
 
 export function DataSourceStatus({ source }: { source: DataSourceSnapshot }) {
-  const toneClass = source.isFallback
-    ? 'border-amber-200 bg-amber-50 text-amber-800'
-    : source.effectiveMode === 'review-db'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-      : 'border-slate-200 bg-slate-50 text-slate-800'
+  let toneStyle: React.CSSProperties
+  if (source.isFallback) {
+    toneStyle = {
+      borderColor: 'var(--color-warning-line)',
+      backgroundColor: 'var(--color-warning-soft)',
+      color: 'var(--color-warning-ink)',
+    }
+  } else if (source.effectiveMode === 'review-db') {
+    toneStyle = {
+      borderColor: 'var(--color-success-line)',
+      backgroundColor: 'var(--color-success-soft)',
+      color: 'var(--color-success-ink)',
+    }
+  } else {
+    toneStyle = {
+      borderColor: 'var(--color-line)',
+      backgroundColor: 'var(--color-card-subtle)',
+      color: 'var(--color-mute-strong)',
+    }
+  }
 
   return (
-    <section className={`rounded-3xl border px-5 py-4 ${toneClass}`}>
+    <section
+      className="rounded-3xl border px-5 py-4"
+      style={toneStyle}
+    >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em]">Sumber Data</p>

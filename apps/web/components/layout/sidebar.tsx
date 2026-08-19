@@ -1212,9 +1212,13 @@ function SidebarBrand({
       onClick={onNavigate}
     >
       <div
-        className={`overflow-hidden border border-slate-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.24)] ${
+        className={`overflow-hidden border shadow-[0_12px_32px_rgba(15,23,42,0.24)] ${
           collapsed ? 'flex h-12 w-12 items-center justify-center rounded-xl p-2' : 'max-w-[11.5rem] rounded-xl px-2 py-0.5'
         }`}
+        style={{
+          borderColor: 'var(--color-sidebar-line)',
+          backgroundColor: 'var(--color-surface)',
+        }}
       >
         <Image
           src="/branding/perkasa-networks-original.png"
@@ -1230,7 +1234,7 @@ function SidebarBrand({
           {collapsed ? 'ERP' : 'ERP OSS BSS'}
         </p>
         {!collapsed ? (
-          <p className="mt-1 text-xs leading-5 text-slate-400">
+          <p className="mt-1 text-xs leading-5" style={{ color: 'color-mix(in srgb, var(--color-sidebar-ink) 60%, transparent)' }}>
             {translateUiText(
               'Masuk ke queue, list kerja, dan modul harian tanpa perlu menebak alur dari awal.',
               language,
@@ -1268,19 +1272,36 @@ function SidebarSection({
   if (!items.length) return null
   const isWorkspaceSection =
     title === 'Workspace' || title === 'Operasional Inti' || title === 'Lintas Divisi'
-  const sectionTitleClass = isWorkspaceSection
-    ? 'text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-200'
-    : 'text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500'
-  const sectionBadgeClass = isWorkspaceSection
-    ? 'border border-slate-700 bg-slate-800 text-slate-200'
-    : 'border border-slate-800 bg-slate-900 text-slate-400'
+
+  const sectionTitleStyle = isWorkspaceSection
+    ? { color: 'color-mix(in srgb, var(--color-sidebar-ink) 92%, transparent)' }
+    : { color: 'color-mix(in srgb, var(--color-sidebar-ink) 50%, transparent)' }
+  const sectionBadgeStyle = isWorkspaceSection
+    ? {
+        borderColor: 'var(--color-sidebar-line)',
+        backgroundColor: 'var(--color-sidebar-soft)',
+        color: 'color-mix(in srgb, var(--color-sidebar-ink) 92%, transparent)',
+      }
+    : {
+        borderColor: 'color-mix(in srgb, var(--color-sidebar-line) 80%, transparent)',
+        backgroundColor: 'color-mix(in srgb, var(--color-sidebar-soft) 70%, transparent)',
+        color: 'color-mix(in srgb, var(--color-sidebar-ink) 55%, transparent)',
+      }
 
   return (
     <div className={collapsed ? 'space-y-2' : 'space-y-1.5'}>
       {!collapsed ? (
         <div className="flex items-center justify-between gap-3 px-1">
-          <p className={sectionTitleClass}>{translateUiText(title, language)}</p>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${sectionBadgeClass}`}>
+          <p
+            className="text-[11px] font-semibold uppercase tracking-[0.24em]"
+            style={sectionTitleStyle}
+          >
+            {translateUiText(title, language)}
+          </p>
+          <span
+            className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+            style={sectionBadgeStyle}
+          >
             {items.length}
           </span>
         </div>
@@ -1314,6 +1335,30 @@ function SidebarSection({
           onNavigate?.()
         }
 
+        const itemContainerStyle = active
+          ? {
+              borderColor: 'color-mix(in srgb, var(--color-sidebar-line) 160%, transparent)',
+              backgroundColor: 'var(--color-sidebar-soft)',
+              boxShadow: '0 10px 24px rgba(2, 6, 23, 0.28)',
+            }
+          : activeChild
+            ? {
+                borderColor: 'color-mix(in srgb, var(--color-sidebar-line) 120%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--color-sidebar-soft) 68%, transparent)',
+                boxShadow: '0 8px 18px rgba(2, 6, 23, 0.18)',
+              }
+            : {
+                borderColor: 'color-mix(in srgb, var(--color-sidebar-line) 90%, transparent)',
+                backgroundColor: 'var(--color-sidebar)',
+                '--hover-border': 'var(--color-sidebar-line)',
+                '--hover-bg': 'var(--color-sidebar-soft)',
+              } as React.CSSProperties
+
+        const itemHighlightBarStyle = { backgroundColor: 'color-mix(in srgb, var(--color-sidebar-ink) 90%, white 10%)' }
+        const itemTitleStyle = { color: 'var(--color-sidebar-ink)' }
+        const itemDescStyle = { color: 'color-mix(in srgb, var(--color-sidebar-ink) 58%, transparent)' }
+        const itemChevronStyle = { color: 'color-mix(in srgb, var(--color-sidebar-ink) 55%, transparent)' }
+
         return (
           <div key={item.key} className="space-y-1.5">
             <Link
@@ -1321,18 +1366,27 @@ function SidebarSection({
               prefetch={false}
               onClick={handleItemClick}
               title={itemTitle}
-              className={`relative block overflow-hidden rounded-xl border transition ${
+              className={`relative block overflow-hidden rounded-xl border transition [&:not(:hover)]:shadow-none hover:[box-shadow:var(--shadow-panel)] ${
                 collapsed ? 'px-3 py-3' : 'px-3.5 py-2.5'
-              } ${
-                active
-                  ? 'border-slate-600 bg-slate-900 shadow-[0_10px_24px_rgba(15,23,42,0.24)]'
-                  : activeChild
-                    ? 'border-slate-800 bg-slate-900/60 shadow-[0_8px_18px_rgba(15,23,42,0.16)]'
-                  : 'border-slate-900 bg-slate-950 hover:border-slate-800 hover:bg-slate-900'
               }`}
+              style={itemContainerStyle}
+              onMouseEnter={(event: ReactMouseEvent<HTMLAnchorElement>) => {
+                if (active || activeChild) return
+                event.currentTarget.style.borderColor = 'var(--color-sidebar-line)'
+                event.currentTarget.style.backgroundColor = 'var(--color-sidebar-soft)'
+              }}
+              onMouseLeave={(event: ReactMouseEvent<HTMLAnchorElement>) => {
+                if (active || activeChild) return
+                event.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-sidebar-line) 90%, transparent)'
+                event.currentTarget.style.backgroundColor = 'var(--color-sidebar)'
+              }}
             >
               {itemHighlighted ? (
-                <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-white/90" aria-hidden="true" />
+                <span
+                  className="absolute inset-y-2 left-0 w-1 rounded-r-full"
+                  aria-hidden="true"
+                  style={itemHighlightBarStyle}
+                />
               ) : null}
               <div className={`flex ${collapsed ? 'justify-center' : 'items-center gap-3'}`}>
                 <span className={`shrink-0 rounded-lg ${collapsed ? 'p-2' : 'p-1.5'} ${item.tone}`}>
@@ -1341,13 +1395,26 @@ function SidebarSection({
                 {!collapsed ? (
                   <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                     <div className="min-w-0 space-y-0.5">
-                      <p className="truncate text-sm font-semibold text-slate-100">{itemTitle}</p>
+                      <p
+                        className="truncate text-sm font-semibold"
+                        style={itemTitleStyle}
+                      >
+                        {itemTitle}
+                      </p>
                       {showDescription ? (
-                        <p className="truncate text-[11px] leading-4 text-slate-400">{itemDescription}</p>
+                        <p
+                          className="truncate text-[11px] leading-4"
+                          style={itemDescStyle}
+                        >
+                          {itemDescription}
+                        </p>
                       ) : null}
                     </div>
                     {hasChildren ? (
-                      <span className="mt-0.5 shrink-0 text-slate-400">
+                      <span
+                        className="mt-0.5 shrink-0"
+                        style={itemChevronStyle}
+                      >
                         {expanded ? 'v' : '>'}
                       </span>
                     ) : null}
@@ -1358,14 +1425,23 @@ function SidebarSection({
 
             {!collapsed && item.children?.length && expanded ? (
               <div
-                className={`ml-4 space-y-1 border-l pl-3 ${
-                  itemHighlighted ? 'border-slate-700' : 'border-slate-900'
-                }`}
+                className="ml-4 space-y-1 border-l pl-3"
+                style={{ borderColor: itemHighlighted ? 'color-mix(in srgb, var(--color-sidebar-line) 130%, transparent)' : 'color-mix(in srgb, var(--color-sidebar-line) 90%, transparent)' }}
               >
                 {item.children.map((child) => {
                   const childActive = isSidebarItemActive(child, pathname, focus, currentQueryParams)
                   const childTitle = translateUiText(child.title, language)
                   const childDescription = translateUiText(child.description, language)
+                  const childStyle = childActive
+                    ? {
+                        borderColor: 'var(--color-sidebar-line)',
+                        backgroundColor: 'var(--color-sidebar-soft)',
+                        color: 'var(--color-sidebar-ink)',
+                      }
+                    : {
+                        borderColor: 'transparent',
+                        color: 'color-mix(in srgb, var(--color-sidebar-ink) 55%, transparent)',
+                      }
 
                   return (
                     <Link
@@ -1374,15 +1450,29 @@ function SidebarSection({
                       prefetch={false}
                       onClick={onNavigate}
                       title={childTitle}
-                      className={`block rounded-lg border px-3 py-1.5 text-sm transition ${
-                        childActive
-                          ? 'border-slate-800 bg-slate-900 font-semibold text-white'
-                          : 'border-transparent text-slate-400 hover:border-slate-900 hover:bg-slate-900 hover:text-slate-200'
-                      }`}
+                      className={`block rounded-lg border px-3 py-1.5 text-sm transition`}
+                      style={childStyle}
+                      onMouseEnter={(event: ReactMouseEvent<HTMLAnchorElement>) => {
+                        if (childActive) return
+                        event.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-sidebar-line) 90%, transparent)'
+                        event.currentTarget.style.backgroundColor = 'var(--color-sidebar-soft)'
+                        event.currentTarget.style.color = 'color-mix(in srgb, var(--color-sidebar-ink) 90%, transparent)'
+                      }}
+                      onMouseLeave={(event: ReactMouseEvent<HTMLAnchorElement>) => {
+                        if (childActive) return
+                        event.currentTarget.style.borderColor = 'transparent'
+                        event.currentTarget.style.backgroundColor = 'transparent'
+                        event.currentTarget.style.color = 'color-mix(in srgb, var(--color-sidebar-ink) 55%, transparent)'
+                      }}
                     >
-                      <p className="truncate">{childTitle}</p>
+                      <p className={`truncate ${childActive ? 'font-semibold' : ''}`}>{childTitle}</p>
                       {childActive ? (
-                        <p className="truncate text-[11px] leading-4 text-slate-500">{childDescription}</p>
+                        <p
+                          className="truncate text-[11px] leading-4"
+                          style={{ color: 'color-mix(in srgb, var(--color-sidebar-ink) 45%, transparent)' }}
+                        >
+                          {childDescription}
+                        </p>
                       ) : null}
                     </Link>
                   )
@@ -1490,7 +1580,22 @@ export function Sidebar({
             <button
               type="button"
               onClick={() => setCollapsed(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-slate-300 transition hover:border-slate-700 hover:text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-full border transition"
+              style={{
+                borderColor: 'var(--color-sidebar-line)',
+                backgroundColor: 'var(--color-sidebar-soft)',
+                color: 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)',
+                '--hover-border': 'color-mix(in srgb, var(--color-sidebar-line) 130%, transparent)',
+                '--hover-text': 'var(--color-sidebar-ink)',
+              } as React.CSSProperties}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-sidebar-line) 130%, transparent)'
+                event.currentTarget.style.color = 'var(--color-sidebar-ink)'
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.borderColor = 'var(--color-sidebar-line)'
+                event.currentTarget.style.color = 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)'
+              }}
               aria-label={translateUiText('Minimalkan sidebar', language)}
               title={translateUiText('Minimalkan sidebar', language)}
             >
@@ -1506,7 +1611,20 @@ export function Sidebar({
             <button
               type="button"
               onClick={() => setCollapsed(false)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-slate-300 transition hover:border-slate-700 hover:text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-full border transition"
+              style={{
+                borderColor: 'var(--color-sidebar-line)',
+                backgroundColor: 'var(--color-sidebar-soft)',
+                color: 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)',
+              }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-sidebar-line) 130%, transparent)'
+                event.currentTarget.style.color = 'var(--color-sidebar-ink)'
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.borderColor = 'var(--color-sidebar-line)'
+                event.currentTarget.style.color = 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)'
+              }}
               aria-label={translateUiText('Tampilkan sidebar', language)}
               title={translateUiText('Tampilkan sidebar', language)}
             >
@@ -1590,7 +1708,10 @@ export function Sidebar({
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            className="absolute inset-0"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--color-sidebar) 65%, transparent)',
+            }}
             onClick={() => setMobileOpen(false)}
             aria-label={translateUiText('Tutup menu', language)}
           />
@@ -1607,11 +1728,24 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-slate-300 transition hover:border-slate-700 hover:text-white"
+                className="flex h-11 w-11 items-center justify-center rounded-full border transition"
+                style={{
+                  borderColor: 'var(--color-sidebar-line)',
+                  backgroundColor: 'var(--color-sidebar-soft)',
+                  color: 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)',
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-sidebar-line) 130%, transparent)'
+                  event.currentTarget.style.color = 'var(--color-sidebar-ink)'
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.borderColor = 'var(--color-sidebar-line)'
+                  event.currentTarget.style.color = 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)'
+                }}
                 aria-label={translateUiText('Tutup menu', language)}
               >
                 <span aria-hidden="true" className="text-lg leading-none">
-                  x
+                  ×
                 </span>
               </button>
             </div>

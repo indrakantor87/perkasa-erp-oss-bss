@@ -43,35 +43,65 @@ export default async function LoginPage({
   return (
     <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-7xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded-[28px] bg-slate-950 p-8 text-slate-100 shadow-2xl lg:p-12">
-          <span className="badge border-slate-700 text-slate-300">Satu website operasional</span>
+        <section
+          className="rounded-[28px] p-8 shadow-2xl lg:p-12"
+          style={{
+            backgroundColor: 'var(--color-sidebar)',
+            color: 'var(--color-sidebar-ink)',
+          }}
+        >
+          <span
+            className="badge"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--color-sidebar-line) 130%, transparent)',
+              color: 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)',
+            }}
+          >
+            Satu website operasional
+          </span>
           <h1 className="mt-8 font-[family-name:var(--font-heading)] text-4xl font-semibold tracking-tight sm:text-5xl">
             Perkasa ERP OSS BSS
           </h1>
-          <p className="mt-6 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+          <p
+            className="mt-6 max-w-2xl text-sm leading-7 sm:text-base"
+            style={{ color: 'color-mix(in srgb, var(--color-sidebar-ink) 78%, transparent)' }}
+          >
             Platform tunggal untuk penjualan, customer, support, inventory, HR, billing, dan
             pusat import review dalam satu domain aplikasi.
           </p>
 
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            <article className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Database
-              </p>
-              <p className="mt-3 text-lg font-semibold text-white">1 schema terpadu</p>
-            </article>
-            <article className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Akses
-              </p>
-              <p className="mt-3 text-lg font-semibold text-white">1 login lintas modul</p>
-            </article>
-            <article className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Target
-              </p>
-              <p className="mt-3 text-lg font-semibold text-white">Web + Android wrapper</p>
-            </article>
+            {[
+              {
+                label: 'Database',
+                value: '1 schema terpadu',
+              },
+              {
+                label: 'Akses',
+                value: '1 login lintas modul',
+              },
+              {
+                label: 'Target',
+                value: 'Web + Android wrapper',
+              },
+            ].map((feature) => (
+              <article
+                key={feature.label}
+                className="rounded-2xl border p-5"
+                style={{
+                  borderColor: 'var(--color-sidebar-line)',
+                  backgroundColor: 'var(--color-sidebar-soft)',
+                }}
+              >
+                <p
+                  className="text-xs font-semibold uppercase tracking-[0.18em]"
+                  style={{ color: 'color-mix(in srgb, var(--color-sidebar-ink) 50%, transparent)' }}
+                >
+                  {feature.label}
+                </p>
+                <p className="mt-3 text-lg font-semibold">{feature.value}</p>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -79,7 +109,10 @@ export default async function LoginPage({
           <div className="w-full">
             <div>
               <p className="section-title">Autentikasi</p>
-              <h2 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
+              <h2
+                className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight"
+                style={{ color: 'var(--color-ink-strong)' }}
+              >
                 Masuk ke aplikasi
               </h2>
               <p className="mt-3 text-sm leading-6 text-mute">
@@ -87,50 +120,94 @@ export default async function LoginPage({
               </p>
             </div>
 
-            <div className="mt-6 rounded-2xl border border-line bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <div
+              className="mt-6 rounded-2xl border border-line px-4 py-3 text-sm"
+              style={{
+                backgroundColor: 'var(--color-card-subtle)',
+                color: 'var(--color-mute-strong)',
+              }}
+            >
               {authModeDescription}
             </div>
 
             {errorMessage ? (
-              <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <div
+                className="mt-6 rounded-2xl border px-4 py-3 text-sm"
+                style={{
+                  backgroundColor: 'var(--color-danger-soft)',
+                  borderColor: 'var(--color-danger-line)',
+                  color: 'var(--color-danger-ink)',
+                }}
+              >
                 {errorMessage}
               </div>
             ) : null}
 
             <form action="/api/auth/login" method="post" className="mt-8 space-y-5">
               <label className="block space-y-2">
-                <span className="text-sm font-semibold text-slate-700">Username</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--color-mute-strong)' }}>
+                  Username
+                </span>
                 <input
                   type="text"
                   name="username"
                   placeholder="username atau email auth_users"
-                  className="w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                  className="w-full rounded-2xl border border-line px-4 py-3 text-sm outline-none transition focus:[border-color:var(--color-line-strong)]"
+                  style={{
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-ink)',
+                  }}
                 />
               </label>
 
               <label className="block space-y-2">
-                <span className="text-sm font-semibold text-slate-700">Password</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--color-mute-strong)' }}>
+                  Password
+                </span>
                 <input
                   type="password"
                   name="password"
                   placeholder="********"
-                  className="w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                  className="w-full rounded-2xl border border-line px-4 py-3 text-sm outline-none transition focus:[border-color:var(--color-line-strong)]"
+                  style={{
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-ink)',
+                  }}
                 />
               </label>
 
               <button
                 type="submit"
-                className="w-full rounded-2xl bg-slate-950 px-5 py-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="w-full rounded-2xl px-5 py-4 text-sm font-semibold transition"
+                style={{
+                  backgroundColor: 'var(--color-accent)',
+                  color: 'var(--color-accent-ink)',
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.opacity = '0.92'
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.opacity = '1'
+                }}
               >
                 Masuk ke dashboard
               </button>
             </form>
 
-            <div className="mt-6 rounded-2xl border border-line bg-slate-50 p-4">
+            <div
+              className="mt-6 rounded-2xl border border-line p-4"
+              style={{ backgroundColor: 'var(--color-card-subtle)' }}
+            >
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
                 Catatan Login Lokal
               </p>
-              <div className="mt-4 rounded-2xl border border-line bg-white px-4 py-3 text-sm leading-6 text-slate-700">
+              <div
+                className="mt-4 rounded-2xl border border-line px-4 py-3 text-sm leading-6"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  color: 'var(--color-mute-strong)',
+                }}
+              >
                 {bootstrapMockAuthEnabled ? (
                   <>
                     Password tidak ditampilkan di UI dan tidak disimpan plaintext di repo. Untuk review lokal, isi kredensial mock lewat `ALLOW_BOOTSTRAP_MOCK_AUTH=1` dan `BOOTSTRAP_MOCK_AUTH_CREDENTIALS`, lalu restart server.
