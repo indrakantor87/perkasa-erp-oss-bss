@@ -1,0 +1,255 @@
+name: "BERTANGGUNG JAWAB RECOVERY: Auto SSH ATAU Print Script Copy-Paste Manual"
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: accountability-recovery-final-v2
+  cancel-in-progress: false
+
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pre-Filter Run (commit DARURAT_BERTANGGUNGJAWAB atau workflow_dispatch)
+        run: |
+          set +e
+          EVENT=$GITHUB_EVENT_NAME
+          MSG="${{ github.event.head_commit.message }}"
+          RUN_OK=0
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            RUN_OK=1
+          else
+            case "$MSG" in
+              DARURAT_BERTANGGUNGJAWAB*) RUN_OK=1 ;;
+            esac
+          fi
+          if [ "$RUN_OK" -eq 0 ]; then
+            echo "[SKIP] bukan trigger recovery"
+            exit 0
+          fi
+          echo "RUN_OK=1" >> $GITHUB_ENV
+          echo "HOST_LEN=$(echo -n '${{ secrets.COOLIFY_SERVER_HOST }}' | wc -c | tr -d ' ')" >> $GITHUB_ENV
+          echo "KEY_LEN=$(printf '%s' '${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}' | wc -c | tr -d ' ')" >> $GITHUB_ENV
+
+      - name: "CHECK DASAR: Secrets lengkap? (Menentukan OPSI A vs OPSI B)"
+        if: env.RUN_OK == '1'
+        run: |
+          echo "================================================================="
+          echo " DIAGNOSA: LENGKAP ATAU TIDAK SECRETS SSH NYA:"
+          echo "   COOLIFY_SERVER_HOST      panjang = ${{ env.HOST_LEN }} chars"
+          echo "   COOLIFY_SERVER_USER      = '${{ secrets.COOLIFY_SERVER_USER }}'"
+          echo "   COOLIFY_SERVER_SSH_KEY   panjang = ${{ env.KEY_LEN }} bytes"
+          echo "================================================================="
+          if [ "${{ env.HOST_LEN }}" -lt 5 ] || [ "${{ env.KEY_LEN }}" -lt 100 ]; then
+            echo "SECRETS_TIDAK_LENGKAP=1" >> $GITHUB_ENV
+            echo "❌ SECRETS TIDAK LENGKAP / KOSONG! Workflow TIDAK BISA jalankan SSH OTOMATIS."
+            echo ""
+            echo "   => MELAKUKAN OPSI A: MENAMPILKAN SCRIPT COPY PASTE KE TERMINAL SERVER SENDIRI"
+          else
+            echo "SECRETS_TIDAK_LENGKAP=0" >> $GITHUB_ENV
+            echo "✅ SECRETS SSH LENGKAP -> Mencoba OPSI B: SSH OTOMATIS menjalankan script recovery!"
+          fi
+
+      - name: "OPSI A: SECRETS TIDAK ADA -> TAMPILKAN SCRIPT COPY PASTE (user pilih copy paste ke Terminal Server sendiri)"
+        if: env.RUN_OK == '1' && env.SECRETS_TIDAK_LENGKAP == '1'
+        run: |
+          cat <<'SCRIPTCOPYPASTE'
+
+          ===================================================================
+          OPSI A: SALIN (COPY) SEMUA ISI DI BAWAH INI SAMPAI END,
+          KEMUDIAN BUKA TERMINAL SSH KE SERVER (PuTTY / WSL / ssh root@IP_SERVER),
+          PASTE (Ctrl+Shift+V) -> TEKAN ENTER -> TUNGGU 5 MENIT.
+          ===================================================================
+
+          clear
+          echo "============================================================"
+          echo " COOLIFY DARURAT RECOVERY (Script Accountability AI)"
+          echo "============================================================"
+          echo "Step 1/6: Survey container..."
+          ALL_NAMES=$(docker ps -aq --format '{{.Names}}' 2>&1 | sort)
+          echo "Total: $(echo $ALL_NAMES | wc -w) containers"
+
+          echo ""
+          echo "Step 2/6: Start Database (PostgreSQL/Redis) stopped..."
+          for C in $ALL_NAMES; do
+            case "$C" in
+              *postgres*|*mysql*|*mariadb*|*mongo*|*redis*)
+                ST=$(docker inspect --format='{{.State.Status}}' $C 2>/dev/null || echo unknown)
+                [ "$ST" != "running" ] && { echo "  START DB $C"; docker start $C >/dev/null 2>&1; sleep 3; }
+                ;;
+            esac
+          done
+
+          echo ""
+          echo "Step 3/6: Restart COOLIFY PROXY (TRAEFIK) -> FIX 'no available server'!!!"
+          for C in $ALL_NAMES; do
+            case "$C" in *coolify-proxy*|*traefik*)
+              ST=$(docker inspect --format='{{.State.Status}}' $C 2>/dev/null)
+              echo "  Restart Proxy: $C ($ST)"
+              docker restart $C 2>&1 | head -2
+              sleep 8
+            esac
+          done
+
+          echo ""
+          echo "Step 4/6: Restart Helper/Service/Worker Coolify (reconcile UI)"
+          for C in $ALL_NAMES; do
+            case "$C" in
+              *coolify-helper*|*coolify-service*|*coolify-worker*|*coolify-realtime*|*coolify-horizon*)
+                ST=$(docker inspect --format='{{.State.Status}}' $C 2>/dev/null)
+                echo "  Restart $C ($ST)"
+                [ "$ST" = "running" ] && docker restart $C >/dev/null 2>&1 || docker start $C >/dev/null 2>&1
+                sleep 3
+                ;;
+            esac
+          done
+          sleep 12
+
+          echo ""
+          echo "Step 5/6: Start SEMUA 5 APLIKASI PRODUKSI Yang Stopped!"
+          NON_COOLIFY=$(echo "$ALL_NAMES" | grep -vE 'postgres|mysql|mariadb|mongo|redis|coolify|traefik|proxy|helper|service|worker|realtime|horizon')
+          RC=0
+          for C in $NON_COOLIFY; do
+            [ -z "$C" ] && continue
+            ST=$(docker inspect --format='{{.State.Status}}' $C 2>/dev/null || echo unknown)
+            case "$ST" in
+              running) echo "  ✅ $C (sudah running)" ; RC=$((RC+1)) ;;
+              exited|created|stopped|dead)
+                echo "  🟡 START APP $C ($ST)"
+                docker start $C >/dev/null 2>&1
+                sleep 6
+                NS=$(docker inspect --format='{{.State.Status}}' $C 2>/dev/null)
+                [ "$NS" = "running" ] && { echo "     ✅"; RC=$((RC+1)); } || echo "     ❌ $NS (docker logs $C | tail 20)"
+                ;;
+            esac
+          done
+          echo "  Apps running sekarang = $RC"
+
+          echo ""
+          echo "Step 6/6: Wait 45 detik Helper Reconcile + warmup + FINAL HTTP CHECK 6 DOMAINS"
+          for i in 1 2 3 4 5 6 7 8 9; do sleep 5; echo "  wait $((i*5))s/45s"; done
+          echo ""
+          echo "=========== FINAL HTTP CHECK DOMAINS (dari server sendiri via Traefik) ==========="
+          DOMS=(
+            "webpsb.perkasa.net.id (CUSTOM DOMAIN OPERASIONAL)"
+            "b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io (ERP OSS BSS)"
+            "uw0gsooko48kwgwogk8wc8gs.103.162.17.178.sslip.io (LANDING PAGE)"
+            "h4ow4sw0k04ksgsgskcwoow8.103.162.17.178.sslip.io (FINANCE)"
+            "ikgc8kkwcc08kkgkskc0gwg4.103.162.17.178.sslip.io (GA WEB APP)"
+            "pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io (WEB PSB PERKASA)"
+          )
+          OKC=0
+          for ENTRY in "${DOMS[@]}"; do
+            D=$(echo $ENTRY | awk '{print $1}')
+            LABEL=$(echo $ENTRY | cut -d'(' -f2 | tr -d ')')
+            HC=$(curl -s -o /dev/null -w '%{http_code}' --max-time 12 -L --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null || echo 000)
+            case "$HC" in
+              200|301|302|307|308) echo "  ✅ HTTP $HC - $LABEL ($D)"; OKC=$((OKC+1)) ;;
+              502|503|504)          echo "  🟡 HTTP $HC - $LABEL ($D) - app booting, F5 2x lagi nanti" ;;
+              000|"")                echo "  ❌ TIMEOUT - $LABEL ($D) - docker logs <container>" ;;
+              *)                    echo "  ⚪ HTTP $HC - $LABEL ($D)" ;;
+            esac
+          done
+          echo ""
+          echo "  RINGKASAN: $OKC / 6 DOMAINS ONLINE"
+          echo ""
+          echo "SCRIPT SELESAI. SEKARANG BUKA BROWSER webpsb.perkasa.net.id -> F5 refresh."
+
+          ===================================================================
+          SCRIPT COPY PASTE SELESAI. YANG DI-COPY = BARIS ANTARA "clear" di atas
+          SAMPAI BARIS "echo SCRIPT SELESAI..."
+          ===================================================================
+          SCRIPTCOPYPASTE
+
+      - name: "OPSI B: SECRETS SSH LENGKAP -> Install key + SSH OTOMATIS jalankan script recovery ke Server"
+        if: env.RUN_OK == '1' && env.SECRETS_TIDAK_LENGKAP == '0'
+        timeout-minutes: 20
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+          SSHKEY: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+        run: |
+          set -e
+          echo "✅ Jalankan SSH OTOMATIS ke $USER@$HOST"
+          mkdir -p $HOME/.ssh && chmod 700 $HOME/.ssh
+          FKEY=$HOME/.ssh/id_ed25519_coolify
+          RAW=$HOME/.ssh/raw
+          echo "$SSHKEY" > $RAW
+          BODY=$HOME/.ssh/body
+          tail -n +2 $RAW | head -n -1 | grep -v '^[[:space:]]*$' > $BODY || true
+          { echo "-----BEGIN OPENSSH PRIVATE KEY-----"; cat $BODY; echo "-----END OPENSSH PRIVATE KEY-----"; } > $FKEY
+          chmod 600 $FKEY
+          FINALKEY_SIZE=$(wc -c < $FKEY | tr -d ' ')
+          echo "Key final: $FINALKEY_SIZE bytes"
+          if [ "$FINALKEY_SIZE" -lt 100 ]; then echo "Key invalid size <100"; exit 5; fi
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $FKEY"
+          ssh $OPTS "$USER@$HOST" '
+            set +e
+            echo "==== SERVER: $(hostname) ===="
+            ALL_NAMES=$(docker ps -aq --format "{{.Names}}" 2>&1 | sort)
+
+            echo Step 2/6 DB
+            for C in $ALL_NAMES; do case "$C" in
+              *postgres*|*mysql*|*mariadb*|*mongo*|*redis*)
+                ST=$(docker inspect --format="{{.State.Status}}" $C 2>/dev/null)
+                [ "$ST" != "running" ] && { echo START DB $C; docker start $C >/dev/null 2>&1; sleep 3; }
+                ;;
+            esac; done
+
+            echo Step 3/6 Restart Proxy Traefik
+            for C in $ALL_NAMES; do case "$C" in *coolify-proxy*|*traefik*)
+              echo "  Restart proxy $C"
+              docker restart $C 2>&1 | head 2
+              sleep 8
+            esac; done
+
+            echo Step 4/6 Restart Helper/Worker/Service
+            for C in $ALL_NAMES; do case "$C" in
+              *coolify-helper*|*coolify-service*|*coolify-worker*|*coolify-realtime*|*coolify-horizon*)
+                ST=$(docker inspect --format="{{.State.Status}}" $C 2>/dev/null)
+                [ "$ST" = "running" ] && docker restart $C >/dev/null 2>&1 || docker start $C >/dev/null 2>&1
+                sleep 3
+                ;;
+            esac; done
+            sleep 12
+
+            echo Step 5/6 Start 5 apps stopped
+            NON_COOLIFY=$(echo "$ALL_NAMES" | grep -vE "postgres|mysql|mariadb|mongo|redis|coolify|traefik|proxy|helper|service|worker|realtime|horizon")
+            RC=0
+            for C in $NON_COOLIFY; do
+              [ -z "$C" ] && continue
+              ST=$(docker inspect --format="{{.State.Status}}" $C 2>/dev/null || echo unknown)
+              case "$ST" in
+                running) echo "  ✅ $C"; RC=$((RC+1));;
+                exited|created|stopped|dead)
+                  echo "  START APP $C ($ST)"
+                  docker start $C >/dev/null 2>&1; sleep 6
+                  NS=$(docker inspect --format="{{.State.Status}}" $C 2>/dev/null)
+                  [ "$NS" = "running" ] && { echo "    ✅"; RC=$((RC+1)); } || echo "    ❌ $NS"
+                  ;;
+              esac
+            done
+            echo Apps running: $RC
+
+            echo Step 6/6 Wait 45s + HTTP Final Verify
+            for i in 1 2 3 4 5 6 7 8 9; do sleep 5; done
+            echo ""
+            for D in webpsb.perkasa.net.id b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io uw0gsooko48kwgwogk8wc8gs.103.162.17.178.sslip.io h4ow4sw0k04ksgsgskcwoow8.103.162.17.178.sslip.io ikgc8kkwcc08kkgkskc0gwg4.103.162.17.178.sslip.io pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io; do
+              HC=$(curl -s -o /dev/null -w "%{http_code}" --max-time 12 -L --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null || echo 000)
+              case "$HC" in
+                200|301|302|307|308) echo "  ✅ HTTP $HC - $D" ;;
+                502|503|504)          echo "  🟡 HTTP $HC - $D (booting)" ;;
+                000|"")                echo "  ❌ TIMEOUT - $D" ;;
+                *)                    echo "  ⚪ HTTP $HC - $D" ;;
+              esac
+            done
+          '
+          echo "[SSH OTOMATIS SELESAI - lihat log di atas untuk status 6 domain]"
