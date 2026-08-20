@@ -91,267 +91,223 @@ jobs:
           "
           echo "✅ Preflight SSH OK - koneksi ke server Coolify BERHASIL!"
 
-      - name: 🚀 Jalankan Deploy Production ke Coolify via SSH (LANGSUNG, tanpa sub-script!)
+      - name: 🚀 Deploy Step [1/9]: Login GHCR di Server Coolify
         env:
           DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
           SSH_KEY_FILE: /home/runner/.ssh/id_ed25519_coolify
           GHCR_USERNAME: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DB_IP: "10.0.1.11"
-          DB_PORT: "3306"
-          DB_USER: "perkasa_erp"
-          DB_PASS: "2z5WT1vImkigS1VlPEFzKAR8up1sbSF03pE0oaHXN7fGEOiEvrHQjS1ceSr6HPvc"
-          DB_NAME: "default"
-          DOMAIN: "de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io"
-          AUTH_SESSION_SECRET: "278476982jhgs98763h59862fwjrihw648"
-          REVIEW_DB_CONNECT_TIMEOUT_MS: "3000"
-          DEFAULT_APP_DATA_MODE: "mock"
-          AUTO_LOAD_DEMO_PSB: "enabled"
+        run: |
+          set -e
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $SSH_KEY_FILE"
+          echo "🔑 docker login ghcr.io @ $DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST"
+          echo "$GHCR_TOKEN" | ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" \
+            "docker login ghcr.io -u \"$GHCR_USERNAME\" --password-stdin 2>&1 | tail -5"
+
+      - name: 🚀 Deploy Step [2/9]: Pull Image GHCR (Tag Specific)
+        env:
+          DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+          SSH_KEY_FILE: /home/runner/.ssh/id_ed25519_coolify
         run: |
           set -e
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $SSH_KEY_FILE"
           SHORT_SHA="${GITHUB_SHA:0:7}"
-          TAG_MAIN_BRANCH="main-${SHORT_SHA}"
-          IMAGE_FULL="ghcr.io/indrakantor87/perkasa-erp-oss-bss:${TAG_MAIN_BRANCH}"
-
-          echo ""
-          echo "====================================================================="
-          echo " 🚀 MEMULAI DEPLOY PRODUCTION OTOMATIS VIA SSH (LANGSUNG EXEC!)"
-          echo " Server target: $DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST"
-          echo " SSH Key File : $SSH_KEY_FILE"
-          echo " Image        : $IMAGE_FULL   (bukan :latest! = TAG SPECIFIC main-XXXXX)"
-          echo " DB URL       : mysql://$DB_USER@$DB_IP:$DB_PORT/$DB_NAME (Review DB)"
-          echo " Domain       : http://$DOMAIN/login"
-          echo "====================================================================="
-          echo ""
-          echo "  Cek key file ada & permission benar:"
-          ls -la "$SSH_KEY_FILE" || { echo "❌ KEY FILE TIDAK ADA! $SSH_KEY_FILE"; ls -la /home/runner/.ssh/ ; exit 9; }
-          echo ""
-
-          # HEREDOC INLINE SCRIPT YANG DIJALANKAN DI SERVER COOLIFY (REMOTE!)
-          REMOTE_SCRIPT=$(cat <<'REMOTE_EOF'
+          IMAGE_FULL="ghcr.io/indrakantor87/perkasa-erp-oss-bss:main-${SHORT_SHA}"
+          echo "  📦 PULL $IMAGE_FULL"
+          echo "IMAGE_FULL=$IMAGE_FULL" >> "$GITHUB_ENV"
+          ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "
             set -x
-            set +e
-            IMAGE="__IMAGE_FULL__"
-            CONTAINER_NAME="perkasa-erp-oss-bss"
-            DEPLOY_ID=$(date '+%Y%m%d%H%M%S')
-            GHCR_USER="__GHCR_USERNAME__"
-            GHCR_TOK="__GHCR_TOKEN__"
+            docker pull $IMAGE_FULL 2>&1 | tail -20
+            echo '--- Image info ---'
+            docker inspect --format='{{index .RepoDigests 0}} | {{.Created}} | {{.Size}}' $IMAGE_FULL 2>&1 || echo 'Image not found (fatal)'
+          "
 
-            echo ""
-            echo "====================================================================="
-            echo "  🚀 DEPLOY AUTO-PRODUCTION (PURE DOCKER — SKIP COOLIFY HELPER!)"
-            echo "  Deploy ID    : $DEPLOY_ID"
-            echo "  Target Image : $IMAGE   (TAG SPECIFIC, bukan latest!)"
-            echo "  Container    : $CONTAINER_NAME"
-            echo "  MODE         : DEBUG! set -x, Health Check = WARNING (tidak exit fatal)"
-            echo "====================================================================="
-
-            echo ""
-            echo "--- [REMOTE 0/8] LOGIN GHCR (WAJIB! Repo private, anonymous pull TIDAK BISA!) ---"
-            echo "  🔑 docker login ghcr.io -u $GHCR_USER -p ***"
-            LOGIN_OUT=$(echo "$GHCR_TOK" | docker login ghcr.io -u "$GHCR_USER" --password-stdin 2>&1)
-            LOGIN_EXIT=$?
-            echo "$LOGIN_OUT"
-            if [ $LOGIN_EXIT -ne 0 ]; then
-              echo "  ⚠️  Login ghcr.io GAGAL (exit=$LOGIN_EXIT). TAPI LANJUTKAN (mungkin image lokal sdh ada)."
-            else
-              echo "  ✅ Login GHCR BERHASIL di Server Coolify!"
-            fi
-
-            echo ""
-            echo "--- [REMOTE 1/8] Pull image tag SPECIFIC + cetak DIGEST untuk verifikasi ---"
-            PULL_OUTPUT=$(docker pull "$IMAGE" 2>&1 | tail -25)
-            echo "$PULL_OUTPUT"
-            IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "N/A")
-            IMAGE_CREATED=$(docker inspect --format='{{.Created}}' "$IMAGE" 2>/dev/null || echo "N/A")
-            echo "  📦 IMAGE DIGEST AKTIF: $IMAGE_DIGEST"
-            echo "  📦 IMAGE CREATED AT  : $IMAGE_CREATED"
-            if echo "$PULL_OUTPUT" | grep -qiE "(manifest unknown|not found|pull access denied|unauthorized)"; then
-              if [ "$IMAGE_DIGEST" = "N/A" ] || [ -z "$IMAGE_DIGEST" ]; then
-                echo "  ❌ FATAL: Image $IMAGE TIDAK BISA DIPULL & TIDAK ADA di Lokal! Deploy berhenti!"
-                exit 22
-              fi
-            fi
-
-            echo ""
-            echo "--- [REMOTE 2/8] Stop & hapus container lama $CONTAINER_NAME (jika ada) ---"
-            OLD_ID=$(docker ps -aq --filter "name=$CONTAINER_NAME")
-            if [ -n "$OLD_ID" ]; then
-              echo "  🗑️  Container lama ditemukan (ID=$OLD_ID), menghapus..."
-              docker rm -f "$CONTAINER_NAME" 2>&1 || true
+      - name: 🚀 Deploy Step [3/9]: Stop & Remove Old Container perkasa-erp-oss-bss
+        env:
+          DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+          SSH_KEY_FILE: /home/runner/.ssh/id_ed25519_coolify
+        run: |
+          set -e
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $SSH_KEY_FILE"
+          ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "
+            OLD=\$(docker ps -aq --filter name=perkasa-erp-oss-bss)
+            if [ -n \"\$OLD\" ]; then
+              echo '🗑️  Old container found, removing...'
+              docker rm -f perkasa-erp-oss-bss 2>&1 || true
               sleep 3
             else
-              echo "  ℹ️  Tidak ada container lama dengan nama $CONTAINER_NAME"
+              echo 'ℹ️  No old container found'
             fi
+          "
 
-            echo ""
-            echo "--- [REMOTE 3/8] DIAGNOSE PATH server.js YANG BENAR DI DALAM IMAGE (SAFETY NET!) ---"
-            SERVER_JS_PATH=$(docker run --rm --entrypoint=/bin/sh "$IMAGE" -c "find / -name server.js -type f 2>/dev/null | grep -v node_modules | head -1 | tr -d '\r'")
-            if [ -z "$SERVER_JS_PATH" ]; then
-              echo "  ❌ FATAL: server.js TIDAK DITEMUKAN di dalam image!"
-              docker run --rm --entrypoint=/bin/sh "$IMAGE" -c "ls -laR /app 2>&1 | head -120"
-              exit 8
-            fi
-            WORKDIR_CORRECT=$(dirname "$SERVER_JS_PATH")
-            echo "  ✅ PATH server.js BENAR : $SERVER_JS_PATH"
-            echo "  ✅ WORKDIR BENAR       : $WORKDIR_CORRECT"
-            echo "  ✅ CMD FINAL            : node $SERVER_JS_PATH"
+      - name: 🚀 Deploy Step [4/9]: Detect server.js path inside the image (Safety Net!)
+        env:
+          DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+          SSH_KEY_FILE: /home/runner/.ssh/id_ed25519_coolify
+        run: |
+          set -e
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $SSH_KEY_FILE"
+          IMG="${{ env.IMAGE_FULL }}"
+          echo "🔍 Find server.js in $IMG"
+          OUT=$(ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "
+            docker run --rm --entrypoint=/bin/sh $IMG -c \"find / -name server.js -type f 2>/dev/null | grep -v node_modules | head -1 | tr -d '\\\\r'\"
+          ")
+          if [ -z "$OUT" ]; then
+            echo "❌ FATAL! server.js TIDAK DITEMUKAN di dalam image! (Build image sebelumnya GAGAL copy standalone output?)"
+            exit 8
+          fi
+          echo "✅ server.js path = $OUT"
+          WORKDIR_CORRECT=$(dirname "$OUT")
+          echo "✅ workdir = $WORKDIR_CORRECT"
+          echo "SERVER_JS_PATH=$OUT" >> "$GITHUB_ENV"
+          echo "WORKDIR_CORRECT=$WORKDIR_CORRECT" >> "$GITHUB_ENV"
 
-            echo ""
-            echo "--- [REMOTE 4/8] Jalankan container production BARU + label Traefik ---"
-            NEW_CONTAINER_ID=$(docker run -d \
-              --name "$CONTAINER_NAME" \
+      - name: 🚀 Deploy Step [5/9]: Run NEW Container with Traefik labels (APP_DATA_MODE=mock!)
+        env:
+          DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+          SSH_KEY_FILE: /home/runner/.ssh/id_ed25519_coolify
+          DOMAIN: "de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io"
+          AUTH_SESSION_SECRET: "278476982jhgs98763h59862fwjrihw648"
+        run: |
+          set -e
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=60 -o ServerAliveInterval=60 -o BatchMode=yes -i $SSH_KEY_FILE"
+          IMG="${{ env.IMAGE_FULL }}"
+          SERVER_JS="${{ env.SERVER_JS_PATH }}"
+          WORKDIR="${{ env.WORKDIR_CORRECT }}"
+          DEPLOY_ID=$(date +%Y%m%d%H%M%S)
+          echo "🚀 docker run new container..."
+          CID=$(ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "
+            docker run -d \
+              --name perkasa-erp-oss-bss \
               --network coolify \
               --restart unless-stopped \
               --memory 2g --cpus 2 \
               -p 3000:3000 \
-              -w "$WORKDIR_CORRECT" \
-              -e PORT="3000" \
-              -e HOSTNAME="0.0.0.0" \
-              -e NODE_ENV="production" \
-              -e APP_DATA_MODE="__DEFAULT_APP_DATA_MODE__" \
-              -e AUTO_LOAD_DEMO_PSB="__AUTO_LOAD_DEMO_PSB__" \
-              -e AUTH_SESSION_SECRET="__AUTH_SESSION_SECRET__" \
-              -e REVIEW_DB_CONNECT_TIMEOUT_MS="__REVIEW_DB_CONNECT_TIMEOUT_MS__" \
-              -e BOOTSTRAP_MOCK_AUTH_CREDENTIALS="disabled" \
-              -e AUTH_COOKIE_SECURE="false" \
-              -e NEXTAUTH_URL="http://__DOMAIN__" \
-              -e LOG_LEVEL="debug" \
-              -l "traefik.enable=true" \
-              -l "traefik.http.routers.perkasa.entryPoints=http" \
-              -l "traefik.http.routers.perkasa.rule=Host(\`__DOMAIN__\`)" \
-              -l "traefik.http.services.perkasa.loadbalancer.server.port=3000" \
-              -l "deploy.id=$DEPLOY_ID" \
-              "$IMAGE" \
-              node "$SERVER_JS_PATH")
-            RUN_EXIT=$?
-            if [ $RUN_EXIT -ne 0 ] || [ -z "$NEW_CONTAINER_ID" ]; then
-              echo "  ❌ FATAL: docker run GAGAL (exit=$RUN_EXIT, ID empty=$NEW_CONTAINER_ID)"
-              exit 16
-            fi
-            echo "  ✅ Container BARU dibuat dengan ID: $NEW_CONTAINER_ID"
+              -w $WORKDIR \
+              -e PORT=3000 \
+              -e HOSTNAME=0.0.0.0 \
+              -e NODE_ENV=production \
+              -e APP_DATA_MODE=mock \
+              -e AUTO_LOAD_DEMO_PSB=enabled \
+              -e AUTH_SESSION_SECRET=$AUTH_SESSION_SECRET \
+              -e REVIEW_DB_CONNECT_TIMEOUT_MS=3000 \
+              -e AUTH_COOKIE_SECURE=false \
+              -e NEXTAUTH_URL=http://$DOMAIN \
+              -e LOG_LEVEL=debug \
+              -l traefik.enable=true \
+              -l 'traefik.http.routers.perkasa.entryPoints=http' \
+              -l \"traefik.http.routers.perkasa.rule=Host(\\\`$DOMAIN\\\`)\" \
+              -l traefik.http.services.perkasa.loadbalancer.server.port=3000 \
+              -l deploy.id=$DEPLOY_ID \
+              $IMG node $SERVER_JS
+          ")
+          if [ -z "$CID" ]; then
+            echo "❌ docker run GAGAL! ID empty!"
+            exit 16
+          fi
+          echo "✅ NEW CONTAINER ID = $CID"
+          echo "NEW_CONTAINER_ID=$CID" >> "$GITHUB_ENV"
 
-            echo ""
-            echo "--- [REMOTE 5/8] Health Check LEMBUT (WARNING ONLY, TIDAK EXIT FATAL!) Next.js start 2-3 menit ---"
-            MAX_WAIT=240
-            CHECK_INTERVAL=8
-            ELAPSED=0
-            HEALTH_OK=0
-            while [ $ELAPSED -lt $MAX_WAIT ]; do
-              CURRENT_STATE=$(docker inspect --format='{{.State.Status}}' "$NEW_CONTAINER_ID" 2>/dev/null || echo "missing")
-              CURRENT_EXITCODE=$(docker inspect --format='{{.State.ExitCode}}' "$NEW_CONTAINER_ID" 2>/dev/null || echo "?")
-              echo "  [${ELAPSED}s/$MAX_WAIT s] State=$CURRENT_STATE Exit=$CURRENT_EXITCODE"
-              if [ "$CURRENT_STATE" = "running" ]; then
-                HEALTH_OK=1
-              fi
-              if [ "$CURRENT_STATE" = "exited" ] || [ "$CURRENT_STATE" = "dead" ]; then
-                echo "  ⚠️  Container EXIT/DEAD (state=$CURRENT_STATE exit=$CURRENT_EXITCODE). MUNCULKAN 100 LOG TERAKHIR DEBUG!"
-                echo "  ====== FULL LOG (sejak container start): ======"
-                docker logs "$NEW_CONTAINER_ID" 2>&1 | tail -100
-                echo "  (TIDAK EXIT WORKFLOW — biarkan container logs terlihat, user bisa cek manual)"
-                HEALTH_OK=2
+      - name: 🚀 Deploy Step [6/9]: Health Wait 240s (Next.js start 2-3 menit) + HTTP 200 verify
+        env:
+          DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+          SSH_KEY_FILE: /home/runner/.ssh/id_ed25519_coolify
+        run: |
+          set +e
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $SSH_KEY_FILE"
+          CID="${{ env.NEW_CONTAINER_ID }}"
+          MAX_WAIT=240
+          INTERVAL=10
+          ELAPSED=0
+          OK=0
+          echo "⏳ Wait max $MAX_WAIT seconds for container & HTTP 200..."
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            ST=$(ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "docker inspect --format='{{.State.Status}}|{{.State.ExitCode}}' $CID 2>/dev/null || echo missing")
+            STATUS=$(echo "$ST" | cut -d'|' -f1)
+            EXIT=$(echo "$ST" | cut -d'|' -f2)
+            echo "  [${ELAPSED}s/${MAX_WAIT}s] State=$STATUS Exit=$EXIT"
+            if [ "$STATUS" = "running" ]; then
+              HTTP=$(ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "curl -sf -o /dev/null --max-time 8 http://127.0.0.1:3000/login ; echo \$?")
+              if [ "$HTTP" = "0" ]; then
+                echo "✅🔥 [${ELAPSED}s] HTTP 200 OK! Next.js START BERHASIL!"
+                OK=1
                 break
               fi
-              if [ "$CURRENT_STATE" = "missing" ]; then
-                echo "  ⚠️  Container HILANG (docker ps tidak ditemukan). Break loop."
-                HEALTH_OK=2
-                break
-              fi
-              sleep $CHECK_INTERVAL
-              ELAPSED=$((ELAPSED + CHECK_INTERVAL))
-            done
-            if [ "$HEALTH_OK" -eq 0 ]; then
-              echo "  ⚠️  TIMEOUT: Container tidak pernah running > 230s. Munculkan logs terakhir:"
-              docker logs "$NEW_CONTAINER_ID" 2>&1 | tail -80
-            elif [ "$HEALTH_OK" -eq 1 ]; then
-              echo "  ✅ HEALTH OK: container stay running selama >230s (tidak crash-loop)"
             fi
-
-            echo ""
-            echo "--- [REMOTE 6/8] VERIFY HTTP 200 OK (curl internal port 3000) — FAILURE = WARNING SAJA ---"
-            sleep 10
-            HTTP_OK=0
-            if curl -sf -o /dev/null --max-time 20 http://127.0.0.1:3000/login ; then
-              echo "  ✅ HTTP 200 OK! http://127.0.0.1:3000/login bisa diakses dari dalam server (Next.js start OK!)"
-              HTTP_OK=1
-            else
-              echo "  ⚠️  Attempt 1 gagal. Tunggu 15 detik lagi (Next.js build lambat)..."
-              sleep 20
-              if curl -sf -o /dev/null --max-time 20 http://127.0.0.1:3000/login ; then
-                echo "  ✅ HTTP 200 OK! Attempt 2."
-                HTTP_OK=1
-              else
-                echo "  ⚠️  Attempt 2 masih gagal. Tunggu 30 detik final attempt..."
-                sleep 35
-                if curl -sf -o /dev/null --max-time 25 http://127.0.0.1:3000/login ; then
-                  echo "  ✅ HTTP 200 OK! Final attempt 3 BERHASIL!"
-                  HTTP_OK=1
-                else
-                  echo "  ⚠️  HTTP curl 3x GAGAL. 100 logs container terakhir (UNTUK DEBUG!):"
-                  docker logs --tail 100 "$NEW_CONTAINER_ID" 2>&1 | tail -100
-                fi
-              fi
+            if [ "$STATUS" = "exited" ] || [ "$STATUS" = "dead" ]; then
+              echo "⚠️  Container EXIT/DEAD! Munculkan 100 logs terakhir:"
+              ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "docker logs $CID 2>&1 | tail -100"
+              OK=2
+              break
             fi
-            echo "  Final HTTP_OK status = $HTTP_OK"
+            if [ "$STATUS" = "missing" ]; then
+              echo "⚠️  Container HILANG!"
+              break
+            fi
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+          if [ $OK -eq 0 ]; then
+            echo "⚠️  TIMEOUT 240 detik — 100 logs terakhir container:"
+            ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "docker logs $CID 2>&1 | tail -100"
+          fi
+          echo "FINAL_OK=$OK" >> "$GITHUB_ENV"
+          exit 0
 
-            echo ""
-            echo "--- [REMOTE 7/8] Cleanup old dangling images (hemat disk) ---"
-            docker image prune -f --filter "until=48h" > /dev/null 2>&1 || true
-            echo "  ℹ️  Prune selesai (keep image 48h terakhir)"
+      - name: 🚀 Deploy Step [7/9]: Cleanup dangling images (disk space)
+        env:
+          DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+          SSH_KEY_FILE: /home/runner/.ssh/id_ed25519_coolify
+        run: |
+          set +e
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $SSH_KEY_FILE"
+          ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" \
+            "docker image prune -f --filter 'until=48h' >/dev/null 2>&1 ; echo '✅ Prune done'"
+          exit 0
 
-            echo ""
-            echo "--- [REMOTE 8/8] FINAL VERIFY SUMMARY (ALWAYS SUCCESS workflow exit=0!) ---"
-            echo ""
-            echo "  🐳 docker ps (semua container, lihat STATUS):"
-            docker ps -a --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.RunningFor}}"
-            echo ""
-            echo "  🏷️  Traefik label (pastikan host rule benar):"
-            docker inspect --format='{{range $k,$v := .Config.Labels}}{{printf "%s=%s\n" $k $v}}{{end}}' "$NEW_CONTAINER_ID" 2>/dev/null | grep -E "(^traefik|^deploy.id)" || echo "  ⚠️  Traefik label verify skipped"
-            echo ""
-            echo "  📜 LAST 60 LOG lines (Next.js startup):"
-            docker logs --tail 60 "$NEW_CONTAINER_ID" 2>&1 | grep -v "^$" | tail -70
-            echo ""
-            echo "====================================================================="
-            echo "  ✅ DEPLOY SCRIPT FINISHED (EXIT=0 SELALU). Deploy ID = $DEPLOY_ID"
-            echo "  Container ID : $NEW_CONTAINER_ID"
-            echo "  Image Digest : $IMAGE_DIGEST"
-            echo "  HTTP OK (200): $HTTP_OK"
-            echo "  Akses App    : http://__DOMAIN__/login"
-            echo "  DEMO Control Tower → http://__DOMAIN__/list-psb?q=FA65B42-DEMO"
-            echo "====================================================================="
-          REMOTE_EOF
-          )
-
-          # GANTI PLACEHOLDER DI REMOTE SCRIPT DENGAN VALUE DARI ENV WORKFLOW (supaya tidak kena quote HEREDOC)
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__IMAGE_FULL__/$IMAGE_FULL}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__GHCR_USERNAME__/$GHCR_USERNAME}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__GHCR_TOKEN__/$GHCR_TOKEN}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__DEFAULT_APP_DATA_MODE__/$DEFAULT_APP_DATA_MODE}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__AUTO_LOAD_DEMO_PSB__/$AUTO_LOAD_DEMO_PSB}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__DOMAIN__/$DOMAIN}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__AUTH_SESSION_SECRET__/$AUTH_SESSION_SECRET}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__REVIEW_DB_CONNECT_TIMEOUT_MS__/$REVIEW_DB_CONNECT_TIMEOUT_MS}
-
-          echo "  Connect SSH & execute redeploy script di server remote..."
-          ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "bash -s" <<<"$REMOTE_SCRIPT"
+      - name: 🚀 Deploy Step [8/9]: FINAL SUMMARY docker ps + labels + last logs
+        env:
+          DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+          SSH_KEY_FILE: /home/runner/.ssh/id_ed25519_coolify
+        run: |
+          set +e
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $SSH_KEY_FILE"
+          CID="${{ env.NEW_CONTAINER_ID }}"
           echo ""
-          echo "✅ DEPLOY VIA SSH SELESAI DI SERVER REMOTE!"
+          echo "🐳 docker ps -a:"
+          ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "docker ps -a --filter id=$CID --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.RunningFor}}'"
+          echo ""
+          echo "🏷️  Traefik labels:"
+          ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "docker inspect --format='{{range \$k,\$v := .Config.Labels}}{{printf \"%s=%s\\n\" \$k \$v}}{{end}}' $CID 2>/dev/null | grep -E '^traefik|^deploy.id' || echo '(skip label)'"
+          echo ""
+          echo "📜 Last 60 logs (Next.js startup):"
+          ssh $SSH_OPTS "$DEPLOY_SERVER_USER@$DEPLOY_SERVER_HOST" "docker logs --tail 60 $CID 2>&1 | grep -v '^$' | tail -70"
+          echo ""
+          echo "🏁 FINAL_HTTP_OK = ${{ env.FINAL_OK }} (0=timeout, 1=OK 200, 2=crash exit)"
+          exit 0
 
       - name: ✅ Deploy Success - Post healthcheck
+        if: always()
         run: |
           set +e
           echo "========================================================"
-          echo " ✅ DEPLOY PRODUCTION SELESAI!"
+          echo " 🏁 DEPLOY SELESAI! (Always run, even if steps warning)"
           echo "========================================================"
-          echo " Akses aplikasi production (browser):"
-          echo "   👉 http://de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io/login"
+          echo "  Image Tag  : main-${GITHUB_SHA:0:7}"
+          echo "  Login page :"
+          echo "     👉 http://de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io/login"
           echo ""
-          echo "   🧪 DEMO MODE Control Tower PSB (Lina Maharani id=105):"
-          echo "   👉 http://de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io/list-psb?q=FA65B42-DEMO"
+          echo "  🧪 DEMO MODE Control Tower PSB (Lina Maharani):"
+          echo "     👉 http://de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io/list-psb?q=FA65B42-DEMO"
           echo ""
-          echo " Commit   : $GITHUB_SHA"
-          echo " Actor    : $GITHUB_ACTOR"
-          echo " Date     : $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "  Tanpa query param juga works (APP_DATA_MODE=mock default):"
+          echo "     👉 http://de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io/list-psb"
           echo "========================================================"
