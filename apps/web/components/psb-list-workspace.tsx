@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import type { ChangeEvent } from 'react'
 import { memo, Suspense, useDeferredValue, useMemo, useState } from 'react'
+import { PsbControlTower } from '@/components/psb-control-tower'
 import type { PsbListItem, PsbListPagePayload, PsbListStatus } from '@/lib/psb-list-shared'
 import { resolvePsbListAvailableActions } from '@/lib/psb-list-shared'
 
@@ -418,12 +419,136 @@ export function PsbListWorkspace({
   reviewDbReady: boolean
 }) {
   const { state, summary, items, selectedItem, renderLimit } = payload
+  const normalizedItems = useMemo<PsbListItem[]>(
+    () =>
+      items.map((raw) => ({
+        ...raw,
+        odpPortLabel: (raw as { odpPortLabel?: string | null }).odpPortLabel ?? null,
+        workOrderCode: (raw as { workOrderCode?: string | null }).workOrderCode ?? null,
+        technicianName: (raw as { technicianName?: string | null }).technicianName ?? null,
+        onuSerialNumber: (raw as { onuSerialNumber?: string | null }).onuSerialNumber ?? null,
+        activationStatus:
+          (raw as { activationStatus?: PsbListItem['activationStatus'] }).activationStatus ??
+          (raw.customerActiveAt
+            ? 'CUSTOMER_ACTIVE'
+            : raw.radiusActivatedAt
+              ? 'RADIUS_ACTIVATED'
+              : raw.odpPortAssignedAt
+                ? 'ODP_PORT_ASSIGNED'
+                : raw.onuInstalledAt
+                  ? 'ONU_ASSIGNED'
+                  : 'PENDING'),
+        billingStatus:
+          (raw as { billingStatus?: PsbListItem['billingStatus'] }).billingStatus ??
+          (raw.firstPaymentReceivedAt
+            ? 'FIRST_PAYMENT_RECEIVED'
+            : raw.invoiceGeneratedAt
+              ? 'INVOICE_SENT'
+              : raw.status === 'DITRANSFER_KE_TICKETING'
+                ? 'INVOICE_DRAFT'
+                : 'NOT_GENERATED'),
+        reviewedAt: (raw as { reviewedAt?: string | null }).reviewedAt ?? null,
+        approvedAt: (raw as { approvedAt?: string | null }).approvedAt ?? null,
+        transferredAt: (raw as { transferredAt?: string | null }).transferredAt ?? null,
+        workOrderCreatedAt: (raw as { workOrderCreatedAt?: string | null }).workOrderCreatedAt ?? null,
+        technicianAssignedAt: (raw as { technicianAssignedAt?: string | null }).technicianAssignedAt ?? null,
+        installationStartedAt: (raw as { installationStartedAt?: string | null }).installationStartedAt ?? null,
+        onuInstalledAt: (raw as { onuInstalledAt?: string | null }).onuInstalledAt ?? null,
+        odpPortAssignedAt: (raw as { odpPortAssignedAt?: string | null }).odpPortAssignedAt ?? null,
+        radiusActivatedAt: (raw as { radiusActivatedAt?: string | null }).radiusActivatedAt ?? null,
+        customerActiveAt: (raw as { customerActiveAt?: string | null }).customerActiveAt ?? null,
+        invoiceGeneratedAt: (raw as { invoiceGeneratedAt?: string | null }).invoiceGeneratedAt ?? null,
+        firstPaymentReceivedAt: (raw as { firstPaymentReceivedAt?: string | null }).firstPaymentReceivedAt ?? null,
+        timelineEvents: (raw as { timelineEvents?: PsbListItem['timelineEvents'] }).timelineEvents ?? [],
+      })),
+    [items]
+  )
+  const normalizedSelected = useMemo<PsbListItem | null>(
+    () =>
+      selectedItem
+        ? normalizedItems.find((n) => n.id === selectedItem.id) ?? {
+            ...selectedItem,
+            odpPortLabel:
+              (selectedItem as { odpPortLabel?: string | null }).odpPortLabel ??
+              null,
+            workOrderCode:
+              (selectedItem as { workOrderCode?: string | null }).workOrderCode ??
+              null,
+            technicianName:
+              (selectedItem as { technicianName?: string | null }).technicianName ??
+              null,
+            onuSerialNumber:
+              (selectedItem as { onuSerialNumber?: string | null }).onuSerialNumber ??
+              null,
+            activationStatus:
+              (selectedItem as { activationStatus?: PsbListItem['activationStatus'] })
+                .activationStatus ??
+              (selectedItem.customerActiveAt
+                ? 'CUSTOMER_ACTIVE'
+                : selectedItem.radiusActivatedAt
+                  ? 'RADIUS_ACTIVATED'
+                  : selectedItem.odpPortAssignedAt
+                    ? 'ODP_PORT_ASSIGNED'
+                    : selectedItem.onuInstalledAt
+                      ? 'ONU_ASSIGNED'
+                      : 'PENDING'),
+            billingStatus:
+              (selectedItem as { billingStatus?: PsbListItem['billingStatus'] })
+                .billingStatus ??
+              (selectedItem.firstPaymentReceivedAt
+                ? 'FIRST_PAYMENT_RECEIVED'
+                : selectedItem.invoiceGeneratedAt
+                  ? 'INVOICE_SENT'
+                  : selectedItem.status === 'DITRANSFER_KE_TICKETING'
+                    ? 'INVOICE_DRAFT'
+                    : 'NOT_GENERATED'),
+            reviewedAt:
+              (selectedItem as { reviewedAt?: string | null }).reviewedAt ?? null,
+            approvedAt:
+              (selectedItem as { approvedAt?: string | null }).approvedAt ?? null,
+            transferredAt:
+              (selectedItem as { transferredAt?: string | null }).transferredAt ??
+              null,
+            workOrderCreatedAt:
+              (selectedItem as { workOrderCreatedAt?: string | null })
+                .workOrderCreatedAt ?? null,
+            technicianAssignedAt:
+              (selectedItem as { technicianAssignedAt?: string | null })
+                .technicianAssignedAt ?? null,
+            installationStartedAt:
+              (selectedItem as { installationStartedAt?: string | null })
+                .installationStartedAt ?? null,
+            onuInstalledAt:
+              (selectedItem as { onuInstalledAt?: string | null }).onuInstalledAt ??
+              null,
+            odpPortAssignedAt:
+              (selectedItem as { odpPortAssignedAt?: string | null })
+                .odpPortAssignedAt ?? null,
+            radiusActivatedAt:
+              (selectedItem as { radiusActivatedAt?: string | null })
+                .radiusActivatedAt ?? null,
+            customerActiveAt:
+              (selectedItem as { customerActiveAt?: string | null }).customerActiveAt ??
+              null,
+            invoiceGeneratedAt:
+              (selectedItem as { invoiceGeneratedAt?: string | null })
+                .invoiceGeneratedAt ?? null,
+            firstPaymentReceivedAt:
+              (selectedItem as { firstPaymentReceivedAt?: string | null })
+                .firstPaymentReceivedAt ?? null,
+            timelineEvents:
+              (selectedItem as { timelineEvents?: PsbListItem['timelineEvents'] })
+                .timelineEvents ?? [],
+          }
+        : null,
+    [selectedItem, normalizedItems]
+  )
   const [importOpen, setImportOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error' | 'warning'; message: string } | null>(null)
 
-  const deferredItems = useDeferredValue(items)
-  const deferredSelectedId = useMemo(() => selectedItem?.id, [selectedItem?.id])
+  const deferredItems = useDeferredValue(normalizedItems)
+  const deferredSelectedId = useMemo(() => normalizedSelected?.id ?? null, [normalizedSelected?.id])
   const displayItems = deferredItems
 
   async function handleExportExcel(event: ChangeEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) {
@@ -642,94 +767,41 @@ export function PsbListWorkspace({
         </article>
 
         <aside className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Detail Pilihan</p>
-          {selectedItem ? (
-            <div className="mt-4 space-y-5">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-950">{selectedItem.customerName}</h2>
-                <p className="mt-1 text-sm text-slate-500">{selectedItem.psbListCode}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <span className={`badge ${getStatusTone(selectedItem.status)}`}>{getStatusLabel(selectedItem.status)}</span>
-                {renderMetaBadge('Ticket', selectedItem.transferredTicketRef)}
-                {renderMetaBadge('PIC CS', selectedItem.csPicName)}
-              </div>
-              {renderWorkOrderLinks(selectedItem)}
-              <div className="space-y-3 text-sm text-slate-700">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Alamat</p>
-                  <p className="mt-1 leading-6">{selectedItem.addressText}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Paket dan ODP</p>
-                  <p className="mt-1 leading-6">
-                    {selectedItem.packageLabel || '-'}{selectedItem.odpCode ? ` • ${selectedItem.odpCode}` : ''}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Jadwal Target</p>
-                  <p className="mt-1">{formatDateTime(selectedItem.requestedInstallDate)}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Pengawalan</p>
-                  <p className="mt-1 leading-6">{selectedItem.escortNotes || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Catatan Aktivitas</p>
-                  <p className="mt-1 leading-6">{selectedItem.activityNotes || '-'}</p>
-                </div>
-                {selectedItem.reviewNotes ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Catatan Review CS</p>
-                    <p className="mt-1 leading-6">{selectedItem.reviewNotes}</p>
-                  </div>
-                ) : null}
-                {selectedItem.correctionNotes ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Catatan Koreksi</p>
-                    <p className="mt-1 leading-6">{selectedItem.correctionNotes}</p>
-                  </div>
-                ) : null}
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Jejak Fase 1</p>
-                <div className="mt-3 space-y-2">
-                  {selectedItem.auditSummary.map((item) => (
-                    <div key={`${selectedItem.id}-${item}`} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Arah Batch Berikutnya</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="badge border-slate-200 bg-white text-slate-700">
-                    {canUpdate ? 'Write-side review aktif' : 'Mode monitor'}
-                  </span>
-                  <span className="badge border-slate-200 bg-white text-slate-700">
-                    {canApprove ? 'Approve dan transfer siap dipakai' : 'Approve menunggu role yang berwenang'}
-                  </span>
-                  <span className="badge border-slate-200 bg-white text-slate-700">WO PSB masuk jalur NOC</span>
-                </div>
-              </div>
-
-              <Suspense fallback={<FormModalSkeleton />}>
-                <PsbListTransitionForm
-                  itemId={selectedItem.id}
-                  itemCode={selectedItem.psbListCode}
-                  currentStatus={selectedItem.status}
-                  canUpdate={canUpdate}
-                  canApprove={canApprove}
-                  reviewDbReady={reviewDbReady}
-                />
-              </Suspense>
-            </div>
+          {normalizedSelected ? (
+            <PsbControlTower
+              item={normalizedSelected}
+              canUpdate={canUpdate}
+              canApprove={canApprove}
+              TransitionSlot={
+                <Suspense fallback={<FormModalSkeleton />}>
+                  <PsbListTransitionForm
+                    itemId={normalizedSelected.id}
+                    itemCode={normalizedSelected.psbListCode}
+                    currentStatus={normalizedSelected.status}
+                    canUpdate={canUpdate}
+                    canApprove={canApprove}
+                    reviewDbReady={reviewDbReady}
+                  />
+                </Suspense>
+              }
+            />
           ) : (
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-              Pilih salah satu item untuk membaca detail operasional.
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
+              <p className="text-sm font-semibold text-slate-700">Pilih salah satu PSB di tabel / daftar atas</p>
+              <p className="text-sm text-slate-500">
+                Panel ini akan menampilkan <strong>Control Tower End-to-End</strong>: dari Sales input PSB sampai Customer aktif + Billing bulan pertama.
+              </p>
+              <div className="mx-auto mt-2 flex max-w-lg flex-wrap items-center justify-center gap-2 text-[11px] text-slate-500">
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">Sales → CS</span>
+                <span aria-hidden>→</span>
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">Ticketing → WO</span>
+                <span aria-hidden>→</span>
+                <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-indigo-700">Teknisi → Inventory</span>
+                <span aria-hidden>→</span>
+                <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-violet-700">ODP → Radius</span>
+                <span aria-hidden>→</span>
+                <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-rose-700">Customer Aktif → Billing</span>
+              </div>
             </div>
           )}
         </aside>

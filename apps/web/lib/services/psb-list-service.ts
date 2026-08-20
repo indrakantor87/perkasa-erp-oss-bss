@@ -1,6 +1,8 @@
 import { getConfiguredDataMode, getFallbackDataSourceSnapshot, getDataSourceSnapshot } from '@/lib/data-source'
 import type { AppSession } from '@/lib/auth-session'
 import {
+  type PsbActivationStatus,
+  type PsbBillingStatus,
   type PsbListItem,
   type PsbListPagePayload,
   type PsbListQuery,
@@ -35,6 +37,7 @@ type ReviewDbPsbListRow = {
   customerPhone: string | null
   addressText: string | null
   odpCode: string | null
+  odpPortLabel: string | null
   packageLabel: string | null
   salesOwnerName: string | null
   requestedInstallDate: string | null
@@ -43,8 +46,25 @@ type ReviewDbPsbListRow = {
   correctionNotes: string | null
   transferredTicketRef: string | null
   transferredWorkOrderId: number | null
+  workOrderCode: string | null
+  technicianName: string | null
+  onuSerialNumber: string | null
+  activationStatus: string | null
+  billingStatus: string | null
   createdAt: string | null
   updatedAt: string | null
+  reviewedAt: string | null
+  approvedAt: string | null
+  transferredAt: string | null
+  workOrderCreatedAt: string | null
+  technicianAssignedAt: string | null
+  installationStartedAt: string | null
+  onuInstalledAt: string | null
+  odpPortAssignedAt: string | null
+  radiusActivatedAt: string | null
+  customerActiveAt: string | null
+  invoiceGeneratedAt: string | null
+  firstPaymentReceivedAt: string | null
   areaLabel: string | null
   googleMapsLink: string | null
   escortNotes: string | null
@@ -79,6 +99,7 @@ const mockPsbListItems: PsbListItem[] = [
     customerPhone: '628523110022',
     addressText: 'Perum Griya Pati Indah Blok C2 No. 8, Pati Kidul',
     odpCode: 'ODP-PTI-02',
+    odpPortLabel: 'PORT-03',
     packageLabel: 'Home 20 Mbps',
     salesOwnerName: 'Dhimas',
     requestedInstallDate: '2026-07-20T09:00:00+07:00',
@@ -87,8 +108,25 @@ const mockPsbListItems: PsbListItem[] = [
     correctionNotes: null,
     transferredTicketRef: null,
     transferredWorkOrderId: null,
+    workOrderCode: null,
+    technicianName: null,
+    onuSerialNumber: null,
+    activationStatus: 'PENDING',
+    billingStatus: 'NOT_GENERATED',
     createdAt: '2026-07-19T08:12:00+07:00',
     updatedAt: '2026-07-19T08:12:00+07:00',
+    reviewedAt: null,
+    approvedAt: null,
+    transferredAt: null,
+    workOrderCreatedAt: null,
+    technicianAssignedAt: null,
+    installationStartedAt: null,
+    onuInstalledAt: null,
+    odpPortAssignedAt: null,
+    radiusActivatedAt: null,
+    customerActiveAt: null,
+    invoiceGeneratedAt: null,
+    firstPaymentReceivedAt: null,
     areaLabel: 'Pati Kota',
     googleMapsLink: 'https://maps.google.com/?q=-6.745204,111.038785',
     escortNotes: 'Marketing meminta pemasangan pagi karena customer standby di rumah.',
@@ -96,6 +134,20 @@ const mockPsbListItems: PsbListItem[] = [
     csPicName: null,
     nextActionLabel: 'Masuk review CS',
     auditSummary: ['Input Penjualan', 'Coverage siap', 'Menunggu validasi CS'],
+    timelineEvents: [
+      { key: 'PSB_CREATED', label: 'PSB dibuat', happenedAt: '2026-07-19T08:12:00+07:00', actorLabel: 'Dhimas', notes: 'Input data via Workspace Penjualan' },
+      { key: 'CS_REVIEWED', label: 'CS Review', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'APPROVED', label: 'Approved', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'WO_CREATED', label: 'WO dibuat', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'TECHNICIAN_ASSIGNED', label: 'Teknisi assigned', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'INSTALLATION_SCHEDULED', label: 'Instalasi', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'ONU_INSTALLED', label: 'ONU installed', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'ODP_PORT_ASSIGNED', label: 'ODP Port assigned', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'RADIUS_ACTIVATED', label: 'Radius activated', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'CUSTOMER_ACTIVE', label: 'Customer active', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'BILLING_INVOICE_GENERATED', label: 'Invoice bulan pertama', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'BILLING_PAYMENT_RECEIVED', label: 'Pembayaran diterima', happenedAt: null, actorLabel: null, notes: null },
+    ],
   },
   {
     id: 102,
@@ -104,6 +156,7 @@ const mockPsbListItems: PsbListItem[] = [
     customerPhone: '628133445566',
     addressText: 'Ds. Sukoharjo RT 03 RW 01, Margorejo',
     odpCode: 'ODP-MRG-11',
+    odpPortLabel: 'PORT-08',
     packageLabel: 'Home 30 Mbps',
     salesOwnerName: 'Kantor',
     requestedInstallDate: '2026-07-20T13:30:00+07:00',
@@ -112,8 +165,25 @@ const mockPsbListItems: PsbListItem[] = [
     correctionNotes: null,
     transferredTicketRef: null,
     transferredWorkOrderId: null,
+    workOrderCode: null,
+    technicianName: null,
+    onuSerialNumber: null,
+    activationStatus: 'PENDING',
+    billingStatus: 'NOT_GENERATED',
     createdAt: '2026-07-18T14:10:00+07:00',
     updatedAt: '2026-07-19T09:45:00+07:00',
+    reviewedAt: '2026-07-19T08:30:00+07:00',
+    approvedAt: null,
+    transferredAt: null,
+    workOrderCreatedAt: null,
+    technicianAssignedAt: null,
+    installationStartedAt: null,
+    onuInstalledAt: null,
+    odpPortAssignedAt: null,
+    radiusActivatedAt: null,
+    customerActiveAt: null,
+    invoiceGeneratedAt: null,
+    firstPaymentReceivedAt: null,
     areaLabel: 'Margorejo',
     googleMapsLink: 'https://maps.google.com/?q=-6.748800,111.021700',
     escortNotes: 'Sudah dikawal oleh penjualan, customer responsif via WhatsApp.',
@@ -121,6 +191,20 @@ const mockPsbListItems: PsbListItem[] = [
     csPicName: 'Admin CS Pagi',
     nextActionLabel: 'Validasi slot ODP',
     auditSummary: ['Input Penjualan', 'Masuk review CS', 'Butuh cek ODP'],
+    timelineEvents: [
+      { key: 'PSB_CREATED', label: 'PSB dibuat', happenedAt: '2026-07-18T14:10:00+07:00', actorLabel: 'Kantor', notes: 'Form Input PSB disubmit sales' },
+      { key: 'CS_REVIEWED', label: 'CS Review', happenedAt: '2026-07-19T08:30:00+07:00', actorLabel: 'Admin CS Pagi', notes: 'Validasi biodata dan alamat' },
+      { key: 'APPROVED', label: 'Approved', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'WO_CREATED', label: 'WO dibuat', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'TECHNICIAN_ASSIGNED', label: 'Teknisi assigned', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'INSTALLATION_SCHEDULED', label: 'Instalasi', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'ONU_INSTALLED', label: 'ONU installed', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'ODP_PORT_ASSIGNED', label: 'ODP Port assigned', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'RADIUS_ACTIVATED', label: 'Radius activated', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'CUSTOMER_ACTIVE', label: 'Customer active', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'BILLING_INVOICE_GENERATED', label: 'Invoice bulan pertama', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'BILLING_PAYMENT_RECEIVED', label: 'Pembayaran diterima', happenedAt: null, actorLabel: null, notes: null },
+    ],
   },
   {
     id: 103,
@@ -129,6 +213,7 @@ const mockPsbListItems: PsbListItem[] = [
     customerPhone: '62295214567',
     addressText: 'Kawasan Industri Margorejo Blok C2',
     odpCode: 'ODP-KIM-03',
+    odpPortLabel: 'PORT-02',
     packageLabel: 'Dedicated 50 Mbps',
     salesOwnerName: 'Chalis',
     requestedInstallDate: '2026-07-21T10:00:00+07:00',
@@ -137,8 +222,25 @@ const mockPsbListItems: PsbListItem[] = [
     correctionNotes: 'Lengkapi nama PIC onsite, jam akses pabrik, dan nomor penanggung jawab lapangan.',
     transferredTicketRef: null,
     transferredWorkOrderId: null,
+    workOrderCode: null,
+    technicianName: null,
+    onuSerialNumber: null,
+    activationStatus: 'PENDING',
+    billingStatus: 'NOT_GENERATED',
     createdAt: '2026-07-18T11:20:00+07:00',
     updatedAt: '2026-07-19T10:20:00+07:00',
+    reviewedAt: '2026-07-19T09:50:00+07:00',
+    approvedAt: null,
+    transferredAt: null,
+    workOrderCreatedAt: null,
+    technicianAssignedAt: null,
+    installationStartedAt: null,
+    onuInstalledAt: null,
+    odpPortAssignedAt: null,
+    radiusActivatedAt: null,
+    customerActiveAt: null,
+    invoiceGeneratedAt: null,
+    firstPaymentReceivedAt: null,
     areaLabel: 'Margorejo Industri',
     googleMapsLink: 'https://maps.google.com/?q=-6.752100,111.018400',
     escortNotes: 'Customer corporate minta teknisi datang setelah jam 10 pagi.',
@@ -146,6 +248,20 @@ const mockPsbListItems: PsbListItem[] = [
     csPicName: 'CS Operator 02',
     nextActionLabel: 'Tunggu koreksi penjualan',
     auditSummary: ['Input Penjualan', 'Masuk review CS', 'Dikembalikan untuk koreksi'],
+    timelineEvents: [
+      { key: 'PSB_CREATED', label: 'PSB dibuat', happenedAt: '2026-07-18T11:20:00+07:00', actorLabel: 'Chalis', notes: 'Corporate client Kawasan Industri' },
+      { key: 'CS_REVIEWED', label: 'CS Review', happenedAt: '2026-07-19T09:50:00+07:00', actorLabel: 'CS Operator 02', notes: 'Butuh dokumen akses pabrik' },
+      { key: 'APPROVED', label: 'Approved', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'WO_CREATED', label: 'WO dibuat', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'TECHNICIAN_ASSIGNED', label: 'Teknisi assigned', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'INSTALLATION_SCHEDULED', label: 'Instalasi', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'ONU_INSTALLED', label: 'ONU installed', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'ODP_PORT_ASSIGNED', label: 'ODP Port assigned', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'RADIUS_ACTIVATED', label: 'Radius activated', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'CUSTOMER_ACTIVE', label: 'Customer active', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'BILLING_INVOICE_GENERATED', label: 'Invoice bulan pertama', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'BILLING_PAYMENT_RECEIVED', label: 'Pembayaran diterima', happenedAt: null, actorLabel: null, notes: null },
+    ],
   },
   {
     id: 104,
@@ -154,6 +270,7 @@ const mockPsbListItems: PsbListItem[] = [
     customerPhone: '628987654321',
     addressText: 'Jl. Melati No. 12, Pati Lor',
     odpCode: 'ODP-PTL-04',
+    odpPortLabel: 'PORT-04',
     packageLabel: 'Home 20 Mbps',
     salesOwnerName: 'Dhimas',
     requestedInstallDate: '2026-07-19T15:00:00+07:00',
@@ -162,8 +279,25 @@ const mockPsbListItems: PsbListItem[] = [
     correctionNotes: null,
     transferredTicketRef: null,
     transferredWorkOrderId: null,
+    workOrderCode: null,
+    technicianName: null,
+    onuSerialNumber: null,
+    activationStatus: 'ODP_PORT_ASSIGNED',
+    billingStatus: 'INVOICE_DRAFT',
     createdAt: '2026-07-18T16:35:00+07:00',
     updatedAt: '2026-07-19T11:05:00+07:00',
+    reviewedAt: '2026-07-19T09:00:00+07:00',
+    approvedAt: '2026-07-19T11:05:00+07:00',
+    transferredAt: null,
+    workOrderCreatedAt: null,
+    technicianAssignedAt: null,
+    installationStartedAt: null,
+    onuInstalledAt: null,
+    odpPortAssignedAt: '2026-07-19T10:30:00+07:00',
+    radiusActivatedAt: null,
+    customerActiveAt: null,
+    invoiceGeneratedAt: null,
+    firstPaymentReceivedAt: null,
     areaLabel: 'Pati Lor',
     googleMapsLink: 'https://maps.google.com/?q=-6.747950,111.036540',
     escortNotes: 'Rumah mudah ditemukan, titik maps sudah dibagikan.',
@@ -171,6 +305,20 @@ const mockPsbListItems: PsbListItem[] = [
     csPicName: 'Admin CS Pagi',
     nextActionLabel: 'Transfer ke ticketing',
     auditSummary: ['Input Penjualan', 'Review selesai', 'Disetujui CS'],
+    timelineEvents: [
+      { key: 'PSB_CREATED', label: 'PSB dibuat', happenedAt: '2026-07-18T16:35:00+07:00', actorLabel: 'Dhimas', notes: 'Residential Pati Lor' },
+      { key: 'CS_REVIEWED', label: 'CS Review', happenedAt: '2026-07-19T09:00:00+07:00', actorLabel: 'Admin CS Pagi', notes: 'Data valid' },
+      { key: 'APPROVED', label: 'Approved', happenedAt: '2026-07-19T11:05:00+07:00', actorLabel: 'Admin CS Pagi', notes: 'Slot ODP tersedia, approve transfer' },
+      { key: 'WO_CREATED', label: 'WO dibuat', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'TECHNICIAN_ASSIGNED', label: 'Teknisi assigned', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'INSTALLATION_SCHEDULED', label: 'Instalasi', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'ONU_INSTALLED', label: 'ONU installed', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'ODP_PORT_ASSIGNED', label: 'ODP Port assigned', happenedAt: '2026-07-19T10:30:00+07:00', actorLabel: 'NOC', notes: 'Port 04 di ODP-PTL-04 tersedia' },
+      { key: 'RADIUS_ACTIVATED', label: 'Radius activated', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'CUSTOMER_ACTIVE', label: 'Customer active', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'BILLING_INVOICE_GENERATED', label: 'Invoice bulan pertama', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'BILLING_PAYMENT_RECEIVED', label: 'Pembayaran diterima', happenedAt: null, actorLabel: null, notes: null },
+    ],
   },
   {
     id: 105,
@@ -179,6 +327,7 @@ const mockPsbListItems: PsbListItem[] = [
     customerPhone: '628111000222',
     addressText: 'Perumahan Graha Asri Blok B7, Tlogowungu',
     odpCode: 'ODP-TLG-07',
+    odpPortLabel: 'PORT-12',
     packageLabel: 'Home 20 Mbps',
     salesOwnerName: 'Kantor',
     requestedInstallDate: '2026-07-22T08:30:00+07:00',
@@ -186,9 +335,26 @@ const mockPsbListItems: PsbListItem[] = [
     reviewNotes: 'Data lengkap dan sudah diteruskan ke ticketing.',
     correctionNotes: null,
     transferredTicketRef: 'PSB/19.07.2026/0188',
-    transferredWorkOrderId: null,
+    transferredWorkOrderId: 5421,
+    workOrderCode: 'WO-20260719-00421',
+    technicianName: 'Andi Wijaya',
+    onuSerialNumber: 'ONU-HW-82104-A1B2',
+    activationStatus: 'CUSTOMER_ACTIVE',
+    billingStatus: 'FIRST_PAYMENT_RECEIVED',
     createdAt: '2026-07-17T09:00:00+07:00',
     updatedAt: '2026-07-19T07:40:00+07:00',
+    reviewedAt: '2026-07-17T15:40:00+07:00',
+    approvedAt: '2026-07-17T18:10:00+07:00',
+    transferredAt: '2026-07-18T07:30:00+07:00',
+    workOrderCreatedAt: '2026-07-18T10:15:00+07:00',
+    technicianAssignedAt: '2026-07-18T11:20:00+07:00',
+    installationStartedAt: '2026-07-19T13:40:00+07:00',
+    onuInstalledAt: '2026-07-19T14:10:00+07:00',
+    odpPortAssignedAt: '2026-07-19T14:20:00+07:00',
+    radiusActivatedAt: '2026-07-19T14:30:00+07:00',
+    customerActiveAt: '2026-07-19T14:31:00+07:00',
+    invoiceGeneratedAt: '2026-07-19T15:10:00+07:00',
+    firstPaymentReceivedAt: '2026-07-19T16:25:00+07:00',
     areaLabel: 'Tlogowungu',
     googleMapsLink: 'https://maps.google.com/?q=-6.677430,111.019840',
     escortNotes: 'Customer sudah konfirmasi pemasangan minggu ini.',
@@ -196,6 +362,20 @@ const mockPsbListItems: PsbListItem[] = [
     csPicName: 'CS Operator 01',
     nextActionLabel: 'Monitor ticket',
     auditSummary: ['Input Penjualan', 'Disetujui CS', 'Ditrasfer ke ticketing'],
+    timelineEvents: [
+      { key: 'PSB_CREATED', label: 'PSB dibuat', happenedAt: '2026-07-17T09:00:00+07:00', actorLabel: 'Kantor', notes: 'Submit data via form Input PSB' },
+      { key: 'CS_REVIEWED', label: 'CS Review', happenedAt: '2026-07-17T15:40:00+07:00', actorLabel: 'CS Operator 01', notes: 'Cek data dan coverage ODP' },
+      { key: 'APPROVED', label: 'Approved', happenedAt: '2026-07-17T18:10:00+07:00', actorLabel: 'Admin CS Pagi', notes: 'Slot ODP port 12 tersedia' },
+      { key: 'WO_CREATED', label: 'WO dibuat', happenedAt: '2026-07-18T10:15:00+07:00', actorLabel: 'NOC', notes: 'Work Order WO-20260719-00421 dibuat' },
+      { key: 'TECHNICIAN_ASSIGNED', label: 'Teknisi assigned', happenedAt: '2026-07-18T11:20:00+07:00', actorLabel: 'Andi Wijaya', notes: 'Teknisi lapangan ditugaskan' },
+      { key: 'INSTALLATION_SCHEDULED', label: 'Instalasi', happenedAt: '2026-07-19T13:40:00+07:00', actorLabel: 'Andi Wijaya', notes: 'Datang ke lokasi sesuai jadwal' },
+      { key: 'ONU_INSTALLED', label: 'ONU installed', happenedAt: '2026-07-19T14:10:00+07:00', actorLabel: 'Andi Wijaya', notes: 'Serial ONU-HW-82104-A1B2 terpasang' },
+      { key: 'ODP_PORT_ASSIGNED', label: 'ODP Port assigned', happenedAt: '2026-07-19T14:20:00+07:00', actorLabel: 'NOC', notes: 'ODP-TLG-07 · PORT-12 aktif' },
+      { key: 'RADIUS_ACTIVATED', label: 'Radius activated', happenedAt: '2026-07-19T14:30:00+07:00', actorLabel: 'NOC / Radius', notes: 'PPPoE username berhasil create & sync Mikrotik' },
+      { key: 'CUSTOMER_ACTIVE', label: 'Customer active', happenedAt: '2026-07-19T14:31:00+07:00', actorLabel: 'CS Operator 01', notes: 'Internet normal, konfirmasi ke customer' },
+      { key: 'BILLING_INVOICE_GENERATED', label: 'Invoice bulan pertama', happenedAt: '2026-07-19T15:10:00+07:00', actorLabel: 'Finance', notes: 'Generate INV-202607-00042 tagihan bulan pertama' },
+      { key: 'BILLING_PAYMENT_RECEIVED', label: 'Pembayaran diterima', happenedAt: '2026-07-19T16:25:00+07:00', actorLabel: 'Finance', notes: 'Transfer VA BCA masuk, status LUNAS' },
+    ],
   },
   {
     id: 106,
@@ -204,6 +384,7 @@ const mockPsbListItems: PsbListItem[] = [
     customerPhone: '628123456789',
     addressText: 'Jl. Raya Tayu Km. 3, Tayu',
     odpCode: null,
+    odpPortLabel: null,
     packageLabel: 'Home 10 Mbps',
     salesOwnerName: 'Dhimas',
     requestedInstallDate: '2026-07-23T14:00:00+07:00',
@@ -212,8 +393,25 @@ const mockPsbListItems: PsbListItem[] = [
     correctionNotes: 'Perlu input ulang setelah alamat final dan hasil coverage baru tersedia.',
     transferredTicketRef: null,
     transferredWorkOrderId: null,
+    workOrderCode: null,
+    technicianName: null,
+    onuSerialNumber: null,
+    activationStatus: 'PENDING',
+    billingStatus: 'NOT_GENERATED',
     createdAt: '2026-07-17T13:15:00+07:00',
     updatedAt: '2026-07-18T10:10:00+07:00',
+    reviewedAt: '2026-07-18T09:40:00+07:00',
+    approvedAt: null,
+    transferredAt: null,
+    workOrderCreatedAt: null,
+    technicianAssignedAt: null,
+    installationStartedAt: null,
+    onuInstalledAt: null,
+    odpPortAssignedAt: null,
+    radiusActivatedAt: null,
+    customerActiveAt: null,
+    invoiceGeneratedAt: null,
+    firstPaymentReceivedAt: null,
     areaLabel: 'Tayu',
     googleMapsLink: 'https://maps.google.com/?q=-6.539970,111.113620',
     escortNotes: 'Masih menunggu alamat final dari penjualan.',
@@ -221,6 +419,20 @@ const mockPsbListItems: PsbListItem[] = [
     csPicName: 'Admin CS Sore',
     nextActionLabel: 'Tunggu submit ulang',
     auditSummary: ['Input Penjualan', 'Review CS', 'Ditolak karena data belum layak'],
+    timelineEvents: [
+      { key: 'PSB_CREATED', label: 'PSB dibuat', happenedAt: '2026-07-17T13:15:00+07:00', actorLabel: 'Dhimas', notes: 'Submit awal dari toko' },
+      { key: 'CS_REVIEWED', label: 'CS Review', happenedAt: '2026-07-18T09:40:00+07:00', actorLabel: 'Admin CS Sore', notes: 'Coverage tayu km3 belum layak' },
+      { key: 'APPROVED', label: 'Approved', happenedAt: null, actorLabel: null, notes: 'Ditolak karena coverage & data' },
+      { key: 'WO_CREATED', label: 'WO dibuat', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'TECHNICIAN_ASSIGNED', label: 'Teknisi assigned', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'INSTALLATION_SCHEDULED', label: 'Instalasi', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'ONU_INSTALLED', label: 'ONU installed', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'ODP_PORT_ASSIGNED', label: 'ODP Port assigned', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'RADIUS_ACTIVATED', label: 'Radius activated', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'CUSTOMER_ACTIVE', label: 'Customer active', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'BILLING_INVOICE_GENERATED', label: 'Invoice bulan pertama', happenedAt: null, actorLabel: null, notes: null },
+      { key: 'BILLING_PAYMENT_RECEIVED', label: 'Pembayaran diterima', happenedAt: null, actorLabel: null, notes: null },
+    ],
   },
 ]
 
@@ -350,6 +562,37 @@ function buildFallbackSnapshot(detail: string) {
 
 function mapReviewDbRowToPsbListItem(row: ReviewDbPsbListRow): PsbListItem {
   const status = normalizeStatus(row.status)
+  const activationStatus =
+    (row.activationStatus === 'PENDING' ||
+      row.activationStatus === 'ONU_ASSIGNED' ||
+      row.activationStatus === 'ODP_PORT_ASSIGNED' ||
+      row.activationStatus === 'RADIUS_ACTIVATED' ||
+      row.activationStatus === 'CUSTOMER_ACTIVE'
+      ? row.activationStatus
+      : null) ??
+    (row.customerActiveAt
+      ? 'CUSTOMER_ACTIVE'
+      : row.radiusActivatedAt
+        ? 'RADIUS_ACTIVATED'
+        : row.odpPortAssignedAt
+          ? 'ODP_PORT_ASSIGNED'
+          : row.onuInstalledAt
+            ? 'ONU_ASSIGNED'
+            : 'PENDING')
+  const billingStatus =
+    (row.billingStatus === 'NOT_GENERATED' ||
+      row.billingStatus === 'INVOICE_DRAFT' ||
+      row.billingStatus === 'INVOICE_SENT' ||
+      row.billingStatus === 'FIRST_PAYMENT_RECEIVED'
+      ? row.billingStatus
+      : null) ??
+    (row.firstPaymentReceivedAt
+      ? 'FIRST_PAYMENT_RECEIVED'
+      : row.invoiceGeneratedAt
+        ? 'INVOICE_SENT'
+        : status === 'DITRANSFER_KE_TICKETING'
+          ? 'INVOICE_DRAFT'
+          : 'NOT_GENERATED')
 
   return {
     id: Number(row.id),
@@ -358,6 +601,7 @@ function mapReviewDbRowToPsbListItem(row: ReviewDbPsbListRow): PsbListItem {
     customerPhone: row.customerPhone,
     addressText: String(row.addressText ?? '-'),
     odpCode: row.odpCode,
+    odpPortLabel: row.odpPortLabel,
     packageLabel: row.packageLabel,
     salesOwnerName: row.salesOwnerName,
     requestedInstallDate: row.requestedInstallDate,
@@ -366,8 +610,25 @@ function mapReviewDbRowToPsbListItem(row: ReviewDbPsbListRow): PsbListItem {
     correctionNotes: row.correctionNotes,
     transferredTicketRef: row.transferredTicketRef,
     transferredWorkOrderId: row.transferredWorkOrderId != null ? Number(row.transferredWorkOrderId) : null,
+    workOrderCode: row.workOrderCode,
+    technicianName: row.technicianName,
+    onuSerialNumber: row.onuSerialNumber,
+    activationStatus: activationStatus as PsbActivationStatus,
+    billingStatus: billingStatus as PsbBillingStatus,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    reviewedAt: row.reviewedAt,
+    approvedAt: row.approvedAt,
+    transferredAt: row.transferredAt,
+    workOrderCreatedAt: row.workOrderCreatedAt,
+    technicianAssignedAt: row.technicianAssignedAt,
+    installationStartedAt: row.installationStartedAt,
+    onuInstalledAt: row.onuInstalledAt,
+    odpPortAssignedAt: row.odpPortAssignedAt,
+    radiusActivatedAt: row.radiusActivatedAt,
+    customerActiveAt: row.customerActiveAt,
+    invoiceGeneratedAt: row.invoiceGeneratedAt,
+    firstPaymentReceivedAt: row.firstPaymentReceivedAt,
     areaLabel: row.areaLabel,
     googleMapsLink: row.googleMapsLink,
     escortNotes: row.escortNotes,
@@ -375,6 +636,7 @@ function mapReviewDbRowToPsbListItem(row: ReviewDbPsbListRow): PsbListItem {
     csPicName: row.csPicName,
     nextActionLabel: row.nextActionLabel?.trim() || buildNextActionLabel(status),
     auditSummary: [],
+    timelineEvents: [],
   }
 }
 
@@ -471,8 +733,24 @@ export async function ensurePsbListTables() {
   await ensurePsbListColumn('approved_by', 'approved_by VARCHAR(150) NULL', 'next_action_label')
   await ensurePsbListColumn('approved_at', 'approved_at DATETIME NULL', 'approved_by')
   await ensurePsbListColumn('transferred_work_order_id', 'transferred_work_order_id BIGINT UNSIGNED NULL', 'transferred_ticket_ref')
+  await ensurePsbListColumn('work_order_code', 'work_order_code VARCHAR(80) NULL', 'transferred_work_order_id')
+  await ensurePsbListColumn('technician_name', 'technician_name VARCHAR(150) NULL', 'work_order_code')
+  await ensurePsbListColumn('onu_serial_number', 'onu_serial_number VARCHAR(120) NULL', 'technician_name')
+  await ensurePsbListColumn('odp_port_label', 'odp_port_label VARCHAR(80) NULL', 'odp_code')
+  await ensurePsbListColumn('reviewed_at', 'reviewed_at DATETIME NULL', 'updated_at')
   await ensurePsbListColumn('transferred_by', 'transferred_by VARCHAR(150) NULL', 'transferred_work_order_id')
   await ensurePsbListColumn('transferred_at', 'transferred_at DATETIME NULL', 'transferred_by')
+  await ensurePsbListColumn('work_order_created_at', 'work_order_created_at DATETIME NULL', 'transferred_at')
+  await ensurePsbListColumn('technician_assigned_at', 'technician_assigned_at DATETIME NULL', 'work_order_created_at')
+  await ensurePsbListColumn('installation_started_at', 'installation_started_at DATETIME NULL', 'technician_assigned_at')
+  await ensurePsbListColumn('onu_installed_at', 'onu_installed_at DATETIME NULL', 'installation_started_at')
+  await ensurePsbListColumn('odp_port_assigned_at', 'odp_port_assigned_at DATETIME NULL', 'onu_installed_at')
+  await ensurePsbListColumn('radius_activated_at', 'radius_activated_at DATETIME NULL', 'odp_port_assigned_at')
+  await ensurePsbListColumn('customer_active_at', 'customer_active_at DATETIME NULL', 'radius_activated_at')
+  await ensurePsbListColumn('invoice_generated_at', 'invoice_generated_at DATETIME NULL', 'customer_active_at')
+  await ensurePsbListColumn('first_payment_received_at', 'first_payment_received_at DATETIME NULL', 'invoice_generated_at')
+  await ensurePsbListColumn('activation_status', "activation_status VARCHAR(40) NOT NULL DEFAULT 'PENDING'", 'onu_serial_number')
+  await ensurePsbListColumn('billing_status', "billing_status VARCHAR(40) NOT NULL DEFAULT 'NOT_GENERATED'", 'activation_status')
 
   await ensurePsbListAuditColumn('from_status', 'from_status VARCHAR(40) NULL', 'event_type')
   await ensurePsbListAuditColumn('to_status', 'to_status VARCHAR(40) NULL', 'from_status')
@@ -809,6 +1087,7 @@ async function getReviewDbPsbListPageData(
         customer_phone AS customerPhone,
         address_text AS addressText,
         odp_code AS odpCode,
+        odp_port_label AS odpPortLabel,
         package_label AS packageLabel,
         sales_owner_name AS salesOwnerName,
         requested_install_date AS requestedInstallDate,
@@ -817,8 +1096,25 @@ async function getReviewDbPsbListPageData(
         correction_notes AS correctionNotes,
         transferred_ticket_ref AS transferredTicketRef,
         transferred_work_order_id AS transferredWorkOrderId,
+        work_order_code AS workOrderCode,
+        technician_name AS technicianName,
+        onu_serial_number AS onuSerialNumber,
+        activation_status AS activationStatus,
+        billing_status AS billingStatus,
         created_at AS createdAt,
         updated_at AS updatedAt,
+        reviewed_at AS reviewedAt,
+        approved_at AS approvedAt,
+        transferred_at AS transferredAt,
+        work_order_created_at AS workOrderCreatedAt,
+        technician_assigned_at AS technicianAssignedAt,
+        installation_started_at AS installationStartedAt,
+        onu_installed_at AS onuInstalledAt,
+        odp_port_assigned_at AS odpPortAssignedAt,
+        radius_activated_at AS radiusActivatedAt,
+        customer_active_at AS customerActiveAt,
+        invoice_generated_at AS invoiceGeneratedAt,
+        first_payment_received_at AS firstPaymentReceivedAt,
         area_label AS areaLabel,
         google_maps_link AS googleMapsLink,
         escort_notes AS escortNotes,
@@ -1328,13 +1624,23 @@ export async function transferPsbListToTicket(params: {
           status = 'DITRANSFER_KE_TICKETING',
           transferred_ticket_ref = ?,
           transferred_work_order_id = ?,
+          work_order_code = ?,
+          work_order_created_at = CURRENT_TIMESTAMP,
+          activation_status = CASE
+            WHEN activation_status IS NULL OR activation_status = '' THEN 'PENDING'
+            ELSE activation_status
+          END,
+          billing_status = CASE
+            WHEN billing_status IS NULL OR billing_status = '' THEN 'INVOICE_DRAFT'
+            ELSE billing_status
+          END,
           transferred_by = ?,
           transferred_at = CURRENT_TIMESTAMP,
           next_action_label = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `,
-      [workOrderNo, workOrderId, params.actorName, buildNextActionLabel('DITRANSFER_KE_TICKETING'), row.id],
+      [workOrderNo, workOrderId, workOrderNo, params.actorName, buildNextActionLabel('DITRANSFER_KE_TICKETING'), row.id],
     )
 
     await connection.query(
