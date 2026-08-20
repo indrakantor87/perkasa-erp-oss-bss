@@ -186,6 +186,35 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{
+  var keyLs='perkasa.ui-theme';
+  var keyCk='perkasa-ui-theme';
+  var pref='';
+  try{
+    pref=window.localStorage.getItem(keyLs)||'';
+  }catch(e){pref='';}
+  if(!pref){
+    try{
+      var cks=('; '+document.cookie).split('; '+keyCk+'=');
+      if(cks.length===2){pref=cks.pop().split(';').shift()||'';}
+    }catch(e){pref='';}
+  }
+  pref=(pref||'').trim().toLowerCase();
+  if(pref!=='light'&&pref!=='dark'){pref='';}
+  if(!pref){
+    try{
+      if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches){pref='dark';}
+      else{pref='light';}
+    }catch(e){pref='light';}
+  }
+  var el=document.documentElement;
+  if(el.getAttribute('data-theme')!==pref){el.setAttribute('data-theme',pref);}
+  el.style.colorScheme=pref;
+}catch(e){try{document.documentElement.setAttribute('data-theme','light');document.documentElement.style.colorScheme='light';}catch(e2){}}})();`
+          }}
+        />
       </head>
       <body
         style={

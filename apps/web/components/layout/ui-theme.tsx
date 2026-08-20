@@ -27,16 +27,26 @@ export function ThemeProvider({
       return initialTheme
     }
     try {
+      const docEl = document.documentElement
+      const dataTheme = (docEl?.getAttribute('data-theme') ?? '').trim().toLowerCase()
+      if (dataTheme === 'light' || dataTheme === 'dark') {
+        try {
+          if (docEl && docEl.style.colorScheme !== dataTheme) {
+            docEl.style.colorScheme = dataTheme
+          }
+        } catch {
+          /* ignore style errors */
+        }
+        return dataTheme
+      }
       const stored = window.localStorage.getItem(UI_THEME_STORAGE_KEY)
       if (stored) {
         const normalized = normalizeUiTheme(stored)
-        if (document.documentElement) {
-          if (document.documentElement.dataset.theme !== normalized) {
-            document.documentElement.dataset.theme = normalized
-          }
-          if (document.documentElement.style.colorScheme !== normalized) {
-            document.documentElement.style.colorScheme = normalized
-          }
+        if (docEl && docEl.getAttribute('data-theme') !== normalized) {
+          docEl.setAttribute('data-theme', normalized)
+        }
+        if (docEl && docEl.style.colorScheme !== normalized) {
+          docEl.style.colorScheme = normalized
         }
         return normalized
       }
@@ -44,8 +54,8 @@ export function ThemeProvider({
       /* ignore storage read errors */
     }
     if (typeof document !== 'undefined' && document.documentElement) {
-      if (!document.documentElement.dataset.theme) {
-        document.documentElement.dataset.theme = initialTheme
+      if (!document.documentElement.getAttribute('data-theme')) {
+        document.documentElement.setAttribute('data-theme', initialTheme)
       }
       if (!document.documentElement.style.colorScheme) {
         document.documentElement.style.colorScheme = initialTheme
@@ -71,7 +81,7 @@ export function ThemeProvider({
       /* ignore cookie write errors */
     }
     if (typeof document !== 'undefined' && document.documentElement) {
-      document.documentElement.dataset.theme = normalized
+      document.documentElement.setAttribute('data-theme', normalized)
       document.documentElement.style.colorScheme = normalized
     }
 
@@ -79,28 +89,23 @@ export function ThemeProvider({
   }, [])
 
   useEffect(() => {
-    if (mountedRef.current) return
-    mountedRef.current = true
-
-    if (userInteractedRef.current) return
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      if (userInteractedRef.current) return
+    }
     try {
       const docEl = document.documentElement
       if (!docEl) return
-      if (!docEl.dataset.theme) {
-        docEl.dataset.theme = theme
+      const current = docEl.getAttribute('data-theme')
+      if (current !== theme) {
+        docEl.setAttribute('data-theme', theme)
       }
-      if (!docEl.style.colorScheme) {
+      if (docEl.style.colorScheme !== theme) {
         docEl.style.colorScheme = theme
       }
     } catch {
       /* ignore dom access errors */
     }
-  }, [initialTheme, theme])
-
-  useEffect(() => {
-    if (!document.documentElement) return
-    document.documentElement.dataset.theme = theme
-    document.documentElement.style.colorScheme = theme
   }, [theme])
 
   const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme])

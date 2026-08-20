@@ -428,6 +428,7 @@ export function PsbListWorkspace({
 
   async function handleExportExcel(event: ChangeEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
+    event.stopPropagation()
     if (exporting) return
     setFeedback(null)
     setExporting(true)
@@ -442,10 +443,17 @@ export function PsbListWorkspace({
         message: `Berhasil ekspor ${displayItems.length.toLocaleString('id-ID')} baris Data PSB ke file Excel.`,
       })
     } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Gagal mengekspor Excel.'
       setFeedback({
         tone: 'error',
-        message: error instanceof Error ? error.message : 'Gagal mengekspor Excel.',
+        message: msg,
       })
+      try {
+        // eslint-disable-next-line no-alert
+        window.alert(`[Export Excel] ${msg}`)
+      } catch {
+        /* ignore */
+      }
     } finally {
       setExporting(false)
     }
@@ -574,7 +582,11 @@ export function PsbListWorkspace({
             </button>
             <button
               type="button"
-              onClick={() => setImportOpen(true)}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setImportOpen(true)
+              }}
               disabled={!canUpdate}
               className="inline-flex items-center justify-center rounded-2xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
               title={canUpdate ? 'Import batch Data PSB via Excel' : 'Role aktif tidak memiliki izin tulis Data PSB'}
