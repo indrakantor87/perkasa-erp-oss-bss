@@ -22,9 +22,6 @@ jobs:
       (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'FORCE_DEPLOY')) ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     timeout-minutes: 20
-    environment:
-      name: production
-      url: http://de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io/login
 
     steps:
       - name: Checkout repository
