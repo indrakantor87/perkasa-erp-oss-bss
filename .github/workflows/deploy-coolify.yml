@@ -2,6 +2,8 @@ name: Deploy Production to Coolify (via SSH)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
   workflow_run:
     workflows: ["Build & Push Docker Image to GHCR"]
     types:
@@ -15,7 +17,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'FORCE_DEPLOY')) ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     timeout-minutes: 20
     environment:
       name: production
