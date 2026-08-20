@@ -112,14 +112,25 @@ jobs:
         run: |
           set -e
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $KEY"
+          DEFAULT_IMG="ghcr.io/indrakantor87/perkasa-erp-oss-bss:main-8d2ca5e"
           SHA7="${GITHUB_SHA:0:7}"
-          IMG="ghcr.io/indrakantor87/perkasa-erp-oss-bss:main-${SHA7}"
+          SHA_IMG="ghcr.io/indrakantor87/perkasa-erp-oss-bss:main-${SHA7}"
+          IMG=""
+          echo "🔍 Cek apakah $SHA_IMG tersedia di GHCR..."
+          EXISTS=$(ssh $OPTS "$USER@$HOST" "docker manifest inspect $SHA_IMG >/dev/null 2>&1 ; echo \$?")
+          if [ "$EXISTS" = "0" ]; then
+            echo "✅ SHA image tersedia: $SHA_IMG"
+            IMG="$SHA_IMG"
+          else
+            echo "ℹ️  SHA image tidak tersedia (commit workflow). Pakai DEFAULT build image terakhir SUCCESS: $DEFAULT_IMG"
+            IMG="$DEFAULT_IMG"
+          fi
           echo "IMAGE_FULL=$IMG" >> $GITHUB_ENV
           echo "📦 Pull $IMG"
           ssh $OPTS "$USER@$HOST" "
             set -x
             docker pull $IMG 2>&1 | tail -20
-            docker inspect --format='{{.RepoDigests}} | {{.Size}}' $IMG 2>&1 || echo 'Image not found'
+            docker inspect --format='{{.RepoDigests}} | {{.Size}}' $IMG 2>&1 || echo 'Image not found (FATAL)'
           "
 
       - name: Step 3/9 Stop Old Container
