@@ -153,14 +153,16 @@ jobs:
             fi
           "
 
-      - name: Step 4/9 Set server.js + workdir (Next.js standalone hardcode /app)
+      - name: Step 4/9 Set server.js + workdir (hardcode cocok Dockerfile runner stage)
         if: env.DEPLOY_OK == '1'
         run: |
           set -e
-          echo "✅ Hardcode SERVER_JS_PATH & WORKDIR untuk Next.js standalone Dockerfile (WORKDIR=/app di stage runner)"
-          echo "SERVER_JS_PATH=/app/server.js" >> "$GITHUB_ENV"
-          echo "WORKDIR_CORRECT=/app" >> "$GITHUB_ENV"
-          echo "✅ SERVER_JS_PATH=/app/server.js (hardcode — 100% cocok Dockerfile)"
+          echo "✅ Hardcode WORKDIR + SERVER_JS yang SESUAI DENGAN Dockerfile runner stage!"
+          echo "   Dockerfile STAGE 3 (runner): WORKDIR=/app/apps/web/standalone, CMD=[node server.js]"
+          echo "WORKDIR_CORRECT=/app/apps/web/standalone" >> "$GITHUB_ENV"
+          echo "SERVER_JS_PATH=/app/apps/web/standalone/server.js" >> "$GITHUB_ENV"
+          echo "✅ WORKDIR_CORRECT=/app/apps/web/standalone (sesuai Dockerfile)"
+          echo "✅ SERVER_JS_PATH=/app/apps/web/standalone/server.js (sesuai Dockerfile)"
 
       - name: Step 5/9 Run NEW Container (APP_DATA_MODE=mock)
         if: env.DEPLOY_OK == '1'
@@ -177,7 +179,7 @@ jobs:
           SERVER_JS="${{ env.SERVER_JS_PATH }}"
           WD="${{ env.WORKDIR_CORRECT }}"
           DEPLOY_ID=$(date +%Y%m%d%H%M%S)
-          echo "🚀 docker run"
+          echo "🚀 docker run (pakai default CMD Dockerfile runner stage: [node server.js] di WORKDIR $WD)"
           CID=$(ssh $OPTS "$USER@$HOST" "
             docker run -d \
               --name perkasa-erp-oss-bss \
@@ -185,7 +187,6 @@ jobs:
               --restart unless-stopped \
               --memory 2g --cpus 2 \
               -p 3000:3000 \
-              -w $WD \
               -e PORT=3000 \
               -e HOSTNAME=0.0.0.0 \
               -e NODE_ENV=production \
@@ -201,7 +202,7 @@ jobs:
               -l \"traefik.http.routers.perkasa.rule=Host(\\\`$DOMAIN\\\`)\" \
               -l traefik.http.services.perkasa.loadbalancer.server.port=3000 \
               -l deploy.id=$DEPLOY_ID \
-              $IMG node $SERVER_JS
+              $IMG
           ")
           test -n "$CID" || { echo "❌ docker run empty ID!"; exit 16; }
           echo "✅ CONTAINER_ID=$CID"
