@@ -214,7 +214,7 @@ jobs:
             echo '[ -n "$PORTBUSY" ] && { echo "[WARN] port 3000 busy: $PORTBUSY -> force kill"; fuser -k 3000/tcp 2>/dev/null || true; sleep 2; }'
             echo 'TRAEFIK_RULE="traefik.http.routers.perkasa.rule=Host(${BT}${DOMAIN_VAL}${BT})"'
             echo 'echo "[INFO] Traefik rule: $TRAEFIK_RULE"'
-            echo 'timeout 120 docker run -d \'
+            echo 'timeout 180 docker run -d \'
             echo '  --name perkasa-erp-oss-bss \'
             echo '  --network coolify \'
             echo '  --restart unless-stopped \'
@@ -224,6 +224,7 @@ jobs:
             echo '  -e HOSTNAME=0.0.0.0 \'
             echo '  -e NODE_ENV=production \'
             echo '  -e NEXT_TELEMETRY_DISABLED=1 \'
+            echo '  -e NODE_OPTIONS="--max-old-space-size=1536" \'
             echo '  -e APP_DATA_MODE=mock \'
             echo '  -e AUTO_LOAD_DEMO_PSB=enabled \'
             echo '  -e AUTH_SESSION_SECRET="$AUTH_VAL" \'
@@ -251,16 +252,16 @@ jobs:
             echo 'ST=$(docker inspect --format="{{.State.Status}}" $CID 2>/dev/null || echo unknown)'
             echo 'echo "[DEBUG] container status after 8s: $ST"'
             echo 'if [ "$ST" != "running" ]; then echo "[FATAL] container not running. last 60 logs:"; docker logs $CID 2>&1 | tail -60; exit 18; fi'
-            echo 'echo "[INFO] PRE-VERIFY: curl internal http://127.0.0.1:3000/login (wait up to 120s for Next.js cold start)..."'
-            echo 'PE=0; for i in $(seq 1 15); do'
+            echo 'echo "[INFO] PRE-VERIFY: curl internal http://127.0.0.1:3000/login (wait up to 240s for Next.js cold start on low-RAM server)..."'
+            echo 'PE=0; for i in $(seq 1 30); do'
             echo '  HC=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 http://127.0.0.1:3000/login 2>/dev/null || echo 000)'
-            echo '  echo "  pre-verify attempt $i: /login HTTP=$HC"'
+            echo '  echo "  pre-verify attempt $i/30: /login HTTP=$HC"'
             echo '  if [ "$HC" = "200" ] || [ "$HC" = "302" ] || [ "$HC" = "307" ]; then PE=1; break; fi'
             echo '  sleep 8'
             echo 'done'
             echo 'if [ "$PE" != "1" ]; then'
-            echo '  echo "[FATAL] PRE-VERIFY FAIL /login not ready after 120s. Last 80 container logs:"'
-            echo '  docker logs $CID 2>&1 | tail -80'
+            echo '  echo "[FATAL] PRE-VERIFY FAIL /login not ready after 240s (30 attempts). Last 120 container logs:"'
+            echo '  docker logs $CID 2>&1 | tail -120'
             echo '  exit 19'
             echo 'fi'
             echo 'echo "[OK] PRE-VERIFY PASS: Next.js server already responding HTTP 2xx at /login"'
@@ -281,11 +282,30 @@ jobs:
           echo "[INFO] sending base64 via SSH stdin"
           RESULT=$(echo "$B64" | ssh $OPTS "$USER@$HOST" "set -e; base64 -d > /tmp/deploy-perkasa.sh; chmod +x /tmp/deploy-perkasa.sh; bash /tmp/deploy-perkasa.sh")
           REMOTE_RC=$?
-          echo "[DEBUG] SSH rc=$REMOTE_RC | remote tail:"
+          echo "[DEBUG] SSH REMOTE_RC=$REMOTE_RC | last 20 lines output:"
           echo "$RESULT" | tail -n 20
+          if [ "$REMOTE_RC" != "0" ]; then
+            echo "==========================================================="
+            echo "[FATAL] REMOTE DEPLOY SCRIPT FAILED exit code=$REMOTE_RC"
+            echo "==========================================================="
+            echo "[LEGEND EXIT CODE]:"
+            echo "  16 = docker run CID empty (gagal start) -> lihat FULL logs di bawah"
+            echo "  17 = BT backtick generation FAIL (len != 1) -> quoting bug"
+            echo "  18 = container CRASH dalam 8s startup -> lihat container logs 60 lines"
+            echo "  19 = PRE-VERIFY timeout 240s (/login tidak HTTP 2xx/3xx) -> Next.js OOM / lambat startup"
+            echo "==========================================================="
+            echo "--- FULL REMOTE OUTPUT (all debug lines + logs): ---"
+            echo "$RESULT"
+            echo "--- END FULL REMOTE OUTPUT ---"
+            exit $REMOTE_RC
+          fi
           CID=$(echo "$RESULT" | grep '^CID_RESULT=' | tail -n 1 | cut -d'=' -f2 | tr -d '\r\n')
-          test -n "$CID" || { echo "[ERR] CID empty - full output:"; echo "$RESULT"; exit 16; }
-          echo "[OK] CONTAINER_ID=$CID"
+          if [ -z "$CID" ]; then
+            echo "[ERR] SSH RC=0 (success) TAPI CID_RESULT empty! Full output:"
+            echo "$RESULT"
+            exit 16
+          fi
+          echo "[OK] CONTAINER_ID=$CID (REMOTE_RC=0, pre-verify PASS)"
           echo "NEW_CONTAINER_ID=$CID" >> "$GITHUB_ENV"
 
       - name: "Step 6/9 Health Verify /list-psb 180s (pre-verify /login sudah PASS di step 5)"
