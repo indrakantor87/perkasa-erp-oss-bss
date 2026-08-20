@@ -17,14 +17,59 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'FORCE_DEPLOY')) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     timeout-minutes: 20
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: 🚦 Pre-Flight Filter: Skip jika TIDAK perlu Deploy (event biasa tanpa FORCE_DEPLOY / tanpa workflow_run success)
+        run: |
+          set -e
+          EVENT_NAME="${GITHUB_EVENT_NAME}"
+          echo "[FILTER] Current event name = ${EVENT_NAME}"
+          
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "✅ Event workflow_dispatch manual trigger = LANJUT DEPLOY!"
+            echo "DEPLOY_OK=1" >> $GITHUB_ENV
+            exit 0
+          fi
+          
+          if [ "${EVENT_NAME}" = "push" ]; then
+            COMMIT_MSG="${{ github.event.head_commit.message }}"
+            echo "[FILTER] push event head_commit.message = ${COMMIT_MSG}"
+            if [[ "${COMMIT_MSG}" == FORCE_DEPLOY* ]]; then
+              echo "✅ Commit message mulai dengan FORCE_DEPLOY = LANJUT DEPLOY!"
+              echo "DEPLOY_OK=1" >> $GITHUB_ENV
+              exit 0
+            else
+              echo "⏭️  Event push biasa (bukan FORCE_DEPLOY commit) = SKIP DEPLOY (success exit 0)"
+              echo "DEPLOY_OK=0" >> $GITHUB_ENV
+              exit 0
+            fi
+          fi
+          
+          if [ "${EVENT_NAME}" = "workflow_run" ]; then
+            CONCLUSION="${{ github.event.workflow_run.conclusion }}"
+            BRANCH="${{ github.event.workflow_run.head_branch }}"
+            echo "[FILTER] workflow_run conclusion=${CONCLUSION} head_branch=${BRANCH}"
+            if [ "${CONCLUSION}" = "success" ] && [ "${BRANCH}" = "main" ]; then
+              echo "✅ Workflow Build Push success di main = LANJUT DEPLOY!"
+              echo "DEPLOY_OK=1" >> $GITHUB_ENV
+              exit 0
+            else
+              echo "⏭️  Workflow Build Push conclusion=${CONCLUSION} branch=${BRANCH} = SKIP DEPLOY (success exit 0)"
+              echo "DEPLOY_OK=0" >> $GITHUB_ENV
+              exit 0
+            fi
+          fi
+          
+          echo "⏭️  Event tidak dikenal = SKIP DEPLOY (success exit 0)"
+          echo "DEPLOY_OK=0" >> $GITHUB_ENV
+          exit 0
+
       - name: Install SSH Key + FORCE Auto Fix Format (always overwrite 1st & last line)
+        if: env.DEPLOY_OK == '1'
         env:
           SSH_PRIVATE_KEY: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
         run: |
@@ -70,6 +115,7 @@ jobs:
           fi
 
       - name: Test koneksi SSH ke Server Coolify (preflight)
+        if: env.DEPLOY_OK == '1'
         env:
           DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -91,6 +137,7 @@ jobs:
           echo "✅ Preflight SSH OK - koneksi ke server Coolify BERHASIL!"
 
       - name: 🚀 Deploy Step [1/9]: Login GHCR di Server Coolify
+        if: env.DEPLOY_OK == '1'
         env:
           DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -105,6 +152,7 @@ jobs:
             "docker login ghcr.io -u \"$GHCR_USERNAME\" --password-stdin 2>&1 | tail -5"
 
       - name: 🚀 Deploy Step [2/9]: Pull Image GHCR (Tag Specific)
+        if: env.DEPLOY_OK == '1'
         env:
           DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -124,6 +172,7 @@ jobs:
           "
 
       - name: 🚀 Deploy Step [3/9]: Stop & Remove Old Container perkasa-erp-oss-bss
+        if: env.DEPLOY_OK == '1'
         env:
           DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -143,6 +192,7 @@ jobs:
           "
 
       - name: 🚀 Deploy Step [4/9]: Detect server.js path inside the image (Safety Net!)
+        if: env.DEPLOY_OK == '1'
         env:
           DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -166,6 +216,7 @@ jobs:
           echo "WORKDIR_CORRECT=$WORKDIR_CORRECT" >> "$GITHUB_ENV"
 
       - name: 🚀 Deploy Step [5/9]: Run NEW Container with Traefik labels (APP_DATA_MODE=mock!)
+        if: env.DEPLOY_OK == '1'
         env:
           DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -213,6 +264,7 @@ jobs:
           echo "NEW_CONTAINER_ID=$CID" >> "$GITHUB_ENV"
 
       - name: 🚀 Deploy Step [6/9]: Health Wait 240s (Next.js start 2-3 menit) + HTTP 200 verify
+        if: env.DEPLOY_OK == '1'
         env:
           DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -260,6 +312,7 @@ jobs:
           exit 0
 
       - name: 🚀 Deploy Step [7/9]: Cleanup dangling images (disk space)
+        if: env.DEPLOY_OK == '1'
         env:
           DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -272,6 +325,7 @@ jobs:
           exit 0
 
       - name: 🚀 Deploy Step [8/9]: FINAL SUMMARY docker ps + labels + last logs
+        if: env.DEPLOY_OK == '1'
         env:
           DEPLOY_SERVER_HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           DEPLOY_SERVER_USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
