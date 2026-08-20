@@ -1,0 +1,137 @@
+name: "SURVEY READ-ONLY: TAHU ERROR DASAR WORKFLOW"
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: darurat-survey-serial
+  cancel-in-progress: false
+
+jobs:
+  survey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Pre-Filter RUN if commit DARURAT_SURVEY_READONLY only
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          case "$MSG" in
+            DARURAT_SURVEY_READONLY*) echo RUN_OK=1 >> $GITHUB_ENV; echo "[OK] trigger survey" ;;
+            *) echo "[SKIP] bukan trigger survey"; exit 0 ;;
+          esac
+
+      - name: "Step 1: CEK PANJANG SECRETS SSH (HOST, USER, KEY) - TANPA KIRIM PASSWORD APA PUN"
+        if: env.RUN_OK == '1'
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER }}
+          KEY:  ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+        run: |
+          set +e
+          echo "==== CHECK SECRETS ===="
+          HLEN=$(echo -n "$HOST" | wc -c | tr -d ' ')
+          ULEN=$(echo -n "$USER" | wc -c | tr -d ' ')
+          KLEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
+          echo "  HOST panjang=$HLEN chars - value (15 char first + last 5): $(echo -n "$HOST" | head -c 15)...$(echo -n "$HOST" | tail -c 5)"
+          echo "  USER panjang=$ULEN chars - value: $USER"
+          echo "  SSH KEY panjang=$KLEN chars (bytes total - SEHARUSNYA >= ~300 chars untuk ED25519 valid)"
+          if [ "$HLEN" -lt 5 ]; then
+            echo "  ❌ FATAL: COOLIFY_SERVER_HOST PANJANGNYA $HLEN (< 5) - KEMUNGKINAN BESAR SECRET TIDAK DISIMPAN di Settings > Secrets and variables > Actions > Repository secrets!"
+            echo "     PERBAIKI: Buka repo -> Settings -> (sidebar kiri) Secrets and variables -> Actions -> TAB Secrets -> New repository secret -> Isi NAME=COOLIFY_SERVER_HOST VALUE=<IP public server Coolify>"
+          fi
+          if [ "$KLEN" -lt 100 ]; then
+            echo "  ❌ FATAL: COOLIFY_SERVER_SSH_PRIVATE_KEY PANJANGNYA $KLEN bytes (<100) - KOSONG / TERSPOTONG / FORMAT SALAH"
+            echo "     PERBAIKI: Generate ulang di server: ssh-keygen -t ed25519 -f coolify_ed25519 -N ''"
+            echo "     Copy isi FILE PRIVATE KEY coolify_ed25519 (bukan .pub!) ke dalam Secrets dengan NAME=COOLIFY_SERVER_SSH_PRIVATE_KEY"
+          fi
+          if [ -z "$USER" ]; then
+            echo "  ⚠️  COOLIFY_SERVER_USER TIDAK DISET - akan fallback ke root"
+          fi
+          echo ""
+          echo "[Step 1 SELESAI - jika ada tanda ❌ FATAL di atas, itu adalah PENYEBAB SEMUA WORKFLOW FAIL 3x berturut-turut!]"
+
+      - name: "Step 2: Tulis SSH Key + Test SSH (HANYA command hostname + date SAJA - TIDAK ADA DOCKER, TIDAK ADA UBAH SERVER)"
+        if: env.RUN_OK == '1'
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER }}
+          KEY:  ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+        timeout-minutes: 4
+        run: |
+          set +e
+          KLEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
+          HLEN=$(echo -n "$HOST" | wc -c | tr -d ' ')
+          if [ "$KLEN" -lt 100 ] || [ "$HLEN" -lt 5 ]; then
+            echo "[SKIP Step 2] - Secrets kosong / invalid di Step 1, tidak bisa lanjut SSH."
+            exit 9
+          fi
+          set -e
+          FKEY=$HOME/.ssh/survey_key
+          mkdir -p $HOME/.ssh && chmod 700 $HOME/.ssh
+          BODY=$HOME/.ssh/key_body
+          printf '%s' "$KEY" > $HOME/.ssh/raw_key.txt
+          tail -n +2 $HOME/.ssh/raw_key.txt | head -n -1 | grep -v '^[[:space:]]*$' > $BODY
+          { echo "-----BEGIN OPENSSH PRIVATE KEY-----"; cat $BODY; echo "-----END OPENSSH PRIVATE KEY-----"; } > $FKEY
+          chmod 600 $FKEY
+          FINAL_USER=${USER:-root}
+          echo "[Step 2] Test koneksi SSH SANGAT MINIMAL: $FINAL_USER@$HOST -> command 'hostname && date && whoami && id && echo SSH_OK'"
+          set +e
+          OUT=$(ssh -i $FKEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -o ServerAliveInterval=20 \
+            "$FINAL_USER@$HOST" "hostname && date '+%Y-%m-%d %H:%M:%S %Z' && whoami && id -un && echo SSH_SUCCESS_MARKER" 2>&1)
+          RC=$?
+          echo "[DEBUG] SSH RC=$RC"
+          echo "=== SSH OUTPUT: ==="
+          echo "$OUT" | head -30
+          echo "=== END OUTPUT ==="
+          if [ "$RC" -ne 0 ]; then
+            echo ""
+            echo "  ❌ ERROR SSH RC=$RC - PENYEBAB FAIL SEMUA WORKFLOW:"
+            case "$RC" in
+              255) echo "     -> SSH exit 255: Permission denied (key invalid / user tidak punya akses ssh / user belum ditambahkan ke sudoers docker) ATAU host unreachable"
+                   if echo "$OUT" | grep -qi "permission denied"; then
+                     echo "     DETAIL: Permission denied! SOLUSI: Copy isi FILE PUBLIC KEY (coolify_ed25519.pub) dari server Anda ke /root/.ssh/authorized_keys (atau ke /home/<user>/.ssh/authorized_keys jika USER != root)"
+                   fi
+                   if echo "$OUT" | grep -qiE "could not resolve|name or service not known"; then
+                     echo "     DETAIL: DNS FAIL! COOLIFY_SERVER_HOST bukan IP valid / DNS tidak resolve. SET secret COOLIFY_SERVER_HOST dengan angka IP PUBLIC server (contoh: 103.162.17.178 - BUKAN domain!)"
+                   fi
+                   if echo "$OUT" | grep -qiE "connection timed out|connection refused|no route"; then
+                     echo "     DETAIL: Connection timeout/refused! Firewall server blokir port 22 IP GitHub Actions 20.x range. ATAU COOLIFY_SERVER_HOST adalah IP PRIVATE (10.x/172.16-31.x/192.168.x) BUKAN IP PUBLIC!"
+                   fi
+                   ;;
+              1) echo "     -> SSH exit 1 (command remote error)";;
+              *) echo "     -> RC=$RC" ;;
+            esac
+            exit 10
+          else
+            echo "  ✅ SSH BERHASIL! Sekarang Step 3 print docker ps -a (read-only - TIDAK start/stop apa pun)."
+          fi
+
+      - name: "Step 3: PRINT docker ps -a SERVER ANDA (Read-Only TANPA UBAH APA PUN - saya bisa tahu nama container yang benar)"
+        if: env.RUN_OK == '1'
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER }}
+          KEY:  ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+        timeout-minutes: 3
+        run: |
+          FKEY=$HOME/.ssh/survey_key
+          FINAL_USER=${USER:-root}
+          echo "==== SERVER ANDA: DOCKER PS -A (SEMUA CONTAINER, TERMASUK YANG STOPPED) ===="
+          ssh -i $FKEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -o ServerAliveInterval=30 \
+            "$FINAL_USER@$HOST" "
+              echo '===== CONTAINER ALL ====='
+              docker ps -a --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}' 2>&1
+              echo ''
+              echo '===== VOLUMES ====='
+              docker volume ls --format '{{.Name}}' 2>&1 | head -30
+              echo ''
+              echo '===== DOCKER NETWORK ====='
+              docker network ls --format '{{.Name}}' 2>&1 | head -20
+              echo ''
+              echo '===== PORT LISTEN 80/443 ====='
+              (ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null) | grep -E ':80 |:443 ' | head -10
+              echo '===== DONE ====='
+            " 2>&1
+          echo "[SURVEY SELESAI - Step 3 output di atas memberi saya nama container COOLIFY CORE yang BENAR untuk restart nanti.]"
