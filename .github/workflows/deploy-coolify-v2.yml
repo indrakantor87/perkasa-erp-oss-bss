@@ -202,12 +202,19 @@ jobs:
             echo '[ "${#BT}" != "1" ] && BT=$(printf '\''%b'\'' '\''\\x60'\'')'
             echo '[ "${#BT}" != "1" ] && { echo "[FATAL] BT gen fail len=${#BT} (expect 1 char backtick)"; exit 17; }'
             echo 'echo "[INFO] BT len: ${#BT} (must be 1) -> char=[${BT}]"'
+            echo 'echo "[INFO] PRE-CHECK 1/3: docker network coolify"'
+            echo 'docker network inspect coolify >/dev/null 2>&1 || docker network create coolify 2>/dev/null || true'
+            echo 'echo "[INFO] PRE-CHECK 2/3: hapus SEMUA container yang expose port 3000 (mengungguli container lawas)"'
+            echo 'PORTCONS=$(docker ps -q --filter expose=3000 2>/dev/null); for C in $PORTCONS; do if [ "$C" != "perkasa-erp-oss-bss" ]; then docker rm -f $C 2>/dev/null; fi; done'
             echo 'echo "[INFO] cleanup old containers"'
             echo 'docker rm -f perkasa-erp-oss-bss 2>/dev/null || true'
-            echo 'sleep 2'
+            echo 'sleep 3'
+            echo 'echo "[INFO] PRE-CHECK 3/3: verify port 3000 TERSEDIA (belum didengar)"'
+            echo 'PORTBUSY=$(ss -ltn 2>/dev/null | grep ":3000 " | head -1 || netstat -ltn 2>/dev/null | grep ":3000 " | head -1 || echo "")'
+            echo '[ -n "$PORTBUSY" ] && { echo "[WARN] port 3000 busy: $PORTBUSY -> force kill"; fuser -k 3000/tcp 2>/dev/null || true; sleep 2; }'
             echo 'TRAEFIK_RULE="traefik.http.routers.perkasa.rule=Host(${BT}${DOMAIN_VAL}${BT})"'
             echo 'echo "[INFO] Traefik rule: $TRAEFIK_RULE"'
-            echo 'timeout 90 docker run -d \'
+            echo 'timeout 120 docker run -d \'
             echo '  --name perkasa-erp-oss-bss \'
             echo '  --network coolify \'
             echo '  --restart unless-stopped \'
@@ -216,6 +223,7 @@ jobs:
             echo '  -e PORT=3000 \'
             echo '  -e HOSTNAME=0.0.0.0 \'
             echo '  -e NODE_ENV=production \'
+            echo '  -e NEXT_TELEMETRY_DISABLED=1 \'
             echo '  -e APP_DATA_MODE=mock \'
             echo '  -e AUTO_LOAD_DEMO_PSB=enabled \'
             echo '  -e AUTH_SESSION_SECRET="$AUTH_VAL" \'
@@ -233,9 +241,29 @@ jobs:
             echo 'ERRMSG=$(cat /tmp/cid.err 2>/dev/null)'
             echo 'echo "[DEBUG] docker run rc=$RUN_RC cid=[$CID] stderr=[$ERRMSG]"'
             echo 'if [ -z "$CID" ]; then'
+            echo '  echo "[FATAL] cid empty - FULL docker logs:"'
+            echo '  OLD=$(docker ps -aq --filter name=perkasa-erp-oss-bss | head -1)'
+            echo '  [ -n "$OLD" ] && docker logs $OLD 2>&1 | tail -60 || echo "no container found for logs"'
             echo '  echo "CID_RESULT="'
             echo '  exit 16'
             echo 'fi'
+            echo 'sleep 8'
+            echo 'ST=$(docker inspect --format="{{.State.Status}}" $CID 2>/dev/null || echo unknown)'
+            echo 'echo "[DEBUG] container status after 8s: $ST"'
+            echo 'if [ "$ST" != "running" ]; then echo "[FATAL] container not running. last 60 logs:"; docker logs $CID 2>&1 | tail -60; exit 18; fi'
+            echo 'echo "[INFO] PRE-VERIFY: curl internal http://127.0.0.1:3000/login (wait up to 120s for Next.js cold start)..."'
+            echo 'PE=0; for i in $(seq 1 15); do'
+            echo '  HC=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 http://127.0.0.1:3000/login 2>/dev/null || echo 000)'
+            echo '  echo "  pre-verify attempt $i: /login HTTP=$HC"'
+            echo '  if [ "$HC" = "200" ] || [ "$HC" = "302" ] || [ "$HC" = "307" ]; then PE=1; break; fi'
+            echo '  sleep 8'
+            echo 'done'
+            echo 'if [ "$PE" != "1" ]; then'
+            echo '  echo "[FATAL] PRE-VERIFY FAIL /login not ready after 120s. Last 80 container logs:"'
+            echo '  docker logs $CID 2>&1 | tail -80'
+            echo '  exit 19'
+            echo 'fi'
+            echo 'echo "[OK] PRE-VERIFY PASS: Next.js server already responding HTTP 2xx at /login"'
             echo 'echo "CID_RESULT=$CID"'
             echo 'exit 0'
           } > "$SCRIPT_FILE"
@@ -260,7 +288,7 @@ jobs:
           echo "[OK] CONTAINER_ID=$CID"
           echo "NEW_CONTAINER_ID=$CID" >> "$GITHUB_ENV"
 
-      - name: "Step 6/9 Health Wait 240s + HTTP 200 (cek /login DAN /list-psb)"
+      - name: "Step 6/9 Health Verify /list-psb 180s (pre-verify /login sudah PASS di step 5)"
         if: env.DEPLOY_OK == '1'
         env:
           HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
@@ -270,31 +298,27 @@ jobs:
           set +e
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $KEY"
           CID="${{ env.NEW_CONTAINER_ID }}"
-          MAX=240 INTERVAL=10 ELAPSED=0 OK=0
-          echo "[6/9] Wait max ${MAX}s health - DUAL CHECK: /login (200) + /list-psb (NOT 404)"
+          MAX=180 INTERVAL=8 ELAPSED=0 OK=0
+          echo "[6/9] Verify /list-psb NOT 404 (confirm image BUKAN lawas) - max ${MAX}s interval ${INTERVAL}s"
           while [ $ELAPSED -lt $MAX ]; do
             ST=$(ssh $OPTS "$USER@$HOST" "docker inspect --format='{{.State.Status}}|{{.State.ExitCode}}' $CID 2>/dev/null || echo missing")
             STATUS=$(echo "$ST" | cut -d'|' -f1)
             EXIT=$(echo "$ST" | cut -d'|' -f2)
             echo "  [${ELAPSED}s/$MAX] Status=$STATUS Exit=$EXIT"
             if [ "$STATUS" = "running" ]; then
-              HTTP_LOGIN=$(ssh $OPTS "$USER@$HOST" "curl -sf -o /dev/null --max-time 8 http://127.0.0.1:3000/login ; echo \$?")
-              if [ "$HTTP_LOGIN" = "0" ]; then
-                echo "  [OK] /login HTTP 200 OK. Sekarang cek /list-psb (pastikan BUKAN image lawas 404)..."
-                HTTP_CODE_PSB=$(ssh $OPTS "$USER@$HOST" "curl -s -o /dev/null -w '%{http_code}' --max-time 8 -L http://127.0.0.1:3000/list-psb?q=FA65B42-DEMO")
-                echo "  [INFO] /list-psb HTTP status code: $HTTP_CODE_PSB"
-                if [ "$HTTP_CODE_PSB" = "200" ] || [ "$HTTP_CODE_PSB" = "302" ] || [ "$HTTP_CODE_PSB" = "307" ] || [ "$HTTP_CODE_PSB" = "308" ]; then
-                  echo "[OK] [${ELAPSED}s] /login 200 + /list-psb OK (status=$HTTP_CODE_PSB)! Image BENAR & Control Tower PSB tersedia!"
-                  OK=1
-                  break
-                else
-                  echo "  [WARN] /list-psb status=$HTTP_CODE_PSB (404 = image LAWAS!). Tunggu Next.js compile route..."
-                fi
+              HTTP_CODE_PSB=$(ssh $OPTS "$USER@$HOST" "curl -s -o /dev/null -w '%{http_code}' --max-time 8 -L http://127.0.0.1:3000/list-psb?q=FA65B42-DEMO")
+              echo "  [INFO] /list-psb internal curl -> HTTP $HTTP_CODE_PSB"
+              if [ "$HTTP_CODE_PSB" = "200" ] || [ "$HTTP_CODE_PSB" = "302" ] || [ "$HTTP_CODE_PSB" = "307" ] || [ "$HTTP_CODE_PSB" = "308" ]; then
+                echo "[OK] [${ELAPSED}s] /list-psb HTTP=$HTTP_CODE_PSB (NOT 404)! Image BENAR, Control Tower PSB tersedia!"
+                OK=1
+                break
+              else
+                echo "  [WARN] status=$HTTP_CODE_PSB (404 = route /list-psb BELUM di-compile Next.js). Menunggu..."
               fi
             fi
             if [ "$STATUS" = "exited" ] || [ "$STATUS" = "dead" ]; then
-              echo "[ERR] Container CRASH! Last 100 logs:"
-              ssh $OPTS "$USER@$HOST" "docker logs $CID 2>&1 | tail -100"
+              echo "[ERR] Container CRASH! Last 120 logs:"
+              ssh $OPTS "$USER@$HOST" "docker logs $CID 2>&1 | tail -120"
               OK=2
               break
             fi
@@ -302,10 +326,20 @@ jobs:
             ELAPSED=$((ELAPSED + INTERVAL))
           done
           if [ $OK -eq 0 ]; then
-            echo "[WARN] TIMEOUT 240s - last 100 logs:"
-            ssh $OPTS "$USER@$HOST" "docker logs $CID 2>&1 | tail -100"
+            echo "[WARN] TIMEOUT 180s - last 120 container logs:"
+            ssh $OPTS "$USER@$HOST" "docker logs $CID 2>&1 | tail -120"
           fi
+          echo "FINAL_OK=$OK (0=timeout 1=OK 2=crash)"
           echo "FINAL_OK=$OK" >> "$GITHUB_ENV"
+          if [ "$OK" != "1" ]; then
+            echo "==========================================================="
+            echo "[FATAL] HEALTH CHECK FAIL - Workflow FAIL"
+            echo "  OK=0: timeout (Next.js compile route /list-psb lambat sekali)"
+            echo "  OK=2: container crash (lihat logs di atas)"
+            echo "==========================================================="
+            exit 1
+          fi
+          echo "[OK] FINAL HEALTH CHECK PASS = deploy sukses!"
           exit 0
 
       - name: "Step 7/9 Prune Images"
