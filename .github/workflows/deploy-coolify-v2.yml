@@ -153,24 +153,14 @@ jobs:
             fi
           "
 
-      - name: Step 4/9 Detect server.js path
+      - name: Step 4/9 Set server.js + workdir (Next.js standalone hardcode /app)
         if: env.DEPLOY_OK == '1'
-        env:
-          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
-          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
-          KEY: /home/runner/.ssh/id_ed25519_coolify
         run: |
           set -e
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $KEY"
-          IMG="${{ env.IMAGE_FULL }}"
-          echo "🔍 Find server.js in $IMG"
-          PATH_OUT=$(ssh $OPTS "$USER@$HOST" "docker run --rm --entrypoint=/bin/sh $IMG -c \"find / -name server.js -type f 2>/dev/null | grep -v node_modules | head -1 | tr -d '\\\\r'\"")
-          test -n "$PATH_OUT" || { echo "❌ server.js not found!"; exit 8; }
-          echo "✅ server.js=$PATH_OUT"
-          WD=$(dirname "$PATH_OUT")
-          echo "✅ workdir=$WD"
-          echo "SERVER_JS_PATH=$PATH_OUT" >> $GITHUB_ENV
-          echo "WORKDIR_CORRECT=$WD" >> $GITHUB_ENV
+          echo "✅ Hardcode SERVER_JS_PATH & WORKDIR untuk Next.js standalone Dockerfile (WORKDIR=/app di stage runner)"
+          echo "SERVER_JS_PATH=/app/server.js" >> "$GITHUB_ENV"
+          echo "WORKDIR_CORRECT=/app" >> "$GITHUB_ENV"
+          echo "✅ SERVER_JS_PATH=/app/server.js (hardcode — 100% cocok Dockerfile)"
 
       - name: Step 5/9 Run NEW Container (APP_DATA_MODE=mock)
         if: env.DEPLOY_OK == '1'
