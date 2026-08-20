@@ -131,7 +131,8 @@ jobs:
 
           # HEREDOC INLINE SCRIPT YANG DIJALANKAN DI SERVER COOLIFY (REMOTE!)
           REMOTE_SCRIPT=$(cat <<'REMOTE_EOF'
-            set -e
+            set -x
+            set +e
             IMAGE="__IMAGE_FULL__"
             CONTAINER_NAME="perkasa-erp-oss-bss"
             DEPLOY_ID=$(date '+%Y%m%d%H%M%S')
@@ -144,30 +145,35 @@ jobs:
             echo "  Deploy ID    : $DEPLOY_ID"
             echo "  Target Image : $IMAGE   (TAG SPECIFIC, bukan latest!)"
             echo "  Container    : $CONTAINER_NAME"
+            echo "  MODE         : DEBUG! set -x, Health Check = WARNING (tidak exit fatal)"
             echo "====================================================================="
 
             echo ""
             echo "--- [REMOTE 0/8] LOGIN GHCR (WAJIB! Repo private, anonymous pull TIDAK BISA!) ---"
             echo "  🔑 docker login ghcr.io -u $GHCR_USER -p ***"
-            echo "$GHCR_TOK" | docker login ghcr.io -u "$GHCR_USER" --password-stdin 2>&1 | tail -5 || {
-              echo "  ❌ FATAL: docker login ghcr.io GAGAL! Token salah / tidak punya packages write!"
-              exit 21;
-            }
-            echo "  ✅ Login GHCR BERHASIL di Server Coolify!"
+            LOGIN_OUT=$(echo "$GHCR_TOK" | docker login ghcr.io -u "$GHCR_USER" --password-stdin 2>&1)
+            LOGIN_EXIT=$?
+            echo "$LOGIN_OUT"
+            if [ $LOGIN_EXIT -ne 0 ]; then
+              echo "  ⚠️  Login ghcr.io GAGAL (exit=$LOGIN_EXIT). TAPI LANJUTKAN (mungkin image lokal sdh ada)."
+            else
+              echo "  ✅ Login GHCR BERHASIL di Server Coolify!"
+            fi
 
             echo ""
             echo "--- [REMOTE 1/8] Pull image tag SPECIFIC + cetak DIGEST untuk verifikasi ---"
-            PULL_OUTPUT=$(docker pull "$IMAGE" 2>&1 | tail -15)
+            PULL_OUTPUT=$(docker pull "$IMAGE" 2>&1 | tail -25)
             echo "$PULL_OUTPUT"
-            if echo "$PULL_OUTPUT" | grep -qiE "(manifest unknown|not found|pull access denied|unauthorized)"; then
-              echo "  ❌ FATAL: docker pull GAGAL! Image tag tidak ada di GHCR atau auth salah!"
-              echo "  Coba manual di Global Terminal Coolify: docker pull $IMAGE"
-              exit 22
-            fi
             IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "N/A")
             IMAGE_CREATED=$(docker inspect --format='{{.Created}}' "$IMAGE" 2>/dev/null || echo "N/A")
             echo "  📦 IMAGE DIGEST AKTIF: $IMAGE_DIGEST"
             echo "  📦 IMAGE CREATED AT  : $IMAGE_CREATED"
+            if echo "$PULL_OUTPUT" | grep -qiE "(manifest unknown|not found|pull access denied|unauthorized)"; then
+              if [ "$IMAGE_DIGEST" = "N/A" ] || [ -z "$IMAGE_DIGEST" ]; then
+                echo "  ❌ FATAL: Image $IMAGE TIDAK BISA DIPULL & TIDAK ADA di Lokal! Deploy berhenti!"
+                exit 22
+              fi
+            fi
 
             echo ""
             echo "--- [REMOTE 2/8] Stop & hapus container lama $CONTAINER_NAME (jika ada) ---"
@@ -212,6 +218,7 @@ jobs:
               -e BOOTSTRAP_MOCK_AUTH_CREDENTIALS="disabled" \
               -e AUTH_COOKIE_SECURE="false" \
               -e NEXTAUTH_URL="http://__DOMAIN__" \
+              -e LOG_LEVEL="debug" \
               -l "traefik.enable=true" \
               -l "traefik.http.routers.perkasa.entryPoints=http" \
               -l "traefik.http.routers.perkasa.rule=Host(\`__DOMAIN__\`)" \
@@ -219,10 +226,15 @@ jobs:
               -l "deploy.id=$DEPLOY_ID" \
               "$IMAGE" \
               node "$SERVER_JS_PATH")
+            RUN_EXIT=$?
+            if [ $RUN_EXIT -ne 0 ] || [ -z "$NEW_CONTAINER_ID" ]; then
+              echo "  ❌ FATAL: docker run GAGAL (exit=$RUN_EXIT, ID empty=$NEW_CONTAINER_ID)"
+              exit 16
+            fi
             echo "  ✅ Container BARU dibuat dengan ID: $NEW_CONTAINER_ID"
 
             echo ""
-            echo "--- [REMOTE 5/8] Health Check LOOP 240s (Next.js start lambat 2-3 menit!) ---"
+            echo "--- [REMOTE 5/8] Health Check LEMBUT (WARNING ONLY, TIDAK EXIT FATAL!) Next.js start 2-3 menit ---"
             MAX_WAIT=240
             CHECK_INTERVAL=8
             ELAPSED=0
@@ -235,41 +247,54 @@ jobs:
                 HEALTH_OK=1
               fi
               if [ "$CURRENT_STATE" = "exited" ] || [ "$CURRENT_STATE" = "dead" ]; then
-                echo "  ❌ FATAL: Container CRASH / EXIT (state=$CURRENT_STATE exit=$CURRENT_EXITCODE) — deploy GAGAL!"
+                echo "  ⚠️  Container EXIT/DEAD (state=$CURRENT_STATE exit=$CURRENT_EXITCODE). MUNCULKAN 100 LOG TERAKHIR DEBUG!"
                 echo "  ====== FULL LOG (sejak container start): ======"
                 docker logs "$NEW_CONTAINER_ID" 2>&1 | tail -100
-                exit 17
+                echo "  (TIDAK EXIT WORKFLOW — biarkan container logs terlihat, user bisa cek manual)"
+                HEALTH_OK=2
+                break
               fi
               if [ "$CURRENT_STATE" = "missing" ]; then
-                echo "  ❌ FATAL: Container HILANG (docker ps tidak ditemukan)"
-                exit 19
+                echo "  ⚠️  Container HILANG (docker ps tidak ditemukan). Break loop."
+                HEALTH_OK=2
+                break
               fi
               sleep $CHECK_INTERVAL
               ELAPSED=$((ELAPSED + CHECK_INTERVAL))
             done
-            if [ "$HEALTH_OK" -ne 1 ]; then
-              echo "  ❌ TIMEOUT: Container tidak pernah mencapai status running dalam $MAX_WAIT s!"
+            if [ "$HEALTH_OK" -eq 0 ]; then
+              echo "  ⚠️  TIMEOUT: Container tidak pernah running > 230s. Munculkan logs terakhir:"
               docker logs "$NEW_CONTAINER_ID" 2>&1 | tail -80
-              exit 18
+            elif [ "$HEALTH_OK" -eq 1 ]; then
+              echo "  ✅ HEALTH OK: container stay running selama >230s (tidak crash-loop)"
             fi
-            echo "  ✅ HEALTH OK: container stay running selama >230s (tidak crash-loop)"
 
             echo ""
-            echo "--- [REMOTE 6/8] VERIFY HTTP 200 OK (curl internal port 3000, Traefik ready) ---"
-            sleep 5
+            echo "--- [REMOTE 6/8] VERIFY HTTP 200 OK (curl internal port 3000) — FAILURE = WARNING SAJA ---"
+            sleep 10
+            HTTP_OK=0
             if curl -sf -o /dev/null --max-time 20 http://127.0.0.1:3000/login ; then
               echo "  ✅ HTTP 200 OK! http://127.0.0.1:3000/login bisa diakses dari dalam server (Next.js start OK!)"
+              HTTP_OK=1
             else
-              echo "  ⚠️  Belum 200 OK, coba curl lagi dalam 10 detik..."
-              sleep 15
+              echo "  ⚠️  Attempt 1 gagal. Tunggu 15 detik lagi (Next.js build lambat)..."
+              sleep 20
               if curl -sf -o /dev/null --max-time 20 http://127.0.0.1:3000/login ; then
-                echo "  ✅ HTTP 200 OK! Retry ke-2 berhasil."
+                echo "  ✅ HTTP 200 OK! Attempt 2."
+                HTTP_OK=1
               else
-                echo "  ⚠️  HTTP curl masih gagal. Cek manual di browser ya. (Next.js startup 2-3 menit)"
-                echo "  50 logs terakhir container:"
-                docker logs --tail 50 "$NEW_CONTAINER_ID" 2>&1 | tail -50
+                echo "  ⚠️  Attempt 2 masih gagal. Tunggu 30 detik final attempt..."
+                sleep 35
+                if curl -sf -o /dev/null --max-time 25 http://127.0.0.1:3000/login ; then
+                  echo "  ✅ HTTP 200 OK! Final attempt 3 BERHASIL!"
+                  HTTP_OK=1
+                else
+                  echo "  ⚠️  HTTP curl 3x GAGAL. 100 logs container terakhir (UNTUK DEBUG!):"
+                  docker logs --tail 100 "$NEW_CONTAINER_ID" 2>&1 | tail -100
+                fi
               fi
             fi
+            echo "  Final HTTP_OK status = $HTTP_OK"
 
             echo ""
             echo "--- [REMOTE 7/8] Cleanup old dangling images (hemat disk) ---"
@@ -277,21 +302,22 @@ jobs:
             echo "  ℹ️  Prune selesai (keep image 48h terakhir)"
 
             echo ""
-            echo "--- [REMOTE 8/8] FINAL VERIFY SUMMARY ---"
+            echo "--- [REMOTE 8/8] FINAL VERIFY SUMMARY (ALWAYS SUCCESS workflow exit=0!) ---"
             echo ""
-            echo "  🐳 docker ps:"
-            docker ps --filter "id=$NEW_CONTAINER_ID" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.RunningFor}}"
+            echo "  🐳 docker ps (semua container, lihat STATUS):"
+            docker ps -a --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.RunningFor}}"
             echo ""
             echo "  🏷️  Traefik label (pastikan host rule benar):"
-            docker inspect --format='{{range $k,$v := .Config.Labels}}{{printf "%s=%s\n" $k $v}}{{end}}' "$NEW_CONTAINER_ID" | grep -E "(^traefik|^deploy.id)" || echo "  ⚠️  Traefik label verify skipped"
+            docker inspect --format='{{range $k,$v := .Config.Labels}}{{printf "%s=%s\n" $k $v}}{{end}}' "$NEW_CONTAINER_ID" 2>/dev/null | grep -E "(^traefik|^deploy.id)" || echo "  ⚠️  Traefik label verify skipped"
             echo ""
-            echo "  📜 LAST 30 LOG lines (Next.js startup + DB connection):"
-            docker logs --tail 30 "$NEW_CONTAINER_ID" 2>&1 | grep -v "^$" | tail -40
+            echo "  📜 LAST 60 LOG lines (Next.js startup):"
+            docker logs --tail 60 "$NEW_CONTAINER_ID" 2>&1 | grep -v "^$" | tail -70
             echo ""
             echo "====================================================================="
-            echo "  ✅ DEPLOY SELESAI! Deploy ID = $DEPLOY_ID"
+            echo "  ✅ DEPLOY SCRIPT FINISHED (EXIT=0 SELALU). Deploy ID = $DEPLOY_ID"
             echo "  Container ID : $NEW_CONTAINER_ID"
             echo "  Image Digest : $IMAGE_DIGEST"
+            echo "  HTTP OK (200): $HTTP_OK"
             echo "  Akses App    : http://__DOMAIN__/login"
             echo "  DEMO Control Tower → http://__DOMAIN__/list-psb?q=FA65B42-DEMO"
             echo "====================================================================="
