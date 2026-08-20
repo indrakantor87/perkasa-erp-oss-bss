@@ -22,7 +22,37 @@ export function ThemeProvider({
   children: React.ReactNode
   initialTheme: UiTheme
 }) {
-  const [theme, setThemeState] = useState<UiTheme>(initialTheme)
+  const [theme, setThemeState] = useState<UiTheme>(() => {
+    if (typeof window === 'undefined') {
+      return initialTheme
+    }
+    try {
+      const stored = window.localStorage.getItem(UI_THEME_STORAGE_KEY)
+      if (stored) {
+        const normalized = normalizeUiTheme(stored)
+        if (document.documentElement) {
+          if (document.documentElement.dataset.theme !== normalized) {
+            document.documentElement.dataset.theme = normalized
+          }
+          if (document.documentElement.style.colorScheme !== normalized) {
+            document.documentElement.style.colorScheme = normalized
+          }
+        }
+        return normalized
+      }
+    } catch {
+      /* ignore storage read errors */
+    }
+    if (typeof document !== 'undefined' && document.documentElement) {
+      if (!document.documentElement.dataset.theme) {
+        document.documentElement.dataset.theme = initialTheme
+      }
+      if (!document.documentElement.style.colorScheme) {
+        document.documentElement.style.colorScheme = initialTheme
+      }
+    }
+    return initialTheme
+  })
   const userInteractedRef = useRef(false)
   const mountedRef = useRef(false)
 
@@ -54,34 +84,18 @@ export function ThemeProvider({
 
     if (userInteractedRef.current) return
     try {
-      const stored = window.localStorage.getItem(UI_THEME_STORAGE_KEY)
-      if (!stored) {
-        if (document.documentElement) {
-          if (!document.documentElement.dataset.theme) {
-            document.documentElement.dataset.theme = initialTheme
-          }
-          if (!document.documentElement.style.colorScheme) {
-            document.documentElement.style.colorScheme = initialTheme
-          }
-        }
-        return
+      const docEl = document.documentElement
+      if (!docEl) return
+      if (!docEl.dataset.theme) {
+        docEl.dataset.theme = theme
       }
-      const normalized = normalizeUiTheme(stored)
-      if (normalized !== initialTheme) {
-        setThemeState(normalized)
-        if (document.documentElement) {
-          document.documentElement.dataset.theme = normalized
-          document.documentElement.style.colorScheme = normalized
-        }
+      if (!docEl.style.colorScheme) {
+        docEl.style.colorScheme = theme
       }
     } catch {
-      /* ignore storage read errors */
-      if (document.documentElement && !document.documentElement.dataset.theme) {
-        document.documentElement.dataset.theme = initialTheme
-        document.documentElement.style.colorScheme = initialTheme
-      }
+      /* ignore dom access errors */
     }
-  }, [initialTheme])
+  }, [initialTheme, theme])
 
   useEffect(() => {
     if (!document.documentElement) return

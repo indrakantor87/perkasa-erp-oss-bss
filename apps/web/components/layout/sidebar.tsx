@@ -1497,7 +1497,14 @@ export function Sidebar({
   const pathname = usePathname()
   const role = session?.role ?? null
 
-  const [currentQueryParams, setCurrentQueryParams] = useState(() => new URLSearchParams())
+  const [currentQueryParams, setCurrentQueryParams] = useState(() => {
+    if (typeof window === 'undefined') return new URLSearchParams()
+    try {
+      return new URLSearchParams(window.location.search)
+    } catch {
+      return new URLSearchParams()
+    }
+  })
   const focus =
     String(currentQueryParams.get('focus') ?? '')
       .trim()
@@ -1520,29 +1527,34 @@ export function Sidebar({
     }
   }, [allowedPrefixes, role])
 
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return window.localStorage.getItem('perkasa.sidebar.collapsed') === '1'
+    } catch {
+      return false
+    }
+  })
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const stored = window.localStorage.getItem('perkasa.sidebar.expanded-items')
+      if (!stored) return {}
+      const parsed = JSON.parse(stored) as unknown
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, boolean>
+      }
+    } catch {
+      /* ignore */
+    }
+    return {}
+  })
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
     setCurrentQueryParams(new URLSearchParams(window.location.search))
   }, [pathname])
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem('perkasa.sidebar.collapsed')
-    if (stored === '1') {
-      setCollapsed(true)
-    }
-    const storedExpandedItems = window.localStorage.getItem('perkasa.sidebar.expanded-items')
-    if (storedExpandedItems) {
-      try {
-        const parsed = JSON.parse(storedExpandedItems) as Record<string, boolean>
-        if (parsed && typeof parsed === 'object') {
-          setExpandedItems(parsed)
-        }
-      } catch {}
-    }
-  }, [])
 
   useEffect(() => {
     window.localStorage.setItem('perkasa.sidebar.collapsed', collapsed ? '1' : '0')
