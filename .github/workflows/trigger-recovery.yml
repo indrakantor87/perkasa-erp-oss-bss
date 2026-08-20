@@ -1,0 +1,40 @@
+name: Trigger Recovery (call safe-restart-coolify-helper via API)
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: trigger-recovery-serial
+  cancel-in-progress: false
+
+jobs:
+  trigger-if-commit-message:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check commit message trigger
+        id: check
+        run: |
+          set +e
+          MSG="${{ github.event.head_commit.message }}"
+          echo "commit msg: $(echo "$MSG" | cut -c1-80)"
+          TRIGGER=0
+          case "$MSG" in
+            SAFE_RECOVERY_NOW*) TRIGGER=1 ;;
+          esac
+          echo "trigger=$TRIGGER"
+          echo "trigger=$TRIGGER" >> $GITHUB_OUTPUT
+
+      - name: Dispatch safe-restart-coolify-helper workflow
+        if: steps.check.outputs.trigger == '1'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'safe-restart-coolify-helper.yml',
+              ref: 'main'
+            });
+            console.log('OK - workflow_dispatch terkirim untuk safe-restart-coolify-helper.yml');

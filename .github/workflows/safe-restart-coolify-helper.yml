@@ -1,0 +1,161 @@
+name: "SAFE RECOVERY: Restart Coolify Helper (Reconcile ALL Apps)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: safe-recovery-coolify-helper-restart
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SSH Key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+        run: |
+          set -e
+          mkdir -p $HOME/.ssh && chmod 700 $HOME/.ssh
+          RAW=$HOME/.ssh/raw_key
+          FINAL=$HOME/.ssh/id_ed25519_coolify
+          echo "$SSH_PRIVATE_KEY" > $RAW
+          BODY=$RAW.body
+          tail -n +2 $RAW | head -n -1 | grep -v '^[[:space:]]*$' > $BODY || true
+          { echo "-----BEGIN OPENSSH PRIVATE KEY-----"; cat $BODY; echo "-----END OPENSSH PRIVATE KEY-----"; } > $FINAL
+          chmod 600 $FINAL
+          KEY_SIZE=$(wc -c < $FINAL)
+          echo "Final key size: $KEY_SIZE bytes | lines: $(wc -l < $FINAL)"
+          test "$KEY_SIZE" -gt 50 || { echo "[ERR] SSH KEY TERLALU KECIL ($KEY_SIZE bytes)"; exit 1; }
+          ssh-keygen -l -f $FINAL 2>&1 || true
+          rm -f $RAW $BODY
+
+      - name: Preflight SSH Test + SURVEY BEFORE
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+        run: |
+          set -e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $KEY"
+          echo "SSH $USER@$HOST"
+          ssh $OPTS "$USER@$HOST" "
+            echo '=== [1/4] BEFORE RECOVERY: docker ps -a ALL containers ==='
+            docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | head -60
+            echo ''
+            echo '=== [2/4] Coolify-related containers (coolify-*, coolify-proxy, etc) ==='
+            docker ps -a --format 'table {{.Names}}\t{{.Status}}' 2>&1 | grep -iE 'coolify|traefik|helper' | head -20
+            echo ''
+            echo '=== [3/4] Port listeners 80/443/3000 ==='
+            (ss -ltn 2>/dev/null || netstat -ltn 2>/dev/null) | grep -E ':80 |:443 |:300[0-9]' | head -20
+            echo ''
+            echo '=== [4/4] Survey ALL images yang tersedia locally (cek ada image 5 app) ==='
+            docker images 2>&1 | grep -E 'perkasa|landing|finance|ga-web|erp-oss|web-psb' | head -30 || echo '(tidak ada di local cache image)'
+            echo ''
+            echo '=== END SURVEY BEFORE ==='
+          " 2>&1
+          echo "[OK] SSH OK - survey before berhasil"
+
+      - name: RESTART COOLIFY HELPER (Reconcile SEMUA 5 Environment di UI Coolify) - SAFE
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $KEY"
+          echo "=================================================================="
+          echo " STEP 1: Temukan nama container coolify-helper / coolify-service... "
+          echo "=================================================================="
+          HELPER_NAMES=$(ssh $OPTS "$USER@$HOST" "docker ps -aq --format '{{.Names}}' 2>&1 | grep -iE 'coolify.*(helper|service|worker)' | sort -u" 2>&1)
+          echo "[INFO] helper/service/worker yang ditemukan:"
+          echo "$HELPER_NAMES"
+          if [ -z "$HELPER_NAMES" ]; then
+            echo "[WARN] Tidak menemukan coolify-helper dengan nama pattern. Coba listing ALL containers grep coolify:"
+            ssh $OPTS "$USER@$HOST" "docker ps -a --format 'table {{.Names}}' 2>&1 | grep -i coolify | head -30"
+            HELPER_NAMES=$(ssh $OPTS "$USER@$HOST" "docker ps -aq --format '{{.Names}}' 2>&1 | grep -i coolify | head -10" 2>&1)
+          fi
+          echo ""
+          echo "=================================================================="
+          echo " STEP 2: Restart satu per satu helper/service/worker container... "
+          echo "=================================================================="
+          for HN in $HELPER_NAMES; do
+            if [ -z "$HN" ]; then continue; fi
+            echo "[INFO] Restart container: $HN"
+            RESULT=$(ssh $OPTS "$USER@$HOST" "set +e; docker restart $HN 2>&1; sleep 2; ST=\$(docker inspect --format='{{.State.Status}}' $HN 2>/dev/null || echo unknown); echo \"STATUS_AFTER_RESTART=\$ST\"" 2>&1)
+            echo "$RESULT"
+            ST_LINE=$(echo "$RESULT" | grep "STATUS_AFTER_RESTART=" | tail -1)
+            echo "[INFO] $HN -> $ST_LINE"
+          done
+          echo ""
+          echo "[INFO] Menunggu 15 detik agar helper selesai startup dan mulai reconcile apps..."
+          sleep 15
+          exit 0
+
+      - name: WAIT 60s for Coolify Helper Reconcile ALL 5 Apps
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $KEY"
+          echo "Menunggu 60 detik (interval 10s) agar Coolify Helper reconcile 5 Environment di UI Coolify (Red dot 🔴 -> Green dot 🟢)"
+          ELAPSED=0
+          while [ $ELAPSED -lt 60 ]; do
+            echo "  wait ${ELAPSED}s/60s..."
+            sleep 10
+            ELAPSED=$((ELAPSED + 10))
+            RUNNING_COUNT=$(ssh $OPTS "$USER@$HOST" "docker ps --format '{{.Names}}' 2>&1 | wc -l" 2>&1 | tr -d "\r ")
+            echo "  [${ELAPSED}s] Running containers count: $RUNNING_COUNT"
+          done
+          echo "[OK] Wait 60s selesai"
+          exit 0
+
+      - name: FINAL VERIFICATION - LIVE HTTP CHECK 5 DOMAINS
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $KEY"
+          echo "=================================================================="
+          echo " FINAL: HTTP STATUS CHECK 5 LIVE DOMAINS via curl Traefik di server "
+          echo "=================================================================="
+          DOMAINS="perkasa-erp-oss-bss|b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io
+          landing-page-perkasa|uw0gsooko48kwgwogk8wc8gs.103.162.17.178.sslip.io
+          finance-perkasa|h4ow4sw0k04ksgsgskcwoow8.103.162.17.178.sslip.io
+          ga-web-app|ikgc8kkwcc08kkgkskc0gwg4.103.162.17.178.sslip.io
+          web-psb-perkasa|pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io"
+          COUNT_OK=0
+          echo "$DOMAINS" | while IFS='|' read -r NAME DOM; do
+            if [ -z "$NAME" ]; then continue; fi
+            H_CODE=$(ssh $OPTS "$USER@$HOST" "curl -s -o /dev/null -w '%{http_code}' --max-time 12 -L --resolve $DOM:80:127.0.0.1 http://$DOM/ 2>/dev/null || echo 000" 2>&1 | tr -d "\r ")
+            echo "  ✅ $NAME  -> HTTP $H_CODE   ($DOM)"
+            if [ "$H_CODE" = "200" ] || [ "$H_CODE" = "301" ] || [ "$H_CODE" = "302" ] || [ "$H_CODE" = "307" ] || [ "$H_CODE" = "308" ]; then
+              COUNT_OK=$((COUNT_OK+1))
+            fi
+          done
+          echo ""
+          echo "=================================================================="
+          echo " SURVEY AFTER RECOVERY: docker ps running containers: "
+          echo "=================================================================="
+          ssh $OPTS "$USER@$HOST" "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.RunningFor}}\t{{.Image}}' 2>&1 | head -30"
+          echo ""
+          echo "=================================================================="
+          echo " RINGKASAN: User TIDAK USAH KLIK APA PUN DI COOLIFY UI! "
+          echo " Silakan REFRESH BROWSER di domain masing-masing: "
+          echo "   1. ERP OSS BSS  : http://b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io"
+          echo "   2. Landing Page : http://uw0gsooko48kwgwogk8wc8gs.103.162.17.178.sslip.io"
+          echo "   3. Finance     : http://h4ow4sw0k04ksgsgskcwoow8.103.162.17.178.sslip.io"
+          echo "   4. GA Web App  : http://ikgc8kkwcc08kkgkskc0gwg4.103.162.17.178.sslip.io"
+          echo "   5. Web PSB     : http://pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io"
+          echo " Jika masih 404 / loading: tunggu 1-2 menit (Coolify Helper reconcile membutuhkan waktu sedikit), lalu tekan F5 / Ctrl+R."
+          echo "=================================================================="
+          exit 0
