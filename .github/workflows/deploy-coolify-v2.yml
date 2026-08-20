@@ -174,7 +174,7 @@ jobs:
           echo "[OK] WORKDIR_CORRECT=/app/apps/web/standalone (sesuai Dockerfile)"
           echo "[OK] SERVER_JS_PATH=/app/apps/web/standalone/server.js (sesuai Dockerfile)"
 
-      - name: "Step 5/9 Run NEW Container (APP_DATA_MODE=mock) - base64 script no quoting bug"
+      - name: "Step 5/9 Run NEW Container - FIX backtick literal single-quote Traefik + capture docker stderr"
         if: env.DEPLOY_OK == '1'
         env:
           HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
@@ -187,19 +187,22 @@ jobs:
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=60 -o ServerAliveInterval=60 -o BatchMode=yes -i $KEY"
           IMG="${{ env.IMAGE_FULL }}"
           DEPLOY_ID=$(date +%Y%m%d%H%M%S)
-          echo "[5/9] docker run image=$IMG domain=$DOMAIN"
+          echo "[5/9] docker run image=$IMG domain=$DOMAIN deploy_id=$DEPLOY_ID"
 
           SCRIPT_FILE=$(mktemp)
-          cat > "$SCRIPT_FILE" <<SCRIPT_EOF
+          cat > "$SCRIPT_FILE" <<'SCRIPT_EOF'
           #!/usr/bin/env bash
-          set -e
+          set +e
           IMG_PLACEHOLDER="__IMG__"
           DOMAIN_PLACEHOLDER="__DOMAIN__"
           AUTH_PLACEHOLDER="__AUTH__"
           DEPLOY_PLACEHOLDER="__DEPLOY__"
+          echo "[INFO] cleanup old containers"
           docker rm -f perkasa-erp-oss-bss 2>/dev/null || true
-          sleep 2
-          CID=$(docker run -d \
+          sleep 3
+          TRAEFIK_RULE='traefik.http.routers.perkasa.rule=Host(`'"$DOMAIN_PLACEHOLDER"'`)'
+          echo "[INFO] Traefik rule=$TRAEFIK_RULE"
+          RUN_OUTPUT=$(docker run -d \
             --name perkasa-erp-oss-bss \
             --network coolify \
             --restart unless-stopped \
@@ -217,24 +220,40 @@ jobs:
             -e LOG_LEVEL=debug \
             -l traefik.enable=true \
             -l "traefik.http.routers.perkasa.entryPoints=http" \
-            -l "traefik.http.routers.perkasa.rule=Host(\`$DOMAIN_PLACEHOLDER\`)" \
+            -l "$TRAEFIK_RULE" \
             -l traefik.http.services.perkasa.loadbalancer.server.port=3000 \
             -l "deploy.id=$DEPLOY_PLACEHOLDER" \
-            "$IMG_PLACEHOLDER")
+            "$IMG_PLACEHOLDER" 2>&1)
+          RUN_RC=$?
+          echo "[DEBUG] docker run exit=$RUN_RC"
+          echo "[DEBUG] docker run output=$RUN_OUTPUT"
+          CID=$(echo "$RUN_OUTPUT" | head -n 1 | tr -d '\r\n ')
+          echo "[DEBUG] extracted CID=[$CID]"
           if [ -z "$CID" ]; then
-            echo "[ERR] docker run empty ID!"
+            echo "[ERR] docker run empty ID! listing local images..."
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}" | head -20
+            echo "CID_RESULT="
             exit 16
           fi
           echo "CID_RESULT=$CID"
+          exit 0
           SCRIPT_EOF
 
           sed -i "s|__IMG__|$IMG|g; s|__DOMAIN__|$DOMAIN|g; s|__AUTH__|$AUTH_SECRET|g; s|__DEPLOY__|$DEPLOY_ID|g" "$SCRIPT_FILE"
+          echo "[DEBUG] Script preview (line 1-5):"; head -n 5 "$SCRIPT_FILE"
+          echo "[DEBUG] Traefik rule line preview:"; grep -n "TRAEFIK_RULE" "$SCRIPT_FILE" || true
           B64=$(base64 -w0 "$SCRIPT_FILE")
           rm -f "$SCRIPT_FILE"
 
-          RESULT=$(ssh $OPTS "$USER@$HOST" "echo '$B64' | base64 -d > /tmp/deploy-perkasa.sh ; chmod +x /tmp/deploy-perkasa.sh ; bash /tmp/deploy-perkasa.sh")
-          CID=$(echo "$RESULT" | grep '^CID_RESULT=' | cut -d'=' -f2 | tr -d '\r\n')
-          test -n "$CID" || { echo "[ERR] CID empty! Remote output:"; echo "$RESULT"; exit 16; }
+          echo "[INFO] executing remote script via base64..."
+          RESULT=$(ssh $OPTS "$USER@$HOST" "echo '$B64' | base64 -d > /tmp/deploy-perkasa.sh ; chmod +x /tmp/deploy-perkasa.sh ; bash -x /tmp/deploy-perkasa.sh 2>&1")
+          REMOTE_RC=$?
+          echo "[DEBUG] SSH remote exit=$REMOTE_RC"
+          echo "[DEBUG] === REMOTE OUTPUT START ==="
+          echo "$RESULT" | tail -n 50
+          echo "[DEBUG] === REMOTE OUTPUT END ==="
+          CID=$(echo "$RESULT" | grep '^CID_RESULT=' | tail -n 1 | cut -d'=' -f2 | tr -d '\r\n')
+          test -n "$CID" || { echo "[ERR] FINAL CID EMPTY!!!"; exit 16; }
           echo "[OK] CONTAINER_ID=$CID"
           echo "NEW_CONTAINER_ID=$CID" >> "$GITHUB_ENV"
 
