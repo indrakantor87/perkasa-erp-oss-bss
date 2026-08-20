@@ -106,6 +106,8 @@ jobs:
           DOMAIN: "de6w6jefch37pks4cbg9hivq.103.162.17.178.sslip.io"
           AUTH_SESSION_SECRET: "278476982jhgs98763h59862fwjrihw648"
           REVIEW_DB_CONNECT_TIMEOUT_MS: "3000"
+          DEFAULT_APP_DATA_MODE: "mock"
+          AUTO_LOAD_DEMO_PSB: "enabled"
         run: |
           set -e
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $SSH_KEY_FILE"
@@ -203,9 +205,9 @@ jobs:
               -e PORT="3000" \
               -e HOSTNAME="0.0.0.0" \
               -e NODE_ENV="production" \
-              -e APP_DATA_MODE="review-db" \
+              -e APP_DATA_MODE="__DEFAULT_APP_DATA_MODE__" \
+              -e AUTO_LOAD_DEMO_PSB="__AUTO_LOAD_DEMO_PSB__" \
               -e AUTH_SESSION_SECRET="__AUTH_SESSION_SECRET__" \
-              -e "DATABASE_URL=mysql://__DB_USER__:__DB_PASS__@__DB_IP__:__DB_PORT__/__DB_NAME__" \
               -e REVIEW_DB_CONNECT_TIMEOUT_MS="__REVIEW_DB_CONNECT_TIMEOUT_MS__" \
               -e BOOTSTRAP_MOCK_AUTH_CREDENTIALS="disabled" \
               -e AUTH_COOKIE_SECURE="false" \
@@ -300,11 +302,8 @@ jobs:
           REMOTE_SCRIPT=${REMOTE_SCRIPT//__IMAGE_FULL__/$IMAGE_FULL}
           REMOTE_SCRIPT=${REMOTE_SCRIPT//__GHCR_USERNAME__/$GHCR_USERNAME}
           REMOTE_SCRIPT=${REMOTE_SCRIPT//__GHCR_TOKEN__/$GHCR_TOKEN}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__DB_IP__/$DB_IP}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__DB_PORT__/$DB_PORT}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__DB_USER__/$DB_USER}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__DB_PASS__/$DB_PASS}
-          REMOTE_SCRIPT=${REMOTE_SCRIPT//__DB_NAME__/$DB_NAME}
+          REMOTE_SCRIPT=${REMOTE_SCRIPT//__DEFAULT_APP_DATA_MODE__/$DEFAULT_APP_DATA_MODE}
+          REMOTE_SCRIPT=${REMOTE_SCRIPT//__AUTO_LOAD_DEMO_PSB__/$AUTO_LOAD_DEMO_PSB}
           REMOTE_SCRIPT=${REMOTE_SCRIPT//__DOMAIN__/$DOMAIN}
           REMOTE_SCRIPT=${REMOTE_SCRIPT//__AUTH_SESSION_SECRET__/$AUTH_SESSION_SECRET}
           REMOTE_SCRIPT=${REMOTE_SCRIPT//__REVIEW_DB_CONNECT_TIMEOUT_MS__/$REVIEW_DB_CONNECT_TIMEOUT_MS}
