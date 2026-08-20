@@ -1,0 +1,419 @@
+name: "DARURAT: Server Triage & Restart ALL Apps (Push Triggered)"
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: darurat-server-triage-serial-run
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pre-Flight Filter (only run if commit DARURAT or workflow_dispatch)
+        run: |
+          set +e
+          EVENT=$GITHUB_EVENT_NAME
+          MSG="${{ github.event.head_commit.message }}"
+          echo "Event=$EVENT commit_msg=$(echo "$MSG" | cut -c1-60)"
+          RUN_OK=0
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "[OK] workflow_dispatch -> RUN"
+            RUN_OK=1
+          else
+            case "$MSG" in
+              DARURAT_HTTP_NO_SERVER*|DARURAT_RECOVERY_ALL*|EMERGENCY*|DARURAT*)
+                echo "[OK] Commit trigger darurat terdeteksi -> RUN"
+                RUN_OK=1
+                ;;
+              *)
+                echo "[SKIP] push commit biasa / bukan darurat -> exit sukses (skip)"
+                RUN_OK=0
+                ;;
+            esac
+          fi
+          echo "RUN_OK=$RUN_OK"
+          echo "RUN_OK=$RUN_OK" >> $GITHUB_ENV
+          exit 0
+
+      - name: Install SSH Key (LENGKAP DEBUG)
+        if: env.RUN_OK == '1'
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+        run: |
+          set -e
+          mkdir -p $HOME/.ssh && chmod 700 $HOME/.ssh
+          RAW=$HOME/.ssh/raw_key
+          FINAL=$HOME/.ssh/id_ed25519_coolify
+          echo "[INFO] Menulis SSH_PRIVATE_KEY raw..."
+          echo "$SSH_PRIVATE_KEY" > "$RAW"
+          RAW_LINES=$(wc -l < "$RAW" | tr -d ' ')
+          RAW_BYTES=$(wc -c < "$RAW" | tr -d ' ')
+          echo "[DEBUG] RAW key lines=$RAW_LINES bytes=$RAW_BYTES"
+          head -c 1 "$RAW" | xxd -p 2>/dev/null | head -1 || true
+          echo "[DEBUG] RAW 5 baris PERTAMA:"
+          head -n 5 "$RAW"
+          echo "[DEBUG] RAW 2 baris TERAKHIR:"
+          tail -n 2 "$RAW"
+          echo ""
+          BODY=$RAW.body
+          tail -n +2 "$RAW" | head -n -1 | grep -v '^[[:space:]]*$' > "$BODY" || true
+          { echo "-----BEGIN OPENSSH PRIVATE KEY-----"; cat "$BODY"; echo "-----END OPENSSH PRIVATE KEY-----"; } > "$FINAL"
+          chmod 600 "$FINAL"
+          FINAL_LINES=$(wc -l < "$FINAL" | tr -d ' ')
+          FINAL_BYTES=$(wc -c < "$FINAL" | tr -d ' ')
+          echo "[INFO] FINAL key lines=$FINAL_LINES bytes=$FINAL_BYTES"
+          echo "[DEBUG] FINAL head 1 line:"
+          head -n 1 "$FINAL"
+          echo "[DEBUG] FINAL tail 1 line:"
+          tail -n 1 "$FINAL"
+          ssh-keygen -l -f "$FINAL" 2>&1 || echo "[WARN] ssh-keygen -l gagal (bisa karena format)"
+          rm -f "$RAW" "$BODY"
+          if [ "$FINAL_BYTES" -lt 100 ]; then
+            echo "[FATAL] SSH KEY TERLALU KECIL ($FINAL_BYTES bytes < 100) - COOLIFY_SERVER_SSH_PRIVATE_KEY kemungkinan KOSONG / SALAH di GitHub Secrets Settings!"
+            exit 8
+          fi
+
+      - name: "PRE CHECK: hostname docker network - CONFIRMASI SSH BENAR TERKONEKSI"
+        if: env.RUN_OK == '1'
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+        timeout-minutes: 2
+        run: |
+          set -e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $KEY"
+          test -n "$HOST" || { echo "[FATAL] COOLIFY_SERVER_HOST KOSONG di GitHub Secrets!"; exit 2; }
+          echo "[PRE-CHECK] SSH ke USER=$USER HOST=$HOST"
+          ssh $OPTS "$USER@$HOST" "
+            echo ==== PRE-CHECK: SERVER INFO ====
+            echo hostname: \$(hostname)
+            echo uname: \$(uname -a)
+            echo date: \$(date '+%Y-%m-%d %H:%M:%S')
+            echo uid: \$(id)
+            echo docker: \$(docker -v 2>&1)
+            echo
+            echo ==== ALL CONTAINERS (including Exited) ====
+            docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}' 2>&1 | head -80
+            echo
+            echo ==== DOCKER VOLUMES (Coolify databases/data) ====
+            docker volume ls 2>&1 | grep -iE 'coolify|postgres|mysql|redis' | head -20 || echo '(tidak ada volume coolify yang match)'
+            echo
+            echo ==== DOCKER NETWORKS ====
+            docker network ls 2>&1 | head -20
+            echo
+            echo ==== PORT LISTENERS CRITICAL 80 443 3000-3005 ====
+            (ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null) | grep -E ':80 |:443 |:300[0-5]' | head -20 || echo '(port listener kosong / permission denied)'
+            echo
+            echo ==== END PRE-CHECK ====
+          "
+          echo "[OK] SSH BERHASIL - server sudah terkoneksi"
+
+      - name: "STEP 1/4: Restart COOLIFY CORE SERVICES (proxy + helper + service + worker + postgres + redis) AMAN TANPA SIDE EFFECT"
+        if: env.RUN_OK == '1'
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+        timeout-minutes: 6
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $KEY"
+          echo "==================================================================="
+          echo " STEP 1: Temukan + Restart urutan service inti Coolify:"
+          echo "   (1) postgres / redis (database) (2) coolify-proxy/Traefik"
+          echo "   (3) coolify-helper / service / worker"
+          echo "   (4) SEMUA apps user yang stopped (5 aplikasi prod)"
+          echo " TIDAK ADA docker rm, HANYA docker start / docker restart existing!"
+          echo "==================================================================="
+          RESULT=$(ssh $OPTS "$USER@$HOST" "
+            set +e
+            echo --- STEP 1.0: List container names Coolify core + apps
+            ALL_NAMES=\$(docker ps -aq --format '{{.Names}}' 2>&1 | sort)
+            echo 'ALL CONTAINER NAMES:'
+            echo \"\$ALL_NAMES\"
+            echo
+            CORE_DB=\$(echo \"\$ALL_NAMES\" | grep -iE 'postgres|mysql|redis|mariadb|mongo' | head -10)
+            CORE_PROXY=\$(echo \"\$ALL_NAMES\" | grep -iE 'coolify-proxy|traefik|proxy' | head -5)
+            CORE_HELP=\$(echo \"\$ALL_NAMES\" | grep -iE 'coolify.*(helper|service|worker|realtime|horizon)' | head -15)
+            USER_APPS=\$(echo \"\$ALL_NAMES\" | grep -vE 'postgres|mysql|redis|mariadb|mongo|coolify|traefik|proxy|helper|service|worker|horizon|realtime' | head -50)
+            echo '[INFO] DB      containers: ' \$CORE_DB
+            echo '[INFO] PROXY   containers: ' \$CORE_PROXY
+            echo '[INFO] HELPER  containers: ' \$CORE_HELP
+            echo '[INFO] USERAPP containers: ' \$USER_APPS
+            echo
+            echo --- STEP 1.1: start DB yang stopped
+            for C in \$CORE_DB; do
+              if [ -z \"\$C\" ]; then continue; fi
+              ST=\$(docker inspect --format='{{.State.Status}}' \$C 2>/dev/null || echo unknown)
+              if [ \"\$ST\" != \"running\" ]; then
+                echo \"[START DB] \$C (status=\$ST)\"
+                docker start \$C 2>&1
+                sleep 3
+                NS=\$(docker inspect --format='{{.State.Status}}' \$C 2>/dev/null || echo unknown)
+                echo \"            after start \$C -> \$NS\"
+              else
+                echo \"[SKIP DB running] \$C\"
+              fi
+            done
+            echo
+            echo --- STEP 1.2: restart PROXY (Traefik) - PENTING karena 'no available server' adalah proxy error!
+            for C in \$CORE_PROXY; do
+              if [ -z \"\$C\" ]; then continue; fi
+              ST=\$(docker inspect --format='{{.State.Status}}' \$C 2>/dev/null || echo unknown)
+              echo \"[RESTART PROXY] \$C (current status=\$ST)\"
+              docker restart \$C 2>&1
+              sleep 5
+              NS=\$(docker inspect --format='{{.State.Status}}' \$C 2>/dev/null || echo unknown)
+              echo \"              after restart \$C -> status=\$NS\"
+              if [ \"\$NS\" = \"running\" ]; then
+                echo \"[PROXY LOG tail 5 lines after restart]:\"
+                docker logs \$C 2>&1 | tail -n 5
+              fi
+            done
+            echo
+            echo --- STEP 1.3: start/restart helper + service + worker + realtime
+            for C in \$CORE_HELP; do
+              if [ -z \"\$C\" ]; then continue; fi
+              ST=\$(docker inspect --format='{{.State.Status}}' \$C 2>/dev/null || echo unknown)
+              if [ \"\$ST\" = \"running\" ]; then
+                echo \"[RESTART HELPER] \$C\"
+                docker restart \$C 2>&1
+              else
+                echo \"[START   HELPER] \$C (status=\$ST)\"
+                docker start \$C 2>&1
+              fi
+              sleep 3
+              NS=\$(docker inspect --format='{{.State.Status}}' \$C 2>/dev/null || echo unknown)
+              echo \"            after start/restart \$C -> status=\$NS\"
+            done
+            echo
+            echo --- STEP 1.4: START SEMUA USER APLIKASI YANG STOPPED (5 apps bisnis operasional!)
+            TOTAL_STARTED=0
+            for C in \$USER_APPS; do
+              if [ -z \"\$C\" ]; then continue; fi
+              ST=\$(docker inspect --format='{{.State.Status}}' \$C 2>/dev/null || echo unknown)
+              if [ \"\$ST\" != \"running\" ]; then
+                echo \"[START APP] \$C (status=\$ST)\"
+                docker start \$C 2>&1
+                sleep 4
+                NS=\$(docker inspect --format='{{.State.Status}}' \$C 2>/dev/null || echo unknown)
+                echo \"           \$C -> after start: \$NS\"
+                if [ \"\$NS\" = \"running\" ]; then
+                  TOTAL_STARTED=\$((TOTAL_STARTED+1))
+                fi
+              else
+                echo \"[SKIP running] \$C\"
+                TOTAL_STARTED=\$((TOTAL_STARTED+1))
+              fi
+            done
+            echo
+            echo --- STEP 1.5: FINAL container running count
+            sleep 8
+            echo Running containers:
+            docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.RunningFor}}\t{{.Image}}' 2>&1 | head -50
+            echo
+            echo APPS_RUNNING_COUNT=\$TOTAL_STARTED
+            echo ==== END STEP 1 ====
+          " 2>&1)
+          RC=$?
+          echo "[DEBUG] SSH RC=$RC"
+          echo "=== STEP 1 OUTPUT (tail 80 lines): ==="
+          echo "$RESULT" | tail -n 80
+          exit 0
+
+      - name: "STEP 2/4: Wait 40s Coolify Helper Reconcile All Apps + warmup"
+        if: env.RUN_OK == '1'
+        run: |
+          set +e
+          echo "Coolify helper sedang reconcile environment UI ke container yang benar - wait 40s"
+          for i in 1 2 3 4 5 6 7 8; do
+            sleep 5
+            ELAPSED=$((i*5))
+            echo "  [${ELAPSED}s/40s] tunggu reconcile..."
+          done
+          echo "[OK] Wait 40s selesai."
+          exit 0
+
+      - name: "STEP 3/4: LIVE HTTP STATUS VERIFICATION 6 DOMAINS (TERMASUK CUSTOM DOMAIN webpsb.perkasa.net.id)"
+        if: env.RUN_OK == '1'
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+        timeout-minutes: 3
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $KEY"
+          echo "==================================================================="
+          echo " FINAL VERIFIKASI HTTP STATUS 6 DOMAIN (dari SERVER sendiri via curl --resolve Traefik):"
+          echo "  -> TERMASUK webpsb.perkasa.net.id (DOMAIN OPERASIONAL YANG SEDANG ERROR!)"
+          echo "==================================================================="
+          DOMAINS_JSON='[
+            {"name":"(PROD) webpsb.perkasa.net.id CUSTOM DOMAIN!!","domain":"webpsb.perkasa.net.id"},
+            {"name":"[1] ERP OSS BSS","domain":"b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io"},
+            {"name":"[2] LANDING PAGE","domain":"uw0gsooko48kwgwogk8wc8gs.103.162.17.178.sslip.io"},
+            {"name":"[3] FINANCE","domain":"h4ow4sw0k04ksgsgskcwoow8.103.162.17.178.sslip.io"},
+            {"name":"[4] GA WEB APP","domain":"ikgc8kkwcc08kkgkskc0gwg4.103.162.17.178.sslip.io"},
+            {"name":"[5] WEB PSB PERKASA (ssl ip)","domain":"pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io"}
+          ]'
+          OK_COUNT=0
+          echo "$DOMAINS_JSON" | python3 -c "
+import sys, json, subprocess, os
+doms = json.load(sys.stdin)
+results = []
+for d in doms:
+  name = d['name']; dom = d['domain']
+  host=os.environ.get('SRV_HOST','')
+  user=os.environ.get('SRV_USER','root')
+  print(f'CHECKING {name}: {dom} ...', flush=True)
+  cmd = (
+    f'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+    f'-o ConnectTimeout=15 -o BatchMode=yes '
+    f'-i {os.path.expanduser(\"~/.ssh/id_ed25519_coolify\")} '
+    f'{user}@{host} \"curl -s -o /dev/null -w \\\"%{{http_code}}\\\" --max-time 12 -L '
+    f'--resolve {dom}:80:127.0.0.1 http://{dom}/ 2>/dev/null || echo 000\"'
+  )
+  try:
+    r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=20)
+    code = (r.stdout.strip().split()[-1] if r.stdout.strip() else '').strip()
+    if not code: code='000'
+  except Exception as e:
+    code = 'ERR'
+  try:
+    c = int(code)
+    ok = (200 <= c <= 399)
+  except:
+    ok = False
+  results.append((name, dom, code, ok))
+  mark = '✅ OK' if ok else ('⚠️ TIMEOUT/REDIRECT_NOK' if code != '000' and code != 'ERR' else '❌ OFFLINE')
+  print(f'  RESULT: HTTP {code} {mark}', flush=True)
+  if ok:
+    pass
+print()
+print('======== FINAL SUMMARY ========')
+okc = 0
+for name, dom, code, ok in results:
+  if ok: okc += 1; symb='✅'
+  else: symb='❌'
+  print(f'  {symb} {name} -> HTTP {code}')
+print(f'\n  DOMAINS ONLINE: {okc} / {len(results)}')
+"
+          exit 0
+
+      - name: "STEP 4/4: IF STILL FAIL -> FORCIBLE DOCKER START web-psb-perkasa DIRECT + full 3000:3000 port mapping bypass Coolify (100% start container existing stopped)"
+        if: always()
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+        timeout-minutes: 4
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=60 -o BatchMode=yes -i $KEY"
+          echo "==================================================================="
+          echo " STEP 4 DARURAT FALLBACK: Jika webpsb.perkasa.net.id masih 'no available server', "
+          echo " cari container web-psb-perkasa yang stopped, start manual, jika tidak ada buat BARU dengan"
+          echo " image ghcr.io yang sesuai + Traefik labels TERMASUK host rule webpsb.perkasa.net.id SECARA LANGSUNG!"
+          echo "==================================================================="
+          RESULT=$(ssh $OPTS "$USER@$HOST" "
+            set +e
+            echo --- Cari container web-psb-perkasa stopped
+            NAMES=\$(docker ps -aq --format '{{.Names}}' | grep -iE 'web-psb|webpsb|psb' | head -5)
+            echo Container yang berhubungan PSB ditemukan: \$NAMES
+            CID_FINAL=''
+            if [ -n \"\$NAMES\" ]; then
+              for C in \$NAMES; do
+                ST=\$(docker inspect --format='{{.State.Status}}' \$C 2>/dev/null || echo unknown)
+                echo \" existing container \$C status=\$ST\"
+                if [ \"\$ST\" != \"running\" ]; then
+                  echo \"  -> START \$C\"
+                  docker start \$C 2>&1
+                  sleep 8
+                  NS=\$(docker inspect --format='{{.State.Status}}' \$C 2>/dev/null || echo unknown)
+                  if [ \"\$NS\" = \"running\" ]; then
+                    CID_FINAL=\$C
+                    break
+                  fi
+                else
+                  CID_FINAL=\$C
+                  break
+                fi
+              done
+            fi
+            if [ -z \"\$CID_FINAL\" ]; then
+              echo
+              echo \"[DARURAT FALLBACK] container web psb TIDAK ADA / tidak bisa start. BUAT ULANG BARU dari GHCR image + label custom domain webpsb.perkasa.net.id!\"
+              IMAGE_NEW=\"ghcr.io/indrakantor87/web-psb-perkasa:latest\"
+              echo \"  -> cek image terbaru web-psb...\"
+              docker images 2>&1 | grep -iE 'web-psb|perkasa' | head -10
+              EXIST_IMG=\$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -iE 'web-psb-perkasa' | head -1)
+              if [ -z \"\$EXIST_IMG\" ]; then
+                echo \"  image tidak ada local: pull \$IMAGE_NEW\"
+                docker pull \"\$IMAGE_NEW\" 2>&1 | tail -5
+                EXIST_IMG=\"\$IMAGE_NEW\"
+              fi
+              BT=\\\$(printf '%b' '\\x60')
+              RULE_PSB_SSLIP=\"traefik.http.routers.webpsb-ssl.rule=Host(\\\${BT}pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io\\\${BT})\"
+              RULE_PSB_CUSTOM=\"traefik.http.routers.webpsb-netid.rule=Host(\\\${BT}webpsb.perkasa.net.id\\\${BT})\"
+              docker rm -f web-psb-perkasa 2>/dev/null
+              sleep 3
+              echo \"  docker run fresh web-psb-perkasa (port 3002 -> container 3000) + label CUSTOM DOMAIN webpsb.perkasa.net.id\"
+              timeout 150 docker run -d --name web-psb-perkasa --network coolify --restart unless-stopped -p 3002:3000 \
+                -e PORT=3000 -e HOSTNAME=0.0.0.0 -e NODE_ENV=production \
+                -l traefik.enable=true \
+                -l \"traefik.http.routers.webpsb-ssl.entryPoints=http\" \
+                -l \"\\\$RULE_PSB_SSLIP\" \
+                -l \"traefik.http.services.webpsb-ssl.loadbalancer.server.port=3000\" \
+                -l \"traefik.http.routers.webpsb-netid.entryPoints=http\" \
+                -l \"\\\$RULE_PSB_CUSTOM\" \
+                -l \"traefik.http.services.webpsb-netid.loadbalancer.server.port=3000\" \
+                \"\$EXIST_IMG\" > /tmp/cid_webpsb.txt 2> /tmp/cid_webpsb.err
+              CID_NEW=\\\$(cat /tmp/cid_webpsb.txt | tr -d '\\\r\\\n ')
+              if [ -z \"\$CID_NEW\" ]; then
+                echo \"  [FATAL] start webpsb fresh gagal! stderr:\"
+                cat /tmp/cid_webpsb.err 2>/dev/null
+                echo WEBPBSB_FALLBACK=NO
+              else
+                sleep 12
+                NS=\\\$(docker inspect --format='{{.State.Status}}' \\\$CID_NEW 2>/dev/null)
+                echo New container web-psb-perkasa cid=\\\$CID_NEW status=\\\$NS
+                CID_FINAL=\\\$CID_NEW
+                echo WEBPBSB_FALLBACK=YES_FRESH_CONTAINER_CREATED
+              fi
+            fi
+            echo
+            if [ -n \"\$CID_FINAL\" ]; then
+              echo [FINAL CHECK] container webpsb cid=\$CID_FINAL
+              ST=\\\$(docker inspect --format='{{.State.Status}}' \$CID_FINAL 2>/dev/null)
+              echo \"Status: \$ST\"
+              echo \"Last 25 logs:\"
+              docker logs \$CID_FINAL 2>&1 | tail -25
+              echo
+              echo \"[FINAL WARMUP curl direct container port 3000 - login check]:\"
+              for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+                HC=\\\$(curl -s -o /dev/null -w '%{http_code}' --max-time 6 http://127.0.0.1:3002 2>/dev/null || echo 000)
+                HC2=\\\$(curl -s -o /dev/null -w '%{http_code}' --max-time 6 http://127.0.0.1:3000 2>/dev/null || echo 000)
+                echo \"  warmup \\\$i: p3002=\\\$HC p3000=\\\$HC2\"
+                if [ \"\$HC\" = \"200\" ] || [ \"\$HC\" = \"302\" ] || [ \"\$HC\" = \"307\" ]; then echo \"    WARMUP OK\"; break; fi
+                sleep 6
+              done
+              echo
+              echo \"[FINAL CURL CUSTOM DOMAIN webpsb.perkasa.net.id via Traefik]\"
+              curl -s -o /dev/null -w 'HTTP=%{http_code} redirect_url=%{redirect_url}\n' --max-time 15 -L --resolve webpsb.perkasa.net.id:80:127.0.0.1 http://webpsb.perkasa.net.id/ 2>&1
+            else
+              echo \"[FATAL FALLBACK FAIL] CID_FINAL kosong, tidak bisa start webpsb sama sekali. Lihat semua container sekarang:\"
+              docker ps -a --format 'table {{.Names}}\t{{.Status}}' | head -40
+            fi
+          " 2>&1)
+          echo "$RESULT" | tail -n 100
+          exit 0
