@@ -8,8 +8,9 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  DOCKER_BUILDKIT: "0"
-  COMPOSE_DOCKER_CLI_BUILD: "0"
+  DOCKER_BUILDKIT: "1"
+  COMPOSE_DOCKER_CLI_BUILD: "1"
+  BUILDX_NO_DEFAULT_ATTESTATIONS: "1"
   DEBIAN_FRONTEND: "noninteractive"
   NEXT_TELEMETRY_DISABLED: "1"
   NODE_OPTIONS: "--max-old-space-size=4096"
@@ -28,6 +29,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          driver-opts: image=moby/buildkit:v0.17
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -43,37 +50,66 @@ jobs:
           test -f "$GITHUB_WORKSPACE/apps/web/public/branding/perkasa-networks-original.png" && echo "  ✓ branding PNG original (sidebar)"
           echo "OK - pre-flight passed"
 
-      - name: Build production image
+      - name: Build production image (retry 3x on pull failure with backoff)
         id: build
-        run: |
-          set -e
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          IMG_LATEST="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          IMG_SHA="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}"
-          echo "IMG_LATEST=$IMG_LATEST" >> "$GITHUB_OUTPUT"
-          echo "IMG_SHA=$IMG_SHA" >> "$GITHUB_OUTPUT"
-          echo "--- docker build (legacy engine, DOCKER_BUILDKIT=0) ---"
-          docker build \
-            --file ./Dockerfile \
-            --build-arg NEXT_TELEMETRY_DISABLED=1 \
-            --build-arg DEBIAN_FRONTEND=noninteractive \
-            --build-arg NODE_OPTIONS="--max-old-space-size=4096" \
-            --tag "$IMG_LATEST" \
-            --tag "$IMG_SHA" \
-            . 2>&1 | tail -n 80
-          echo "--- built images ---"
-          docker images --format "{{.Repository}}:{{.Tag}}    {{.Size}}" | grep "perkasa-erp-oss-bss" | head -5 || true
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          retry_wait_seconds: 20
+          retry_on: error
+          command: |
+            set -e
+            SHORT_SHA="${GITHUB_SHA:0:7}"
+            BRANCH_TAG_PREFIX="main-${SHORT_SHA}"
+            IMG_LATEST="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            IMG_SHA="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}"
+            IMG_BRANCH="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${BRANCH_TAG_PREFIX}"
+            echo "IMG_LATEST=$IMG_LATEST" >> "$GITHUB_OUTPUT"
+            echo "IMG_SHA=$IMG_SHA" >> "$GITHUB_OUTPUT"
+            echo "IMG_BRANCH=$IMG_BRANCH" >> "$GITHUB_OUTPUT"
+            echo "==== DOCKER BUILD (BuildKit $DOCKER_BUILDKIT) ===="
+            echo "  • tag: $IMG_LATEST"
+            echo "  • tag: $IMG_SHA"
+            echo "  • tag: $IMG_BRANCH (BRANCH PREFIX yang user butuhkan!)"
+            docker buildx build \
+              --file ./Dockerfile \
+              --platform linux/amd64 \
+              --cache-to type=gha,scope=perkasa-erp-main,mode=max \
+              --cache-from type=gha,scope=perkasa-erp-main \
+              --build-arg NEXT_TELEMETRY_DISABLED=1 \
+              --build-arg DEBIAN_FRONTEND=noninteractive \
+              --build-arg NODE_OPTIONS="--max-old-space-size=4096" \
+              --tag "$IMG_LATEST" \
+              --tag "$IMG_SHA" \
+              --tag "$IMG_BRANCH" \
+              --output type=docker,dest=/tmp/perkasa-image.tar,compression=zstd \
+              . 2>&1 | tail -n 80
+            echo "==== LOAD image tar back into local daemon ===="
+            docker load -i /tmp/perkasa-image.tar 2>&1 | tail -5
+            echo "--- built images ---"
+            docker images --format "{{.Repository}}:{{.Tag}}    {{.Size}}" | grep "perkasa-erp-oss-bss" | head -6 || true
 
       - name: Push to GHCR
-        run: |
-          set -e
-          IMG_LATEST="${{ steps.build.outputs.IMG_LATEST }}"
-          IMG_SHA="${{ steps.build.outputs.IMG_SHA }}"
-          echo "--- docker push $IMG_SHA ---"
-          docker push "$IMG_SHA" 2>&1 | tail -5
-          echo "--- docker push $IMG_LATEST ---"
-          docker push "$IMG_LATEST" 2>&1 | tail -5
-          echo "✅ OK - pushed both tags"
-          echo ""
-          echo "Digest:"
-          docker inspect "$IMG_LATEST" --format '{{index .RepoDigests 0}}' 2>&1 || true
+        if: success()
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 20
+          max_attempts: 3
+          retry_wait_seconds: 15
+          retry_on: error
+          command: |
+            set -e
+            IMG_LATEST="${{ steps.build.outputs.IMG_LATEST }}"
+            IMG_SHA="${{ steps.build.outputs.IMG_SHA }}"
+            IMG_BRANCH="${{ steps.build.outputs.IMG_BRANCH }}"
+            echo "--- docker push $IMG_BRANCH (branch-sha TAG PALING PENTING!) ---"
+            docker push "$IMG_BRANCH" 2>&1 | tail -8
+            echo "--- docker push $IMG_SHA ---"
+            docker push "$IMG_SHA" 2>&1 | tail -8
+            echo "--- docker push $IMG_LATEST ---"
+            docker push "$IMG_LATEST" 2>&1 | tail -8
+            echo "✅ OK - pushed TIGA tags: [$IMG_BRANCH] [$IMG_SHA] [$IMG_LATEST]"
+            echo ""
+            echo "Digest:"
+            docker inspect "$IMG_LATEST" --format '{{index .RepoDigests 0}}' 2>&1 || true

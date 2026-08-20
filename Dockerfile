@@ -4,7 +4,7 @@
 # ============================================================
 
 # ---------- STAGE 1/3: deps - install npm packages only ----------
-FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:20-bookworm-slim AS deps
+FROM --platform=linux/amd64 node:20-bookworm-slim AS deps
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -15,7 +15,7 @@ RUN npm ci --ignore-scripts --no-audit --no-fund \
  && npm cache clean --force 2>/dev/null || true
 
 # ---------- STAGE 2/3: builder - run next build and assemble standalone ----------
-FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:20-bookworm-slim AS builder
+FROM --platform=linux/amd64 node:20-bookworm-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -43,7 +43,7 @@ RUN echo "=== [1/3 builder] Start next build ===" \
  && test -d ".next/standalone/public"
 
 # ---------- STAGE 3/3: runner - production image, only standalone output ----------
-FROM --platform=linux/amd64 public.ecr.aws/docker/library/node:20-bookworm-slim AS runner
+FROM --platform=linux/amd64 node:20-bookworm-slim AS runner
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NODE_ENV=production
