@@ -153,17 +153,30 @@ jobs:
           set +eo pipefail
           OUT="${{ steps.diag_fix.outputs.RAW_OUT }}"
           SSH_RC="${{ steps.diag_fix.outputs.SSH_RC }}"
-          N=0; ERR_COUNT=0
-          ORDER="R25_TRAEFIK R25_TRAEFIK_IMAGE R25_TRAEFIK_STATUS R25_ENTRYPOINTS R25_TLS_RESOLVERS R25_PROVIDERS R25_DYNAMIC_DIR R25_PSB R25_PSB_IMAGE R25_PSB_STATUS R25_NETWORK_COMMON R25_PORT R25_ROUTER_HTTP_LABEL R25_ROUTER_HTTPS_LABEL R25_BACKEND_REACHABLE R25_PUBLIC_HTTP R25_PUBLIC_HTTPS R25_LOCAL_HTTP R25_LOCAL_HTTPS R25_RESULT"
-          for PREFIX in $ORDER; do
-            LINE=$(printf '%s\n' "$OUT" | { grep -E "^${PREFIX}" || true; } | head -1 | tr -d '\r' | sed 's/[[:space:]]\+$//')
-            [ -z "$LINE" ] && continue
-            N=$((N+1)); ERR_COUNT=$((ERR_COUNT+1))
-            TITLE=$(echo "$LINE" | cut -d: -f1 | head -c 100)
-            VAL=$(echo "$LINE" | cut -d: -f2- | sed 's/^[[:space:]]*//' | head -c 200)
-            VAL_SAFE=$(printf '%s' "$VAL" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
-            echo "::error title=${TITLE}::${VAL_SAFE}"
-            echo "[ANN-$N $ERR_COUNT] $TITLE :: $VAL"
-            [ $ERR_COUNT -ge 22 ] && break
+          getv() {
+            local key="$1"
+            printf '%s\n' "$OUT" | { grep -E "^${key}:" || true; } | head -1 | cut -d: -f2- | sed 's/^[[:space:]]*//; s/[[:space:]]\+$//'
+          }
+
+          TRAEFIK="$(getv R25_TRAEFIK) img=$(getv R25_TRAEFIK_IMAGE) st=$(getv R25_TRAEFIK_STATUS) ep=$(getv R25_ENTRYPOINTS) resolvers=$(getv R25_TLS_RESOLVERS) prov=$(getv R25_PROVIDERS) dyn=$(getv R25_DYNAMIC_DIR)"
+          PSB="$(getv R25_PSB) img=$(getv R25_PSB_IMAGE) st=$(getv R25_PSB_STATUS) port=$(getv R25_PORT) backend=$(getv R25_BACKEND_REACHABLE)"
+          NET="$(getv R25_NETWORK_COMMON)"
+          ROUTERS="http=$(getv R25_ROUTER_HTTP_LABEL) https=$(getv R25_ROUTER_HTTPS_LABEL)"
+          PUB="http=$(getv R25_PUBLIC_HTTP) https=$(getv R25_PUBLIC_HTTPS)"
+          LOC="http=$(getv R25_LOCAL_HTTP) https=$(getv R25_LOCAL_HTTPS)"
+          RES="$(getv R25_RESULT)"
+
+          for line in \
+            "TRAEFIK: $TRAEFIK" \
+            "PSB: $PSB" \
+            "NETWORK_COMMON: $NET" \
+            "ROUTERS_CUSTOM_DOMAIN: $ROUTERS" \
+            "TEST_PUBLIC: $PUB" \
+            "TEST_LOCAL: $LOC" \
+            "RESULT: $RES (SSH_RC=$SSH_RC)"; do
+            title="$(printf '%s' "$line" | cut -d: -f1 | head -c 60)"
+            val="$(printf '%s' "$line" | cut -d: -f2- | sed 's/^[[:space:]]*//' | head -c 900)"
+            val_safe="$(printf '%s' "$val" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+            echo "::notice title=${title}::${val_safe}"
+            printf '%s\n' "$line"
           done
-          echo "Annotations count=$ERR_COUNT, lines=$N, SSH_RC=$SSH_RC"
