@@ -177,30 +177,20 @@ jobs:
           }
 
           TS="$(getv R28_TS)"
-          TRAEFIK="$(getv R28_TRAEFIK) ep=$(getv R28_ENTRYPOINTS) resolvers=$(getv R28_TLS_RESOLVERS) prov=$(getv R28_PROVIDERS) dyn=$(getv R28_DYNAMIC_DIR)"
-          PSB="$(getv R28_PSB) names=$(getv R28_PSB_NAMES)"
           MATRIX="$(getv R28_PSB_MATRIX)"
           CONT="$(getv R28_CONTAINER)"
-          NET="$(getv R28_NETWORK_COMMON)"
-          PORT="$(getv R28_PORT)"
-          APP="$(getv R28_APP_LOCAL)"
-          DB="$(getv R28_DATABASE)"
           AUTH="$(getv R28_AUTH_KEYS)"
+          DB="$(getv R28_DATABASE)"
           API="$(getv R28_LOGIN_API)"
           LOG="$(getv R28_APP_LOG)"
           NC="$(getv R28_NO_CHANGES)"
 
           for line in \
             "TS: $TS" \
-            "TRAEFIK: $TRAEFIK" \
-            "PSB: $PSB" \
             "PSB_MATRIX: $MATRIX" \
             "CONTAINER: $CONT" \
-            "NETWORK_COMMON: $NET" \
-            "PORT: $PORT" \
-            "APPLICATION: $APP" \
-            "DATABASE: $DB" \
             "AUTH_KEYS: $AUTH" \
+            "DATABASE: $DB" \
             "LOGIN_API: $API" \
             "APP_LOG: $LOG" \
             "NO_CHANGES: $NC SSH_RC=$SSH_RC"; do
