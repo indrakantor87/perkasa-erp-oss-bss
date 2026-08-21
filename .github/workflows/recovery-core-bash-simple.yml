@@ -1,4 +1,4 @@
-name: "RUN22 DIAG LUAS: List ALL Container TANPA grep (cari nama proxy + PSB hilang)"
+name: "RUN23 PRIORITAS 9 DATA: entrypoints proxy + labels PSB hash"
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_r22:
+  diag_r23:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -19,7 +19,7 @@ jobs:
           KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
           HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
           mkdir -p $HOME/.ssh; chmod 700 $HOME/.ssh
-          K=$HOME/.ssh/id_rsa_r22
+          K=$HOME/.ssh/id_rsa_r23
           install -m 600 /dev/null $K
           printf '%s\n' "$KEY" > $K
           chmod 600 $K
@@ -27,7 +27,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "R22: ALL DIAG LUAS server-side → RAW LINES prefix R22_"
+      - name: "R23: 9 PRIORITAS DATA TERTINGGI → 9 annotations PERTAMA"
         id: diag
         continue-on-error: true
         run: |
@@ -35,62 +35,46 @@ jobs:
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
           OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
-            echo "R22_DOCKER_PS_ALL: START"
+            PRX="4a311401537e"
+            PSB1="8f847eab3486"
+            PSB2="1ade45689941"
+            PSB3="230bc9dc1c21"
             N=0
-            docker ps -aq --format "{{.Names}}" 2>/dev/null | while read CNAME; do
-              N=$((N+1)); if [ $N -le 25 ]; then
-                IMG=$(docker inspect --format="{{.Config.Image}}" $CNAME 2>/dev/null | head -c 80)
-                ST=$(docker inspect --format="{{.State.Status}}" $CNAME 2>/dev/null)
-                echo "R22_C_${N}: NAME=$CNAME STATUS=$ST IMG=$IMG"
-              fi
-            done
-            N=0
-            for NET in coolify bridge host none; do
-              EXISTS=$(docker network ls --format "{{.Name}}" 2>/dev/null | grep -cx "$NET")
-              echo "R22_NET_${NET^^}: EXISTS=$EXISTS"
-            done
-            echo "R22_IMG_WEBPSB: $(docker images --format "{{.Repository}}:{{.Tag}} {{.Size}}" 2>/dev/null | grep -iE "local-webpsb|webpsb|web-psb" | head -3)"
-            echo "R22_IMG_PROXY: $(docker images --format "{{.Repository}}:{{.Tag}} {{.Size}}" 2>/dev/null | grep -iE "traefik|coolify-proxy|proxy" | head -5)"
-            N=0
-            for CNAME in $(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE "proxy|traefik|coolify" | head -3); do
-              N=$((N+1))
-              echo "R22_PRX_CANDIDATE_${N}: $CNAME"
-              for A in $(docker inspect $CNAME 2>/dev/null | python3 -c "import sys,json;[print(a) for a in json.load(sys.stdin)[0].get(\"Args\",[])]" 2>/dev/null | grep -iE "entrypoint|address|:80|:443|http|web"); do
-                echo "R22_PRX${N}_ARG: $A"
-              done | head -10
-            done
+            for A in $(docker inspect $PRX 2>/dev/null | python3 -c "import sys,json;[print(a) for a in json.load(sys.stdin)[0].get(\"Args\",[])]" 2>/dev/null); do N=$((N+1)); [ $N -le 8 ] && echo "R23_A_PRX_ARG_${N}: $A"; done
+            NET=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" $PSB1 2>/dev/null); LAB=$(docker inspect $PSB1 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});outs=[];[outs.append(f\"{k}={v[:140]}\") for k,v in sorted(l.items()) if \"traefik.http.routers\" in k and (\".entryPoints\" in k or \".rule\" in k or \".tls\" in k or \".service\" in k or \".certresolver\" in k or \".middlewares\" in k)];print(\"|\".join(outs[:10]))" 2>/dev/null); echo "R23_B_PSB1_NET=${NET:-NONE} LABELS=${LAB:0:220}"
+            NET=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" $PSB2 2>/dev/null); LAB=$(docker inspect $PSB2 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});outs=[];[outs.append(f\"{k}={v[:140]}\") for k,v in sorted(l.items()) if \"traefik.http.routers\" in k and (\".entryPoints\" in k or \".rule\" in k or \".tls\" in k or \".service\" in k or \".certresolver\" in k or \".middlewares\" in k)];print(\"|\".join(outs[:10]))" 2>/dev/null); echo "R23_C_PSB2_NET=${NET:-NONE} LABELS=${LAB:0:220}"
+            NET=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" $PSB3 2>/dev/null); LAB=$(docker inspect $PSB3 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});outs=[];[outs.append(f\"{k}={v[:140]}\") for k,v in sorted(l.items()) if \"traefik.http.routers\" in k and (\".entryPoints\" in k or \".rule\" in k or \".tls\" in k or \".service\" in k or \".certresolver\" in k or \".middlewares\" in k)];print(\"|\".join(outs[:10]))" 2>/dev/null); echo "R23_D_PSB3_NET=${NET:-NONE} LABELS=${LAB:0:220}"
             D=webpsb.perkasa.net.id
-            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); echo "R22_LOCAL_HTTP: ${C:-000}"
-            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 --resolve $D:443:127.0.0.1 https://$D/ 2>/dev/null); echo "R22_LOCAL_HTTPS: ${C:-000}"
-            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 http://$D/ 2>/dev/null); echo "R22_PUB_HTTP: ${C:-000}"
-            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 15 https://$D/ 2>/dev/null); echo "R22_PUB_HTTPS: ${C:-000}"
-            echo "R22_PSB_CANDIDATES: $(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE "webpsb|psb|web-psb|perkasa|rec[0-9]+-")"
+            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 15 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); echo "R23_E_LOCAL_HTTP_CODE=${C:-000} REDIR=${L:0:120}"
+            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:443:127.0.0.1 https://$D/ 2>/dev/null); echo "R23_F_LOCAL_HTTPS_CODE=${C:-000}"
+            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 18 http://$D/ 2>/dev/null); L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 18 http://$D/ 2>/dev/null); echo "R23_G_PUB_HTTP_CODE=${C:-000} REDIR=${L:0:120}"
+            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 18 https://$D/ 2>/dev/null); echo "R23_H_PUB_HTTPS_CODE=${C:-000}"
+            NETLBL1=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" $PSB1 2>/dev/null); NETLBL2=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" $PSB2 2>/dev/null); echo "R23_I_PSB_NET_LABELS=${NETLBL1:-EMPTY}/${NETLBL2:-EMPTY}"
           ' 2>&1)
           RC=$?
-          echo "RAW_OUT<<EOF_R22" >> $GITHUB_OUTPUT
+          echo "RAW_OUT<<EOF_R23" >> $GITHUB_OUTPUT
           printf '%s\n' "$OUT" >> $GITHUB_OUTPUT
-          echo "EOF_R22" >> $GITHUB_OUTPUT
+          echo "EOF_R23" >> $GITHUB_OUTPUT
           echo "SSH_RC=$RC" >> $GITHUB_OUTPUT
           echo "--- RAW SERVER OUTPUT START ---"
           printf '%s\n' "$OUT"
           echo "--- RAW SERVER OUTPUT END RC=$RC ---"
 
-      - name: "R22: CONVERT raw lines → GITHUB ANNOTATIONS ::error:: (terbaca di Summary!)"
+      - name: "R23: CONVERT to 9 ANNOTATIONS (sort: data tertinggi muncul PERTAMA)"
         run: |
           OUT="${{ steps.diag.outputs.RAW_OUT }}"
           SSH_RC="${{ steps.diag.outputs.SSH_RC }}"
-          N=0
-          while IFS= read -r LINE; do
-            LINE=$(printf '%s' "$LINE" | tr -d '\r' | tr '\n' ' ' | sed 's/[[:space:]]\+$//')
+          N=0; ERR_COUNT=0
+          ORDER="R23_A_ R23_B_ R23_C_ R23_D_ R23_E_ R23_F_ R23_G_ R23_H_ R23_I_"
+          for PREFIX in $ORDER; do
+            LINE=$(printf '%s\n' "$OUT" | grep -E "^${PREFIX}" | head -1 | tr -d '\r' | sed 's/[[:space:]]\+$//')
             [ -z "$LINE" ] && continue
-            N=$((N+1))
-            if echo "$LINE" | grep -qE '^R22_'; then
-              TITLE=$(echo "$LINE" | cut -d: -f1 | head -c 100)
-              VAL=$(echo "$LINE" | cut -d: -f2- | sed 's/^[[:space:]]*//' | head -c 200)
-              VAL_SAFE=$(printf '%s' "$VAL" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
-              echo "::error title=${TITLE}::${VAL_SAFE}"
-              echo "[ANN-$N] $TITLE :: $VAL"
-            fi
-            [ $N -ge 80 ] && break
-          done <<< "$OUT"
-          echo "Total lines: $N, SSH_RC=$SSH_RC"
+            N=$((N+1)); ERR_COUNT=$((ERR_COUNT+1))
+            TITLE=$(echo "$LINE" | cut -d: -f1 | head -c 100)
+            VAL=$(echo "$LINE" | cut -d: -f2- | sed 's/^[[:space:]]*//' | head -c 200)
+            VAL_SAFE=$(printf '%s' "$VAL" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+            echo "::error title=${TITLE}::${VAL_SAFE}"
+            echo "[ANN-$N $ERR_COUNT] $TITLE :: $VAL"
+            [ $ERR_COUNT -ge 9 ] && break
+          done
+          echo "Annotations count=$ERR_COUNT, lines=$N, SSH_RC=$SSH_RC"
