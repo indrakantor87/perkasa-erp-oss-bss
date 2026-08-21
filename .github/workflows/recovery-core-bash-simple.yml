@@ -1,4 +1,4 @@
-name: "RUN30 READ-ONLY: Map Coolify AppID -> rec17-webpsb-p1"
+name: "RUN32 READ-ONLY: Map Coolify AppID -> rec17-webpsb-p1"
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_r30:
+  diag_r32:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -27,7 +27,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN30: Read-only mapping (Coolify app metadata + rec17 + Prisma)"
+      - name: "RUN32: Read-only mapping (Coolify app metadata + rec17 + Prisma)"
         id: diag_ro
         continue-on-error: true
         run: |
@@ -69,7 +69,13 @@ jobs:
 
             envfile_scheme() {
               f="$1"; k="$2"
-              python3 -c "import sys,re,os; p=sys.argv[1]; k=sys.argv[2];\nif not os.path.exists(p):\n  print(\"unknown\"); raise SystemExit\nfor ln in open(p,\"r\",errors=\"ignore\"):\n  if re.match(r\"^\\s*\"+re.escape(k)+r\"\\s*=\", ln):\n    v=ln.split(\"=\",1)[1].strip().strip(\"\\\"'\");\n    m=re.match(r\"^([a-zA-Z0-9_+.-]+)://\", v);\n    print((m.group(1) if m else \"unknown\"));\n    raise SystemExit\nprint(\"unknown\")" "$f" "$k" 2>/dev/null | tr -d "\r\n" | head -c 40
+              [ -f "$f" ] || { echo "unknown"; return 0; }
+              line=$(grep -E "^[[:space:]]*${k}[[:space:]]*=" "$f" 2>/dev/null | head -1)
+              [ -z "$line" ] && { echo "unknown"; return 0; }
+              val=$(printf "%s\n" "$line" | sed -E "s/^[^=]*=//; s/^\\\"//; s/\\\"$//")
+              sch=$(printf "%s\n" "$val" | sed -E "s#^([a-zA-Z0-9_+.-]+)://.*#\\1#")
+              [ -z "$sch" ] && sch="unknown"
+              printf "%s" "$sch" | tr -d "\r\n" | head -c 40
             }
 
             container_exists() {
