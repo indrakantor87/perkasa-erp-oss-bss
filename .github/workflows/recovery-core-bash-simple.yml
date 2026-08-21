@@ -1,4 +1,4 @@
-name: "RUN32 READ-ONLY: Map Coolify AppID -> rec17-webpsb-p1"
+name: "RUN33 READ-ONLY: Map Coolify AppID -> rec17-webpsb-p1 (full mapping + Prisma)"
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN32: Read-only mapping (Coolify app metadata + rec17 + Prisma)"
+      - name: "RUN33: Read-only mapping (Coolify app metadata + rec17 + Prisma)"
         id: diag_ro
         continue-on-error: true
         run: |
@@ -136,6 +136,15 @@ jobs:
             fi
             echo "R30_REC17_SOURCE_APPID: $REC17_APPID"
 
+            QPWS_ENV_IS_SOURCE="NO"
+            [ "$REC17_APPID" = "$APP1" ] && QPWS_ENV_IS_SOURCE="YES"
+            echo "R30_QPWS_ENV_IS_SOURCE: $QPWS_ENV_IS_SOURCE"
+
+            QPWS_DB_IN_ENV="NOT_FOUND"
+            f_qpws="$root/applications/$APP1/.env"
+            has_key_in_envfile "$f_qpws" "DATABASE_URL" && QPWS_DB_IN_ENV="FOUND"
+            echo "R30_QPWS_ENV_DATABASE_URL: $QPWS_DB_IN_ENV file=$f_qpws"
+
             map_containers_for_app() {
               aid="$1"
               out=""
@@ -180,7 +189,6 @@ jobs:
             DB_SRC="NOT_FOUND"
             DB_SRC_APP="UNKNOWN"
             DB_SRC_FILE="(none)"
-            DB_SRC_REDACTED="(none)"
             DB_SRC_SCHEME="unknown"
             if [ "$REC17_APPID" != "UNKNOWN" ]; then
               f="$root/applications/$REC17_APPID/.env"
@@ -188,7 +196,6 @@ jobs:
                 DB_SRC="FOUND"
                 DB_SRC_APP="$REC17_APPID"
                 DB_SRC_FILE="$f"
-                DB_SRC_REDACTED=$(envfile_redacted_url "$f" "DATABASE_URL")
                 DB_SRC_SCHEME=$(envfile_scheme "$f" "DATABASE_URL")
               else
                 DB_SRC="NOT_FOUND"
@@ -196,7 +203,7 @@ jobs:
                 DB_SRC_FILE="$f"
               fi
             fi
-            echo "R30_REC17_DB_ENVFILE: status=${DB_SRC} app=${DB_SRC_APP} file=${DB_SRC_FILE} scheme=${DB_SRC_SCHEME} redacted=${DB_SRC_REDACTED}"
+            echo "R30_REC17_DB_ENVFILE_SAFE: status=${DB_SRC} app=${DB_SRC_APP} file=${DB_SRC_FILE} scheme=${DB_SRC_SCHEME}"
 
             AUTH_SRC="NOT_FOUND"
             AUTH_SRC_APP="UNKNOWN"
@@ -213,13 +220,31 @@ jobs:
                 AUTH_SRC_FILE="$f"
               fi
             fi
-            echo "R30_REC17_AUTH_ENVFILE: status=${AUTH_SRC} app=${AUTH_SRC_APP} file=${AUTH_SRC_FILE}"
+            echo "R30_REC17_AUTH_ENVFILE_SAFE: status=${AUTH_SRC} app=${AUTH_SRC_APP} file=${AUTH_SRC_FILE}"
 
             PR_PROVIDER="UNKNOWN"
             PR_DBURL="NO"
             PR_DIRECT="NO"
             if [ "$REC17_CID" != "NONE" ]; then
-              PR_OUT=$(docker exec "$REC17_CID" /bin/sh -c "for p in /app/prisma/schema.prisma /prisma/schema.prisma /usr/src/app/prisma/schema.prisma /workspace/prisma/schema.prisma; do if [ -f \\\"\\$p\\\" ]; then echo FILE:\\$p; grep -E \\\"provider[[:space:]]*=\\\" \\\"\\$p\\\" 2>/dev/null | head -1; grep -E \\\"url[[:space:]]*=\\\" \\\"\\$p\\\" 2>/dev/null | head -1; grep -E \\\"directUrl[[:space:]]*=\\\" \\\"\\$p\\\" 2>/dev/null | head -1; break; fi; done" 2>/dev/null | tr -d "\r")
+              PR_OUT=$(docker exec "$REC17_CID" sh -c "
+                pick=\"\"
+                for base in /app /usr/src/app /workspace; do
+                  [ -d \"\$base\" ] || continue
+                  p=\$(find \"\$base\" -maxdepth 6 -type f -name schema.prisma 2>/dev/null | head -1)
+                  [ -n \"\$p\" ] && pick=\"\$p\" && break
+                done
+                if [ -z \"\$pick\" ]; then
+                  for p in /app/prisma/schema.prisma /prisma/schema.prisma /usr/src/app/prisma/schema.prisma /workspace/prisma/schema.prisma; do
+                    [ -f \"\$p\" ] && pick=\"\$p\" && break
+                  done
+                fi
+                if [ -n \"\$pick\" ]; then
+                  echo FILE:\$pick
+                  grep -E \"provider[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -1
+                  grep -E \"url[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -1
+                  grep -E \"directUrl[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -1
+                fi
+              " 2>/dev/null | tr -d "\r")
               PR_PROVIDER=$(printf "%s\n" "$PR_OUT" | grep -E "provider[[:space:]]*=" 2>/dev/null | head -1 | sed -E "s/.*provider[[:space:]]*=[[:space:]]*\\\"([^\\\"]+)\\\".*/\\1/")
               [ -z "$PR_PROVIDER" ] && PR_PROVIDER="UNKNOWN"
               printf "%s\n" "$PR_OUT" | grep -E "url[[:space:]]*=" 2>/dev/null | grep -F "DATABASE_URL" >/dev/null 2>&1 && PR_DBURL="YES"
@@ -264,7 +289,7 @@ jobs:
           printf '%s\n' "$OUT"
           echo "--- RAW OUT END ---"
 
-      - name: "RUN30: Summary (A-F only)"
+      - name: "RUN33: Summary (mapping + A-F)"
         continue-on-error: true
         run: |
           set +eo pipefail
@@ -282,8 +307,29 @@ jobs:
           F="$(getv R30_F)"
           NC="$(getv R30_NO_CHANGES)"
 
-          for title in A B C D E F NO_CHANGES; do
+          APP1="$(getv R30_APP_qpwsfd82uqkae83wmgjsapie)"
+          APP2="$(getv R30_APP_pic3vleasj465ooh77ioicw6)"
+          APP3="$(getv R30_APP_b8qxcx7nu5nfvcygs1gg1fyt)"
+          REC17_SRC="$(getv R30_REC17_SOURCE_APPID)"
+          QPWS_IS_SRC="$(getv R30_QPWS_ENV_IS_SOURCE)"
+          QPWS_DB="$(getv R30_QPWS_ENV_DATABASE_URL)"
+          REC17_ENV_KEYS="$(getv R30_REC17_ENV_KEYS)"
+          REC17_DB_FILE="$(getv R30_REC17_DB_ENVFILE_SAFE)"
+          REC17_AUTH_FILE="$(getv R30_REC17_AUTH_ENVFILE_SAFE)"
+          PR="$(getv R30_PRISMA)"
+
+          for title in APP1 APP2 APP3 REC17_SOURCE QPWS_ENV_IS_SOURCE QPWS_ENV_DATABASE_URL REC17_ENV_KEYS REC17_DB_ENVFILE REC17_AUTH_ENVFILE PRISMA A B C D E F NO_CHANGES; do
             case "$title" in
+              APP1) val="UUID=qpwsfd82uqkae83wmgjsapie ${APP1}" ;;
+              APP2) val="UUID=pic3vleasj465ooh77ioicw6 ${APP2}" ;;
+              APP3) val="UUID=b8qxcx7nu5nfvcygs1gg1fyt ${APP3}" ;;
+              REC17_SOURCE) val="$REC17_SRC" ;;
+              QPWS_ENV_IS_SOURCE) val="$QPWS_IS_SRC" ;;
+              QPWS_ENV_DATABASE_URL) val="$QPWS_DB" ;;
+              REC17_ENV_KEYS) val="$REC17_ENV_KEYS" ;;
+              REC17_DB_ENVFILE) val="$REC17_DB_FILE" ;;
+              REC17_AUTH_ENVFILE) val="$REC17_AUTH_FILE" ;;
+              PRISMA) val="$PR" ;;
               A) val="$A" ;;
               B) val="$B" ;;
               C) val="$C" ;;
