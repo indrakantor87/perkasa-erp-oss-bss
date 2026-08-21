@@ -18,29 +18,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Pre-Flight Filter (only run if commit DARURAT or workflow_dispatch)
+      - name: Pre-Flight Filter (ALWAYS RUN - NO SKIP)
         run: |
           set +e
           EVENT=$GITHUB_EVENT_NAME
           MSG="${{ github.event.head_commit.message }}"
           echo "Event=$EVENT commit_msg=$(echo "$MSG" | cut -c1-60)"
-          RUN_OK=0
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            echo "[OK] workflow_dispatch -> RUN"
-            RUN_OK=1
-          else
-            case "$MSG" in
-              DARURAT_HTTP_NO_SERVER*|DARURAT_RECOVERY_ALL*|EMERGENCY*|DARURAT*)
-                echo "[OK] Commit trigger darurat terdeteksi -> RUN"
-                RUN_OK=1
-                ;;
-              *)
-                echo "[SKIP] push commit biasa / bukan darurat -> exit sukses (skip)"
-                RUN_OK=0
-                ;;
-            esac
-          fi
-          echo "RUN_OK=$RUN_OK"
+          # [PERMANEN] RUN_OK=1 SELALU - JANGAN SKIP LAGI!
+          RUN_OK=1
+          echo "RUN_OK=$RUN_OK (FORCED - NO SKIP)"
           echo "RUN_OK=$RUN_OK" >> $GITHUB_ENV
           exit 0
 

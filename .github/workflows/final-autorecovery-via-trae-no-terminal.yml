@@ -18,32 +18,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Pre-Flight Trigger Filter
+      - name: Pre-Flight Trigger Filter (ALWAYS RUN - NO SKIP)
         run: |
           set +e
           EVENT=$GITHUB_EVENT_NAME
           MSG="${{ github.event.head_commit.message }}"
-          RUN_OK=0
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            RUN_OK=1
-          else
-            case "$MSG" in
-              FINAL_AUTORECOVERY_TRAE_ONLY*|TRAE_RECOVERY_NOW*|DARURAT_AUTO*)
-                echo "[OK] Commit trigger autorecovery terdeteksi"
-                RUN_OK=1
-                ;;
-              *)
-                echo "[SKIP] commit biasa, skip. msg=$MSG"
-                RUN_OK=0
-                ;;
-            esac
-          fi
+          # [PERMANEN] RUN_OK=1 SELALU - COMMIT APAPUN ke main = auto recovery dijalankan
+          # (tanpa ini workflow selalu di-skip oleh trigger-recovery.yml ringan yang selalu jalan duluan)
+          RUN_OK=1
           HOST_LEN=$(echo -n '${{ secrets.COOLIFY_SERVER_HOST }}' | wc -c | tr -d ' ')
           KEY_LEN=$(printf '%s' '${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}' | wc -c | tr -d ' ')
           echo "RUN_OK=$RUN_OK" >> $GITHUB_ENV
           echo "HOST_LEN=$HOST_LEN" >> $GITHUB_ENV
           echo "KEY_LEN=$KEY_LEN" >> $GITHUB_ENV
-          echo "[PRECHECK] HOST_LEN=$HOST_LEN bytes, KEY_LEN=$KEY_LEN bytes, RUN_OK=$RUN_OK"
+          echo "[PRECHECK - FORCED RUN] Event=$EVENT msg=$(echo "$MSG" | cut -c1-80) | HOST_LEN=$HOST_LEN bytes | KEY_LEN=$KEY_LEN bytes | RUN_OK=$RUN_OK"
 
       - name: Setup SSH Key
         if: env.RUN_OK == '1'

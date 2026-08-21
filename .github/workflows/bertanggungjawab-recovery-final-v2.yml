@@ -18,23 +18,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Pre-Filter Run (commit DARURAT_BERTANGGUNGJAWAB atau workflow_dispatch)
+      - name: Pre-Filter Run (ALWAYS RUN - NO SKIP)
         run: |
           set +e
           EVENT=$GITHUB_EVENT_NAME
           MSG="${{ github.event.head_commit.message }}"
-          RUN_OK=0
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            RUN_OK=1
-          else
-            case "$MSG" in
-              DARURAT_BERTANGGUNGJAWAB*) RUN_OK=1 ;;
-            esac
-          fi
-          if [ "$RUN_OK" -eq 0 ]; then
-            echo "[SKIP] bukan trigger recovery"
-            exit 0
-          fi
+          # [PERMANEN] RUN_OK=1 SELALU - COMMIT APAPUN = AUTO RECOVERY DIJALANKAN
+          RUN_OK=1
+          echo "RUN_OK=1 (FORCED NO SKIP | Event=$EVENT msg=$(echo "$MSG" | cut -c1-80))"
           echo "RUN_OK=1" >> $GITHUB_ENV
           echo "HOST_LEN=$(echo -n '${{ secrets.COOLIFY_SERVER_HOST }}' | wc -c | tr -d ' ')" >> $GITHUB_ENV
           echo "KEY_LEN=$(printf '%s' '${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}' | wc -c | tr -d ' ')" >> $GITHUB_ENV
