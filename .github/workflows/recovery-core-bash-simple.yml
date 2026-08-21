@@ -1,4 +1,4 @@
-name: "RUN33 READ-ONLY: Map Coolify AppID -> rec17-webpsb-p1 (full mapping + Prisma)"
+name: "RUN34 READ-ONLY: Map Coolify AppID -> rec17-webpsb-p1 (final A-F)"
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN33: Read-only mapping (Coolify app metadata + rec17 + Prisma)"
+      - name: "RUN34: Read-only mapping (Coolify app metadata + rec17 + Prisma)"
         id: diag_ro
         continue-on-error: true
         run: |
@@ -245,7 +245,7 @@ jobs:
                   grep -E \"directUrl[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -1
                 fi
               " 2>/dev/null | tr -d "\r")
-              PR_PROVIDER=$(printf "%s\n" "$PR_OUT" | grep -E "provider[[:space:]]*=" 2>/dev/null | head -1 | sed -E "s/.*provider[[:space:]]*=[[:space:]]*\\\"([^\\\"]+)\\\".*/\\1/")
+              PR_PROVIDER=$(printf "%s\n" "$PR_OUT" | grep -E "provider[[:space:]]*=" 2>/dev/null | grep -v "prisma-client-js" | head -1 | sed -E "s/.*provider[[:space:]]*=[[:space:]]*\\\"([^\\\"]+)\\\".*/\\1/")
               [ -z "$PR_PROVIDER" ] && PR_PROVIDER="UNKNOWN"
               printf "%s\n" "$PR_OUT" | grep -E "url[[:space:]]*=" 2>/dev/null | grep -F "DATABASE_URL" >/dev/null 2>&1 && PR_DBURL="YES"
               printf "%s\n" "$PR_OUT" | grep -E "directUrl[[:space:]]*=" 2>/dev/null | grep -F "DIRECT_URL" >/dev/null 2>&1 && PR_DIRECT="YES"
@@ -289,7 +289,7 @@ jobs:
           printf '%s\n' "$OUT"
           echo "--- RAW OUT END ---"
 
-      - name: "RUN33: Summary (mapping + A-F)"
+      - name: "RUN34: Summary (A-F + critical checks)"
         continue-on-error: true
         run: |
           set +eo pipefail
@@ -307,29 +307,15 @@ jobs:
           F="$(getv R30_F)"
           NC="$(getv R30_NO_CHANGES)"
 
-          APP1="$(getv R30_APP_qpwsfd82uqkae83wmgjsapie)"
-          APP2="$(getv R30_APP_pic3vleasj465ooh77ioicw6)"
-          APP3="$(getv R30_APP_b8qxcx7nu5nfvcygs1gg1fyt)"
-          REC17_SRC="$(getv R30_REC17_SOURCE_APPID)"
           QPWS_IS_SRC="$(getv R30_QPWS_ENV_IS_SOURCE)"
           QPWS_DB="$(getv R30_QPWS_ENV_DATABASE_URL)"
-          REC17_ENV_KEYS="$(getv R30_REC17_ENV_KEYS)"
           REC17_DB_FILE="$(getv R30_REC17_DB_ENVFILE_SAFE)"
-          REC17_AUTH_FILE="$(getv R30_REC17_AUTH_ENVFILE_SAFE)"
-          PR="$(getv R30_PRISMA)"
 
-          for title in APP1 APP2 APP3 REC17_SOURCE QPWS_ENV_IS_SOURCE QPWS_ENV_DATABASE_URL REC17_ENV_KEYS REC17_DB_ENVFILE REC17_AUTH_ENVFILE PRISMA A B C D E F NO_CHANGES; do
+          for title in QPWS_ENV_IS_SOURCE QPWS_ENV_DATABASE_URL REC17_DB_ENVFILE A B C D E F NO_CHANGES; do
             case "$title" in
-              APP1) val="UUID=qpwsfd82uqkae83wmgjsapie ${APP1}" ;;
-              APP2) val="UUID=pic3vleasj465ooh77ioicw6 ${APP2}" ;;
-              APP3) val="UUID=b8qxcx7nu5nfvcygs1gg1fyt ${APP3}" ;;
-              REC17_SOURCE) val="$REC17_SRC" ;;
               QPWS_ENV_IS_SOURCE) val="$QPWS_IS_SRC" ;;
               QPWS_ENV_DATABASE_URL) val="$QPWS_DB" ;;
-              REC17_ENV_KEYS) val="$REC17_ENV_KEYS" ;;
               REC17_DB_ENVFILE) val="$REC17_DB_FILE" ;;
-              REC17_AUTH_ENVFILE) val="$REC17_AUTH_FILE" ;;
-              PRISMA) val="$PR" ;;
               A) val="$A" ;;
               B) val="$B" ;;
               C) val="$C" ;;
