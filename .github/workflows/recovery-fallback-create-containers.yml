@@ -1,0 +1,346 @@
+name: "💥 FALLBACK: Buat Container BARU dengan Backtick Label Hex \\x60 (tanpa heredoc / Python)"
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: recovery-fallback-create-containers-serial
+  cancel-in-progress: false
+
+jobs:
+  recovery_fallback_create:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "0. Precheck & Install SSH Key"
+        run: |
+          set +e
+          HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
+          USER="${{ secrets.COOLIFY_SERVER_USER }}"
+          USER="${USER:-root}"
+          KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
+          HOST_LEN=$(printf '%s' "$HOST" | wc -c | tr -d ' ')
+          KEY_LEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
+          echo "HOST=$HOST USER=$USER HOST_LEN=$HOST_LEN KEY_LEN=$KEY_LEN"
+          if [ "$KEY_LEN" -lt 150 ]; then
+            echo "ERROR: SSH PRIVATE KEY < 150 byte. Isi repo secrets!"
+            exit 1
+          fi
+          mkdir -p $HOME/.ssh && chmod 700 $HOME/.ssh
+          KEY_FILE=$HOME/.ssh/id_ed25519_coolify
+          printf '%s\n' '-----BEGIN OPENSSH PRIVATE KEY-----' > /tmp/hdr.txt
+          printf '%s\n' '-----END OPENSSH PRIVATE KEY-----' > /tmp/tlr.txt
+          printf '%s' "$KEY" | grep -v 'OPENSSH PRIVATE KEY' | tr -d '\r' > /tmp/body.txt
+          (cat /tmp/hdr.txt; cat /tmp/body.txt; cat /tmp/tlr.txt) > $KEY_FILE
+          chmod 600 $KEY_FILE
+          echo "KEY_FILE=$KEY_FILE USER=$USER HOST=$HOST" >> $GITHUB_ENV
+          echo "OK"
+
+      - name: "💥 STEP A: Buat Script .sh di SERVER SENDIRI (bukan inline GitHub!) -> chmod +x -> JALANKAN. (Ini SANGAT PENTING: tidak ada nested quote GitHub YAML vs bash vs shell server!)"
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          echo "=== Step A1: Test SSH koneksi ke server ==="
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" "echo OK_CONNECT_$(hostname); whoami"
+          RC=$?
+          if [ $RC -ne 0 ]; then echo "ERROR SSH connect FAIL RC=$RC"; exit 1; fi
+
+          echo ""
+          echo "=== Step A2: UPLOAD Script recovery.sh KE SERVER via base64 (100% Aman, tidak ada quote / backtick rusak di transit!) ==="
+          # BT = printf '\x60' = backtick di server, dieksekusi SAAT script berjalan, SAAT docker run.
+          SCRIPT_CONTENT_BASE64=$(cat <<'SCRIPTEOF' | base64 -w 0
+#!/bin/bash
+set +e
+########################################################################
+# Script INI DIJALANKAN DI SERVER SENDIRI.
+# Tidak ada nested quote GitHub YAML.
+# Semua docker run label dibuat dengan printf '\x60' -> BACKTICK murni ASCII 96.
+########################################################################
+
+# BACKTICK: hanya dihasilkan SAAT script di server BERJALAN, sehingga 100% lolos shell quote YAML/GitHub!
+BT=$(printf '\x60')
+echo "[INFO] BT(backtick) = [$BT]"
+if [ "$BT" = "`" ]; then echo "[OK] Backtick TERDETEKSI BENAR ASCII 96"; else echo "[FAIL] Backtick SALAH! Lanjut tapi label kemungkinan fail"; fi
+echo ""
+
+# Pastikan network coolify ada
+if ! docker network inspect coolify >/dev/null 2>&1; then
+  docker network create coolify 2>&1 | head -2
+fi
+echo ""
+
+########################################################################
+# FALLBACK RUN FUNCTION: Jalankan docker run dengan label backtick benar
+# Argumen: name image ext_port int_port sslip_domain [custom_domain]
+########################################################################
+docker_run_fallback() {
+  local safe_name=$1
+  local img=$2
+  local ext_port=$3
+  local int_port=$4
+  local sslip=$5
+  local custom_domain=$6
+
+  echo ""
+  echo "================================================================="
+  echo " RUN FALLBACK: $safe_name | image=$img | port=$ext_port:$int_port"
+  echo "          sslip=$sslip"
+  [ -n "$custom_domain" ] && echo "    custom_domain=$custom_domain"
+  echo "================================================================="
+
+  # Hapus container lama jika ada
+  docker rm -f "$safe_name" >/dev/null 2>&1
+  sleep 2
+
+  # LABEL SSLIP (selalu ada). Host($BT domain $BT) -> backtick literal ASCII 96
+  local L1="traefik.enable=true"
+  local L2="traefik.http.routers.${safe_name}-ssl.entryPoints=http"
+  local L3="traefik.http.routers.${safe_name}-ssl.rule=Host(${BT}${sslip}${BT})"
+  local L4="traefik.http.services.${safe_name}-ssl.loadbalancer.server.port=${int_port}"
+
+  # Jalankan docker run dengan label sslip terlebih dahulu
+  docker run -d --name "$safe_name" --network coolify --restart unless-stopped \
+    -p ${ext_port}:${int_port} \
+    -e PORT=${int_port} -e HOSTNAME=0.0.0.0 -e NODE_ENV=production \
+    -l "$L1" -l "$L2" -l "$L3" -l "$L4" "$img" > /tmp/cid_${safe_name}.txt 2> /tmp/err_${safe_name}.txt
+  RC=$?
+  CID=$(cat /tmp/cid_${safe_name}.txt 2>/dev/null | head -1 | tr -d '\r\n')
+  ERR=$(cat /tmp/err_${safe_name}.txt 2>/dev/null | tail -3 | tr -d '\r')
+  sleep 3
+  if [ $RC -eq 0 ] && [ -n "$CID" ]; then
+    echo " ✅ SSLIP RUN OK: CID=${CID:0:20}..."
+
+    # JIKA ADA CUSTOM DOMAIN (misal webpsb.perkasa.net.id), tambahkan LABEL BARU via docker update (tidak perlu rerun container)
+    if [ -n "$custom_domain" ]; then
+      local L5="traefik.http.routers.${safe_name}-netid.entryPoints=http"
+      local L6="traefik.http.routers.${safe_name}-netid.rule=Host(${BT}${custom_domain}${BT})"
+      local L7="traefik.http.services.${safe_name}-netid.loadbalancer.server.port=${int_port}"
+      echo "   + Tambah custom domain label via docker rm + create ulang (karena docker update tidak support label)"
+      docker rm -f "$safe_name" >/dev/null 2>&1
+      sleep 2
+      docker run -d --name "$safe_name" --network coolify --restart unless-stopped \
+        -p ${ext_port}:${int_port} \
+        -e PORT=${int_port} -e HOSTNAME=0.0.0.0 -e NODE_ENV=production \
+        -l "$L1" -l "$L2" -l "$L3" -l "$L4" \
+        -l "$L5" -l "$L6" -l "$L7" "$img" > /tmp/cid2_${safe_name}.txt 2> /tmp/err2_${safe_name}.txt
+      RC2=$?
+      CID2=$(cat /tmp/cid2_${safe_name}.txt 2>/dev/null | head -1 | tr -d '\r\n')
+      ERR2=$(cat /tmp/err2_${safe_name}.txt 2>/dev/null | tail -3 | tr -d '\r')
+      if [ $RC2 -eq 0 ] && [ -n "$CID2" ]; then
+        echo " ✅ CUSTOM DOMAIN + SSLIP OK: CID=${CID2:0:20}..."
+        return 0
+      else
+        echo " ❌ FAIL custom domain ulang! RC=$RC2 | ERR=$ERR2"
+        return 1
+      fi
+    fi
+    return 0
+  else
+    echo " ❌ FAIL! RC=$RC | STDOUT=$CID | LAST_ERR=$ERR"
+    return 1
+  fi
+}
+
+########################################################################
+# 1. WEB PSB (PRIORITAS #1): cek jika sudah running? kalau ya SKIP
+########################################################################
+PSB_RUN=$(docker ps --format "{{.Names}}" | grep -ciE "web-psb|webpsb|psb")
+if [ "$PSB_RUN" -ge 1 ]; then
+  echo "🟢 [1/5 WEB PSB] SUDAH RUNNING, SKIP create fallback"
+  docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -iE "web.psb|webpsb|psb"
+else
+  echo "🔴 [1/5 WEB PSB] BELUM RUNNING, create FALLBACK..."
+  IMG_PSB=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -iE "local-web-psb" | head -1)
+  if [ -z "$IMG_PSB" ]; then
+    IMG_PSB="ghcr.io/indrakantor87/web-psb-perkasa:latest"
+    echo "   (tidak ada local-web-psb, fallback ghcr.io)"
+  else
+    echo "   (pakai local image: $IMG_PSB)"
+  fi
+  docker_run_fallback "web-psb-recovery-via-backtick" "$IMG_PSB" 3004 3000 \
+    "pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io" \
+    "webpsb.perkasa.net.id"
+  sleep 12
+fi
+
+########################################################################
+# 2. ERP OSS BSS
+########################################################################
+ERP_RUN=$(docker ps --format "{{.Names}}" | grep -ciE "perkasa-erp-oss-bss")
+if [ "$ERP_RUN" -ge 1 ]; then
+  echo "🟢 [2/5 ERP OSS BSS] SUDAH RUNNING, SKIP"
+else
+  echo "🟡 [2/5 ERP OSS BSS] create FALLBACK ghcr image..."
+  docker_run_fallback "erp-oss-bss-recovery-via-backtick" "ghcr.io/indrakantor87/perkasa-erp-oss-bss:latest" 3005 3000 \
+    "b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io"
+  sleep 12
+fi
+
+########################################################################
+# 3. FINANCE APP (cari image local dari container exited jika tidak ada di images)
+########################################################################
+FIN_RUN=$(docker ps --format "{{.Names}}" | grep -ciE "finance")
+if [ "$FIN_RUN" -ge 1 ]; then
+  echo "🟢 [3/5 FINANCE] SUDAH RUNNING, SKIP"
+else
+  echo "🟡 [3/5 FINANCE] cari image..."
+  IMG_FIN=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -iE "finance" | head -1)
+  if [ -z "$IMG_FIN" ]; then
+    FIN_CID=$(docker ps -aq --format "{{.Names}}" | grep -iE "finance" | head -1)
+    if [ -n "$FIN_CID" ]; then
+      IMG_FIN=$(docker inspect --format="{{.Image}}" "$FIN_CID" 2>/dev/null)
+      echo "   clone dari container exited $FIN_CID -> $IMG_FIN"
+    fi
+  fi
+  if [ -n "$IMG_FIN" ]; then
+    docker_run_fallback "finance-recovery-via-backtick" "$IMG_FIN" 3006 3000 \
+      "h4ow4sw0k04ksgsgskcwoow8.103.162.17.178.sslip.io"
+    sleep 10
+  else
+    echo "   ⚠️  Tidak ada image Finance yang bisa dipakai."
+  fi
+fi
+
+########################################################################
+# 4. LANDING PAGE
+########################################################################
+LAND_RUN=$(docker ps --format "{{.Names}}" | grep -ciE "landing")
+if [ "$LAND_RUN" -ge 1 ]; then
+  echo "🟢 [4/5 LANDING] SUDAH RUNNING, SKIP"
+else
+  echo "🟡 [4/5 LANDING] cari image..."
+  IMG_LAND=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -iE "landing" | head -1)
+  if [ -z "$IMG_LAND" ]; then
+    LAND_CID=$(docker ps -aq --format "{{.Names}}" | grep -iE "landing" | head -1)
+    if [ -n "$LAND_CID" ]; then
+      IMG_LAND=$(docker inspect --format="{{.Image}}" "$LAND_CID" 2>/dev/null)
+      echo "   clone dari container exited $LAND_CID -> $IMG_LAND"
+    fi
+  fi
+  if [ -n "$IMG_LAND" ]; then
+    docker_run_fallback "landing-recovery-via-backtick" "$IMG_LAND" 3007 3000 \
+      "uw0gsooko48kwgwogk8wc8gs.103.162.17.178.sslip.io"
+    sleep 10
+  else
+    echo "   ⚠️  Tidak ada image Landing yang bisa dipakai."
+  fi
+fi
+
+########################################################################
+# 5. GA WEB APP
+########################################################################
+GA_RUN=$(docker ps --format "{{.Names}}" | grep -ciE "ga-web|ga_")
+if [ "$GA_RUN" -ge 1 ]; then
+  echo "🟢 [5/5 GA WEB] SUDAH RUNNING, SKIP"
+else
+  echo "🟡 [5/5 GA WEB] cari image..."
+  IMG_GA=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -iE "ga-web" | head -1)
+  if [ -z "$IMG_GA" ]; then
+    GA_CID=$(docker ps -aq --format "{{.Names}}" | grep -iE "ga-web|ga_" | head -1)
+    if [ -n "$GA_CID" ]; then
+      IMG_GA=$(docker inspect --format="{{.Image}}" "$GA_CID" 2>/dev/null)
+      echo "   clone dari container exited $GA_CID -> $IMG_GA"
+    fi
+  fi
+  if [ -n "$IMG_GA" ]; then
+    docker_run_fallback "ga-web-recovery-via-backtick" "$IMG_GA" 3008 3000 \
+      "ikgc8kkwcc08kkgkskc0gwg4.103.162.17.178.sslip.io"
+    sleep 10
+  else
+    echo "   ⚠️  Tidak ada image GA Web yang bisa dipakai."
+  fi
+fi
+
+########################################################################
+# RESTART PROXY, TUNGGU, FINAL CHECK
+########################################################################
+echo ""
+echo "########################################################################"
+echo "# RESTART COOLIFY-PROXY (Traefik) + Wait 50 detik                    #"
+echo "########################################################################"
+PRX=$(docker ps -aq --format "{{.Names}}" | grep -iE coolify-proxy | head -1)
+if [ -n "$PRX" ]; then
+  docker restart "$PRX" 2>&1 | head -3
+fi
+echo ""
+echo "Menunggu 50 detik (setiap app siap listen port + traefik reload router)..."
+for i in 50 45 40 35 30 25 20 15 10 5; do echo "  ... ${i}s"; sleep 5; done
+
+echo ""
+echo "########################################################################"
+echo "# FINAL LIST CONTAINER SETELAH FALLBACK RECOVERY                     #"
+echo "########################################################################"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1 | head -40
+
+echo ""
+echo "########################################################################"
+echo "# FINAL HTTP CHECK 6 DOMAINS                                         #"
+echo "########################################################################"
+D1=webpsb.perkasa.net.id
+D2=b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io
+D3=uw0gsooko48kwgwogk8wc8gs.103.162.17.178.sslip.io
+D4=h4ow4sw0k04ksgsgskcwoow8.103.162.17.178.sslip.io
+D5=ikgc8kkwcc08kkgkskc0gwg4.103.162.17.178.sslip.io
+D6=pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io
+OKC=0; TOT=0
+check_domain() {
+  local dom=$1 name=$2
+  TOT=$((TOT+1))
+  local code=$(curl -s -o /dev/null -w "%{http_code}" --resolve $dom:80:127.0.0.1 --max-time 15 http://$dom/ 2>/dev/null)
+  code="${code:-000}"
+  case "$code" in
+    200|301|302|307|308) echo "  ✅ [$code] $name => $dom"; OKC=$((OKC+1)) ;;
+    *) echo "  ❌ [$code] $name => $dom" ;;
+  esac
+}
+check_domain $D1 "[PRIO 1] WEB PSB CUSTOM"
+check_domain $D2 "[PRIO 2] ERP OSS BSS"
+check_domain $D3 "[PRIO 3] LANDING"
+check_domain $D4 "[PRIO 4] FINANCE"
+check_domain $D5 "[PRIO 5] GA WEB"
+check_domain $D6 "[PRIO 6] WEB PSB SSLIP"
+echo ""
+echo "================================================================="
+echo "  HASIL FALLBACK RECOVERY: $OKC / $TOT DOMAINS HIDUP HTTP 200/30x"
+echo "================================================================="
+if [ "$OKC" = "$TOT" ]; then
+  echo "  🎉🎉🎉 SEMUA LAYANAN HIDUP! 🎉🎉🎉"
+  echo "  => Silakan buka https://webpsb.perkasa.net.id + Ctrl+Shift+R (Hard Refresh)"
+fi
+SCRIPTEOF
+)
+          echo "Script encoded len=$(printf '%s' "$SCRIPT_CONTENT_BASE64" | wc -c) bytes"
+
+          # Kirim ke server via base64 decode (100% aman, tidak ada quote yang diproses oleh GitHub Actions / shell runner)
+          echo "$SCRIPT_CONTENT_BASE64" | ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" "cat > /tmp/recovery_fallback.b64; base64 -d /tmp/recovery_fallback.b64 > /root/recovery_fallback.sh; chmod +x /root/recovery_fallback.sh; ls -la /root/recovery_fallback.sh; echo '=== SCRIPT UPLOAD OK ==='; wc -l /root/recovery_fallback.sh"
+          RC2=$?
+          if [ $RC2 -ne 0 ]; then
+            echo "ERROR Upload script FAIL RC=$RC2"
+            exit 1
+          fi
+          echo "UPLOAD OK. Script ada di /root/recovery_fallback.sh"
+
+      - name: "💥 STEP B: EKSEKUSI Script /root/recovery_fallback.sh DI SERVER (durasi ~10-20 menit, tunggu sampai selesai!)"
+        timeout-minutes: 28
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          echo "Mulai eksekusi script di server (akan berjalan ~10-20 menit. Sabar tunggu output...)"
+          echo ""
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" "bash /root/recovery_fallback.sh 2>&1 | tee /root/recovery_fallback.log | tail -n 250"
+          RC=$?
+          echo ""
+          echo "Eksekusi script selesai. RC=$RC"
+          echo ""
+          echo "=== TAIL 40 baris log recovery_fallback.log di server ==="
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" "tail -n 40 /root/recovery_fallback.log 2>/dev/null"
+          echo ""
+          echo "SELESAI. Buka https://webpsb.perkasa.net.id di browser Anda + Ctrl+Shift+R (Hard Refresh)"

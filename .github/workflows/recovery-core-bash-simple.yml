@@ -1,0 +1,248 @@
+name: "⭐ RECOVERY INTI 1-2-3: Docker Start All Exited + Proxy Restart (Bash Saja)"
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: recovery-core-simple-serial
+  cancel-in-progress: false
+
+jobs:
+  recovery_core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "0. Precheck & Install SSH Key"
+        run: |
+          set +e
+          HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
+          USER="${{ secrets.COOLIFY_SERVER_USER }}"
+          USER="${USER:-root}"
+          KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
+          HOST_LEN=$(printf '%s' "$HOST" | wc -c | tr -d ' ')
+          KEY_LEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
+          echo "HOST=$HOST"
+          echo "USER=$USER"
+          echo "HOST_LEN=$HOST_LEN"
+          echo "KEY_LEN=$KEY_LEN"
+          if [ "$KEY_LEN" -lt 150 ]; then
+            echo "ERROR: SSH PRIVATE KEY KOSONG / terlalu pendek. Isi di Repo Settings > Secrets > Actions"
+            exit 1
+          fi
+          mkdir -p $HOME/.ssh
+          chmod 700 $HOME/.ssh
+          KEY_FILE=$HOME/.ssh/id_ed25519_coolify
+          printf '%s\n' '-----BEGIN OPENSSH PRIVATE KEY-----' > /tmp/hdr.txt
+          printf '%s\n' '-----END OPENSSH PRIVATE KEY-----' > /tmp/tlr.txt
+          printf '%s' "$KEY" | grep -v 'OPENSSH PRIVATE KEY' | tr -d '\r' > /tmp/body.txt
+          (cat /tmp/hdr.txt; cat /tmp/body.txt; cat /tmp/tlr.txt) > $KEY_FILE
+          chmod 600 $KEY_FILE
+          echo "KEY_FILE=$KEY_FILE" >> $GITHUB_ENV
+          echo "USER=$USER" >> $GITHUB_ENV
+          echo "HOST=$HOST" >> $GITHUB_ENV
+          ssh -V
+          echo "OK: SSH key ready"
+
+      - name: "⭐ STEP 1: SSH PREFLIGHT + Lihat Container Sebelum Recovery"
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+            set +e
+            echo "===== [SERVER UPTIME & DISK] ====="
+            uptime
+            echo ""
+            df -h /
+            echo ""
+            echo "===== [DOCKER PS -a SEBELUM RECOVERY] ====="
+            docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" 2>&1 | head -50
+            echo ""
+            echo "===== [EXITED / CREATED / DEAD containers (akan di-start)] ====="
+            docker ps -aq -f status=exited -f status=created -f status=dead 2>&1
+            echo ""
+            echo "===== [COOLIFY PROXY STATUS] ====="
+            docker ps --format "table {{.Names}}\t{{.Status}}" 2>&1 | grep -iE "proxy|traefik"
+            echo "PREFLIGHT OK"
+          '
+          RC=$?
+          echo "SSH RC=$RC"
+          if [ $RC -ne 0 ]; then
+            echo "ERROR: SSH gagal! Periksa secrets COOLIFY_SERVER_HOST / USER / SSH_PRIVATE_KEY."
+            exit 1
+          fi
+
+      - name: "⭐ STEP 2: HAPUS CONTAINER MANUAL SALAH LABEL (web-psb-perkasa manual single quote) + PASTIKAN NETWORK COOLIFY ADA"
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+            set +e
+            echo "=== Bersihkan container manual yang labelnya salah (single quote) ==="
+            BAD=$(docker ps -aq --format "{{.Names}}" | grep -iE "^web-psb-perkasa$|fallback$" | head -20)
+            for C in $BAD; do
+              echo "  -> docker rm -f $C"
+              docker rm -f $C 2>&1 | head -2
+            done
+            echo ""
+            echo "=== Pastikan network coolify ada ==="
+            NET_EXIST=$(docker network ls --format "{{.Name}}" | grep -cE "^coolify$")
+            if [ "$NET_EXIST" -eq 0 ]; then
+              echo "  buat network coolify"
+              docker network create coolify 2>&1 | head -2
+            else
+              echo "  network coolify sudah ada OK"
+            fi
+            echo ""
+            echo "=== Pastikan coolify-proxy UP ==="
+            PRX=$(docker ps -aq --format "{{.Names}}" | grep -iE coolify-proxy | head -1)
+            if [ -n "$PRX" ]; then
+              PRX_UP=$(docker inspect --format="{{.State.Running}}" "$PRX" 2>/dev/null)
+              if [ "$PRX_UP" != "true" ]; then
+                echo "  start $PRX"
+                docker start "$PRX" 2>&1 | head -2
+              else
+                echo "  $PRX sudah UP"
+              fi
+            fi
+            echo "STEP 2 OK"
+          '
+
+      - name: "⭐ STEP 3: DOCKER START SEMUA EXITED / CREATED / DEAD CONTAINERS (COOLIFY ASLI = LABEL BACKTICK BENAR!) [PALING PENTING]"
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+            set +e
+            echo "########################################################################"
+            echo "#  STEP 3 PALING PENTING: START SEMUA CONTAINER YANG STOPPED/EXITED    #"
+            echo "#  Container Coolify asli punya label dengan BACKTICK BENAR, jadi      #"
+            echo "#  Traefik akan temukan Host rule dengan benar! TANPA BUILD / PULL!    #"
+            echo "########################################################################"
+            LIST=$(docker ps -aq -f status=exited -f status=created -f status=dead 2>/dev/null)
+            TOTAL=0; OK=0; FAIL=0
+            for C in $LIST; do
+              NAME=$(docker inspect --format="{{.Name}}" "$C" 2>/dev/null | sed s#/##)
+              # Skip container helper yang korup
+              case "$NAME" in
+                *coolify-helper*)
+                  echo "  [$TOTAL] SKIP coolify-helper (image sudah diperbaiki manual sebelumnya): $NAME"
+                  TOTAL=$((TOTAL+1))
+                  continue
+                  ;;
+              esac
+              TOTAL=$((TOTAL+1))
+              echo "  [$TOTAL] docker start $NAME ..."
+              docker start "$C" >/dev/null 2>&1
+              RC=$?
+              sleep 2
+              if [ $RC -eq 0 ]; then
+                UP=$(docker inspect --format="{{.State.Running}}" "$C" 2>/dev/null)
+                if [ "$UP" = "true" ]; then
+                  echo "         ✅ OK $NAME RUNNING"
+                  OK=$((OK+1))
+                else
+                  echo "         ⚠️  STARTED tapi tidak UP (exit cepat). RC=$RC"
+                  FAIL=$((FAIL+1))
+                fi
+              else
+                echo "         ❌ FAIL RC=$RC"
+                FAIL=$((FAIL+1))
+              fi
+            done
+            echo ""
+            echo "================================================================="
+            echo "  RINGKASAN: TOTAL=$TOTAL | OK=$OK | FAIL=$FAIL"
+            echo "================================================================="
+            echo ""
+            echo "=== DOCKER PS SETELAH START ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1 | head -60
+            echo "STEP 3 OK"
+          '
+
+      - name: "⭐ STEP 4: RESTART COOLIFY-PROXY (Traefik) AGAR RELOAD DYNAMIC CONFIG + WAIT 45s"
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+            set +e
+            echo "=== Restart coolify-proxy untuk reload semua router Host rules ==="
+            PRX=$(docker ps -aq --format "{{.Names}}" | grep -iE coolify-proxy | head -1)
+            if [ -n "$PRX" ]; then
+              docker restart "$PRX" 2>&1 | head -3
+            fi
+            echo ""
+            echo "=== Tunggu 45 detik agar semua container web siap + Traefik sync ==="
+            for i in 45 40 35 30 25 20 15 10 5; do
+              echo "  tunggu ${i}s lagi..."
+              sleep 5
+            done
+            echo "Selesai menunggu."
+            echo ""
+            echo "=== Final container list UP ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}" 2>&1
+            echo "STEP 4 OK"
+          '
+
+      - name: "⭐ STEP 5: FINAL HTTP CHECK 6 DOMAINS VIA TRAEFIK (curl --resolve ke 127.0.0.1:80)"
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          RESULT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+            set +e
+            echo "================================================================="
+            echo "  🔥 FINAL CHECK 6 DOMAINS PRODUKSI PERKASA (curl Traefik local)"
+            echo "================================================================="
+            D1=webpsb.perkasa.net.id
+            D2=b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io
+            D3=uw0gsooko48kwgwogk8wc8gs.103.162.17.178.sslip.io
+            D4=h4ow4sw0k04ksgsgskcwoow8.103.162.17.178.sslip.io
+            D5=ikgc8kkwcc08kkgkskc0gwg4.103.162.17.178.sslip.io
+            D6=pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io
+            OKC=0
+            TOT=0
+            check() {
+              local dom=$1 name=$2
+              TOT=$((TOT+1))
+              local code=$(curl -s -o /dev/null -w "%{http_code}" --resolve $dom:80:127.0.0.1 --max-time 15 http://$dom/ 2>/dev/null)
+              if [ -z "$code" ]; then code="000"; fi
+              if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ] || [ "$code" = "307" ] || [ "$code" = "308" ]; then
+                echo "  ✅ [$code] $name  => $dom"
+                OKC=$((OKC+1))
+              else
+                echo "  ❌ [$code] $name  => $dom"
+              fi
+            }
+            echo ""
+            check $D1 "[PRIORITAS 1] WEB PSB CUSTOM DOMAIN"
+            check $D2 "[PRIORITAS 2] ERP OSS BSS"
+            check $D3 "[PRIORITAS 3] LANDING PAGE"
+            check $D4 "[PRIORITAS 4] FINANCE APP"
+            check $D5 "[PRIORITAS 5] GA WEB APP"
+            check $D6 "[PRIORITAS 6] WEB PSB SSLIP"
+            echo ""
+            echo "================================================================="
+            echo "  HASIL: $OKC / $TOT DOMAINS HTTP 200/30x OK"
+            if [ "$OKC" = "$TOT" ]; then
+              echo "  🎉🎉🎉 SEMUA 6 DOMAINS HIDUP SEMPURNA! 🎉🎉🎉"
+            elif [ "$OKC" -ge 4 ]; then
+              echo "  🟡 MAYORITAS HIDUP, OK. Lainnya bisa deploy ulang nanti."
+            else
+              echo "  ❌ MASIH BANYAK FAIL. Perlu fallback Step 6 create container manual dengan backtick."
+            fi
+            echo "================================================================="
+          ' 2>&1)
+          echo "$RESULT"
+          echo ""
+          echo "=== FLOW SELESAI ==="
+          echo "Buka https://webpsb.perkasa.net.id di browser -> Ctrl+Shift+R (Hard Refresh)"
