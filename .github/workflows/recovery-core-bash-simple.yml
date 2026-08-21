@@ -128,24 +128,30 @@ jobs:
             echo "WARNING: Step2 non-critical FAIL — LANJUTKAN Step3+ (priority Web PSB)"
           fi
 
-      - name: "⭐ STEP 3: DOCKER START SEMUA EXITED / CREATED / DEAD CONTAINERS (COOLIFY ASLI = LABEL BACKTICK BENAR!) [PALING PENTING]"
+      - name: "⭐ STEP 3: DOCKER START SEMUA EXITED / CREATED / DEAD CONTAINERS (COOLIFY ASLI = LABEL BACKTICK BENAR!) [NON-CRITICAL, TIMEOUT 2M]"
         continue-on-error: true
+        timeout-minutes: 2
         run: |
           set +e
           KEY=$HOME/.ssh/id_ed25519_coolify
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
           OUTPUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
-            echo "=== STEP 3: DOCKER START SEMUA EXITED (COOLIFY ASLI LABEL BACKTICK BENAR!) ==="
+            echo "=== STEP 3: DOCKER START SEMUA EXITED (NON-CRITICAL, TIMEOUT PAKSA 2M) ==="
             LIST=$(docker ps -aq -f status=exited -f status=created -f status=dead 2>/dev/null)
+            LIST_COUNT=$(echo "$LIST" | grep -c . || true)
+            echo "  Jumlah exited containers = $LIST_COUNT (maksimal 20 di-start, selewatnya SKIP demi kecepatan Step5 Web PSB P1)"
             TOTAL=0; OK=0; FAIL=0; FAIL_LIST=""
+            START_LIMIT=20; STARTED_NOW=0
             for C in $LIST; do
               NAME=$(docker inspect --format="{{.Name}}" "$C" 2>/dev/null | sed s#/##)
               case "$NAME" in *coolify-helper*) TOTAL=$((TOTAL+1)); continue ;; esac
-              TOTAL=$((TOTAL+1))
-              docker start "$C" >/dev/null 2>&1
+              TOTAL=$((TOTAL+1)); STARTED_NOW=$((STARTED_NOW+1))
+              if [ $STARTED_NOW -gt $START_LIMIT ]; then
+                FAIL=$((FAIL+1)); FAIL_LIST="$FAIL_LIST ${NAME}(skip-limit)"; continue
+              fi
+              timeout 8 docker start "$C" >/dev/null 2>&1
               RC=$?
-              sleep 1
               if [ $RC -eq 0 ]; then
                 UP=$(docker inspect --format="{{.State.Running}}" "$C" 2>/dev/null)
                 if [ "$UP" = "true" ]; then OK=$((OK+1)); else FAIL=$((FAIL+1)); FAIL_LIST="$FAIL_LIST $NAME"; fi
@@ -153,11 +159,11 @@ jobs:
                 FAIL=$((FAIL+1)); FAIL_LIST="$FAIL_LIST $NAME"
               fi
             done
-            echo "RINGKASAN: TOTAL=$TOTAL | OK=$OK | FAIL=$FAIL"
-            [ -n "$FAIL_LIST" ] && echo "CONTAINER YANG FAIL (skip non-critical): $FAIL_LIST"
-            echo "=== DOCKER PS UP ==="
-            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1 | head -30
-            echo "STEP 3 OK (fail=$FAIL non-critical, TIDAK HENTIKAN Step5/6 Web PSB P1)"
+            echo "RINGKASAN: TOTAL=$TOTAL | OK=$OK | FAIL=$FAIL (LIMIT=$START_LIMIT)"
+            [ -n "$FAIL_LIST" ] && echo "CONTAINER YANG FAIL/SKIP (non-critical): [${FAIL_LIST:0:200}...]"
+            echo "=== DOCKER PS UP (first 20) ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1 | head -20
+            echo "STEP 3 OK (non-critical, Step5 Web PSB P1 DIUTAMAKAN!)"
           ' 2>&1)
           RC=$?
           echo "$OUTPUT"
