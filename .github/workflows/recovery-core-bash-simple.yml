@@ -50,7 +50,7 @@ jobs:
           set +e
           KEY=$HOME/.ssh/id_ed25519_coolify
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+          OUTPUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
             echo "===== [SERVER UPTIME & DISK] ====="
             uptime
@@ -66,10 +66,16 @@ jobs:
             echo "===== [COOLIFY PROXY STATUS] ====="
             docker ps --format "table {{.Names}}\t{{.Status}}" 2>&1 | grep -iE "proxy|traefik"
             echo "PREFLIGHT OK"
-          '
+          ' 2>&1)
           RC=$?
-          echo "SSH RC=$RC"
+          echo "$OUTPUT"
+          echo ""
+          echo "STEP 1 SSH RC=$RC"
           if [ $RC -ne 0 ]; then
+            echo ""
+            echo "==================== STEP 1 FAIL — LAST 80 LINES OUTPUT ===================="
+            printf "%s\n" "$OUTPUT" | tail -80
+            echo "============================================================================"
             echo "ERROR: SSH gagal! Periksa secrets COOLIFY_SERVER_HOST / USER / SSH_PRIVATE_KEY."
             exit 1
           fi
@@ -79,7 +85,7 @@ jobs:
           set +e
           KEY=$HOME/.ssh/id_ed25519_coolify
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+          OUTPUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
             echo "=== Bersihkan container manual yang labelnya salah (single quote) ==="
             BAD=$(docker ps -aq --format "{{.Names}}" | grep -iE "^web-psb-perkasa$|fallback$" | head -20)
@@ -109,14 +115,26 @@ jobs:
               fi
             fi
             echo "STEP 2 OK"
-          '
+          ' 2>&1)
+          RC=$?
+          echo "$OUTPUT"
+          echo ""
+          echo "STEP 2 SSH RC=$RC"
+          if [ $RC -ne 0 ]; then
+            echo ""
+            echo "==================== STEP 2 FAIL — LAST 80 LINES OUTPUT ===================="
+            printf "%s\n" "$OUTPUT" | tail -80
+            echo "============================================================================"
+            echo "WARNING: Step2 non-critical FAIL — LANJUTKAN Step3+ (priority Web PSB)"
+          fi
 
       - name: "⭐ STEP 3: DOCKER START SEMUA EXITED / CREATED / DEAD CONTAINERS (COOLIFY ASLI = LABEL BACKTICK BENAR!) [PALING PENTING]"
+        continue-on-error: true
         run: |
           set +e
           KEY=$HOME/.ssh/id_ed25519_coolify
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+          OUTPUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
             echo "=== STEP 3: DOCKER START SEMUA EXITED (COOLIFY ASLI LABEL BACKTICK BENAR!) ==="
             LIST=$(docker ps -aq -f status=exited -f status=created -f status=dead 2>/dev/null)
@@ -136,18 +154,30 @@ jobs:
               fi
             done
             echo "RINGKASAN: TOTAL=$TOTAL | OK=$OK | FAIL=$FAIL"
-            [ -n "$FAIL_LIST" ] && echo "CONTAINER YANG FAIL: $FAIL_LIST"
+            [ -n "$FAIL_LIST" ] && echo "CONTAINER YANG FAIL (skip non-critical): $FAIL_LIST"
             echo "=== DOCKER PS UP ==="
             docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1 | head -30
-            echo "STEP 3 OK"
-          '
+            echo "STEP 3 OK (fail=$FAIL non-critical, TIDAK HENTIKAN Step5/6 Web PSB P1)"
+          ' 2>&1)
+          RC=$?
+          echo "$OUTPUT"
+          echo ""
+          echo "STEP 3 SSH RC=$RC"
+          if [ $RC -ne 0 ]; then
+            echo ""
+            echo "==================== STEP 3 FAIL — LAST 80 LINES OUTPUT ===================="
+            printf "%s\n" "$OUTPUT" | tail -80
+            echo "============================================================================"
+            echo "WARNING: Step3 non-critical FAIL — LANJUTKAN Step4/5/6 (PRIORITAS Web PSB P1!)"
+          fi
 
       - name: "⭐ STEP 4: RESTART COOLIFY-PROXY (Traefik) AGAR RELOAD DYNAMIC CONFIG + WAIT 45s"
+        continue-on-error: true
         run: |
           set +e
           KEY=$HOME/.ssh/id_ed25519_coolify
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+          OUTPUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
             echo "=== STEP 4: RESTART COOLIFY-PROXY + WAIT 45s ==="
             PRX=$(docker ps -aq --format "{{.Names}}" | grep -iE coolify-proxy | head -1)
@@ -156,7 +186,18 @@ jobs:
             echo "=== Final container list UP ==="
             docker ps --format "table {{.Names}}\t{{.Status}}" 2>&1 | head -30
             echo "STEP 4 OK"
-          '
+          ' 2>&1)
+          RC=$?
+          echo "$OUTPUT"
+          echo ""
+          echo "STEP 4 SSH RC=$RC"
+          if [ $RC -ne 0 ]; then
+            echo ""
+            echo "==================== STEP 4 FAIL — LAST 80 LINES OUTPUT ===================="
+            printf "%s\n" "$OUTPUT" | tail -80
+            echo "============================================================================"
+            echo "WARNING: Step4 non-critical FAIL — LANJUTKAN Step5/6 (PRIORITAS Web PSB P1!)"
+          fi
 
       - name: "⭐ STEP 5: WEB PSB CUSTOM DOMAIN (PRIORITAS #1) - Docker run EXPLICIT 2 LABEL HOST (CUSTOM + SSLIP) dengan BACKTICK printf hex \\x60 100% BENAR"
         timeout-minutes: 8
