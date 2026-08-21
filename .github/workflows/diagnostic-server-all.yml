@@ -1,0 +1,183 @@
+name: "🔍 DIAGNOSTIC: SSH KE SERVER OUTPUT INFO SEMUA - TANPA UBAH APA-APA"
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "0. Install SSH Key (POLA TERBUKTI WORKING 100% DARI RECOVERY-CORE)"
+        run: |
+          set +e
+          HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
+          USER="${{ secrets.COOLIFY_SERVER_USER }}"
+          USER="${USER:-root}"
+          KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
+          HOST_LEN=$(printf '%s' "$HOST" | wc -c | tr -d ' ')
+          KEY_LEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
+          echo "HOST=$HOST"
+          echo "USER=$USER"
+          echo "HOST_LEN=$HOST_LEN"
+          echo "KEY_LEN=$KEY_LEN"
+          if [ "$KEY_LEN" -lt 150 ]; then
+            echo "ERROR: SSH PRIVATE KEY KOSONG / terlalu pendek."
+            exit 1
+          fi
+          mkdir -p $HOME/.ssh
+          chmod 700 $HOME/.ssh
+          KEY_FILE=$HOME/.ssh/id_ed25519_coolify
+          printf '%s\n' '-----BEGIN OPENSSH PRIVATE KEY-----' > /tmp/hdr.txt
+          printf '%s\n' '-----END OPENSSH PRIVATE KEY-----' > /tmp/tlr.txt
+          printf '%s' "$KEY" | grep -v 'OPENSSH PRIVATE KEY' | tr -d '\r' > /tmp/body.txt
+          (cat /tmp/hdr.txt; cat /tmp/body.txt; cat /tmp/tlr.txt) > $KEY_FILE
+          chmod 600 $KEY_FILE
+          echo "KEY_FILE=$KEY_FILE" >> $GITHUB_ENV
+          echo "USER=$USER" >> $GITHUB_ENV
+          echo "HOST=$HOST" >> $GITHUB_ENV
+          ssh -V
+          echo "OK: SSH key ready"
+
+      - name: "🔍 1. DIAGNOSTIC SERVER: DOCKER PS | IMAGES | INSPECT PSB LABEL | CURL CHECK DOMAIN (TANPA UBAH APA-APA!)"
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          echo ""
+          echo "=== [SERVER] SSH ke ${{ env.USER }}@${{ env.HOST }} ==="
+          RESULT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+            set +e
+            echo "######################################################################"
+            echo "#  [DIAGNOSTIK-1] SERVER UPTIME, DISK, LOAD"
+            echo "######################################################################"
+            echo "DATE:"; date -u
+            echo "UPTIME:"; uptime
+            echo "DISK /:"; df -h / 2>&1 | head -5
+            echo "FREE MEM:"; free -h 2>&1 | head -3
+            echo ""
+
+            echo "######################################################################"
+            echo "#  [DIAGNOSTIK-2] DOCKER PS -a (ALL CONTAINERS)"
+            echo "######################################################################"
+            docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}" 2>&1 | head -80
+            echo ""
+
+            echo "######################################################################"
+            echo "#  [DIAGNOSTIK-3] DOCKER IMAGES FILTER PSB / WEB / PERKASA"
+            echo "######################################################################"
+            docker images 2>&1 | head -40
+            echo "--- FILTER PSB/PERKASA/WEB ---"
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.ID}}" 2>&1 | grep -iE "psb|perkasa|web" | head -30
+            echo ""
+
+            echo "######################################################################"
+            echo "#  [DIAGNOSTIK-4] CARI & INSPECT SEMUA CONTAINER YANG NAMANYA MENGANDUNG PSB / WEB-PERKASA / ULTRAFAST / FALLBACK / RECOVERYCORE"
+            echo "#  TAMPILKAN: Status, Label Traefik, Image, IP network"
+            echo "######################################################################"
+            PSB_LIST=$(docker ps -aq --format "{{.Names}}" 2>&1 | grep -iE "web.psb|webpsb|psb|ultrafast|fallback|recoverycore|perkasa" | head -20)
+            if [ -z "$PSB_LIST" ]; then
+              echo "⚠️  TIDAK ADA CONTAINER PSB/ULTRAFAST/FALLBACK/RECOVERYCORE SAMA SEKALI!"
+            else
+              TOTAL_PSB=$(echo "$PSB_LIST" | wc -l | tr -d " ")
+              echo "✅ DITEMUKAN $TOTAL_PSB CONTAINER TERKAIT PSB:"
+              for C in $PSB_LIST; do
+                echo "======================================================================"
+                echo "  CONTAINER: $C"
+                echo "======================================================================"
+                STATE=$(docker inspect --format="{{.State.Status}}" "$C" 2>/dev/null)
+                RUNNING=$(docker inspect --format="{{.State.Running}}" "$C" 2>/dev/null)
+                IMG=$(docker inspect --format="{{.Config.Image}}" "$C" 2>/dev/null)
+                REST=$(docker inspect --format="{{.HostConfig.RestartPolicy.Name}}" "$C" 2>/dev/null)
+                IP=$(docker inspect --format="{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}" "$C" 2>/dev/null)
+                echo "  Status    = $STATE (Running=$RUNNING)"
+                echo "  Image     = $IMG"
+                echo "  Restart   = $REST"
+                echo "  IP Addr   = $IP"
+                echo "  Exit Code = $(docker inspect --format="{{.State.ExitCode}}" "$C" 2>/dev/null)"
+                echo "  StartedAt = $(docker inspect --format="{{.State.StartedAt}}" "$C" 2>/dev/null | cut -c1-25)"
+                if [ "$RUNNING" = "false" ]; then
+                  echo "  FinishedAt = $(docker inspect --format="{{.State.FinishedAt}}" "$C" 2>/dev/null | cut -c1-25)"
+                  echo "  --- LAST 10 LOGS CONTAINER ---"
+                  docker logs --tail 10 "$C" 2>&1 | head -20
+                fi
+                echo ""
+                echo "  ---- LABEL DOCKER (FILTER HANYA TRAEFIK + NAME) ----"
+                docker inspect "$C" 2>/dev/null | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+labels = d[0].get('Config', {}).get('Labels', {})
+if not labels:
+    print('  NO LABELS')
+    sys.exit(0)
+for k, v in sorted(labels.items()):
+    if 'traefik' in k.lower() or 'name' in k.lower() or 'maintainer' in k.lower():
+        print(f'  LABEL: {k} = {v}')
+" 2>&1 | head -50
+                echo ""
+              done
+            fi
+            echo ""
+
+            echo "######################################################################"
+            echo "#  [DIAGNOSTIK-5] COOLIFY PROXY STATUS + TRAEFIK CONFIG (docker inspect)"
+            echo "######################################################################"
+            PRX=$(docker ps -aq --format "{{.Names}}" 2>&1 | grep -iE coolify-proxy | head -1)
+            if [ -n "$PRX" ]; then
+              echo "✅ Proxy: $PRX"
+              P_STATE=$(docker inspect --format="{{.State.Status}}" "$PRX" 2>/dev/null)
+              P_RUN=$(docker inspect --format="{{.State.Running}}" "$PRX" 2>/dev/null)
+              echo "  Status   = $P_STATE (Running=$P_RUN)"
+              echo "  Restart  = $(docker inspect --format="{{.HostConfig.RestartPolicy.Name}}" "$PRX" 2>/dev/null)"
+              echo "  Ports    = $(docker inspect --format="{{range $p, $conf := .NetworkSettings.Ports}}{{$p}} {{end}}" "$PRX" 2>/dev/null)"
+              echo ""
+              echo "  --- PROXY LAST 15 LOGS ---"
+              docker logs --tail 15 "$PRX" 2>&1 | tail -25
+            else
+              echo "❌ TIDAK ADA coolify-proxy!"
+            fi
+            echo ""
+
+            echo "######################################################################"
+            echo "#  [DIAGNOSTIK-6] FINAL CURL CHECK 6 DOMAINS VIA --resolve ke 127.0.0.1:80 (LANGSUNG KE TRAEFIK LOKAL SERVER)"
+            echo "######################################################################"
+            D1=webpsb.perkasa.net.id
+            D2=b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io
+            D3=uw0gsooko48kwgwogk8wc8gs.103.162.17.178.sslip.io
+            D4=h4ow4sw0k04ksgsgskcwoow8.103.162.17.178.sslip.io
+            D5=ikgc8kkwcc08kkgkskc0gwg4.103.162.17.178.sslip.io
+            D6=pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io
+            check() {
+              local dom=$1 name=$2
+              echo "  CHECK $name ($dom)..."
+              local out=$(curl -sv --resolve $dom:80:127.0.0.1 --max-time 20 http://$dom/ 2>&1 | tail -40)
+              echo "$out"
+              echo "  === END CHECK $dom ==="
+              echo ""
+            }
+            check $D1 "[PRIORITAS #1] WEB PSB CUSTOM DOMAIN webpsb.perkasa.net.id"
+            check $D6 "[PRIORITAS #2] WEB PSB SSLIP"
+            check $D2 "[PRIORITAS #3] ERP OSS BSS SSLIP"
+            check $D3 "[PRIORITAS #4] LANDING SSLIP"
+            check $D4 "[PRIORITAS #5] FINANCE SSLIP"
+            check $D5 "[PRIORITAS #6] GA WEB SSLIP"
+
+            echo "######################################################################"
+            echo "#  DIAGNOSTIC SELESAI - TERIMA KASIH"
+            echo "######################################################################"
+          ' 2>&1)
+          RC=$?
+          echo "SSH RC=$RC"
+          echo ""
+          echo "======================================================================"
+          echo "  OUTPUT DIAGNOSTIC SERVER:"
+          echo "======================================================================"
+          echo "$RESULT"
+          echo ""
+          echo "=== DIAGNOSTIC SELESAI (RC=$RC) ==="
