@@ -1,4 +1,4 @@
-name: "RUN20 DIAG SAFE: ALL continue-on-error + STD SSH key"
+name: "RUN21 ANNOTATIONS: ::error:: PASTI terbaca di Summary (anti UI truncate)"
 
 on:
   push:
@@ -6,122 +6,88 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_r20:
+  diag_r21:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: "0. Install SSH Key (STANDARD SAFE MODE)"
-        continue-on-error: true
+      - name: "0. Install SSH Key STANDARD SAFE"
         run: |
-          echo "R20_S0_START"
           USER="${{ secrets.COOLIFY_SERVER_USER }}"; USER="${USER:-root}"
           KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
           HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
           mkdir -p $HOME/.ssh; chmod 700 $HOME/.ssh
-          K=$HOME/.ssh/id_rsa_r20
+          K=$HOME/.ssh/id_rsa_r21
           install -m 600 /dev/null $K
           printf '%s\n' "$KEY" > $K
           chmod 600 $K
-          KEY_HEAD=$(head -1 $K 2>/dev/null); KEY_TAIL=$(tail -1 $K 2>/dev/null)
-          KEY_LINES=$(wc -l < $K 2>/dev/null)
-          echo "R20_SSH_KEY: file=$K lines=$KEY_LINES head=$KEY_HEAD tail=$KEY_TAIL"
           echo "KEY=$K" >> $GITHUB_ENV
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
-          echo "R20_S0_END RC=0"
 
-      - name: "R20-A1: Proxy name + image"
+      - name: "R21: ALL DIAG SERVER-SIDE → return RAW LINES (prefix R21_)"
+        id: diag
         continue-on-error: true
         run: |
-          echo "R20_SA1_START"
           K=${{ env.KEY }}
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1); IMG=$(docker inspect --format="{{.Config.Image}}" $PRX 2>/dev/null); echo "R20_PRX: $PRX"; echo "R20_PRX_IMG: $IMG"' 2>&1
-          RC=$?; echo "R20_SA1_END RC=$RC"; true
-
-      - name: "R20-A2: PROXY ARGS (entrypoints flags KRITIS!)"
-        continue-on-error: true
-        run: |
-          echo "R20_SA2_START"
-          K=${{ env.KEY }}
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1); for A in $(docker inspect $PRX 2>/dev/null | python3 -c "import sys,json;[print(a) for a in json.load(sys.stdin)[0].get(\"Args\",[])]" 2>/dev/null | grep -iE "entrypoint|address|:80|:443|http|web"); do echo "R20_ARG: $A"; done' 2>&1
-          RC=$?; echo "R20_SA2_END RC=$RC"; true
-
-      - name: "R20-A3: proxy labels traefik.*"
-        continue-on-error: true
-        run: |
-          echo "R20_SA3_START"
-          K=${{ env.KEY }}
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1); docker inspect $PRX 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});[print(f\"R20_PX_LBL: {k}={v[:90]}\") for k,v in sorted(l.items()) if \"traefik\" in k.lower() or \"entrypoint\" in k.lower()]"' 2>&1
-          RC=$?; echo "R20_SA3_END RC=$RC"; true
-
-      - name: "R20-B1: LOCAL HTTP webpsb via 127.0.0.1"
-        continue-on-error: true
-        run: |
-          echo "R20_SB1_START"
-          K=${{ env.KEY }}
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'D=webpsb.perkasa.net.id; C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 10 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); echo "R20_LOCAL_HTTP: $C REDIR: ${L:0:100}"' 2>&1
-          RC=$?; echo "R20_SB1_END RC=$RC"; true
-
-      - name: "R20-B2: LOCAL HTTPS webpsb via 127.0.0.1"
-        continue-on-error: true
-        run: |
-          echo "R20_SB2_START"
-          K=${{ env.KEY }}
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'D=webpsb.perkasa.net.id; C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 --resolve $D:443:127.0.0.1 https://$D/ 2>/dev/null); echo "R20_LOCAL_HTTPS: $C"' 2>&1
-          RC=$?; echo "R20_SB2_END RC=$RC"; true
-
-      - name: "R20-B3: PUBLIC HTTP via DNS"
-        continue-on-error: true
-        run: |
-          echo "R20_SB3_START"
-          K=${{ env.KEY }}
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'D=webpsb.perkasa.net.id; C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 12 http://$D/ 2>/dev/null); L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 12 http://$D/ 2>/dev/null); echo "R20_PUB_HTTP: $C REDIR: ${L:0:100}"' 2>&1
-          RC=$?; echo "R20_SB3_END RC=$RC"; true
-
-      - name: "R20-B4: PUBLIC HTTPS via DNS skip-verify"
-        continue-on-error: true
-        run: |
-          echo "R20_SB4_START"
-          K=${{ env.KEY }}
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'D=webpsb.perkasa.net.id; C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 12 https://$D/ 2>/dev/null); echo "R20_PUB_HTTPS: $C"' 2>&1
-          RC=$?; echo "R20_SB4_END RC=$RC"; true
-
-      - name: "R20-C1: DNS + rec17 container + labels SAFE awk-free"
-        continue-on-error: true
-        run: |
-          echo "R20_SC1_START"
-          K=${{ env.KEY }}
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
+          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+            set +e
             D=webpsb.perkasa.net.id
+            PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1)
+            echo "R21_PRX: ${PRX:-NONE}"
+            [ -n "$PRX" ] && IMG=$(docker inspect --format="{{.Config.Image}}" $PRX 2>/dev/null) && echo "R21_PRX_IMG: ${IMG:-NONE}"
+            N=0
+            [ -n "$PRX" ] && for A in $(docker inspect $PRX 2>/dev/null | python3 -c "import sys,json;[print(a) for a in json.load(sys.stdin)[0].get(\"Args\",[])]" 2>/dev/null | grep -iE "entrypoint|address|:80|:443|http|web"); do N=$((N+1)); if [ $N -le 10 ]; then echo "R21_ARG_${N}: $A"; fi; done
+            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); echo "R21_LOCAL_HTTP_CODE: ${C:-000}"
+            L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 10 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); echo "R21_LOCAL_HTTP_REDIR: ${L:0:150}"
+            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 --resolve $D:443:127.0.0.1 https://$D/ 2>/dev/null); echo "R21_LOCAL_HTTPS_CODE: ${C:-000}"
+            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 http://$D/ 2>/dev/null); echo "R21_PUB_HTTP_CODE: ${C:-000}"
+            L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 15 http://$D/ 2>/dev/null); echo "R21_PUB_HTTP_REDIR: ${L:0:150}"
+            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 15 https://$D/ 2>/dev/null); echo "R21_PUB_HTTPS_CODE: ${C:-000}"
             IP=$(getent hosts $D 2>/dev/null | cut -d" " -f1 | head -1)
             [ -z "$IP" ] && IP=$(ping -c1 -W2 $D 2>&1 | grep -oE "\([0-9.]{7,}\)" | head -1 | tr -d "()")
-            [ -z "$IP" ] && IP="UNKNOWN"
-            echo "R20_DNS: $D -> $IP"
+            echo "R21_DNS: $D -> ${IP:-UNKNOWN}"
             CID=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE "rec17-webpsb" | head -1)
             [ -z "$CID" ] && CID=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE "webpsb" | head -1)
-            if [ -z "$CID" ]; then
-              echo "R20_REC17: NONE"
-            else
-              ST=$(docker inspect --format="{{.State.Status}}" $CID 2>/dev/null)
+            echo "R21_PSB_CID: ${CID:-NONE}"
+            if [ -n "$CID" ]; then
+              ST=$(docker inspect --format="{{.State.Status}}" $CID 2>/dev/null); echo "R21_PSB_STATUS: ${ST:-UNKNOWN}"
               IPNET=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" $CID 2>/dev/null)
-              [ -z "$IPNET" ] && IPNET="NOT_IN_COOLIFY_NET"
-              echo "R20_REC17: $CID STATUS=$ST COOLIFY_IP=$IPNET"
+              echo "R21_PSB_COOLIFY_IP: ${IPNET:-NOT_IN_COOLIFY_NET}"
               NETLBL=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" $CID 2>/dev/null)
-              echo "R20_PSB_NET_LABEL: $NETLBL"
-              ALL_LAB=$(docker inspect $CID 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});[print(f\"{k}={v[:150]}\") for k,v in sorted(l.items()) if \"traefik.http.routers\" in k and (\".entryPoints\" in k or \".rule\" in k or \".service\" in k or \".tls\" in k)]" 2>/dev/null)
+              echo "R21_PSB_NET_LABEL: ${NETLBL:-EMPTY}"
               N=0
-              for L in $ALL_LAB; do N=$((N+1)); if [ $N -le 15 ]; then echo "R20_PSB_LAB: $L"; fi; done
+              for L in $(docker inspect $CID 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});[print(f\"{k}={v[:180]}\") for k,v in sorted(l.items()) if \"traefik.http.routers\" in k and (\".entryPoints\" in k or \".rule\" in k or \".service\" in k or \".tls\" in k or \".certresolver\" in k)]" 2>/dev/null); do N=$((N+1)); if [ $N -le 15 ]; then echo "R21_PSB_LAB_${N}: $L"; fi; done
             fi
-          ' 2>&1
-          RC=$?; echo "R20_SC1_END RC=$RC"; true
+          ' 2>&1)
+          RC=$?
+          echo "RAW_OUT<<EOF_R21" >> $GITHUB_OUTPUT
+          printf '%s\n' "$OUT" >> $GITHUB_OUTPUT
+          echo "EOF_R21" >> $GITHUB_OUTPUT
+          echo "SSH_RC=$RC" >> $GITHUB_OUTPUT
+          echo "--- RAW SERVER OUTPUT START ---"
+          printf '%s\n' "$OUT"
+          echo "--- RAW SERVER OUTPUT END RC=$RC ---"
+
+      - name: "R21: CONVERT raw lines → GITHUB ANNOTATIONS ::error:: (PASTI terbaca di Summary!)"
+        run: |
+          OUT="${{ steps.diag.outputs.RAW_OUT }}"
+          SSH_RC="${{ steps.diag.outputs.SSH_RC }}"
+          N=0
+          while IFS= read -r LINE; do
+            LINE=$(printf '%s' "$LINE" | tr -d '\r' | tr '\n' ' ' | sed 's/[[:space:]]\+$//')
+            [ -z "$LINE" ] && continue
+            N=$((N+1))
+            if echo "$LINE" | grep -qE '^R21_'; then
+              TITLE=$(echo "$LINE" | cut -d: -f1 | head -c 80)
+              VAL=$(echo "$LINE" | cut -d: -f2- | sed 's/^[[:space:]]*//' | head -c 180)
+              VAL_SAFE=$(printf '%s' "$VAL" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+              echo "::error title=${TITLE}::${VAL_SAFE}"
+              echo "[ANN] $TITLE :: $VAL"
+            fi
+            [ $N -ge 60 ] && break
+          done <<< "$OUT"
+          echo "Total lines processed: $N, SSH_RC=$SSH_RC"
