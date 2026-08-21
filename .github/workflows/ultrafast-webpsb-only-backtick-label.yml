@@ -5,10 +5,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: ultrafast-webpsb-serial
-  cancel-in-progress: false
-
 jobs:
   webpsb_only:
     runs-on: ubuntu-latest
@@ -18,9 +14,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: "0. Install SSH Key (SAMA PERSIS dengan Workflow Core yang TERBUKTI konek OK)"
+      - name: "0. [FAIL CEPAT JIKA ERROR] Install SSH Key + Fail Fast Test SSH Connect"
         run: |
-          set +e
+          set -euo pipefail
           HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
           USER="${{ secrets.COOLIFY_SERVER_USER }}"
           USER="${USER:-root}"
@@ -30,25 +26,45 @@ jobs:
           echo "HOST=$HOST USER=$USER HOST_LEN=$HOST_LEN KEY_LEN=$KEY_LEN"
           mkdir -p $HOME/.ssh && chmod 700 $HOME/.ssh
           KEY_FILE=$HOME/.ssh/id_ed25519_coolify
-          printf '%s\n' '-----BEGIN OPENSSH PRIVATE KEY-----' > /tmp/hdr.txt
-          printf '%s\n' '-----END OPENSSH PRIVATE KEY-----' > /tmp/tlr.txt
-          printf '%s' "$KEY" | grep -v 'OPENSSH PRIVATE KEY' | tr -d '\r' > /tmp/body.txt
-          (cat /tmp/hdr.txt; cat /tmp/body.txt; cat /tmp/tlr.txt) > $KEY_FILE
-          chmod 600 $KEY_FILE
+          # KIRIM KEY LANGSUNG ke file dengan Python - TIDAK ADA shell wrap / grep / hack apapun (paling robust!)
+          python3 - <<PY > "$KEY_FILE"
+import os, sys
+with open(os.environ["KF"], "w", encoding="utf-8", newline="\n") as f:
+    f.write(os.environ["K"])
+PY
+          chmod 600 "$KEY_FILE"
+          ls -la "$KEY_FILE"
           echo "KEY_FILE=$KEY_FILE USER=$USER HOST=$HOST" >> $GITHUB_ENV
-          echo "OK SSH key ready"
 
-      - name: "⚡ 1. DOCKER RUN WEB PSB HANYA 1 CONTAINER - LABEL DENGAN printf '\\x60' (BACKTICK 100% BENAR) - custom domain webpsb.perkasa.net.id + sslip + port mapping"
+          # === PREFLIGHT SSH CONNECT (FAIL FAST JIKA TIDAK BISA KONEK!) ===
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $KEY_FILE"
+          echo ""
+          echo "=== TEST SSH Connect ke $USER@$HOST ==="
+          RES=$(ssh $OPTS "$USER@$HOST" "echo SSH_OK_$(hostname)_$(whoami)_uptime=$(uptime | cut -c1-40)")
+          echo "  Result: $RES"
+          if [[ "$RES" != SSH_OK_* ]]; then
+            echo "❌❌❌ SSH TEST GAGAL! Exit workflow sekarang ❌❌❌"
+            exit 1
+          fi
+          echo "✅✅✅ SSH CONNECT OK - lanjut eksekusi di server ✅✅✅"
+          echo "OPTS=$OPTS" >> $GITHUB_ENV
+        env:
+          K: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+          KF: ${{ env.HOME }}/.ssh/id_ed25519_coolify
+
+      - name: "⚡ 1. DOCKER RUN WEB PSB HANYA 1 CONTAINER - LABEL DENGAN printf '\\x60' (BACKTICK 100% BENAR) - FAIL JIKA ADA ERROR KONEKSI"
         timeout-minutes: 8
         run: |
-          set +e
+          set -euo pipefail
           KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          OPTS="${{ env.OPTS }}"
+          USER="${{ env.USER }}"
+          HOST="${{ env.HOST }}"
 
           echo "Mulai eksekusi script recovery HANYA Web PSB di server (durasi ~3-5 menit)..."
           echo ""
 
-          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+          ssh $OPTS "$USER@$HOST" '
             set +e
             BT=$(printf "\x60")
             echo "=========================================================================="
