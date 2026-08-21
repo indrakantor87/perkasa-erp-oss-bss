@@ -71,6 +71,19 @@ jobs:
               PSB_META=$(docker ps --filter "ancestor=local-web-psb:6f3e12e" --format "{{.ID}} {{.Names}}" 2>/dev/null | tr "\n" " " | sed "s/[[:space:]]\\+$//")
               [ -z "$PSB_META" ] && PSB_META="UNKNOWN"
               echo "R28_PSB_NAMES: ${PSB_META:0:220}"
+              MATRIX=""
+              BEST="$PSB1"
+              for id in $PSB_IDS; do
+                nm=$(docker ps --filter "id=$id" --format "{{.Names}}" 2>/dev/null | head -1)
+                [ -z "$nm" ] && nm="${id:0:12}"
+                env=$(docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$id" 2>/dev/null)
+                dbk=NO; printf "%s\n" "$env" | grep -q "^DATABASE_URL=" >/dev/null 2>&1 && dbk=YES
+                ask=NO; { printf "%s\n" "$env" | grep -q "^AUTH_SECRET=" >/dev/null 2>&1 || printf "%s\n" "$env" | grep -q "^NEXTAUTH_SECRET=" >/dev/null 2>&1; } && ask=YES
+                [ "$dbk" = "YES" ] && BEST="$id"
+                MATRIX="${MATRIX}${id:0:12}:${nm}:DB=${dbk}:AUTH=${ask} | "
+              done
+              echo "R28_PSB_MATRIX: ${MATRIX:0:900}"
+              PSB1="$BEST"
               C_STATUS=$(docker inspect -f "{{.State.Status}}" "$PSB1" 2>/dev/null)
               C_HEALTH=$(docker inspect -f "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" "$PSB1" 2>/dev/null)
               C_RESTART=$(docker inspect -f "{{.RestartCount}}" "$PSB1" 2>/dev/null)
@@ -166,6 +179,7 @@ jobs:
           TS="$(getv R28_TS)"
           TRAEFIK="$(getv R28_TRAEFIK) ep=$(getv R28_ENTRYPOINTS) resolvers=$(getv R28_TLS_RESOLVERS) prov=$(getv R28_PROVIDERS) dyn=$(getv R28_DYNAMIC_DIR)"
           PSB="$(getv R28_PSB) names=$(getv R28_PSB_NAMES)"
+          MATRIX="$(getv R28_PSB_MATRIX)"
           CONT="$(getv R28_CONTAINER)"
           NET="$(getv R28_NETWORK_COMMON)"
           PORT="$(getv R28_PORT)"
@@ -180,6 +194,7 @@ jobs:
             "TS: $TS" \
             "TRAEFIK: $TRAEFIK" \
             "PSB: $PSB" \
+            "PSB_MATRIX: $MATRIX" \
             "CONTAINER: $CONT" \
             "NETWORK_COMMON: $NET" \
             "PORT: $PORT" \
