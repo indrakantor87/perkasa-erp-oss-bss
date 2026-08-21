@@ -1,4 +1,4 @@
-name: "RUN25 DIAGNOSTIC READ-ONLY: Traefik/PSB routing state"
+name: "RUN26 FIX MINIMAL: WebPSB via Traefik dynamic config (no container touch)"
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN25 DIAG: Read-only inspect Traefik/PSB/network/labels/dynamic + curl"
+      - name: "RUN26: Diagnose → Apply dynamic config → Re-test"
         id: diag_fix
         continue-on-error: true
         run: |
@@ -139,10 +139,47 @@ jobs:
             CL2=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:443:127.0.0.1 https://$D/ 2>/dev/null)
             echo "R25_LOCAL_HTTPS: code=${CL2:-000}"
 
+            if [ "$PRX" != "NONE" ] && [ "$PSB1" != "NONE" ] && [ "$HTTP_LBL" = "NOT_FOUND" ] && [ "$HTTPS_LBL" = "NOT_FOUND" ]; then
+              EPS_SAFE=$(printf "%s" "$EPS" | tr "\n" " " | sed "s/[[:space:]]\\+$//")
+              RES_SAFE=$(printf "%s" "$RES" | tr "\n" " " | sed "s/[[:space:]]\\+$//")
+              EP_HTTP="http"; printf " %s " "$EPS_SAFE" | grep -w "http" >/dev/null 2>&1 || { printf " %s " "$EPS_SAFE" | grep -w "web" >/dev/null 2>&1 && EP_HTTP="web"; }
+              EP_HTTPS="https"; printf " %s " "$EPS_SAFE" | grep -w "https" >/dev/null 2>&1 || { printf " %s " "$EPS_SAFE" | grep -w "websecure" >/dev/null 2>&1 && EP_HTTPS="websecure"; }
+              RESOLVER=$(printf "%s" "$RES_SAFE" | awk "{print \\$1}")
+              printf " %s " "$RES_SAFE" | grep -w "letsencrypt" >/dev/null 2>&1 && RESOLVER="letsencrypt"
+              [ -z "$RESOLVER" ] && RESOLVER="letsencrypt"
+
+              SERVICE_REF="NONE"
+              if [ "$SVC" != "NONE" ]; then
+                BASE=$(printf "%s\n" "$SVC" | awk "{print \\$1}")
+                [ -n "$BASE" ] && SERVICE_REF="${BASE}@docker"
+              fi
+              PSB_NAME=$(docker ps --filter "id=$PSB1" --format "{{.Names}}" 2>/dev/null | head -1)
+              [ -z "$PSB_NAME" ] && PSB_NAME="$PSB1"
+
+              DYN_DIR=/data/coolify/proxy/dynamic
+              CFG_PATH="$DYN_DIR/webpsb-perkasa.yaml"
+              python3 -c "import sys; bt=chr(96); d=sys.argv[1]; ep_http=sys.argv[2]; ep_https=sys.argv[3]; resolver=sys.argv[4]; svc_ref=sys.argv[5]; host=sys.argv[6]; port=sys.argv[7]; out=sys.argv[8]; rule='Host(' + bt + d + bt + ')'; lines=[]; lines+=['http:','  routers:','    webpsb-http:','      rule: ' + rule,'      entryPoints:','        - ' + ep_http,'      middlewares:','        - webpsb-redirect']; if svc_ref!='NONE': lines+=['      service: ' + svc_ref]; else: lines+=['      service: webpsb-svc']; lines+=['    webpsb-https:','      rule: ' + rule,'      entryPoints:','        - ' + ep_https,'      tls:','        certResolver: ' + resolver]; if svc_ref!='NONE': lines+=['      service: ' + svc_ref]; else: lines+=['      service: webpsb-svc']; lines+=['  middlewares:','    webpsb-redirect:','      redirectScheme:','        scheme: https']; if svc_ref=='NONE': lines+=['  services:','    webpsb-svc:','      loadBalancer:','        servers:','          - url: http://' + host + ':' + port]; open(out,'w').write('\\n'.join(lines) + '\\n')" "$D" "$EP_HTTP" "$EP_HTTPS" "$RESOLVER" "$SERVICE_REF" "$PSB_NAME" "$PORT" "$CFG_PATH" 2>/dev/null
+              WRC=$?
+              echo "R26_APPLY: rc=$WRC path=$CFG_PATH ep=$EP_HTTP/$EP_HTTPS resolver=$RESOLVER svc=$SERVICE_REF host=$PSB_NAME"
+              sleep 3
+            fi
+
+            CH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 18 http://$D/ 2>/dev/null); RH=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 18 http://$D/ 2>/dev/null)
+            CK=$(curl -s -o /dev/null -w "%{http_code}" --max-time 18 https://$D/ 2>/dev/null); RC_HTTPS=$?
+            TLS="UNKNOWN"; [ "$RC_HTTPS" = "0" ] && TLS="OK"
+            echo "R26_AFTER_PUBLIC: http=${CH:-000} redir=${RH:0:120} https=${CK:-000} tls=$TLS"
+
             RESULT="UNKNOWN"
             if [ "$PRX" = "NONE" ] || [ "$PSB1" = "NONE" ]; then RESULT="P0_INFRA_BROKEN"; fi
-            if [ "$PRX" != "NONE" ] && [ "$PSB1" != "NONE" ] && [ "$HTTP_LBL" = "NOT_FOUND" ] && [ "$HTTPS_LBL" = "NOT_FOUND" ]; then RESULT="P0_ROUTING_BROKEN"; fi
-            echo "R25_RESULT: $RESULT"
+            if [ "$PRX" != "NONE" ] && [ "$PSB1" != "NONE" ]; then
+              if [ "${CH:-000}" = "301" ] || [ "${CH:-000}" = "302" ] || [ "${CH:-000}" = "307" ] || [ "${CH:-000}" = "308" ]; then
+                if [ "${CK:-000}" = "200" ] || [ "${CK:-000}" = "301" ] || [ "${CK:-000}" = "302" ] || [ "${CK:-000}" = "307" ] || [ "${CK:-000}" = "308" ]; then
+                  RESULT="P0_PASS"
+                fi
+              fi
+              [ "$RESULT" = "UNKNOWN" ] && RESULT="P0_STILL_FAIL"
+            fi
+            echo "R26_RESULT: $RESULT"
           ' 2>&1)
           RC=$?
           echo "RAW_OUT<<EOF_R25" >> $GITHUB_OUTPUT
@@ -170,7 +207,10 @@ jobs:
           ROUTERS="http=$(getv R25_ROUTER_HTTP_LABEL) https=$(getv R25_ROUTER_HTTPS_LABEL)"
           PUB="http=$(getv R25_PUBLIC_HTTP) https=$(getv R25_PUBLIC_HTTPS)"
           LOC="http=$(getv R25_LOCAL_HTTP) https=$(getv R25_LOCAL_HTTPS)"
-          RES="$(getv R25_RESULT)"
+          APPLY="$(getv R26_APPLY)"
+          AFTER="$(getv R26_AFTER_PUBLIC)"
+          RES="$(getv R26_RESULT)"
+          [ -z "$RES" ] && RES="$(getv R25_RESULT)"
 
           for line in \
             "TRAEFIK: $TRAEFIK" \
@@ -179,6 +219,8 @@ jobs:
             "ROUTERS_CUSTOM_DOMAIN: $ROUTERS" \
             "TEST_PUBLIC: $PUB" \
             "TEST_LOCAL: $LOC" \
+            "APPLY: $APPLY" \
+            "AFTER_PUBLIC: $AFTER" \
             "RESULT: $RES (SSH_RC=$SSH_RC)"; do
             title="$(printf '%s' "$line" | cut -d: -f1 | head -c 60)"
             val="$(printf '%s' "$line" | cut -d: -f2- | sed 's/^[[:space:]]*//' | head -c 900)"
