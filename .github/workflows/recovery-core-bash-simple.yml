@@ -207,7 +207,7 @@ jobs:
           fi
 
       - name: "⭐ STEP 5: WEB PSB CUSTOM DOMAIN (PRIORITAS #1) - 4 FAIL_FAST VERIFY BT|NET|LABEL|APP + MULTI METHOD BACKTICK"
-        timeout-minutes: 20
+        timeout-minutes: 5
         continue-on-error: true
         run: |
           set +e
@@ -226,13 +226,10 @@ jobs:
             BT_LEN1=${#BT1}; BT_LEN2=${#BT2}; BT_LEN3=${#BT3}
             ORD1=$(ord_of "$BT1"); ORD2=$(ord_of "$BT2"); ORD3=$(ord_of "$BT3")
             [ -z "$ORD1" ] && ORD1=0; [ -z "$ORD2" ] && ORD2=0; [ -z "$ORD3" ] && ORD3=0
-            echo "  BT1 printf_hex  len=$BT_LEN1 ORD=$ORD1 (expect 96)"
-            echo "  BT2 printf_oct  len=$BT_LEN2 ORD=$ORD2 (expect 96)"
-            echo "  BT3 printf_dec  len=$BT_LEN3 ORD=$ORD3 (expect 96)"
             BT=""
-            if [ "$ORD1" -eq 96 ] && [ "$BT_LEN1" -eq 1 ]; then BT="$BT1"; echo "  ✅ PAKAI BT1 printf hex OK"; fi
-            if [ -z "$BT" ] && [ "$ORD2" -eq 96 ] && [ "$BT_LEN2" -eq 1 ]; then BT="$BT2"; echo "  ✅ PAKAI BT2 printf oct OK"; fi
-            if [ -z "$BT" ] && [ "$ORD3" -eq 96 ] && [ "$BT_LEN3" -eq 1 ]; then BT="$BT3"; echo "  ✅ PAKAI BT3 printf dec OK"; fi
+            if [ "$ORD1" -eq 96 ] && [ "$BT_LEN1" -eq 1 ]; then BT="$BT1"; fi
+            if [ -z "$BT" ] && [ "$ORD2" -eq 96 ] && [ "$BT_LEN2" -eq 1 ]; then BT="$BT2"; fi
+            if [ -z "$BT" ] && [ "$ORD3" -eq 96 ] && [ "$BT_LEN3" -eq 1 ]; then BT="$BT3"; fi
             BT_ORD=$(ord_of "$BT"); BT_LEN=${#BT}
             [ -z "$BT_ORD" ] && BT_ORD=0
             if [ "$BT_ORD" -ne 96 ] || [ "$BT_LEN" -ne 1 ]; then
@@ -258,7 +255,6 @@ jobs:
             OLD_LIST=$(docker ps -aq --format "{{.Names}}" | grep -iE "web.psb|webpsb|psb|ultrafast|fallback|recoverycore")
             [ -n "$OLD_LIST" ] && for C in $OLD_LIST; do docker rm -f $C >/dev/null 2>&1; done
             echo "[5.3] CARI & VERIFIKASI IMAGE WEB PSB"
-            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.ID}}" 2>&1 | grep -iE "psb|perkasa|web" | head -15
             IMG_PSB=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -iE "local-web-psb" | head -1)
             [ -z "$IMG_PSB" ] && IMG_PSB=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -iE "web-psb-perkasa|webpsb" | head -1)
             [ -z "$IMG_PSB" ] && IMG_PSB="ghcr.io/indrakantor87/web-psb-perkasa:latest"
@@ -278,10 +274,7 @@ jobs:
             CUSTOM_DOM="webpsb.perkasa.net.id"
             L_RULE_SSLIP="traefik.http.routers.wpssl.rule=Host(${BT}${SSLIP_DOM}${BT})"
             L_RULE_CUSTOM="traefik.http.routers.wpnetid.rule=Host(${BT}${CUSTOM_DOM}${BT})"
-            echo "  Rule SSLIP RAW: $L_RULE_SSLIP"
-            echo "  Rule Custom RAW: $L_RULE_CUSTOM"
             RULE_CUSTOM_LEN=${#L_RULE_CUSTOM}
-            echo "  Rule Custom len=$RULE_CUSTOM_LEN"
             PSB_PORT_HOST=3005
             PORT_USED=$(netstat -tln 2>/dev/null | grep -c ":$PSB_PORT_HOST " || true)
             if [ "$PORT_USED" -gt 0 ]; then
@@ -365,29 +358,21 @@ jobs:
               exit 1
             fi
             echo "  ✅ VERIFY5D OK: Container Next.js tetap running 3x poll ($POLL_OK/3 = app tidak crash)"
-            echo "  [5.4.1] FINAL DIAGNOSTIC BEFORE PROXY RESTART"
-            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1 | grep -iE "web.psb|webpsb|psb|proxy"
-            echo "  Status=$(docker inspect --format="{{.State.Status}}" "$CID" 2>/dev/null) Running=$(docker inspect --format="{{.State.Running}}" "$CID" 2>/dev/null) Exit=$(docker inspect --format="{{.State.ExitCode}}" "$CID" 2>/dev/null)"
-            echo "  LOGS last 20 app:"
-            docker logs --tail 20 "$CID" 2>&1 | tail -25
-            echo "  CURL LOCAL port $PSB_PORT_HOST:"
-            curl -sv --max-time 15 http://127.0.0.1:${PSB_PORT_HOST}/ 2>&1 | tail -15 || true
-            echo "[5.5] RESTART PROXY + WAIT 50s"
+            echo "[5.5] RESTART PROXY + WAIT 15s"
             PRX=$(docker ps -aq --format "{{.Names}}" | grep -iE coolify-proxy | head -1)
             [ -n "$PRX" ] && docker restart "$PRX" >/dev/null 2>&1
-            sleep 50
+            sleep 15
             echo "[5.6] CHECK 2 DOMAINS WEB PSB VIA TRAEFIK LOCAL"
             OKC=0; TOT=0
             check() {
               TOT=$((TOT+1))
-              code=$(curl -s -o /dev/null -w "%{http_code}" --resolve $1:80:127.0.0.1 --max-time 15 http://$1/ 2>/dev/null)
+              code=$(curl -s -o /dev/null -w "%{http_code}" --resolve $1:80:127.0.0.1 --max-time 8 http://$1/ 2>/dev/null)
               code="${code:-000}"
               case "$code" in 200|301|302|307|308) echo "    ✅ [HTTP $code] $2 => $1"; OKC=$((OKC+1)) ;; *) echo "    ❌ [HTTP $code] $2 => $1" ;; esac
             }
             check "webpsb.perkasa.net.id" "WEB PSB CUSTOM [P1]"
             check "pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io" "WEB PSB SSLIP [P2]"
             echo "  STEP5 HASIL: $OKC / $TOT"
-            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1 | grep -iE "web.psb|webpsb|psb|proxy"
             echo "STEP 5 OK"
           ' 2>&1)
           RC=$?
