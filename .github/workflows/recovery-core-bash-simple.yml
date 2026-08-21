@@ -31,6 +31,7 @@ jobs:
         id: diag_fix
         continue-on-error: true
         run: |
+          set +e
           K=${{ env.KEY }}
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
           OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
@@ -158,7 +159,7 @@ jobs:
 
               DYN_DIR=/data/coolify/proxy/dynamic
               CFG_PATH="$DYN_DIR/webpsb-perkasa.yaml"
-              python3 -c "import sys; bt=chr(96); d=sys.argv[1]; ep_http=sys.argv[2]; ep_https=sys.argv[3]; resolver=sys.argv[4]; svc_ref=sys.argv[5]; host=sys.argv[6]; port=sys.argv[7]; out=sys.argv[8]; rule='Host(' + bt + d + bt + ')'; lines=[]; lines+=['http:','  routers:','    webpsb-http:','      rule: ' + rule,'      entryPoints:','        - ' + ep_http,'      middlewares:','        - webpsb-redirect']; if svc_ref!='NONE': lines+=['      service: ' + svc_ref]; else: lines+=['      service: webpsb-svc']; lines+=['    webpsb-https:','      rule: ' + rule,'      entryPoints:','        - ' + ep_https,'      tls:','        certResolver: ' + resolver]; if svc_ref!='NONE': lines+=['      service: ' + svc_ref]; else: lines+=['      service: webpsb-svc']; lines+=['  middlewares:','    webpsb-redirect:','      redirectScheme:','        scheme: https']; if svc_ref=='NONE': lines+=['  services:','    webpsb-svc:','      loadBalancer:','        servers:','          - url: http://' + host + ':' + port]; open(out,'w').write('\\n'.join(lines) + '\\n')" "$D" "$EP_HTTP" "$EP_HTTPS" "$RESOLVER" "$SERVICE_REF" "$PSB_NAME" "$PORT" "$CFG_PATH" 2>/dev/null
+              python3 -c "import sys; bt=chr(96); d,ep_http,ep_https,resolver,svc_ref,host,port,out=sys.argv[1:9]; rule='Host(' + bt + d + bt + ')'; use_svc=(svc_ref!='NONE'); svc=(svc_ref if use_svc else 'webpsb-svc'); lines=['http:','  routers:','    webpsb-http:','      rule: ' + rule,'      entryPoints:','        - ' + ep_http,'      middlewares:','        - webpsb-redirect','      service: ' + svc,'    webpsb-https:','      rule: ' + rule,'      entryPoints:','        - ' + ep_https,'      tls:','        certResolver: ' + resolver,'      service: ' + svc,'  middlewares:','    webpsb-redirect:','      redirectScheme:','        scheme: https']; (not use_svc) and lines.extend(['  services:','    webpsb-svc:','      loadBalancer:','        servers:','          - url: http://' + host + ':' + port]); open(out,'w').write('\\n'.join(lines) + '\\n')" "$D" "$EP_HTTP" "$EP_HTTPS" "$RESOLVER" "$SERVICE_REF" "$PSB_NAME" "$PORT" "$CFG_PATH" 2>/dev/null
               WRC=$?
               echo "R26_APPLY: rc=$WRC path=$CFG_PATH ep=$EP_HTTP/$EP_HTTPS resolver=$RESOLVER svc=$SERVICE_REF host=$PSB_NAME"
               sleep 3
