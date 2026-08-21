@@ -109,17 +109,17 @@ jobs:
                 fi
                 echo ""
                 echo "  ---- LABEL DOCKER (FILTER HANYA TRAEFIK + NAME) ----"
-                docker inspect "$C" 2>/dev/null | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-labels = d[0].get('Config', {}).get('Labels', {})
-if not labels:
-    print('  NO LABELS')
-    sys.exit(0)
-for k, v in sorted(labels.items()):
-    if 'traefik' in k.lower() or 'name' in k.lower() or 'maintainer' in k.lower():
-        print(f'  LABEL: {k} = {v}')
-" 2>&1 | head -50
+                LBL_OUT=$(docker inspect "$C" 2>/dev/null | grep -iE "traefik|name|maintainer" 2>&1 | head -50)
+                if [ -z "$LBL_OUT" ]; then
+                  echo "  NO LABELS RELEVAN DITEMUKAN"
+                else
+                  LCOUNT=$(printf "%s\n" "$LBL_OUT" | wc -l | tr -d " ")
+                  echo "  (Total $LCOUNT label relevan -> raw JSON grep)"
+                  echo "  ---"
+                  printf "%s\n" "$LBL_OUT" | while IFS= read -r line; do
+                    echo "  $line"
+                  done
+                fi
                 echo ""
               done
             fi
