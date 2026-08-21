@@ -199,16 +199,53 @@ jobs:
             echo "WARNING: Step4 non-critical FAIL — LANJUTKAN Step5/6 (PRIORITAS Web PSB P1!)"
           fi
 
-      - name: "⭐ STEP 5: WEB PSB CUSTOM DOMAIN (PRIORITAS #1) - Docker run EXPLICIT 2 LABEL HOST (CUSTOM + SSLIP) dengan BACKTICK printf hex \\x60 100% BENAR"
-        timeout-minutes: 8
+      - name: "⭐ STEP 5: WEB PSB CUSTOM DOMAIN (PRIORITAS #1) - 4 FAIL_FAST VERIFY BT|NET|LABEL|APP + MULTI METHOD BACKTICK"
+        timeout-minutes: 12
         run: |
           set +e
           KEY=$HOME/.ssh/id_ed25519_coolify
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
           OUTPUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
-            echo "=== STEP 5: WEB PSB CUSTOM DOMAIN (PRIORITAS #1) - 2 LABEL HOST BACKTICK printf hex 0x60 ==="
-            BT=$(printf "\x60")
+            echo "=== STEP 5: WEB PSB CUSTOM DOMAIN (PRIORITAS #1) - 4 FAIL_FAST VERIFY + MULTI METHOD BACKTICK ==="
+            echo "[5.0] MULTI-METHOD BACKTICK EXPANSION (PILIH YANG HASIL ASCII 96)"
+            ord_of() {
+              printf "%s" "$1" | od -An -tuC | tr -d " \n"
+            }
+            BT1=$(printf "\x60")
+            BT2=$(printf "\140")
+            BT3=$(printf "\\$(printf "%03o" 96)")
+            BT_LEN1=${#BT1}; BT_LEN2=${#BT2}; BT_LEN3=${#BT3}
+            ORD1=$(ord_of "$BT1"); ORD2=$(ord_of "$BT2"); ORD3=$(ord_of "$BT3")
+            [ -z "$ORD1" ] && ORD1=0; [ -z "$ORD2" ] && ORD2=0; [ -z "$ORD3" ] && ORD3=0
+            echo "  BT1 printf_hex  len=$BT_LEN1 ORD=$ORD1 (expect 96)"
+            echo "  BT2 printf_oct  len=$BT_LEN2 ORD=$ORD2 (expect 96)"
+            echo "  BT3 printf_dec  len=$BT_LEN3 ORD=$ORD3 (expect 96)"
+            BT=""
+            if [ "$ORD1" -eq 96 ] && [ "$BT_LEN1" -eq 1 ]; then BT="$BT1"; echo "  ✅ PAKAI BT1 printf hex OK"; fi
+            if [ -z "$BT" ] && [ "$ORD2" -eq 96 ] && [ "$BT_LEN2" -eq 1 ]; then BT="$BT2"; echo "  ✅ PAKAI BT2 printf oct OK"; fi
+            if [ -z "$BT" ] && [ "$ORD3" -eq 96 ] && [ "$BT_LEN3" -eq 1 ]; then BT="$BT3"; echo "  ✅ PAKAI BT3 printf dec OK"; fi
+            BT_ORD=$(ord_of "$BT"); BT_LEN=${#BT}
+            [ -z "$BT_ORD" ] && BT_ORD=0
+            if [ "$BT_ORD" -ne 96 ] || [ "$BT_LEN" -ne 1 ]; then
+              echo "FAIL_FAST_REASON=BT_EXPAND_NOT_BACKTICK|BT_ORD=$BT_ORD|BT_LEN=$BT_LEN|ORD1=$ORD1|ORD2=$ORD2|ORD3=$ORD3"
+              exit 1
+            fi
+            echo "  ✅ VERIFY5A OK: BT FINAL ORD=$BT_ORD LEN=$BT_LEN (ASCII 96 backtick)"
+            echo "[5.1] EXTRACT ENV VARS NEXT.JS DARI CONTAINER COOLIFY LAMA (jika ada)"
+            OLD_PSB_ENV=$(docker ps -aq --format "{{.Names}}" | grep -iE "^web-psb-perkasa-|^web_psb" | head -1)
+            ENV_DATABASE_URL=""; ENV_NEXTAUTH_URL=""; ENV_JWT_SECRET=""
+            if [ -n "$OLD_PSB_ENV" ]; then
+              echo "  Ketemu container lama $OLD_PSB_ENV -> extract env vars..."
+              ENV_DATABASE_URL=$(docker inspect "$OLD_PSB_ENV" 2>/dev/null | grep -A2000 "Env\":" | grep -oE "DATABASE_URL=[^,\" ]+" | head -1 | sed "s/DATABASE_URL=//")
+              ENV_NEXTAUTH_URL=$(docker inspect "$OLD_PSB_ENV" 2>/dev/null | grep -A2000 "Env\":" | grep -oE "NEXTAUTH_URL=[^,\" ]+" | head -1 | sed "s/NEXTAUTH_URL=//")
+              ENV_JWT_SECRET=$(docker inspect "$OLD_PSB_ENV" 2>/dev/null | grep -A2000 "Env\":" | grep -oE "JWT_SECRET=[^,\" ]+" | head -1 | sed "s/JWT_SECRET=//")
+              [ -n "$ENV_DATABASE_URL" ] && echo "  ✅ DATABASE_URL ditemukan (len=${#ENV_DATABASE_URL})"
+              [ -n "$ENV_NEXTAUTH_URL" ] && echo "  ✅ NEXTAUTH_URL=$ENV_NEXTAUTH_URL"
+              [ -n "$ENV_JWT_SECRET" ] && echo "  ✅ JWT_SECRET ditemukan (len=${#ENV_JWT_SECRET})"
+            else
+              echo "  (tidak ada container lama, pakai env dasar)"
+            fi
             echo "[5.2] HAPUS CONTAINER PSB LAMA (label salah)"
             OLD_LIST=$(docker ps -aq --format "{{.Names}}" | grep -iE "web.psb|webpsb|psb|ultrafast|fallback|recoverycore")
             [ -n "$OLD_LIST" ] && for C in $OLD_LIST; do docker rm -f $C >/dev/null 2>&1; done
@@ -233,8 +270,10 @@ jobs:
             CUSTOM_DOM="webpsb.perkasa.net.id"
             L_RULE_SSLIP="traefik.http.routers.wpssl.rule=Host(${BT}${SSLIP_DOM}${BT})"
             L_RULE_CUSTOM="traefik.http.routers.wpnetid.rule=Host(${BT}${CUSTOM_DOM}${BT})"
-            echo "  Rule SSLIP : $L_RULE_SSLIP"
-            echo "  Rule Custom: $L_RULE_CUSTOM"
+            echo "  Rule SSLIP RAW: $L_RULE_SSLIP"
+            echo "  Rule Custom RAW: $L_RULE_CUSTOM"
+            RULE_CUSTOM_LEN=${#L_RULE_CUSTOM}
+            echo "  Rule Custom len=$RULE_CUSTOM_LEN"
             PSB_PORT_HOST=3005
             PORT_USED=$(netstat -tln 2>/dev/null | grep -c ":$PSB_PORT_HOST " || true)
             if [ "$PORT_USED" -gt 0 ]; then
@@ -249,7 +288,12 @@ jobs:
             echo "  Port: $PSB_PORT_HOST:3000"
             docker rm -f "$NAME" 2>/dev/null || true
             sleep 1
-            docker run -d --name "$NAME" --network coolify --restart unless-stopped -p ${PSB_PORT_HOST}:3000 -e PORT=3000 -e HOSTNAME=0.0.0.0 -e NODE_ENV=production -l "traefik.enable=true" -l "traefik.http.routers.wpssl.entryPoints=http" -l "$L_RULE_SSLIP" -l "traefik.http.services.wpssl.loadbalancer.server.port=3000" -l "traefik.http.routers.wpnetid.entryPoints=http" -l "$L_RULE_CUSTOM" -l "traefik.http.services.wpnetid.loadbalancer.server.port=3000" "$IMG_PSB" > /tmp/psb_cid.txt 2> /tmp/psb_err.txt
+            EXTRA_ENV=""
+            [ -n "$ENV_DATABASE_URL" ] && EXTRA_ENV="$EXTRA_ENV -e DATABASE_URL=$ENV_DATABASE_URL"
+            [ -n "$ENV_NEXTAUTH_URL" ] && EXTRA_ENV="$EXTRA_ENV -e NEXTAUTH_URL=$ENV_NEXTAUTH_URL"
+            [ -n "$ENV_JWT_SECRET" ] && EXTRA_ENV="$EXTRA_ENV -e JWT_SECRET=$ENV_JWT_SECRET"
+            echo "  Extra env flags: [$EXTRA_ENV]"
+            docker run -d --name "$NAME" --network coolify --restart unless-stopped -p ${PSB_PORT_HOST}:3000 -e PORT=3000 -e HOSTNAME=0.0.0.0 -e NODE_ENV=production $EXTRA_ENV -l "traefik.enable=true" -l "traefik.docker.network=coolify" -l "traefik.http.routers.wpssl.entryPoints=http" -l "$L_RULE_SSLIP" -l "traefik.http.services.wpssl.loadbalancer.server.port=3000" -l "traefik.http.routers.wpnetid.entryPoints=http" -l "$L_RULE_CUSTOM" -l "traefik.http.services.wpnetid.loadbalancer.server.port=3000" "$IMG_PSB" > /tmp/psb_cid.txt 2> /tmp/psb_err.txt
             RC=$?
             CID=$(cat /tmp/psb_cid.txt 2>/dev/null | head -1 | tr -d "\r\n")
             ERR=$(cat /tmp/psb_err.txt 2>/dev/null | tail -15 | tr -d "\r")
@@ -262,13 +306,76 @@ jobs:
               exit 1
             fi
             echo "  ✅ Docker run OK CID=${CID:0:20} | Custom: https://$CUSTOM_DOM | SSLIP: http://$SSLIP_DOM"
-            echo "  [5.4.1] DIAGNOSTIC AFTER RUN"
-            sleep 5
+            echo "  [VERIFY5B] CONTAINER ATTACH NETWORK COOLIFY"
+            sleep 3
+            NET_ID=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.NetworkID}}" "$CID" 2>/dev/null)
+            NET_IP=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" "$CID" 2>/dev/null)
+            NET_LEN=${#NET_ID}
+            echo "    NetworkID len=$NET_LEN value=[${NET_ID:0:20}...]"
+            echo "    Network coolify IP=$NET_IP"
+            if [ "$NET_LEN" -lt 5 ]; then
+              echo "FAIL_FAST_REASON=CONTAINER_NOT_ATTACH_COOLIFY_NETWORK|NET_ID_LEN=$NET_LEN|NET_ID=[$NET_ID]"
+              echo "  NETWORK LIST INSPECT:"
+              docker inspect -f "{{json .NetworkSettings.Networks}}" "$CID" 2>/dev/null
+              echo "  DOCKER NETWORK LS:"
+              docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}"
+              exit 1
+            fi
+            echo "  ✅ VERIFY5B OK: Container terdaftar di network coolify (IP=$NET_IP)"
+            echo "  [VERIFY5C] HOST RULE LABEL ASCII INSPECT (BACKTICK ORD 96 WAJIB ADA)"
+            RULE_CUSTOM_VAL=$(docker inspect -f "{{ index .Config.Labels \"traefik.http.routers.wpnetid.rule\" }}" "$CID" 2>/dev/null)
+            RULE_SSLIP_VAL=$(docker inspect -f "{{ index .Config.Labels \"traefik.http.routers.wpssl.rule\" }}" "$CID" 2>/dev/null)
+            echo "    Rule wpnetid (custom) dari docker label inspect=[$RULE_CUSTOM_VAL]"
+            echo "    Rule wpssl (sslip)   dari docker label inspect=[$RULE_SSLIP_VAL]"
+            RULE_ORD_ARRAY=""
+            FOUND_BACKTICK_CUSTOM=0
+            RC_LEN=${#RULE_CUSTOM_VAL}
+            for ((i=0;i<RC_LEN;i++)); do
+              ch="${RULE_CUSTOM_VAL:i:1}"
+              ord=$(ord_of "$ch"); [ -z "$ord" ] && ord=0
+              if [ "$ord" -eq 96 ]; then FOUND_BACKTICK_CUSTOM=$((FOUND_BACKTICK_CUSTOM+1)); fi
+              RULE_ORD_ARRAY="$RULE_ORD_ARRAY $ord"
+            done
+            echo "    Rule Custom ord array (len=$RC_LEN backtick_count=$FOUND_BACKTICK_CUSTOM):[${RULE_ORD_ARRAY:0:200}...]"
+            FOUND_BACKTICK_SSLIP=0
+            RS_LEN=${#RULE_SSLIP_VAL}
+            RULE_ORD_ARRAY2=""
+            for ((i=0;i<RS_LEN;i++)); do
+              ch="${RULE_SSLIP_VAL:i:1}"
+              ord=$(ord_of "$ch"); [ -z "$ord" ] && ord=0
+              if [ "$ord" -eq 96 ]; then FOUND_BACKTICK_SSLIP=$((FOUND_BACKTICK_SSLIP+1)); fi
+              RULE_ORD_ARRAY2="$RULE_ORD_ARRAY2 $ord"
+            done
+            echo "    Rule SSLIP ord array (len=$RS_LEN backtick_count=$FOUND_BACKTICK_SSLIP):[${RULE_ORD_ARRAY2:0:200}...]"
+            if [ "$FOUND_BACKTICK_CUSTOM" -lt 2 ] || [ "$FOUND_BACKTICK_SSLIP" -lt 2 ]; then
+              echo "FAIL_FAST_REASON=HOST_RULE_LABEL_NOT_BACKTICK|CUSTOM_BT=$FOUND_BACKTICK_CUSTOM/2|SSLIP_BT=$FOUND_BACKTICK_SSLIP/2"
+              echo "  ALL LABELS CID:"
+              docker inspect -f "{{json .Config.Labels}}" "$CID" 2>/dev/null | tr "," "\n" | grep -iE "traefik|host|rule" | head -30
+              exit 1
+            fi
+            echo "  ✅ VERIFY5C OK: Label wpnetid=$FOUND_BACKTICK_CUSTOM backtick + wpssl=$FOUND_BACKTICK_SSLIP backtick (BUKAN single/double quote!)"
+            echo "  [VERIFY5D] POLL CONTAINER RUNNING 3x 5s (CEK NEXT.JS TIDAK CRASH SETELAH START)"
+            POLL_OK=0
+            for p in 1 2 3; do
+              sleep 5
+              ST=$(docker inspect --format="{{.State.Running}}" "$CID" 2>/dev/null)
+              EX=$(docker inspect --format="{{.State.ExitCode}}" "$CID" 2>/dev/null)
+              echo "    Poll $p: Running=$ST Exit=$EX"
+              if [ "$ST" = "true" ] && [ "$EX" -eq 0 ]; then POLL_OK=$((POLL_OK+1)); fi
+            done
+            if [ "$POLL_OK" -lt 2 ]; then
+              echo "FAIL_FAST_REASON=APP_CRASH_AFTER_RUN|POLL_OK=$POLL_OK/3|Exit=$EX"
+              echo "  LAST 60 LOGS PSB:"
+              docker logs --tail 60 "$CID" 2>&1 | tail -70
+              echo "  FULL STATE:"
+              docker inspect -f "{{json .State}}" "$CID" 2>/dev/null
+              exit 1
+            fi
+            echo "  ✅ VERIFY5D OK: Container Next.js tetap running 3x poll ($POLL_OK/3 = app tidak crash)"
+            echo "  [5.4.1] FINAL DIAGNOSTIC BEFORE PROXY RESTART"
             docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1 | grep -iE "web.psb|webpsb|psb|proxy"
             echo "  Status=$(docker inspect --format="{{.State.Status}}" "$CID" 2>/dev/null) Running=$(docker inspect --format="{{.State.Running}}" "$CID" 2>/dev/null) Exit=$(docker inspect --format="{{.State.ExitCode}}" "$CID" 2>/dev/null)"
-            echo "  LABELS traefik/name:"
-            docker inspect "$CID" 2>/dev/null | grep -iE "traefik|name|maintainer" | head -20
-            echo "  LOGS last 20:"
+            echo "  LOGS last 20 app:"
             docker logs --tail 20 "$CID" 2>&1 | tail -25
             echo "  CURL LOCAL port $PSB_PORT_HOST:"
             curl -sv --max-time 15 http://127.0.0.1:${PSB_PORT_HOST}/ 2>&1 | tail -15 || true
@@ -371,3 +478,59 @@ jobs:
           echo ""
           echo "=== FLOW RECOVERY SELESAI, SEMUA CHECK OK ==="
           echo "Buka https://webpsb.perkasa.net.id -> Ctrl+Shift+R (Hard Refresh ignore cache) untuk pastikan halaman login tampil, BUKAN 'no available server'!"
+
+      - name: "⭐ STEP 7: ADVANCED DIAGNOSTIC (NETWORK COOLIFY + TRAEFIK PROVIDER + DNS) [ALWAYS RUN]"
+        if: always()
+        continue-on-error: true
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          OUTPUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+            set +e
+            echo "=== STEP 7: ADVANCED DIAGNOSTIC ALWAYS RUN (even step6 fail) ==="
+            echo "[7.1] CONTAINER DI NETWORK COOLIFY (Traefik HANYA SCAN SINI!)"
+            COOLIFY_CONTAINERS=$(docker network inspect coolify --format "{{json .Containers}}" 2>/dev/null | tr "," "\n" | grep -oE "\"Name\":\"[^\"]+\"" | head -50)
+            echo "$COOLIFY_CONTAINERS"
+            echo "  Total containers di network coolify = $(echo "$COOLIFY_CONTAINERS" | grep -c "Name")"
+            echo ""
+            echo "[7.2] PROXY (Traefik) CONFIG: docker inspect labels + mount volume"
+            PRX=$(docker ps -aq --format "{{.Names}}" | grep -iE coolify-proxy | head -1)
+            if [ -n "$PRX" ]; then
+              echo "  Proxy container = $PRX"
+              echo "  Proxy status=$(docker inspect --format="{{.State.Status}}" "$PRX" 2>/dev/null)"
+              echo "  Proxy labels (entrypoints):"
+              docker inspect -f "{{json .Config.Labels}}" "$PRX" 2>/dev/null | tr "," "\n" | grep -iE "entrypoint|http|https|traefik" | head -20
+              echo "  Proxy env vars (ACME/entrypoints?):"
+              docker inspect "$PRX" 2>/dev/null | grep -A8000 "\"Env\":" | head -30
+            fi
+            echo ""
+            echo "[7.3] DNS RESOLVE webpsb.perkasa.net.id (cek DNS domain custom)"
+            if command -v dig >/dev/null 2>&1; then
+              dig +short webpsb.perkasa.net.id 2>&1 | head -10
+            elif command -v nslookup >/dev/null 2>&1; then
+              nslookup webpsb.perkasa.net.id 2>&1 | tail -10
+            elif command -v getent >/dev/null 2>&1; then
+              getent hosts webpsb.perkasa.net.id 2>&1
+            else
+              cat /etc/resolv.conf 2>&1 | head -5
+              ping -c1 -W3 webpsb.perkasa.net.id 2>&1 | head -3 || true
+            fi
+            echo ""
+            echo "[7.4] CURL MANUAL HOST HEADER ke Traefik 127.0.0.1:80 (--resolve diganti Host header)"
+            curl -sv --max-time 15 -H "Host: webpsb.perkasa.net.id" http://127.0.0.1:80/ 2>&1 | tail -20 || true
+            echo ""
+            echo "[7.5] WEB PSB CONTAINER (if exists) -> inspect network mode + service port label"
+            PSB_NAME="webpsb-recoverycore-customdomain"
+            if docker ps -a --format "{{.Names}}" 2>/dev/null | grep -qxF "$PSB_NAME"; then
+              echo "  NetworkMode=$(docker inspect -f "{{.HostConfig.NetworkMode}}" "$PSB_NAME" 2>/dev/null)"
+              echo "  Service wpnetid port label=$(docker inspect -f "{{ index .Config.Labels \"traefik.http.services.wpnetid.loadbalancer.server.port\" }}" "$PSB_NAME" 2>/dev/null)"
+              echo "  Service wpssl port label=$(docker inspect -f "{{ index .Config.Labels \"traefik.http.services.wpssl.loadbalancer.server.port\" }}" "$PSB_NAME" 2>/dev/null)"
+              echo "  Docker network label=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" "$PSB_NAME" 2>/dev/null)"
+            fi
+            echo "STEP 7 DIAGNOSTIC COMPLETED (RC=0 always)"
+          ' 2>&1)
+          RC=$?
+          echo "$OUTPUT"
+          echo ""
+          echo "STEP 7 DIAGNOSTIC RC=$RC (non-critical, info only)"
