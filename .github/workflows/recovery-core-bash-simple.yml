@@ -1,4 +1,4 @@
-name: "RUN34 READ-ONLY: Map Coolify AppID -> rec17-webpsb-p1 (final A-F)"
+name: "RUN35 READ-ONLY: Map Coolify AppID -> rec17-webpsb-p1 (A-F + Prisma provider)"
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN34: Read-only mapping (Coolify app metadata + rec17 + Prisma)"
+      - name: "RUN35: Read-only mapping (Coolify app metadata + rec17 + Prisma)"
         id: diag_ro
         continue-on-error: true
         run: |
@@ -240,7 +240,7 @@ jobs:
                 fi
                 if [ -n \"\$pick\" ]; then
                   echo FILE:\$pick
-                  grep -E \"provider[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -1
+                  grep -E \"provider[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -5
                   grep -E \"url[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -1
                   grep -E \"directUrl[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -1
                 fi
@@ -289,7 +289,7 @@ jobs:
           printf '%s\n' "$OUT"
           echo "--- RAW OUT END ---"
 
-      - name: "RUN34: Summary (A-F + critical checks)"
+      - name: "RUN35: Summary (A-F + critical checks)"
         continue-on-error: true
         run: |
           set +eo pipefail
