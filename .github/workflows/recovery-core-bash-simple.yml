@@ -180,9 +180,15 @@ jobs:
 
           TS="$(getv R29_TS)"
           COOLIFY="$(getv R29_COOLIFY_DIR)"
-          DBFS="$(getv R29_FS_DATABASE_URL)"
-          AUTHFS1="$(getv R29_FS_NEXTAUTH_SECRET)"
-          AUTHFS2="$(getv R29_FS_AUTH_SECRET)"
+          FS_DB="$(getv R29_FS_DATABASE_URL)"
+          FS_DIRECT="$(getv R29_FS_DIRECT_URL)"
+          FS_SHADOW="$(getv R29_FS_SHADOW_DATABASE_URL)"
+          FS_PRISMA="$(getv R29_FS_PRISMA_DATABASE_URL)"
+          FS_NXU="$(getv R29_FS_NEXTAUTH_URL)"
+          FS_AUU="$(getv R29_FS_AUTH_URL)"
+          FS_NXS="$(getv R29_FS_NEXTAUTH_SECRET)"
+          FS_AUS="$(getv R29_FS_AUTH_SECRET)"
+          FS_TRUST="$(getv R29_FS_AUTH_TRUST_HOST)"
           C1="$(getv R29_CTR_rec17-webpsb-p1)"
           E1="$(getv R29_ENV_rec17-webpsb-p1)"
           C2="$(getv R29_CTR_webpsb-recoverycore-customdomain)"
@@ -192,23 +198,21 @@ jobs:
           TRAF="$(getv R29_TRAEFIK_TARGET)"
           NC="$(getv R29_NO_CHANGES)"
 
-          for line in \
-            "TS: $TS" \
-            "COOLIFY_DIR: $COOLIFY" \
-            "FS_DATABASE_URL: $DBFS" \
-            "FS_NEXTAUTH_SECRET: $AUTHFS1" \
-            "FS_AUTH_SECRET: $AUTHFS2" \
-            "CTR_rec17-webpsb-p1: $C1" \
-            "ENV_rec17-webpsb-p1: $E1" \
-            "CTR_webpsb-recoverycore-customdomain: $C2" \
-            "ENV_webpsb-recoverycore-customdomain: $E2" \
-            "CTR_web-psb-perkasa: $C3" \
-            "ENV_web-psb-perkasa: $E3" \
-            "TRAEFIK_TARGET: $TRAF" \
-            "NO_CHANGES: $NC SSH_RC=$SSH_RC"; do
-            title="$(printf '%s' "$line" | cut -d: -f1 | head -c 60)"
-            val="$(printf '%s' "$line" | cut -d: -f2- | sed 's/^[[:space:]]*//' | head -c 900)"
+          META="TS=$TS | COOLIFY_DIR=$COOLIFY | NO_CHANGES=$NC | SSH_RC=$SSH_RC"
+          FS="DATABASE_URL=$FS_DB | DIRECT_URL=$FS_DIRECT | SHADOW_DATABASE_URL=$FS_SHADOW | PRISMA_DATABASE_URL=$FS_PRISMA | NEXTAUTH_URL=$FS_NXU | AUTH_URL=$FS_AUU | NEXTAUTH_SECRET=$FS_NXS | AUTH_SECRET=$FS_AUS | AUTH_TRUST_HOST=$FS_TRUST"
+          CTRS="rec17-webpsb-p1={$C1} ; webpsb-recoverycore-customdomain={$C2} ; web-psb-perkasa={$C3}"
+          ENVS="rec17-webpsb-p1={$E1} ; webpsb-recoverycore-customdomain={$E2} ; web-psb-perkasa={$E3}"
+
+          for title in META FS CONTAINERS ENV TRAEFIK; do
+            case "$title" in
+              META) val="$META" ;;
+              FS) val="$FS" ;;
+              CONTAINERS) val="$CTRS" ;;
+              ENV) val="$ENVS" ;;
+              TRAEFIK) val="$TRAF" ;;
+            esac
+            val="$(printf '%s' "$val" | head -c 1100)"
             val_safe="$(printf '%s' "$val" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
             echo "::notice title=${title}::${val_safe}"
-            printf '%s\n' "$line"
+            printf '%s\n' "${title}: ${val}"
           done
