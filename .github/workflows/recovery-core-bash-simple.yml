@@ -1,4 +1,4 @@
-name: "RUN23 PRIORITAS 9 DATA: entrypoints proxy + labels PSB hash"
+name: "RUN24 DETECT DINAMIS by IMAGE + FIX PIPEFAIL: 9 prioritas tinggi"
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_r23:
+  diag_r24:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -19,7 +19,7 @@ jobs:
           KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
           HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
           mkdir -p $HOME/.ssh; chmod 700 $HOME/.ssh
-          K=$HOME/.ssh/id_rsa_r23
+          K=$HOME/.ssh/id_rsa_r24
           install -m 600 /dev/null $K
           printf '%s\n' "$KEY" > $K
           chmod 600 $K
@@ -27,7 +27,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "R23: 9 PRIORITAS DATA TERTINGGI → 9 annotations PERTAMA"
+      - name: "R24: DETECT DINAMIS by IMAGE → 12 PRIORITAS TERTINGGI"
         id: diag
         continue-on-error: true
         run: |
@@ -35,39 +35,81 @@ jobs:
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
           OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
-            PRX="4a311401537e"
-            PSB1="8f847eab3486"
-            PSB2="1ade45689941"
-            PSB3="230bc9dc1c21"
+            # === DETECT DINAMIS: proxy & PSB by IMAGE NAME (bukan hardcode hash) ===
+            PRX=$(docker ps --filter "ancestor=traefik:v3.6" --format "{{.ID}}" 2>/dev/null | head -1)
+            [ -z "$PRX" ] && PRX=NONE
+            echo "R24_0_PRX: $PRX"
+            PSB1=$(docker ps --filter "ancestor=local-web-psb:6f3e12e" --format "{{.ID}}" 2>/dev/null | sed -n 1p)
+            PSB2=$(docker ps --filter "ancestor=local-web-psb:6f3e12e" --format "{{.ID}}" 2>/dev/null | sed -n 2p)
+            PSB3=$(docker ps --filter "ancestor=local-web-psb:6f3e12e" --format "{{.ID}}" 2>/dev/null | sed -n 3p)
+            [ -z "$PSB1" ] && PSB1=NONE
+            [ -z "$PSB2" ] && PSB2=NONE
+            [ -z "$PSB3" ] && PSB3=NONE
+            echo "R24_0_PSB1: $PSB1"
+            echo "R24_0_PSB2: $PSB2"
+            echo "R24_0_PSB3: $PSB3"
+
+            # === H1: 8 args proxy PERTAMA (entrypoints nama + bind IP) ===
             N=0
-            for A in $(docker inspect $PRX 2>/dev/null | python3 -c "import sys,json;[print(a) for a in json.load(sys.stdin)[0].get(\"Args\",[])]" 2>/dev/null); do N=$((N+1)); [ $N -le 8 ] && echo "R23_A_PRX_ARG_${N}: $A"; done
-            NET=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" $PSB1 2>/dev/null); LAB=$(docker inspect $PSB1 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});outs=[];[outs.append(f\"{k}={v[:140]}\") for k,v in sorted(l.items()) if \"traefik.http.routers\" in k and (\".entryPoints\" in k or \".rule\" in k or \".tls\" in k or \".service\" in k or \".certresolver\" in k or \".middlewares\" in k)];print(\"|\".join(outs[:10]))" 2>/dev/null); echo "R23_B_PSB1_NET=${NET:-NONE} LABELS=${LAB:0:220}"
-            NET=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" $PSB2 2>/dev/null); LAB=$(docker inspect $PSB2 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});outs=[];[outs.append(f\"{k}={v[:140]}\") for k,v in sorted(l.items()) if \"traefik.http.routers\" in k and (\".entryPoints\" in k or \".rule\" in k or \".tls\" in k or \".service\" in k or \".certresolver\" in k or \".middlewares\" in k)];print(\"|\".join(outs[:10]))" 2>/dev/null); echo "R23_C_PSB2_NET=${NET:-NONE} LABELS=${LAB:0:220}"
-            NET=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" $PSB3 2>/dev/null); LAB=$(docker inspect $PSB3 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});outs=[];[outs.append(f\"{k}={v[:140]}\") for k,v in sorted(l.items()) if \"traefik.http.routers\" in k and (\".entryPoints\" in k or \".rule\" in k or \".tls\" in k or \".service\" in k or \".certresolver\" in k or \".middlewares\" in k)];print(\"|\".join(outs[:10]))" 2>/dev/null); echo "R23_D_PSB3_NET=${NET:-NONE} LABELS=${LAB:0:220}"
+            if [ "$PRX" != "NONE" ]; then
+              for A in $(docker inspect $PRX 2>/dev/null | python3 -c "import sys,json;[print(a) for a in json.load(sys.stdin)[0].get(\"Args\",[])]" 2>/dev/null); do N=$((N+1)); [ $N -le 8 ] && echo "R24_A_PRX_ARG_${N}: $A"; done
+            fi
+            [ $N -eq 0 ] && echo "R24_A_PRX_ARG_1: NONE (proxy not running)"
+
+            # === H1/H2/H3: 3 PSB net coolify IP + router labels entryPoints/rule/tls/certresolver/service ===
+            for IDX in 1 2 3; do
+              eval PSB=\$PSB$IDX
+              if [ "$PSB" != "NONE" ]; then
+                NET=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" $PSB 2>/dev/null)
+                LAB=$(docker inspect $PSB 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});outs=[];[outs.append(f\"{k}={v[:120]}\") for k,v in sorted(l.items()) if \"traefik.http.routers\" in k and (\".entryPoints\" in k or \".rule\" in k or \".tls\" in k or \".service\" in k or \".certresolver\" in k or \".middlewares\" in k)];print(\"|\".join(outs[:10]))" 2>/dev/null)
+                echo "R24_X${IDX}_PSB${IDX}_NET=${NET:-NONE} LABELS=${LAB:0:220}"
+              else
+                echo "R24_X${IDX}_PSB${IDX}_NET=NONE LABELS=NONE"
+              fi
+            done
+
+            # === Lokal curl resolve 127 ===
             D=webpsb.perkasa.net.id
-            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 15 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); echo "R23_E_LOCAL_HTTP_CODE=${C:-000} REDIR=${L:0:120}"
-            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:443:127.0.0.1 https://$D/ 2>/dev/null); echo "R23_F_LOCAL_HTTPS_CODE=${C:-000}"
-            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 18 http://$D/ 2>/dev/null); L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 18 http://$D/ 2>/dev/null); echo "R23_G_PUB_HTTP_CODE=${C:-000} REDIR=${L:0:120}"
-            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 18 https://$D/ 2>/dev/null); echo "R23_H_PUB_HTTPS_CODE=${C:-000}"
-            NETLBL1=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" $PSB1 2>/dev/null); NETLBL2=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" $PSB2 2>/dev/null); echo "R23_I_PSB_NET_LABELS=${NETLBL1:-EMPTY}/${NETLBL2:-EMPTY}"
+            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null)
+            L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 15 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null)
+            echo "R24_E_LOCAL_HTTP_CODE=${C:-000} REDIR=${L:0:120}"
+            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:443:127.0.0.1 https://$D/ 2>/dev/null)
+            echo "R24_F_LOCAL_HTTPS_CODE=${C:-000}"
+
+            # === Publik via DNS ===
+            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 18 http://$D/ 2>/dev/null)
+            L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 18 http://$D/ 2>/dev/null)
+            echo "R24_G_PUB_HTTP_CODE=${C:-000} REDIR=${L:0:120}"
+            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 18 https://$D/ 2>/dev/null)
+            echo "R24_H_PUB_HTTPS_CODE=${C:-000}"
+
+            # === Network label traefik.docker.network ===
+            NL1=NONE; NL2=NONE; NL3=NONE
+            [ "$PSB1" != "NONE" ] && NL1=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" $PSB1 2>/dev/null)
+            [ "$PSB2" != "NONE" ] && NL2=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" $PSB2 2>/dev/null)
+            [ -z "$NL1" ] && NL1=EMPTY
+            [ -z "$NL2" ] && NL2=EMPTY
+            echo "R24_I_PSB_NET_LABELS=${NL1}/${NL2}"
           ' 2>&1)
           RC=$?
-          echo "RAW_OUT<<EOF_R23" >> $GITHUB_OUTPUT
+          echo "RAW_OUT<<EOF_R24" >> $GITHUB_OUTPUT
           printf '%s\n' "$OUT" >> $GITHUB_OUTPUT
-          echo "EOF_R23" >> $GITHUB_OUTPUT
+          echo "EOF_R24" >> $GITHUB_OUTPUT
           echo "SSH_RC=$RC" >> $GITHUB_OUTPUT
           echo "--- RAW SERVER OUTPUT START ---"
           printf '%s\n' "$OUT"
           echo "--- RAW SERVER OUTPUT END RC=$RC ---"
 
-      - name: "R23: CONVERT to 9 ANNOTATIONS (sort: data tertinggi muncul PERTAMA)"
+      - name: "R24: ANNOTATIONS 12 item (set +eo pipefail + grep || true → TIDAK BOLEH FAIL)"
+        continue-on-error: true
         run: |
+          set +eo pipefail
           OUT="${{ steps.diag.outputs.RAW_OUT }}"
           SSH_RC="${{ steps.diag.outputs.SSH_RC }}"
           N=0; ERR_COUNT=0
-          ORDER="R23_A_ R23_B_ R23_C_ R23_D_ R23_E_ R23_F_ R23_G_ R23_H_ R23_I_"
+          ORDER="R24_0_PRX R24_0_PSB1 R24_0_PSB2 R24_0_PSB3 R24_A_ R24_X1 R24_X2 R24_X3 R24_E_ R24_F_ R24_G_ R24_H_ R24_I_"
           for PREFIX in $ORDER; do
-            LINE=$(printf '%s\n' "$OUT" | grep -E "^${PREFIX}" | head -1 | tr -d '\r' | sed 's/[[:space:]]\+$//')
+            LINE=$(printf '%s\n' "$OUT" | { grep -E "^${PREFIX}" || true; } | head -1 | tr -d '\r' | sed 's/[[:space:]]\+$//')
             [ -z "$LINE" ] && continue
             N=$((N+1)); ERR_COUNT=$((ERR_COUNT+1))
             TITLE=$(echo "$LINE" | cut -d: -f1 | head -c 100)
@@ -75,6 +117,6 @@ jobs:
             VAL_SAFE=$(printf '%s' "$VAL" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
             echo "::error title=${TITLE}::${VAL_SAFE}"
             echo "[ANN-$N $ERR_COUNT] $TITLE :: $VAL"
-            [ $ERR_COUNT -ge 9 ] && break
+            [ $ERR_COUNT -ge 13 ] && break
           done
           echo "Annotations count=$ERR_COUNT, lines=$N, SSH_RC=$SSH_RC"
