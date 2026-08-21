@@ -23,34 +23,45 @@ jobs:
           KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
           HOST_LEN=$(printf '%s' "$HOST" | wc -c | tr -d ' ')
           KEY_LEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
-          echo "HOST=$HOST USER=$USER HOST_LEN=$HOST_LEN KEY_LEN=$KEY_LEN"
-          mkdir -p $HOME/.ssh && chmod 700 $HOME/.ssh
+          echo "HOST=$HOST"
+          echo "USER=$USER"
+          echo "HOST_LEN=$HOST_LEN"
+          echo "KEY_LEN=$KEY_LEN"
+          if [ "$KEY_LEN" -lt 150 ]; then
+            echo "ERROR: SSH PRIVATE KEY KOSONG / terlalu pendek. Isi di Repo Settings > Secrets > Actions"
+            exit 1
+          fi
+          mkdir -p $HOME/.ssh
+          chmod 700 $HOME/.ssh
           KEY_FILE=$HOME/.ssh/id_ed25519_coolify
-          # KIRIM KEY LANGSUNG ke file dengan Python - TIDAK ADA shell wrap / grep / hack apapun (paling robust!)
-          python3 - <<PY > "$KEY_FILE"
-import os, sys
-with open(os.environ["KF"], "w", encoding="utf-8", newline="\n") as f:
-    f.write(os.environ["K"])
-PY
-          chmod 600 "$KEY_FILE"
+          # POLA TERBUKTI WORKING DARI recovery-core-bash-simple.yml (printf + grep wrap header/footer)
+          printf '%s\n' '-----BEGIN OPENSSH PRIVATE KEY-----' > /tmp/hdr.txt
+          printf '%s\n' '-----END OPENSSH PRIVATE KEY-----' > /tmp/tlr.txt
+          printf '%s' "$KEY" | grep -v 'OPENSSH PRIVATE KEY' | tr -d '\r' > /tmp/body.txt
+          (cat /tmp/hdr.txt; cat /tmp/body.txt; cat /tmp/tlr.txt) > $KEY_FILE
+          chmod 600 $KEY_FILE
           ls -la "$KEY_FILE"
-          echo "KEY_FILE=$KEY_FILE USER=$USER HOST=$HOST" >> $GITHUB_ENV
+          ssh -V
+          # EXPORT SEMUA KE GITHUB_ENV AGAR STEP 1 BISA PAKAI
+          echo "KEY_FILE=$KEY_FILE" >> $GITHUB_ENV
+          echo "USER=$USER" >> $GITHUB_ENV
+          echo "HOST=$HOST" >> $GITHUB_ENV
 
           # === PREFLIGHT SSH CONNECT (FAIL FAST JIKA TIDAK BISA KONEK!) ===
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $KEY_FILE"
           echo ""
           echo "=== TEST SSH Connect ke $USER@$HOST ==="
+          set +e
           RES=$(ssh $OPTS "$USER@$HOST" "echo SSH_OK_$(hostname)_$(whoami)_uptime=$(uptime | cut -c1-40)")
-          echo "  Result: $RES"
-          if [[ "$RES" != SSH_OK_* ]]; then
+          RC=$?
+          set -e
+          echo "  Result: $RES (RC=$RC)"
+          if [ $RC -ne 0 ] || [[ "$RES" != SSH_OK_* ]]; then
             echo "❌❌❌ SSH TEST GAGAL! Exit workflow sekarang ❌❌❌"
             exit 1
           fi
           echo "✅✅✅ SSH CONNECT OK - lanjut eksekusi di server ✅✅✅"
           echo "OPTS=$OPTS" >> $GITHUB_ENV
-        env:
-          K: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
-          KF: ${{ env.HOME }}/.ssh/id_ed25519_coolify
 
       - name: "⚡ 1. DOCKER RUN WEB PSB HANYA 1 CONTAINER - LABEL DENGAN printf '\\x60' (BACKTICK 100% BENAR) - FAIL JIKA ADA ERROR KONEKSI"
         timeout-minutes: 8
