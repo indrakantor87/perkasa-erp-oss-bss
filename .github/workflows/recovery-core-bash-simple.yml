@@ -1,4 +1,4 @@
-name: "⭐ RECOVERY INTI RUN17: Step per-job KECIL (anti truncate) + FIX entryPoints=web Coolify v3"
+name: "RUN18 DIAGNOSTIC: EntryPoints proxy ASLI + HTTP code redirect (SUPER KECIL anti truncate)"
 
 on:
   push:
@@ -6,31 +6,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  recovery_core:
+  diag_run18:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: "0. Precheck & Install SSH Key"
+      - name: "0. Install SSH Key"
         run: |
           set +e
           HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
           USER="${{ secrets.COOLIFY_SERVER_USER }}"
           USER="${USER:-root}"
           KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
-          HOST_LEN=$(printf '%s' "$HOST" | wc -c | tr -d ' ')
-          KEY_LEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
-          echo "HOST=$HOST"
-          echo "USER=$USER"
-          echo "HOST_LEN=$HOST_LEN"
-          echo "KEY_LEN=$KEY_LEN"
-          if [ "$KEY_LEN" -lt 150 ]; then
-            echo "ERROR: SSH PRIVATE KEY KOSONG / terlalu pendek. Isi di Repo Settings > Secrets > Actions"
-            exit 1
-          fi
           mkdir -p $HOME/.ssh
           chmod 700 $HOME/.ssh
           KEY_FILE=$HOME/.ssh/id_ed25519_coolify
@@ -42,73 +32,8 @@ jobs:
           echo "KEY_FILE=$KEY_FILE" >> $GITHUB_ENV
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
-          ssh -V
-          echo "OK: SSH key ready"
 
-      - name: "⭐ STEP 1: SSH PREFLIGHT (cek server live)"
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'uptime; df -h / | tail -1; docker ps -q 2>/dev/null | wc -l; echo PREFLIGHT_OK' 2>&1)
-          echo "$OUT"
-          RC=$?
-          echo "RC=$RC"
-          if echo "$OUT" | grep -q PREFLIGHT_OK; then echo "✅ Server reachable"; else echo "⚠️ SSH warn"; fi
-
-      - name: "⭐ STEP 2: HAPUS CONTAINER PSB LAMA (semua recovery ultrafast dll)"
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            echo "=== NETWORK coolify exist? ==="
-            NET_EXIST=$(docker network ls --format "{{.Name}}" | grep -cE "^coolify$" || true)
-            if [ "$NET_EXIST" -eq 0 ]; then
-              docker network create coolify 2>&1 | head -2
-              echo "created network coolify"
-            else
-              echo "network coolify OK"
-            fi
-            echo "=== RM OLD webpsb containers ==="
-            OLD=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE "web\.psb|webpsb|psb|ultrafast|fallback|recoverycore" | head -20)
-            [ -z "$OLD" ] && echo "tidak ada container lama" && exit 0
-            for C in $OLD; do
-              echo "  rm -f $C"
-              docker rm -f $C >/dev/null 2>&1
-            done
-            echo "DONE"
-          ' 2>&1)
-          echo "$OUT"
-          echo "RC=$?"
-
-      - name: "⭐ STEP 3: DOCKER START exited containers (Coolify asli label BACKTICK benar) [NON-CRIT]"
-        continue-on-error: true
-        timeout-minutes: 2
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            LIST=$(docker ps -aq -f status=exited -f status=created -f status=dead 2>/dev/null | head -20)
-            [ -z "$LIST" ] && echo "Tidak ada exited container" && exit 0
-            OK=0; FAIL=0; N=0
-            for C in $LIST; do
-              N=$((N+1))
-              timeout 8 docker start "$C" >/dev/null 2>&1 && OK=$((OK+1)) || FAIL=$((FAIL+1))
-            done
-            echo "Start OK=$OK FAIL=$FAIL TOTAL=$N"
-          ' 2>&1)
-          echo "$OUT"
-          echo "RC=$?"
-
-      - name: "⭐ STEP 4: RESTART COOLIFY-PROXY (Traefik) + WAIT 10s (FAST)"
-        continue-on-error: true
-        timeout-minutes: 2
+      - name: "RUN18 Step A: coolify-proxy ENTRYPOINTS ASLI (labels + args)"
         run: |
           set +e
           KEY=$HOME/.ssh/id_ed25519_coolify
@@ -116,243 +41,20 @@ jobs:
           OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
             PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1)
-            if [ -n "$PRX" ]; then
-              docker restart "$PRX" 2>&1 | head -1
-            fi
-            sleep 10
-            echo "Proxy restart OK"
+            [ -z "$PRX" ] && echo "NO_PROXY" && exit 0
+            echo "=== PROXY NAME: $PRX ==="
+            echo "--- proxy All labels (key=value): ---"
+            docker inspect "$PRX" 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);lbls=d[0].get(\"Config\",{}).get(\"Labels\",{});[print(f\"  {k}={v}\") for k,v in sorted(lbls.items())]" 2>/dev/null || echo "(python3 not avail fallback grep)"
+            docker inspect "$PRX" 2>/dev/null | grep -iE "entrypoint|address|web|http|80|443" | head -30
+            echo "--- proxy ARGS (traefik startup flags): ---"
+            docker inspect "$PRX" 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);[print(f\"  ARG: {a}\") for a in d[0].get(\"Args\",[])]" 2>/dev/null
+            echo "--- proxy CMD: ---"
+            docker inspect "$PRX" 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);print(d[0].get(\"Config\",{}).get(\"Cmd\",[]))" 2>/dev/null
           ' 2>&1)
           echo "$OUT"
           echo "RC=$?"
 
-      - name: "⭐ STEP 5A: BACKTICK (ASCII 96) generate + VERIFY (ord_of tanpa nested quote)"
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            ord_of() {
-              printf "%s" "$1" | od -An -tuC | tr -d " \n"
-            }
-            BT1=$(printf "\x60")
-            BT2=$(printf "\140")
-            BT3=$(printf "\\$(printf "%03o" 96)")
-            BT=""
-            ORD1=$(ord_of "$BT1"); ORD2=$(ord_of "$BT2"); ORD3=$(ord_of "$BT3")
-            [ -z "$ORD1" ] && ORD1=0; [ -z "$ORD2" ] && ORD2=0; [ -z "$ORD3" ] && ORD3=0
-            if [ "$ORD1" -eq 96 ] && [ "${#BT1}" -eq 1 ]; then BT="$BT1"; fi
-            if [ -z "$BT" ] && [ "$ORD2" -eq 96 ] && [ "${#BT2}" -eq 1 ]; then BT="$BT2"; fi
-            if [ -z "$BT" ] && [ "$ORD3" -eq 96 ] && [ "${#BT3}" -eq 1 ]; then BT="$BT3"; fi
-            BT_ORD=$(ord_of "$BT"); BT_LEN=${#BT}
-            [ -z "$BT_ORD" ] && BT_ORD=0
-            if [ "$BT_ORD" -ne 96 ] || [ "$BT_LEN" -ne 1 ]; then
-              echo "FAIL_BT_EXPAND ORD=$BT_ORD LEN=$BT_LEN ORD1=$ORD1 ORD2=$ORD2 ORD3=$ORD3"
-              exit 1
-            fi
-            printf "BT=%s ORD=%s LEN=%s OK\n" "$BT" "$BT_ORD" "$BT_LEN"
-            echo "$BT" > /tmp/rec17_bt.txt
-            echo "BT_SAVED=/tmp/rec17_bt.txt"
-            exit 0
-          ' 2>&1)
-          echo "$OUT"
-          RC=$?
-          echo "RC=$RC"
-          if [ "$RC" -ne 0 ] || ! echo "$OUT" | grep -qE "BT_SAVED|OK$"; then
-            echo "FAIL_FAST Step5A: backtick tidak expand ASCII 96! RC=$RC"
-          fi
-
-      - name: "⭐ STEP 5B: FIND IMAGE Web PSB + EXTRACT ALL ENV dari container Coolify lama (JANGAN cuma 3 env!)"
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            IMG=$(docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -iE "local-web-psb" | head -1)
-            [ -z "$IMG" ] && IMG=$(docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -iE "web-psb-perkasa|webpsb" | head -1)
-            [ -z "$IMG" ] && IMG="ghcr.io/indrakantor87/web-psb-perkasa:latest"
-            echo "IMG=$IMG"
-            docker image inspect "$IMG" >/dev/null 2>&1
-            [ $? -ne 0 ] && echo "FAIL_IMAGE_NOT_FOUND $IMG" && exit 1
-            echo "$IMG" > /tmp/rec17_img.txt
-            OLD=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE "^web-psb-perkasa-|^web_psb|psb" | head -1)
-            ENV_DATABASE_URL=""; ENV_NEXTAUTH_URL=""; ENV_JWT_SECRET=""
-            ENV_NEXTAUTH_SECRET=""; ENV_NEXT_PUBLIC_API_URL=""
-            ENV_REDIS_URL=""; ENV_DB_URL=""
-            if [ -n "$OLD" ]; then
-              echo "OLD_CONTAINER=$OLD -> extract ALL env vars"
-              ALL_ENV=$(docker inspect "$OLD" 2>/dev/null | grep -A500 "Env\":" | grep -oE "\"[A-Za-z_][A-Za-z0-9_]*=.*\"" | tr -d "\"" | head -100)
-              while IFS= read -r line; do
-                case "$line" in
-                  DATABASE_URL=*)   echo "  GOT $line" | cut -c1-80; ENV_DATABASE_URL="$line" ;;
-                  NEXTAUTH_URL=*)   echo "  GOT $line"; ENV_NEXTAUTH_URL="$line" ;;
-                  JWT_SECRET=*)     echo "  GOT ${line:0:30}(len=${#line})"; ENV_JWT_SECRET="$line" ;;
-                  NEXTAUTH_SECRET=*)echo "  GOT ${line:0:30}(len=${#line})"; ENV_NEXTAUTH_SECRET="$line" ;;
-                  NEXT_PUBLIC_*)    echo "  GOT $line" ;;
-                  DB_URL=*)         echo "  GOT $line" | cut -c1-80; ENV_DB_URL="$line" ;;
-                  REDIS_URL=*)      echo "  GOT $line" | cut -c1-60; ENV_REDIS_URL="$line" ;;
-                  PORT=*|HOSTNAME=*|NODE_ENV=*) echo "  skip system $line" ;;
-                  *) echo "  unknown $line" | cut -c1-60 ;;
-                esac
-              done <<< "$ALL_ENV"
-            fi
-            : > /tmp/rec17_env.txt
-            [ -n "$ENV_DATABASE_URL" ]   && echo "$ENV_DATABASE_URL"   >> /tmp/rec17_env.txt
-            [ -n "$ENV_NEXTAUTH_URL" ]   && echo "$ENV_NEXTAUTH_URL"   >> /tmp/rec17_env.txt
-            [ -n "$ENV_JWT_SECRET" ]     && echo "$ENV_JWT_SECRET"     >> /tmp/rec17_env.txt
-            [ -n "$ENV_NEXTAUTH_SECRET" ]&& echo "$ENV_NEXTAUTH_SECRET">> /tmp/rec17_env.txt
-            [ -n "$ENV_DB_URL" ]         && echo "$ENV_DB_URL"         >> /tmp/rec17_env.txt
-            [ -n "$ENV_REDIS_URL" ]      && echo "$ENV_REDIS_URL"      >> /tmp/rec17_env.txt
-            echo "ENV_FILE=/tmp/rec17_env.txt lines=$(wc -l < /tmp/rec17_env.txt)"
-          ' 2>&1)
-          echo "$OUT"
-          echo "RC=$?"
-
-      - name: "⭐ STEP 5C: TULIS LABELS KE FILE /tmp/rec17_labels.txt (--label-file TANPA escape bash!) FIX ENTRYPOINTS=WEB COOLIFY V3"
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            BT=$(cat /tmp/rec17_bt.txt 2>/dev/null)
-            CUSTOM_DOM="webpsb.perkasa.net.id"
-            SSLIP_DOM="pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io"
-            LBL=/tmp/rec17_labels.txt
-            : > $LBL
-            echo "traefik.enable=true" >> $LBL
-            echo "traefik.docker.network=coolify" >> $LBL
-            echo "traefik.http.routers.rec17_netid.entryPoints=web" >> $LBL
-            echo "traefik.http.routers.rec17_netid.rule=Host(${BT}${CUSTOM_DOM}${BT})" >> $LBL
-            echo "traefik.http.routers.rec17_netid.service=rec17_psb_svc" >> $LBL
-            echo "traefik.http.services.rec17_psb_svc.loadbalancer.server.port=3000" >> $LBL
-            echo "traefik.http.routers.rec17_sslip.entryPoints=web" >> $LBL
-            echo "traefik.http.routers.rec17_sslip.rule=Host(${BT}${SSLIP_DOM}${BT})" >> $LBL
-            echo "traefik.http.routers.rec17_sslip.service=rec17_psb_svc" >> $LBL
-            echo "=== LABEL FILE CONTENT (9 lines) ==="
-            cat $LBL
-            ord_of() {
-              printf "%s" "$1" | od -An -tuC | tr -d " \n"
-            }
-            RULE_NETID=$(grep "rec17_netid.rule=" $LBL | cut -d= -f2-)
-            BT_COUNT=$(printf "%s" "$RULE_NETID" | tr -cd "\140" | wc -c)
-            BT_COUNT_ORIG=$(echo "$RULE_NETID" | awk "{print gsub(/\x60/,\"#\")}")
-            echo "Rule_netid backtick count=$BT_COUNT (expect 2)"
-            if [ "$BT_COUNT" -lt 2 ]; then
-              echo "FAIL_LABEL_BACKTICK count=$BT_COUNT rule=[$RULE_NETID]"
-              exit 1
-            fi
-            echo "LABELS_OK count=$BT_COUNT"
-          ' 2>&1)
-          echo "$OUT"
-          RC=$?
-          echo "RC=$RC"
-          if [ "$RC" -ne 0 ] || ! echo "$OUT" | grep -q LABELS_OK; then
-            echo "FAIL_FAST Step5C: labels tidak backtick atau entryPoints salah!"
-          fi
-
-      - name: "⭐ STEP 5D: DOCKER RUN Web PSB dengan --label-file + --env-file + --network coolify (tanpa -p host expose!)"
-        continue-on-error: true
-        timeout-minutes: 3
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            NAME="rec17-webpsb-p1"
-            IMG=$(cat /tmp/rec17_img.txt 2>/dev/null)
-            [ -z "$IMG" ] && echo "FAIL no IMG saved" && exit 1
-            ENV_FLAGS=""
-            while IFS= read -r E; do
-              [ -z "$E" ] && continue
-              ENV_FLAGS="$ENV_FLAGS -e $E"
-            done < /tmp/rec17_env.txt
-            echo "ENV_FLAGS count=$(wc -l < /tmp/rec17_env.txt)"
-            docker rm -f "$NAME" >/dev/null 2>&1
-            sleep 2
-            docker run -d \
-              --name "$NAME" \
-              --network coolify \
-              --network-alias rec17-webpsb \
-              --restart unless-stopped \
-              -e PORT=3000 \
-              -e HOSTNAME=0.0.0.0 \
-              -e NODE_ENV=production \
-              $ENV_FLAGS \
-              --label-file /tmp/rec17_labels.txt \
-              "$IMG" > /tmp/rec17_cid.txt 2> /tmp/rec17_err.txt
-            RC=$?
-            CID=$(cat /tmp/rec17_cid.txt 2>/dev/null | tr -d "\r\n")
-            ERR=$(tail -5 /tmp/rec17_err.txt 2>/dev/null | tr -d "\r")
-            echo "docker run RC=$RC CID=${CID:0:20}"
-            if [ "$RC" -ne 0 ] || [ -z "$CID" ]; then
-              echo "FAIL_DOCKER_RUN RC=$RC CID=[$CID]"
-              echo "ERR last 5:"
-              printf "%s\n" "$ERR"
-              exit 1
-            fi
-            echo "$CID" > /tmp/rec17_cid_saved.txt
-            echo "NAME=$NAME" >> /tmp/rec17_cid_saved.txt
-            sleep 5
-            RUNNING=$(docker inspect --format="{{.State.Running}}" "$CID" 2>/dev/null)
-            EXIT=$(docker inspect --format="{{.State.ExitCode}}" "$CID" 2>/dev/null)
-            NET_LEN=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.NetworkID}}" "$CID" 2>/dev/null | wc -c)
-            echo "Running=$RUNNING Exit=$EXIT coolify_netid_len=$NET_LEN"
-            if [ "$RUNNING" != "true" ] || [ "$NET_LEN" -lt 5 ]; then
-              echo "FAIL_CONTAINER Running=$RUNNING NetID_len=$NET_LEN"
-              docker logs --tail 20 "$CID" 2>&1 | tail -25
-              exit 1
-            fi
-            echo "DOCKER_RUN_OK CID=${CID:0:12}"
-          ' 2>&1)
-          echo "$OUT"
-          RC=$?
-          echo "RC=$RC"
-          if [ "$RC" -ne 0 ] || ! echo "$OUT" | grep -q DOCKER_RUN_OK; then
-            echo "FAIL_FAST Step5D: container tidak running atau tidak masuk network coolify!"
-          fi
-
-      - name: "⭐ STEP 5E: RESTART PROXY + WAIT 20s (propagasi labels Traefik)"
-        continue-on-error: true
-        timeout-minutes: 2
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1)
-            [ -n "$PRX" ] && docker restart "$PRX" 2>&1 | head -1
-            sleep 20
-            echo "PROXY_RESTART_OK"
-          ' 2>&1)
-          echo "$OUT"
-          echo "RC=$?"
-
-      - name: "⭐ STEP 5F: CURL LOCAL VIA TRAEFIK Host header → webpsb.perkasa.net.id HTTP? (diagnostik internal)"
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            CUSTOM=webpsb.perkasa.net.id
-            SSLIP=pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io
-            CODE_C=$(curl -s -o /dev/null -w "%{http_code}" --resolve $CUSTOM:80:127.0.0.1 --max-time 8 http://$CUSTOM/ 2>/dev/null)
-            CODE_S=$(curl -s -o /dev/null -w "%{http_code}" --resolve $SSLIP:80:127.0.0.1 --max-time 8 http://$SSLIP/ 2>/dev/null)
-            CODE_C="${CODE_C:-000}"; CODE_S="${CODE_S:-000}"
-            echo "LOCAL_HTTP_CHECK CUSTOM=$CODE_C SSLIP=$CODE_S (expect 200/30x)"
-          ' 2>&1)
-          echo "$OUT"
-          echo "RC=$?"
-
-      - name: "⭐ STEP 6D1: FINAL CHECK D1=webpsb.perkasa.net.id (PRIORITAS #1 MUTLAK) HTTP 200/30x"
+      - name: "RUN18 Step B: HTTP code webpsb.perkasa.net.id LOCAL vs EKSTERNAL (redirect HTTPS?)"
         run: |
           set +e
           KEY=$HOME/.ssh/id_ed25519_coolify
@@ -360,176 +62,57 @@ jobs:
           OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
             D=webpsb.perkasa.net.id
-            C=$(curl -s -o /dev/null -w "%{http_code}" --resolve $D:80:127.0.0.1 --max-time 15 http://$D/ 2>/dev/null)
-            C="${C:-000}"
-            echo "D1=$D HTTP=$C"
-            case "$C" in 200|301|302|307|308) echo "D1_OK HTTP=$C" ;; *) echo "D1_FAIL HTTP=$C" && exit 1 ;; esac
+            echo "=== B1: CURL LOCAL resolve 127.0.0.1 HTTP ==="
+            curl -sL --max-time 12 -D /tmp/h_local.txt --resolve $D:80:127.0.0.1 -o /dev/null http://$D/ 2>&1
+            echo "HEADERS LOCAL (HTTP 80 ->127):"
+            head -20 /tmp/h_local.txt 2>/dev/null
+            echo "=== B2: CURL LOCAL resolve 127.0.0.1 HTTPS (skip verify) ==="
+            curl -skL --max-time 12 -D /tmp/h_local_https.txt --resolve $D:443:127.0.0.1 -o /dev/null https://$D/ 2>&1
+            echo "HEADERS LOCAL (HTTPS 443 ->127):"
+            head -20 /tmp/h_local_https.txt 2>/dev/null
+            echo "=== B3: CURL EKSTERNAL via PUBLIC IP (http://$D) ==="
+            curl -sL --max-time 15 -D /tmp/h_pub_http.txt -o /tmp/b_pub_http.txt http://$D/ 2>&1 | head -5
+            echo "HEADERS PUBLIC HTTP:"
+            head -20 /tmp/h_pub_http.txt 2>/dev/null
+            echo "BODY PUBLIC HTTP first 500 chars:"
+            cut -c1-500 /tmp/b_pub_http.txt 2>/dev/null
+            echo ""
+            echo "=== B4: CURL EKSTERNAL via PUBLIC IP (https://$D) ==="
+            curl -skL --max-time 15 -D /tmp/h_pub_https.txt -o /tmp/b_pub_https.txt https://$D/ 2>&1 | head -5
+            echo "HEADERS PUBLIC HTTPS:"
+            head -20 /tmp/h_pub_https.txt 2>/dev/null
+            echo "BODY PUBLIC HTTPS first 500 chars:"
+            cut -c1-500 /tmp/b_pub_https.txt 2>/dev/null
+            echo ""
           ' 2>&1)
           echo "$OUT"
-          RC=$?
-          echo "RC=$RC"
-          if [ "$RC" -ne 0 ]; then
-            echo ""
-            echo "==================== STEP 6D1 FAIL (Web PSB Custom Domain DOWN!) — LAST 30 LINES STEP 6D1 OUTPUT ===================="
-            printf "%s\n" "$OUT" | tail -30
-            echo "===================================================================================================================="
-            echo "❌❌❌ D1 webpsb.perkasa.net.id masih gagal → Step7 Advanced diagnostic selalu jalan (if: always())"
-          fi
-          exit $RC
+          echo "RC=$?"
 
-      - name: "⭐ STEP 6D2: FINAL CHECK ERP SSLIP HTTP"
-        continue-on-error: true
-        if: always()
+      - name: "RUN18 Step C: DNS webpsb.perkasa.net.id + container rec17 labels"
         run: |
           set +e
           KEY=$HOME/.ssh/id_ed25519_coolify
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
           OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            D=b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io
-            C=$(curl -s -o /dev/null -w "%{http_code}" --resolve $D:80:127.0.0.1 --max-time 10 http://$D/ 2>/dev/null)
-            C="${C:-000}"; echo "D2=ERP HTTP=$C"
-            case "$C" in 200|301|302|307|308) exit 0 ;; *) exit 1 ;; esac
+            set +e
+            D=webpsb.perkasa.net.id
+            echo "=== C1: DNS resolve $D ==="
+            if command -v dig >/dev/null 2>&1; then dig +short $D | head -5
+            elif command -v nslookup >/dev/null 2>&1; then nslookup $D 2>&1 | tail -10
+            elif command -v getent >/dev/null 2>&1; then getent hosts $D
+            else ping -c1 -W2 $D 2>&1 | head -3; fi
+            echo "=== C2: REC17 container list ==="
+            docker ps -a --format "{{.Names}} {{.Status}}" 2>/dev/null | grep -iE rec17
+            echo "=== C3: REC17 labels traefik ==="
+            CID=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE rec17-webpsb | head -1)
+            if [ -n "$CID" ]; then
+              echo "Container: $CID"
+              docker inspect "$CID" 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);lbls=d[0].get(\"Config\",{}).get(\"Labels\",{});[print(f\"  {k}={v}\") for k,v in sorted(lbls.items()) if \"traefik\" in k.lower()]" 2>/dev/null
+              echo "NetworkMode:"
+              docker inspect -f "{{.HostConfig.NetworkMode}}" "$CID" 2>/dev/null
+              echo "coolify network IP:"
+              docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" "$CID" 2>/dev/null
+            fi
           ' 2>&1)
-          echo "$OUT"; echo "RC=$?"
-
-      - name: "⭐ STEP 6D3: FINAL CHECK LANDING SSLIP HTTP"
-        continue-on-error: true
-        if: always()
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            D=uw0gsooko48kwgwogk8wc8gs.103.162.17.178.sslip.io
-            C=$(curl -s -o /dev/null -w "%{http_code}" --resolve $D:80:127.0.0.1 --max-time 10 http://$D/ 2>/dev/null)
-            C="${C:-000}"; echo "D3=LANDING HTTP=$C"
-            case "$C" in 200|301|302|307|308) exit 0 ;; *) exit 1 ;; esac
-          ' 2>&1)
-          echo "$OUT"; echo "RC=$?"
-
-      - name: "⭐ STEP 6D4: FINAL CHECK FINANCE SSLIP HTTP"
-        continue-on-error: true
-        if: always()
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            D=h4ow4sw0k04ksgsgskcwoow8.103.162.17.178.sslip.io
-            C=$(curl -s -o /dev/null -w "%{http_code}" --resolve $D:80:127.0.0.1 --max-time 10 http://$D/ 2>/dev/null)
-            C="${C:-000}"; echo "D4=FINANCE HTTP=$C"
-            case "$C" in 200|301|302|307|308) exit 0 ;; *) exit 1 ;; esac
-          ' 2>&1)
-          echo "$OUT"; echo "RC=$?"
-
-      - name: "⭐ STEP 6D5: FINAL CHECK GA WEB SSLIP HTTP"
-        continue-on-error: true
-        if: always()
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            D=ikgc8kkwcc08kkgkskc0gwg4.103.162.17.178.sslip.io
-            C=$(curl -s -o /dev/null -w "%{http_code}" --resolve $D:80:127.0.0.1 --max-time 10 http://$D/ 2>/dev/null)
-            C="${C:-000}"; echo "D5=GAWEB HTTP=$C"
-            case "$C" in 200|301|302|307|308) exit 0 ;; *) exit 1 ;; esac
-          ' 2>&1)
-          echo "$OUT"; echo "RC=$?"
-
-      - name: "⭐ STEP 6D6: FINAL CHECK D6=Web PSB SSLIP HTTP 200/30x"
-        continue-on-error: true
-        if: always()
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            D=pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io
-            C=$(curl -s -o /dev/null -w "%{http_code}" --resolve $D:80:127.0.0.1 --max-time 10 http://$D/ 2>/dev/null)
-            C="${C:-000}"; echo "D6=WEB_PSB_SSLIP HTTP=$C"
-            case "$C" in 200|301|302|307|308) exit 0 ;; *) exit 1 ;; esac
-          ' 2>&1)
-          echo "$OUT"; echo "RC=$?"
-
-      - name: "⭐ STEP 7A: DIAGNOSTIC: Containers di network coolify (Traefik hanya lihat ini!)"
-        if: always()
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            echo "=== [7A] containers di network coolify ==="
-            docker network inspect coolify --format "{{json .Containers}}" 2>/dev/null | tr "," "\n" | grep -oE "\"Name\":\"[^\"]+\"" | head -50
-            echo "=== REC17 container status ==="
-            CID=$(cat /tmp/rec17_cid_saved.txt 2>/dev/null | head -1)
-            [ -n "$CID" ] && docker inspect -f "Name={{.Name}} Status={{.State.Status}} Running={{.State.Running}} coolifyIP={{.NetworkSettings.Networks.coolify.IPAddress}}" "$CID" 2>/dev/null
-          ' 2>&1)
-          echo "$OUT"; echo "RC=$?"
-
-      - name: "⭐ STEP 7B: DIAGNOSTIC: coolify-proxy entryPoints (apakah bernama web atau http?!)"
-        if: always()
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1)
-            [ -z "$PRX" ] && echo "NO PROXY FOUND" && exit 0
-            echo "=== [7B] PROXY $PRX labels traefik ==="
-            docker inspect -f "{{json .Config.Labels}}" "$PRX" 2>/dev/null | tr "," "\n" | grep -iE "entrypoint|http|https|traefik|websecure" | head -30
-            echo "=== PROXY args / cmd entrypoints ==="
-            docker inspect "$PRX" 2>/dev/null | grep -A10 "Cmd\":" | head -20
-            docker inspect "$PRX" 2>/dev/null | grep -A20 "Args\":" | head -25
-          ' 2>&1)
-          echo "$OUT"; echo "RC=$?"
-
-      - name: "⭐ STEP 7C: DIAGNOSTIC: DNS resolve webpsb.perkasa.net.id = 103.162.17.178?"
-        if: always()
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            echo "=== [7C] DNS webpsb.perkasa.net.id ==="
-            if command -v dig >/dev/null 2>&1; then dig +short webpsb.perkasa.net.id 2>&1 | head -10
-            elif command -v nslookup >/dev/null 2>&1; then nslookup webpsb.perkasa.net.id 2>&1 | tail -8
-            elif command -v getent >/dev/null 2>&1; then getent hosts webpsb.perkasa.net.id 2>&1
-            else ping -c1 -W2 webpsb.perkasa.net.id 2>&1 | head -3; fi
-          ' 2>&1)
-          echo "$OUT"; echo "RC=$?"
-
-      - name: "⭐ STEP 7D: DIAGNOSTIC: curl Host: webpsb.perkasa.net.id langsung ke Traefik 127.0.0.1:80"
-        if: always()
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            echo "=== [7D] curl -sv Host header ==="
-            curl -sv --max-time 15 -H "Host: webpsb.perkasa.net.id" http://127.0.0.1:80/ 2>&1 | tail -25
-          ' 2>&1)
-          echo "$OUT"; echo "RC=$?"
-
-      - name: "⭐ STEP 7E: DIAGNOSTIC: rec17-webpsb-p1 labels (verifikasi rule backtick & entryPoints=web)"
-        if: always()
-        continue-on-error: true
-        run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            CID=$(cat /tmp/rec17_cid_saved.txt 2>/dev/null | head -1)
-            [ -z "$CID" ] && echo "NO CID" && exit 0
-            echo "=== [7E] REC17 PSB container labels Traefik ==="
-            docker inspect -f "{{json .Config.Labels}}" "$CID" 2>/dev/null | tr "," "\n" | grep -iE "traefik|rec17|rule|entryPoints|network" | head -30
-            echo "=== REC17 network label ==="
-            docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" "$CID" 2>/dev/null
-            echo "=== REC17 hostmode NetworkMode ==="
-            docker inspect -f "{{.HostConfig.NetworkMode}}" "$CID" 2>/dev/null
-          ' 2>&1)
-          echo "$OUT"; echo "RC=$?"
+          echo "$OUT"
+          echo "RC=$?"
