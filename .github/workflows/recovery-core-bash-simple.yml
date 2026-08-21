@@ -177,7 +177,8 @@ jobs:
             echo "WARNING: Step3 non-critical FAIL — LANJUTKAN Step4/5/6 (PRIORITAS Web PSB P1!)"
           fi
 
-      - name: "⭐ STEP 4: RESTART COOLIFY-PROXY (Traefik) AGAR RELOAD DYNAMIC CONFIG + WAIT 45s"
+      - name: "⭐ STEP 4: RESTART COOLIFY-PROXY (Traefik) AGAR RELOAD DYNAMIC CONFIG + WAIT 10s"
+        timeout-minutes: 2
         continue-on-error: true
         run: |
           set +e
@@ -185,12 +186,12 @@ jobs:
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
           OUTPUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
-            echo "=== STEP 4: RESTART COOLIFY-PROXY + WAIT 45s ==="
+            echo "=== STEP 4: RESTART COOLIFY-PROXY + WAIT 10s (FAST) ==="
             PRX=$(docker ps -aq --format "{{.Names}}" | grep -iE coolify-proxy | head -1)
-            [ -n "$PRX" ] && docker restart "$PRX" 2>&1 | head -2
-            sleep 45
-            echo "=== Final container list UP ==="
-            docker ps --format "table {{.Names}}\t{{.Status}}" 2>&1 | head -30
+            [ -n "$PRX" ] && docker restart "$PRX" 2>&1 | head -1
+            sleep 10
+            echo "=== Running containers 5 ==="
+            docker ps -q 2>&1 | head -5
             echo "STEP 4 OK"
           ' 2>&1)
           RC=$?
