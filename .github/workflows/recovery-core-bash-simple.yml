@@ -70,19 +70,7 @@ jobs:
               PIMG=$(docker inspect -f "{{.Config.Image}}" "$PSB1" 2>/dev/null); echo "R25_PSB_IMAGE: ${PIMG:-unknown}"
             fi
 
-            PORT=$(docker image inspect local-web-psb:6f3e12e 2>/dev/null | python3 -c "
-import sys, json
-try:
-  d = json.load(sys.stdin)[0]
-  ports = (d.get(\"Config\") or {}).get(\"ExposedPorts\") or {}
-  for k in ports.keys():
-    p = k.split(\"/\",1)[0]
-    if p.isdigit():
-      print(p); raise SystemExit(0)
-except Exception:
-  pass
-print(\"3000\")
-" 2>/dev/null | head -1)
+            PORT=$(docker image inspect local-web-psb:6f3e12e 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin)[0]; ports=(d.get(\"Config\") or {}).get(\"ExposedPorts\") or {}; c=[k.split(\"/\",1)[0] for k in ports.keys() if k.split(\"/\",1)[0].isdigit()]; print(c[0] if c else \"3000\")" 2>/dev/null | head -1)
             PORT=${PORT:-3000}
             echo "R25_PORT: $PORT"
 
