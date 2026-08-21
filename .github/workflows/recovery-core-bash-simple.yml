@@ -1,4 +1,4 @@
-name: "RUN29 READ-ONLY: Locate WebPSB DATABASE_URL in Coolify Metadata"
+name: "RUN30 READ-ONLY: Map Coolify AppID -> rec17-webpsb-p1"
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_r29:
+  diag_r30:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -27,7 +27,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN29: Read-only env locator (Coolify metadata + containers + Traefik target)"
+      - name: "RUN30: Read-only mapping (Coolify app metadata + rec17 + Prisma)"
         id: diag_ro
         continue-on-error: true
         run: |
@@ -36,138 +36,229 @@ jobs:
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
           OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
-            D=webpsb.perkasa.net.id
-            NOW=$(date -u +%FT%TZ 2>/dev/null); NOW=${NOW:-unknown}; echo "R29_TS: $NOW"
+            APP1=qpwsfd82uqkae83wmgjsapie
+            APP2=pic3vleasj465ooh77ioicw6
+            APP3=b8qxcx7nu5nfvcygs1gg1fyt
+            APPS="$APP1 $APP2 $APP3"
 
             DB_VARS="DATABASE_URL DIRECT_URL SHADOW_DATABASE_URL PRISMA_DATABASE_URL"
             AUTH_VARS="NEXTAUTH_SECRET NEXTAUTH_URL AUTH_SECRET AUTH_URL AUTH_TRUST_HOST"
-            URL_VARS="DATABASE_URL DIRECT_URL SHADOW_DATABASE_URL PRISMA_DATABASE_URL NEXTAUTH_URL AUTH_URL"
             ALL_VARS="$DB_VARS $AUTH_VARS"
 
             root=/data/coolify
-            if [ -d "$root" ]; then
-              echo "R29_COOLIFY_DIR: FOUND path=$root"
-            else
-              echo "R29_COOLIFY_DIR: NOT_FOUND path=$root"
-            fi
+            NOW=$(date -u +%FT%TZ 2>/dev/null); NOW=${NOW:-unknown}
 
             redact_url() {
-              python3 -c "import sys,re; u=sys.argv[1].strip(); u=re.sub(r\"(\\w+://)([^/@]+@)\", r\"\\1REDACTED@\", u); u=re.sub(r\"([?&](?:password|passwd|pass|token|secret)=[^&#]*)\", r\"\\1REDACTED\", u, flags=re.I); print(u)" "$1" 2>/dev/null | tr -d "\r\n" | head -c 220
+              python3 -c "import sys,re; u=sys.argv[1].strip(); u=re.sub(r\"(\\w+://)([^/@]+@)\", r\"\\1REDACTED@\", u); print(u)" "$1" 2>/dev/null | tr -d "\r\n" | head -c 220
             }
 
-            scan_var_files() {
-              v="$1"
-              [ ! -d "$root" ] && echo "R29_FS_${v}: NOT_FOUND root_missing" && return 0
-              files=$(grep -RIl "$v" "$root" 2>/dev/null | head -n 8 | tr "\n" " " | sed "s/[[:space:]]\+$//")
-              if [ -z "$files" ]; then
-                echo "R29_FS_${v}: NOT_FOUND"
-                return 0
-              fi
-
-              hit=$(grep -RIn -m 1 -E "^[[:space:]]*${v}[[:space:]]*=" "$root" 2>/dev/null | head -1)
-              if [ -n "$hit" ]; then
-                f=$(printf "%s" "$hit" | cut -d: -f1)
-                if printf "%s\n" "$URL_VARS" | grep -w "$v" >/dev/null 2>&1; then
-                  val=$(printf "%s" "$hit" | cut -d: -f3- | sed -E "s/^[^=]*=//")
-                  red=$(redact_url "$val")
-                  [ -z "$red" ] && red="(redacted_unavailable)"
-                  echo "R29_FS_${v}: FOUND file=$f redacted=$red"
-                else
-                  echo "R29_FS_${v}: FOUND file=$f"
-                fi
-              else
-                echo "R29_FS_${v}: FOUND files=${files:0:260}"
-              fi
+            has_key_in_envfile() {
+              f="$1"; k="$2"
+              [ -f "$f" ] || return 1
+              grep -q -E "^[[:space:]]*${k}[[:space:]]*=" "$f" 2>/dev/null
             }
 
-            for v in $ALL_VARS; do
-              scan_var_files "$v"
+            envfile_redacted_url() {
+              f="$1"; k="$2"
+              [ -f "$f" ] || return 0
+              line=$(grep -E "^[[:space:]]*${k}[[:space:]]*=" "$f" 2>/dev/null | head -1)
+              [ -z "$line" ] && return 0
+              val=$(printf "%s\n" "$line" | sed -E "s/^[^=]*=//")
+              redact_url "$val"
+            }
+
+            envfile_scheme() {
+              f="$1"; k="$2"
+              python3 -c "import sys,re,os; p=sys.argv[1]; k=sys.argv[2];\nif not os.path.exists(p):\n  print(\"unknown\"); raise SystemExit\nfor ln in open(p,\"r\",errors=\"ignore\"):\n  if re.match(r\"^\\s*\"+re.escape(k)+r\"\\s*=\", ln):\n    v=ln.split(\"=\",1)[1].strip().strip(\"\\\"'\");\n    m=re.match(r\"^([a-zA-Z0-9_+.-]+)://\", v);\n    print((m.group(1) if m else \"unknown\"));\n    raise SystemExit\nprint(\"unknown\")" "$f" "$k" 2>/dev/null | tr -d "\r\n" | head -c 40
+            }
+
+            container_exists() {
+              docker ps -a --filter "name=^/$1$" --format "{{.ID}}" 2>/dev/null | head -1
+            }
+
+            container_labels() {
+              docker inspect -f "{{range \$k, \$v := .Config.Labels}}{{println \$k \"=\" \$v}}{{end}}" "$1" 2>/dev/null
+            }
+
+            container_env_keys() {
+              docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$1" 2>/dev/null | awk -F= "{print \$1}" | sort -u
+            }
+
+            app_name_from_dir() {
+              dir="$1"
+              n=$(grep -RIn -m 1 -E "\"name\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" "$dir" 2>/dev/null | head -1 | sed -E "s/.*\"name\"[[:space:]]*:[[:space:]]*\"([^\"]+)\".*/\\1/")
+              [ -z "$n" ] && n=$(grep -RIn -m 1 -E "^[[:space:]]*name:[[:space:]]+" "$dir" 2>/dev/null | head -1 | sed -E "s/^[^:]*:[^:]*:[[:space:]]*name:[[:space:]]*//")
+              [ -z "$n" ] && n="(unknown)"
+              printf "%s" "$n" | tr -d "\r\n" | head -c 120
+            }
+
+            app_domain_from_dir() {
+              dir="$1"
+              d=$(grep -RIn -m 1 -E "webpsb\\.perkasa\\.net\\.id|[a-z0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.sslip\\.io" "$dir" 2>/dev/null | head -1 | sed -E "s/.*(webpsb\\.perkasa\\.net\\.id|[a-z0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.sslip\\.io).*/\\1/")
+              [ -z "$d" ] && d="(unknown)"
+              printf "%s" "$d" | tr -d "\r\n" | head -c 160
+            }
+
+            app_image_from_dir() {
+              dir="$1"
+              img=$(grep -RIn -m 1 -E "^[[:space:]]*image:[[:space:]]+" "$dir" 2>/dev/null | head -1 | sed -E "s/^[^:]*:[^:]*:[[:space:]]*image:[[:space:]]*//")
+              [ -z "$img" ] && img=$(grep -RIn -m 1 -E "local-web-psb:" "$dir" 2>/dev/null | head -1 | sed -E "s/.*(local-web-psb:[a-z0-9]+).*/\\1/")
+              [ -z "$img" ] && img="(unknown)"
+              printf "%s" "$img" | tr -d "\r\n" | head -c 140
+            }
+
+            echo "R30_TS: $NOW"
+            if [ -d "$root" ]; then
+              echo "R30_COOLIFY_DIR: FOUND"
+            else
+              echo "R30_COOLIFY_DIR: NOT_FOUND"
+            fi
+
+            REC17_CID=$(container_exists "rec17-webpsb-p1"); REC17_CID=${REC17_CID:-NONE}
+            if [ "$REC17_CID" = "NONE" ]; then
+              echo "R30_REC17_CONTAINER: NOT_FOUND"
+            else
+              echo "R30_REC17_CONTAINER: FOUND id=${REC17_CID:0:12}"
+            fi
+
+            REC17_APPID="UNKNOWN"
+            if [ "$REC17_CID" != "NONE" ]; then
+              LBL=$(container_labels "$REC17_CID")
+              for a in $APPS; do
+                printf "%s\n" "$LBL" | grep -F "$a" >/dev/null 2>&1 && REC17_APPID="$a" && break
+              done
+            fi
+            echo "R30_REC17_SOURCE_APPID: $REC17_APPID"
+
+            map_containers_for_app() {
+              aid="$1"
+              out=""
+              for nm in rec17-webpsb-p1 webpsb-recoverycore-customdomain web-psb-perkasa; do
+                cid=$(container_exists "$nm"); [ -z "$cid" ] && continue
+                lbl=$(container_labels "$cid")
+                printf "%s\n" "$lbl" | grep -F "$aid" >/dev/null 2>&1 && out="${out}${nm} "
+              done
+              [ -z "$out" ] && out="(none)"
+              printf "%s" "$out" | head -c 220
+            }
+
+            for aid in $APPS; do
+              dir="$root/applications/$aid"
+              if [ ! -d "$dir" ]; then
+                echo "R30_APP_${aid}: NOT_FOUND"
+                continue
+              fi
+
+              nm=$(app_name_from_dir "$dir")
+              dom=$(app_domain_from_dir "$dir")
+              img=$(app_image_from_dir "$dir")
+              ctrs=$(map_containers_for_app "$aid")
+              rel="NO"
+              [ "$aid" = "$REC17_APPID" ] && rel="YES"
+              echo "R30_APP_${aid}: FOUND name=${nm} domain=${dom} image=${img} containers=${ctrs} rel_rec17=${rel}"
             done
 
-            ctr_check() {
-              nm="$1"
-              id=$(docker ps -a --filter "name=^/${nm}$" --format "{{.ID}}" 2>/dev/null | head -1)
-              if [ -z "$id" ]; then
-                echo "R29_CTR_${nm}: NOT_FOUND"
-                return 0
-              fi
-
-              st=$(docker inspect -f "{{.State.Status}}" "$id" 2>/dev/null)
-              img=$(docker inspect -f "{{.Config.Image}}" "$id" 2>/dev/null)
-              ip=$(docker inspect -f "{{with index .NetworkSettings.Networks \"coolify\"}}{{.IPAddress}}{{end}}" "$id" 2>/dev/null)
-              [ -z "$ip" ] && ip="(none)"
-              echo "R29_CTR_${nm}: FOUND id=${id:0:12} st=${st:-unknown} img=${img:-unknown} ip=$ip"
-
-              envk=$(docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$id" 2>/dev/null | awk -F= "{print \$1}" | sort -u | tr "\n" " ")
-              [ -z "$envk" ] && envk="(none)"
-
-              line=""
+            REC17_ENV_LINE=""
+            if [ "$REC17_CID" != "NONE" ]; then
+              keys=$(container_env_keys "$REC17_CID" | tr "\n" " " | sed "s/[[:space:]]\+$//")
               for v in $ALL_VARS; do
                 found="NOT_FOUND"
-                printf "%s\n" "$envk" | grep -w "$v" >/dev/null 2>&1 && found="FOUND"
-                line="${line}${v}=${found} "
+                printf "%s\n" "$keys" | grep -w "$v" >/dev/null 2>&1 && found="FOUND"
+                REC17_ENV_LINE="${REC17_ENV_LINE}${v}=${found} "
               done
-              echo "R29_ENV_${nm}: ${line:0:880}"
-
-              lbl=$(docker inspect -f "{{range \$k, \$v := .Config.Labels}}{{println \$k \"=\" \$v}}{{end}}" "$id" 2>/dev/null | grep -F "$D" 2>/dev/null | head -n 3 | tr "\n" ";" | head -c 260)
-              if [ -n "$lbl" ]; then
-                echo "R29_LABEL_MATCH_${nm}: FOUND"
-              else
-                echo "R29_LABEL_MATCH_${nm}: NOT_FOUND"
-              fi
-            }
-
-            ctr_check "rec17-webpsb-p1"
-            ctr_check "webpsb-recoverycore-customdomain"
-            ctr_check "web-psb-perkasa"
-
-            PSB_IDS=$(docker ps --filter "ancestor=local-web-psb:6f3e12e" --format "{{.ID}}" 2>/dev/null | tr "\n" " " | sed "s/[[:space:]]\+$//"); PSB_IDS=${PSB_IDS:-NONE}
-            if [ "$PSB_IDS" = "NONE" ]; then
-              echo "R29_PSB_BY_IMAGE: NOT_FOUND"
             else
-              meta=$(docker ps --filter "ancestor=local-web-psb:6f3e12e" --format "{{.ID}} {{.Names}}" 2>/dev/null | tr "\n" " " | sed "s/[[:space:]]\+$//")
-              echo "R29_PSB_BY_IMAGE: FOUND ${meta:0:260}"
+              REC17_ENV_LINE="(container_missing)"
             fi
+            echo "R30_REC17_ENV_KEYS: ${REC17_ENV_LINE:0:900}"
 
-            DYN=/data/coolify/proxy/dynamic
-            if [ -d "$DYN" ]; then
-              dyn_hits=$(grep -RIl "$D" "$DYN" 2>/dev/null | head -n 6 | tr "\n" " " | sed "s/[[:space:]]\+$//")
-              if [ -z "$dyn_hits" ]; then
-                echo "R29_TRAEFIK_TARGET: NOT_FOUND in=$DYN"
+            DB_SRC="NOT_FOUND"
+            DB_SRC_APP="UNKNOWN"
+            DB_SRC_FILE="(none)"
+            DB_SRC_REDACTED="(none)"
+            DB_SRC_SCHEME="unknown"
+            if [ "$REC17_APPID" != "UNKNOWN" ]; then
+              f="$root/applications/$REC17_APPID/.env"
+              if has_key_in_envfile "$f" "DATABASE_URL"; then
+                DB_SRC="FOUND"
+                DB_SRC_APP="$REC17_APPID"
+                DB_SRC_FILE="$f"
+                DB_SRC_REDACTED=$(envfile_redacted_url "$f" "DATABASE_URL")
+                DB_SRC_SCHEME=$(envfile_scheme "$f" "DATABASE_URL")
               else
-                f=$(printf "%s\n" "$dyn_hits" | awk "{print \$1}")
-                svc=$(grep -E "^[[:space:]]*service:[[:space:]]*" "$f" 2>/dev/null | head -1 | sed -E "s/^[[:space:]]*service:[[:space:]]*//" | head -c 120)
-                url=$(grep -E "^[[:space:]]*-[[:space:]]*url:[[:space:]]*http" "$f" 2>/dev/null | head -1 | sed -E "s/.*url:[[:space:]]*//" | tr -d "\r\n" | head -c 180)
-                [ -z "$svc" ] && svc="(unknown)"
-                [ -z "$url" ] && url="(none)"
-                target="(unknown)"
-                if printf "%s" "$url" | grep -q "^http://"; then
-                  hip=$(printf "%s" "$url" | sed -E "s#^http://([^:/]+).*#\1#")
-                  for nm in rec17-webpsb-p1 webpsb-recoverycore-customdomain web-psb-perkasa; do
-                    cid=$(docker ps -a --filter "name=^/${nm}$" --format "{{.ID}}" 2>/dev/null | head -1)
-                    [ -z "$cid" ] && continue
-                    cip=$(docker inspect -f "{{with index .NetworkSettings.Networks \"coolify\"}}{{.IPAddress}}{{end}}" "$cid" 2>/dev/null)
-                    [ -n "$cip" ] && [ "$cip" = "$hip" ] && target="$nm" && break
-                  done
-                fi
-                echo "R29_TRAEFIK_TARGET: FOUND file=$f service=$svc backend=$url maps_to=$target"
+                DB_SRC="NOT_FOUND"
+                DB_SRC_APP="$REC17_APPID"
+                DB_SRC_FILE="$f"
               fi
-            else
-              echo "R29_TRAEFIK_TARGET: NOT_FOUND dir_missing=$DYN"
             fi
+            echo "R30_REC17_DB_ENVFILE: status=${DB_SRC} app=${DB_SRC_APP} file=${DB_SRC_FILE} scheme=${DB_SRC_SCHEME} redacted=${DB_SRC_REDACTED}"
 
-            echo "R29_NO_CHANGES: YES"
+            AUTH_SRC="NOT_FOUND"
+            AUTH_SRC_APP="UNKNOWN"
+            AUTH_SRC_FILE="(none)"
+            if [ "$REC17_APPID" != "UNKNOWN" ]; then
+              f="$root/applications/$REC17_APPID/.env"
+              if has_key_in_envfile "$f" "NEXTAUTH_SECRET" || has_key_in_envfile "$f" "AUTH_SECRET"; then
+                AUTH_SRC="FOUND"
+                AUTH_SRC_APP="$REC17_APPID"
+                AUTH_SRC_FILE="$f"
+              else
+                AUTH_SRC="NOT_FOUND"
+                AUTH_SRC_APP="$REC17_APPID"
+                AUTH_SRC_FILE="$f"
+              fi
+            fi
+            echo "R30_REC17_AUTH_ENVFILE: status=${AUTH_SRC} app=${AUTH_SRC_APP} file=${AUTH_SRC_FILE}"
+
+            PR_PROVIDER="UNKNOWN"
+            PR_DBURL="NO"
+            PR_DIRECT="NO"
+            if [ "$REC17_CID" != "NONE" ]; then
+              PR_OUT=$(docker exec "$REC17_CID" /bin/sh -c "for p in /app/prisma/schema.prisma /prisma/schema.prisma /usr/src/app/prisma/schema.prisma /workspace/prisma/schema.prisma; do if [ -f \\\"\\$p\\\" ]; then echo FILE:\\$p; grep -E \\\"provider[[:space:]]*=\\\" \\\"\\$p\\\" 2>/dev/null | head -1; grep -E \\\"url[[:space:]]*=\\\" \\\"\\$p\\\" 2>/dev/null | head -1; grep -E \\\"directUrl[[:space:]]*=\\\" \\\"\\$p\\\" 2>/dev/null | head -1; break; fi; done" 2>/dev/null | tr -d "\r")
+              PR_PROVIDER=$(printf "%s\n" "$PR_OUT" | grep -E "provider[[:space:]]*=" 2>/dev/null | head -1 | sed -E "s/.*provider[[:space:]]*=[[:space:]]*\\\"([^\\\"]+)\\\".*/\\1/")
+              [ -z "$PR_PROVIDER" ] && PR_PROVIDER="UNKNOWN"
+              printf "%s\n" "$PR_OUT" | grep -E "url[[:space:]]*=" 2>/dev/null | grep -F "DATABASE_URL" >/dev/null 2>&1 && PR_DBURL="YES"
+              printf "%s\n" "$PR_OUT" | grep -E "directUrl[[:space:]]*=" 2>/dev/null | grep -F "DIRECT_URL" >/dev/null 2>&1 && PR_DIRECT="YES"
+            fi
+            echo "R30_PRISMA: provider=${PR_PROVIDER} uses_DATABASE_URL=${PR_DBURL} uses_DIRECT_URL=${PR_DIRECT}"
+
+            DB_MATCH="NO"
+            if [ "$PR_PROVIDER" = "mysql" ] && [ "$DB_SRC_SCHEME" = "mysql" ]; then
+              DB_MATCH="YES"
+            elif [ "$PR_PROVIDER" = "postgresql" ] && ( [ "$DB_SRC_SCHEME" = "postgresql" ] || [ "$DB_SRC_SCHEME" = "postgres" ] ); then
+              DB_MATCH="YES"
+            fi
+            echo "R30_DATABASE_ENV_MATCH: $DB_MATCH"
+
+            SAFE="NO"
+            if [ "$REC17_APPID" != "UNKNOWN" ] && [ "$DB_SRC" = "FOUND" ] && [ "$PR_PROVIDER" != "UNKNOWN" ] && [ "$DB_MATCH" = "YES" ]; then
+              SAFE="YES"
+            fi
+            echo "R30_SAFE_TO_FIX: $SAFE"
+
+            A="REC17_SOURCE_APPLICATION = ${REC17_APPID}"
+            B="DATABASE_URL_SOURCE = ${DB_SRC} ${DB_SRC_FILE}"
+            C="PRISMA_PROVIDER = ${PR_PROVIDER} (DATABASE_URL=${PR_DBURL} DIRECT_URL=${PR_DIRECT})"
+            D="DATABASE_ENV_MATCH = ${DB_MATCH}"
+            E="AUTH_ENV_SOURCE = ${AUTH_SRC} ${AUTH_SRC_FILE}"
+            F="SAFE_TO_FIX = ${SAFE}"
+            echo "R30_A: $A"
+            echo "R30_B: $B"
+            echo "R30_C: $C"
+            echo "R30_D: $D"
+            echo "R30_E: $E"
+            echo "R30_F: $F"
+            echo "R30_NO_CHANGES: YES"
           ' 2>&1)
           RC=$?
-          echo "RAW_OUT<<EOF_R29" >> $GITHUB_OUTPUT
+          echo "RAW_OUT<<EOF_R30" >> $GITHUB_OUTPUT
           printf '%s\n' "$OUT" >> $GITHUB_OUTPUT
-          echo "EOF_R29" >> $GITHUB_OUTPUT
+          echo "EOF_R30" >> $GITHUB_OUTPUT
           echo "SSH_RC=$RC" >> $GITHUB_OUTPUT
           echo "--- RAW OUT START RC=$RC ---"
           printf '%s\n' "$OUT"
           echo "--- RAW OUT END ---"
 
-      - name: "RUN29: Summary (annotations)"
+      - name: "RUN30: Summary (A-F only)"
         continue-on-error: true
         run: |
           set +eo pipefail
@@ -177,40 +268,25 @@ jobs:
             local key="$1"
             printf '%s\n' "$OUT" | { grep -E "^${key}:" || true; } | head -1 | cut -d: -f2- | sed "s/^[[:space:]]*//; s/[[:space:]]\+$//"
           }
+          A="$(getv R30_A)"
+          B="$(getv R30_B)"
+          C="$(getv R30_C)"
+          D="$(getv R30_D)"
+          E="$(getv R30_E)"
+          F="$(getv R30_F)"
+          NC="$(getv R30_NO_CHANGES)"
 
-          TS="$(getv R29_TS)"
-          COOLIFY="$(getv R29_COOLIFY_DIR)"
-          FS_DB="$(getv R29_FS_DATABASE_URL)"
-          FS_DIRECT="$(getv R29_FS_DIRECT_URL)"
-          FS_SHADOW="$(getv R29_FS_SHADOW_DATABASE_URL)"
-          FS_PRISMA="$(getv R29_FS_PRISMA_DATABASE_URL)"
-          FS_NXU="$(getv R29_FS_NEXTAUTH_URL)"
-          FS_AUU="$(getv R29_FS_AUTH_URL)"
-          FS_NXS="$(getv R29_FS_NEXTAUTH_SECRET)"
-          FS_AUS="$(getv R29_FS_AUTH_SECRET)"
-          FS_TRUST="$(getv R29_FS_AUTH_TRUST_HOST)"
-          C1="$(getv R29_CTR_rec17-webpsb-p1)"
-          E1="$(getv R29_ENV_rec17-webpsb-p1)"
-          C2="$(getv R29_CTR_webpsb-recoverycore-customdomain)"
-          E2="$(getv R29_ENV_webpsb-recoverycore-customdomain)"
-          C3="$(getv R29_CTR_web-psb-perkasa)"
-          E3="$(getv R29_ENV_web-psb-perkasa)"
-          TRAF="$(getv R29_TRAEFIK_TARGET)"
-          NC="$(getv R29_NO_CHANGES)"
-
-          META="TS=$TS | COOLIFY_DIR=$COOLIFY | NO_CHANGES=$NC | SSH_RC=$SSH_RC"
-          FS="DATABASE_URL=$FS_DB | DIRECT_URL=$FS_DIRECT | SHADOW_DATABASE_URL=$FS_SHADOW | PRISMA_DATABASE_URL=$FS_PRISMA | NEXTAUTH_URL=$FS_NXU | AUTH_URL=$FS_AUU | NEXTAUTH_SECRET=$FS_NXS | AUTH_SECRET=$FS_AUS | AUTH_TRUST_HOST=$FS_TRUST"
-          CTRS="rec17-webpsb-p1={$C1} ; webpsb-recoverycore-customdomain={$C2} ; web-psb-perkasa={$C3}"
-          ENVS="rec17-webpsb-p1={$E1} ; webpsb-recoverycore-customdomain={$E2} ; web-psb-perkasa={$E3}"
-
-          for title in META FS CONTAINERS ENV TRAEFIK; do
+          for title in A B C D E F NO_CHANGES; do
             case "$title" in
-              META) val="$META" ;;
-              FS) val="$FS" ;;
-              CONTAINERS) val="$CTRS" ;;
-              ENV) val="$ENVS" ;;
-              TRAEFIK) val="$TRAF" ;;
+              A) val="$A" ;;
+              B) val="$B" ;;
+              C) val="$C" ;;
+              D) val="$D" ;;
+              E) val="$E" ;;
+              F) val="$F" ;;
+              NO_CHANGES) val="$NC SSH_RC=$SSH_RC" ;;
             esac
+            [ -z "$val" ] && val="(missing)"
             val="$(printf '%s' "$val" | head -c 1100)"
             val_safe="$(printf '%s' "$val" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
             echo "::notice title=${title}::${val_safe}"
