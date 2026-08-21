@@ -237,8 +237,11 @@ jobs:
 
             echo ""
             echo "========================================================================"
-            echo "  [5.3] CARI IMAGE WEB PSB YANG TERSEDIA"
+            echo "  [5.3] CARI & VERIFIKASI IMAGE WEB PSB YANG TERSEDIA"
             echo "========================================================================"
+            echo "  DOCKER IMAGES FILTER PSB/PERKASA/WEB (FULL LIST):"
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.ID}}" 2>&1 | grep -iE "psb|perkasa|web" | head -20
+            echo ""
             IMG_PSB=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -iE "local-web-psb" | head -1)
             if [ -z "$IMG_PSB" ]; then
               IMG_PSB=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -iE "web-psb-perkasa|webpsb" | head -1)
@@ -248,6 +251,17 @@ jobs:
               IMG_PSB="ghcr.io/indrakantor87/web-psb-perkasa:latest"
             fi
             echo "  Image Web PSB yang akan dipakai: $IMG_PSB"
+            echo "  VERIFIKASI IMAGE ADA di docker..."
+            docker image inspect "$IMG_PSB" > /dev/null 2>&1
+            RC_IMG=$?
+            if [ $RC_IMG -ne 0 ]; then
+              echo "  ❌❌❌ IMAGE TIDAK ADA DI DOCKER! RC=$RC_IMG. Nama image salah / image belum di-build!"
+              echo "  List SEMUA images yang tersedia (30 teratas):"
+              docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.ID}}" 2>&1 | head -30
+              echo "  GAGAL: Image $IMG_PSB TIDAK DITEMUKAN. Perbaiki nama image di Step 5.3. EXIT 1"
+              exit 1
+            fi
+            echo "  ✅ IMAGE ADA & VALID."
 
             echo ""
             echo "========================================================================"
@@ -261,13 +275,32 @@ jobs:
             L_RULE_CUSTOM="traefik.http.routers.wpnetid.rule=Host(${BT}${CUSTOM_DOM}${BT})"
             echo "  Label Rule SSLIP  = [$L_RULE_SSLIP]"
             echo "  Label Rule Custom = [$L_RULE_CUSTOM]"
+            PSB_PORT_HOST=3005
+            echo "  Port mapping host:container = $PSB_PORT_HOST:3000 (dipilih 3005 untuk hindari bentrok Coolify asli port 3004)"
+            PORT_USED=$(netstat -tln 2>/dev/null | grep -c ":$PSB_PORT_HOST " || true)
+            if [ "$PORT_USED" -gt 0 ]; then
+              echo "  ⚠️  Port $PSB_PORT_HOST TERPAKAI! Coba ganti port 3006..."
+              PSB_PORT_HOST=3006
+              PORT_USED2=$(netstat -tln 2>/dev/null | grep -c ":$PSB_PORT_HOST " || true)
+              if [ "$PORT_USED2" -gt 0 ]; then
+                echo "  ❌ Port 3005 DAN 3006 KEDUANYA TERPAKAI! EXIT 1."
+                echo "  Netstat listen ports:"
+                netstat -tln 2>/dev/null | head -20
+                exit 1
+              fi
+              echo "  ✅ Pakai Port $PSB_PORT_HOST:3000"
+            else
+              echo "  ✅ Port $PSB_PORT_HOST BEBAS."
+            fi
             echo ""
-            echo "  Menjalankan docker run..."
+            echo "  Menjalankan docker run (dengan FAIL FAST)..."
+            docker rm -f "$NAME" 2>/dev/null || true
+            sleep 1
             docker run -d \
               --name "$NAME" \
               --network coolify \
               --restart unless-stopped \
-              -p 3004:3000 \
+              -p ${PSB_PORT_HOST}:3000 \
               -e PORT=3000 \
               -e HOSTNAME=0.0.0.0 \
               -e NODE_ENV=production \
@@ -281,7 +314,7 @@ jobs:
               "$IMG_PSB" > /tmp/psb_cid.txt 2> /tmp/psb_err.txt
             RC=$?
             CID=$(cat /tmp/psb_cid.txt 2>/dev/null | head -1 | tr -d "\r\n")
-            ERR=$(cat /tmp/psb_err.txt 2>/dev/null | tail -8 | tr -d "\r")
+            ERR=$(cat /tmp/psb_err.txt 2>/dev/null | tail -15 | tr -d "\r")
             if [ $RC -eq 0 ] && [ -n "$CID" ]; then
               echo ""
               echo "  ✅✅✅ WEB PSB BERHASIL DIJALANKAN DENGAN 2 LABEL HOST! ✅✅✅"
@@ -290,10 +323,37 @@ jobs:
               echo "     Custom Domain:  https://$CUSTOM_DOM"
               echo "     SSLIP Domain:   http://$SSLIP_DOM"
               echo ""
+              echo "  =================================================================="
+              echo "  [5.4.1] DIAGNOSTIK LENGKAP SETELAH DOCKER RUN BERHASIL"
+              echo "  =================================================================="
+              sleep 5
+              echo "  --- [5.4.1a] DOCKER PS (filter webpsb / proxy) ---"
+              docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1 | grep -iE "web.psb|webpsb|psb|proxy|coolify-proxy"
+              echo ""
+              echo "  --- [5.4.1b] DOCKER INSPECT Container Status + Image + Labels (grep traefik/name) ---"
+              echo "  Status    = $(docker inspect --format="{{.State.Status}}" "$CID" 2>/dev/null) (Running=$(docker inspect --format="{{.State.Running}}" "$CID" 2>/dev/null))"
+              echo "  Image     = $(docker inspect --format="{{.Config.Image}}" "$CID" 2>/dev/null)"
+              echo "  ExitCode  = $(docker inspect --format="{{.State.ExitCode}}" "$CID" 2>/dev/null)"
+              echo "  --- LABELS (relevant traefik/name) ---"
+              docker inspect "$CID" 2>/dev/null | grep -iE "traefik|name|maintainer" | head -40
+              echo ""
+              echo "  --- [5.4.1c] LAST 25 LOGS CONTAINER (cek app crash / startup error) ---"
+              docker logs --tail 25 "$CID" 2>&1 | tail -30
+              echo ""
+              echo "  --- [5.4.1d] QUICK CURL LOCAL CHECK (sebelum proxy restart, port ${PSB_PORT_HOST} internal) ---"
+              curl -sv --max-time 15 http://127.0.0.1:${PSB_PORT_HOST}/ 2>&1 | tail -25 || echo "  (curl local port ${PSB_PORT_HOST} gagal - app mungkin masih cold start)"
+              echo ""
             else
-              echo "  ❌ docker run GAGAL RC=$RC"
+              echo "  ❌❌❌ docker run GAGAL RC=$RC ❌❌❌"
               echo "  STDOUT CID: [$CID]"
-              echo "  STDERR: $ERR"
+              echo "  STDERR docker run (last 15 lines):"
+              printf "%s\n" "$ERR"
+              echo ""
+              echo "  LIST CONTAINER (semua exited + running psb related):"
+              docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}" 2>&1 | grep -iE "web.psb|webpsb|psb|ultrafast|fallback"
+              echo ""
+              echo "  EXIT 1 (FAIL FAST) agar workflow status MERAH jelas, TIDAK HIJAU PALSU!"
+              exit 1
             fi
 
             echo ""
@@ -338,6 +398,11 @@ jobs:
           RC=$?
           echo ""
           echo "STEP 5 SSH RC=$RC"
+          if [ $RC -ne 0 ]; then
+            echo "❌❌❌ STEP 5 SSH FAIL RC=$RC! Server-side EXIT 1 karena (image tidak ada / docker run gagal / port bentrok / Web PSB gagal start)! EXIT 1 FAIL FAST AGAR WORKFLOW STATUS MERAH JELAS, BUKAN HIJAU PALSU SEPERTI RUN6!"
+            exit 1
+          fi
+          echo "✅ STEP 5 SSH SUCCESS RC=$RC (docker run Web PSB OK, lanjut ke Step 6 Final Check 6 domains via Traefik local)"
 
       - name: "⭐ STEP 6: FINAL HTTP CHECK 6 DOMAINS VIA TRAEFIK (curl --resolve ke 127.0.0.1:80)"
         run: |
@@ -387,8 +452,53 @@ jobs:
               echo "  ❌ MASIH BANYAK FAIL. Perlu fallback Step 6 create container manual dengan backtick."
             fi
             echo "================================================================="
+            echo ""
+            echo "================== FAIL FAST CHECK WEB PSB (PRIORITAS #1 & #2) =================="
+            CUSTOM_CODE=$(curl -s -o /dev/null -w "%{http_code}" --resolve $D1:80:127.0.0.1 --max-time 20 http://$D1/ 2>/dev/null)
+            CUSTOM_CODE="${CUSTOM_CODE:-000}"
+            SSLIP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --resolve $D6:80:127.0.0.1 --max-time 20 http://$D6/ 2>/dev/null)
+            SSLIP_CODE="${SSLIP_CODE:-000}"
+            case "$CUSTOM_CODE" in 200|301|302|307|308) echo "✅ WEB PSB CUSTOM DOMAIN ($D1) HTTP $CUSTOM_CODE = HIDUP!" ;; *) echo "❌❌❌ WEB PSB CUSTOM DOMAIN ($D1) [PRIORITAS #1 MUTLAK] HTTP $CUSTOM_CODE = MASIH FAIL!" ;; esac
+            case "$SSLIP_CODE" in 200|301|302|307|308) echo "✅ WEB PSB SSLIP DOMAIN ($D6) HTTP $SSLIP_CODE = HIDUP!" ;; *) echo "❌❌❌ WEB PSB SSLIP ($D6) [PRIORITAS #2] HTTP $SSLIP_CODE = MASIH FAIL!" ;; esac
+            WEBPSB_REQ_OK=0
+            case "$CUSTOM_CODE" in 200|301|302|307|308) WEBPSB_REQ_OK=$((WEBPSB_REQ_OK+1)) ;; esac
+            case "$SSLIP_CODE" in 200|301|302|307|308) WEBPSB_REQ_OK=$((WEBPSB_REQ_OK+1)) ;; esac
+            echo "Required Web PSB OK: $WEBPSB_REQ_OK / 2 (CUSTOM + SSLIP)"
+            if [ "$WEBPSB_REQ_OK" -ne 2 ]; then
+              echo ""
+              echo "❌❌❌ EXIT 1 FAIL FAST! KEDUA DOMAIN WEB PSB (CUSTOM + SSLIP) WAJIB HIDUP KEDUANYA, TAPI BARU $WEBPSB_REQ_OK OK. Workflow status AKAN MERAH JELAS (bukan hijau palsu RUN6!)."
+              echo ""
+              echo "--- DIAGNOSTIC DIAGNOSTIC FAIL FAST: docker ps webpsb + proxy + last 25 proxy logs ---"
+              docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Image}}" 2>&1 | grep -iE "web.psb|webpsb|psb|proxy|coolify-proxy"
+              echo ""
+              PRX=$(docker ps -aq --format "{{.Names}}" | grep -iE coolify-proxy | head -1)
+              if [ -n "$PRX" ]; then
+                echo "--- LAST 25 LOGS COOLIFY-PROXY (Traefik dynamic config reload?) ---"
+                docker logs --tail 25 "$PRX" 2>&1 | tail -30
+              fi
+              echo ""
+              echo "--- LAST 30 LOGS SEMUA CONTAINER PSB EXITED ATAU RUNNING ---"
+              PSB_LIST=$(docker ps -aq --format "{{.Names}}" 2>&1 | grep -iE "web.psb|webpsb|psb|ultrafast|fallback|recoverycore" | head -10)
+              for C in $PSB_LIST; do
+                echo "  === LOGS CONTAINER: $C ==="
+                docker logs --tail 20 "$C" 2>&1 | tail -25
+                echo ""
+              done
+              exit 1
+            fi
+            echo "✅✅✅ DUA DOMAIN WEB PSB (CUSTOM DOMAIN + SSLIP) HIDUP SEMPURNA! PRIORITAS #1 SELESAI."
+            echo "================================================================="
+            echo "EXIT 0 OK."
           ' 2>&1)
+          RC=$?
           echo "$RESULT"
           echo ""
-          echo "=== FLOW SELESAI ==="
-          echo "Buka https://webpsb.perkasa.net.id di browser -> Ctrl+Shift+R (Hard Refresh)"
+          echo "STEP 6 Final Check SSH RC=$RC"
+          if [ $RC -ne 0 ]; then
+            echo "❌❌❌ STEP 6 FINAL CHECK FAIL RC=$RC! Web PSB masih FAIL HTTP. Workflow status AKAN MERAH JELAS (bukan hijau palsu RUN6!)."
+            exit 1
+          fi
+          echo "✅ STEP 6 Final Check SUCCESS RC=$RC (Web PSB Custom + SSLIP HTTP 200/30x KEDUANYA OK!)"
+          echo ""
+          echo "=== FLOW RECOVERY SELESAI, SEMUA CHECK OK ==="
+          echo "Buka https://webpsb.perkasa.net.id di browser -> Ctrl+Shift+R (Hard Refresh ignore cache) untuk pastikan halaman login tampil, BUKAN 'no available server'!"
