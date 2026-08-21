@@ -1,4 +1,4 @@
-name: "RUN18 DIAGNOSTIC: EntryPoints proxy ASLI + HTTP code redirect (SUPER KECIL anti truncate)"
+name: "RUN19 SUPER DUPER MINI (setiap step <3 lines!): ENTRYPOINTS ASLI proxy"
 
 on:
   push:
@@ -6,113 +6,98 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_run18:
+  diag_r19:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 8
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: "0. Install SSH Key"
         run: |
-          set +e
-          HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
-          USER="${{ secrets.COOLIFY_SERVER_USER }}"
-          USER="${USER:-root}"
+          USER="${{ secrets.COOLIFY_SERVER_USER }}"; USER="${USER:-root}"
           KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
-          mkdir -p $HOME/.ssh
-          chmod 700 $HOME/.ssh
-          KEY_FILE=$HOME/.ssh/id_ed25519_coolify
-          printf '%s\n' '-----BEGIN OPENSSH PRIVATE KEY-----' > /tmp/hdr.txt
-          printf '%s\n' '-----END OPENSSH PRIVATE KEY-----' > /tmp/tlr.txt
-          printf '%s' "$KEY" | grep -v 'OPENSSH PRIVATE KEY' | tr -d '\r' > /tmp/body.txt
-          (cat /tmp/hdr.txt; cat /tmp/body.txt; cat /tmp/tlr.txt) > $KEY_FILE
-          chmod 600 $KEY_FILE
-          echo "KEY_FILE=$KEY_FILE" >> $GITHUB_ENV
+          mkdir -p $HOME/.ssh; chmod 700 $HOME/.ssh
+          K=$HOME/.ssh/id_ed25519_run19
+          printf '%s\n' '-----BEGIN OPENSSH PRIVATE KEY-----' > /tmp/h.txt
+          printf '%s\n' '-----END OPENSSH PRIVATE KEY-----' > /tmp/t.txt
+          printf '%s' "$KEY" | grep -v 'OPENSSH PRIVATE KEY' | tr -d '\r' > /tmp/b.txt
+          (cat /tmp/h.txt; cat /tmp/b.txt; cat /tmp/t.txt) > $K; chmod 600 $K
+          echo "KEY=$K" >> $GITHUB_ENV
           echo "USER=$USER" >> $GITHUB_ENV
-          echo "HOST=$HOST" >> $GITHUB_ENV
+          echo "HOST=${{ secrets.COOLIFY_SERVER_HOST }}" >> $GITHUB_ENV
 
-      - name: "RUN18 Step A: coolify-proxy ENTRYPOINTS ASLI (labels + args)"
+      - name: "R19-A1: Proxy name + image"
         run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1)
-            [ -z "$PRX" ] && echo "NO_PROXY" && exit 0
-            echo "=== PROXY NAME: $PRX ==="
-            echo "--- proxy All labels (key=value): ---"
-            docker inspect "$PRX" 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);lbls=d[0].get(\"Config\",{}).get(\"Labels\",{});[print(f\"  {k}={v}\") for k,v in sorted(lbls.items())]" 2>/dev/null || echo "(python3 not avail fallback grep)"
-            docker inspect "$PRX" 2>/dev/null | grep -iE "entrypoint|address|web|http|80|443" | head -30
-            echo "--- proxy ARGS (traefik startup flags): ---"
-            docker inspect "$PRX" 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);[print(f\"  ARG: {a}\") for a in d[0].get(\"Args\",[])]" 2>/dev/null
-            echo "--- proxy CMD: ---"
-            docker inspect "$PRX" 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);print(d[0].get(\"Config\",{}).get(\"Cmd\",[]))" 2>/dev/null
-          ' 2>&1)
-          echo "$OUT"
+          K=${{ env.KEY }}
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1); IMG=$(docker inspect --format="{{.Config.Image}}" $PRX 2>/dev/null); echo "R19_PRX: $PRX"; echo "R19_PRX_IMG: $IMG"' 2>&1
           echo "RC=$?"
 
-      - name: "RUN18 Step B: HTTP code webpsb.perkasa.net.id LOCAL vs EKSTERNAL (redirect HTTPS?)"
+      - name: "R19-A2: PROXY ARGS (entrypoints flags KRITIS!)"
         run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            D=webpsb.perkasa.net.id
-            echo "=== B1: CURL LOCAL resolve 127.0.0.1 HTTP ==="
-            curl -sL --max-time 12 -D /tmp/h_local.txt --resolve $D:80:127.0.0.1 -o /dev/null http://$D/ 2>&1
-            echo "HEADERS LOCAL (HTTP 80 ->127):"
-            head -20 /tmp/h_local.txt 2>/dev/null
-            echo "=== B2: CURL LOCAL resolve 127.0.0.1 HTTPS (skip verify) ==="
-            curl -skL --max-time 12 -D /tmp/h_local_https.txt --resolve $D:443:127.0.0.1 -o /dev/null https://$D/ 2>&1
-            echo "HEADERS LOCAL (HTTPS 443 ->127):"
-            head -20 /tmp/h_local_https.txt 2>/dev/null
-            echo "=== B3: CURL EKSTERNAL via PUBLIC IP (http://$D) ==="
-            curl -sL --max-time 15 -D /tmp/h_pub_http.txt -o /tmp/b_pub_http.txt http://$D/ 2>&1 | head -5
-            echo "HEADERS PUBLIC HTTP:"
-            head -20 /tmp/h_pub_http.txt 2>/dev/null
-            echo "BODY PUBLIC HTTP first 500 chars:"
-            cut -c1-500 /tmp/b_pub_http.txt 2>/dev/null
-            echo ""
-            echo "=== B4: CURL EKSTERNAL via PUBLIC IP (https://$D) ==="
-            curl -skL --max-time 15 -D /tmp/h_pub_https.txt -o /tmp/b_pub_https.txt https://$D/ 2>&1 | head -5
-            echo "HEADERS PUBLIC HTTPS:"
-            head -20 /tmp/h_pub_https.txt 2>/dev/null
-            echo "BODY PUBLIC HTTPS first 500 chars:"
-            cut -c1-500 /tmp/b_pub_https.txt 2>/dev/null
-            echo ""
-          ' 2>&1)
-          echo "$OUT"
+          K=${{ env.KEY }}
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1); for A in $(docker inspect $PRX 2>/dev/null | python3 -c "import sys,json;[print(a) for a in json.load(sys.stdin)[0].get(\"Args\",[])]" 2>/dev/null | grep -iE "entrypoint|address|:80|:443|http|web"); do echo "R19_ARG: $A"; done' 2>&1
           echo "RC=$?"
 
-      - name: "RUN18 Step C: DNS webpsb.perkasa.net.id + container rec17 labels"
+      - name: "R19-A3: proxy labels (if any traefik.* label)"
         run: |
-          set +e
-          KEY=$HOME/.ssh/id_ed25519_coolify
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+          K=${{ env.KEY }}
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'PRX=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE coolify-proxy | head -1); docker inspect $PRX 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});[print(f\"R19_PX_LBL: {k}={v[:90]}\") for k,v in sorted(l.items()) if \"traefik\" in k.lower() or \"entrypoint\" in k.lower()]"' 2>&1
+          echo "RC=$?"
+
+      - name: "R19-B1: LOCAL HTTP webpsb via 127.0.0.1"
+        run: |
+          K=${{ env.KEY }}
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'D=webpsb.perkasa.net.id; C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 10 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null); echo "R19_LOCAL_HTTP: $C REDIR: ${L:0:100}"' 2>&1
+          echo "RC=$?"
+
+      - name: "R19-B2: LOCAL HTTPS webpsb via 127.0.0.1 skip-verify"
+        run: |
+          K=${{ env.KEY }}
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'D=webpsb.perkasa.net.id; C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 --resolve $D:443:127.0.0.1 https://$D/ 2>/dev/null); echo "R19_LOCAL_HTTPS: $C"' 2>&1
+          echo "RC=$?"
+
+      - name: "R19-B3: PUBLIC HTTP webpsb via normal DNS"
+        run: |
+          K=${{ env.KEY }}
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'D=webpsb.perkasa.net.id; C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 12 http://$D/ 2>/dev/null); L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 12 http://$D/ 2>/dev/null); echo "R19_PUB_HTTP: $C REDIR: ${L:0:100}"' 2>&1
+          echo "RC=$?"
+
+      - name: "R19-B4: PUBLIC HTTPS webpsb skip-verify"
+        run: |
+          K=${{ env.KEY }}
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'D=webpsb.perkasa.net.id; C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 12 https://$D/ 2>/dev/null); echo "R19_PUB_HTTPS: $C"' 2>&1
+          echo "RC=$?"
+
+      - name: "R19-C1: DNS + rec17 container status + labels entrypoints"
+        run: |
+          K=${{ env.KEY }}
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o BatchMode=yes -i $K"
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
             D=webpsb.perkasa.net.id
-            echo "=== C1: DNS resolve $D ==="
-            if command -v dig >/dev/null 2>&1; then dig +short $D | head -5
-            elif command -v nslookup >/dev/null 2>&1; then nslookup $D 2>&1 | tail -10
-            elif command -v getent >/dev/null 2>&1; then getent hosts $D
-            else ping -c1 -W2 $D 2>&1 | head -3; fi
-            echo "=== C2: REC17 container list ==="
-            docker ps -a --format "{{.Names}} {{.Status}}" 2>/dev/null | grep -iE rec17
-            echo "=== C3: REC17 labels traefik ==="
-            CID=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE rec17-webpsb | head -1)
+            IP=$(getent hosts $D 2>/dev/null | awk "{print \$1}" | head -1)
+            [ -z "$IP" ] && IP=$(ping -c1 -W2 $D 2>&1 | grep -oE "\([0-9.]{7,}\)" | head -1 | tr -d "()")
+            echo "R19_DNS: $D -> $IP"
+            CID=$(docker ps -aq --format "{{.Names}}" 2>/dev/null | grep -iE "rec17-webpsb" | head -1)
+            [ -z "$CID" ] && echo "R19_REC17: NONE"
             if [ -n "$CID" ]; then
-              echo "Container: $CID"
-              docker inspect "$CID" 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);lbls=d[0].get(\"Config\",{}).get(\"Labels\",{});[print(f\"  {k}={v}\") for k,v in sorted(lbls.items()) if \"traefik\" in k.lower()]" 2>/dev/null
-              echo "NetworkMode:"
-              docker inspect -f "{{.HostConfig.NetworkMode}}" "$CID" 2>/dev/null
-              echo "coolify network IP:"
-              docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" "$CID" 2>/dev/null
+              ST=$(docker inspect --format="{{.State.Status}}" $CID 2>/dev/null)
+              IPNET=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" $CID 2>/dev/null)
+              echo "R19_REC17: $CID STATUS=$ST COOLIFY_IP=$IPNET"
+              ENTRYLINE=$(docker inspect $CID 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});[print(f\"{k}={v[:120]}\") for k,v in sorted(l.items()) if \"entryPoint\" in k]" 2>/dev/null)
+              for L in $ENTRYLINE; do echo "R19_PSB_EP: $L"; done | head -5
+              RULELINE=$(docker inspect $CID 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});[print(f\"{k}={v[:120]}\") for k,v in sorted(l.items()) if \".rule\" in k]" 2>/dev/null)
+              for L in $RULELINE; do echo "R19_PSB_RULE: $L"; done | head -5
+              NETLBL=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" $CID 2>/dev/null)
+              echo "R19_PSB_NET_LABEL: $NETLBL"
             fi
-          ' 2>&1)
-          echo "$OUT"
+          ' 2>&1
           echo "RC=$?"
