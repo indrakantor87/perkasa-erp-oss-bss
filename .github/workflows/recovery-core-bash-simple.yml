@@ -1,4 +1,4 @@
-name: "RUN24 DETECT DINAMIS by IMAGE + FIX PIPEFAIL: 9 prioritas tinggi"
+name: "RUN25 DIAGNOSTIC READ-ONLY: Traefik/PSB routing state"
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_r24:
+  diag_r25:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -19,7 +19,7 @@ jobs:
           KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
           HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
           mkdir -p $HOME/.ssh; chmod 700 $HOME/.ssh
-          K=$HOME/.ssh/id_rsa_r24
+          K=$HOME/.ssh/id_rsa_r25
           install -m 600 /dev/null $K
           printf '%s\n' "$KEY" > $K
           chmod 600 $K
@@ -27,87 +27,146 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "R24: DETECT DINAMIS by IMAGE → 12 PRIORITAS TERTINGGI"
-        id: diag
+      - name: "RUN25 DIAG: Read-only inspect Traefik/PSB/network/labels/dynamic + curl"
+        id: diag_fix
         continue-on-error: true
         run: |
           K=${{ env.KEY }}
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
           OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
-            # === DETECT DINAMIS: proxy & PSB by IMAGE NAME (bukan hardcode hash) ===
-            PRX=$(docker ps --filter "ancestor=traefik:v3.6" --format "{{.ID}}" 2>/dev/null | head -1)
-            [ -z "$PRX" ] && PRX=NONE
-            echo "R24_0_PRX: $PRX"
-            PSB1=$(docker ps --filter "ancestor=local-web-psb:6f3e12e" --format "{{.ID}}" 2>/dev/null | sed -n 1p)
-            PSB2=$(docker ps --filter "ancestor=local-web-psb:6f3e12e" --format "{{.ID}}" 2>/dev/null | sed -n 2p)
-            PSB3=$(docker ps --filter "ancestor=local-web-psb:6f3e12e" --format "{{.ID}}" 2>/dev/null | sed -n 3p)
-            [ -z "$PSB1" ] && PSB1=NONE
-            [ -z "$PSB2" ] && PSB2=NONE
-            [ -z "$PSB3" ] && PSB3=NONE
-            echo "R24_0_PSB1: $PSB1"
-            echo "R24_0_PSB2: $PSB2"
-            echo "R24_0_PSB3: $PSB3"
-
-            # === H1: 8 args proxy PERTAMA (entrypoints nama + bind IP) ===
-            N=0
-            if [ "$PRX" != "NONE" ]; then
-              for A in $(docker inspect $PRX 2>/dev/null | python3 -c "import sys,json;[print(a) for a in json.load(sys.stdin)[0].get(\"Args\",[])]" 2>/dev/null); do N=$((N+1)); [ $N -le 8 ] && echo "R24_A_PRX_ARG_${N}: $A"; done
-            fi
-            [ $N -eq 0 ] && echo "R24_A_PRX_ARG_1: NONE (proxy not running)"
-
-            # === H1/H2/H3: 3 PSB net coolify IP + router labels entryPoints/rule/tls/certresolver/service ===
-            for IDX in 1 2 3; do
-              eval PSB=\$PSB$IDX
-              if [ "$PSB" != "NONE" ]; then
-                NET=$(docker inspect -f "{{.NetworkSettings.Networks.coolify.IPAddress}}" $PSB 2>/dev/null)
-                LAB=$(docker inspect $PSB 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);l=d[0].get(\"Config\",{}).get(\"Labels\",{});outs=[];[outs.append(f\"{k}={v[:120]}\") for k,v in sorted(l.items()) if \"traefik.http.routers\" in k and (\".entryPoints\" in k or \".rule\" in k or \".tls\" in k or \".service\" in k or \".certresolver\" in k or \".middlewares\" in k)];print(\"|\".join(outs[:10]))" 2>/dev/null)
-                echo "R24_X${IDX}_PSB${IDX}_NET=${NET:-NONE} LABELS=${LAB:0:220}"
-              else
-                echo "R24_X${IDX}_PSB${IDX}_NET=NONE LABELS=NONE"
-              fi
-            done
-
-            # === Lokal curl resolve 127 ===
             D=webpsb.perkasa.net.id
-            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null)
-            L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 15 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null)
-            echo "R24_E_LOCAL_HTTP_CODE=${C:-000} REDIR=${L:0:120}"
-            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:443:127.0.0.1 https://$D/ 2>/dev/null)
-            echo "R24_F_LOCAL_HTTPS_CODE=${C:-000}"
+            PRX=$(docker ps --filter "ancestor=traefik:v3.6" --format "{{.ID}}" 2>/dev/null | head -1); PRX=${PRX:-NONE}
+            PSB_IDS=$(docker ps --filter "ancestor=local-web-psb:6f3e12e" --format "{{.ID}}" 2>/dev/null | tr "\n" " " | sed "s/[[:space:]]\+$//"); PSB_IDS=${PSB_IDS:-NONE}
+            PSB1=$(printf "%s\n" "$PSB_IDS" | awk "{print \$1}"); PSB1=${PSB1:-NONE}
 
-            # === Publik via DNS ===
-            C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 18 http://$D/ 2>/dev/null)
-            L=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 18 http://$D/ 2>/dev/null)
-            echo "R24_G_PUB_HTTP_CODE=${C:-000} REDIR=${L:0:120}"
-            C=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 18 https://$D/ 2>/dev/null)
-            echo "R24_H_PUB_HTTPS_CODE=${C:-000}"
+            if [ "$PRX" = "NONE" ]; then
+              echo "R25_TRAEFIK: NOT_FOUND"
+            else
+              echo "R25_TRAEFIK: FOUND id=$PRX"
+              TIMG=$(docker inspect -f "{{.Config.Image}}" "$PRX" 2>/dev/null); echo "R25_TRAEFIK_IMAGE: ${TIMG:-unknown}"
+              TST=$(docker inspect -f "{{.State.Status}}" "$PRX" 2>/dev/null); echo "R25_TRAEFIK_STATUS: ${TST:-unknown}"
+              CMD=$( (docker inspect -f "{{range .Args}}{{println .}}{{end}}" "$PRX" 2>/dev/null; docker inspect -f "{{range .Config.Cmd}}{{println .}}{{end}}" "$PRX" 2>/dev/null) | sed "/^$/d" )
+              EPS=$(printf "%s\n" "$CMD" | grep -E "^\-\-entrypoints\." 2>/dev/null | sed -E "s/^--entrypoints\.([^.]+)\..*$/\1/" | sort -u | tr "\n" " " | sed "s/[[:space:]]\+$//")
+              [ -z "$EPS" ] && EPS="UNKNOWN"
+              echo "R25_ENTRYPOINTS: $EPS"
+              RES=$(printf "%s\n" "$CMD" | grep -E "^\-\-certificatesresolvers\." 2>/dev/null | sed -E "s/^--certificatesresolvers\.([^.]+)\..*$/\1/" | sort -u | tr "\n" " " | sed "s/[[:space:]]\+$//")
+              [ -z "$RES" ] && RES="NONE"
+              echo "R25_TLS_RESOLVERS: $RES"
+              P_DOCK=$(printf "%s\n" "$CMD" | grep -E "^\-\-providers\.docker(=|$)" 2>/dev/null | head -1 | sed "s/^--providers\.docker=//")
+              P_FILE=$(printf "%s\n" "$CMD" | grep -E "^\-\-providers\.file(=|$)" 2>/dev/null | head -1 | sed "s/^--providers\.file=//")
+              P_DIR=$(printf "%s\n" "$CMD" | grep -E "^\-\-providers\.file\.directory=" 2>/dev/null | head -1 | sed "s/^--providers\.file\.directory=//")
+              [ -z "$P_DOCK" ] && P_DOCK="UNKNOWN"
+              [ -z "$P_FILE" ] && P_FILE="UNKNOWN"
+              [ -z "$P_DIR" ] && P_DIR="UNKNOWN"
+              echo "R25_PROVIDERS: docker=$P_DOCK file=$P_FILE dir=$P_DIR"
+            fi
 
-            # === Network label traefik.docker.network ===
-            NL1=NONE; NL2=NONE; NL3=NONE
-            [ "$PSB1" != "NONE" ] && NL1=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" $PSB1 2>/dev/null)
-            [ "$PSB2" != "NONE" ] && NL2=$(docker inspect -f "{{ index .Config.Labels \"traefik.docker.network\" }}" $PSB2 2>/dev/null)
-            [ -z "$NL1" ] && NL1=EMPTY
-            [ -z "$NL2" ] && NL2=EMPTY
-            echo "R24_I_PSB_NET_LABELS=${NL1}/${NL2}"
+            if [ "$PSB_IDS" = "NONE" ] || [ "$PSB1" = "NONE" ]; then
+              echo "R25_PSB: NOT_FOUND"
+            else
+              CNT=$(printf "%s\n" "$PSB_IDS" | wc -w | tr -d " "); echo "R25_PSB: FOUND count=$CNT ids=${PSB_IDS:0:80}"
+              PST=$(docker inspect -f "{{.State.Status}}" "$PSB1" 2>/dev/null); echo "R25_PSB_STATUS: ${PST:-unknown}"
+              PIMG=$(docker inspect -f "{{.Config.Image}}" "$PSB1" 2>/dev/null); echo "R25_PSB_IMAGE: ${PIMG:-unknown}"
+            fi
+
+            PORT=$(docker image inspect local-web-psb:6f3e12e 2>/dev/null | python3 -c "
+import sys, json
+try:
+  d = json.load(sys.stdin)[0]
+  ports = (d.get(\"Config\") or {}).get(\"ExposedPorts\") or {}
+  for k in ports.keys():
+    p = k.split(\"/\",1)[0]
+    if p.isdigit():
+      print(p); raise SystemExit(0)
+except Exception:
+  pass
+print(\"3000\")
+" 2>/dev/null | head -1)
+            PORT=${PORT:-3000}
+            echo "R25_PORT: $PORT"
+
+            if [ "$PRX" != "NONE" ] && [ "$PSB1" != "NONE" ]; then
+              PRX_NETS=$(docker inspect -f "{{range \$k, \$v := .NetworkSettings.Networks}}{{println \$k}}{{end}}" "$PRX" 2>/dev/null | tr "\n" " " | sed "s/[[:space:]]\+$//")
+              PSB_NETS=$(docker inspect -f "{{range \$k, \$v := .NetworkSettings.Networks}}{{println \$k}}{{end}}" "$PSB1" 2>/dev/null | tr "\n" " " | sed "s/[[:space:]]\+$//")
+              COMMON="NO"; CNET="NONE"
+              for n in $PRX_NETS; do
+                printf "%s\n" "$PSB_NETS" | grep -w "$n" >/dev/null 2>&1 && COMMON="YES" && CNET="$n" && break
+              done
+              echo "R25_NETWORK_COMMON: $COMMON name=$CNET"
+              echo "R25_NETWORK_TRAEFIK: ${PRX_NETS:-none}"
+              echo "R25_NETWORK_PSB: ${PSB_NETS:-none}"
+            else
+              echo "R25_NETWORK_COMMON: UNKNOWN name=NONE"
+            fi
+
+            DYN=/data/coolify/proxy/dynamic
+            if [ -d "$DYN" ]; then
+              FC=$(find "$DYN" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d " ")
+              FN=$(ls -1 "$DYN" 2>/dev/null | head -5 | tr "\n" " " | sed "s/[[:space:]]\+$//")
+              [ -z "$FN" ] && FN="(empty)"
+              echo "R25_DYNAMIC_DIR: YES files=$FC sample=$FN"
+            else
+              echo "R25_DYNAMIC_DIR: NO path=$DYN"
+            fi
+
+            HTTP_LBL="NOT_FOUND"; HTTPS_LBL="NOT_FOUND"
+            if [ "$PSB_IDS" != "NONE" ]; then
+              for id in $PSB_IDS; do
+                L=$(docker inspect -f "{{json .Config.Labels}}" "$id" 2>/dev/null | tr -d "\n")
+                printf "%s" "$L" | grep -F "$D" >/dev/null 2>&1 || continue
+                printf "%s" "$L" | grep -F "entrypoints=websecure" >/dev/null 2>&1 && HTTPS_LBL="FOUND on=${id:0:12}"
+                printf "%s" "$L" | grep -F "entrypoints=web" >/dev/null 2>&1 && HTTP_LBL="FOUND on=${id:0:12}"
+              done
+            fi
+            echo "R25_ROUTER_HTTP_LABEL: $HTTP_LBL"
+            echo "R25_ROUTER_HTTPS_LABEL: $HTTPS_LBL"
+
+            BACK="UNKNOWN"
+            if [ "$PSB1" != "NONE" ]; then
+              CIP=$(docker inspect -f "{{range \$k, \$v := .NetworkSettings.Networks}}{{println \$v.IPAddress}}{{end}}" "$PSB1" 2>/dev/null | head -1 | tr -d "\r\n")
+              if [ -n "$CIP" ]; then
+                CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://$CIP:$PORT/" 2>/dev/null)
+                [ -z "$CODE" ] && CODE="000"
+                BACK="code=$CODE"
+              fi
+            fi
+            echo "R25_BACKEND_REACHABLE: $BACK"
+
+            CH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 18 http://$D/ 2>/dev/null); RH=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 18 http://$D/ 2>/dev/null)
+            echo "R25_PUBLIC_HTTP: code=${CH:-000} redir=${RH:0:120}"
+            CK=$(curl -s -o /dev/null -w "%{http_code}" --max-time 18 https://$D/ 2>/dev/null); RC_HTTPS=$?
+            TLS="UNKNOWN"; [ "$RC_HTTPS" = "0" ] && TLS="OK"
+            echo "R25_PUBLIC_HTTPS: code=${CK:-000} tls=$TLS"
+
+            CL=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null)
+            RL=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 15 --resolve $D:80:127.0.0.1 http://$D/ 2>/dev/null)
+            echo "R25_LOCAL_HTTP: code=${CL:-000} redir=${RL:0:120}"
+            CL2=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 --resolve $D:443:127.0.0.1 https://$D/ 2>/dev/null)
+            echo "R25_LOCAL_HTTPS: code=${CL2:-000}"
+
+            RESULT="UNKNOWN"
+            if [ "$PRX" = "NONE" ] || [ "$PSB1" = "NONE" ]; then RESULT="P0_INFRA_BROKEN"; fi
+            if [ "$PRX" != "NONE" ] && [ "$PSB1" != "NONE" ] && [ "$HTTP_LBL" = "NOT_FOUND" ] && [ "$HTTPS_LBL" = "NOT_FOUND" ]; then RESULT="P0_ROUTING_BROKEN"; fi
+            echo "R25_RESULT: $RESULT"
           ' 2>&1)
           RC=$?
-          echo "RAW_OUT<<EOF_R24" >> $GITHUB_OUTPUT
+          echo "RAW_OUT<<EOF_R25" >> $GITHUB_OUTPUT
           printf '%s\n' "$OUT" >> $GITHUB_OUTPUT
-          echo "EOF_R24" >> $GITHUB_OUTPUT
+          echo "EOF_R25" >> $GITHUB_OUTPUT
           echo "SSH_RC=$RC" >> $GITHUB_OUTPUT
-          echo "--- RAW SERVER OUTPUT START ---"
+          echo "--- RAW OUT START RC=$RC ---"
           printf '%s\n' "$OUT"
-          echo "--- RAW SERVER OUTPUT END RC=$RC ---"
+          echo "--- RAW OUT END ---"
 
-      - name: "R24: ANNOTATIONS 12 item (set +eo pipefail + grep || true → TIDAK BOLEH FAIL)"
+      - name: "RUN25: Annotations ringkas (read-only)"
         continue-on-error: true
         run: |
           set +eo pipefail
-          OUT="${{ steps.diag.outputs.RAW_OUT }}"
-          SSH_RC="${{ steps.diag.outputs.SSH_RC }}"
+          OUT="${{ steps.diag_fix.outputs.RAW_OUT }}"
+          SSH_RC="${{ steps.diag_fix.outputs.SSH_RC }}"
           N=0; ERR_COUNT=0
-          ORDER="R24_0_PRX R24_0_PSB1 R24_0_PSB2 R24_0_PSB3 R24_A_ R24_X1 R24_X2 R24_X3 R24_E_ R24_F_ R24_G_ R24_H_ R24_I_"
+          ORDER="R25_TRAEFIK R25_TRAEFIK_IMAGE R25_TRAEFIK_STATUS R25_ENTRYPOINTS R25_TLS_RESOLVERS R25_PROVIDERS R25_DYNAMIC_DIR R25_PSB R25_PSB_IMAGE R25_PSB_STATUS R25_NETWORK_COMMON R25_PORT R25_ROUTER_HTTP_LABEL R25_ROUTER_HTTPS_LABEL R25_BACKEND_REACHABLE R25_PUBLIC_HTTP R25_PUBLIC_HTTPS R25_LOCAL_HTTP R25_LOCAL_HTTPS R25_RESULT"
           for PREFIX in $ORDER; do
             LINE=$(printf '%s\n' "$OUT" | { grep -E "^${PREFIX}" || true; } | head -1 | tr -d '\r' | sed 's/[[:space:]]\+$//')
             [ -z "$LINE" ] && continue
@@ -117,6 +176,6 @@ jobs:
             VAL_SAFE=$(printf '%s' "$VAL" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
             echo "::error title=${TITLE}::${VAL_SAFE}"
             echo "[ANN-$N $ERR_COUNT] $TITLE :: $VAL"
-            [ $ERR_COUNT -ge 13 ] && break
+            [ $ERR_COUNT -ge 22 ] && break
           done
           echo "Annotations count=$ERR_COUNT, lines=$N, SSH_RC=$SSH_RC"
