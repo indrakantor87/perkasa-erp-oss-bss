@@ -1,0 +1,213 @@
+name: "⚡ ULTRA-FAST: WEB PSB CUSTOM DOMAIN ONLY (Backtick printf \\x60 label - 5 menit selesai)"
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ultrafast-webpsb-serial
+  cancel-in-progress: false
+
+jobs:
+  webpsb_only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "0. Install SSH Key (SAMA PERSIS dengan Workflow Core yang TERBUKTI konek OK)"
+        run: |
+          set +e
+          HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
+          USER="${{ secrets.COOLIFY_SERVER_USER }}"
+          USER="${USER:-root}"
+          KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
+          HOST_LEN=$(printf '%s' "$HOST" | wc -c | tr -d ' ')
+          KEY_LEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
+          echo "HOST=$HOST USER=$USER HOST_LEN=$HOST_LEN KEY_LEN=$KEY_LEN"
+          mkdir -p $HOME/.ssh && chmod 700 $HOME/.ssh
+          KEY_FILE=$HOME/.ssh/id_ed25519_coolify
+          printf '%s\n' '-----BEGIN OPENSSH PRIVATE KEY-----' > /tmp/hdr.txt
+          printf '%s\n' '-----END OPENSSH PRIVATE KEY-----' > /tmp/tlr.txt
+          printf '%s' "$KEY" | grep -v 'OPENSSH PRIVATE KEY' | tr -d '\r' > /tmp/body.txt
+          (cat /tmp/hdr.txt; cat /tmp/body.txt; cat /tmp/tlr.txt) > $KEY_FILE
+          chmod 600 $KEY_FILE
+          echo "KEY_FILE=$KEY_FILE USER=$USER HOST=$HOST" >> $GITHUB_ENV
+          echo "OK SSH key ready"
+
+      - name: "⚡ 1. DOCKER RUN WEB PSB HANYA 1 CONTAINER - LABEL DENGAN printf '\\x60' (BACKTICK 100% BENAR) - custom domain webpsb.perkasa.net.id + sslip + port mapping"
+        timeout-minutes: 8
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+
+          echo "Mulai eksekusi script recovery HANYA Web PSB di server (durasi ~3-5 menit)..."
+          echo ""
+
+          ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+            set +e
+            BT=$(printf "\x60")
+            echo "=========================================================================="
+            echo "  ⚡ LANGKAH 1: VERIFIKASI BACKTICK ASCII 96 via printf hex \x60"
+            echo "=========================================================================="
+            echo "  Karakter BT = [$BT]"
+            if [ "$BT" = "`" ]; then
+              echo "  ✅ BACKTICK BENAR. ASCII 96 terdeteksi = label Host($BT domain $BT) akan OK untuk Traefik!"
+            else
+              echo "  ⚠️  BACKTICK TIDAK SESUAI HARAPAN. Coba metode ASCII octal 0140"
+              BT=$(printf "\140")
+              echo "  BT octal = [$BT]"
+            fi
+
+            echo ""
+            echo "=========================================================================="
+            echo "  ⚡ LANGKAH 2: Pastikan network coolify ada"
+            echo "=========================================================================="
+            NET_EXIST=$(docker network inspect coolify >/dev/null 2>&1 && echo 1 || echo 0)
+            if [ "$NET_EXIST" = "0" ]; then
+              docker network create coolify 2>&1 | head -2
+            else
+              echo "  ✅ network coolify ada"
+            fi
+
+            echo ""
+            echo "=========================================================================="
+            echo "  ⚡ LANGKAH 3: Hapus container web-psb-perkasa / fallback / ultrafast JIKA ADA (label lama salah single quote)"
+            echo "=========================================================================="
+            OLD_LIST=$(docker ps -aq --format "{{.Names}}" | grep -iE "web.psb|webpsb|psb|ultrafast|fallback")
+            for C in $OLD_LIST; do
+              echo "  Hapus: $C"
+              docker rm -f $C 2>&1 | head -2
+            done
+
+            echo ""
+            echo "=========================================================================="
+            echo "  ⚡ LANGKAH 4: Cari image Web PSB yang tersedia (local-web-psb:6f3e12e PRIORITAS)"
+            echo "=========================================================================="
+            IMG_PSB=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -iE "local-web-psb" | head -1)
+            if [ -z "$IMG_PSB" ]; then
+              # Coba cari ghcr.io image
+              IMG_PSB=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -iE "web-psb-perkasa|webpsb" | head -1)
+            fi
+            if [ -z "$IMG_PSB" ]; then
+              echo "  ⚠️  Tidak ada image web psb build lokal, pakai ghcr.io default"
+              IMG_PSB="ghcr.io/indrakantor87/web-psb-perkasa:latest"
+            fi
+            echo "  Image Web PSB yang akan dipakai: $IMG_PSB"
+
+            echo ""
+            echo "=========================================================================="
+            echo "  ⚡ LANGKAH 5: DOCKER RUN dengan 2 Host rule (CUSTOM DOMAIN + SSLIP) via BACKTICK LITERAL BT"
+            echo "  Port mapping: 3004->3000 (agar tidak bentrok port)"
+            echo "=========================================================================="
+            NAME="webpsb-ultrafix-backtick"
+            SSLIP_DOM="pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io"
+            CUSTOM_DOM="webpsb.perkasa.net.id"
+
+            # RULE disimpan di shell variable DENGAN BACKTICK SUDAH DIEXPAND SEBELUM docker run!
+            L_RULE_SSLIP="traefik.http.routers.wpssl.rule=Host(${BT}${SSLIP_DOM}${BT})"
+            L_RULE_CUSTOM="traefik.http.routers.wpnetid.rule=Host(${BT}${CUSTOM_DOM}${BT})"
+            echo "  Label Rule SSLIP  = [$L_RULE_SSLIP]"
+            echo "  Label Rule Custom = [$L_RULE_CUSTOM]"
+
+            docker run -d \
+              --name "$NAME" \
+              --network coolify \
+              --restart unless-stopped \
+              -p 3004:3000 \
+              -e PORT=3000 \
+              -e HOSTNAME=0.0.0.0 \
+              -e NODE_ENV=production \
+              -l "traefik.enable=true" \
+              -l "traefik.http.routers.wpssl.entryPoints=http" \
+              -l "$L_RULE_SSLIP" \
+              -l "traefik.http.services.wpssl.loadbalancer.server.port=3000" \
+              -l "traefik.http.routers.wpnetid.entryPoints=http" \
+              -l "$L_RULE_CUSTOM" \
+              -l "traefik.http.services.wpnetid.loadbalancer.server.port=3000" \
+              "$IMG_PSB" > /tmp/webpsb_cid.txt 2> /tmp/webpsb_err.txt
+            RC=$?
+            CID=$(cat /tmp/webpsb_cid.txt 2>/dev/null | head -1 | tr -d "\r\n")
+            ERR=$(cat /tmp/webpsb_err.txt 2>/dev/null | tail -5 | tr -d "\r")
+            if [ $RC -eq 0 ] && [ -n "$CID" ]; then
+              echo ""
+              echo "  ✅✅✅ WEB PSB BERHASIL DIJALANKAN! ✅✅✅"
+              echo "     Container ID (20 char): ${CID:0:20}"
+              echo "     Nama Container: $NAME"
+              echo "     Custom Domain:  https://$CUSTOM_DOM"
+              echo "     SSLIP Domain:   http://$SSLIP_DOM"
+              echo ""
+            else
+              echo "  ❌ GAGAL docker run RC=$RC"
+              echo "  STDOUT CID: [$CID]"
+              echo "  STDERR: $ERR"
+              echo ""
+              # Try fallback without custom domain (just sslip first)
+              echo "  → FALLBACK: Jalan Cuma sslip domain saja tanpa custom domain"
+              docker rm -f "$NAME" >/dev/null 2>&1
+              sleep 2
+              docker run -d \
+                --name "$NAME" \
+                --network coolify \
+                --restart unless-stopped \
+                -p 3004:3000 \
+                -e PORT=3000 \
+                -e HOSTNAME=0.0.0.0 \
+                -e NODE_ENV=production \
+                -l "traefik.enable=true" \
+                -l "traefik.http.routers.wpssl.entryPoints=http" \
+                -l "$L_RULE_SSLIP" \
+                -l "traefik.http.services.wpssl.loadbalancer.server.port=3000" \
+                "$IMG_PSB" > /tmp/webpsb_cid2.txt 2> /tmp/webpsb_err2.txt
+              RC2=$?
+              CID2=$(cat /tmp/webpsb_cid2.txt 2>/dev/null | head -1 | tr -d "\r\n")
+              if [ $RC2 -eq 0 ] && [ -n "$CID2" ]; then
+                echo "  ✅ SSLIP FALLBACK OK. CID=${CID2:0:20}. Sekarang coba tambahkan custom domain via docker update label."
+                echo ""
+              fi
+            fi
+
+            echo ""
+            echo "=========================================================================="
+            echo "  ⚡ LANGKAH 6: Restart coolify-proxy + Tunggu 45 detik agar container ready"
+            echo "=========================================================================="
+            PRX=$(docker ps -aq --format "{{.Names}}" | grep -iE coolify-proxy | head -1)
+            if [ -n "$PRX" ]; then
+              echo "  Restart proxy: $PRX"
+              docker restart "$PRX" 2>&1 | head -3
+            fi
+            echo "  Menunggu 45 detik (Next.js startup + Traefik reload routing)..."
+            for i in 45 40 35 30 25 20 15 10 5; do echo "    ${i}s..."; sleep 5; done
+
+            echo ""
+            echo "=========================================================================="
+            echo "  ⚡ LANGKAH 7: FINAL HTTP CHECK 2 DOMAINS Web PSB via --resolve 127.0.0.1"
+            echo "=========================================================================="
+            check() {
+              local dom=$1 name=$2
+              local code=$(curl -s -o /dev/null -w "%{http_code}" --resolve $dom:80:127.0.0.1 --max-time 15 http://$dom/ 2>/dev/null)
+              code="${code:-000}"
+              case "$code" in
+                200|301|302|307|308) echo "    ✅ [HTTP $code] $name => http://$dom" ;;
+                *) echo "    ❌ [HTTP $code] $name => http://$dom" ;;
+              esac
+            }
+            check "webpsb.perkasa.net.id" "[PRIORITAS #1] WEB PSB CUSTOM DOMAIN"
+            check "pic3vleasj465ooh77ioicw6.103.162.17.178.sslip.io" "[PRIORITAS #2] WEB PSB SSLIP"
+
+            echo ""
+            echo "=========================================================================="
+            echo "  ⚡ LANGKAH 8: DOCKER PS FINAL STATUS"
+            echo "=========================================================================="
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1 | grep -iE "web.psb|webpsb|psb|proxy|coolify-proxy"
+            echo ""
+            echo "SELESAI! Jika HTTP 200 / 302, silakan buka https://webpsb.perkasa.net.id + Ctrl+Shift+R di browser!"
+          ' 2>&1
+
+          EXIT_RC=$?
+          echo ""
+          echo "SCRIPT SELESAI. SSH RC=$EXIT_RC"
