@@ -293,8 +293,14 @@ jobs:
           printf '%s\n' "$OUT"
           echo "===== RUN43 END ====="
 
-          summary_lines="$(for k in "${keys[@]}"; do printf '%s=%s\n' "$k" "${KV[$k]}"; done)"
-          summary_safe="$(printf '%s' "$summary_lines" | head -c 6000 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
-          echo "::notice title=RUN43_RESULTS::${summary_safe}"
+          msg1="R43_FATAL_ERROR=${KV[R43_FATAL_ERROR]} R43_FATAL_REASON=${KV[R43_FATAL_REASON]} R43_CONTAINER_FOUND=${KV[R43_CONTAINER_FOUND]} R43_CONTAINER_NAME=${KV[R43_CONTAINER_NAME]} R43_CONTAINER_IMAGE=${KV[R43_CONTAINER_IMAGE]} R43_CONTAINER_CREATED=${KV[R43_CONTAINER_CREATED]}"
+          msg2="R43_ENVFILE_PATH=${KV[R43_ENVFILE_PATH]} R43_ENVFILE_EXISTS=${KV[R43_ENVFILE_EXISTS]} R43_ENVFILE_HAS_DATABASE_URL=${KV[R43_ENVFILE_HAS_DATABASE_URL]} R43_ENVFILE_HAS_DIRECT_URL=${KV[R43_ENVFILE_HAS_DIRECT_URL]} R43_COMPOSE_WORKDIR=${KV[R43_COMPOSE_WORKDIR]} R43_COMPOSE_CONFIG_FILES=${KV[R43_COMPOSE_CONFIG_FILES]} R43_COMPOSE_SERVICE=${KV[R43_COMPOSE_SERVICE]} R43_COMPOSE_PROJECT=${KV[R43_COMPOSE_PROJECT]}"
+          msg3="R43_SERVICE_BLOCK_HAS_ENV_FILE=${KV[R43_SERVICE_BLOCK_HAS_ENV_FILE]} R43_SERVICE_BLOCK_HAS_ENVIRONMENT=${KV[R43_SERVICE_BLOCK_HAS_ENVIRONMENT]} R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY=${KV[R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY]} R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL=${KV[R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL]} R43_COMPOSE_FILE_REFERENCES_DOTENV=${KV[R43_COMPOSE_FILE_REFERENCES_DOTENV]} R43_ENV_INJECTION_MECHANISM=${KV[R43_ENV_INJECTION_MECHANISM]} R43_STALE_OR_BROKEN_DEPLOYMENT=${KV[R43_STALE_OR_BROKEN_DEPLOYMENT]}"
+          msg1_safe="$(printf '%s' "$msg1" | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          msg2_safe="$(printf '%s' "$msg2" | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          msg3_safe="$(printf '%s' "$msg3" | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          echo "::notice title=R43_RESULTS_1::${msg1_safe}"
+          echo "::notice title=R43_RESULTS_2::${msg2_safe}"
+          echo "::notice title=R43_RESULTS_3::${msg3_safe}"
 
           exit 0
