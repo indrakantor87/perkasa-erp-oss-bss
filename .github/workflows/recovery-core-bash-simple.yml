@@ -135,8 +135,7 @@ jobs:
               COMPOSE_HAS_ENVFILE="NO"
               COMPOSE_MENTIONS_DATABASE_URL="NO"
               COMPOSE_MENTIONS_DIRECT_URL="NO"
-              IFS="," read -r -a files <<< "$COMPOSE_CONFIG_FILES"
-              for f in "${files[@]}"; do
+              for f in $(printf "%s" "$COMPOSE_CONFIG_FILES" | tr "," " "); do
                 [ -f "$f" ] || { EXISTS_ALL="NO"; continue; }
                 grep -E "^[[:space:]]*env_file[[:space:]]*:" "$f" >/dev/null 2>&1 && COMPOSE_HAS_ENVFILE="YES"
                 grep -F "DATABASE_URL" "$f" >/dev/null 2>&1 && COMPOSE_MENTIONS_DATABASE_URL="YES"
@@ -289,8 +288,7 @@ jobs:
             $COMP version >/dev/null 2>&1 || COMP="docker-compose"
             $COMP version >/dev/null 2>&1 || { echo "FIX_ERR: docker_compose_not_found"; exit 7; }
 
-            IFS="," read -r -a files <<< "$CFG"
-            PATCH_FILE="${files[-1]}"
+            PATCH_FILE=$(printf "%s" "$CFG" | awk -F, "{print \$NF}" 2>/dev/null)
             [ -f "$PATCH_FILE" ] || { echo "FIX_ERR: patch_file_missing $PATCH_FILE"; exit 8; }
 
             TS=$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null); TS=${TS:-unknown}
@@ -333,7 +331,7 @@ jobs:
             " "$PATCH_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$PATCH_FILE" 2>/dev/null
 
             CFGA=""
-            for f in "${files[@]}"; do
+            for f in $(printf "%s" "$CFG" | tr "," " "); do
               CFGA="$CFGA -f $f"
             done
 
