@@ -1,4 +1,4 @@
-name: "RUN38 DIAG+FIX MINIMAL: Restore DB env to rec17-webpsb-p1 (fallback compose)"
+name: "RUN42 DIAG FINAL (READ-ONLY): Determine Coolify env injection for rec17-webpsb-p1"
 
 on:
   push:
@@ -6,24 +6,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_r36:
+  diag_r42:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    outputs:
-      proceed_fix: ${{ steps.diag.outputs.proceed_fix }}
-      app_id: ${{ steps.diag.outputs.app_id }}
-      container_name: ${{ steps.diag.outputs.container_name }}
-      compose_workdir: ${{ steps.diag.outputs.compose_workdir }}
-      compose_service: ${{ steps.diag.outputs.compose_service }}
-      compose_project: ${{ steps.diag.outputs.compose_project }}
-      compose_config_files: ${{ steps.diag.outputs.compose_config_files }}
-      envfile_has_database_url: ${{ steps.diag.outputs.envfile_has_database_url }}
-      envfile_has_direct_url: ${{ steps.diag.outputs.envfile_has_direct_url }}
-      container_has_database_url: ${{ steps.diag.outputs.container_has_database_url }}
-      container_has_direct_url: ${{ steps.diag.outputs.container_has_direct_url }}
-      compose_has_envfile: ${{ steps.diag.outputs.compose_has_envfile }}
-      compose_mentions_database_url: ${{ steps.diag.outputs.compose_mentions_database_url }}
-      compose_mentions_direct_url: ${{ steps.diag.outputs.compose_mentions_direct_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +27,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN38: Read-only — determine Coolify env injection mechanism"
+      - name: "RUN42: Read-only — determine Coolify env injection mechanism"
         id: diag
         continue-on-error: true
         run: |
@@ -62,6 +47,26 @@ jobs:
             container_has_env_key() { cid="$1"; k="$2"; docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$cid" 2>/dev/null | awk -F= "{print \$1}" | grep -x "$k" >/dev/null 2>&1; }
             label_get() { cid="$1"; key="$2"; docker inspect -f "{{ index .Config.Labels \"'"'"'$key'"'"'\" }}" "$cid" 2>/dev/null | tr -d "\r\n" | head -c 500; }
             mounts_have_app() { cid="$1"; docker inspect -f "{{range .Mounts}}{{println .Source}}{{end}}" "$cid" 2>/dev/null | grep -F "$APP_ID" >/dev/null 2>&1; }
+            inspect_created() { cid="$1"; docker inspect -f "{{.Created}}" "$cid" 2>/dev/null | head -1 | tr -d "\r\n"; }
+            inspect_image() { cid="$1"; docker inspect -f "{{.Config.Image}}" "$cid" 2>/dev/null | head -1 | tr -d "\r\n"; }
+            file_mtime_utc() { f="$1"; [ -f "$f" ] || return 1; (date -u -r "$f" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null) || (stat -c %y "$f" 2>/dev/null | head -1); }
+
+            svc_block_has() {
+              f="$1"; svc="$2"; needle="$3"
+              [ -f "$f" ] || return 1
+              awk -v svc="$svc" -v needle="$needle" '
+                BEGIN{in_services=0; in_svc=0; found=0}
+                /^[[:space:]]*services:[[:space:]]*$/ {in_services=1}
+                in_services && $0 ~ ("^  " svc ":[[:space:]]*$") {in_svc=1; next}
+                in_svc && $0 ~ /^  [A-Za-z0-9_.-]+:[[:space:]]*$/ {in_svc=0}
+                in_svc && index($0, needle) > 0 {found=1; exit}
+                END{ if(found==1) exit 0; exit 1 }
+              ' "$f" >/dev/null 2>&1
+            }
+
+            find_compose_by_container_name() {
+              grep -R -n --include="*.yml" --include="*.yaml" "container_name:[[:space:]]*${CONTAINER_NAME}[[:space:]]*$" "$ROOT" 2>/dev/null | head -1
+            }
 
             ENV_FILE="$ROOT/applications/$APP_ID/.env"
             CID=$(container_exists "$CONTAINER_NAME"); CID=${CID:-NONE}
@@ -85,6 +90,14 @@ jobs:
               if [ -z "$FALLBACK_COMPOSE_FILE" ]; then
                 FALLBACK_COMPOSE_FILE=$(ls -1t "$APPDIR"/*compose*.yml "$APPDIR"/*compose*.yaml 2>/dev/null | head -1)
               fi
+            fi
+
+            GREP_HIT=""
+            GREP_COMPOSE_FILE=""
+            if [ -z "$FALLBACK_COMPOSE_FILE" ]; then
+              GREP_HIT=$(find_compose_by_container_name)
+              GREP_COMPOSE_FILE=$(printf "%s" "$GREP_HIT" | cut -d: -f1)
+              [ -n "$GREP_COMPOSE_FILE" ] && [ -f "$GREP_COMPOSE_FILE" ] && FALLBACK_COMPOSE_FILE="$GREP_COMPOSE_FILE"
             fi
 
             FALLBACK_SERVICE=""
@@ -116,6 +129,17 @@ jobs:
             has_key_in_envfile "$ENV_FILE" "DATABASE_URL" && ENVFILE_HAS_DATABASE_URL="YES"
             has_key_in_envfile "$ENV_FILE" "DIRECT_URL" && ENVFILE_HAS_DIRECT_URL="YES"
 
+            WORKDIR_ENV_FILE=""
+            WORKDIR_ENVFILE_EXISTS="NO"
+            WORKDIR_ENVFILE_HAS_DATABASE_URL="NO"
+            WORKDIR_ENVFILE_HAS_DIRECT_URL="NO"
+            if [ -n "$COMPOSE_WORKDIR" ]; then
+              WORKDIR_ENV_FILE="$COMPOSE_WORKDIR/.env"
+              [ -f "$WORKDIR_ENV_FILE" ] && WORKDIR_ENVFILE_EXISTS="YES"
+              has_key_in_envfile "$WORKDIR_ENV_FILE" "DATABASE_URL" && WORKDIR_ENVFILE_HAS_DATABASE_URL="YES"
+              has_key_in_envfile "$WORKDIR_ENV_FILE" "DIRECT_URL" && WORKDIR_ENVFILE_HAS_DIRECT_URL="YES"
+            fi
+
             CONTAINER_HAS_DATABASE_URL="NO"
             CONTAINER_HAS_DIRECT_URL="NO"
             if [ "$CID" != "NONE" ]; then
@@ -126,56 +150,99 @@ jobs:
             MOUNTS_HAVE_APP="NO"
             [ "$CID" != "NONE" ] && mounts_have_app "$CID" && MOUNTS_HAVE_APP="YES"
 
-            COMPOSE_HAS_ENVFILE="UNKNOWN"
-            COMPOSE_MENTIONS_DATABASE_URL="UNKNOWN"
-            COMPOSE_MENTIONS_DIRECT_URL="UNKNOWN"
-
             EXISTS_ALL="YES"
             if [ -n "$COMPOSE_CONFIG_FILES" ]; then
-              COMPOSE_HAS_ENVFILE="NO"
-              COMPOSE_MENTIONS_DATABASE_URL="NO"
-              COMPOSE_MENTIONS_DIRECT_URL="NO"
+              COMPOSE_FILES_EXIST="YES"
               for f in $(printf "%s" "$COMPOSE_CONFIG_FILES" | tr "," " "); do
-                [ -f "$f" ] || { EXISTS_ALL="NO"; continue; }
-                grep -E "^[[:space:]]*env_file[[:space:]]*:" "$f" >/dev/null 2>&1 && COMPOSE_HAS_ENVFILE="YES"
-                grep -F "DATABASE_URL" "$f" >/dev/null 2>&1 && COMPOSE_MENTIONS_DATABASE_URL="YES"
-                grep -F "DIRECT_URL" "$f" >/dev/null 2>&1 && COMPOSE_MENTIONS_DIRECT_URL="YES"
+                [ -f "$f" ] || { EXISTS_ALL="NO"; }
               done
             else
               EXISTS_ALL="NO"
             fi
 
-            PROCEED_FIX="NO"
-            if [ "$CID" != "NONE" ] \
-              && [ "$ENVFILE_HAS_DATABASE_URL" = "YES" ] \
-              && [ "$CONTAINER_HAS_DATABASE_URL" = "NO" ] \
-              && [ -n "$COMPOSE_WORKDIR" ] \
-              && [ -n "$COMPOSE_SERVICE" ] \
-              && [ -n "$COMPOSE_CONFIG_FILES" ] \
-              && [ "$EXISTS_ALL" = "YES" ]; then
-              PROCEED_FIX="YES"
+            SERVICE_BLOCK_HAS_ENV_FILE="UNKNOWN"
+            SERVICE_BLOCK_HAS_ENVIRONMENT="UNKNOWN"
+            SERVICE_BLOCK_HAS_DATABASE_URL_KEY="UNKNOWN"
+            SERVICE_BLOCK_HAS_DIRECT_URL_KEY="UNKNOWN"
+            COMPOSE_FILE_REFERENCES_DOTENV="UNKNOWN"
+            COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL="UNKNOWN"
+            if [ -n "$FALLBACK_COMPOSE_FILE" ] && [ -f "$FALLBACK_COMPOSE_FILE" ] && [ -n "$COMPOSE_SERVICE" ]; then
+              SERVICE_BLOCK_HAS_ENV_FILE="NO"
+              SERVICE_BLOCK_HAS_ENVIRONMENT="NO"
+              SERVICE_BLOCK_HAS_DATABASE_URL_KEY="NO"
+              SERVICE_BLOCK_HAS_DIRECT_URL_KEY="NO"
+              COMPOSE_FILE_REFERENCES_DOTENV="NO"
+              COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL="NO"
+
+              svc_block_has "$FALLBACK_COMPOSE_FILE" "$COMPOSE_SERVICE" "env_file:" && SERVICE_BLOCK_HAS_ENV_FILE="YES"
+              svc_block_has "$FALLBACK_COMPOSE_FILE" "$COMPOSE_SERVICE" "environment:" && SERVICE_BLOCK_HAS_ENVIRONMENT="YES"
+              svc_block_has "$FALLBACK_COMPOSE_FILE" "$COMPOSE_SERVICE" "DATABASE_URL" && SERVICE_BLOCK_HAS_DATABASE_URL_KEY="YES"
+              svc_block_has "$FALLBACK_COMPOSE_FILE" "$COMPOSE_SERVICE" "DIRECT_URL" && SERVICE_BLOCK_HAS_DIRECT_URL_KEY="YES"
+              grep -F ".env" "$FALLBACK_COMPOSE_FILE" >/dev/null 2>&1 && COMPOSE_FILE_REFERENCES_DOTENV="YES"
+              grep -F "\${DATABASE_URL}" "$FALLBACK_COMPOSE_FILE" >/dev/null 2>&1 && COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL="YES"
             fi
 
-            echo "R36_APP_ID: $APP_ID"
-            echo "R36_CONTAINER_NAME: $CONTAINER_NAME"
-            echo "R36_CONTAINER_FOUND: $( [ "$CID" = "NONE" ] && echo NO || echo YES )"
-            echo "R36_ENVFILE_PATH: $ENV_FILE"
-            echo "R36_ENVFILE_HAS_DATABASE_URL: $ENVFILE_HAS_DATABASE_URL"
-            echo "R36_ENVFILE_HAS_DIRECT_URL: $ENVFILE_HAS_DIRECT_URL"
-            echo "R36_CONTAINER_HAS_DATABASE_URL: $CONTAINER_HAS_DATABASE_URL"
-            echo "R36_CONTAINER_HAS_DIRECT_URL: $CONTAINER_HAS_DIRECT_URL"
-            echo "R36_COMPOSE_PROJECT: $COMPOSE_PROJECT"
-            echo "R36_COMPOSE_SERVICE: $COMPOSE_SERVICE"
-            echo "R36_COMPOSE_WORKDIR: $COMPOSE_WORKDIR"
-            echo "R36_COMPOSE_CONFIG_FILES: $COMPOSE_CONFIG_FILES"
-            echo "R36_COMPOSE_FILES_EXIST: $EXISTS_ALL"
-            echo "R36_COMPOSE_HAS_ENVFILE: $COMPOSE_HAS_ENVFILE"
-            echo "R36_COMPOSE_MENTIONS_DATABASE_URL: $COMPOSE_MENTIONS_DATABASE_URL"
-            echo "R36_COMPOSE_MENTIONS_DIRECT_URL: $COMPOSE_MENTIONS_DIRECT_URL"
-            echo "R36_FALLBACK_COMPOSE_FILE: $FALLBACK_COMPOSE_FILE"
-            echo "R36_FALLBACK_SERVICE: $FALLBACK_SERVICE"
-            echo "R36_CONTAINER_MOUNTS_HAVE_APP_DIR: $MOUNTS_HAVE_APP"
-            echo "R36_PROCEED_FIX: $PROCEED_FIX"
+            ENV_INJECTION_MECHANISM="UNKNOWN"
+            if [ "$SERVICE_BLOCK_HAS_ENV_FILE" = "YES" ]; then
+              ENV_INJECTION_MECHANISM="COMPOSE_ENV_FILE"
+            elif [ "$SERVICE_BLOCK_HAS_ENVIRONMENT" = "YES" ] && [ "$SERVICE_BLOCK_HAS_DATABASE_URL_KEY" = "YES" ]; then
+              ENV_INJECTION_MECHANISM="COMPOSE_ENVIRONMENT_KEYS"
+            elif [ "$COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL" = "YES" ] && [ "$SERVICE_BLOCK_HAS_DATABASE_URL_KEY" = "NO" ]; then
+              ENV_INJECTION_MECHANISM="COMPOSE_SUBSTITUTION_ONLY"
+            fi
+
+            CONTAINER_CREATED="(missing)"
+            CONTAINER_IMAGE="(missing)"
+            if [ "$CID" != "NONE" ]; then
+              CONTAINER_CREATED=$(inspect_created "$CID"); [ -z "$CONTAINER_CREATED" ] && CONTAINER_CREATED="(missing)"
+              CONTAINER_IMAGE=$(inspect_image "$CID"); [ -z "$CONTAINER_IMAGE" ] && CONTAINER_IMAGE="(missing)"
+            fi
+
+            SOURCE_ENV_MTIME="(missing)"
+            WORKDIR_ENV_MTIME="(missing)"
+            [ -f "$ENV_FILE" ] && SOURCE_ENV_MTIME=$(file_mtime_utc "$ENV_FILE"); [ -z "$SOURCE_ENV_MTIME" ] && SOURCE_ENV_MTIME="(missing)"
+            [ -n "$WORKDIR_ENV_FILE" ] && [ -f "$WORKDIR_ENV_FILE" ] && WORKDIR_ENV_MTIME=$(file_mtime_utc "$WORKDIR_ENV_FILE"); [ -z "$WORKDIR_ENV_MTIME" ] && WORKDIR_ENV_MTIME="(missing)"
+
+            STALE_OR_BROKEN="UNKNOWN"
+            if [ "$ENVFILE_HAS_DATABASE_URL" = "YES" ] && [ "$CONTAINER_HAS_DATABASE_URL" = "NO" ]; then
+              STALE_OR_BROKEN="YES"
+            elif [ "$ENVFILE_HAS_DATABASE_URL" = "NO" ]; then
+              STALE_OR_BROKEN="NO_ENV_SOURCE"
+            fi
+
+            echo "R42_APP_ID: $APP_ID"
+            echo "R42_CONTAINER_NAME: $CONTAINER_NAME"
+            echo "R42_CONTAINER_FOUND: $( [ "$CID" = "NONE" ] && echo NO || echo YES )"
+            echo "R42_CONTAINER_CREATED: $CONTAINER_CREATED"
+            echo "R42_CONTAINER_IMAGE: $CONTAINER_IMAGE"
+            echo "R42_ENVFILE_PATH: $ENV_FILE"
+            echo "R42_ENVFILE_MTIME_UTC: $SOURCE_ENV_MTIME"
+            echo "R42_ENVFILE_HAS_DATABASE_URL: $ENVFILE_HAS_DATABASE_URL"
+            echo "R42_ENVFILE_HAS_DIRECT_URL: $ENVFILE_HAS_DIRECT_URL"
+            echo "R42_CONTAINER_HAS_DATABASE_URL: $CONTAINER_HAS_DATABASE_URL"
+            echo "R42_CONTAINER_HAS_DIRECT_URL: $CONTAINER_HAS_DIRECT_URL"
+            echo "R42_COMPOSE_PROJECT: $COMPOSE_PROJECT"
+            echo "R42_COMPOSE_SERVICE: $COMPOSE_SERVICE"
+            echo "R42_COMPOSE_WORKDIR: $COMPOSE_WORKDIR"
+            echo "R42_COMPOSE_CONFIG_FILES: $COMPOSE_CONFIG_FILES"
+            echo "R42_COMPOSE_FILES_EXIST: $EXISTS_ALL"
+            echo "R42_WORKDIR_ENVFILE_PATH: $WORKDIR_ENV_FILE"
+            echo "R42_WORKDIR_ENVFILE_EXISTS: $WORKDIR_ENVFILE_EXISTS"
+            echo "R42_WORKDIR_ENVFILE_MTIME_UTC: $WORKDIR_ENV_MTIME"
+            echo "R42_WORKDIR_ENVFILE_HAS_DATABASE_URL: $WORKDIR_ENVFILE_HAS_DATABASE_URL"
+            echo "R42_WORKDIR_ENVFILE_HAS_DIRECT_URL: $WORKDIR_ENVFILE_HAS_DIRECT_URL"
+            echo "R42_FALLBACK_COMPOSE_FILE: $FALLBACK_COMPOSE_FILE"
+            echo "R42_FALLBACK_SERVICE: $FALLBACK_SERVICE"
+            echo "R42_GREP_CONTAINER_NAME_MATCH: $( [ -n "$GREP_HIT" ] && echo YES || echo NO )"
+            echo "R42_CONTAINER_MOUNTS_HAVE_APP_DIR: $MOUNTS_HAVE_APP"
+            echo "R42_SERVICE_BLOCK_HAS_ENV_FILE: $SERVICE_BLOCK_HAS_ENV_FILE"
+            echo "R42_SERVICE_BLOCK_HAS_ENVIRONMENT: $SERVICE_BLOCK_HAS_ENVIRONMENT"
+            echo "R42_SERVICE_BLOCK_HAS_DATABASE_URL_KEY: $SERVICE_BLOCK_HAS_DATABASE_URL_KEY"
+            echo "R42_SERVICE_BLOCK_HAS_DIRECT_URL_KEY: $SERVICE_BLOCK_HAS_DIRECT_URL_KEY"
+            echo "R42_COMPOSE_FILE_REFERENCES_DOTENV: $COMPOSE_FILE_REFERENCES_DOTENV"
+            echo "R42_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL: $COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL"
+            echo "R42_ENV_INJECTION_MECHANISM: $ENV_INJECTION_MECHANISM"
+            echo "R42_STALE_OR_BROKEN_DEPLOYMENT: $STALE_OR_BROKEN"
           ' 2>&1)
 
           echo "raw<<EOF" >> "$GITHUB_OUTPUT"
@@ -183,198 +250,19 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
           getv() { printf '%s\n' "$OUT" | { grep -E "^$1:" || true; } | head -1 | cut -d: -f2- | sed "s/^[[:space:]]*//; s/[[:space:]]\+$//"; }
-          proceed_fix="$(getv R36_PROCEED_FIX)"
-          app_id="$(getv R36_APP_ID)"
-          container_name="$(getv R36_CONTAINER_NAME)"
-          compose_workdir="$(getv R36_COMPOSE_WORKDIR)"
-          compose_service="$(getv R36_COMPOSE_SERVICE)"
-          compose_project="$(getv R36_COMPOSE_PROJECT)"
-          compose_config_files="$(getv R36_COMPOSE_CONFIG_FILES)"
-          envfile_has_database_url="$(getv R36_ENVFILE_HAS_DATABASE_URL)"
-          envfile_has_direct_url="$(getv R36_ENVFILE_HAS_DIRECT_URL)"
-          container_has_database_url="$(getv R36_CONTAINER_HAS_DATABASE_URL)"
-          container_has_direct_url="$(getv R36_CONTAINER_HAS_DIRECT_URL)"
-          compose_has_envfile="$(getv R36_COMPOSE_HAS_ENVFILE)"
-          compose_mentions_database_url="$(getv R36_COMPOSE_MENTIONS_DATABASE_URL)"
-          compose_mentions_direct_url="$(getv R36_COMPOSE_MENTIONS_DIRECT_URL)"
-
-          for kv in proceed_fix app_id container_name compose_workdir compose_service compose_project compose_config_files envfile_has_database_url envfile_has_direct_url container_has_database_url container_has_direct_url compose_has_envfile compose_mentions_database_url compose_mentions_direct_url; do
-            eval "v=\${$kv}"
+          for k in R42_APP_ID R42_CONTAINER_NAME R42_CONTAINER_FOUND R42_CONTAINER_CREATED R42_CONTAINER_IMAGE R42_ENVFILE_PATH R42_ENVFILE_MTIME_UTC R42_ENVFILE_HAS_DATABASE_URL R42_ENVFILE_HAS_DIRECT_URL R42_CONTAINER_HAS_DATABASE_URL R42_CONTAINER_HAS_DIRECT_URL R42_COMPOSE_PROJECT R42_COMPOSE_SERVICE R42_COMPOSE_WORKDIR R42_COMPOSE_CONFIG_FILES R42_COMPOSE_FILES_EXIST R42_WORKDIR_ENVFILE_PATH R42_WORKDIR_ENVFILE_EXISTS R42_WORKDIR_ENVFILE_MTIME_UTC R42_WORKDIR_ENVFILE_HAS_DATABASE_URL R42_WORKDIR_ENVFILE_HAS_DIRECT_URL R42_FALLBACK_COMPOSE_FILE R42_FALLBACK_SERVICE R42_GREP_CONTAINER_NAME_MATCH R42_CONTAINER_MOUNTS_HAVE_APP_DIR R42_SERVICE_BLOCK_HAS_ENV_FILE R42_SERVICE_BLOCK_HAS_ENVIRONMENT R42_SERVICE_BLOCK_HAS_DATABASE_URL_KEY R42_SERVICE_BLOCK_HAS_DIRECT_URL_KEY R42_COMPOSE_FILE_REFERENCES_DOTENV R42_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL R42_ENV_INJECTION_MECHANISM R42_STALE_OR_BROKEN_DEPLOYMENT; do
+            v="$(getv "$k")"
             [ -z "$v" ] && v="(missing)"
-            echo "${kv}=$v" >> "$GITHUB_OUTPUT"
+            echo "${k}=$v" >> "$GITHUB_OUTPUT"
           done
 
-      - name: "RUN38: Summary (read-only)"
+      - name: "RUN42: Summary (read-only)"
         continue-on-error: true
         run: |
           set +eo pipefail
           OUT="${{ steps.diag.outputs.raw }}"
           getv() { printf '%s\n' "$OUT" | { grep -E "^$1:" || true; } | head -1 | cut -d: -f2- | sed "s/^[[:space:]]*//; s/[[:space:]]\+$//"; }
-          for k in R36_PROCEED_FIX R36_COMPOSE_WORKDIR R36_COMPOSE_CONFIG_FILES R36_COMPOSE_SERVICE R36_FALLBACK_COMPOSE_FILE R36_FALLBACK_SERVICE R36_ENVFILE_HAS_DATABASE_URL R36_ENVFILE_HAS_DIRECT_URL R36_CONTAINER_HAS_DATABASE_URL R36_CONTAINER_HAS_DIRECT_URL R36_COMPOSE_HAS_ENVFILE R36_COMPOSE_MENTIONS_DATABASE_URL R36_COMPOSE_MENTIONS_DIRECT_URL; do
-            v="$(getv "$k")"; [ -z "$v" ] && v="(missing)"
-            v="$(printf '%s' "$v" | head -c 1100)"
-            v_safe="$(printf '%s' "$v" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
-            echo "::notice title=${k}::${v_safe}"
-          done
-
-  fix_r36:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [diag_r36]
-    if: ${{ needs.diag_r36.outputs.proceed_fix == 'YES' }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: "0. Install SSH Key STANDARD SAFE"
-        run: |
-          USER="${{ secrets.COOLIFY_SERVER_USER }}"; USER="${USER:-root}"
-          KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
-          HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
-          mkdir -p $HOME/.ssh; chmod 700 $HOME/.ssh
-          K=$HOME/.ssh/id_rsa_r25
-          install -m 600 /dev/null $K
-          printf '%s\n' "$KEY" > $K
-          chmod 600 $K
-          echo "KEY=$K" >> $GITHUB_ENV
-          echo "USER=$USER" >> $GITHUB_ENV
-          echo "HOST=$HOST" >> $GITHUB_ENV
-
-      - name: "RUN38: CHANGE_PLAN (must print before change)"
-        run: |
-          set +e
-          APP_ID="${{ needs.diag_r36.outputs.app_id }}"
-          CTR="${{ needs.diag_r36.outputs.container_name }}"
-          KEYS="DATABASE_URL DIRECT_URL"
-          echo "::notice title=CHANGE_PLAN::Patch Compose env injection for ${CTR} to restore DB env keys via placeholders (no secrets printed), then force-recreate only that service using docker compose."
-          echo "::notice title=AFFECTED_APPLICATION::${APP_ID}"
-          echo "::notice title=AFFECTED_CONTAINER::${CTR}"
-          echo "::notice title=ENV_KEYS_TO_RESTORE::${KEYS}"
-          echo "::notice title=ROLLBACK_PLAN::Restore compose file from backup (.bak.RUN36.<ts>) and force-recreate only the same service again."
-
-      - name: "RUN38: APPLY FIX — restore DATABASE_URL/DIRECT_URL via Compose and recreate service"
-        id: fix
-        run: |
-          set +e
-          K=${{ env.KEY }}
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
-
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
-            APP_ID=pic3vleasj465ooh77ioicw6
-            CONTAINER_NAME=rec17-webpsb-p1
-            ROOT=/data/coolify
-            ENV_FILE="$ROOT/applications/$APP_ID/.env"
-
-            container_exists() { docker ps -a --filter "name=^/$1$" --format "{{.ID}}" 2>/dev/null | head -1; }
-            container_has_env_key() { cid="$1"; k="$2"; docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$cid" 2>/dev/null | awk -F= "{print \$1}" | grep -x "$k" >/dev/null 2>&1; }
-            label_get() { cid="$1"; key="$2"; docker inspect -f "{{ index .Config.Labels \"'"'"'$key'"'"'\" }}" "$cid" 2>/dev/null | tr -d "\r\n" | head -c 800; }
-            has_key_in_envfile() { f="$1"; k="$2"; [ -f "$f" ] || return 1; grep -q -E "^[[:space:]]*${k}[[:space:]]*=" "$f" 2>/dev/null; }
-
-            CID=$(container_exists "$CONTAINER_NAME"); CID=${CID:-NONE}
-            [ "$CID" = "NONE" ] && echo "FIX_ERR: container_not_found" && exit 2
-
-            WORKDIR=$(label_get "$CID" "com.docker.compose.project.working_dir")
-            SERVICE=$(label_get "$CID" "com.docker.compose.service")
-            CFG=$(label_get "$CID" "com.docker.compose.project.config_files")
-            [ -z "$WORKDIR" ] && echo "FIX_ERR: compose_workdir_missing" && exit 3
-            [ -z "$SERVICE" ] && echo "FIX_ERR: compose_service_missing" && exit 4
-            [ -z "$CFG" ] && echo "FIX_ERR: compose_config_files_missing" && exit 5
-
-            has_key_in_envfile "$ENV_FILE" "DATABASE_URL" || { echo "FIX_ERR: envfile_missing_DATABASE_URL"; exit 6; }
-            has_key_in_envfile "$ENV_FILE" "DIRECT_URL" || { echo "FIX_WARN: envfile_missing_DIRECT_URL"; }
-
-            COMP="docker compose"
-            $COMP version >/dev/null 2>&1 || COMP="docker-compose"
-            $COMP version >/dev/null 2>&1 || { echo "FIX_ERR: docker_compose_not_found"; exit 7; }
-
-            PATCH_FILE=$(printf "%s" "$CFG" | awk -F, "{print \$NF}" 2>/dev/null)
-            [ -f "$PATCH_FILE" ] || { echo "FIX_ERR: patch_file_missing $PATCH_FILE"; exit 8; }
-
-            TS=$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null); TS=${TS:-unknown}
-            BAK="${PATCH_FILE}.bak.RUN36.${TS}"
-            cp -f "$PATCH_FILE" "$BAK" 2>/dev/null || { echo "FIX_ERR: backup_failed"; exit 9; }
-
-            TMP="${PATCH_FILE}.tmp.RUN36.${TS}"
-            awk -v svc="$SERVICE" "
-              BEGIN {in_services=0; in_svc=0; env_seen=0; inserted=0; added_db=0; added_du=0; }
-              {
-                line=\$0
-                if (line ~ /^services:[[:space:]]*$/) { in_services=1 }
-                if (in_services && line ~ (\"^  \" svc \":[[:space:]]*$\")) { in_svc=1; env_seen=0; inserted=0; added_db=0; added_du=0 }
-                if (in_svc && line ~ /^    environment:[[:space:]]*$/) { env_seen=1 }
-                print line
-                if (in_svc && !inserted) {
-                  if (!env_seen && (line ~ /^    image:/ || line ~ /^    build:/ || line ~ /^    container_name:/)) {
-                    print \"    environment:\"
-                    print \"      - DATABASE_URL=\\\${DATABASE_URL}\"
-                    print \"      - DIRECT_URL=\\\${DIRECT_URL}\"
-                    inserted=1
-                  }
-                  if (env_seen && (line ~ /^    environment:[[:space:]]*$/)) {
-                    print \"      - DATABASE_URL=\\\${DATABASE_URL}\"
-                    print \"      - DIRECT_URL=\\\${DIRECT_URL}\"
-                    inserted=1
-                  }
-                }
-                if (in_services && in_svc && line ~ /^  [^ ][^:]*:[[:space:]]*$/ && line !~ (\"^  \" svc \":[[:space:]]*$\")) {
-                  in_svc=0
-                }
-              }
-              END {
-                if (in_svc && !inserted) {
-                  print \"    environment:\"
-                  print \"      - DATABASE_URL=\\\${DATABASE_URL}\"
-                  print \"      - DIRECT_URL=\\\${DIRECT_URL}\"
-                }
-              }
-            " "$PATCH_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$PATCH_FILE" 2>/dev/null
-
-            CFGA=""
-            for f in $(printf "%s" "$CFG" | tr "," " "); do
-              CFGA="$CFGA -f $f"
-            done
-
-            cd "$WORKDIR" 2>/dev/null || { echo "FIX_ERR: cannot_cd_workdir"; exit 11; }
-            $COMP $CFGA up -d --force-recreate --no-deps "$SERVICE" 2>/dev/null || { echo "FIX_ERR: compose_up_failed"; cp -f "$BAK" "$PATCH_FILE" 2>/dev/null; $COMP $CFGA up -d --force-recreate --no-deps "$SERVICE" 2>/dev/null; exit 12; }
-
-            NEWCID=$(container_exists "$CONTAINER_NAME"); NEWCID=${NEWCID:-NONE}
-            [ "$NEWCID" = "NONE" ] && { echo "FIX_ERR: container_missing_after_recreate"; cp -f "$BAK" "$PATCH_FILE" 2>/dev/null; $COMP $CFGA up -d --force-recreate --no-deps "$SERVICE" 2>/dev/null; exit 13; }
-
-            DB_KEY="NOT_FOUND"
-            DU_KEY="NOT_FOUND"
-            container_has_env_key "$NEWCID" "DATABASE_URL" && DB_KEY="FOUND"
-            container_has_env_key "$NEWCID" "DIRECT_URL" && DU_KEY="FOUND"
-
-            HTTP_LOGIN_CODE=$(curl -k -sS -o /dev/null -w "%{http_code}" https://webpsb.perkasa.net.id/login 2>/dev/null)
-            HTTP_LOGIN_CODE=${HTTP_LOGIN_CODE:-curl_failed}
-
-            curl -k -sS -X POST -H "Content-Type: application/x-www-form-urlencoded" -d "username=__probe__&password=__probe__" https://webpsb.perkasa.net.id/login -o /dev/null 2>/dev/null
-
-            PRISMA_ENV_ERR="NO"
-            docker logs --tail 220 "$NEWCID" 2>/dev/null | grep -F "Environment variable not found: DATABASE_URL" >/dev/null 2>&1 && PRISMA_ENV_ERR="YES"
-
-            echo "FIX_APPLIED: YES"
-            echo "FIX_AFFECTED_APP: $APP_ID"
-            echo "FIX_AFFECTED_CONTAINER: $CONTAINER_NAME"
-            echo "FIX_ENV_DATABASE_URL: $DB_KEY"
-            echo "FIX_ENV_DIRECT_URL: $DU_KEY"
-            echo "FIX_HTTP_LOGIN_CODE: $HTTP_LOGIN_CODE"
-            echo "FIX_PRISMA_ENV_ERROR_STILL_PRESENT: $PRISMA_ENV_ERR"
-            echo "FIX_BACKUP_FILE: $BAK"
-          ' 2>&1)
-
-          echo "raw<<EOF" >> "$GITHUB_OUTPUT"
-          printf '%s\n' "$OUT" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: "RUN37: Result summary"
-        continue-on-error: true
-        run: |
-          set +eo pipefail
-          OUT="${{ steps.fix.outputs.raw }}"
-          getv() { printf '%s\n' "$OUT" | { grep -E "^$1:" || true; } | head -1 | cut -d: -f2- | sed "s/^[[:space:]]*//; s/[[:space:]]\+$//"; }
-          for k in FIX_APPLIED FIX_AFFECTED_APP FIX_AFFECTED_CONTAINER FIX_ENV_DATABASE_URL FIX_ENV_DIRECT_URL FIX_HTTP_LOGIN_CODE FIX_PRISMA_ENV_ERROR_STILL_PRESENT FIX_BACKUP_FILE; do
+          for k in R42_APP_ID R42_CONTAINER_NAME R42_CONTAINER_FOUND R42_CONTAINER_CREATED R42_CONTAINER_IMAGE R42_ENVFILE_PATH R42_ENVFILE_MTIME_UTC R42_ENVFILE_HAS_DATABASE_URL R42_ENVFILE_HAS_DIRECT_URL R42_CONTAINER_HAS_DATABASE_URL R42_CONTAINER_HAS_DIRECT_URL R42_COMPOSE_PROJECT R42_COMPOSE_SERVICE R42_COMPOSE_WORKDIR R42_COMPOSE_CONFIG_FILES R42_COMPOSE_FILES_EXIST R42_WORKDIR_ENVFILE_PATH R42_WORKDIR_ENVFILE_EXISTS R42_WORKDIR_ENVFILE_MTIME_UTC R42_WORKDIR_ENVFILE_HAS_DATABASE_URL R42_WORKDIR_ENVFILE_HAS_DIRECT_URL R42_FALLBACK_COMPOSE_FILE R42_FALLBACK_SERVICE R42_GREP_CONTAINER_NAME_MATCH R42_CONTAINER_MOUNTS_HAVE_APP_DIR R42_SERVICE_BLOCK_HAS_ENV_FILE R42_SERVICE_BLOCK_HAS_ENVIRONMENT R42_SERVICE_BLOCK_HAS_DATABASE_URL_KEY R42_SERVICE_BLOCK_HAS_DIRECT_URL_KEY R42_COMPOSE_FILE_REFERENCES_DOTENV R42_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL R42_ENV_INJECTION_MECHANISM R42_STALE_OR_BROKEN_DEPLOYMENT; do
             v="$(getv "$k")"; [ -z "$v" ] && v="(missing)"
             v="$(printf '%s' "$v" | head -c 1100)"
             v_safe="$(printf '%s' "$v" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
