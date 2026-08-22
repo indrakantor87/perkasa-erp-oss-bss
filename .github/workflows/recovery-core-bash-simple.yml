@@ -1,4 +1,4 @@
-name: "RUN35 READ-ONLY: Map Coolify AppID -> rec17-webpsb-p1 (A-F + Prisma provider)"
+name: "RUN36 DIAG+FIX MINIMAL: Restore DB env to rec17-webpsb-p1"
 
 on:
   push:
@@ -6,9 +6,24 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_r32:
+  diag_r36:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      proceed_fix: ${{ steps.diag.outputs.proceed_fix }}
+      app_id: ${{ steps.diag.outputs.app_id }}
+      container_name: ${{ steps.diag.outputs.container_name }}
+      compose_workdir: ${{ steps.diag.outputs.compose_workdir }}
+      compose_service: ${{ steps.diag.outputs.compose_service }}
+      compose_project: ${{ steps.diag.outputs.compose_project }}
+      compose_config_files: ${{ steps.diag.outputs.compose_config_files }}
+      envfile_has_database_url: ${{ steps.diag.outputs.envfile_has_database_url }}
+      envfile_has_direct_url: ${{ steps.diag.outputs.envfile_has_direct_url }}
+      container_has_database_url: ${{ steps.diag.outputs.container_has_database_url }}
+      container_has_direct_url: ${{ steps.diag.outputs.container_has_direct_url }}
+      compose_has_envfile: ${{ steps.diag.outputs.compose_has_envfile }}
+      compose_mentions_database_url: ${{ steps.diag.outputs.compose_mentions_database_url }}
+      compose_mentions_direct_url: ${{ steps.diag.outputs.compose_mentions_direct_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -27,306 +42,387 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN35: Read-only mapping (Coolify app metadata + rec17 + Prisma)"
-        id: diag_ro
+      - name: "RUN36: Read-only — determine Coolify env injection mechanism"
+        id: diag
         continue-on-error: true
         run: |
           set +e
           K=${{ env.KEY }}
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
+
           OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
             set +e
-            APP1=qpwsfd82uqkae83wmgjsapie
-            APP2=pic3vleasj465ooh77ioicw6
-            APP3=b8qxcx7nu5nfvcygs1gg1fyt
-            APPS="$APP1 $APP2 $APP3"
 
-            DB_VARS="DATABASE_URL DIRECT_URL SHADOW_DATABASE_URL PRISMA_DATABASE_URL"
-            AUTH_VARS="NEXTAUTH_SECRET NEXTAUTH_URL AUTH_SECRET AUTH_URL AUTH_TRUST_HOST"
-            ALL_VARS="$DB_VARS $AUTH_VARS"
+            APP_ID=pic3vleasj465ooh77ioicw6
+            CONTAINER_NAME=rec17-webpsb-p1
+            ROOT=/data/coolify
 
-            root=/data/coolify
-            NOW=$(date -u +%FT%TZ 2>/dev/null); NOW=${NOW:-unknown}
+            container_exists() { docker ps -a --filter "name=^/$1$" --format "{{.ID}}" 2>/dev/null | head -1; }
+            has_key_in_envfile() { f="$1"; k="$2"; [ -f "$f" ] || return 1; grep -q -E "^[[:space:]]*${k}[[:space:]]*=" "$f" 2>/dev/null; }
+            container_has_env_key() { cid="$1"; k="$2"; docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$cid" 2>/dev/null | awk -F= "{print \$1}" | grep -x "$k" >/dev/null 2>&1; }
+            label_get() { cid="$1"; key="$2"; docker inspect -f "{{ index .Config.Labels \"'"'"'$key'"'"'\" }}" "$cid" 2>/dev/null | tr -d "\r\n" | head -c 500; }
+            mounts_have_app() { cid="$1"; docker inspect -f "{{range .Mounts}}{{println .Source}}{{end}}" "$cid" 2>/dev/null | grep -F "$APP_ID" >/dev/null 2>&1; }
 
-            redact_url() {
-              python3 -c "import sys,re; u=sys.argv[1].strip(); u=re.sub(r\"(\\w+://)([^/@]+@)\", r\"\\1REDACTED@\", u); print(u)" "$1" 2>/dev/null | tr -d "\r\n" | head -c 220
-            }
+            ENV_FILE="$ROOT/applications/$APP_ID/.env"
+            CID=$(container_exists "$CONTAINER_NAME"); CID=${CID:-NONE}
 
-            has_key_in_envfile() {
-              f="$1"; k="$2"
-              [ -f "$f" ] || return 1
-              grep -q -E "^[[:space:]]*${k}[[:space:]]*=" "$f" 2>/dev/null
-            }
-
-            envfile_redacted_url() {
-              f="$1"; k="$2"
-              [ -f "$f" ] || return 0
-              line=$(grep -E "^[[:space:]]*${k}[[:space:]]*=" "$f" 2>/dev/null | head -1)
-              [ -z "$line" ] && return 0
-              val=$(printf "%s\n" "$line" | sed -E "s/^[^=]*=//")
-              redact_url "$val"
-            }
-
-            envfile_scheme() {
-              f="$1"; k="$2"
-              [ -f "$f" ] || { echo "unknown"; return 0; }
-              line=$(grep -E "^[[:space:]]*${k}[[:space:]]*=" "$f" 2>/dev/null | head -1)
-              [ -z "$line" ] && { echo "unknown"; return 0; }
-              val=$(printf "%s\n" "$line" | sed -E "s/^[^=]*=//; s/^\\\"//; s/\\\"$//")
-              sch=$(printf "%s\n" "$val" | sed -E "s#^([a-zA-Z0-9_+.-]+)://.*#\\1#")
-              [ -z "$sch" ] && sch="unknown"
-              printf "%s" "$sch" | tr -d "\r\n" | head -c 40
-            }
-
-            container_exists() {
-              docker ps -a --filter "name=^/$1$" --format "{{.ID}}" 2>/dev/null | head -1
-            }
-
-            container_labels() {
-              docker inspect -f "{{range \$k, \$v := .Config.Labels}}{{println \$k \"=\" \$v}}{{end}}" "$1" 2>/dev/null
-            }
-
-            container_env_keys() {
-              docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$1" 2>/dev/null | awk -F= "{print \$1}" | sort -u
-            }
-
-            app_name_from_dir() {
-              dir="$1"
-              n=$(grep -RIn -m 1 -E "\"name\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" "$dir" 2>/dev/null | head -1 | sed -E "s/.*\"name\"[[:space:]]*:[[:space:]]*\"([^\"]+)\".*/\\1/")
-              [ -z "$n" ] && n=$(grep -RIn -m 1 -E "^[[:space:]]*name:[[:space:]]+" "$dir" 2>/dev/null | head -1 | sed -E "s/^[^:]*:[^:]*:[[:space:]]*name:[[:space:]]*//")
-              [ -z "$n" ] && n="(unknown)"
-              printf "%s" "$n" | tr -d "\r\n" | head -c 120
-            }
-
-            app_domain_from_dir() {
-              dir="$1"
-              d=$(grep -RIn -m 1 -E "webpsb\\.perkasa\\.net\\.id|[a-z0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.sslip\\.io" "$dir" 2>/dev/null | head -1 | sed -E "s/.*(webpsb\\.perkasa\\.net\\.id|[a-z0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.sslip\\.io).*/\\1/")
-              [ -z "$d" ] && d="(unknown)"
-              printf "%s" "$d" | tr -d "\r\n" | head -c 160
-            }
-
-            app_image_from_dir() {
-              dir="$1"
-              img=$(grep -RIn -m 1 -E "^[[:space:]]*image:[[:space:]]+" "$dir" 2>/dev/null | head -1 | sed -E "s/^[^:]*:[^:]*:[[:space:]]*image:[[:space:]]*//")
-              [ -z "$img" ] && img=$(grep -RIn -m 1 -E "local-web-psb:" "$dir" 2>/dev/null | head -1 | sed -E "s/.*(local-web-psb:[a-z0-9]+).*/\\1/")
-              [ -z "$img" ] && img="(unknown)"
-              printf "%s" "$img" | tr -d "\r\n" | head -c 140
-            }
-
-            echo "R30_TS: $NOW"
-            if [ -d "$root" ]; then
-              echo "R30_COOLIFY_DIR: FOUND"
-            else
-              echo "R30_COOLIFY_DIR: NOT_FOUND"
+            COMPOSE_WORKDIR=""
+            COMPOSE_PROJECT=""
+            COMPOSE_SERVICE=""
+            COMPOSE_CONFIG_FILES=""
+            if [ "$CID" != "NONE" ]; then
+              COMPOSE_WORKDIR=$(label_get "$CID" "com.docker.compose.project.working_dir")
+              COMPOSE_PROJECT=$(label_get "$CID" "com.docker.compose.project")
+              COMPOSE_SERVICE=$(label_get "$CID" "com.docker.compose.service")
+              COMPOSE_CONFIG_FILES=$(label_get "$CID" "com.docker.compose.project.config_files")
             fi
 
-            REC17_CID=$(container_exists "rec17-webpsb-p1"); REC17_CID=${REC17_CID:-NONE}
-            if [ "$REC17_CID" = "NONE" ]; then
-              echo "R30_REC17_CONTAINER: NOT_FOUND"
-            else
-              echo "R30_REC17_CONTAINER: FOUND id=${REC17_CID:0:12}"
+            ENVFILE_HAS_DATABASE_URL="NO"
+            ENVFILE_HAS_DIRECT_URL="NO"
+            has_key_in_envfile "$ENV_FILE" "DATABASE_URL" && ENVFILE_HAS_DATABASE_URL="YES"
+            has_key_in_envfile "$ENV_FILE" "DIRECT_URL" && ENVFILE_HAS_DIRECT_URL="YES"
+
+            CONTAINER_HAS_DATABASE_URL="NO"
+            CONTAINER_HAS_DIRECT_URL="NO"
+            if [ "$CID" != "NONE" ]; then
+              container_has_env_key "$CID" "DATABASE_URL" && CONTAINER_HAS_DATABASE_URL="YES"
+              container_has_env_key "$CID" "DIRECT_URL" && CONTAINER_HAS_DIRECT_URL="YES"
             fi
 
-            REC17_APPID="UNKNOWN"
-            if [ "$REC17_CID" != "NONE" ]; then
-              LBL=$(container_labels "$REC17_CID")
-              for a in $APPS; do
-                printf "%s\n" "$LBL" | grep -F "$a" >/dev/null 2>&1 && REC17_APPID="$a" && break
-              done
-            fi
-            echo "R30_REC17_SOURCE_APPID: $REC17_APPID"
+            MOUNTS_HAVE_APP="NO"
+            [ "$CID" != "NONE" ] && mounts_have_app "$CID" && MOUNTS_HAVE_APP="YES"
 
-            QPWS_ENV_IS_SOURCE="NO"
-            [ "$REC17_APPID" = "$APP1" ] && QPWS_ENV_IS_SOURCE="YES"
-            echo "R30_QPWS_ENV_IS_SOURCE: $QPWS_ENV_IS_SOURCE"
+            COMPOSE_HAS_ENVFILE="UNKNOWN"
+            COMPOSE_MENTIONS_DATABASE_URL="UNKNOWN"
+            COMPOSE_MENTIONS_DIRECT_URL="UNKNOWN"
 
-            QPWS_DB_IN_ENV="NOT_FOUND"
-            f_qpws="$root/applications/$APP1/.env"
-            has_key_in_envfile "$f_qpws" "DATABASE_URL" && QPWS_DB_IN_ENV="FOUND"
-            echo "R30_QPWS_ENV_DATABASE_URL: $QPWS_DB_IN_ENV file=$f_qpws"
-
-            map_containers_for_app() {
-              aid="$1"
-              out=""
-              for nm in rec17-webpsb-p1 webpsb-recoverycore-customdomain web-psb-perkasa; do
-                cid=$(container_exists "$nm"); [ -z "$cid" ] && continue
-                lbl=$(container_labels "$cid")
-                printf "%s\n" "$lbl" | grep -F "$aid" >/dev/null 2>&1 && out="${out}${nm} "
-              done
-              [ -z "$out" ] && out="(none)"
-              printf "%s" "$out" | head -c 220
-            }
-
-            for aid in $APPS; do
-              dir="$root/applications/$aid"
-              if [ ! -d "$dir" ]; then
-                echo "R30_APP_${aid}: NOT_FOUND"
-                continue
-              fi
-
-              nm=$(app_name_from_dir "$dir")
-              dom=$(app_domain_from_dir "$dir")
-              img=$(app_image_from_dir "$dir")
-              ctrs=$(map_containers_for_app "$aid")
-              rel="NO"
-              [ "$aid" = "$REC17_APPID" ] && rel="YES"
-              echo "R30_APP_${aid}: FOUND name=${nm} domain=${dom} image=${img} containers=${ctrs} rel_rec17=${rel}"
-            done
-
-            REC17_ENV_LINE=""
-            if [ "$REC17_CID" != "NONE" ]; then
-              keys=$(container_env_keys "$REC17_CID" | tr "\n" " " | sed "s/[[:space:]]\+$//")
-              for v in $ALL_VARS; do
-                found="NOT_FOUND"
-                printf "%s\n" "$keys" | grep -w "$v" >/dev/null 2>&1 && found="FOUND"
-                REC17_ENV_LINE="${REC17_ENV_LINE}${v}=${found} "
+            EXISTS_ALL="YES"
+            if [ -n "$COMPOSE_CONFIG_FILES" ]; then
+              COMPOSE_HAS_ENVFILE="NO"
+              COMPOSE_MENTIONS_DATABASE_URL="NO"
+              COMPOSE_MENTIONS_DIRECT_URL="NO"
+              IFS="," read -r -a files <<< "$COMPOSE_CONFIG_FILES"
+              for f in "${files[@]}"; do
+                [ -f "$f" ] || { EXISTS_ALL="NO"; continue; }
+                grep -E "^[[:space:]]*env_file[[:space:]]*:" "$f" >/dev/null 2>&1 && COMPOSE_HAS_ENVFILE="YES"
+                grep -F "DATABASE_URL" "$f" >/dev/null 2>&1 && COMPOSE_MENTIONS_DATABASE_URL="YES"
+                grep -F "DIRECT_URL" "$f" >/dev/null 2>&1 && COMPOSE_MENTIONS_DIRECT_URL="YES"
               done
             else
-              REC17_ENV_LINE="(container_missing)"
+              EXISTS_ALL="NO"
             fi
-            echo "R30_REC17_ENV_KEYS: ${REC17_ENV_LINE:0:900}"
 
-            DB_SRC="NOT_FOUND"
-            DB_SRC_APP="UNKNOWN"
-            DB_SRC_FILE="(none)"
-            DB_SRC_SCHEME="unknown"
-            if [ "$REC17_APPID" != "UNKNOWN" ]; then
-              f="$root/applications/$REC17_APPID/.env"
-              if has_key_in_envfile "$f" "DATABASE_URL"; then
-                DB_SRC="FOUND"
-                DB_SRC_APP="$REC17_APPID"
-                DB_SRC_FILE="$f"
-                DB_SRC_SCHEME=$(envfile_scheme "$f" "DATABASE_URL")
-              else
-                DB_SRC="NOT_FOUND"
-                DB_SRC_APP="$REC17_APPID"
-                DB_SRC_FILE="$f"
-              fi
+            PROCEED_FIX="NO"
+            if [ "$CID" != "NONE" ] \
+              && [ "$ENVFILE_HAS_DATABASE_URL" = "YES" ] \
+              && [ "$CONTAINER_HAS_DATABASE_URL" = "NO" ] \
+              && [ -n "$COMPOSE_WORKDIR" ] \
+              && [ -n "$COMPOSE_SERVICE" ] \
+              && [ -n "$COMPOSE_CONFIG_FILES" ] \
+              && [ "$EXISTS_ALL" = "YES" ]; then
+              PROCEED_FIX="YES"
             fi
-            echo "R30_REC17_DB_ENVFILE_SAFE: status=${DB_SRC} app=${DB_SRC_APP} file=${DB_SRC_FILE} scheme=${DB_SRC_SCHEME}"
 
-            AUTH_SRC="NOT_FOUND"
-            AUTH_SRC_APP="UNKNOWN"
-            AUTH_SRC_FILE="(none)"
-            if [ "$REC17_APPID" != "UNKNOWN" ]; then
-              f="$root/applications/$REC17_APPID/.env"
-              if has_key_in_envfile "$f" "NEXTAUTH_SECRET" || has_key_in_envfile "$f" "AUTH_SECRET"; then
-                AUTH_SRC="FOUND"
-                AUTH_SRC_APP="$REC17_APPID"
-                AUTH_SRC_FILE="$f"
-              else
-                AUTH_SRC="NOT_FOUND"
-                AUTH_SRC_APP="$REC17_APPID"
-                AUTH_SRC_FILE="$f"
-              fi
-            fi
-            echo "R30_REC17_AUTH_ENVFILE_SAFE: status=${AUTH_SRC} app=${AUTH_SRC_APP} file=${AUTH_SRC_FILE}"
-
-            PR_PROVIDER="UNKNOWN"
-            PR_DBURL="NO"
-            PR_DIRECT="NO"
-            if [ "$REC17_CID" != "NONE" ]; then
-              PR_OUT=$(docker exec "$REC17_CID" sh -c "
-                pick=\"\"
-                for base in /app /usr/src/app /workspace; do
-                  [ -d \"\$base\" ] || continue
-                  p=\$(find \"\$base\" -maxdepth 6 -type f -name schema.prisma 2>/dev/null | head -1)
-                  [ -n \"\$p\" ] && pick=\"\$p\" && break
-                done
-                if [ -z \"\$pick\" ]; then
-                  for p in /app/prisma/schema.prisma /prisma/schema.prisma /usr/src/app/prisma/schema.prisma /workspace/prisma/schema.prisma; do
-                    [ -f \"\$p\" ] && pick=\"\$p\" && break
-                  done
-                fi
-                if [ -n \"\$pick\" ]; then
-                  echo FILE:\$pick
-                  grep -E \"provider[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -5
-                  grep -E \"url[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -1
-                  grep -E \"directUrl[[:space:]]*=\" \"\$pick\" 2>/dev/null | head -1
-                fi
-              " 2>/dev/null | tr -d "\r")
-              PR_PROVIDER=$(printf "%s\n" "$PR_OUT" | grep -E "provider[[:space:]]*=" 2>/dev/null | grep -v "prisma-client-js" | head -1 | sed -E "s/.*provider[[:space:]]*=[[:space:]]*\\\"([^\\\"]+)\\\".*/\\1/")
-              [ -z "$PR_PROVIDER" ] && PR_PROVIDER="UNKNOWN"
-              printf "%s\n" "$PR_OUT" | grep -E "url[[:space:]]*=" 2>/dev/null | grep -F "DATABASE_URL" >/dev/null 2>&1 && PR_DBURL="YES"
-              printf "%s\n" "$PR_OUT" | grep -E "directUrl[[:space:]]*=" 2>/dev/null | grep -F "DIRECT_URL" >/dev/null 2>&1 && PR_DIRECT="YES"
-            fi
-            echo "R30_PRISMA: provider=${PR_PROVIDER} uses_DATABASE_URL=${PR_DBURL} uses_DIRECT_URL=${PR_DIRECT}"
-
-            DB_MATCH="NO"
-            if [ "$PR_PROVIDER" = "mysql" ] && [ "$DB_SRC_SCHEME" = "mysql" ]; then
-              DB_MATCH="YES"
-            elif [ "$PR_PROVIDER" = "postgresql" ] && ( [ "$DB_SRC_SCHEME" = "postgresql" ] || [ "$DB_SRC_SCHEME" = "postgres" ] ); then
-              DB_MATCH="YES"
-            fi
-            echo "R30_DATABASE_ENV_MATCH: $DB_MATCH"
-
-            SAFE="NO"
-            if [ "$REC17_APPID" != "UNKNOWN" ] && [ "$DB_SRC" = "FOUND" ] && [ "$PR_PROVIDER" != "UNKNOWN" ] && [ "$DB_MATCH" = "YES" ]; then
-              SAFE="YES"
-            fi
-            echo "R30_SAFE_TO_FIX: $SAFE"
-
-            A="REC17_SOURCE_APPLICATION = ${REC17_APPID}"
-            B="DATABASE_URL_SOURCE = ${DB_SRC} ${DB_SRC_FILE}"
-            C="PRISMA_PROVIDER = ${PR_PROVIDER} (DATABASE_URL=${PR_DBURL} DIRECT_URL=${PR_DIRECT})"
-            D="DATABASE_ENV_MATCH = ${DB_MATCH}"
-            E="AUTH_ENV_SOURCE = ${AUTH_SRC} ${AUTH_SRC_FILE}"
-            F="SAFE_TO_FIX = ${SAFE}"
-            echo "R30_A: $A"
-            echo "R30_B: $B"
-            echo "R30_C: $C"
-            echo "R30_D: $D"
-            echo "R30_E: $E"
-            echo "R30_F: $F"
-            echo "R30_NO_CHANGES: YES"
+            echo "R36_APP_ID: $APP_ID"
+            echo "R36_CONTAINER_NAME: $CONTAINER_NAME"
+            echo "R36_CONTAINER_FOUND: $( [ "$CID" = "NONE" ] && echo NO || echo YES )"
+            echo "R36_ENVFILE_PATH: $ENV_FILE"
+            echo "R36_ENVFILE_HAS_DATABASE_URL: $ENVFILE_HAS_DATABASE_URL"
+            echo "R36_ENVFILE_HAS_DIRECT_URL: $ENVFILE_HAS_DIRECT_URL"
+            echo "R36_CONTAINER_HAS_DATABASE_URL: $CONTAINER_HAS_DATABASE_URL"
+            echo "R36_CONTAINER_HAS_DIRECT_URL: $CONTAINER_HAS_DIRECT_URL"
+            echo "R36_COMPOSE_PROJECT: $COMPOSE_PROJECT"
+            echo "R36_COMPOSE_SERVICE: $COMPOSE_SERVICE"
+            echo "R36_COMPOSE_WORKDIR: $COMPOSE_WORKDIR"
+            echo "R36_COMPOSE_CONFIG_FILES: $COMPOSE_CONFIG_FILES"
+            echo "R36_COMPOSE_FILES_EXIST: $EXISTS_ALL"
+            echo "R36_COMPOSE_HAS_ENVFILE: $COMPOSE_HAS_ENVFILE"
+            echo "R36_COMPOSE_MENTIONS_DATABASE_URL: $COMPOSE_MENTIONS_DATABASE_URL"
+            echo "R36_COMPOSE_MENTIONS_DIRECT_URL: $COMPOSE_MENTIONS_DIRECT_URL"
+            echo "R36_CONTAINER_MOUNTS_HAVE_APP_DIR: $MOUNTS_HAVE_APP"
+            echo "R36_PROCEED_FIX: $PROCEED_FIX"
           ' 2>&1)
-          RC=$?
-          echo "RAW_OUT<<EOF_R30" >> $GITHUB_OUTPUT
-          printf '%s\n' "$OUT" >> $GITHUB_OUTPUT
-          echo "EOF_R30" >> $GITHUB_OUTPUT
-          echo "SSH_RC=$RC" >> $GITHUB_OUTPUT
-          echo "--- RAW OUT START RC=$RC ---"
-          printf '%s\n' "$OUT"
-          echo "--- RAW OUT END ---"
 
-      - name: "RUN35: Summary (A-F + critical checks)"
+          echo "raw<<EOF" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$OUT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          getv() { printf '%s\n' "$OUT" | { grep -E "^$1:" || true; } | head -1 | cut -d: -f2- | sed "s/^[[:space:]]*//; s/[[:space:]]\+$//"; }
+          proceed_fix="$(getv R36_PROCEED_FIX)"
+          app_id="$(getv R36_APP_ID)"
+          container_name="$(getv R36_CONTAINER_NAME)"
+          compose_workdir="$(getv R36_COMPOSE_WORKDIR)"
+          compose_service="$(getv R36_COMPOSE_SERVICE)"
+          compose_project="$(getv R36_COMPOSE_PROJECT)"
+          compose_config_files="$(getv R36_COMPOSE_CONFIG_FILES)"
+          envfile_has_database_url="$(getv R36_ENVFILE_HAS_DATABASE_URL)"
+          envfile_has_direct_url="$(getv R36_ENVFILE_HAS_DIRECT_URL)"
+          container_has_database_url="$(getv R36_CONTAINER_HAS_DATABASE_URL)"
+          container_has_direct_url="$(getv R36_CONTAINER_HAS_DIRECT_URL)"
+          compose_has_envfile="$(getv R36_COMPOSE_HAS_ENVFILE)"
+          compose_mentions_database_url="$(getv R36_COMPOSE_MENTIONS_DATABASE_URL)"
+          compose_mentions_direct_url="$(getv R36_COMPOSE_MENTIONS_DIRECT_URL)"
+
+          for kv in proceed_fix app_id container_name compose_workdir compose_service compose_project compose_config_files envfile_has_database_url envfile_has_direct_url container_has_database_url container_has_direct_url compose_has_envfile compose_mentions_database_url compose_mentions_direct_url; do
+            eval "v=\${$kv}"
+            [ -z "$v" ] && v="(missing)"
+            echo "${kv}=$v" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: "RUN36: Summary (read-only)"
         continue-on-error: true
         run: |
           set +eo pipefail
-          OUT="${{ steps.diag_ro.outputs.RAW_OUT }}"
-          SSH_RC="${{ steps.diag_ro.outputs.SSH_RC }}"
-          getv() {
-            local key="$1"
-            printf '%s\n' "$OUT" | { grep -E "^${key}:" || true; } | head -1 | cut -d: -f2- | sed "s/^[[:space:]]*//; s/[[:space:]]\+$//"
-          }
-          A="$(getv R30_A)"
-          B="$(getv R30_B)"
-          C="$(getv R30_C)"
-          D="$(getv R30_D)"
-          E="$(getv R30_E)"
-          F="$(getv R30_F)"
-          NC="$(getv R30_NO_CHANGES)"
+          OUT="${{ steps.diag.outputs.raw }}"
+          getv() { printf '%s\n' "$OUT" | { grep -E "^$1:" || true; } | head -1 | cut -d: -f2- | sed "s/^[[:space:]]*//; s/[[:space:]]\+$//"; }
+          for k in R36_PROCEED_FIX R36_COMPOSE_WORKDIR R36_COMPOSE_CONFIG_FILES R36_COMPOSE_SERVICE R36_ENVFILE_HAS_DATABASE_URL R36_ENVFILE_HAS_DIRECT_URL R36_CONTAINER_HAS_DATABASE_URL R36_CONTAINER_HAS_DIRECT_URL R36_COMPOSE_HAS_ENVFILE R36_COMPOSE_MENTIONS_DATABASE_URL R36_COMPOSE_MENTIONS_DIRECT_URL; do
+            v="$(getv "$k")"; [ -z "$v" ] && v="(missing)"
+            v="$(printf '%s' "$v" | head -c 1100)"
+            v_safe="$(printf '%s' "$v" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+            echo "::notice title=${k}::${v_safe}"
+          done
 
-          QPWS_IS_SRC="$(getv R30_QPWS_ENV_IS_SOURCE)"
-          QPWS_DB="$(getv R30_QPWS_ENV_DATABASE_URL)"
-          REC17_DB_FILE="$(getv R30_REC17_DB_ENVFILE_SAFE)"
+  fix_r36:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [diag_r36]
+    if: ${{ needs.diag_r36.outputs.proceed_fix == 'YES' }}
 
-          for title in QPWS_ENV_IS_SOURCE QPWS_ENV_DATABASE_URL REC17_DB_ENVFILE A B C D E F NO_CHANGES; do
-            case "$title" in
-              QPWS_ENV_IS_SOURCE) val="$QPWS_IS_SRC" ;;
-              QPWS_ENV_DATABASE_URL) val="$QPWS_DB" ;;
-              REC17_DB_ENVFILE) val="$REC17_DB_FILE" ;;
-              A) val="$A" ;;
-              B) val="$B" ;;
-              C) val="$C" ;;
-              D) val="$D" ;;
-              E) val="$E" ;;
-              F) val="$F" ;;
-              NO_CHANGES) val="$NC SSH_RC=$SSH_RC" ;;
-            esac
-            [ -z "$val" ] && val="(missing)"
-            val="$(printf '%s' "$val" | head -c 1100)"
-            val_safe="$(printf '%s' "$val" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
-            echo "::notice title=${title}::${val_safe}"
-            printf '%s\n' "${title}: ${val}"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "0. Install SSH Key STANDARD SAFE"
+        run: |
+          USER="${{ secrets.COOLIFY_SERVER_USER }}"; USER="${USER:-root}"
+          KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
+          HOST="${{ secrets.COOLIFY_SERVER_HOST }}"
+          mkdir -p $HOME/.ssh; chmod 700 $HOME/.ssh
+          K=$HOME/.ssh/id_rsa_r25
+          install -m 600 /dev/null $K
+          printf '%s\n' "$KEY" > $K
+          chmod 600 $K
+          echo "KEY=$K" >> $GITHUB_ENV
+          echo "USER=$USER" >> $GITHUB_ENV
+          echo "HOST=$HOST" >> $GITHUB_ENV
+
+      - name: "RUN36: CHANGE_PLAN (must print before change)"
+        run: |
+          set +e
+          APP_ID="${{ needs.diag_r36.outputs.app_id }}"
+          CTR="${{ needs.diag_r36.outputs.container_name }}"
+          KEYS="DATABASE_URL DIRECT_URL"
+          echo "::notice title=CHANGE_PLAN::Patch Compose env injection for ${CTR} to restore DB env keys via placeholders (no secrets printed), then force-recreate only that service using docker compose."
+          echo "::notice title=AFFECTED_APPLICATION::${APP_ID}"
+          echo "::notice title=AFFECTED_CONTAINER::${CTR}"
+          echo "::notice title=ENV_KEYS_TO_RESTORE::${KEYS}"
+          echo "::notice title=ROLLBACK_PLAN::Restore compose file from backup (.bak.RUN36.<ts>) and force-recreate only the same service again."
+
+      - name: "RUN36: APPLY FIX — restore DATABASE_URL/DIRECT_URL via Compose and recreate service"
+        id: fix
+        run: |
+          set +e
+          K=${{ env.KEY }}
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
+
+          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
+            set +e
+            APP_ID=pic3vleasj465ooh77ioicw6
+            CONTAINER_NAME=rec17-webpsb-p1
+            ROOT=/data/coolify
+            ENV_FILE="$ROOT/applications/$APP_ID/.env"
+
+            container_exists() { docker ps -a --filter "name=^/$1$" --format "{{.ID}}" 2>/dev/null | head -1; }
+            container_has_env_key() { cid="$1"; k="$2"; docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$cid" 2>/dev/null | awk -F= "{print \$1}" | grep -x "$k" >/dev/null 2>&1; }
+            label_get() { cid="$1"; key="$2"; docker inspect -f "{{ index .Config.Labels \"'"'"'$key'"'"'\" }}" "$cid" 2>/dev/null | tr -d "\r\n" | head -c 800; }
+            has_key_in_envfile() { f="$1"; k="$2"; [ -f "$f" ] || return 1; grep -q -E "^[[:space:]]*${k}[[:space:]]*=" "$f" 2>/dev/null; }
+
+            CID=$(container_exists "$CONTAINER_NAME"); CID=${CID:-NONE}
+            [ "$CID" = "NONE" ] && echo "FIX_ERR: container_not_found" && exit 2
+
+            WORKDIR=$(label_get "$CID" "com.docker.compose.project.working_dir")
+            SERVICE=$(label_get "$CID" "com.docker.compose.service")
+            CFG=$(label_get "$CID" "com.docker.compose.project.config_files")
+            [ -z "$WORKDIR" ] && echo "FIX_ERR: compose_workdir_missing" && exit 3
+            [ -z "$SERVICE" ] && echo "FIX_ERR: compose_service_missing" && exit 4
+            [ -z "$CFG" ] && echo "FIX_ERR: compose_config_files_missing" && exit 5
+
+            has_key_in_envfile "$ENV_FILE" "DATABASE_URL" || { echo "FIX_ERR: envfile_missing_DATABASE_URL"; exit 6; }
+            has_key_in_envfile "$ENV_FILE" "DIRECT_URL" || { echo "FIX_WARN: envfile_missing_DIRECT_URL"; }
+
+            COMP="docker compose"
+            $COMP version >/dev/null 2>&1 || COMP="docker-compose"
+            $COMP version >/dev/null 2>&1 || { echo "FIX_ERR: docker_compose_not_found"; exit 7; }
+
+            IFS="," read -r -a files <<< "$CFG"
+            PATCH_FILE="${files[-1]}"
+            [ -f "$PATCH_FILE" ] || { echo "FIX_ERR: patch_file_missing $PATCH_FILE"; exit 8; }
+
+            TS=$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null); TS=${TS:-unknown}
+            BAK="${PATCH_FILE}.bak.RUN36.${TS}"
+            cp -f "$PATCH_FILE" "$BAK" 2>/dev/null || { echo "FIX_ERR: backup_failed"; exit 9; }
+
+            python3 - "$PATCH_FILE" "$SERVICE" << "PY"
+import sys
+
+path, service = sys.argv[1], sys.argv[2]
+with open(path, "r", encoding="utf-8", errors="replace") as f:
+    lines = f.read().splitlines(True)
+
+def find_services_idx(lines):
+    for i, ln in enumerate(lines):
+        if ln.strip() == "services:":
+            return i
+    return None
+
+def find_service_block(lines, service):
+    services_i = find_services_idx(lines)
+    if services_i is None:
+        return None
+    target = f"  {service}:"
+    start = None
+    for i in range(services_i + 1, len(lines)):
+        if lines[i].startswith(target) and lines[i].strip() == target.strip():
+            start = i
+            break
+    if start is None:
+        return None
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        ln = lines[j]
+        if ln.startswith("  ") and (not ln.startswith("    ")) and ln.strip().endswith(":"):
+            end = j
+            break
+    return (start, end)
+
+block = find_service_block(lines, service)
+if not block:
+    sys.exit(10)
+
+start, end = block
+svc_lines = lines[start:end]
+
+def has_env_key_list_style(svc_lines, key):
+    needle = f"- {key}="
+    needle2 = f"- {key}=${{{key}}}"
+    for ln in svc_lines:
+        s = ln.strip()
+        if s.startswith("- ") and (s == needle2 or s.startswith(needle)):
+            return True
+    return False
+
+def has_env_key_map_style(svc_lines, key):
+    needle = f"{key}:"
+    for ln in svc_lines:
+        if ln.startswith("      ") and ln.strip().startswith(needle):
+            return True
+    return False
+
+def find_env_block(svc_lines):
+    for i, ln in enumerate(svc_lines):
+        if ln.startswith("    environment:"):
+            j = i + 1
+            while j < len(svc_lines) and (svc_lines[j].startswith("      ") or svc_lines[j].strip() == ""):
+                j += 1
+            return (i, j)
+    return None
+
+env_block = find_env_block(svc_lines)
+
+def ensure_env_list(svc_lines, insert_at, keys):
+    add = []
+    for k in keys:
+        add.append(f"      - {k}=${{{k}}}\n")
+    return svc_lines[:insert_at] + ["    environment:\n"] + add + svc_lines[insert_at:]
+
+keys = ["DATABASE_URL", "DIRECT_URL"]
+if env_block:
+    env_i, env_j = env_block
+    children = svc_lines[env_i+1:env_j]
+    is_list = False
+    is_map = False
+    for ln in children:
+        t = ln.strip()
+        if t.startswith("- "):
+            is_list = True
+            break
+        if ":" in t and not t.startswith("#"):
+            is_map = True
+            break
+    if not is_list and not is_map:
+        is_list = True
+
+    if is_list:
+        for k in keys:
+            if not has_env_key_list_style(svc_lines, k):
+                svc_lines.insert(env_j, f"      - {k}=${{{k}}}\n")
+                env_j += 1
+    else:
+        for k in keys:
+            if not has_env_key_map_style(svc_lines, k):
+                svc_lines.insert(env_j, f"      {k}: ${{{k}}}\n")
+                env_j += 1
+else:
+    insert_at = None
+    for i in range(1, len(svc_lines)):
+        if svc_lines[i].startswith("    image:") or svc_lines[i].startswith("    build:"):
+            insert_at = i + 1
+            break
+    if insert_at is None:
+        insert_at = 1
+    svc_lines = ensure_env_list(svc_lines, insert_at, keys)
+
+new_lines = lines[:start] + svc_lines + lines[end:]
+with open(path, "w", encoding="utf-8") as f:
+    f.writelines(new_lines)
+PY
+
+            CFGA=""
+            for f in "${files[@]}"; do
+              CFGA="$CFGA -f $f"
+            done
+
+            cd "$WORKDIR" 2>/dev/null || { echo "FIX_ERR: cannot_cd_workdir"; exit 11; }
+            $COMP $CFGA up -d --force-recreate --no-deps "$SERVICE" 2>/dev/null || { echo "FIX_ERR: compose_up_failed"; cp -f "$BAK" "$PATCH_FILE" 2>/dev/null; $COMP $CFGA up -d --force-recreate --no-deps "$SERVICE" 2>/dev/null; exit 12; }
+
+            NEWCID=$(container_exists "$CONTAINER_NAME"); NEWCID=${NEWCID:-NONE}
+            [ "$NEWCID" = "NONE" ] && { echo "FIX_ERR: container_missing_after_recreate"; cp -f "$BAK" "$PATCH_FILE" 2>/dev/null; $COMP $CFGA up -d --force-recreate --no-deps "$SERVICE" 2>/dev/null; exit 13; }
+
+            DB_KEY="NOT_FOUND"
+            DU_KEY="NOT_FOUND"
+            container_has_env_key "$NEWCID" "DATABASE_URL" && DB_KEY="FOUND"
+            container_has_env_key "$NEWCID" "DIRECT_URL" && DU_KEY="FOUND"
+
+            HTTP_LOGIN_CODE=$(curl -k -sS -o /dev/null -w "%{http_code}" https://webpsb.perkasa.net.id/login 2>/dev/null)
+            HTTP_LOGIN_CODE=${HTTP_LOGIN_CODE:-curl_failed}
+
+            curl -k -sS -X POST -H "Content-Type: application/x-www-form-urlencoded" -d "username=__probe__&password=__probe__" https://webpsb.perkasa.net.id/login -o /dev/null 2>/dev/null
+
+            PRISMA_ENV_ERR="NO"
+            docker logs --tail 220 "$NEWCID" 2>/dev/null | grep -F "Environment variable not found: DATABASE_URL" >/dev/null 2>&1 && PRISMA_ENV_ERR="YES"
+
+            echo "FIX_APPLIED: YES"
+            echo "FIX_AFFECTED_APP: $APP_ID"
+            echo "FIX_AFFECTED_CONTAINER: $CONTAINER_NAME"
+            echo "FIX_ENV_DATABASE_URL: $DB_KEY"
+            echo "FIX_ENV_DIRECT_URL: $DU_KEY"
+            echo "FIX_HTTP_LOGIN_CODE: $HTTP_LOGIN_CODE"
+            echo "FIX_PRISMA_ENV_ERROR_STILL_PRESENT: $PRISMA_ENV_ERR"
+            echo "FIX_BACKUP_FILE: $BAK"
+          ' 2>&1)
+
+          echo "raw<<EOF" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$OUT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: "RUN36: Result summary"
+        continue-on-error: true
+        run: |
+          set +eo pipefail
+          OUT="${{ steps.fix.outputs.raw }}"
+          getv() { printf '%s\n' "$OUT" | { grep -E "^$1:" || true; } | head -1 | cut -d: -f2- | sed "s/^[[:space:]]*//; s/[[:space:]]\+$//"; }
+          for k in FIX_APPLIED FIX_AFFECTED_APP FIX_AFFECTED_CONTAINER FIX_ENV_DATABASE_URL FIX_ENV_DIRECT_URL FIX_HTTP_LOGIN_CODE FIX_PRISMA_ENV_ERROR_STILL_PRESENT FIX_BACKUP_FILE; do
+            v="$(getv "$k")"; [ -z "$v" ] && v="(missing)"
+            v="$(printf '%s' "$v" | head -c 1100)"
+            v_safe="$(printf '%s' "$v" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+            echo "::notice title=${k}::${v_safe}"
           done
