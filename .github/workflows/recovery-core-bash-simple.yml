@@ -251,7 +251,14 @@ jobs:
 
           if [ $rc -ne 0 ]; then
             KV[R43_FATAL_ERROR]="YES"
-            KV[R43_FATAL_REASON]="ssh_failed_rc_${rc}"
+            if [ $rc -eq 90 ]; then
+              KV[R43_FATAL_REASON]="ssh_setup_invalid"
+            else
+              reason="ssh_failed_rc_${rc}"
+              err_line="$(printf '%s\n' "$OUT" | head -1 | tr -d '\r' | head -c 160)"
+              [ -n "$err_line" ] && reason="${reason}:${err_line}"
+              KV[R43_FATAL_REASON]="$reason"
+            fi
           fi
 
           keys=(
@@ -286,11 +293,8 @@ jobs:
           printf '%s\n' "$OUT"
           echo "===== RUN43 END ====="
 
-          for k in "${keys[@]}"; do
-            v="${KV[$k]}"
-            v="$(printf '%s' "$v" | head -c 1100)"
-            v_safe="$(printf '%s' "$v" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
-            echo "::notice title=${k}::${v_safe}"
-          done
+          summary_lines="$(for k in "${keys[@]}"; do printf '%s=%s\n' "$k" "${KV[$k]}"; done)"
+          summary_safe="$(printf '%s' "$summary_lines" | head -c 6000 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          echo "::notice title=RUN43_RESULTS::${summary_safe}"
 
           exit 0
