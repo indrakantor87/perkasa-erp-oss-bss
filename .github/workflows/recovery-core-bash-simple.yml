@@ -35,185 +35,181 @@ jobs:
           K=${{ env.KEY }}
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
 
-          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" '
-            set +e
+          OUT=$(ssh $OPTS "${{ env.USER }}@${{ env.HOST }}" 'sh -s' 2>&1 <<'R43REMOTE'
+          set +e
 
-            APP_ID="pic3vleasj465ooh77ioicw6"
-            CONTAINER_NAME="rec17-webpsb-p1"
-            ROOT="/data/coolify"
-            APPDIR="$ROOT/applications/$APP_ID"
-            ENV_FILE="$APPDIR/.env"
+          APP_ID="pic3vleasj465ooh77ioicw6"
+          CONTAINER_NAME="rec17-webpsb-p1"
+          ROOT="/data/coolify"
+          APPDIR="$ROOT/applications/$APP_ID"
+          ENV_FILE="$APPDIR/.env"
 
-            R43_FATAL_ERROR="NO"
-            R43_FATAL_REASON=""
+          R43_FATAL_ERROR="NO"
+          R43_FATAL_REASON=""
 
-            R43_CONTAINER_FOUND="NO"
-            R43_CONTAINER_NAME="$CONTAINER_NAME"
-            R43_CONTAINER_IMAGE="NONE"
-            R43_CONTAINER_CREATED="NONE"
+          R43_CONTAINER_FOUND="NO"
+          R43_CONTAINER_NAME="$CONTAINER_NAME"
+          R43_CONTAINER_IMAGE="NONE"
+          R43_CONTAINER_CREATED="NONE"
 
-            R43_ENVFILE_PATH="$ENV_FILE"
-            R43_ENVFILE_EXISTS="NO"
-            R43_ENVFILE_HAS_DATABASE_URL="NO"
-            R43_ENVFILE_HAS_DIRECT_URL="NO"
+          R43_ENVFILE_PATH="$ENV_FILE"
+          R43_ENVFILE_EXISTS="NO"
+          R43_ENVFILE_HAS_DATABASE_URL="NO"
+          R43_ENVFILE_HAS_DIRECT_URL="NO"
 
-            R43_COMPOSE_WORKDIR=""
-            R43_COMPOSE_CONFIG_FILES=""
-            R43_COMPOSE_SERVICE=""
-            R43_COMPOSE_PROJECT=""
+          R43_COMPOSE_WORKDIR=""
+          R43_COMPOSE_CONFIG_FILES=""
+          R43_COMPOSE_SERVICE=""
+          R43_COMPOSE_PROJECT=""
 
-            R43_WORKDIR_ENVFILE_EXISTS="NO"
-            R43_WORKDIR_ENVFILE_HAS_DATABASE_URL="NO"
+          R43_WORKDIR_ENVFILE_EXISTS="NO"
+          R43_WORKDIR_ENVFILE_HAS_DATABASE_URL="NO"
 
-            R43_SERVICE_BLOCK_HAS_ENV_FILE="NO"
-            R43_SERVICE_BLOCK_HAS_ENVIRONMENT="NO"
-            R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY="NO"
-            R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL="NO"
-            R43_COMPOSE_FILE_REFERENCES_DOTENV="NO"
+          R43_SERVICE_BLOCK_HAS_ENV_FILE="NO"
+          R43_SERVICE_BLOCK_HAS_ENVIRONMENT="NO"
+          R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY="NO"
+          R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL="NO"
+          R43_COMPOSE_FILE_REFERENCES_DOTENV="NO"
 
-            R43_ENV_INJECTION_MECHANISM="UNKNOWN"
-            R43_STALE_OR_BROKEN_DEPLOYMENT="NO"
+          R43_ENV_INJECTION_MECHANISM="UNKNOWN"
+          R43_STALE_OR_BROKEN_DEPLOYMENT="NO"
 
-            command -v docker >/dev/null 2>&1 || { R43_FATAL_ERROR="YES"; R43_FATAL_REASON="docker_not_found"; }
+          command -v docker >/dev/null 2>&1 || { R43_FATAL_ERROR="YES"; R43_FATAL_REASON="docker_not_found"; }
 
-            container_id=""
-            if [ "$R43_FATAL_ERROR" = "NO" ]; then
-              container_id=$(docker ps -a --filter "name=^/${CONTAINER_NAME}$" --format "{{.ID}}" 2>/dev/null | head -1)
-              [ -n "$container_id" ] && R43_CONTAINER_FOUND="YES"
+          container_id=""
+          if [ "$R43_FATAL_ERROR" = "NO" ]; then
+            container_id=$(docker ps -a --filter "name=^/${CONTAINER_NAME}$" --format "{{.ID}}" 2>/dev/null | head -1)
+            [ -n "$container_id" ] && R43_CONTAINER_FOUND="YES"
+          fi
+
+          if [ "$R43_CONTAINER_FOUND" = "YES" ]; then
+            img=$(docker inspect -f "{{.Config.Image}}" "$container_id" 2>/dev/null | head -1 | tr -d "\r\n"); [ -n "$img" ] && R43_CONTAINER_IMAGE="$img"
+            crt=$(docker inspect -f "{{.Created}}" "$container_id" 2>/dev/null | head -1 | tr -d "\r\n"); [ -n "$crt" ] && R43_CONTAINER_CREATED="$crt"
+            R43_COMPOSE_WORKDIR=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$container_id" 2>/dev/null | tr -d "\r\n")
+            R43_COMPOSE_PROJECT=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$container_id" 2>/dev/null | tr -d "\r\n")
+            R43_COMPOSE_SERVICE=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.service" }}' "$container_id" 2>/dev/null | tr -d "\r\n")
+            R43_COMPOSE_CONFIG_FILES=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.config_files" }}' "$container_id" 2>/dev/null | tr -d "\r\n")
+          fi
+
+          if [ -f "$ENV_FILE" ]; then
+            R43_ENVFILE_EXISTS="YES"
+            grep -q -E "^[[:space:]]*DATABASE_URL[[:space:]]*=" "$ENV_FILE" 2>/dev/null && R43_ENVFILE_HAS_DATABASE_URL="YES"
+            grep -q -E "^[[:space:]]*DIRECT_URL[[:space:]]*=" "$ENV_FILE" 2>/dev/null && R43_ENVFILE_HAS_DIRECT_URL="YES"
+          fi
+
+          fallback_compose=""
+          if [ -z "$R43_COMPOSE_CONFIG_FILES" ]; then
+            [ -f "$APPDIR/docker-compose.yml" ] && fallback_compose="$APPDIR/docker-compose.yml"
+            [ -z "$fallback_compose" ] && [ -f "$APPDIR/docker-compose.yaml" ] && fallback_compose="$APPDIR/docker-compose.yaml"
+            if [ -z "$fallback_compose" ] && [ -d "$APPDIR" ]; then
+              fallback_compose=$(ls -1t "$APPDIR"/*compose*.yml "$APPDIR"/*compose*.yaml 2>/dev/null | head -1)
             fi
+            [ -n "$fallback_compose" ] && R43_COMPOSE_CONFIG_FILES="$fallback_compose"
+          fi
 
-            if [ "$R43_CONTAINER_FOUND" = "YES" ]; then
-              img=$(docker inspect -f "{{.Config.Image}}" "$container_id" 2>/dev/null | head -1 | tr -d "\r\n"); [ -n "$img" ] && R43_CONTAINER_IMAGE="$img"
-              crt=$(docker inspect -f "{{.Created}}" "$container_id" 2>/dev/null | head -1 | tr -d "\r\n"); [ -n "$crt" ] && R43_CONTAINER_CREATED="$crt"
+          if [ -z "$R43_COMPOSE_WORKDIR" ] && [ -n "$R43_COMPOSE_CONFIG_FILES" ]; then
+            first_cf=$(printf "%s" "$R43_COMPOSE_CONFIG_FILES" | awk -F, "{print \$1}" 2>/dev/null)
+            [ -n "$first_cf" ] && [ -f "$first_cf" ] && R43_COMPOSE_WORKDIR=$(dirname "$first_cf" 2>/dev/null)
+          fi
+
+          if [ -n "$R43_COMPOSE_WORKDIR" ] && [ -f "$R43_COMPOSE_WORKDIR/.env" ]; then
+            R43_WORKDIR_ENVFILE_EXISTS="YES"
+            grep -q -E "^[[:space:]]*DATABASE_URL[[:space:]]*=" "$R43_COMPOSE_WORKDIR/.env" 2>/dev/null && R43_WORKDIR_ENVFILE_HAS_DATABASE_URL="YES"
+          fi
+
+          compose_file=""
+          if [ -n "$R43_COMPOSE_CONFIG_FILES" ]; then
+            compose_file=$(printf "%s" "$R43_COMPOSE_CONFIG_FILES" | awk -F, "{print \$1}" 2>/dev/null)
+            [ -f "$compose_file" ] || compose_file=""
+          fi
+
+          if [ -z "$compose_file" ] && [ -d "$ROOT" ]; then
+            compose_file=$(find "$ROOT" -maxdepth 5 -type f \( -name "*.yml" -o -name "*.yaml" \) 2>/dev/null | while IFS= read -r f; do
+              grep -q -E "^[[:space:]]*container_name:[[:space:]]*${CONTAINER_NAME}[[:space:]]*$" "$f" 2>/dev/null && { echo "$f"; break; }
+            done | head -1)
+            [ -n "$compose_file" ] && R43_COMPOSE_CONFIG_FILES="$compose_file"
+            [ -z "$R43_COMPOSE_WORKDIR" ] && [ -n "$compose_file" ] && [ -f "$compose_file" ] && R43_COMPOSE_WORKDIR=$(dirname "$compose_file" 2>/dev/null)
+          fi
+
+          if [ -n "$compose_file" ] && [ -f "$compose_file" ] && [ -z "$R43_COMPOSE_SERVICE" ]; then
+            R43_COMPOSE_SERVICE=$(awk '
+              BEGIN{svc=""; in_services=0}
+              /^[[:space:]]*services:[[:space:]]*$/ {in_services=1; next}
+              in_services && $0 ~ /^  [A-Za-z0-9_.-]+:[[:space:]]*$/ {
+                svc=$0
+                sub(/^  /, "", svc)
+                sub(/:[[:space:]]*$/, "", svc)
+              }
+              in_services && $0 ~ /^[[:space:]]*container_name:[[:space:]]*rec17-webpsb-p1[[:space:]]*$/ {print svc; exit}
+            ' "$compose_file" 2>/dev/null | head -1)
+          fi
+
+          container_has_db="NO"
+          if [ "$R43_CONTAINER_FOUND" = "YES" ]; then
+            docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$container_id" 2>/dev/null | awk -F= "{print \$1}" | grep -x "DATABASE_URL" >/dev/null 2>&1 && container_has_db="YES"
+          fi
+
+          if [ -n "$compose_file" ] && [ -f "$compose_file" ]; then
+            grep -F "\${DATABASE_URL}" "$compose_file" >/dev/null 2>&1 && R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL="YES"
+            grep -F ".env" "$compose_file" >/dev/null 2>&1 && R43_COMPOSE_FILE_REFERENCES_DOTENV="YES"
+
+            if [ -n "$R43_COMPOSE_SERVICE" ]; then
+              block=$(awk -v svc="$R43_COMPOSE_SERVICE" '
+                BEGIN{in_services=0; in_svc=0}
+                /^[[:space:]]*services:[[:space:]]*$/ {in_services=1}
+                in_services && $0 ~ ("^  " svc ":[[:space:]]*$") {in_svc=1; next}
+                in_svc && $0 ~ /^  [A-Za-z0-9_.-]+:[[:space:]]*$/ {exit}
+                in_svc {print}
+              ' "$compose_file" 2>/dev/null)
+              printf "%s\n" "$block" | grep -q -E "^[[:space:]]*env_file:" >/dev/null 2>&1 && R43_SERVICE_BLOCK_HAS_ENV_FILE="YES"
+              printf "%s\n" "$block" | grep -q -E "^[[:space:]]*environment:" >/dev/null 2>&1 && R43_SERVICE_BLOCK_HAS_ENVIRONMENT="YES"
+              printf "%s\n" "$block" | grep -q -F "DATABASE_URL" >/dev/null 2>&1 && R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY="YES"
             fi
+          fi
 
-            if [ -f "$ENV_FILE" ]; then
-              R43_ENVFILE_EXISTS="YES"
-              grep -q -E "^[[:space:]]*DATABASE_URL[[:space:]]*=" "$ENV_FILE" 2>/dev/null && R43_ENVFILE_HAS_DATABASE_URL="YES"
-              grep -q -E "^[[:space:]]*DIRECT_URL[[:space:]]*=" "$ENV_FILE" 2>/dev/null && R43_ENVFILE_HAS_DIRECT_URL="YES"
-            fi
+          if [ "$R43_SERVICE_BLOCK_HAS_ENV_FILE" = "YES" ]; then
+            R43_ENV_INJECTION_MECHANISM="COMPOSE_ENV_FILE"
+          elif [ "$R43_SERVICE_BLOCK_HAS_ENVIRONMENT" = "YES" ] && [ "$R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY" = "YES" ]; then
+            R43_ENV_INJECTION_MECHANISM="COMPOSE_ENVIRONMENT_KEYS"
+          elif [ "$R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL" = "YES" ] && [ "$R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY" = "NO" ]; then
+            R43_ENV_INJECTION_MECHANISM="COMPOSE_SUBSTITUTION_ONLY"
+          fi
 
-            label_get() { cid="$1"; key="$2"; docker inspect -f "{{ index .Config.Labels \"'"'"'$key'"'"'\" }}" "$cid" 2>/dev/null | tr -d "\r\n"; }
+          if [ "$R43_ENVFILE_HAS_DATABASE_URL" = "YES" ] && [ "$container_has_db" = "NO" ]; then
+            R43_STALE_OR_BROKEN_DEPLOYMENT="YES"
+          fi
 
-            if [ "$R43_CONTAINER_FOUND" = "YES" ]; then
-              R43_COMPOSE_WORKDIR=$(label_get "$container_id" "com.docker.compose.project.working_dir")
-              R43_COMPOSE_PROJECT=$(label_get "$container_id" "com.docker.compose.project")
-              R43_COMPOSE_SERVICE=$(label_get "$container_id" "com.docker.compose.service")
-              R43_COMPOSE_CONFIG_FILES=$(label_get "$container_id" "com.docker.compose.project.config_files")
-            fi
+          echo "R43_FATAL_ERROR=$R43_FATAL_ERROR"
+          echo "R43_FATAL_REASON=$R43_FATAL_REASON"
 
-            fallback_compose=""
-            if [ -z "$R43_COMPOSE_CONFIG_FILES" ]; then
-              [ -f "$APPDIR/docker-compose.yml" ] && fallback_compose="$APPDIR/docker-compose.yml"
-              [ -z "$fallback_compose" ] && [ -f "$APPDIR/docker-compose.yaml" ] && fallback_compose="$APPDIR/docker-compose.yaml"
-              if [ -z "$fallback_compose" ] && [ -d "$APPDIR" ]; then
-                fallback_compose=$(ls -1t "$APPDIR"/*compose*.yml "$APPDIR"/*compose*.yaml 2>/dev/null | head -1)
-              fi
-              [ -n "$fallback_compose" ] && R43_COMPOSE_CONFIG_FILES="$fallback_compose"
-            fi
+          echo "R43_CONTAINER_FOUND=$R43_CONTAINER_FOUND"
+          echo "R43_CONTAINER_NAME=$R43_CONTAINER_NAME"
+          echo "R43_CONTAINER_IMAGE=$R43_CONTAINER_IMAGE"
+          echo "R43_CONTAINER_CREATED=$R43_CONTAINER_CREATED"
 
-            if [ -z "$R43_COMPOSE_WORKDIR" ] && [ -n "$R43_COMPOSE_CONFIG_FILES" ]; then
-              first_cf=$(printf "%s" "$R43_COMPOSE_CONFIG_FILES" | awk -F, "{print \\$1}" 2>/dev/null)
-              [ -n "$first_cf" ] && [ -f "$first_cf" ] && R43_COMPOSE_WORKDIR=$(dirname "$first_cf" 2>/dev/null)
-            fi
+          echo "R43_ENVFILE_PATH=$R43_ENVFILE_PATH"
+          echo "R43_ENVFILE_EXISTS=$R43_ENVFILE_EXISTS"
+          echo "R43_ENVFILE_HAS_DATABASE_URL=$R43_ENVFILE_HAS_DATABASE_URL"
+          echo "R43_ENVFILE_HAS_DIRECT_URL=$R43_ENVFILE_HAS_DIRECT_URL"
 
-            if [ -n "$R43_COMPOSE_WORKDIR" ] && [ -f "$R43_COMPOSE_WORKDIR/.env" ]; then
-              R43_WORKDIR_ENVFILE_EXISTS="YES"
-              grep -q -E "^[[:space:]]*DATABASE_URL[[:space:]]*=" "$R43_COMPOSE_WORKDIR/.env" 2>/dev/null && R43_WORKDIR_ENVFILE_HAS_DATABASE_URL="YES"
-            fi
+          echo "R43_COMPOSE_WORKDIR=$R43_COMPOSE_WORKDIR"
+          echo "R43_COMPOSE_CONFIG_FILES=$R43_COMPOSE_CONFIG_FILES"
+          echo "R43_COMPOSE_SERVICE=$R43_COMPOSE_SERVICE"
+          echo "R43_COMPOSE_PROJECT=$R43_COMPOSE_PROJECT"
 
-            compose_file=""
-            if [ -n "$R43_COMPOSE_CONFIG_FILES" ]; then
-              compose_file=$(printf "%s" "$R43_COMPOSE_CONFIG_FILES" | awk -F, "{print \\$1}" 2>/dev/null)
-              [ -f "$compose_file" ] || compose_file=""
-            fi
+          echo "R43_WORKDIR_ENVFILE_EXISTS=$R43_WORKDIR_ENVFILE_EXISTS"
+          echo "R43_WORKDIR_ENVFILE_HAS_DATABASE_URL=$R43_WORKDIR_ENVFILE_HAS_DATABASE_URL"
 
-            if [ -z "$compose_file" ] && [ -d "$ROOT" ]; then
-              compose_file=$(find "$ROOT" -maxdepth 5 -type f \( -name "*.yml" -o -name "*.yaml" \) 2>/dev/null | while IFS= read -r f; do
-                grep -q -E "^[[:space:]]*container_name:[[:space:]]*${CONTAINER_NAME}[[:space:]]*$" "$f" 2>/dev/null && { echo "$f"; break; }
-              done | head -1)
-              [ -n "$compose_file" ] && R43_COMPOSE_CONFIG_FILES="$compose_file"
-              [ -z "$R43_COMPOSE_WORKDIR" ] && [ -n "$compose_file" ] && [ -f "$compose_file" ] && R43_COMPOSE_WORKDIR=$(dirname "$compose_file" 2>/dev/null)
-            fi
+          echo "R43_SERVICE_BLOCK_HAS_ENV_FILE=$R43_SERVICE_BLOCK_HAS_ENV_FILE"
+          echo "R43_SERVICE_BLOCK_HAS_ENVIRONMENT=$R43_SERVICE_BLOCK_HAS_ENVIRONMENT"
+          echo "R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY=$R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY"
+          echo "R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL=$R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL"
+          echo "R43_COMPOSE_FILE_REFERENCES_DOTENV=$R43_COMPOSE_FILE_REFERENCES_DOTENV"
 
-            if [ -n "$compose_file" ] && [ -f "$compose_file" ] && [ -z "$R43_COMPOSE_SERVICE" ]; then
-              R43_COMPOSE_SERVICE=$(awk '
-                BEGIN{svc=""; in_services=0}
-                /^[[:space:]]*services:[[:space:]]*$/ {in_services=1; next}
-                in_services && $0 ~ /^  [A-Za-z0-9_.-]+:[[:space:]]*$/ {
-                  svc=$0
-                  sub(/^  /, "", svc)
-                  sub(/:[[:space:]]*$/, "", svc)
-                }
-                in_services && $0 ~ /^[[:space:]]*container_name:[[:space:]]*rec17-webpsb-p1[[:space:]]*$/ {print svc; exit}
-              ' "$compose_file" 2>/dev/null | head -1)
-            fi
-
-            container_has_db="NO"
-            if [ "$R43_CONTAINER_FOUND" = "YES" ]; then
-              docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$container_id" 2>/dev/null | awk -F= "{print \\$1}" | grep -x "DATABASE_URL" >/dev/null 2>&1 && container_has_db="YES"
-            fi
-
-            if [ -n "$compose_file" ] && [ -f "$compose_file" ]; then
-              grep -F "\${DATABASE_URL}" "$compose_file" >/dev/null 2>&1 && R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL="YES"
-              grep -F ".env" "$compose_file" >/dev/null 2>&1 && R43_COMPOSE_FILE_REFERENCES_DOTENV="YES"
-
-              if [ -n "$R43_COMPOSE_SERVICE" ]; then
-                block=$(awk -v svc="$R43_COMPOSE_SERVICE" '
-                  BEGIN{in_services=0; in_svc=0}
-                  /^[[:space:]]*services:[[:space:]]*$/ {in_services=1}
-                  in_services && $0 ~ ("^  " svc ":[[:space:]]*$") {in_svc=1; next}
-                  in_svc && $0 ~ /^  [A-Za-z0-9_.-]+:[[:space:]]*$/ {exit}
-                  in_svc {print}
-                ' "$compose_file" 2>/dev/null)
-                printf "%s\n" "$block" | grep -q -E "^[[:space:]]*env_file:" >/dev/null 2>&1 && R43_SERVICE_BLOCK_HAS_ENV_FILE="YES"
-                printf "%s\n" "$block" | grep -q -E "^[[:space:]]*environment:" >/dev/null 2>&1 && R43_SERVICE_BLOCK_HAS_ENVIRONMENT="YES"
-                printf "%s\n" "$block" | grep -q -F "DATABASE_URL" >/dev/null 2>&1 && R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY="YES"
-              fi
-            fi
-
-            if [ "$R43_SERVICE_BLOCK_HAS_ENV_FILE" = "YES" ]; then
-              R43_ENV_INJECTION_MECHANISM="COMPOSE_ENV_FILE"
-            elif [ "$R43_SERVICE_BLOCK_HAS_ENVIRONMENT" = "YES" ] && [ "$R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY" = "YES" ]; then
-              R43_ENV_INJECTION_MECHANISM="COMPOSE_ENVIRONMENT_KEYS"
-            elif [ "$R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL" = "YES" ] && [ "$R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY" = "NO" ]; then
-              R43_ENV_INJECTION_MECHANISM="COMPOSE_SUBSTITUTION_ONLY"
-            fi
-
-            if [ "$R43_ENVFILE_HAS_DATABASE_URL" = "YES" ] && [ "$container_has_db" = "NO" ]; then
-              R43_STALE_OR_BROKEN_DEPLOYMENT="YES"
-            fi
-
-            echo "R43_FATAL_ERROR=$R43_FATAL_ERROR"
-            echo "R43_FATAL_REASON=$R43_FATAL_REASON"
-
-            echo "R43_CONTAINER_FOUND=$R43_CONTAINER_FOUND"
-            echo "R43_CONTAINER_NAME=$R43_CONTAINER_NAME"
-            echo "R43_CONTAINER_IMAGE=$R43_CONTAINER_IMAGE"
-            echo "R43_CONTAINER_CREATED=$R43_CONTAINER_CREATED"
-
-            echo "R43_ENVFILE_PATH=$R43_ENVFILE_PATH"
-            echo "R43_ENVFILE_EXISTS=$R43_ENVFILE_EXISTS"
-            echo "R43_ENVFILE_HAS_DATABASE_URL=$R43_ENVFILE_HAS_DATABASE_URL"
-            echo "R43_ENVFILE_HAS_DIRECT_URL=$R43_ENVFILE_HAS_DIRECT_URL"
-
-            echo "R43_COMPOSE_WORKDIR=$R43_COMPOSE_WORKDIR"
-            echo "R43_COMPOSE_CONFIG_FILES=$R43_COMPOSE_CONFIG_FILES"
-            echo "R43_COMPOSE_SERVICE=$R43_COMPOSE_SERVICE"
-            echo "R43_COMPOSE_PROJECT=$R43_COMPOSE_PROJECT"
-
-            echo "R43_WORKDIR_ENVFILE_EXISTS=$R43_WORKDIR_ENVFILE_EXISTS"
-            echo "R43_WORKDIR_ENVFILE_HAS_DATABASE_URL=$R43_WORKDIR_ENVFILE_HAS_DATABASE_URL"
-
-            echo "R43_SERVICE_BLOCK_HAS_ENV_FILE=$R43_SERVICE_BLOCK_HAS_ENV_FILE"
-            echo "R43_SERVICE_BLOCK_HAS_ENVIRONMENT=$R43_SERVICE_BLOCK_HAS_ENVIRONMENT"
-            echo "R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY=$R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY"
-            echo "R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL=$R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL"
-            echo "R43_COMPOSE_FILE_REFERENCES_DOTENV=$R43_COMPOSE_FILE_REFERENCES_DOTENV"
-
-            echo "R43_ENV_INJECTION_MECHANISM=$R43_ENV_INJECTION_MECHANISM"
-            echo "R43_STALE_OR_BROKEN_DEPLOYMENT=$R43_STALE_OR_BROKEN_DEPLOYMENT"
-          ' 2>&1)
+          echo "R43_ENV_INJECTION_MECHANISM=$R43_ENV_INJECTION_MECHANISM"
+          echo "R43_STALE_OR_BROKEN_DEPLOYMENT=$R43_STALE_OR_BROKEN_DEPLOYMENT"
+R43REMOTE
+          )
           rc=$?
 
           echo "===== RUN43 STDOUT (remote) ====="
