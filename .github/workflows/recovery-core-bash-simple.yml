@@ -1,4 +1,4 @@
-name: "RUN43 READ-ONLY DIAGNOSTIC: Robust env injection probe for rec17-webpsb-p1"
+name: "RUN44 SSH CONNECTIVITY DIAGNOSTIC ONLY"
 
 on:
   push:
@@ -6,14 +6,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_r43:
+  diag_r44:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: "0. Install SSH Key STANDARD SAFE"
+      - name: "0. Install SSH Key STANDARD SAFE (no output)"
         run: |
           USER="${{ secrets.COOLIFY_SERVER_USER }}"; USER="${USER:-root}"
           KEY="${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}"
@@ -27,7 +27,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN43: Read-only — robust diagnostic probe"
+      - name: "RUN44: SSH connectivity diagnostic (runner-side only)"
         id: diag
         continue-on-error: true
         run: |
@@ -35,272 +35,110 @@ jobs:
           K="${{ env.KEY }}"
           USER="${{ env.USER }}"
           HOST="${{ env.HOST }}"
-          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $K"
+          PORT="22"
 
-          OUT=""
-          rc=0
+          R44_TARGET_HOST_REDACTED="REDACTED"
+          R44_SSH_PORT="$PORT"
+          R44_RUNNER_PUBLIC_IP="UNKNOWN"
 
-          if [ -z "$HOST" ] || [ -z "$USER" ] || [ -z "$K" ] || [ ! -s "$K" ]; then
-            rc=90
+          R44_DNS="FAIL"
+          R44_TCP_CONNECT="FAIL"
+          R44_SSH_BANNER="FAIL"
+          R44_SSH_AUTH_REACHED="NO"
+          R44_SSH_FAILURE_STAGE="UNKNOWN"
+
+          host_hash=""
+          if [ -n "$HOST" ]; then
+            host_hash="$(printf '%s' "$HOST" | sha256sum 2>/dev/null | awk '{print $1}' | cut -c1-12)"
+            [ -n "$host_hash" ] && R44_TARGET_HOST_REDACTED="sha256:${host_hash}"
+          fi
+
+          ip="$(curl -fsS --max-time 6 https://checkip.amazonaws.com 2>/dev/null | tr -d '\r\n' | head -c 64)"
+          if printf '%s' "$ip" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then
+            R44_RUNNER_PUBLIC_IP="$ip"
           else
-            OUT=$(ssh $OPTS "$USER@$HOST" 'sh -s' 2>&1 <<'R43REMOTE'
-          set +e
-
-          APP_ID="pic3vleasj465ooh77ioicw6"
-          CONTAINER_NAME="rec17-webpsb-p1"
-          ROOT="/data/coolify"
-          APPDIR="$ROOT/applications/$APP_ID"
-          ENV_FILE="$APPDIR/.env"
-
-          R43_FATAL_ERROR="NO"
-          R43_FATAL_REASON=""
-
-          R43_CONTAINER_FOUND="NO"
-          R43_CONTAINER_NAME="$CONTAINER_NAME"
-          R43_CONTAINER_IMAGE="NONE"
-          R43_CONTAINER_CREATED="NONE"
-
-          R43_ENVFILE_PATH="$ENV_FILE"
-          R43_ENVFILE_EXISTS="NO"
-          R43_ENVFILE_HAS_DATABASE_URL="NO"
-          R43_ENVFILE_HAS_DIRECT_URL="NO"
-
-          R43_COMPOSE_WORKDIR=""
-          R43_COMPOSE_CONFIG_FILES=""
-          R43_COMPOSE_SERVICE=""
-          R43_COMPOSE_PROJECT=""
-
-          R43_SERVICE_BLOCK_HAS_ENV_FILE="NO"
-          R43_SERVICE_BLOCK_HAS_ENVIRONMENT="NO"
-          R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY="NO"
-          R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL="NO"
-          R43_COMPOSE_FILE_REFERENCES_DOTENV="NO"
-
-          R43_ENV_INJECTION_MECHANISM="UNKNOWN"
-          R43_STALE_OR_BROKEN_DEPLOYMENT="NO"
-
-          command -v docker >/dev/null 2>&1 || { R43_FATAL_ERROR="YES"; R43_FATAL_REASON="docker_not_found"; }
-
-          container_id=""
-          if [ "$R43_FATAL_ERROR" = "NO" ]; then
-            container_id=$(docker ps -a --filter "name=^/${CONTAINER_NAME}$" --format "{{.ID}}" 2>/dev/null | head -1)
-            [ -n "$container_id" ] && R43_CONTAINER_FOUND="YES"
-          fi
-
-          if [ "$R43_CONTAINER_FOUND" = "YES" ]; then
-            img=$(docker inspect -f "{{.Config.Image}}" "$container_id" 2>/dev/null | head -1 | tr -d "\r\n"); [ -n "$img" ] && R43_CONTAINER_IMAGE="$img"
-            crt=$(docker inspect -f "{{.Created}}" "$container_id" 2>/dev/null | head -1 | tr -d "\r\n"); [ -n "$crt" ] && R43_CONTAINER_CREATED="$crt"
-            R43_COMPOSE_WORKDIR=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$container_id" 2>/dev/null | tr -d "\r\n")
-            R43_COMPOSE_PROJECT=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$container_id" 2>/dev/null | tr -d "\r\n")
-            R43_COMPOSE_SERVICE=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.service" }}' "$container_id" 2>/dev/null | tr -d "\r\n")
-            R43_COMPOSE_CONFIG_FILES=$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.config_files" }}' "$container_id" 2>/dev/null | tr -d "\r\n")
-          fi
-
-          if [ -f "$ENV_FILE" ]; then
-            R43_ENVFILE_EXISTS="YES"
-            grep -q -E "^[[:space:]]*DATABASE_URL[[:space:]]*=" "$ENV_FILE" 2>/dev/null && R43_ENVFILE_HAS_DATABASE_URL="YES"
-            grep -q -E "^[[:space:]]*DIRECT_URL[[:space:]]*=" "$ENV_FILE" 2>/dev/null && R43_ENVFILE_HAS_DIRECT_URL="YES"
-          fi
-
-          fallback_compose=""
-          if [ -z "$R43_COMPOSE_CONFIG_FILES" ]; then
-            [ -f "$APPDIR/docker-compose.yml" ] && fallback_compose="$APPDIR/docker-compose.yml"
-            [ -z "$fallback_compose" ] && [ -f "$APPDIR/docker-compose.yaml" ] && fallback_compose="$APPDIR/docker-compose.yaml"
-            if [ -z "$fallback_compose" ] && [ -d "$APPDIR" ]; then
-              fallback_compose=$(ls -1t "$APPDIR"/*compose*.yml "$APPDIR"/*compose*.yaml 2>/dev/null | head -1)
-            fi
-            [ -n "$fallback_compose" ] && R43_COMPOSE_CONFIG_FILES="$fallback_compose"
-          fi
-
-          if [ -z "$R43_COMPOSE_WORKDIR" ] && [ -n "$R43_COMPOSE_CONFIG_FILES" ]; then
-            first_cf=$(printf "%s" "$R43_COMPOSE_CONFIG_FILES" | awk -F, "{print \$1}" 2>/dev/null)
-            [ -n "$first_cf" ] && [ -f "$first_cf" ] && R43_COMPOSE_WORKDIR=$(dirname "$first_cf" 2>/dev/null)
-          fi
-
-          compose_file=""
-          if [ -n "$R43_COMPOSE_CONFIG_FILES" ]; then
-            compose_file=$(printf "%s" "$R43_COMPOSE_CONFIG_FILES" | awk -F, "{print \$1}" 2>/dev/null)
-            [ -f "$compose_file" ] || compose_file=""
-          fi
-
-          if [ -z "$compose_file" ] && [ -d "$ROOT" ]; then
-            compose_file=$(find "$ROOT" -maxdepth 5 -type f \( -name "*.yml" -o -name "*.yaml" \) 2>/dev/null | while IFS= read -r f; do
-              grep -q -E "^[[:space:]]*container_name:[[:space:]]*${CONTAINER_NAME}[[:space:]]*$" "$f" 2>/dev/null && { echo "$f"; break; }
-            done | head -1)
-            [ -n "$compose_file" ] && R43_COMPOSE_CONFIG_FILES="$compose_file"
-            [ -z "$R43_COMPOSE_WORKDIR" ] && [ -n "$compose_file" ] && [ -f "$compose_file" ] && R43_COMPOSE_WORKDIR=$(dirname "$compose_file" 2>/dev/null)
-          fi
-
-          if [ -n "$compose_file" ] && [ -f "$compose_file" ] && [ -z "$R43_COMPOSE_SERVICE" ]; then
-            R43_COMPOSE_SERVICE=$(awk '
-              BEGIN{svc=""; in_services=0}
-              /^[[:space:]]*services:[[:space:]]*$/ {in_services=1; next}
-              in_services && $0 ~ /^  [A-Za-z0-9_.-]+:[[:space:]]*$/ {
-                svc=$0
-                sub(/^  /, "", svc)
-                sub(/:[[:space:]]*$/, "", svc)
-              }
-              in_services && $0 ~ /^[[:space:]]*container_name:[[:space:]]*rec17-webpsb-p1[[:space:]]*$/ {print svc; exit}
-            ' "$compose_file" 2>/dev/null | head -1)
-          fi
-
-          container_has_db="NO"
-          if [ "$R43_CONTAINER_FOUND" = "YES" ]; then
-            docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" "$container_id" 2>/dev/null | awk -F= "{print \$1}" | grep -x "DATABASE_URL" >/dev/null 2>&1 && container_has_db="YES"
-          fi
-
-          if [ -n "$compose_file" ] && [ -f "$compose_file" ]; then
-            grep -Eq '\$\{?DATABASE_URL\}?' "$compose_file" >/dev/null 2>&1 && R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL="YES"
-            grep -F ".env" "$compose_file" >/dev/null 2>&1 && R43_COMPOSE_FILE_REFERENCES_DOTENV="YES"
-
-            if [ -n "$R43_COMPOSE_SERVICE" ]; then
-              block=$(awk -v svc="$R43_COMPOSE_SERVICE" '
-                BEGIN{in_services=0; in_svc=0; ind=""}
-                /^[[:space:]]*services:[[:space:]]*$/ {in_services=1; next}
-                in_services && $0 ~ ("^[[:space:]]*" svc ":[[:space:]]*$") {
-                  match($0, /^[[:space:]]*/)
-                  ind=substr($0, 1, RLENGTH)
-                  in_svc=1
-                  next
-                }
-                in_svc && ind != "" && $0 ~ ("^" ind "[A-Za-z0-9_.-]+:[[:space:]]*$") {exit}
-                in_svc {print}
-              ' "$compose_file" 2>/dev/null)
-              printf "%s\n" "$block" | grep -q -E "^[[:space:]]*env_file:" >/dev/null 2>&1 && R43_SERVICE_BLOCK_HAS_ENV_FILE="YES"
-              printf "%s\n" "$block" | grep -q -E "^[[:space:]]*environment:" >/dev/null 2>&1 && R43_SERVICE_BLOCK_HAS_ENVIRONMENT="YES"
-              printf "%s\n" "$block" | grep -q -F "DATABASE_URL" >/dev/null 2>&1 && R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY="YES"
+            ip2="$(curl -fsS --max-time 6 https://api.ipify.org 2>/dev/null | tr -d '\r\n' | head -c 64)"
+            if printf '%s' "$ip2" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then
+              R44_RUNNER_PUBLIC_IP="$ip2"
             fi
           fi
 
-          if [ "$R43_SERVICE_BLOCK_HAS_ENV_FILE" = "YES" ]; then
-            R43_ENV_INJECTION_MECHANISM="COMPOSE_ENV_FILE"
-          elif [ "$R43_SERVICE_BLOCK_HAS_ENVIRONMENT" = "YES" ] && [ "$R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY" = "YES" ]; then
-            R43_ENV_INJECTION_MECHANISM="COMPOSE_ENVIRONMENT_KEYS"
-          elif [ "$R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL" = "YES" ] && [ "$R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY" = "NO" ]; then
-            R43_ENV_INJECTION_MECHANISM="COMPOSE_SUBSTITUTION_ONLY"
+          is_ipv4="NO"
+          if printf '%s' "$HOST" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then
+            is_ipv4="YES"
           fi
 
-          if [ "$R43_ENVFILE_HAS_DATABASE_URL" = "YES" ] && [ "$container_has_db" = "NO" ]; then
-            R43_STALE_OR_BROKEN_DEPLOYMENT="YES"
-          fi
-
-          echo "R43_FATAL_ERROR=$R43_FATAL_ERROR"
-          echo "R43_FATAL_REASON=$R43_FATAL_REASON"
-
-          echo "R43_CONTAINER_FOUND=$R43_CONTAINER_FOUND"
-          echo "R43_CONTAINER_NAME=$R43_CONTAINER_NAME"
-          echo "R43_CONTAINER_IMAGE=$R43_CONTAINER_IMAGE"
-          echo "R43_CONTAINER_CREATED=$R43_CONTAINER_CREATED"
-
-          echo "R43_ENVFILE_PATH=$R43_ENVFILE_PATH"
-          echo "R43_ENVFILE_EXISTS=$R43_ENVFILE_EXISTS"
-          echo "R43_ENVFILE_HAS_DATABASE_URL=$R43_ENVFILE_HAS_DATABASE_URL"
-          echo "R43_ENVFILE_HAS_DIRECT_URL=$R43_ENVFILE_HAS_DIRECT_URL"
-
-          echo "R43_COMPOSE_WORKDIR=$R43_COMPOSE_WORKDIR"
-          echo "R43_COMPOSE_CONFIG_FILES=$R43_COMPOSE_CONFIG_FILES"
-          echo "R43_COMPOSE_SERVICE=$R43_COMPOSE_SERVICE"
-          echo "R43_COMPOSE_PROJECT=$R43_COMPOSE_PROJECT"
-
-          echo "R43_SERVICE_BLOCK_HAS_ENV_FILE=$R43_SERVICE_BLOCK_HAS_ENV_FILE"
-          echo "R43_SERVICE_BLOCK_HAS_ENVIRONMENT=$R43_SERVICE_BLOCK_HAS_ENVIRONMENT"
-          echo "R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY=$R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY"
-          echo "R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL=$R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL"
-          echo "R43_COMPOSE_FILE_REFERENCES_DOTENV=$R43_COMPOSE_FILE_REFERENCES_DOTENV"
-
-          echo "R43_ENV_INJECTION_MECHANISM=$R43_ENV_INJECTION_MECHANISM"
-          echo "R43_STALE_OR_BROKEN_DEPLOYMENT=$R43_STALE_OR_BROKEN_DEPLOYMENT"
-          exit 0
-          R43REMOTE
-          )
-            rc=$?
-          fi
-
-          declare -A KV
-          KV[R43_FATAL_ERROR]="NO"
-          KV[R43_FATAL_REASON]=""
-          KV[R43_CONTAINER_FOUND]="NO"
-          KV[R43_CONTAINER_NAME]="rec17-webpsb-p1"
-          KV[R43_CONTAINER_IMAGE]="NONE"
-          KV[R43_CONTAINER_CREATED]="NONE"
-          KV[R43_ENVFILE_PATH]="/data/coolify/applications/pic3vleasj465ooh77ioicw6/.env"
-          KV[R43_ENVFILE_EXISTS]="NO"
-          KV[R43_ENVFILE_HAS_DATABASE_URL]="NO"
-          KV[R43_ENVFILE_HAS_DIRECT_URL]="NO"
-          KV[R43_COMPOSE_WORKDIR]=""
-          KV[R43_COMPOSE_CONFIG_FILES]=""
-          KV[R43_COMPOSE_SERVICE]=""
-          KV[R43_COMPOSE_PROJECT]=""
-          KV[R43_SERVICE_BLOCK_HAS_ENV_FILE]="NO"
-          KV[R43_SERVICE_BLOCK_HAS_ENVIRONMENT]="NO"
-          KV[R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY]="NO"
-          KV[R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL]="NO"
-          KV[R43_COMPOSE_FILE_REFERENCES_DOTENV]="NO"
-          KV[R43_ENV_INJECTION_MECHANISM]="UNKNOWN"
-          KV[R43_STALE_OR_BROKEN_DEPLOYMENT]="NO"
-
-          while IFS= read -r line; do
-            case "$line" in
-              R43_*=*)
-                k="${line%%=*}"
-                v="${line#*=}"
-                KV["$k"]="$v"
-                ;;
-            esac
-          done <<<"$OUT"
-
-          if [ $rc -ne 0 ]; then
-            KV[R43_FATAL_ERROR]="YES"
-            if [ $rc -eq 90 ]; then
-              KV[R43_FATAL_REASON]="ssh_setup_invalid"
+          if [ -z "$HOST" ]; then
+            R44_DNS="FAIL"
+            R44_TCP_CONNECT="FAIL"
+            R44_SSH_BANNER="FAIL"
+            R44_SSH_AUTH_REACHED="NO"
+            R44_SSH_FAILURE_STAGE="DNS"
+          else
+            if [ "$is_ipv4" = "YES" ]; then
+              R44_DNS="OK"
             else
-              reason="ssh_failed_rc_${rc}"
-              err_line="$(printf '%s\n' "$OUT" | head -1 | tr -d '\r' | head -c 160)"
-              [ -n "$err_line" ] && reason="${reason}:${err_line}"
-              KV[R43_FATAL_REASON]="$reason"
+              getent ahosts "$HOST" >/dev/null 2>&1 && R44_DNS="OK"
+            fi
+
+            if [ "$R44_DNS" = "OK" ]; then
+              timeout 6 bash -c "cat < /dev/null > /dev/tcp/${HOST}/${PORT}" >/dev/null 2>&1
+              if [ $? -eq 0 ]; then
+                R44_TCP_CONNECT="OK"
+              else
+                R44_TCP_CONNECT="FAIL"
+              fi
+            fi
+
+            if [ "$R44_TCP_CONNECT" = "OK" ]; then
+              banner="$(timeout 6 bash -c "exec 3<>/dev/tcp/${HOST}/${PORT}; head -c 64 <&3" 2>/dev/null | tr -d '\r\n' | head -c 64)"
+              if printf '%s' "$banner" | grep -q '^SSH-'; then
+                R44_SSH_BANNER="OK"
+              else
+                R44_SSH_BANNER="FAIL"
+              fi
+            fi
+
+            if [ "$R44_SSH_BANNER" = "OK" ]; then
+              ssh_log="$(timeout 18 ssh -vv -p "$PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 -o ConnectionAttempts=1 -i "$K" "$USER@$HOST" true 2>&1 | tail -n 120)"
+              ssh_rc=$?
+              ssh_log_redacted="$(printf '%s\n' "$ssh_log" \
+                | sed -E "s/${HOST}/<HOST_${R44_TARGET_HOST_REDACTED}>/g" \
+                | sed -E 's/[0-9]{1,3}(\\.[0-9]{1,3}){3}/<REDACTED_IP>/g' \
+                | head -n 120)"
+
+              printf '%s\n' "$ssh_log_redacted" | grep -Eq 'Authentications that can continue|Offering public key|Next authentication method|Authentication succeeded|Permission denied' && R44_SSH_AUTH_REACHED="YES"
+
+              if [ "$R44_SSH_AUTH_REACHED" = "YES" ] && [ $ssh_rc -ne 0 ]; then
+                R44_SSH_FAILURE_STAGE="AUTH"
+              fi
+            fi
+
+            if [ "$R44_DNS" != "OK" ]; then
+              R44_SSH_FAILURE_STAGE="DNS"
+            elif [ "$R44_TCP_CONNECT" != "OK" ]; then
+              R44_SSH_FAILURE_STAGE="TCP"
+            elif [ "$R44_SSH_BANNER" != "OK" ]; then
+              R44_SSH_FAILURE_STAGE="BANNER"
+            elif [ "$R44_SSH_AUTH_REACHED" != "YES" ]; then
+              R44_SSH_FAILURE_STAGE="UNKNOWN"
             fi
           fi
 
-          keys=(
-            R43_FATAL_ERROR
-            R43_FATAL_REASON
-            R43_CONTAINER_FOUND
-            R43_CONTAINER_NAME
-            R43_CONTAINER_IMAGE
-            R43_CONTAINER_CREATED
-            R43_ENVFILE_PATH
-            R43_ENVFILE_EXISTS
-            R43_ENVFILE_HAS_DATABASE_URL
-            R43_ENVFILE_HAS_DIRECT_URL
-            R43_COMPOSE_WORKDIR
-            R43_COMPOSE_CONFIG_FILES
-            R43_COMPOSE_SERVICE
-            R43_COMPOSE_PROJECT
-            R43_SERVICE_BLOCK_HAS_ENV_FILE
-            R43_SERVICE_BLOCK_HAS_ENVIRONMENT
-            R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY
-            R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL
-            R43_COMPOSE_FILE_REFERENCES_DOTENV
-            R43_ENV_INJECTION_MECHANISM
-            R43_STALE_OR_BROKEN_DEPLOYMENT
-          )
+          echo "R44_TARGET_HOST_REDACTED=$R44_TARGET_HOST_REDACTED"
+          echo "R44_SSH_PORT=$R44_SSH_PORT"
+          echo "R44_RUNNER_PUBLIC_IP=$R44_RUNNER_PUBLIC_IP"
+          echo "R44_DNS=$R44_DNS"
+          echo "R44_TCP_CONNECT=$R44_TCP_CONNECT"
+          echo "R44_SSH_BANNER=$R44_SSH_BANNER"
+          echo "R44_SSH_AUTH_REACHED=$R44_SSH_AUTH_REACHED"
+          echo "R44_SSH_FAILURE_STAGE=$R44_SSH_FAILURE_STAGE"
 
-          echo "===== RUN43 SUMMARY (KEY=VALUE) ====="
-          for k in "${keys[@]}"; do
-            echo "$k=${KV[$k]}"
-          done
-          echo "===== RUN43 RAW (remote) ====="
-          printf '%s\n' "$OUT"
-          echo "===== RUN43 END ====="
-
-          msg1="R43_FATAL_ERROR=${KV[R43_FATAL_ERROR]} R43_FATAL_REASON=${KV[R43_FATAL_REASON]} R43_CONTAINER_FOUND=${KV[R43_CONTAINER_FOUND]} R43_CONTAINER_NAME=${KV[R43_CONTAINER_NAME]} R43_CONTAINER_IMAGE=${KV[R43_CONTAINER_IMAGE]} R43_CONTAINER_CREATED=${KV[R43_CONTAINER_CREATED]}"
-          msg2="R43_ENVFILE_PATH=${KV[R43_ENVFILE_PATH]} R43_ENVFILE_EXISTS=${KV[R43_ENVFILE_EXISTS]} R43_ENVFILE_HAS_DATABASE_URL=${KV[R43_ENVFILE_HAS_DATABASE_URL]} R43_ENVFILE_HAS_DIRECT_URL=${KV[R43_ENVFILE_HAS_DIRECT_URL]} R43_COMPOSE_WORKDIR=${KV[R43_COMPOSE_WORKDIR]} R43_COMPOSE_CONFIG_FILES=${KV[R43_COMPOSE_CONFIG_FILES]} R43_COMPOSE_SERVICE=${KV[R43_COMPOSE_SERVICE]} R43_COMPOSE_PROJECT=${KV[R43_COMPOSE_PROJECT]}"
-          msg3="R43_SERVICE_BLOCK_HAS_ENV_FILE=${KV[R43_SERVICE_BLOCK_HAS_ENV_FILE]} R43_SERVICE_BLOCK_HAS_ENVIRONMENT=${KV[R43_SERVICE_BLOCK_HAS_ENVIRONMENT]} R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY=${KV[R43_SERVICE_BLOCK_HAS_DATABASE_URL_KEY]} R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL=${KV[R43_COMPOSE_FILE_HAS_DOLLAR_DATABASE_URL]} R43_COMPOSE_FILE_REFERENCES_DOTENV=${KV[R43_COMPOSE_FILE_REFERENCES_DOTENV]} R43_ENV_INJECTION_MECHANISM=${KV[R43_ENV_INJECTION_MECHANISM]} R43_STALE_OR_BROKEN_DEPLOYMENT=${KV[R43_STALE_OR_BROKEN_DEPLOYMENT]}"
-          msg1_safe="$(printf '%s' "$msg1" | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
-          msg2_safe="$(printf '%s' "$msg2" | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
-          msg3_safe="$(printf '%s' "$msg3" | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
-          echo "::notice title=R43_RESULTS_1::${msg1_safe}"
-          echo "::notice title=R43_RESULTS_2::${msg2_safe}"
-          echo "::notice title=R43_RESULTS_3::${msg3_safe}"
+          msgA="R44_TARGET_HOST_REDACTED=$R44_TARGET_HOST_REDACTED R44_SSH_PORT=$R44_SSH_PORT R44_RUNNER_PUBLIC_IP=$R44_RUNNER_PUBLIC_IP"
+          msgB="R44_DNS=$R44_DNS R44_TCP_CONNECT=$R44_TCP_CONNECT R44_SSH_BANNER=$R44_SSH_BANNER R44_SSH_AUTH_REACHED=$R44_SSH_AUTH_REACHED R44_SSH_FAILURE_STAGE=$R44_SSH_FAILURE_STAGE"
+          msgA_safe="$(printf '%s' "$msgA" | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          msgB_safe="$(printf '%s' "$msgB" | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          echo "::notice title=R44_RESULTS_A::${msgA_safe}"
+          echo "::notice title=R44_RESULTS_B::${msgB_safe}"
 
           exit 0
