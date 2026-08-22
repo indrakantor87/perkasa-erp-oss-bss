@@ -92,7 +92,11 @@ jobs:
               FALLBACK_SERVICE=$(awk '
                 BEGIN{svc=""; in_services=0}
                 /^[[:space:]]*services:[[:space:]]*$/ {in_services=1; next}
-                in_services && match($0, /^[[:space:]]{2}([A-Za-z0-9_.-]+):[[:space:]]*$/, m) {svc=m[1]}
+                in_services && $0 ~ /^[[:space:]]{2}[A-Za-z0-9_.-]+:[[:space:]]*$/ {
+                  svc=$0
+                  sub(/^[[:space:]]{2}/, "", svc)
+                  sub(/:[[:space:]]*$/, "", svc)
+                }
                 in_services && $0 ~ /^[[:space:]]{4}container_name:[[:space:]]*rec17-webpsb-p1[[:space:]]*$/ {print svc; exit}
               ' "$FALLBACK_COMPOSE_FILE" 2>/dev/null | head -1)
             fi
