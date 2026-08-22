@@ -1,4 +1,4 @@
-name: "RUN36 DIAG+FIX MINIMAL: Restore DB env to rec17-webpsb-p1"
+name: "RUN37 DIAG+FIX MINIMAL: Restore DB env to rec17-webpsb-p1"
 
 on:
   push:
@@ -42,7 +42,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN36: Read-only — determine Coolify env injection mechanism"
+      - name: "RUN37: Read-only — determine Coolify env injection mechanism"
         id: diag
         continue-on-error: true
         run: |
@@ -169,7 +169,7 @@ jobs:
             echo "${kv}=$v" >> "$GITHUB_OUTPUT"
           done
 
-      - name: "RUN36: Summary (read-only)"
+      - name: "RUN37: Summary (read-only)"
         continue-on-error: true
         run: |
           set +eo pipefail
@@ -205,7 +205,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN36: CHANGE_PLAN (must print before change)"
+      - name: "RUN37: CHANGE_PLAN (must print before change)"
         run: |
           set +e
           APP_ID="${{ needs.diag_r36.outputs.app_id }}"
@@ -217,7 +217,7 @@ jobs:
           echo "::notice title=ENV_KEYS_TO_RESTORE::${KEYS}"
           echo "::notice title=ROLLBACK_PLAN::Restore compose file from backup (.bak.RUN36.<ts>) and force-recreate only the same service again."
 
-      - name: "RUN36: APPLY FIX — restore DATABASE_URL/DIRECT_URL via Compose and recreate service"
+      - name: "RUN37: APPLY FIX — restore DATABASE_URL/DIRECT_URL via Compose and recreate service"
         id: fix
         run: |
           set +e
@@ -261,120 +261,40 @@ jobs:
             BAK="${PATCH_FILE}.bak.RUN36.${TS}"
             cp -f "$PATCH_FILE" "$BAK" 2>/dev/null || { echo "FIX_ERR: backup_failed"; exit 9; }
 
-            python3 - "$PATCH_FILE" "$SERVICE" << "PY"
-import sys
-
-path, service = sys.argv[1], sys.argv[2]
-with open(path, "r", encoding="utf-8", errors="replace") as f:
-    lines = f.read().splitlines(True)
-
-def find_services_idx(lines):
-    for i, ln in enumerate(lines):
-        if ln.strip() == "services:":
-            return i
-    return None
-
-def find_service_block(lines, service):
-    services_i = find_services_idx(lines)
-    if services_i is None:
-        return None
-    target = f"  {service}:"
-    start = None
-    for i in range(services_i + 1, len(lines)):
-        if lines[i].startswith(target) and lines[i].strip() == target.strip():
-            start = i
-            break
-    if start is None:
-        return None
-    end = len(lines)
-    for j in range(start + 1, len(lines)):
-        ln = lines[j]
-        if ln.startswith("  ") and (not ln.startswith("    ")) and ln.strip().endswith(":"):
-            end = j
-            break
-    return (start, end)
-
-block = find_service_block(lines, service)
-if not block:
-    sys.exit(10)
-
-start, end = block
-svc_lines = lines[start:end]
-
-def has_env_key_list_style(svc_lines, key):
-    needle = f"- {key}="
-    needle2 = f"- {key}=${{{key}}}"
-    for ln in svc_lines:
-        s = ln.strip()
-        if s.startswith("- ") and (s == needle2 or s.startswith(needle)):
-            return True
-    return False
-
-def has_env_key_map_style(svc_lines, key):
-    needle = f"{key}:"
-    for ln in svc_lines:
-        if ln.startswith("      ") and ln.strip().startswith(needle):
-            return True
-    return False
-
-def find_env_block(svc_lines):
-    for i, ln in enumerate(svc_lines):
-        if ln.startswith("    environment:"):
-            j = i + 1
-            while j < len(svc_lines) and (svc_lines[j].startswith("      ") or svc_lines[j].strip() == ""):
-                j += 1
-            return (i, j)
-    return None
-
-env_block = find_env_block(svc_lines)
-
-def ensure_env_list(svc_lines, insert_at, keys):
-    add = []
-    for k in keys:
-        add.append(f"      - {k}=${{{k}}}\n")
-    return svc_lines[:insert_at] + ["    environment:\n"] + add + svc_lines[insert_at:]
-
-keys = ["DATABASE_URL", "DIRECT_URL"]
-if env_block:
-    env_i, env_j = env_block
-    children = svc_lines[env_i+1:env_j]
-    is_list = False
-    is_map = False
-    for ln in children:
-        t = ln.strip()
-        if t.startswith("- "):
-            is_list = True
-            break
-        if ":" in t and not t.startswith("#"):
-            is_map = True
-            break
-    if not is_list and not is_map:
-        is_list = True
-
-    if is_list:
-        for k in keys:
-            if not has_env_key_list_style(svc_lines, k):
-                svc_lines.insert(env_j, f"      - {k}=${{{k}}}\n")
-                env_j += 1
-    else:
-        for k in keys:
-            if not has_env_key_map_style(svc_lines, k):
-                svc_lines.insert(env_j, f"      {k}: ${{{k}}}\n")
-                env_j += 1
-else:
-    insert_at = None
-    for i in range(1, len(svc_lines)):
-        if svc_lines[i].startswith("    image:") or svc_lines[i].startswith("    build:"):
-            insert_at = i + 1
-            break
-    if insert_at is None:
-        insert_at = 1
-    svc_lines = ensure_env_list(svc_lines, insert_at, keys)
-
-new_lines = lines[:start] + svc_lines + lines[end:]
-with open(path, "w", encoding="utf-8") as f:
-    f.writelines(new_lines)
-PY
+            TMP="${PATCH_FILE}.tmp.RUN36.${TS}"
+            awk -v svc="$SERVICE" "
+              BEGIN {in_services=0; in_svc=0; env_seen=0; inserted=0; added_db=0; added_du=0; }
+              {
+                line=\$0
+                if (line ~ /^services:[[:space:]]*$/) { in_services=1 }
+                if (in_services && line ~ (\"^  \" svc \":[[:space:]]*$\")) { in_svc=1; env_seen=0; inserted=0; added_db=0; added_du=0 }
+                if (in_svc && line ~ /^    environment:[[:space:]]*$/) { env_seen=1 }
+                print line
+                if (in_svc && !inserted) {
+                  if (!env_seen && (line ~ /^    image:/ || line ~ /^    build:/ || line ~ /^    container_name:/)) {
+                    print \"    environment:\"
+                    print \"      - DATABASE_URL=\\\${DATABASE_URL}\"
+                    print \"      - DIRECT_URL=\\\${DIRECT_URL}\"
+                    inserted=1
+                  }
+                  if (env_seen && (line ~ /^    environment:[[:space:]]*$/)) {
+                    print \"      - DATABASE_URL=\\\${DATABASE_URL}\"
+                    print \"      - DIRECT_URL=\\\${DIRECT_URL}\"
+                    inserted=1
+                  }
+                }
+                if (in_services && in_svc && line ~ /^  [^ ][^:]*:[[:space:]]*$/ && line !~ (\"^  \" svc \":[[:space:]]*$\")) {
+                  in_svc=0
+                }
+              }
+              END {
+                if (in_svc && !inserted) {
+                  print \"    environment:\"
+                  print \"      - DATABASE_URL=\\\${DATABASE_URL}\"
+                  print \"      - DIRECT_URL=\\\${DIRECT_URL}\"
+                }
+              }
+            " "$PATCH_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$PATCH_FILE" 2>/dev/null
 
             CFGA=""
             for f in "${files[@]}"; do
@@ -414,7 +334,7 @@ PY
           printf '%s\n' "$OUT" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: "RUN36: Result summary"
+      - name: "RUN37: Result summary"
         continue-on-error: true
         run: |
           set +eo pipefail
