@@ -1,4 +1,4 @@
-name: "RUN37 DIAG+FIX MINIMAL: Restore DB env to rec17-webpsb-p1"
+name: "RUN38 DIAG+FIX MINIMAL: Restore DB env to rec17-webpsb-p1 (fallback compose)"
 
 on:
   push:
@@ -42,7 +42,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN37: Read-only — determine Coolify env injection mechanism"
+      - name: "RUN38: Read-only — determine Coolify env injection mechanism"
         id: diag
         continue-on-error: true
         run: |
@@ -75,6 +75,36 @@ jobs:
               COMPOSE_PROJECT=$(label_get "$CID" "com.docker.compose.project")
               COMPOSE_SERVICE=$(label_get "$CID" "com.docker.compose.service")
               COMPOSE_CONFIG_FILES=$(label_get "$CID" "com.docker.compose.project.config_files")
+            fi
+
+            APPDIR="$ROOT/applications/$APP_ID"
+            FALLBACK_COMPOSE_FILE=""
+            if [ -d "$APPDIR" ]; then
+              [ -f "$APPDIR/docker-compose.yml" ] && FALLBACK_COMPOSE_FILE="$APPDIR/docker-compose.yml"
+              [ -z "$FALLBACK_COMPOSE_FILE" ] && [ -f "$APPDIR/docker-compose.yaml" ] && FALLBACK_COMPOSE_FILE="$APPDIR/docker-compose.yaml"
+              if [ -z "$FALLBACK_COMPOSE_FILE" ]; then
+                FALLBACK_COMPOSE_FILE=$(ls -1t "$APPDIR"/*compose*.yml "$APPDIR"/*compose*.yaml 2>/dev/null | head -1)
+              fi
+            fi
+
+            FALLBACK_SERVICE=""
+            if [ -n "$FALLBACK_COMPOSE_FILE" ] && [ -f "$FALLBACK_COMPOSE_FILE" ]; then
+              FALLBACK_SERVICE=$(awk '
+                BEGIN{svc=""; in_services=0}
+                /^[[:space:]]*services:[[:space:]]*$/ {in_services=1; next}
+                in_services && match($0, /^[[:space:]]{2}([A-Za-z0-9_.-]+):[[:space:]]*$/, m) {svc=m[1]}
+                in_services && $0 ~ /^[[:space:]]{4}container_name:[[:space:]]*rec17-webpsb-p1[[:space:]]*$/ {print svc; exit}
+              ' "$FALLBACK_COMPOSE_FILE" 2>/dev/null | head -1)
+            fi
+
+            if [ -z "$COMPOSE_WORKDIR" ] && [ -n "$FALLBACK_COMPOSE_FILE" ]; then
+              COMPOSE_WORKDIR=$(dirname "$FALLBACK_COMPOSE_FILE" 2>/dev/null)
+            fi
+            if [ -z "$COMPOSE_CONFIG_FILES" ] && [ -n "$FALLBACK_COMPOSE_FILE" ]; then
+              COMPOSE_CONFIG_FILES="$FALLBACK_COMPOSE_FILE"
+            fi
+            if [ -z "$COMPOSE_SERVICE" ] && [ -n "$FALLBACK_SERVICE" ]; then
+              COMPOSE_SERVICE="$FALLBACK_SERVICE"
             fi
 
             ENVFILE_HAS_DATABASE_URL="NO"
@@ -139,6 +169,8 @@ jobs:
             echo "R36_COMPOSE_HAS_ENVFILE: $COMPOSE_HAS_ENVFILE"
             echo "R36_COMPOSE_MENTIONS_DATABASE_URL: $COMPOSE_MENTIONS_DATABASE_URL"
             echo "R36_COMPOSE_MENTIONS_DIRECT_URL: $COMPOSE_MENTIONS_DIRECT_URL"
+            echo "R36_FALLBACK_COMPOSE_FILE: $FALLBACK_COMPOSE_FILE"
+            echo "R36_FALLBACK_SERVICE: $FALLBACK_SERVICE"
             echo "R36_CONTAINER_MOUNTS_HAVE_APP_DIR: $MOUNTS_HAVE_APP"
             echo "R36_PROCEED_FIX: $PROCEED_FIX"
           ' 2>&1)
@@ -169,13 +201,13 @@ jobs:
             echo "${kv}=$v" >> "$GITHUB_OUTPUT"
           done
 
-      - name: "RUN37: Summary (read-only)"
+      - name: "RUN38: Summary (read-only)"
         continue-on-error: true
         run: |
           set +eo pipefail
           OUT="${{ steps.diag.outputs.raw }}"
           getv() { printf '%s\n' "$OUT" | { grep -E "^$1:" || true; } | head -1 | cut -d: -f2- | sed "s/^[[:space:]]*//; s/[[:space:]]\+$//"; }
-          for k in R36_PROCEED_FIX R36_COMPOSE_WORKDIR R36_COMPOSE_CONFIG_FILES R36_COMPOSE_SERVICE R36_ENVFILE_HAS_DATABASE_URL R36_ENVFILE_HAS_DIRECT_URL R36_CONTAINER_HAS_DATABASE_URL R36_CONTAINER_HAS_DIRECT_URL R36_COMPOSE_HAS_ENVFILE R36_COMPOSE_MENTIONS_DATABASE_URL R36_COMPOSE_MENTIONS_DIRECT_URL; do
+          for k in R36_PROCEED_FIX R36_COMPOSE_WORKDIR R36_COMPOSE_CONFIG_FILES R36_COMPOSE_SERVICE R36_FALLBACK_COMPOSE_FILE R36_FALLBACK_SERVICE R36_ENVFILE_HAS_DATABASE_URL R36_ENVFILE_HAS_DIRECT_URL R36_CONTAINER_HAS_DATABASE_URL R36_CONTAINER_HAS_DIRECT_URL R36_COMPOSE_HAS_ENVFILE R36_COMPOSE_MENTIONS_DATABASE_URL R36_COMPOSE_MENTIONS_DIRECT_URL; do
             v="$(getv "$k")"; [ -z "$v" ] && v="(missing)"
             v="$(printf '%s' "$v" | head -c 1100)"
             v_safe="$(printf '%s' "$v" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
@@ -205,7 +237,7 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN37: CHANGE_PLAN (must print before change)"
+      - name: "RUN38: CHANGE_PLAN (must print before change)"
         run: |
           set +e
           APP_ID="${{ needs.diag_r36.outputs.app_id }}"
@@ -217,7 +249,7 @@ jobs:
           echo "::notice title=ENV_KEYS_TO_RESTORE::${KEYS}"
           echo "::notice title=ROLLBACK_PLAN::Restore compose file from backup (.bak.RUN36.<ts>) and force-recreate only the same service again."
 
-      - name: "RUN37: APPLY FIX — restore DATABASE_URL/DIRECT_URL via Compose and recreate service"
+      - name: "RUN38: APPLY FIX — restore DATABASE_URL/DIRECT_URL via Compose and recreate service"
         id: fix
         run: |
           set +e
