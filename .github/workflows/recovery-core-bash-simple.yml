@@ -1,4 +1,4 @@
-name: "RUN44 SSH CONNECTIVITY DIAGNOSTIC ONLY"
+name: "RUN46: SSH Probe + FIX MINIMAL recreate rec17-webpsb-p1 (env-file inject)"
 
 on:
   push:
@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  diag_r44:
+  fix_r46:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -27,9 +27,9 @@ jobs:
           echo "USER=$USER" >> $GITHUB_ENV
           echo "HOST=$HOST" >> $GITHUB_ENV
 
-      - name: "RUN44: SSH connectivity diagnostic (runner-side only)"
-        id: diag
-        continue-on-error: true
+      - name: "1. SSH connectivity preflight (BANNER required to proceed)"
+        id: preflight
+        continue-on-error: false
         run: |
           set +e
           K="${{ env.KEY }}"
@@ -37,108 +37,182 @@ jobs:
           HOST="${{ env.HOST }}"
           PORT="22"
 
-          R44_TARGET_HOST_REDACTED="REDACTED"
-          R44_SSH_PORT="$PORT"
-          R44_RUNNER_PUBLIC_IP="UNKNOWN"
-
-          R44_DNS="FAIL"
-          R44_TCP_CONNECT="FAIL"
-          R44_SSH_BANNER="FAIL"
-          R44_SSH_AUTH_REACHED="NO"
-          R44_SSH_FAILURE_STAGE="UNKNOWN"
-
-          host_hash=""
-          if [ -n "$HOST" ]; then
-            host_hash="$(printf '%s' "$HOST" | sha256sum 2>/dev/null | awk '{print $1}' | cut -c1-12)"
-            [ -n "$host_hash" ] && R44_TARGET_HOST_REDACTED="sha256:${host_hash}"
-          fi
-
-          ip="$(curl -fsS --max-time 6 https://checkip.amazonaws.com 2>/dev/null | tr -d '\r\n' | head -c 64)"
-          if printf '%s' "$ip" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then
-            R44_RUNNER_PUBLIC_IP="$ip"
-          else
-            ip2="$(curl -fsS --max-time 6 https://api.ipify.org 2>/dev/null | tr -d '\r\n' | head -c 64)"
-            if printf '%s' "$ip2" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then
-              R44_RUNNER_PUBLIC_IP="$ip2"
-            fi
-          fi
+          R46_DNS="FAIL"
+          R46_TCP_CONNECT="FAIL"
+          R46_SSH_BANNER="FAIL"
+          R46_SSH_AUTH_REACHED="NO"
+          R46_SSH_FAILURE_STAGE="UNKNOWN"
 
           is_ipv4="NO"
-          if printf '%s' "$HOST" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then
-            is_ipv4="YES"
-          fi
+          if printf '%s' "$HOST" | grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'; then is_ipv4="YES"; fi
 
           if [ -z "$HOST" ]; then
-            R44_DNS="FAIL"
-            R44_TCP_CONNECT="FAIL"
-            R44_SSH_BANNER="FAIL"
-            R44_SSH_AUTH_REACHED="NO"
-            R44_SSH_FAILURE_STAGE="DNS"
+            R46_SSH_FAILURE_STAGE="DNS"
           else
-            if [ "$is_ipv4" = "YES" ]; then
-              R44_DNS="OK"
-            else
-              getent ahosts "$HOST" >/dev/null 2>&1 && R44_DNS="OK"
+            if [ "$is_ipv4" = "YES" ]; then R46_DNS="OK"; else
+              getent ahosts "$HOST" >/dev/null 2>&1 && R46_DNS="OK"
             fi
-
-            if [ "$R44_DNS" = "OK" ]; then
-              timeout 6 bash -c "cat < /dev/null > /dev/tcp/${HOST}/${PORT}" >/dev/null 2>&1
-              if [ $? -eq 0 ]; then
-                R44_TCP_CONNECT="OK"
-              else
-                R44_TCP_CONNECT="FAIL"
-              fi
+            if [ "$R46_DNS" = "OK" ]; then
+              timeout 6 bash -c "cat < /dev/null > /dev/tcp/${HOST}/${PORT}" >/dev/null 2>&1 && R46_TCP_CONNECT="OK"
             fi
-
-            if [ "$R44_TCP_CONNECT" = "OK" ]; then
+            if [ "$R46_TCP_CONNECT" = "OK" ]; then
               banner="$(timeout 6 bash -c "exec 3<>/dev/tcp/${HOST}/${PORT}; head -c 64 <&3" 2>/dev/null | tr -d '\r\n' | head -c 64)"
-              if printf '%s' "$banner" | grep -q '^SSH-'; then
-                R44_SSH_BANNER="OK"
-              else
-                R44_SSH_BANNER="FAIL"
-              fi
+              printf '%s' "$banner" | grep -q '^SSH-' && R46_SSH_BANNER="OK"
             fi
-
-            if [ "$R44_SSH_BANNER" = "OK" ]; then
-              ssh_log="$(timeout 18 ssh -vv -p "$PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 -o ConnectionAttempts=1 -i "$K" "$USER@$HOST" true 2>&1 | tail -n 120)"
+            if [ "$R46_SSH_BANNER" = "OK" ]; then
+              ssh_log="$(timeout 20 ssh -vv -p "$PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=12 -o ConnectionAttempts=1 -i "$K" "$USER@$HOST" true 2>&1 | tail -n 120)"
               ssh_rc=$?
-              ssh_log_redacted="$(printf '%s\n' "$ssh_log" \
-                | sed -E "s/${HOST}/<HOST_${R44_TARGET_HOST_REDACTED}>/g" \
-                | sed -E 's/[0-9]{1,3}(\\.[0-9]{1,3}){3}/<REDACTED_IP>/g' \
-                | head -n 120)"
-
-              printf '%s\n' "$ssh_log_redacted" | grep -Eq 'Authentications that can continue|Offering public key|Next authentication method|Authentication succeeded|Permission denied' && R44_SSH_AUTH_REACHED="YES"
-
-              if [ "$R44_SSH_AUTH_REACHED" = "YES" ] && [ $ssh_rc -ne 0 ]; then
-                R44_SSH_FAILURE_STAGE="AUTH"
+              printf '%s\n' "$ssh_log" | grep -Eq 'Authentications that can continue|Offering public key|Next authentication method|Authentication succeeded|Permission denied' && R46_SSH_AUTH_REACHED="YES"
+              if [ "$R46_SSH_AUTH_REACHED" = "YES" ] && [ $ssh_rc -eq 0 ]; then
+                R46_SSH_FAILURE_STAGE="AUTH_OK"
+              elif [ "$R46_SSH_AUTH_REACHED" = "YES" ]; then
+                R46_SSH_FAILURE_STAGE="AUTH"
               fi
             fi
-
-            if [ "$R44_DNS" != "OK" ]; then
-              R44_SSH_FAILURE_STAGE="DNS"
-            elif [ "$R44_TCP_CONNECT" != "OK" ]; then
-              R44_SSH_FAILURE_STAGE="TCP"
-            elif [ "$R44_SSH_BANNER" != "OK" ]; then
-              R44_SSH_FAILURE_STAGE="BANNER"
-            elif [ "$R44_SSH_AUTH_REACHED" != "YES" ]; then
-              R44_SSH_FAILURE_STAGE="UNKNOWN"
+            if [ "$R46_DNS" != "OK" ]; then R46_SSH_FAILURE_STAGE="DNS"
+            elif [ "$R46_TCP_CONNECT" != "OK" ]; then R46_SSH_FAILURE_STAGE="TCP"
+            elif [ "$R46_SSH_BANNER" != "OK" ]; then R46_SSH_FAILURE_STAGE="BANNER"
             fi
           fi
 
-          echo "R44_TARGET_HOST_REDACTED=$R44_TARGET_HOST_REDACTED"
-          echo "R44_SSH_PORT=$R44_SSH_PORT"
-          echo "R44_RUNNER_PUBLIC_IP=$R44_RUNNER_PUBLIC_IP"
-          echo "R44_DNS=$R44_DNS"
-          echo "R44_TCP_CONNECT=$R44_TCP_CONNECT"
-          echo "R44_SSH_BANNER=$R44_SSH_BANNER"
-          echo "R44_SSH_AUTH_REACHED=$R44_SSH_AUTH_REACHED"
-          echo "R44_SSH_FAILURE_STAGE=$R44_SSH_FAILURE_STAGE"
+          echo "R46_DNS=$R46_DNS"
+          echo "R46_TCP_CONNECT=$R46_TCP_CONNECT"
+          echo "R46_SSH_BANNER=$R46_SSH_BANNER"
+          echo "R46_SSH_AUTH_REACHED=$R46_SSH_AUTH_REACHED"
+          echo "R46_SSH_FAILURE_STAGE=$R46_SSH_FAILURE_STAGE"
 
-          msgA="R44_TARGET_HOST_REDACTED=$R44_TARGET_HOST_REDACTED R44_SSH_PORT=$R44_SSH_PORT R44_RUNNER_PUBLIC_IP=$R44_RUNNER_PUBLIC_IP"
-          msgB="R44_DNS=$R44_DNS R44_TCP_CONNECT=$R44_TCP_CONNECT R44_SSH_BANNER=$R44_SSH_BANNER R44_SSH_AUTH_REACHED=$R44_SSH_AUTH_REACHED R44_SSH_FAILURE_STAGE=$R44_SSH_FAILURE_STAGE"
-          msgA_safe="$(printf '%s' "$msgA" | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
-          msgB_safe="$(printf '%s' "$msgB" | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
-          echo "::notice title=R44_RESULTS_A::${msgA_safe}"
-          echo "::notice title=R44_RESULTS_B::${msgB_safe}"
+          echo "R46_DNS=$R46_DNS" >> $GITHUB_OUTPUT
+          echo "R46_TCP_CONNECT=$R46_TCP_CONNECT" >> $GITHUB_OUTPUT
+          echo "R46_SSH_BANNER=$R46_SSH_BANNER" >> $GITHUB_OUTPUT
+          echo "R46_SSH_AUTH_REACHED=$R46_SSH_AUTH_REACHED" >> $GITHUB_OUTPUT
+          echo "R46_SSH_FAILURE_STAGE=$R46_SSH_FAILURE_STAGE" >> $GITHUB_OUTPUT
 
+          if [ "$R46_SSH_AUTH_REACHED" != "YES" ]; then
+            echo "::error title=R46_PREFLIGHT_SSH_FAIL::stage=$R46_SSH_FAILURE_STAGE dns=$R46_DNS tcp=$R46_TCP_CONNECT banner=$R46_SSH_BANNER auth=$R46_SSH_AUTH_REACHED"
+            exit 1
+          fi
+          exit 0
+
+      - name: "2. RUN46 FIX: Recreate rec17-webpsb-p1 with --env-file (ROLLBACK ready)"
+        id: fix
+        if: steps.preflight.outputs.R46_SSH_AUTH_REACHED == 'YES'
+        continue-on-error: false
+        run: |
+          set +e
+          K="${{ env.KEY }}"
+          USER="${{ env.USER }}"
+          HOST="${{ env.HOST }}"
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -o ConnectionAttempts=2 -i $K"
+
+          OUT=$(ssh $OPTS "${USER}@${HOST}" 'sh -s' 2>&1 <<'R46REMOTE'
+          set +e
+          APP_ID="pic3vleasj465ooh77ioicw6"
+          ENV_FILE="/data/coolify/applications/${APP_ID}/.env"
+          CONTAINER="rec17-webpsb-p1"
+          NETWORK="coolify"
+
+          echo "FIX_START=YES"
+
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "FIX_FATAL=YES"
+            echo "FIX_FATAL_REASON=env_file_missing"
+            echo "ENV_FILE=$ENV_FILE"
+            exit 2
+          fi
+
+          grep -q -E '^[[:space:]]*(export[[:space:]]+)?DATABASE_URL[[:space:]]*=' "$ENV_FILE" 2>/dev/null
+          echo "SOURCE_HAS_DATABASE_URL_KEY=$([ $? -eq 0 ] && echo FOUND || echo NOT_FOUND)"
+          grep -q -E '^[[:space:]]*(export[[:space:]]+)?DIRECT_URL[[:space:]]*=' "$ENV_FILE" 2>/dev/null
+          echo "SOURCE_HAS_DIRECT_URL_KEY=$([ $? -eq 0 ] && echo FOUND || echo NOT_FOUND)"
+
+          CID="$(docker ps -a --filter "name=^/${CONTAINER}$" --format "{{.ID}}" 2>/dev/null | head -1)"
+          if [ -z "$CID" ]; then
+            echo "FIX_FATAL=YES"
+            echo "FIX_FATAL_REASON=container_missing"
+            exit 3
+          fi
+          IMG="$(docker inspect -f '{{.Config.Image}}' "$CID" 2>/dev/null | head -1 | tr -d '\r')"
+          echo "OLD_CID=$CID"
+          echo "OLD_IMAGE=$IMG"
+
+          LABEL_FILE="/tmp/rec17_labels_$$.txt"
+          docker inspect -f '{{range $k,$v := .Config.Labels}}{{println $k "=" $v}}{{end}}' "$CID" 2>/dev/null | grep -E '^traefik\.' > "$LABEL_FILE"
+          echo "TRAEFIK_LABELS_COUNT=$(wc -l < "$LABEL_FILE")"
+
+          BACKUP_NAME="${CONTAINER}__bak_$(date -u +%Y%m%dT%H%M%SZ)"
+          echo "BACKUP_NAME=$BACKUP_NAME"
+
+          echo "STEP=stop_old"
+          docker stop "$CONTAINER" >/dev/null 2>&1
+          echo "STEP=rename_old_to_backup"
+          docker rename "$CONTAINER" "$BACKUP_NAME" >/dev/null 2>&1
+
+          echo "STEP=run_new"
+          LABEL_ARGS=""
+          while IFS= read -r line; do
+            k="${line%%=*}"
+            v="${line#*=}"
+            [ -n "$k" ] && LABEL_ARGS="$LABEL_ARGS --label $k=$v"
+          done < "$LABEL_FILE"
+
+          CMD="docker run -d --name $CONTAINER --restart unless-stopped --network $NETWORK --env-file $ENV_FILE $LABEL_ARGS $IMG"
+          NEWCID=$(eval "$CMD" 2>&1)
+          RUN_RC=$?
+          echo "RUN_RC=$RUN_RC"
+          echo "NEW_CID=$(printf '%s' "$NEWCID" | tr -d '\r\n' | head -c 80)"
+
+          if [ $RUN_RC -ne 0 ] || [ -z "$NEWCID" ]; then
+            echo "FIX_FATAL=YES"
+            echo "FIX_FATAL_REASON=docker_run_failed"
+            echo "ROLLBACK_BACKUP_NAME=$BACKUP_NAME"
+            exit 4
+          fi
+
+          sleep 3
+          echo "NEW_STATUS=$(docker ps --filter "name=^/${CONTAINER}$" --format "{{.Status}}" | head -1)"
+
+          ENV_KEYS=$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$NEWCID" 2>/dev/null | awk -F= '{print $1}' | sort)
+          echo "RUNTIME_DATABASE_URL_KEY=$(printf '%s\n' "$ENV_KEYS" | grep -x 'DATABASE_URL' >/dev/null 2>&1 && echo FOUND || echo NOT_FOUND)"
+          echo "RUNTIME_DIRECT_URL_KEY=$(printf '%s\n' "$ENV_KEYS" | grep -x 'DIRECT_URL' >/dev/null 2>&1 && echo FOUND || echo NOT_FOUND)"
+          echo "RUNTIME_ENV_KEYS_COUNT=$(printf '%s\n' "$ENV_KEYS" | grep -c . || echo 0)"
+
+          echo "FIX_DONE=YES"
+          echo "ROLLBACK_BACKUP_NAME=$BACKUP_NAME"
+          exit 0
+          R46REMOTE
+          )
+          RC=$?
+
+          printf '%s\n' "$OUT" | sed -E 's/(DATABASE_URL|DIRECT_URL)=[^[:space:]]+/\1=<REDACTED>/g'
+
+          echo
+          echo "=== SSH_RC=$RC ==="
+
+          if [ $RC -ne 0 ]; then
+            FATAL=$(printf '%s\n' "$OUT" | grep -E '^FIX_FATAL=' | head -1)
+            echo "::error title=R46_FIX_FAILED::rc=$RC $FATAL"
+            exit 1
+          fi
+
+          done_l=$(printf '%s\n' "$OUT" | grep -E '^FIX_DONE=' | head -1)
+          if [ -z "$done_l" ]; then
+            echo "::error title=R46_FIX_MISSING_DONE_MARKER::rc=$RC"
+            exit 1
+          fi
+
+          for k in SOURCE_HAS_DATABASE_URL_KEY SOURCE_HAS_DIRECT_URL_KEY OLD_CID OLD_IMAGE TRAEFIK_LABELS_COUNT BACKUP_NAME NEW_STATUS RUNTIME_DATABASE_URL_KEY RUNTIME_DIRECT_URL_KEY RUNTIME_ENV_KEYS_COUNT ROLLBACK_BACKUP_NAME; do
+            v="$(printf '%s\n' "$OUT" | grep -E "^${k}=" | tail -1 | cut -d= -f2-)"
+            echo "${k}=${v}"
+            echo "${k}=${v}" >> $GITHUB_OUTPUT 2>/dev/null || true
+          done
+
+          SUMMARY="$(printf '%s\n' "$OUT" | grep -E '^(SOURCE_HAS_|NEW_STATUS|RUNTIME_|BACKUP_NAME=|ROLLBACK_BACKUP_NAME=)' | tr '\n' ' ' | head -c 1400 | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+          echo "::notice title=R46_FIX_SUMMARY::${SUMMARY}"
+          exit 0
+
+      - name: "3. HUMAN NOTICE if preflight SSH failed (BANNER timeout)"
+        if: always() && steps.preflight.outcome != 'success'
+        run: |
+          echo "PREFLIGHT DNS=${{ steps.preflight.outputs.R46_DNS }} TCP=${{ steps.preflight.outputs.R46_TCP_CONNECT }} BANNER=${{ steps.preflight.outputs.R46_SSH_BANNER }} AUTH=${{ steps.preflight.outputs.R46_SSH_AUTH_REACHED }} STAGE=${{ steps.preflight.outputs.R46_SSH_FAILURE_STAGE }}"
+          echo "::notice title=R46_PREFLIGHT_HINT::If stage=BANNER, GHA runner cannot reach SSH banner. Manual workaround: run the FIX block directly on root@coolify as provided in TRAE chat."
           exit 0
