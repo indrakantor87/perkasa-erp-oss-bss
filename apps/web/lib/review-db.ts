@@ -36,34 +36,76 @@ export function invalidateReviewDbColumnCache(tableName?: string, columnName?: s
   }
 }
 
-function getDatabaseConfig() {
+type DatabaseConfig = {
+  host: string
+  port: number
+  user: string
+  password: string
+  database: string
+}
+
+function getDatabaseConfig(): DatabaseConfig | null {
   const databaseUrl = process.env.DATABASE_URL?.trim()
   if (!databaseUrl) {
-    throw new Error('DATABASE_URL belum diisi.')
+    return null
   }
 
-  const parsed = new URL(databaseUrl)
-
-  return {
-    host: parsed.hostname,
-    port: parsed.port ? Number(parsed.port) : 3306,
-    user: decodeURIComponent(parsed.username),
-    password: decodeURIComponent(parsed.password),
-    database: decodeURIComponent(parsed.pathname.replace(/^\//, '')),
+  try {
+    const parsed = new URL(databaseUrl)
+    const config: DatabaseConfig = {
+      host: parsed.hostname,
+      port: parsed.port ? Number(parsed.port) : 3306,
+      user: decodeURIComponent(parsed.username),
+      password: decodeURIComponent(parsed.password),
+      database: decodeURIComponent(parsed.pathname.replace(/^\//, '')),
+    }
+    if (!config.database || !config.host) {
+      return null
+    }
+    if (!Number.isFinite(config.port) || config.port <= 0 || config.port > 65535) {
+      config.port = 3306
+    }
+    return config
+  } catch {
+    return null
   }
 }
 
-async function createPool(): Promise<ReviewDbPool> {
-  const mysql = await import('mysql2/promise')
-  const config = getDatabaseConfig()
+type DisabledReviewDbPool = {
+  __perkasaDisabled: true
+}
 
-  return mysql.createPool({
-    ...config,
-    waitForConnections: true,
-    connectionLimit: 4,
-    queueLimit: 0,
-    connectTimeout: Number(process.env.REVIEW_DB_CONNECT_TIMEOUT_MS ?? 1500),
-  }) as unknown as ReviewDbPool
+function createDisabledPool(): ReviewDbPool {
+  const disabled: DisabledReviewDbPool = { __perkasaDisabled: true }
+  return disabled as unknown as ReviewDbPool
+}
+
+function isDisabledPool(pool: ReviewDbPool): pool is ReviewDbPool & DisabledReviewDbPool {
+  return (pool as unknown as DisabledReviewDbPool)?.__perkasaDisabled === true
+}
+
+export function isReviewDbConfigured(): boolean {
+  return getDatabaseConfig() !== null
+}
+
+async function createPool(): Promise<ReviewDbPool> {
+  const config = getDatabaseConfig()
+  if (!config) {
+    return createDisabledPool()
+  }
+
+  try {
+    const mysql = await import('mysql2/promise')
+    return mysql.createPool({
+      ...config,
+      waitForConnections: true,
+      connectionLimit: 4,
+      queueLimit: 0,
+      connectTimeout: Number(process.env.REVIEW_DB_CONNECT_TIMEOUT_MS ?? 1500),
+    }) as unknown as ReviewDbPool
+  } catch {
+    return createDisabledPool()
+  }
 }
 
 async function getPool() {
@@ -73,14 +115,34 @@ async function getPool() {
 
 export async function runReviewDbQuery<T>(sql: string, values: unknown[] = []) {
   const pool = await getPool()
-  const [rows] = await pool.query(sql, values)
-  return rows as T[]
+  if (isDisabledPool(pool)) {
+    return [] as T[]
+  }
+  try {
+    const [rows] = await pool.query(sql, values)
+    return rows as T[]
+  } catch (error) {
+    if (typeof window === 'undefined') {
+      return [] as T[]
+    }
+    throw error
+  }
 }
 
 export async function runReviewDbExecute<T>(sql: string, values: unknown[] = []) {
   const pool = await getPool()
-  const [result] = await pool.query(sql, values)
-  return result as T
+  if (isDisabledPool(pool)) {
+    return { affectedRows: 0, insertId: 0, changedRows: 0 } as unknown as T
+  }
+  try {
+    const [result] = await pool.query(sql, values)
+    return result as T
+  } catch (error) {
+    if (typeof window === 'undefined') {
+      return { affectedRows: 0, insertId: 0, changedRows: 0 } as unknown as T
+    }
+    throw error
+  }
 }
 
 export async function hasReviewDbColumn(tableName: string, columnName: string) {
@@ -89,24 +151,32 @@ export async function hasReviewDbColumn(tableName: string, columnName: string) {
     return reviewDbColumnCache.get(cacheKey) ?? false
   }
 
-  const rows = await runReviewDbQuery<{ total: number }>(
-    `
-      SELECT COUNT(*) AS total
-      FROM information_schema.columns
-      WHERE table_schema = DATABASE()
-        AND table_name = ?
-        AND column_name = ?
-    `,
-    [tableName, columnName],
-  )
+  try {
+    const rows = await runReviewDbQuery<{ total: number }>(
+      `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = ?
+          AND column_name = ?
+      `,
+      [tableName, columnName],
+    )
 
-  const exists = Number(rows[0]?.total ?? 0) > 0
-  reviewDbColumnCache.set(cacheKey, exists)
-  return exists
+    const exists = Number(rows[0]?.total ?? 0) > 0
+    reviewDbColumnCache.set(cacheKey, exists)
+    return exists
+  } catch {
+    reviewDbColumnCache.set(cacheKey, false)
+    return false
+  }
 }
 
 export async function runReviewDbTransaction<T>(handler: (connection: ReviewDbConnection) => Promise<T>) {
   const pool = await getPool()
+  if (isDisabledPool(pool)) {
+    throw new Error('Mode review DB belum tersedia pada environment saat ini.')
+  }
   const connection = await pool.getConnection()
   try {
     await connection.beginTransaction()

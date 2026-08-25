@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import './globals.css'
 import { getServerUiTheme } from '@/lib/ui-theme-server'
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
+import { RootSafeErrorBoundary } from '@/components/root-safe-error-boundary'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -167,7 +168,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: ReactNode
 }>) {
-  const initialTheme = await getServerUiTheme()
+  let initialTheme: 'light' | 'dark'
+  try {
+    initialTheme = await getServerUiTheme()
+  } catch {
+    initialTheme = 'light'
+  }
 
   return (
     <html
@@ -225,7 +231,9 @@ export default async function RootLayout({
         }
         className="font-[family-name:var(--font-body)] antialiased min-h-screen bg-surface text-ink selection:bg-accent/20"
       >
-        <Suspense fallback={<LoadingSkeleton />}>{children}</Suspense>
+        <RootSafeErrorBoundary>
+          <Suspense fallback={<LoadingSkeleton />}>{children}</Suspense>
+        </RootSafeErrorBoundary>
       </body>
     </html>
   )

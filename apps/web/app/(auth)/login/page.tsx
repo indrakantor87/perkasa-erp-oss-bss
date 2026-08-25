@@ -210,16 +210,10 @@ export default async function LoginPage({
 
               <button
                 type="submit"
-                className="w-full rounded-2xl px-5 py-4 text-sm font-semibold transition"
+                className="w-full rounded-2xl px-5 py-4 text-sm font-semibold transition hover:opacity-92"
                 style={{
                   backgroundColor: 'var(--color-accent)',
                   color: 'var(--color-accent-ink)',
-                }}
-                onMouseEnter={(event) => {
-                  event.currentTarget.style.opacity = '0.92'
-                }}
-                onMouseLeave={(event) => {
-                  event.currentTarget.style.opacity = '1'
                 }}
               >
                 Masuk ke dashboard
