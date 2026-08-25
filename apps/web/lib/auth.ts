@@ -49,7 +49,12 @@ type CookieWritableResponse = {
 }
 
 export function applySessionCookie(response: CookieWritableResponse, session: AppSession) {
-  response.cookies.set(AUTH_COOKIE_NAME, createSessionToken(session), getCookieOptions())
+  const token = createSessionToken(session)
+  if (!token) {
+    return false
+  }
+  response.cookies.set(AUTH_COOKIE_NAME, token, getCookieOptions())
+  return true
 }
 
 export function clearSessionCookie(response: CookieWritableResponse) {

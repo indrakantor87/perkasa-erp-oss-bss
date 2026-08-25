@@ -22,17 +22,49 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string | string[] }>
 }) {
-  const session = await getSession()
-  if (session) {
-    redirect(getDefaultLandingPath(session.role))
+  let forcedErrorCode: string | undefined
+
+  try {
+    const session = await getSession()
+    if (session) {
+      redirect(getDefaultLandingPath(session.role))
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error ?? '')
+    if (/AUTH_SESSION_SECRET|DATABASE_URL/i.test(msg)) {
+      forcedErrorCode = 'auth_unavailable'
+    } else if (forcedErrorCode === undefined) {
+      forcedErrorCode = 'auth_unavailable'
+    }
   }
 
-  const resolvedSearchParams = await searchParams
-  const errorValue = resolvedSearchParams.error
+  let resolvedSearchParams: { error?: string | string[] } = {}
+  try {
+    resolvedSearchParams = await searchParams
+  } catch {
+    resolvedSearchParams = {}
+  }
+
+  const errorValue = forcedErrorCode ?? resolvedSearchParams.error
   const errorCode = Array.isArray(errorValue) ? errorValue[0] : errorValue
   const errorMessage = getLoginErrorMessage(errorCode)
-  const dataSource = getDataSourceSnapshot()
-  const bootstrapMockAuthEnabled = isBootstrapMockAuthEnabled()
+
+  let dataSource
+  let bootstrapMockAuthEnabled
+  try {
+    dataSource = getDataSourceSnapshot()
+    bootstrapMockAuthEnabled = isBootstrapMockAuthEnabled()
+  } catch {
+    dataSource = {
+      configuredMode: 'review-db' as const,
+      effectiveMode: 'mock' as const,
+      isFallback: true,
+      label: 'Mock Fallback',
+      detail: 'Terdeteksi kendala saat membaca sumber data. Aplikasi otomatis memakai mode fallback lokal.',
+    }
+    bootstrapMockAuthEnabled = true
+  }
+
   const authModeDescription =
     dataSource.effectiveMode === 'review-db' && !dataSource.isFallback
       ? bootstrapMockAuthEnabled

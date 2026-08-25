@@ -162,21 +162,25 @@ export function isBootstrapMockAuthEnabled() {
   return source.effectiveMode !== 'review-db' || source.isFallback
 }
 
-function getAuthSecret() {
+function getAuthSecret(): string | null {
   const configuredSecret = process.env.AUTH_SESSION_SECRET?.trim()
   if (configuredSecret) {
     return configuredSecret
   }
 
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('AUTH_SESSION_SECRET wajib diisi pada environment production.')
+    return null
   }
 
   return DEFAULT_AUTH_SECRET
 }
 
-function signPayload(payload: string) {
-  return createHmac('sha256', getAuthSecret()).update(payload).digest('hex')
+function signPayload(payload: string): string | null {
+  const secret = getAuthSecret()
+  if (!secret) {
+    return null
+  }
+  return createHmac('sha256', secret).update(payload).digest('hex')
 }
 
 function mapReviewRoleToAppRole(roleCode: string): AppRole {
@@ -339,9 +343,12 @@ export async function authenticateUser(username: string, password: string): Prom
     : reviewAttempt
 }
 
-export function createSessionToken(session: AppSession) {
+export function createSessionToken(session: AppSession): string | null {
   const payload = Buffer.from(JSON.stringify(session), 'utf8').toString('base64url')
   const signature = signPayload(payload)
+  if (!signature) {
+    return null
+  }
 
   return `${payload}.${signature}`
 }
@@ -357,6 +364,9 @@ export function parseSessionToken(token: string | undefined | null): AppSession 
   }
 
   const expectedSignature = signPayload(payload)
+  if (!expectedSignature) {
+    return null
+  }
   const left = Buffer.from(signature)
   const right = Buffer.from(expectedSignature)
 
