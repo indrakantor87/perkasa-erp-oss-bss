@@ -18,3 +18,8 @@ production-data/
 database/generated/
 .db-backups/
 .vscode/
+
+# phase recovery / go-live temp artifacts
+.trigger-cicd-test.txt
+RECOVERY_SCRIPT*.txt
+apps/web/docs/proofs/
