@@ -149,13 +149,13 @@ export const mockAuthUsers: MockAuthUser[] = [
 ]
 
 export function isBootstrapMockAuthEnabled() {
-  if (process.env.NODE_ENV === 'production') {
-    return false
-  }
-
   const override = parseBooleanEnv(process.env.ALLOW_BOOTSTRAP_MOCK_AUTH)
   if (override !== null) {
     return override
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return false
   }
 
   const source = getDataSourceSnapshot()
