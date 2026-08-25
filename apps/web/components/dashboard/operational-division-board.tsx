@@ -171,17 +171,7 @@ export function OperationalDivisionBoard({
           <div className="flex items-end">
             <button
               type="submit"
-              className="w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition"
-              style={{
-                ...submitButtonStyle,
-                borderColor: 'var(--color-accent)',
-              }}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.opacity = '0.92'
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.opacity = '1'
-              }}
+              className="w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition bg-[var(--color-accent)] text-[var(--color-accent-ink)] border-[var(--color-accent)] hover:opacity-[0.92]"
             >
               Terapkan
             </button>
@@ -385,19 +375,7 @@ export function OperationalDivisionBoard({
                           <Link
                             href={card.href}
                             prefetch={false}
-                            className="rounded-full border border-line px-4 py-2 text-sm font-medium transition"
-                            style={{
-                              backgroundColor: 'var(--color-surface)',
-                              color: 'var(--color-mute-strong)',
-                            }}
-                            onMouseEnter={(event: ReactMouseEvent<HTMLAnchorElement>) => {
-                              event.currentTarget.style.borderColor = 'var(--color-line-strong)'
-                              event.currentTarget.style.backgroundColor = 'var(--color-surface-soft)'
-                            }}
-                            onMouseLeave={(event: ReactMouseEvent<HTMLAnchorElement>) => {
-                              event.currentTarget.style.borderColor = 'var(--color-line)'
-                              event.currentTarget.style.backgroundColor = 'var(--color-surface)'
-                            }}
+                            className="rounded-full border border-line px-4 py-2 text-sm font-medium transition bg-[var(--color-surface)] text-[var(--color-mute-strong)] hover:bg-[var(--color-surface-soft)] hover:border-[var(--color-line-strong)]"
                           >
                             Lihat detail
                           </Link>
