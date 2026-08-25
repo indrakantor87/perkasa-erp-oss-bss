@@ -54,75 +54,59 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
 
       <div className="relative z-50 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-          {!hideQuickControls ? (
-            <div className="surface-soft inline-flex items-center rounded-full border p-1">
-              <span className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute select-none">
-                {themeLabel}
-              </span>
-              {([
-                ['light', 'Light'],
-                ['dark', 'Dark'],
-              ] as const).map(([value, label]) => {
-                const active = theme === value
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => { setTheme(value) }}
-                    className={`cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold transition ${
-                      active
-                        ? 'text-[var(--color-accent-ink)]'
-                        : 'text-mute hover:text-[var(--color-ink-strong)]'
-                    }`}
-                    style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
-                    aria-label={label}
-                    title={label}
-                  >
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="surface-soft inline-flex items-center rounded-full border p-1 sm:hidden">
-              <button
-                type="button"
-                onClick={() => { setTheme(theme === 'dark' ? 'light' : 'dark') }}
-                className="cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold text-mute transition hover:text-[var(--color-ink-strong)]"
-                aria-label={theme === 'dark' ? 'Gunakan tema terang' : 'Gunakan tema gelap'}
-                title={themeLabel}
-              >
-                {theme === 'dark' ? '☀️' : '🌙'}
-              </button>
-            </div>
-          )}
-          {!hideQuickControls ? (
-            <div className="surface-soft inline-flex items-center rounded-full border p-1">
-              {([
-                ['id', 'ID'],
-                ['en', 'EN'],
-              ] as const).map(([value, label]) => {
-                const active = language === value
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => { setLanguage(value) }}
-                    className={`cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold transition ${
-                      active
-                        ? 'text-[var(--color-accent-ink)]'
-                        : 'text-mute hover:text-[var(--color-ink-strong)]'
-                    }`}
-                    style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
-                    aria-label={value === 'id' ? 'Gunakan Bahasa Indonesia' : 'Use English'}
-                    title={value === 'id' ? 'Bahasa Indonesia' : 'English'}
-                  >
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-          ) : null}
+          <div className="surface-soft inline-flex items-center rounded-full border p-1">
+            <span className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute select-none">
+              {themeLabel}
+            </span>
+            {([
+              ['light', 'Light'],
+              ['dark', 'Dark'],
+            ] as const).map(([value, label]) => {
+              const active = theme === value
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => { setTheme(value) }}
+                  className={`cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold transition ${
+                    active
+                      ? 'text-[var(--color-accent-ink)]'
+                      : 'text-mute hover:text-[var(--color-ink-strong)]'
+                  }`}
+                  style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
+                  aria-label={label}
+                  title={label}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          <div className="surface-soft inline-flex items-center rounded-full border p-1">
+            {([
+              ['id', 'ID'],
+              ['en', 'EN'],
+            ] as const).map(([value, label]) => {
+              const active = language === value
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => { setLanguage(value) }}
+                  className={`cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold transition ${
+                    active
+                      ? 'text-[var(--color-accent-ink)]'
+                      : 'text-mute hover:text-[var(--color-ink-strong)]'
+                  }`}
+                  style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
+                  aria-label={value === 'id' ? 'Gunakan Bahasa Indonesia' : 'Use English'}
+                  title={value === 'id' ? 'Bahasa Indonesia' : 'English'}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
           {session ? (
             <div
               className="surface-soft flex items-center gap-2 rounded-full border px-2 py-2 sm:gap-3 sm:px-4 sm:py-2.5"
