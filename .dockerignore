@@ -50,4 +50,3 @@ apps/web/.env.production.final.template
 apps/web/lib/mock-domains.ts
 apps/web/lib/mock-dashboard.ts
 apps/web/lib/mock-import.ts
-apps/web/lib/mock-tracking.ts
