@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   normalizeUiTheme,
   UI_THEME_COOKIE_KEY,
@@ -15,43 +15,6 @@ type UiThemeContextValue = {
 
 const UiThemeContext = createContext<UiThemeContextValue | null>(null)
 
-function applyThemeDom(theme: UiTheme) {
-  if (typeof document === 'undefined' || !document.documentElement) return
-  try {
-    const docEl = document.documentElement
-    if (docEl.getAttribute('data-theme') !== theme) {
-      docEl.setAttribute('data-theme', theme)
-    }
-    if (docEl.style.colorScheme !== theme) {
-      docEl.style.colorScheme = theme
-    }
-  } catch {
-    /* ignore DOM access errors */
-  }
-}
-
-function readStoredTheme(defaultValue: UiTheme): UiTheme {
-  if (typeof window === 'undefined') return defaultValue
-  try {
-    const stored = window.localStorage.getItem(UI_THEME_STORAGE_KEY)
-    if (stored) {
-      return normalizeUiTheme(stored)
-    }
-  } catch {
-    /* ignore storage read errors */
-  }
-  try {
-    const cks = (`; ${document.cookie}`).split(`; ${UI_THEME_COOKIE_KEY}=`)
-    if (cks.length === 2) {
-      const raw = cks.pop()?.split(';').shift() ?? ''
-      if (raw) return normalizeUiTheme(raw)
-    }
-  } catch {
-    /* ignore cookie read errors */
-  }
-  return defaultValue
-}
-
 export function ThemeProvider({
   children,
   initialTheme,
@@ -61,49 +24,74 @@ export function ThemeProvider({
 }) {
   const normalizedInitial = normalizeUiTheme(initialTheme)
   const [theme, setThemeState] = useState<UiTheme>(normalizedInitial)
-  const userInteractedRef = useRef(false)
-  const mountedRef = useRef(false)
-
-  const persistTheme = useCallback((nextTheme: UiTheme) => {
-    const normalized = normalizeUiTheme(nextTheme)
-    try {
-      window.localStorage.setItem(UI_THEME_STORAGE_KEY, normalized)
-    } catch {
-      /* ignore storage write errors */
-    }
-    try {
-      document.cookie = `${UI_THEME_COOKIE_KEY}=${normalized}; path=/; max-age=31536000; samesite=lax`
-    } catch {
-      /* ignore cookie write errors */
-    }
-    applyThemeDom(normalized)
-  }, [])
 
   const setTheme = useCallback((nextTheme: UiTheme) => {
     const normalized = normalizeUiTheme(nextTheme)
-    userInteractedRef.current = true
-    setThemeState((prev) => {
-      if (prev === normalized) return prev
-      return normalized
-    })
-    persistTheme(normalized)
-  }, [persistTheme])
+    setThemeState(normalized)
+    if (typeof window === 'undefined') return
+    try { window.localStorage.setItem(UI_THEME_STORAGE_KEY, normalized) } catch {}
+    try {
+      document.cookie = `${UI_THEME_COOKIE_KEY}=${normalized}; path=/; max-age=31536000; samesite=lax`
+    } catch {}
+    try {
+      const docEl = document.documentElement
+      docEl.setAttribute('data-theme', normalized)
+      docEl.style.colorScheme = normalized
+    } catch {}
+  }, [])
 
   useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true
-      if (userInteractedRef.current) return
-      const fromStorage = readStoredTheme(normalizedInitial)
-      if (fromStorage !== normalizedInitial) {
-        setThemeState(fromStorage)
-        applyThemeDom(fromStorage)
-      } else {
-        applyThemeDom(fromStorage)
+    if (typeof window === 'undefined') return
+    let target: UiTheme = normalizedInitial
+    try {
+      const stored = window.localStorage.getItem(UI_THEME_STORAGE_KEY)
+      if (stored) {
+        const n = normalizeUiTheme(stored)
+        if (n) target = n
       }
-      return
-    }
-    applyThemeDom(theme)
-  }, [theme, normalizedInitial])
+    } catch {}
+    try {
+      const cks = (`; ${document.cookie}`).split(`; ${UI_THEME_COOKIE_KEY}=`)
+      if (cks.length === 2) {
+        const raw = cks.pop()?.split(';').shift() ?? ''
+        if (raw) {
+          const n = normalizeUiTheme(raw)
+          if (n) target = n
+        }
+      }
+    } catch {}
+    try {
+      const docEl = document.documentElement
+      const docAttr = (docEl.getAttribute('data-theme') ?? '').trim().toLowerCase()
+      if (docAttr === 'light' || docAttr === 'dark') {
+        target = docAttr
+      }
+    } catch {}
+    if (target !== theme) setThemeState(target)
+    try {
+      const docEl = document.documentElement
+      docEl.setAttribute('data-theme', target)
+      docEl.style.colorScheme = target
+    } catch {}
+    try { window.localStorage.setItem(UI_THEME_STORAGE_KEY, target) } catch {}
+    try {
+      document.cookie = `${UI_THEME_COOKIE_KEY}=${target}; path=/; max-age=31536000; samesite=lax`
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const docEl = document.documentElement
+      docEl.setAttribute('data-theme', theme)
+      docEl.style.colorScheme = theme
+    } catch {}
+    try { window.localStorage.setItem(UI_THEME_STORAGE_KEY, theme) } catch {}
+    try {
+      document.cookie = `${UI_THEME_COOKIE_KEY}=${theme}; path=/; max-age=31536000; samesite=lax`
+    } catch {}
+  }, [theme])
 
   const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme])
 
