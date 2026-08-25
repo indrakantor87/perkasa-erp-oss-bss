@@ -16,7 +16,7 @@ export function SettingsPreferencesPage({
     <div className="space-y-6">
       <section className="panel p-6">
         <p className="section-title">Pengaturan</p>
-        <h1 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-slate-950">
+        <h1 className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
           Preferensi Aplikasi
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
@@ -27,7 +27,7 @@ export function SettingsPreferencesPage({
       <section className="grid gap-4 md:grid-cols-2">
         <article className="panel p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Tema</p>
-          <div className="mt-4 flex items-center gap-2 rounded-full border border-line bg-white p-1">
+          <div className="mt-4 flex items-center gap-2 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-1">
             {([
               ['light', 'Light'],
               ['dark', 'Dark'],
@@ -52,7 +52,7 @@ export function SettingsPreferencesPage({
 
         <article className="panel p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Bahasa</p>
-          <div className="mt-4 flex items-center gap-2 rounded-full border border-line bg-white p-1">
+          <div className="mt-4 flex items-center gap-2 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-1">
             {([
               ['id', 'ID'],
               ['en', 'EN'],
@@ -80,7 +80,7 @@ export function SettingsPreferencesPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="section-title">Aksi</p>
-            <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
+            <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-[var(--color-ink-strong)]">
               Akses cepat
             </h2>
           </div>
@@ -89,7 +89,7 @@ export function SettingsPreferencesPage({
               <Link
                 href="/import"
                 prefetch={false}
-                className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                className="rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-5 py-3 text-sm font-semibold text-[var(--color-ink)] transition hover:border-[var(--color-line-strong)] hover:bg-[var(--color-surface-soft)]"
               >
                 Buka Import
               </Link>
