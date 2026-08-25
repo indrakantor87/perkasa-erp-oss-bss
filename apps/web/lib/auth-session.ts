@@ -329,7 +329,12 @@ export async function authenticateUser(username: string, password: string): Prom
     return reviewAttempt
   }
 
-  if (!isBootstrapMockAuthEnabled()) {
+  const bootstrapEnabled = isBootstrapMockAuthEnabled()
+  const reviewFallbackDueToConfig =
+    reviewAttempt.reason === 'unavailable' &&
+    (getDataSourceSnapshot().isFallback || !getDataSourceSnapshot())
+
+  if (!bootstrapEnabled && !reviewFallbackDueToConfig) {
     return reviewAttempt
   }
 
@@ -338,7 +343,11 @@ export async function authenticateUser(username: string, password: string): Prom
     return { session: mockSession, source: 'mock' }
   }
 
-  return reviewAttempt.reason === 'unavailable'
+  if (reviewFallbackDueToConfig && !bootstrapEnabled) {
+    return { session: null, reason: 'unavailable' }
+  }
+
+  return reviewAttempt.reason === 'unavailable' && bootstrapEnabled
     ? { session: null, reason: 'not_found' }
     : reviewAttempt
 }

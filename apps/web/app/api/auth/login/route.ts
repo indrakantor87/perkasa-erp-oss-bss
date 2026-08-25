@@ -12,12 +12,22 @@ export async function POST(request: Request) {
   const session = authResult.session
 
   if (!session) {
-    const errorCode = authResult.reason === 'unavailable' ? 'auth_unavailable' : 'invalid_credentials'
+    let errorCode = authResult.reason === 'unavailable' ? 'auth_unavailable' : 'invalid_credentials'
+    if (authResult.reason === 'unavailable') {
+      const authSecretEmpty = !process.env.AUTH_SESSION_SECRET?.trim()
+      const dbUrlEmpty = !process.env.DATABASE_URL?.trim()
+      if (authSecretEmpty || dbUrlEmpty) {
+        errorCode = 'auth_config_missing'
+      }
+    }
     return NextResponse.redirect(buildRequestUrl(request, `/login?error=${errorCode}`))
   }
 
   const response = NextResponse.redirect(buildRequestUrl(request, getDefaultLandingPath(session.role)))
-  applySessionCookie(response, session)
+  const sessionApplied = applySessionCookie(response, session)
+  if (!sessionApplied) {
+    return NextResponse.redirect(buildRequestUrl(request, '/login?error=auth_config_missing'))
+  }
 
   return response
 }
