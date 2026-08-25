@@ -14,7 +14,12 @@ function resolveSecureCookieSetting() {
     return false
   }
 
-  return process.env.NODE_ENV === 'production'
+  const appUrl = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim().toLowerCase()
+  if (appUrl.startsWith('https://')) {
+    return true
+  }
+
+  return false
 }
 
 function getCookieOptions(maxAge = 60 * 60 * 12) {
