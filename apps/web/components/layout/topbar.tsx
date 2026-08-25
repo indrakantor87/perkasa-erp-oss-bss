@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { findNavigationItem } from '@/lib/navigation'
 import type { AppSession } from '@/lib/auth-session'
-import { useUiLanguage } from '@/components/layout/ui-language'
-import { useUiTheme } from '@/components/layout/ui-theme'
+import { useUiLanguage, dispatchLanguageChange } from '@/components/layout/ui-language'
+import { useUiTheme, dispatchThemeChange } from '@/components/layout/ui-theme'
 import { getRoleMeta } from '@/lib/role-meta'
 import { translateUiText } from '@/lib/ui-language'
 
@@ -67,7 +67,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => { setTheme(value) }}
+                  onClick={() => { dispatchThemeChange(value) }}
                   className={`cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold transition ${
                     active
                       ? 'text-[var(--color-accent-ink)]'
@@ -92,7 +92,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => { setLanguage(value) }}
+                  onClick={() => { dispatchLanguageChange(value) }}
                   className={`cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold transition ${
                     active
                       ? 'text-[var(--color-accent-ink)]'
