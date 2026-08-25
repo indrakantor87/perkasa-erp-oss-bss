@@ -47,6 +47,3 @@ apps/web/sandbox-verify.ps1
 apps/web/.env.example
 apps/web/.env.production.example
 apps/web/.env.production.final.template
-apps/web/lib/mock-domains.ts
-apps/web/lib/mock-dashboard.ts
-apps/web/lib/mock-import.ts
