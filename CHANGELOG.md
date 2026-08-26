@@ -10,6 +10,25 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.64] - 2026-08-26
+
+### Added
+
+- Field Technician dapat menerima assignment Work Order langsung dari Work Order Tracking Detail melalui tombol `Terima Tugas`.
+- Ditambahkan client component `AssignmentAcceptButton` dengan server-side visibility gate agar hanya tampil untuk `FIELD_TECHNICIAN` yang memiliki assignment aktif berstatus `ASSIGNED`.
+- Ditambahkan resolver `accepted_by_user_id` dan nama display penerima pada tracking assignment detail, sehingga UI dapat menampilkan informasi siapa yang menerima assignment beserta waktunya.
+
+### Changed
+
+- Assignment Tracking Log sekarang menampilkan visual status badge sesuai state assignment: `ASSIGNED` (amber), `ACCEPTED` (hijau), `RELEASED` (abu-abu), serta kolom `Acceptance` yang merangkum tanggal penerimaan dan nama penerima.
+- Timeline assignment pada detail work order sekarang menggunakan timestamp yang sesuai state (`acceptedAt` untuk `ACCEPTED`, `releasedAt` untuk `RELEASED`, `assignedAt` untuk `ASSIGNED`), serta menuliskan label `Diterima oleh: <nama>` bila data tersedia.
+
+### Security
+
+- Accept action tetap menggunakan server-side session identity melalui `requireSession` pada route handler accept; enforcement otorisasi dan state machine backend `P5.3` (FIELD_TECHNICIAN SELF_ONLY, ASSIGNED → ACCEPTED saja, idempotent, deny resurrection released) **tidak diubah**.
+- Client `AssignmentAcceptButton` **tidak mengirim** `userId`, `role`, `assigned_user_id`, atau credential lain dalam `request body`; identitas actor sepenuhnya ditetapkan server-side dari encrypted session cookie.
+- Visibility tombol `Terima Tugas` dihitung server-side (RSC) dalam `canAcceptAssignment()` dan hanya dikirim sebagai prop boolean tunggal `canAccept` ke client, untuk menghindari asumsi otorisasi dari sisi client.
+
 ## [0.66.63] - 2026-07-20
 
 ### Fixed

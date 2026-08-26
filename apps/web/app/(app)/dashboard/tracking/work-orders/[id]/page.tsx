@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { AssignmentAcceptButton } from '@/components/assignment-accept-button'
 import { DeviceLifecycleActionForm } from '@/components/device-lifecycle-action-form'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { canPerformAction } from '@/lib/access-control'
@@ -8,7 +9,7 @@ import { requireSession } from '@/lib/auth'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import { hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import { getDeviceLifecycleLogs, getInventoryDeviceLifecycleItemSuggestions, type DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
-import { getWorkOrderTrackingDetail } from '@/lib/services/tracking-service'
+import { getWorkOrderTrackingDetail, type WorkOrderAssignmentRow } from '@/lib/services/tracking-service'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
 import type { DataSourceSnapshot } from '@/lib/types'
 
@@ -148,12 +149,25 @@ function buildTimelineEntries(payload: Awaited<ReturnType<typeof getWorkOrderTra
   }
 
   for (const row of payload.assignments) {
+    const statusCanon = String(row.assignmentStatus ?? '').trim().toUpperCase()
+    let timelineAt: string | null = row.assignedAt
+    let acceptedByLabel = ''
+    if (statusCanon === 'RELEASED') {
+      timelineAt = row.releasedAt
+    } else if (statusCanon === 'ACCEPTED') {
+      timelineAt = row.acceptedAt
+      if (row.acceptedByFullName || row.acceptedByUsername) {
+        acceptedByLabel = ` • Diterima oleh: ${row.acceptedByFullName ?? row.acceptedByUsername ?? `User #${row.acceptedByUserId}`}`
+      }
+    } else {
+      timelineAt = row.assignedAt
+    }
     entries.push({
       id: `assignment-${row.id}`,
-      at: row.assignedAt,
+      at: timelineAt,
       type: 'assignment',
       title: `Assignment ${row.assignmentStatus ?? 'ASSIGNED'}`,
-      detail: `${row.assignedFullName ?? row.assignedUsername ?? `User #${row.assignedUserId}`} • ${row.assignmentRole ?? 'TECHNICIAN'}${row.isPrimary ? ' • PIC utama' : ''}`,
+      detail: `${row.assignedFullName ?? row.assignedUsername ?? `User #${row.assignedUserId}`} • ${row.assignmentRole ?? 'TECHNICIAN'}${row.isPrimary ? ' • PIC utama' : ''}${acceptedByLabel}`,
     })
   }
 
@@ -207,6 +221,37 @@ function canWriteDeviceLifecycle(role: Awaited<ReturnType<typeof requireSession>
     canPerformAction(role, 'inventory', 'create') ||
     canPerformAction(role, 'support', 'update')
   )
+}
+
+function canAcceptAssignment(
+  session: Awaited<ReturnType<typeof requireSession>>,
+  row: WorkOrderAssignmentRow,
+): boolean {
+  return (
+    session.role === 'FIELD_TECHNICIAN' &&
+    Number(session.userId) === Number(row.assignedUserId) &&
+    String(row.assignmentStatus ?? '').toUpperCase() === 'ASSIGNED' &&
+    row.releasedAt == null
+  )
+}
+
+type AssignmentStatusBadgeInfo = { tone: string; label: string }
+
+function getAssignmentStatusBadge(statusRaw: string | null): AssignmentStatusBadgeInfo {
+  const status = String(statusRaw ?? '').trim().toUpperCase()
+  switch (status) {
+    case 'ACCEPTED':
+      return { tone: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'Diterima (ACCEPTED)' }
+    case 'RELEASED':
+      return { tone: 'border-slate-200 bg-slate-100 text-slate-600', label: 'Dilepaskan (RELEASED)' }
+    case 'ASSIGNED':
+      return { tone: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Menunggu diterima (ASSIGNED)' }
+    default:
+      return {
+        tone: 'border-slate-200 bg-white text-slate-600',
+        label: statusRaw ? String(statusRaw) : '-',
+      }
+  }
 }
 
 function getLifecycleTone(status: string | null) {
@@ -569,23 +614,65 @@ export default async function WorkOrderTrackingDetailPage({
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3">Primary</th>
                         <th className="px-4 py-3">Assigned At</th>
+                        <th className="px-4 py-3">Acceptance</th>
+                        <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line bg-surface">
-                      {payload.assignments.map((row) => (
-                        <tr key={row.id}>
-                          <td className="px-4 py-4 align-top text-sm font-semibold text-[var(--color-ink-strong)]">
-                            {row.assignedFullName ?? row.assignedUsername ?? `User #${row.assignedUserId}`}
-                          </td>
-                          <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.assignmentRole ?? '-'}</td>
-                          <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.assignmentStatus ?? '-'}</td>
-                          <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.isPrimary ? 'YES' : '-'}</td>
-                          <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.assignedAt ?? '-'}</td>
-                        </tr>
-                      ))}
+                      {payload.assignments.map((row) => {
+                        const statusBadge = getAssignmentStatusBadge(row.assignmentStatus)
+                        const acceptanceInfo = (() => {
+                          const canon = String(row.assignmentStatus ?? '').trim().toUpperCase()
+                          if (canon === 'ACCEPTED') {
+                            const byName =
+                              row.acceptedByFullName ??
+                              row.acceptedByUsername ??
+                              (row.acceptedByUserId ? `User #${row.acceptedByUserId}` : null)
+                            return [
+                              `Diterima: ${row.acceptedAt ?? '-'}`,
+                              byName ? `Oleh: ${byName}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')
+                          }
+                          if (canon === 'RELEASED') {
+                            return `Dilepaskan: ${row.releasedAt ?? '-'}`
+                          }
+                          return null
+                        })()
+                        return (
+                          <tr key={row.id}>
+                            <td className="px-4 py-4 align-top text-sm font-semibold text-[var(--color-ink-strong)]">
+                              {row.assignedFullName ?? row.assignedUsername ?? `User #${row.assignedUserId}`}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">
+                              {row.assignmentRole ?? '-'}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm">
+                              <span className={`badge border ${statusBadge.tone}`}>{statusBadge.label}</span>
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">
+                              {row.isPrimary ? 'YES' : '-'}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">
+                              {row.assignedAt ?? '-'}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">
+                              {acceptanceInfo ?? '-'}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm">
+                              <AssignmentAcceptButton
+                                assignmentId={row.id}
+                                canAccept={canAcceptAssignment(session, row)}
+                                reviewDbReady={reviewDbReady}
+                              />
+                            </td>
+                          </tr>
+                        )
+                      })}
                       {!payload.assignments.length ? (
                         <tr>
-                          <td className="px-4 py-6 text-sm text-mute" colSpan={5}>
+                          <td className="px-4 py-6 text-sm text-mute" colSpan={7}>
                             Belum ada assignment log.
                           </td>
                         </tr>

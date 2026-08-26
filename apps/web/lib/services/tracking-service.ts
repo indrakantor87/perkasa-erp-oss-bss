@@ -37,7 +37,7 @@ type WorkOrderRow = {
   updatedAt: string | null
 }
 
-type WorkOrderAssignmentRow = {
+export type WorkOrderAssignmentRow = {
   id: number
   workOrderId: number
   assignedUserId: number
@@ -46,6 +46,9 @@ type WorkOrderAssignmentRow = {
   isPrimary: number
   assignedAt: string | null
   acceptedAt: string | null
+  acceptedByUserId: number | null
+  acceptedByUsername: string | null
+  acceptedByFullName: string | null
   releasedAt: string | null
   notes: string | null
   assignedUsername: string | null
@@ -486,13 +489,18 @@ export async function getWorkOrderTrackingDetail(workOrderId: number, options?: 
               a.is_primary AS isPrimary,
               a.assigned_at AS assignedAt,
               a.accepted_at AS acceptedAt,
+              a.accepted_by_user_id AS acceptedByUserId,
               a.released_at AS releasedAt,
               a.notes AS notes,
               au.username AS assignedUsername,
-              au.full_name AS assignedFullName
+              au.full_name AS assignedFullName,
+              au2.username AS acceptedByUsername,
+              au2.full_name AS acceptedByFullName
             FROM service_work_order_assignments a
             LEFT JOIN auth_users au
               ON au.id = a.assigned_user_id
+            LEFT JOIN auth_users au2
+              ON au2.id = a.accepted_by_user_id
             WHERE a.work_order_id = ?
             ORDER BY a.id DESC
             LIMIT 200
@@ -1645,6 +1653,9 @@ export async function reassignServiceWorkOrderAssignmentMock(params: {
       isPrimary: 1,
       assignedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
       acceptedAt: null,
+      acceptedByUserId: null,
+      acceptedByUsername: null,
+      acceptedByFullName: null,
       releasedAt: null,
       notes: null,
       assignedUsername: `tech.${bId}`,
