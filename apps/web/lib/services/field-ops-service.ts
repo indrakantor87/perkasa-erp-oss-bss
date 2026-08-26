@@ -105,6 +105,7 @@ export async function ensureServiceWorkOrderAssignmentTable() {
         released_at DATETIME NULL,
         notes TEXT NULL,
         assigned_by_user_id BIGINT UNSIGNED NULL,
+        accepted_by_user_id BIGINT UNSIGNED NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -138,9 +139,14 @@ export async function ensureServiceWorkOrderAssignmentTable() {
   await ensureServiceWorkOrderAssignmentColumn('notes', 'notes TEXT NULL', 'released_at')
   await ensureServiceWorkOrderAssignmentColumn('assigned_by_user_id', 'assigned_by_user_id BIGINT UNSIGNED NULL', 'notes')
   await ensureServiceWorkOrderAssignmentColumn(
+    'accepted_by_user_id',
+    'accepted_by_user_id BIGINT UNSIGNED NULL',
+    'assigned_by_user_id',
+  )
+  await ensureServiceWorkOrderAssignmentColumn(
     'created_at',
     'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
-    'assigned_by_user_id',
+    'accepted_by_user_id',
   )
   await ensureServiceWorkOrderAssignmentColumn(
     'updated_at',
@@ -514,6 +520,139 @@ export async function releaseServiceWorkOrderAssignment(params: {
     affectedRows = Number(execResult?.affectedRows ?? 0)
   }
   return { affectedRows }
+}
+
+export type AcceptFieldTechSession = {
+  userId: number | undefined | null
+  role: AppRole
+}
+
+export type AcceptServiceWorkOrderAssignmentResult = {
+  affectedRows: number
+  accepted: boolean
+  alreadyAccepted: boolean
+  workOrderId: number | null
+}
+
+type AcceptAssignmentLockRow = {
+  id: number
+  work_order_id: number
+  assigned_user_id: number
+  assignment_role: string
+  assignment_status: string
+  released_at: Date | string | null
+}
+
+function resolveAcceptAuthorizationScope(
+  sessionRole: AppRole | undefined | null,
+  sessionUserId: number | undefined | null,
+): 'SELF_ONLY' | 'DENY' {
+  const userIdNum = Number(sessionUserId ?? 0)
+  if (!Number.isInteger(userIdNum) || userIdNum <= 0) {
+    return 'DENY'
+  }
+  const role = (sessionRole ?? '').toString().trim().toUpperCase() as AppRole
+  if (role === 'FIELD_TECHNICIAN') {
+    return 'SELF_ONLY'
+  }
+  return 'DENY'
+}
+
+export async function acceptServiceWorkOrderAssignment(params: {
+  assignmentId: number
+  session: AcceptFieldTechSession
+  connection?: ReviewDbConnection
+}): Promise<AcceptServiceWorkOrderAssignmentResult> {
+  const assignmentIdNum = Number(params.assignmentId ?? 0)
+  if (!Number.isInteger(assignmentIdNum) || assignmentIdNum <= 0) {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId: null }
+  }
+  const actorUserIdRaw = params.session?.userId
+  const actorUserIdNum = Number(actorUserIdRaw ?? 0)
+  if (!Number.isInteger(actorUserIdNum) || actorUserIdNum <= 0) {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId: null }
+  }
+  const scope = resolveAcceptAuthorizationScope(params.session.role, actorUserIdNum)
+  if (scope === 'DENY') {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId: null }
+  }
+
+  await ensureServiceWorkOrderAssignmentTable()
+
+  async function doAccept(
+    conn: ReviewDbConnection,
+  ): Promise<AcceptServiceWorkOrderAssignmentResult> {
+    const lockSql = `
+      SELECT id, work_order_id, assigned_user_id, assignment_role, assignment_status, released_at
+      FROM service_work_order_assignments
+      WHERE id = ?
+      LIMIT 1
+      FOR UPDATE
+    `
+    const [lockRows] = await conn.query(lockSql, [assignmentIdNum])
+    const assignment = (lockRows as AcceptAssignmentLockRow[])[0]
+    if (!assignment) {
+      return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId: null }
+    }
+    const workOrderId = Number(assignment.work_order_id ?? 0)
+    if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+      return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId: null }
+    }
+
+    const roleUp = String(assignment.assignment_role ?? '').trim().toUpperCase()
+    if (roleUp !== String(Q3_ASSIGNMENT_ROLE_CANONICAL).trim().toUpperCase()) {
+      return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
+    }
+    if (scope === 'SELF_ONLY' && Number(assignment.assigned_user_id ?? 0) !== actorUserIdNum) {
+      return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
+    }
+
+    const statusUp = String(assignment.assignment_status ?? '').trim().toUpperCase()
+    const isReleased = assignment.released_at != null || statusUp === 'RELEASED'
+
+    if (statusUp === 'ACCEPTED' && !isReleased) {
+      return { affectedRows: 1, accepted: true, alreadyAccepted: true, workOrderId }
+    }
+    if (isReleased) {
+      return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
+    }
+    if (statusUp !== 'ASSIGNED') {
+      return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
+    }
+
+    const updateSql = `
+      UPDATE service_work_order_assignments
+      SET
+        assignment_status = 'ACCEPTED',
+        accepted_at = CURRENT_TIMESTAMP,
+        accepted_by_user_id = ?
+      WHERE
+        id = ?
+        AND assignment_role = ?
+        AND assignment_status = 'ASSIGNED'
+        AND released_at IS NULL
+        AND assigned_user_id = ?
+      LIMIT 1
+    `
+    const updateBind: unknown[] = [
+      actorUserIdNum,
+      assignmentIdNum,
+      Q3_ASSIGNMENT_ROLE_CANONICAL,
+      actorUserIdNum,
+    ]
+    const [updateResult] = await conn.query(updateSql, updateBind)
+    const affectedRows = Number((updateResult as ExecuteResult | undefined)?.affectedRows ?? 0)
+    if (affectedRows <= 0) {
+      return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
+    }
+    return { affectedRows: 1, accepted: true, alreadyAccepted: false, workOrderId }
+  }
+
+  if (params.connection) {
+    return doAccept(params.connection)
+  }
+
+  return runReviewDbTransaction<AcceptServiceWorkOrderAssignmentResult>(async (conn) => doAccept(conn))
 }
 
 export async function insertServiceWorkOrderStatusLog(params: {

@@ -1685,6 +1685,91 @@ export async function reassignServiceWorkOrderAssignmentMock(params: {
   }
 }
 
+export async function acceptServiceWorkOrderAssignmentMock(params: {
+  assignmentId: number
+  session: {
+    userId: number | undefined | null
+    role: string
+  }
+}): Promise<{
+  affectedRows: number
+  accepted: boolean
+  alreadyAccepted: boolean
+  workOrderId: number | null
+}> {
+  const aId = Number(params.assignmentId ?? 0)
+  if (!Number.isInteger(aId) || aId <= 0) {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId: null }
+  }
+  const actorId = Number(params.session?.userId ?? 0)
+  if (!Number.isInteger(actorId) || actorId <= 0) {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId: null }
+  }
+  const role = String(params.session?.role ?? '').trim().toUpperCase()
+  let scope: 'SELF_ONLY' | 'DENY' = 'DENY'
+  if (role === 'FIELD_TECHNICIAN') {
+    scope = 'SELF_ONLY'
+  }
+  if (scope === 'DENY') {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId: null }
+  }
+
+  const roleCanon = String(Q3_ASSIGNMENT_ROLE_CANONICAL).trim().toUpperCase()
+  const findRow = mockTrackingWorkOrderAssignments.find(
+    (rRaw) => Number((rRaw as { id?: number }).id ?? 0) === aId,
+  )
+  if (!findRow) {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId: null }
+  }
+  const row = findRow as unknown as {
+    id: number
+    workOrderId: number
+    assignmentRole: string
+    assignmentStatus: string
+    assignedUserId: number
+    acceptedAt: string | null
+    releasedAt: string | null
+    acceptedByUserId: number | null
+  }
+  const workOrderId = Number(row.workOrderId ?? 0)
+  if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId: null }
+  }
+  const rowRole = String(row.assignmentRole ?? '').trim().toUpperCase()
+  if (rowRole !== roleCanon) {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
+  }
+  if (scope === 'SELF_ONLY' && Number(row.assignedUserId ?? 0) !== actorId) {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
+  }
+
+  const statusUp = String(row.assignmentStatus ?? '').trim().toUpperCase()
+  const isReleased = row.releasedAt != null || statusUp === 'RELEASED'
+
+  if (statusUp === 'ACCEPTED' && !isReleased) {
+    return { affectedRows: 1, accepted: true, alreadyAccepted: true, workOrderId }
+  }
+  if (isReleased) {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
+  }
+  if (statusUp !== 'ASSIGNED') {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
+  }
+
+  const idx = mockTrackingWorkOrderAssignments.findIndex(
+    (rRaw) => Number((rRaw as { id?: number }).id ?? 0) === aId,
+  )
+  if (idx < 0) {
+    return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
+  }
+  const mutated = mockTrackingWorkOrderAssignments[idx] as unknown as typeof row
+  mutated.assignmentStatus = 'ACCEPTED'
+  mutated.acceptedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  mutated.acceptedByUserId = actorId
+  mockTrackingWorkOrderAssignments.splice(idx, 1, mutated as never)
+  return { affectedRows: 1, accepted: true, alreadyAccepted: false, workOrderId }
+}
+
 function resolveStockMovementTrackingState(query: StockMovementTrackingQuery) {
   const q = resolveSearchParam(query.q)?.trim() ?? ''
   const movementType = resolveSearchParam(query.movementType)?.trim().toUpperCase() ?? ''
