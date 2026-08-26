@@ -267,7 +267,7 @@ export default async function WorkOrderTrackingDetailPage({
   }
 
   const [payload, lifecyclePayload, itemSuggestions] = await Promise.all([
-    getWorkOrderTrackingDetail(workOrderId),
+    getWorkOrderTrackingDetail(workOrderId, { session }),
     getDeviceLifecycleLogs({ workOrderId, limit: 30 }),
     getInventoryDeviceLifecycleItemSuggestions(200),
   ])

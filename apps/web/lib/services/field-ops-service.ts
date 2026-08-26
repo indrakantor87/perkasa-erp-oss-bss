@@ -3,7 +3,14 @@ import {
   invalidateReviewDbColumnCache,
   runReviewDbExecute,
   runReviewDbQuery,
+  runReviewDbTransaction,
+  type ReviewDbConnection,
 } from '@/lib/review-db'
+import type { AppRole } from '@/lib/types'
+import {
+  Q3_ASSIGNMENT_ACTIVE_STATUSES,
+  Q3_ASSIGNMENT_ROLE_CANONICAL,
+} from '@/lib/q3-field-tech-ownership'
 
 type ExecuteResult = {
   insertId?: number
@@ -90,7 +97,7 @@ export async function ensureServiceWorkOrderAssignmentTable() {
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         work_order_id BIGINT UNSIGNED NOT NULL,
         assigned_user_id BIGINT UNSIGNED NOT NULL,
-        assignment_role VARCHAR(50) NOT NULL DEFAULT 'TECHNICIAN',
+        assignment_role VARCHAR(50) NOT NULL DEFAULT 'FIELD_TECHNICIAN',
         assignment_status VARCHAR(50) NOT NULL DEFAULT 'ASSIGNED',
         is_primary TINYINT(1) NOT NULL DEFAULT 0,
         assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -112,7 +119,7 @@ export async function ensureServiceWorkOrderAssignmentTable() {
 
   await ensureServiceWorkOrderAssignmentColumn(
     'assignment_role',
-    "assignment_role VARCHAR(50) NOT NULL DEFAULT 'TECHNICIAN'",
+    "assignment_role VARCHAR(50) NOT NULL DEFAULT 'FIELD_TECHNICIAN'",
     'assigned_user_id',
   )
   await ensureServiceWorkOrderAssignmentColumn(
@@ -140,6 +147,58 @@ export async function ensureServiceWorkOrderAssignmentTable() {
     'updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
     'created_at',
   )
+  try {
+    await runReviewDbTransaction(async (conn) => {
+      const legacyRole = 'TECHNICIAN'
+      const canonicalRole = 'FIELD_TECHNICIAN'
+      const unknownQ = await conn.query(
+        `SELECT COUNT(*) AS cnt FROM service_work_order_assignments WHERE TRIM(UPPER(COALESCE(assignment_role,''))) NOT IN (?, ?)`,
+        [legacyRole, canonicalRole],
+      )
+      const unknownRows = unknownQ as unknown as Array<{ cnt: number }> | undefined
+      const unknownCount = Number(unknownRows?.[0]?.cnt ?? 0)
+      if (unknownCount > 0) {
+        throw new Error(
+          `Backfill aborted: ${unknownCount} assignment rows have unsupported assignment_role values. Refusing to proceed without PO/QA decision.`,
+        )
+      }
+      const beforeQ = await conn.query(
+        `SELECT COUNT(*) AS cnt FROM service_work_order_assignments WHERE TRIM(UPPER(COALESCE(assignment_role,''))) = ?`,
+        [legacyRole],
+      )
+      const beforeRows = beforeQ as unknown as Array<{ cnt: number }> | undefined
+      const legacyCount = Number(beforeRows?.[0]?.cnt ?? 0)
+      if (legacyCount <= 0) return
+      const updateQ = await conn.query(
+        `UPDATE service_work_order_assignments SET assignment_role = ? WHERE TRIM(UPPER(COALESCE(assignment_role,''))) = ?`,
+        [canonicalRole, legacyRole],
+      )
+      const updateResult = updateQ as unknown as { affectedRows?: number } | undefined
+      const updatedCount = Number(updateResult?.affectedRows ?? 0)
+      if (updatedCount !== legacyCount) {
+        throw new Error(
+          `Backfill mismatch: expected ${legacyCount} legacy TECHNICIAN rows, but UPDATE affected ${updatedCount}. Rollback.`,
+        )
+      }
+      const afterQ = await conn.query(
+        `SELECT COUNT(*) AS cnt FROM service_work_order_assignments WHERE TRIM(UPPER(COALESCE(assignment_role,''))) = ?`,
+        [legacyRole],
+      )
+      const afterRows = afterQ as unknown as Array<{ cnt: number }> | undefined
+      const remainingLegacy = Number(afterRows?.[0]?.cnt ?? 0)
+      if (remainingLegacy !== 0) {
+        throw new Error(
+          `Backfill failed: ${remainingLegacy} legacy TECHNICIAN rows remaining after UPDATE. Rollback.`,
+        )
+      }
+    })
+  } catch (err) {
+    if (String(err instanceof Error ? err.message : String(err)).includes('belum tersedia')) {
+      // review-db pool disabled on environments without DB access; skip silently until DB is reachable.
+    } else {
+      throw err
+    }
+  }
 }
 
 export async function ensureServiceWorkOrderStatusLogTable() {
@@ -373,10 +432,19 @@ export async function insertServiceWorkOrderAssignment(params: {
   assignmentStatus?: string
   isPrimary?: boolean
   notes?: string | null
+  connection?: ReviewDbConnection
 }) {
   await ensureServiceWorkOrderAssignmentTable()
-  await runReviewDbExecute<ExecuteResult>(
-    `
+  const values = [
+    params.workOrderId,
+    params.assignedUserId,
+    params.assignmentRole ?? 'FIELD_TECHNICIAN',
+    params.assignmentStatus ?? 'ASSIGNED',
+    params.isPrimary ? 1 : 0,
+    params.notes ?? null,
+    params.assignedByUserId ?? null,
+  ]
+  const sql = `
       INSERT INTO service_work_order_assignments (
         work_order_id,
         assigned_user_id,
@@ -388,17 +456,64 @@ export async function insertServiceWorkOrderAssignment(params: {
         assigned_by_user_id
       )
       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
-    `,
-    [
-      params.workOrderId,
-      params.assignedUserId,
-      params.assignmentRole ?? 'TECHNICIAN',
-      params.assignmentStatus ?? 'ASSIGNED',
-      params.isPrimary ? 1 : 0,
-      params.notes ?? null,
-      params.assignedByUserId ?? null,
-    ],
-  )
+    `
+  if (params.connection) {
+    await params.connection.query(sql, values)
+    return
+  }
+  await runReviewDbExecute<ExecuteResult>(sql, values)
+}
+
+export async function releaseServiceWorkOrderAssignment(params: {
+  assignmentId: number
+  sessionUserId: number | undefined | null
+  authorizationScope?: 'SELF_ONLY' | 'FULL_ACCESS'
+  connection?: ReviewDbConnection
+}): Promise<{ affectedRows: number }> {
+  await ensureServiceWorkOrderAssignmentTable()
+  const userIdRaw = params.sessionUserId
+  const userIdNum = Number(userIdRaw ?? 0)
+  const hasValidUserId = Number.isInteger(userIdNum) && userIdNum > 0
+  const activeStatuses = [...Q3_ASSIGNMENT_ACTIVE_STATUSES]
+  const scope = params.authorizationScope ?? 'SELF_ONLY'
+  if (!Number.isInteger(params.assignmentId) || params.assignmentId <= 0) {
+    return { affectedRows: 0 }
+  }
+  if (scope === 'SELF_ONLY' && !hasValidUserId) {
+    return { affectedRows: 0 }
+  }
+  const activePlaceholders = activeStatuses.map(() => '?').join(', ')
+  const bindValues: unknown[] = [
+    Q3_ASSIGNMENT_ROLE_CANONICAL,
+    ...activeStatuses,
+  ]
+  if (scope === 'SELF_ONLY') {
+    bindValues.push(userIdNum)
+  }
+  bindValues.push(params.assignmentId)
+  const selfClause = scope === 'SELF_ONLY' ? 'AND assigned_user_id = ?' : ''
+  const sql = `
+      UPDATE service_work_order_assignments
+      SET
+        assignment_status = 'RELEASED',
+        released_at = CURRENT_TIMESTAMP
+      WHERE
+        assignment_role = ?
+        AND assignment_status IN (${activePlaceholders})
+        AND released_at IS NULL
+        ${selfClause}
+        AND id = ?
+      LIMIT 1
+    `
+  let affectedRows = 0
+  if (params.connection) {
+    const [result] = await params.connection.query(sql, bindValues)
+    affectedRows = Number((result as ExecuteResult | undefined)?.affectedRows ?? 0)
+  } else {
+    const execResult = await runReviewDbExecute<ExecuteResult>(sql, bindValues)
+    affectedRows = Number(execResult?.affectedRows ?? 0)
+  }
+  return { affectedRows }
 }
 
 export async function insertServiceWorkOrderStatusLog(params: {
@@ -432,4 +547,264 @@ export async function insertServiceWorkOrderStatusLog(params: {
       params.changedByUserId ?? null,
     ],
   )
+}
+
+export type ReassignFieldTechAuthorizationScope = 'SELF_ONLY' | 'FULL_ACCESS'
+
+export type ReassignFieldTechSession = {
+  userId: number | undefined | null
+  role: AppRole
+}
+
+const REASSIGN_FULL_ACCESS_ROLES: readonly AppRole[] = [
+  'OWNER',
+  'SUPER_ADMIN',
+  'ADMIN',
+  'NOC_OPERATOR',
+  'TT_OPERATOR',
+] as const
+
+export type ReassignServiceWorkOrderAssignmentResult = {
+  affectedRows: number
+  newAssignmentId: number | null
+  alreadyDone: boolean
+  workOrderId: number | null
+}
+
+type AssignmentARow = {
+  id: number
+  work_order_id: number
+  assigned_user_id: number
+  assignment_role: string
+  assignment_status: string
+  is_primary: number
+  released_at: Date | string | null
+}
+
+type CountRow = { total: number }
+
+type TechBValidationRow = {
+  id: number
+  status: string
+  role_code: string
+}
+
+function resolveReassignAuthorizationScope(
+  sessionRole: AppRole | undefined | null,
+  sessionUserId: number | undefined | null,
+): ReassignFieldTechAuthorizationScope | 'DENY' {
+  const userIdNum = Number(sessionUserId ?? 0)
+  if (!Number.isInteger(userIdNum) || userIdNum <= 0) {
+    return 'DENY'
+  }
+  const role = (sessionRole ?? '').toString().trim().toUpperCase() as AppRole
+  if (role === 'FIELD_TECHNICIAN') {
+    return 'SELF_ONLY'
+  }
+  if (REASSIGN_FULL_ACCESS_ROLES.includes(role as (typeof REASSIGN_FULL_ACCESS_ROLES)[number])) {
+    return 'FULL_ACCESS'
+  }
+  return 'DENY'
+}
+
+function buildActiveWhereParts(prefix: string) {
+  const activePlaceholders = Q3_ASSIGNMENT_ACTIVE_STATUSES.map(() => '?').join(', ')
+  const statuses = [...Q3_ASSIGNMENT_ACTIVE_STATUSES]
+  return {
+    sql: `${prefix}assignment_role = ? AND ${prefix}assignment_status IN (${activePlaceholders}) AND ${prefix}released_at IS NULL`,
+    values: [Q3_ASSIGNMENT_ROLE_CANONICAL, ...statuses],
+  }
+}
+
+export async function reassignServiceWorkOrderAssignment(params: {
+  assignmentAId: number
+  targetTechBId: number
+  session: ReassignFieldTechSession
+}): Promise<ReassignServiceWorkOrderAssignmentResult> {
+  const assignmentAIdNum = Number(params.assignmentAId ?? 0)
+  const targetTechBNum = Number(params.targetTechBId ?? 0)
+  const validA = Number.isInteger(assignmentAIdNum) && assignmentAIdNum > 0
+  const validB = Number.isInteger(targetTechBNum) && targetTechBNum > 0
+  if (!validA || !validB) {
+    return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+  }
+
+  const actorUserIdRaw = params.session?.userId
+  const actorUserIdNum = Number(actorUserIdRaw ?? 0)
+  if (!Number.isInteger(actorUserIdNum) || actorUserIdNum <= 0) {
+    return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+  }
+  const scope = resolveReassignAuthorizationScope(params.session.role, actorUserIdNum)
+  if (scope === 'DENY') {
+    return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+  }
+
+  await ensureServiceWorkOrderAssignmentTable()
+
+  return runReviewDbTransaction<ReassignServiceWorkOrderAssignmentResult>(async (connection) => {
+    const lockTechASql = `
+      SELECT id, work_order_id, assigned_user_id, assignment_role, assignment_status, is_primary, released_at
+      FROM service_work_order_assignments
+      WHERE id = ?
+      LIMIT 1
+      FOR UPDATE
+    `
+    const [lockTechARows] = await connection.query(lockTechASql, [assignmentAIdNum])
+    const techA = (lockTechARows as AssignmentARow[])[0]
+    if (!techA) {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+    }
+    const workOrderId = Number(techA.work_order_id ?? 0)
+    if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+    }
+
+    const lockWoActiveParts = buildActiveWhereParts('')
+    const lockWoScopeSql = `
+      SELECT id
+      FROM service_work_order_assignments
+      WHERE work_order_id = ? AND ${lockWoActiveParts.sql}
+      FOR UPDATE
+    `
+    await connection.query(lockWoScopeSql, [workOrderId, ...lockWoActiveParts.values])
+
+    const techAReleased =
+      techA.released_at != null || String(techA.assignment_status ?? '').trim().toUpperCase() === 'RELEASED'
+
+    const idemActiveParts = buildActiveWhereParts('a')
+    const idemCheckSql = `
+      SELECT a.id AS existing_tech_b_id
+      FROM service_work_order_assignments a
+      WHERE
+        a.work_order_id = ?
+        AND a.assigned_user_id = ?
+        AND ${idemActiveParts.sql}
+      LIMIT 1
+    `
+    const idemValues: unknown[] = [workOrderId, targetTechBNum, ...idemActiveParts.values]
+    const [idemRows] = await connection.query(idemCheckSql, idemValues)
+    const techBAlreadyActive = (idemRows as { existing_tech_b_id: number }[])[0] ?? null
+    if (techAReleased && techBAlreadyActive) {
+      return {
+        affectedRows: 1,
+        newAssignmentId: Number(techBAlreadyActive.existing_tech_b_id ?? 0) || null,
+        alreadyDone: true,
+        workOrderId,
+      }
+    }
+
+    if (targetTechBNum === Number(techA.assigned_user_id ?? 0) && !techAReleased) {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+    }
+
+    const techBValidationSql = `
+      SELECT au.id AS id,
+             au.status AS status,
+             ar.code AS role_code
+      FROM auth_users au
+      JOIN auth_roles ar
+        ON ar.id = au.role_id
+      WHERE au.id = ?
+      LIMIT 1
+      FOR UPDATE
+    `
+    const [techBRows] = await connection.query(techBValidationSql, [targetTechBNum])
+    const techB = (techBRows as TechBValidationRow[])[0]
+    if (!techB) {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+    }
+    const statusUp = String(techB.status ?? '').trim().toUpperCase()
+    if (statusUp !== 'ACTIVE') {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+    }
+    const roleUp = String(techB.role_code ?? '').trim().toUpperCase()
+    if (roleUp !== 'TEKNISI' && roleUp !== 'TEKNISI_PSB') {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+    }
+
+    const dupParts = buildActiveWhereParts('d')
+    const dupCheckSql = `
+      SELECT COUNT(*) AS total
+      FROM service_work_order_assignments d
+      WHERE
+        d.work_order_id = ?
+        AND d.assigned_user_id = ?
+        AND ${dupParts.sql}
+    `
+    const dupValues: unknown[] = [workOrderId, targetTechBNum, ...dupParts.values]
+    const [dupRows] = await connection.query(dupCheckSql, dupValues)
+    const dupTotal = Number((dupRows as CountRow[])[0]?.total ?? 0)
+    if (dupTotal > 0) {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+    }
+
+    if (!techAReleased) {
+      const releaseRes = await releaseServiceWorkOrderAssignment({
+        assignmentId: assignmentAIdNum,
+        sessionUserId: scope === 'SELF_ONLY' ? actorUserIdNum : null,
+        authorizationScope: scope,
+        connection,
+      })
+      if (releaseRes.affectedRows < 1) {
+        return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+      }
+    }
+
+    const postReleaseParts = buildActiveWhereParts('p')
+    const postReleaseCountSql = `
+      SELECT COUNT(*) AS total
+      FROM service_work_order_assignments p
+      WHERE
+        p.work_order_id = ?
+        AND ${postReleaseParts.sql}
+    `
+    const [postCountRows] = await connection.query(postReleaseCountSql, [
+      workOrderId,
+      ...postReleaseParts.values,
+    ])
+    const postTotal = Number((postCountRows as CountRow[])[0]?.total ?? 0)
+    if (postTotal > 0) {
+      throw new Error('Masih ada field technician aktif lain pada work order ini.')
+    }
+
+    const postPrimParts = buildActiveWhereParts('q')
+    const postPrimSql = `
+      SELECT COUNT(*) AS total
+      FROM service_work_order_assignments q
+      WHERE
+        q.work_order_id = ?
+        AND q.is_primary = 1
+        AND ${postPrimParts.sql}
+    `
+    const [primCountRows] = await connection.query(postPrimSql, [
+      workOrderId,
+      ...postPrimParts.values,
+    ])
+    const primTotal = Number((primCountRows as CountRow[])[0]?.total ?? 0)
+    if (primTotal > 0) {
+      throw new Error('Masih ada assignment aktif dengan primary flag pada work order ini.')
+    }
+
+    await insertServiceWorkOrderAssignment({
+      workOrderId,
+      assignedUserId: targetTechBNum,
+      assignedByUserId: actorUserIdNum,
+      assignmentRole: Q3_ASSIGNMENT_ROLE_CANONICAL,
+      assignmentStatus: 'ASSIGNED',
+      isPrimary: true,
+      notes: null,
+      connection,
+    })
+
+    const lastInsertSql = 'SELECT LAST_INSERT_ID() AS insert_id'
+    const [lastRows] = await connection.query(lastInsertSql, [])
+    const newAssignmentId = Number((lastRows as { insert_id: number }[])[0]?.insert_id ?? 0) || null
+
+    return {
+      affectedRows: 1,
+      newAssignmentId,
+      alreadyDone: false,
+      workOrderId,
+    }
+  })
 }

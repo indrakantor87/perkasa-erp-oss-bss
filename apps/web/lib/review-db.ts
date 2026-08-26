@@ -1,9 +1,9 @@
-type ReviewDbPool = {
+export type ReviewDbPool = {
   query: (sql: string, values?: unknown[]) => Promise<[unknown[], unknown]>
   getConnection: () => Promise<ReviewDbConnection>
 }
 
-type ReviewDbConnection = {
+export type ReviewDbConnection = {
   query: (sql: string, values?: unknown[]) => Promise<[unknown[], unknown]>
   beginTransaction: () => Promise<void>
   commit: () => Promise<void>

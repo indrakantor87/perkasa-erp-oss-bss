@@ -299,7 +299,7 @@ export async function POST(request: Request) {
             workOrderId,
             assignedUserId: currentPicUserId,
             assignedByUserId: actorUserId,
-            assignmentRole: 'TECHNICIAN',
+            assignmentRole: 'FIELD_TECHNICIAN',
             assignmentStatus: 'ASSIGNED',
             isPrimary: true,
             notes: `WO lapangan dibuat dari ticket ${ticketCodeForMessage}.`,

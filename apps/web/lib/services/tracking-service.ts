@@ -9,6 +9,11 @@ import {
   mockTrackingWorkOrders,
 } from '@/lib/mock-tracking'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
+import {
+  Q3_ASSIGNMENT_ACTIVE_STATUSES,
+  Q3_ASSIGNMENT_ROLE_CANONICAL,
+  buildFieldTechWorkOrderOwnershipWhere,
+} from '@/lib/q3-field-tech-ownership'
 import { ensureInventoryLocationsTable } from '@/lib/services/inventory-location-service'
 import type { DataSourceSnapshot } from '@/lib/types'
 
@@ -196,19 +201,41 @@ export async function getWorkOrderTrackingList(query: WorkOrderTrackingQuery, op
   const source = getDataSourceSnapshot()
   const state = resolveWorkOrderTrackingState(query)
   const session = options?.session
+  const ownership = session
+    ? buildFieldTechWorkOrderOwnershipWhere(session, 'wo')
+    : null
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    const items = mockTrackingWorkOrders
+    let items = mockTrackingWorkOrders
       .filter((row) => matchesMockSearch([row.workOrderNo, row.technicianName, row.picFullName, row.picUsername], state.q))
-      .filter((row) =>
-        state.mine && session?.username
-          ? String(row.picUsername ?? '').trim().toLowerCase() === session.username.trim().toLowerCase()
-          : true,
-      )
+    if (ownership && ownership.enforced) {
+      items = items.filter((row) => {
+        const isPicOwner =
+          ownership.values[0] != null && Number(row.picUserId) === Number(ownership.values[0])
+        if (isPicOwner) {
+          return true
+        }
+        const assignedUserIdParam = ownership.values[1]
+        const roleParam = ownership.values[2]
+        const activeStatuses = ownership.values.slice(3, 3 + 2) as Array<string>
+        const activeAssignments = mockTrackingWorkOrderAssignments.filter((assignment) =>
+          assignment.workOrderId === row.id
+            && Number(assignment.assignedUserId) === Number(assignedUserIdParam)
+            && String(assignment.assignmentRole ?? '').trim().toUpperCase() === String(roleParam ?? '').trim().toUpperCase()
+            && activeStatuses.includes(String(assignment.assignmentStatus ?? '').trim().toUpperCase())
+            && assignment.releasedAt == null
+        )
+        return activeAssignments.length > 0
+      })
+    }
+    items = items
+      .filter((row) => {
+        if (!state.mine || !session?.userId || row.picUserId == null) return true
+        return Number(row.picUserId) === Number(session.userId)
+      })
       .filter((row) => !state.status || String(row.status ?? '').toUpperCase() === state.status)
       .filter((row) => !state.jobCategory || String(row.jobCategory ?? '').toUpperCase() === state.jobCategory)
       .filter((row) => !state.priority || String(row.priority ?? '').toUpperCase() === state.priority)
       .slice(0, state.limit)
-
     return { source, items, error: null as string | null, state }
   }
 
@@ -286,6 +313,11 @@ export async function getWorkOrderTrackingList(query: WorkOrderTrackingQuery, op
     const where: string[] = []
     const values: unknown[] = []
 
+    if (ownership?.enforced && ownership.whereFragment) {
+      where.push(ownership.whereFragment)
+      values.push(...ownership.values)
+    }
+
     if (state.mine && session?.userId && hasPicUserId) {
       where.push('wo.current_pic_user_id = ?')
       values.push(session.userId)
@@ -335,10 +367,45 @@ export async function getWorkOrderTrackingList(query: WorkOrderTrackingQuery, op
   }
 }
 
-export async function getWorkOrderTrackingDetail(workOrderId: number) {
+export async function getWorkOrderTrackingDetail(workOrderId: number, options?: { session?: AppSession }) {
   const source = getDataSourceSnapshot()
+  const session = options?.session
+  const ownership = session
+    ? buildFieldTechWorkOrderOwnershipWhere(session, 'wo')
+    : null
+  function mockOwnershipAllowedForRow(row: { id: number; picUserId?: number | null }): boolean {
+    if (!ownership || !ownership.enforced) return true
+    const isPicOwner =
+      ownership.values[0] != null && Number(row.picUserId ?? null) === Number(ownership.values[0])
+    if (isPicOwner) {
+      return true
+    }
+    const assignedUserIdParam = ownership.values[1]
+    const roleParam = ownership.values[2]
+    const activeStatuses = ownership.values.slice(3, 3 + 2) as Array<string>
+    const activeAssignments = mockTrackingWorkOrderAssignments.filter((assignment) =>
+      assignment.workOrderId === row.id
+        && Number(assignment.assignedUserId) === Number(assignedUserIdParam)
+        && String(assignment.assignmentRole ?? '').trim().toUpperCase() === String(roleParam ?? '').trim().toUpperCase()
+        && activeStatuses.includes(String(assignment.assignmentStatus ?? '').trim().toUpperCase())
+        && assignment.releasedAt == null
+    )
+    return activeAssignments.length > 0
+  }
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    const workOrder = mockTrackingWorkOrders.find((row) => row.id === workOrderId) ?? null
+    const workOrder = mockTrackingWorkOrders.find(
+      (row) => row.id === workOrderId && mockOwnershipAllowedForRow({ id: row.id, picUserId: row.picUserId }),
+    ) ?? null
+    if (!workOrder) {
+      return {
+        source,
+        workOrder: null as (typeof mockTrackingWorkOrders)[number] | null,
+        assignments: [],
+        statusLogs: [],
+        movements: [],
+        error: null as string | null,
+      }
+    }
     return {
       source,
       workOrder,
@@ -363,6 +430,17 @@ export async function getWorkOrderTrackingDetail(workOrderId: number) {
       (await hasReviewDbColumn('inventory_locations', 'id'))
     const hasMovementTechnician = await hasReviewDbColumn('inventory_stock_movements', 'technician_user_id')
 
+    const primaryWhere: string[] = []
+    const primaryValues: unknown[] = []
+
+    primaryWhere.push('wo.id = ?')
+    primaryValues.push(workOrderId)
+
+    if (ownership?.enforced && ownership.whereFragment) {
+      primaryWhere.push(ownership.whereFragment)
+      primaryValues.push(...ownership.values)
+    }
+
     const [workOrder] = await runReviewDbQuery<WorkOrderRow>(
       `
         SELECT
@@ -386,10 +464,10 @@ export async function getWorkOrderTrackingDetail(workOrderId: number) {
         FROM service_work_orders wo
         LEFT JOIN auth_users au
           ON au.id = wo.current_pic_user_id
-        WHERE wo.id = ?
+        WHERE ${primaryWhere.join(' AND ')}
         LIMIT 1
       `,
-      [workOrderId],
+      primaryValues,
     )
 
     if (!workOrder) {
@@ -1260,6 +1338,350 @@ function resolveWorkOrderTrackingState(query: WorkOrderTrackingQuery) {
     priority: priority || null,
     mine,
     limit,
+  }
+}
+
+export async function releaseServiceWorkOrderAssignmentMock(params: {
+  assignmentId: number
+  sessionUserId: number | undefined | null
+}): Promise<{ affectedRows: number }> {
+  const userIdNum = Number(params.sessionUserId ?? 0)
+  const hasValidUserId = Number.isInteger(userIdNum) && userIdNum > 0
+  const validId = Number.isInteger(params.assignmentId) && params.assignmentId > 0
+  if (!hasValidUserId || !validId) {
+    return { affectedRows: 0 }
+  }
+  const activeStatuses = [...Q3_ASSIGNMENT_ACTIVE_STATUSES].map((s) => String(s).trim().toUpperCase())
+  const targetIdx = mockTrackingWorkOrderAssignments.findIndex((row) => {
+    const rowRole = String(row.assignmentRole ?? '').trim().toUpperCase()
+    const rowStatus = String(row.assignmentStatus ?? '').trim().toUpperCase()
+    const rowUserId = Number(row.assignedUserId ?? 0)
+    const rowId = Number(row.id ?? 0)
+    const rowReleasedNull = row.releasedAt == null
+    return (
+      rowRole === String(Q3_ASSIGNMENT_ROLE_CANONICAL).trim().toUpperCase()
+      && activeStatuses.includes(rowStatus)
+      && rowReleasedNull
+      && rowUserId === userIdNum
+      && rowId === params.assignmentId
+    )
+  })
+  if (targetIdx < 0) {
+    return { affectedRows: 0 }
+  }
+  const target = mockTrackingWorkOrderAssignments[targetIdx] as unknown as {
+    id: number
+    workOrderId: number
+    assignmentRole: string
+    assignmentStatus: string
+    assignedUserId: number
+    assignedAt: string | null
+    acceptedAt: string | null
+    releasedAt: string | null
+    isPrimary: number
+    createdBy: number | null
+    createdAt: string | null
+    updatedAt: string | null
+  }
+  target.assignmentStatus = 'RELEASED'
+  target.releasedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  mockTrackingWorkOrderAssignments.splice(targetIdx, 1, target as never)
+  return { affectedRows: 1 }
+}
+
+type MockReassignFullAccessRole =
+  | 'OWNER'
+  | 'SUPER_ADMIN'
+  | 'ADMIN'
+  | 'NOC_OPERATOR'
+  | 'TT_OPERATOR'
+const REASSIGN_MOCK_FULL_ACCESS: readonly MockReassignFullAccessRole[] = [
+  'OWNER',
+  'SUPER_ADMIN',
+  'ADMIN',
+  'NOC_OPERATOR',
+  'TT_OPERATOR',
+] as const
+
+export async function reassignServiceWorkOrderAssignmentMock(params: {
+  assignmentAId: number
+  targetTechBId: number
+  session: {
+    userId: number | undefined | null
+    role: string
+  }
+}): Promise<{
+  affectedRows: number
+  newAssignmentId: number | null
+  alreadyDone: boolean
+  workOrderId: number | null
+}> {
+  const aId = Number(params.assignmentAId ?? 0)
+  const bId = Number(params.targetTechBId ?? 0)
+  if (!Number.isInteger(aId) || aId <= 0 || !Number.isInteger(bId) || bId <= 0) {
+    return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+  }
+  const actorId = Number(params.session?.userId ?? 0)
+  if (!Number.isInteger(actorId) || actorId <= 0) {
+    return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+  }
+  const role = String(params.session?.role ?? '').trim().toUpperCase()
+  let scope: 'SELF_ONLY' | 'FULL_ACCESS' | 'DENY' = 'DENY'
+  if (role === 'FIELD_TECHNICIAN') {
+    scope = 'SELF_ONLY'
+  } else if (REASSIGN_MOCK_FULL_ACCESS.includes(role as MockReassignFullAccessRole)) {
+    scope = 'FULL_ACCESS'
+  }
+  if (scope === 'DENY') {
+    return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+  }
+
+  const activeStatuses = [...Q3_ASSIGNMENT_ACTIVE_STATUSES].map((s) => String(s).trim().toUpperCase())
+  const roleCanon = String(Q3_ASSIGNMENT_ROLE_CANONICAL).trim().toUpperCase()
+
+  const findAssignmentRow = (id: number) =>
+    mockTrackingWorkOrderAssignments.find((row) => Number((row as { id?: number }).id ?? 0) === id)
+
+  const techARaw = findAssignmentRow(aId)
+  if (!techARaw) {
+    return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+  }
+  const techA = techARaw as unknown as {
+    id: number
+    workOrderId: number
+    assignmentRole: string
+    assignmentStatus: string
+    assignedUserId: number
+    releasedAt: string | null
+    isPrimary: number
+  }
+  const workOrderId = Number(techA.workOrderId ?? 0)
+  if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+    return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+  }
+  const isActiveA =
+    String(techA.assignmentRole ?? '').trim().toUpperCase() === roleCanon &&
+    activeStatuses.includes(String(techA.assignmentStatus ?? '').trim().toUpperCase()) &&
+    techA.releasedAt == null
+  const techAReleased = !isActiveA
+
+  const techBExistingActive = mockTrackingWorkOrderAssignments.find((rRaw) => {
+    const r = rRaw as unknown as {
+      workOrderId: number
+      assignedUserId: number
+      assignmentRole: string
+      assignmentStatus: string
+      releasedAt: string | null
+      id: number
+    }
+    return (
+      Number(r.workOrderId ?? 0) === workOrderId &&
+      Number(r.assignedUserId ?? 0) === bId &&
+      String(r.assignmentRole ?? '').trim().toUpperCase() === roleCanon &&
+      activeStatuses.includes(String(r.assignmentStatus ?? '').trim().toUpperCase()) &&
+      r.releasedAt == null
+    )
+  }) as unknown as { id: number } | undefined
+
+  if (techAReleased && techBExistingActive) {
+    return {
+      affectedRows: 1,
+      newAssignmentId: Number(techBExistingActive.id ?? 0) || null,
+      alreadyDone: true,
+      workOrderId,
+    }
+  }
+
+  if (Number(techA.assignedUserId ?? 0) === bId && !techAReleased) {
+    return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+  }
+
+  const mockUserRepo = globalThis as unknown as {
+    __p52MockUsers?: {
+      id: number
+      status: string
+      roleCode: string
+    }[]
+  }
+  const fakeAuthRepo = mockUserRepo.__p52MockUsers ?? []
+  const techBRow = fakeAuthRepo.find((u) => Number(u.id ?? 0) === bId)
+  if (!techBRow) {
+    if (!Number.isFinite(bId) || bId <= 0) {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+    }
+    // If no mock users configured, allow IDs 200-299 as valid ACTIVE TEKNISI for tests.
+    if (bId >= 200 && bId <= 299) {
+      // Pass-through for test rig.
+    } else {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+    }
+  }
+  if (techBRow) {
+    const statusUp = String(techBRow.status ?? '').trim().toUpperCase()
+    if (statusUp !== 'ACTIVE') {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+    }
+    const roleCodeUp = String(techBRow.roleCode ?? '').trim().toUpperCase()
+    if (roleCodeUp !== 'TEKNISI' && roleCodeUp !== 'TEKNISI_PSB') {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+    }
+  }
+
+  const duplicateB = mockTrackingWorkOrderAssignments.find((rRaw) => {
+    const r = rRaw as unknown as {
+      workOrderId: number
+      assignedUserId: number
+      assignmentRole: string
+      assignmentStatus: string
+      releasedAt: string | null
+    }
+    return (
+      Number(r.workOrderId ?? 0) === workOrderId &&
+      Number(r.assignedUserId ?? 0) === bId &&
+      String(r.assignmentRole ?? '').trim().toUpperCase() === roleCanon &&
+      activeStatuses.includes(String(r.assignmentStatus ?? '').trim().toUpperCase()) &&
+      r.releasedAt == null
+    )
+  })
+  if (duplicateB) {
+    return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+  }
+
+  let rollbackStack: Array<() => void> = []
+  try {
+    if (!techAReleased) {
+      if (scope === 'SELF_ONLY' && Number(techA.assignedUserId ?? 0) !== actorId) {
+        return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+      }
+      const releaseIdx = mockTrackingWorkOrderAssignments.findIndex(
+        (rRaw) => Number((rRaw as { id?: number }).id ?? 0) === aId,
+      )
+      if (releaseIdx < 0) {
+        return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+      }
+      const releaseTarget = mockTrackingWorkOrderAssignments[releaseIdx] as unknown as {
+        id: number
+        workOrderId: number
+        assignmentRole: string
+        assignmentStatus: string
+        assignedUserId: number
+        releasedAt: string | null
+        isPrimary: number
+        assignedAt: string | null
+        acceptedAt: string | null
+      }
+      const rtRole = String(releaseTarget.assignmentRole ?? '').trim().toUpperCase()
+      const rtStatus = String(releaseTarget.assignmentStatus ?? '').trim().toUpperCase()
+      const rtReleased = releaseTarget.releasedAt == null
+      const matchRole = rtRole === roleCanon
+      const matchStatus = activeStatuses.includes(rtStatus)
+      const matchReleased = rtReleased
+      const matchSelf = scope === 'SELF_ONLY' ? Number(releaseTarget.assignedUserId ?? 0) === actorId : true
+      const matchId = Number(releaseTarget.id ?? 0) === aId
+      if (!(matchRole && matchStatus && matchReleased && matchSelf && matchId)) {
+        return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+      }
+      const snapshotBefore = JSON.parse(JSON.stringify(releaseTarget)) as typeof releaseTarget
+      const isPrimaryBefore = releaseTarget.isPrimary
+      releaseTarget.assignmentStatus = 'RELEASED'
+      releaseTarget.releasedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
+      releaseTarget.isPrimary = isPrimaryBefore
+      mockTrackingWorkOrderAssignments.splice(releaseIdx, 1, releaseTarget as never)
+      rollbackStack.push(() => {
+        mockTrackingWorkOrderAssignments.splice(releaseIdx, 1, snapshotBefore as never)
+      })
+    }
+
+    const postActiveCount = mockTrackingWorkOrderAssignments.filter((rRaw) => {
+      const r = rRaw as unknown as {
+        workOrderId: number
+        assignmentRole: string
+        assignmentStatus: string
+        releasedAt: string | null
+      }
+      return (
+        Number(r.workOrderId ?? 0) === workOrderId &&
+        String(r.assignmentRole ?? '').trim().toUpperCase() === roleCanon &&
+        activeStatuses.includes(String(r.assignmentStatus ?? '').trim().toUpperCase()) &&
+        r.releasedAt == null
+      )
+    }).length
+    if (postActiveCount > 0) {
+      throw new Error('Masih ada field technician aktif lain pada work order ini.')
+    }
+    const postActivePrimary = mockTrackingWorkOrderAssignments.filter((rRaw) => {
+      const r = rRaw as unknown as {
+        workOrderId: number
+        assignmentRole: string
+        assignmentStatus: string
+        releasedAt: string | null
+        isPrimary: number
+      }
+      return (
+        Number(r.workOrderId ?? 0) === workOrderId &&
+        Number(r.isPrimary ?? 0) === 1 &&
+        String(r.assignmentRole ?? '').trim().toUpperCase() === roleCanon &&
+        activeStatuses.includes(String(r.assignmentStatus ?? '').trim().toUpperCase()) &&
+        r.releasedAt == null
+      )
+    }).length
+    if (postActivePrimary > 0) {
+      throw new Error('Masih ada assignment aktif dengan primary flag pada work order ini.')
+    }
+
+    const nextId =
+      1 +
+      mockTrackingWorkOrderAssignments.reduce((max, rRaw) => {
+        const r = rRaw as unknown as { id: number }
+        return Math.max(max, Number(r.id ?? 0))
+      }, 9000)
+
+    const newRow = {
+      id: nextId,
+      workOrderId,
+      assignedUserId: bId,
+      assignmentRole: 'FIELD_TECHNICIAN',
+      assignmentStatus: 'ASSIGNED',
+      isPrimary: 1,
+      assignedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      acceptedAt: null,
+      releasedAt: null,
+      notes: null,
+      assignedUsername: `tech.${bId}`,
+      assignedFullName: `Technician ${bId}`,
+      assignedBy: actorId,
+    }
+    mockTrackingWorkOrderAssignments.push(newRow as never)
+    rollbackStack.push(() => {
+      let rollIdx = mockTrackingWorkOrderAssignments.length
+      while (rollIdx-- > 0) {
+        if (
+          Number(
+            (mockTrackingWorkOrderAssignments[rollIdx] as unknown as { id: number }).id ?? 0,
+          ) === nextId
+        ) {
+          mockTrackingWorkOrderAssignments.splice(rollIdx, 1)
+          break
+        }
+      }
+    })
+
+    return {
+      affectedRows: 1,
+      newAssignmentId: nextId,
+      alreadyDone: false,
+      workOrderId,
+    }
+  } catch (e) {
+    while (rollbackStack.length > 0) {
+      const undo = rollbackStack.pop()
+      try {
+        if (undo) undo()
+      } catch {
+        /* ignore */
+      }
+    }
+    throw e
   }
 }
 

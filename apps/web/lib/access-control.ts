@@ -11,7 +11,7 @@ function getDbPermissionSets() {
 }
 
 const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
-  OWNER: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing', '/finance'],
+  OWNER: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing', '/finance', '/dashboard/tracking'],
   SUPER_ADMIN: [
     '/dashboard',
     '/import',
@@ -27,20 +27,21 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
     '/settings/access',
     '/settings/users',
     '/settings/preferences',
+    '/dashboard/tracking',
   ],
-  ADMIN: ['/dashboard', '/import', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing', '/finance'],
-  FINANCE: ['/dashboard', '/billing', '/finance', '/list-dismantle', '/sales', '/customers', '/support'],
-  HR: ['/dashboard', '/hr'],
-  GA: ['/dashboard', '/inventory', '/support'],
-  PENJUALAN: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
-  SALES_MARKETING: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory'],
-  CS_OPERATOR: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory'],
-  CS_ADMIN: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory'],
-  NOC_OPERATOR: ['/dashboard', '/support', '/inventory'],
-  FIELD_TECHNICIAN: ['/dashboard', '/support', '/inventory'],
-  TT_OPERATOR: ['/dashboard', '/support'],
-  DIGITAL_CREATOR: ['/dashboard', '/sales'],
-  DISMANTLE_OPERATOR: ['/dashboard', '/list-dismantle', '/support'],
+  ADMIN: ['/dashboard', '/import', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/billing', '/finance', '/dashboard/tracking'],
+  FINANCE: ['/dashboard', '/billing', '/finance', '/list-dismantle', '/sales', '/customers', '/support', '/dashboard/tracking'],
+  HR: ['/dashboard', '/hr', '/dashboard/tracking'],
+  GA: ['/dashboard', '/inventory', '/support', '/dashboard/tracking'],
+  PENJUALAN: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory', '/dashboard/tracking'],
+  SALES_MARKETING: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory', '/dashboard/tracking'],
+  CS_OPERATOR: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/dashboard/tracking'],
+  CS_ADMIN: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/dashboard/tracking'],
+  NOC_OPERATOR: ['/dashboard', '/support', '/inventory', '/dashboard/tracking'],
+  FIELD_TECHNICIAN: ['/dashboard', '/support', '/inventory', '/dashboard/tracking'],
+  TT_OPERATOR: ['/dashboard', '/support', '/dashboard/tracking'],
+  DIGITAL_CREATOR: ['/dashboard', '/sales', '/dashboard/tracking'],
+  DISMANTLE_OPERATOR: ['/dashboard', '/list-dismantle', '/support', '/dashboard/tracking'],
 }
 
 const baselineRoleLandingPaths: Record<AppRole, string> = {
