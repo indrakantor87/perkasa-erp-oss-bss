@@ -24,7 +24,7 @@ function resolveOptionalPositiveInt(raw: unknown): number | null {
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ assignmentAId: string }> },
+  { params }: { params: Promise<{ assignmentId: string }> },
 ) {
   const session = await getSession()
   if (!session) {
@@ -33,9 +33,9 @@ export async function POST(
 
   try {
     const resolvedParams = await params
-    const assignmentIdRaw = String(resolvedParams.assignmentAId ?? '').trim()
-    const assignmentAId = Number.parseInt(assignmentIdRaw, 10)
-    if (!Number.isInteger(assignmentAId) || assignmentAId <= 0) {
+    const assignmentIdRaw = String(resolvedParams.assignmentId ?? '').trim()
+    const assignmentId = Number.parseInt(assignmentIdRaw, 10)
+    if (!Number.isInteger(assignmentId) || assignmentId <= 0) {
       return Response.json({ message: 'ID assignment lama tidak valid.' }, { status: 400 })
     }
     const body = (await request.json().catch(() => null)) as { targetTechBId?: unknown } | null
@@ -58,7 +58,7 @@ export async function POST(
     let newAssignmentId: number | null = null
     if (source.effectiveMode === 'review-db' && !source.isFallback) {
       const res = await reassignServiceWorkOrderAssignment({
-        assignmentAId,
+        assignmentAId: assignmentId,
         targetTechBId,
         session: reassignSession,
       })
@@ -67,7 +67,7 @@ export async function POST(
       newAssignmentId = res.newAssignmentId ?? null
     } else {
       const res = await reassignServiceWorkOrderAssignmentMock({
-        assignmentAId,
+        assignmentAId: assignmentId,
         targetTechBId,
         session: reassignSession,
       })
