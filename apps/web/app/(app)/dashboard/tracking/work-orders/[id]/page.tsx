@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { AssignmentAcceptButton } from '@/components/assignment-accept-button'
+import { ReleaseAssignmentButton } from '@/components/release-assignment-button'
+import { ReassignAssignmentModal, type TechnicianOption } from '@/components/reassign-assignment-modal'
 import { DeviceLifecycleActionForm } from '@/components/device-lifecycle-action-form'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { canPerformAction } from '@/lib/access-control'
@@ -9,6 +11,7 @@ import { requireSession } from '@/lib/auth'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import { hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import { getDeviceLifecycleLogs, getInventoryDeviceLifecycleItemSuggestions, type DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
+import { getAuthUsersPageData, type AuthUserListItem } from '@/lib/services/auth-user-service'
 import { getWorkOrderTrackingDetail, type WorkOrderAssignmentRow } from '@/lib/services/tracking-service'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
 import type { DataSourceSnapshot } from '@/lib/types'
@@ -241,6 +244,63 @@ function canAcceptAssignment(
   )
 }
 
+const P58A_ASSIGNMENT_FULL_ACCESS_ROLES = [
+  'OWNER',
+  'SUPER_ADMIN',
+  'ADMIN',
+  'NOC_OPERATOR',
+  'TT_OPERATOR',
+] as const
+
+function isAssignmentFullAccessRole(role: string): boolean {
+  return P58A_ASSIGNMENT_FULL_ACCESS_ROLES.includes(
+    String(role ?? '').trim().toUpperCase() as (typeof P58A_ASSIGNMENT_FULL_ACCESS_ROLES)[number],
+  )
+}
+
+function canReleaseAssignment(
+  session: Awaited<ReturnType<typeof requireSession>>,
+  row: WorkOrderAssignmentRow,
+): boolean {
+  const status = String(row.assignmentStatus ?? '').trim().toUpperCase()
+  const isActiveStatus = status === 'ASSIGNED' || status === 'ACCEPTED'
+
+  if (!isActiveStatus) return false
+  if (row.releasedAt != null) return false
+
+  const isFieldTechSelf =
+    session.role === 'FIELD_TECHNICIAN' &&
+    Number(session.userId) === Number(row.assignedUserId)
+
+  const isFullAccessReleaseRole = isAssignmentFullAccessRole(session.role)
+
+  if (isFullAccessReleaseRole) {
+    return false
+  }
+
+  return isFieldTechSelf
+}
+
+function canReassignAssignment(
+  session: Awaited<ReturnType<typeof requireSession>>,
+  row: WorkOrderAssignmentRow,
+): boolean {
+  const status = String(row.assignmentStatus ?? '').trim().toUpperCase()
+  const isActiveStatus = status === 'ASSIGNED' || status === 'ACCEPTED'
+
+  if (!isActiveStatus) return false
+  if (row.releasedAt != null) return false
+
+  const isFieldTechSelf =
+    session.role === 'FIELD_TECHNICIAN' &&
+    Number(session.userId) === Number(row.assignedUserId)
+
+  const isFullAccessReassignRole = isAssignmentFullAccessRole(session.role)
+
+  if (isFullAccessReassignRole) return true
+  return isFieldTechSelf
+}
+
 type AssignmentStatusBadgeInfo = { tone: string; label: string }
 
 function getAssignmentStatusBadge(statusRaw: string | null): AssignmentStatusBadgeInfo {
@@ -317,10 +377,13 @@ export default async function WorkOrderTrackingDetailPage({
     redirect('/dashboard/tracking/work-orders')
   }
 
-  const [payload, lifecyclePayload, itemSuggestions] = await Promise.all([
+  const [payload, lifecyclePayload, itemSuggestions, authUsersRaw] = await Promise.all([
     getWorkOrderTrackingDetail(workOrderId, { session }),
     getDeviceLifecycleLogs({ workOrderId, limit: 30 }),
     getInventoryDeviceLifecycleItemSuggestions(200),
+    getAuthUsersPageData()
+      .then((data) => (Array.isArray(data?.users) ? data.users : []))
+      .catch(() => [] as AuthUserListItem[]),
   ])
   const lifecycleItemCodes = Array.from(
     new Set(
@@ -334,6 +397,20 @@ export default async function WorkOrderTrackingDetailPage({
   const timelineEntries = buildTimelineEntries(payload)
   const canCreateDeviceLifecycle = canWriteDeviceLifecycle(session.role)
   const reviewDbReady = payload.source.effectiveMode === 'review-db' && !payload.source.isFallback
+
+  const technicianOptions: TechnicianOption[] = (authUsersRaw ?? [])
+    .filter((u) => {
+      const status = String(u.status ?? '').trim().toUpperCase()
+      const roleCode = String(u.roleCode ?? '').trim().toUpperCase()
+      return status === 'ACTIVE' && (roleCode === 'TEKNISI' || roleCode === 'TEKNISI_PSB')
+    })
+    .map((u) => ({
+      id: Number(u.id),
+      label: `${u.fullName ?? u.username ?? `User #${u.id}`} (${u.username ?? `#${u.id}`}${u.roleCode ? ` • ${u.roleCode}` : ''})`,
+      username: String(u.username ?? `user-${u.id}`),
+      roleCode: String(u.roleCode ?? ''),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
 
   return (
     <div className="space-y-6">
@@ -690,6 +767,18 @@ export default async function WorkOrderTrackingDetailPage({
                                 assignmentId={row.id}
                                 canAccept={canAcceptAssignment(session, row)}
                                 reviewDbReady={reviewDbReady}
+                              />
+                              <ReleaseAssignmentButton
+                                assignmentId={row.id}
+                                canRelease={canReleaseAssignment(session, row)}
+                                reviewDbReady={reviewDbReady}
+                              />
+                              <ReassignAssignmentModal
+                                assignmentId={row.id}
+                                canReassign={canReassignAssignment(session, row)}
+                                reviewDbReady={reviewDbReady}
+                                currentTechnicianLabel={`${row.assignedFullName ?? row.assignedUsername ?? `User #${row.assignedUserId}`} (${row.assignedUsername ?? `#${row.assignedUserId}`})`}
+                                technicianOptions={technicianOptions.filter((opt) => Number(opt.id) !== Number(row.assignedUserId))}
                               />
                             </td>
                           </tr>

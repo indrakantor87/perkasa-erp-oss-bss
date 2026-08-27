@@ -10,6 +10,32 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.66] - 2026-08-27
+
+### Added
+
+- Server-side visibility gates `canReleaseAssignment` dan `canReassignAssignment` pada Work Order Tracking Detail (S1) yang mengikuti aturan otorisasi: FIELD_TECHNICIAN SELF_ONLY untuk release self, FULL_ACCESS role (OWNER/SUPER_ADMIN/ADMIN/NOC_OPERATOR/TT_OPERATOR) untuk reassign, serta state active (ASSIGNED/ACCEPTED) + releasedAt NULL.
+- Release UI (`Lepas Tugas`) untuk authorized FIELD_TECHNICIAN self-release assignment langsung dari Assignment Log Actions column S1, menggunakan client component `ReleaseAssignmentButton` yang mengikuti pola precedent `AssignmentAcceptButton` P5.6. **FULL_ACCESS role release force-release button disembunyikan (tidak ditampilkan) di P5.8A karena release route API masih frozen SELF_ONLY default dan membutuhkan otorisasi unlock P5.8B.**
+- Reassign UI (`Tugaskan Ulang`) dalam modal client component `ReassignAssignmentModal` yang memungkinkan FIELD_TECHNICIAN self (reassign diri sendiri) dan FULL_ACCESS role (NOC/ADMIN/SUPER/OWNER/TT) untuk menugaskan ulang ke teknisi lain. Target teknisi di-filter server-side menjadi user dengan status ACTIVE dan peran TEKNISI/TEKNISI_PSB, menggunakan data dari resolver existing `getAuthUsersPageData()`. **Tidak membuat endpoint baru** — 100% menggunakan existing reassign API endpoint yang sudah teruji dan menyediakan FULL_ACCESS scope mapping.
+
+### Changed
+
+- Assignment Log Actions column S1 Tracking Detail sekarang menampilkan 3 aksi (Accept + Release + Reassign) sesuai perhitungan server boolean; client TIDAK PERNAH menentukan otorisasi secara independen. Teknisi current dikecualikan dari pilihan target reassign untuk menghindari self-target no-op.
+
+### Tests
+
+- Test regresi executable `q3-p5-8-actions.test.ts` dengan 12 skenario (T1-T12): verifikasi canRelease/canReassign predicate matrix, audit compliance FULL_ACCESS release visibility FALSE (frozen route lock enforcement), T10 classification BLOCKED P5.8B pending frozen unlock, T11 idempotency/resurrection releasedAt guard untuk 3 predicate, T12 visibility matrix 10 rows sesuai server boolean.
+
+### Security
+
+- Server-side boolean visibility gate pattern tetap mengikuti precedent P5.6: session.userId dan session.role TIDAK di-expose ke client JavaScript bundle, HANYA boolean canAccept/canRelease/canReassign + data teknisi terfilter yang dilewatkan. Otorisasi backend existing (accept/release/reassign route + state machine service) **TIDAK DIUBAH**, termasuk release route yang masih berstatus frozen SELF_ONLY.
+
+### Notes
+
+- P5.8B (FULL_ACCESS force-release backend scope mapping + release route authorization unlock) TETAP PENDING dan BELUM IMPLEMENTASI. Release untuk NOC/ADMIN terhadap assignment teknisi lain saat ini akan ditolak oleh backend SELF_ONLY default — ini diantisipasi dengan UI menyembunyikan tombol release FULL_ACCESS di P5.8A agar tidak menampilkan aksi yang tidak dapat dijalankan.
+- `released_by_user_id` actor identity (DDL column + ensureColumn + UPDATE SQL SET + resolver LEFT JOIN) BELUM IMPLEMENTASI dan termasuk cakupan potensial P5.9 bila otorisasi unlock `field-ops-service.ts` diberikan.
+- Existing reassign API route FULL_ACCESS scope mapping **SUDAH BERJALAN 100%**; Reassign UI yang ditambahkan P5.8A hanya menyediakan trigger antarmuka untuk endpoint yang sudah ada.
+
 ## [0.66.65] - 2026-08-27
 
 ### Added
