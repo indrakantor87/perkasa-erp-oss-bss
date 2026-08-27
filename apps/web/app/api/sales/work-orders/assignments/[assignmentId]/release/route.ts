@@ -60,6 +60,7 @@ export async function POST(
         assignmentId,
         sessionUserId: actorUserId,
         authorizationScope: resolvedScope,
+        releasedByUserId: actorUserId,
       })
       affectedRows = Number(res.affectedRows ?? 0)
     } else {
@@ -67,6 +68,7 @@ export async function POST(
         assignmentId,
         sessionUserId: actorUserId,
         authorizationScope: resolvedScope,
+        releasedByUserId: actorUserId,
       })
       affectedRows = Number(res.affectedRows ?? 0)
     }

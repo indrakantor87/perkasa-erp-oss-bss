@@ -144,9 +144,14 @@ export async function ensureServiceWorkOrderAssignmentTable() {
     'assigned_by_user_id',
   )
   await ensureServiceWorkOrderAssignmentColumn(
+    'released_by_user_id',
+    'released_by_user_id BIGINT UNSIGNED NULL',
+    'accepted_by_user_id',
+  )
+  await ensureServiceWorkOrderAssignmentColumn(
     'created_at',
     'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
-    'accepted_by_user_id',
+    'released_by_user_id',
   )
   await ensureServiceWorkOrderAssignmentColumn(
     'updated_at',
@@ -474,12 +479,16 @@ export async function releaseServiceWorkOrderAssignment(params: {
   assignmentId: number
   sessionUserId: number | undefined | null
   authorizationScope?: 'SELF_ONLY' | 'FULL_ACCESS'
+  releasedByUserId?: number | undefined | null
   connection?: ReviewDbConnection
 }): Promise<{ affectedRows: number }> {
   await ensureServiceWorkOrderAssignmentTable()
   const userIdRaw = params.sessionUserId
   const userIdNum = Number(userIdRaw ?? 0)
   const hasValidUserId = Number.isInteger(userIdNum) && userIdNum > 0
+  const releasedByRaw = params.releasedByUserId
+  const releasedByNum = Number(releasedByRaw ?? 0)
+  const hasValidReleasedBy = Number.isInteger(releasedByNum) && releasedByNum > 0
   const activeStatuses = [...Q3_ASSIGNMENT_ACTIVE_STATUSES]
   const scope = params.authorizationScope ?? 'SELF_ONLY'
   if (!Number.isInteger(params.assignmentId) || params.assignmentId <= 0) {
@@ -488,8 +497,12 @@ export async function releaseServiceWorkOrderAssignment(params: {
   if (scope === 'SELF_ONLY' && !hasValidUserId) {
     return { affectedRows: 0 }
   }
+  if (!hasValidReleasedBy) {
+    return { affectedRows: 0 }
+  }
   const activePlaceholders = activeStatuses.map(() => '?').join(', ')
   const bindValues: unknown[] = [
+    releasedByNum,
     Q3_ASSIGNMENT_ROLE_CANONICAL,
     ...activeStatuses,
   ]
@@ -502,7 +515,8 @@ export async function releaseServiceWorkOrderAssignment(params: {
       UPDATE service_work_order_assignments
       SET
         assignment_status = 'RELEASED',
-        released_at = CURRENT_TIMESTAMP
+        released_at = CURRENT_TIMESTAMP,
+        released_by_user_id = ?
       WHERE
         assignment_role = ?
         AND assignment_status IN (${activePlaceholders})
@@ -882,6 +896,7 @@ export async function reassignServiceWorkOrderAssignment(params: {
         assignmentId: assignmentAIdNum,
         sessionUserId: scope === 'SELF_ONLY' ? actorUserIdNum : null,
         authorizationScope: scope,
+        releasedByUserId: actorUserIdNum,
         connection,
       })
       if (releaseRes.affectedRows < 1) {

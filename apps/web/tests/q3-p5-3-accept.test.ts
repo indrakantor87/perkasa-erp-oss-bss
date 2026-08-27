@@ -252,6 +252,7 @@ async function runAllAcceptTests() {
     const releaseRes = await releaseServiceWorkOrderAssignmentMock({
       assignmentId: 9002,
       sessionUserId: 212,
+      releasedByUserId: 212,
     })
     assert.equal(releaseRes.affectedRows, 1, 'P5.1 release terhadap ACCEPTED sukses → interop valid')
 

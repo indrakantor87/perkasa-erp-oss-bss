@@ -50,6 +50,9 @@ export type WorkOrderAssignmentRow = {
   acceptedByUsername: string | null
   acceptedByFullName: string | null
   releasedAt: string | null
+  releasedByUserId: number | null
+  releasedByUsername: string | null
+  releasedByFullName: string | null
   notes: string | null
   assignedUsername: string | null
   assignedFullName: string | null
@@ -494,6 +497,7 @@ export async function getWorkOrderTrackingDetail(workOrderId: number, options?: 
               a.accepted_at AS acceptedAt,
               a.accepted_by_user_id AS acceptedByUserId,
               a.released_at AS releasedAt,
+              a.released_by_user_id AS releasedByUserId,
               a.notes AS notes,
               a.assigned_by_user_id AS assignedByUserId,
               au.username AS assignedUsername,
@@ -501,7 +505,9 @@ export async function getWorkOrderTrackingDetail(workOrderId: number, options?: 
               au2.username AS acceptedByUsername,
               au2.full_name AS acceptedByFullName,
               au3.username AS assignedByUsername,
-              au3.full_name AS assignedByFullName
+              au3.full_name AS assignedByFullName,
+              au4.username AS releasedByUsername,
+              au4.full_name AS releasedByFullName
             FROM service_work_order_assignments a
             LEFT JOIN auth_users au
               ON au.id = a.assigned_user_id
@@ -509,6 +515,8 @@ export async function getWorkOrderTrackingDetail(workOrderId: number, options?: 
               ON au2.id = a.accepted_by_user_id
             LEFT JOIN auth_users au3
               ON au3.id = a.assigned_by_user_id
+            LEFT JOIN auth_users au4
+              ON au4.id = a.released_by_user_id
             WHERE a.work_order_id = ?
             ORDER BY a.id DESC
             LIMIT 200
@@ -1361,15 +1369,21 @@ export async function releaseServiceWorkOrderAssignmentMock(params: {
   assignmentId: number
   sessionUserId: number | undefined | null
   authorizationScope?: 'SELF_ONLY' | 'FULL_ACCESS'
+  releasedByUserId?: number | undefined | null
 }): Promise<{ affectedRows: number }> {
   const userIdNum = Number(params.sessionUserId ?? 0)
   const hasValidUserId = Number.isInteger(userIdNum) && userIdNum > 0
   const scope = params.authorizationScope ?? 'SELF_ONLY'
   const validId = Number.isInteger(params.assignmentId) && params.assignmentId > 0
+  const releasedByNum = Number(params.releasedByUserId ?? 0)
+  const hasValidReleasedBy = Number.isInteger(releasedByNum) && releasedByNum > 0
   if (!validId) {
     return { affectedRows: 0 }
   }
   if (scope === 'SELF_ONLY' && !hasValidUserId) {
+    return { affectedRows: 0 }
+  }
+  if (!hasValidReleasedBy) {
     return { affectedRows: 0 }
   }
   const activeStatuses = [...Q3_ASSIGNMENT_ACTIVE_STATUSES].map((s) => String(s).trim().toUpperCase())
@@ -1400,6 +1414,7 @@ export async function releaseServiceWorkOrderAssignmentMock(params: {
     assignedAt: string | null
     acceptedAt: string | null
     releasedAt: string | null
+    releasedByUserId: number | null
     isPrimary: number
     createdBy: number | null
     createdAt: string | null
@@ -1407,6 +1422,7 @@ export async function releaseServiceWorkOrderAssignmentMock(params: {
   }
   target.assignmentStatus = 'RELEASED'
   target.releasedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  target.releasedByUserId = releasedByNum
   mockTrackingWorkOrderAssignments.splice(targetIdx, 1, target as never)
   return { affectedRows: 1 }
 }
@@ -1588,6 +1604,7 @@ export async function reassignServiceWorkOrderAssignmentMock(params: {
         assignmentStatus: string
         assignedUserId: number
         releasedAt: string | null
+        releasedByUserId: number | null
         isPrimary: number
         assignedAt: string | null
         acceptedAt: string | null
@@ -1607,6 +1624,7 @@ export async function reassignServiceWorkOrderAssignmentMock(params: {
       const isPrimaryBefore = releaseTarget.isPrimary
       releaseTarget.assignmentStatus = 'RELEASED'
       releaseTarget.releasedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
+      releaseTarget.releasedByUserId = actorId
       releaseTarget.isPrimary = isPrimaryBefore
       mockTrackingWorkOrderAssignments.splice(releaseIdx, 1, releaseTarget as never)
       rollbackStack.push(() => {
@@ -1671,6 +1689,9 @@ export async function reassignServiceWorkOrderAssignmentMock(params: {
       acceptedByUsername: null,
       acceptedByFullName: null,
       releasedAt: null,
+      releasedByUserId: null,
+      releasedByUsername: null,
+      releasedByFullName: null,
       notes: null,
       assignedUsername: `tech.${bId}`,
       assignedFullName: `Technician ${bId}`,

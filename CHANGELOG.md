@@ -10,6 +10,21 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.68] - 2026-08-27
+
+### Added
+
+- P5.9: Persist actor identity authenticated user (`released_by_user_id`) saat assignment release BERHASIL. Actor identity berasal EKSKLUSIF dari server-side `session.userId` (tidak pernah dari client request body/query/header/form state — route `release/route.ts` mempertahankan `void request` pada L24 + hardcode param `releasedByUserId: actorUserId` sama dengan session userId). Single atomic UPDATE bersama `assignment_status = RELEASED` dan `released_at = CURRENT_TIMESTAMP` dengan WHERE lifecycle guards (status IN (ASSIGNED,ACCEPTED), released_at IS NULL, ownership SELF_ONLY untuk FIELD_TECHNICIAN, authorizationScope FULL_ACCESS untuk OWNER/SUPER_ADMIN/ADMIN/NOC_OPERATOR/TT_OPERATOR, LIMIT 1) tetap terjaga untuk menjamin idempotency (second release → 0 rows sehingga released_by_user_id TIDAK di-overwrite). In-app migration via `ensureServiceWorkOrderAssignmentColumn` menambahkan `released_by_user_id BIGINT UNSIGNED NULL AFTER accepted_by_user_id` mengikuti pola convention `assigned_by_user_id` / `accepted_by_user_id` (tidak membuat file migration framework baru, sesuai existing project pattern). Mock parity disesuaikan di `releaseServiceWorkOrderAssignmentMock` + `reassignServiceWorkOrderAssignmentMock` internal release inline + `WorkOrderAssignmentRow` type + SELECT LEFT JOIN `au4 auth_users` untuk field `releasedByUserId / releasedByUsername / releasedByFullName`.
+
+### Tests
+
+- 10 test case P5.9 actor identity (T/P59-01 s/d T/P59-10) ditambahkan secara additive-only di akhir suite `q3-p5-1-release.test.ts`: FULL_ACCESS actor storage (T/P59-01), FT self-release actor (T/P59-02), FT cross-user deny no actor write (T/P59-03), unauthorized non-owner deny no actor (T/P59-04), client spoofing ignore invariant (T/P59-05), second release NO overwrite actor immutability (T/P59-06), failed release 0 actor persist (T/P59-07), RELEASED status guard preserved actor original (T/P59-08), COMPLETED inactive no release no actor (T/P59-09), concurrent double Promise release safe dengan 1 winner (T/P59-10). T11-T12 PO §9 (existing regression P5.8B/P5.1 tetap hijau) dibuktikan via 88/88 all-tests pass tanpa perubahan existing assertion legacy.
+
+### Security
+
+- Fail-closed `hasValidReleasedBy` early return 0 rows jika `releasedByUserId` bukan integer positif → invalid/absent session TIDAK menghasilkan partial actor write.
+- Scope resolution FULL_ACCESS 5 roles (P5.8B) + SELF_ONLY FIELD_TECHNICIAN tetap dipertahankan tanpa pembesaran scope; actor identity DITULIS HANYA jika release sukses (atomic single write bersama status/timestamp).
+
 ## [0.66.67] - 2026-08-27
 
 ### Added
