@@ -10,6 +10,18 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.65] - 2026-08-27
+
+### Added
+
+- Deterministic unified tracking timeline ordering dengan tiebreak prioritas event type dan id untuk menghindari non-deterministic sorting ketika timestamp event sama.
+- Assignment Log kolom `Assigned By` yang menampilkan informasi user/operator yang membuat assignment (full name → username → User #id fallback).
+- Assignment Log kolom `Released Info` yang menampilkan tanggal release assignment untuk baris berstatus `RELEASED`.
+
+### Tests
+
+- Executable timeline regression coverage (`q3-p5-7-timeline.test.ts`) memverifikasi aturan timestamp per status (RELEASED=releasedAt walau acceptedAt ada, ACCEPTED=acceptedAt, ASSIGNED=assignedAt), acceptedBy label fallback, dan deterministic ordering event same-timestamp.
+
 ## [0.66.64] - 2026-08-26
 
 ### Added

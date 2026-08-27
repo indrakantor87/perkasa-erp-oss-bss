@@ -195,7 +195,13 @@ function buildTimelineEntries(payload: Awaited<ReturnType<typeof getWorkOrderTra
   return entries.sort((left, right) => {
     const leftTime = left.at ? new Date(left.at).getTime() : 0
     const rightTime = right.at ? new Date(right.at).getTime() : 0
-    return rightTime - leftTime
+    const diff = rightTime - leftTime
+    if (diff !== 0) return diff
+    const typeRank = (type: string): number =>
+      ({ 'work-order': 1, movement: 2, assignment: 3, status: 4 }[type] ?? 0)
+    const rankDiff = typeRank(right.type) - typeRank(left.type)
+    if (rankDiff !== 0) return rankDiff
+    return String(left.id).localeCompare(String(right.id))
   })
 }
 
@@ -613,8 +619,10 @@ export default async function WorkOrderTrackingDetailPage({
                         <th className="px-4 py-3">Role</th>
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3">Primary</th>
+                        <th className="px-4 py-3">Assigned By</th>
                         <th className="px-4 py-3">Assigned At</th>
                         <th className="px-4 py-3">Acceptance</th>
+                        <th className="px-4 py-3">Released Info</th>
                         <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
@@ -640,6 +648,17 @@ export default async function WorkOrderTrackingDetailPage({
                           }
                           return null
                         })()
+                        const assignedByDisplay =
+                          row.assignedByFullName ??
+                          row.assignedByUsername ??
+                          (row.assignedByUserId != null ? `User #${row.assignedByUserId}` : '-')
+                        const releasedInfo = (() => {
+                          const canon = String(row.assignmentStatus ?? '').trim().toUpperCase()
+                          if (canon === 'RELEASED') {
+                            return `Dilepaskan: ${row.releasedAt ?? '-'}`
+                          }
+                          return '-'
+                        })()
                         return (
                           <tr key={row.id}>
                             <td className="px-4 py-4 align-top text-sm font-semibold text-[var(--color-ink-strong)]">
@@ -655,10 +674,16 @@ export default async function WorkOrderTrackingDetailPage({
                               {row.isPrimary ? 'YES' : '-'}
                             </td>
                             <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">
+                              {assignedByDisplay}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">
                               {row.assignedAt ?? '-'}
                             </td>
                             <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">
                               {acceptanceInfo ?? '-'}
+                            </td>
+                            <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">
+                              {releasedInfo}
                             </td>
                             <td className="px-4 py-4 align-top text-sm">
                               <AssignmentAcceptButton
@@ -672,7 +697,7 @@ export default async function WorkOrderTrackingDetailPage({
                       })}
                       {!payload.assignments.length ? (
                         <tr>
-                          <td className="px-4 py-6 text-sm text-mute" colSpan={7}>
+                          <td className="px-4 py-6 text-sm text-mute" colSpan={9}>
                             Belum ada assignment log.
                           </td>
                         </tr>

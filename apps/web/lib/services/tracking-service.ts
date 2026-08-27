@@ -53,6 +53,9 @@ export type WorkOrderAssignmentRow = {
   notes: string | null
   assignedUsername: string | null
   assignedFullName: string | null
+  assignedByUserId: number | null
+  assignedByUsername: string | null
+  assignedByFullName: string | null
 }
 
 type WorkOrderStatusLogRow = {
@@ -492,15 +495,20 @@ export async function getWorkOrderTrackingDetail(workOrderId: number, options?: 
               a.accepted_by_user_id AS acceptedByUserId,
               a.released_at AS releasedAt,
               a.notes AS notes,
+              a.assigned_by_user_id AS assignedByUserId,
               au.username AS assignedUsername,
               au.full_name AS assignedFullName,
               au2.username AS acceptedByUsername,
-              au2.full_name AS acceptedByFullName
+              au2.full_name AS acceptedByFullName,
+              au3.username AS assignedByUsername,
+              au3.full_name AS assignedByFullName
             FROM service_work_order_assignments a
             LEFT JOIN auth_users au
               ON au.id = a.assigned_user_id
             LEFT JOIN auth_users au2
               ON au2.id = a.accepted_by_user_id
+            LEFT JOIN auth_users au3
+              ON au3.id = a.assigned_by_user_id
             WHERE a.work_order_id = ?
             ORDER BY a.id DESC
             LIMIT 200
@@ -1660,7 +1668,9 @@ export async function reassignServiceWorkOrderAssignmentMock(params: {
       notes: null,
       assignedUsername: `tech.${bId}`,
       assignedFullName: `Technician ${bId}`,
-      assignedBy: actorId,
+      assignedByUserId: actorId,
+      assignedByUsername: actorId != null ? `user.${actorId}` : null,
+      assignedByFullName: actorId != null ? `User ${actorId}` : null,
     }
     mockTrackingWorkOrderAssignments.push(newRow as never)
     rollbackStack.push(() => {

@@ -59,6 +59,9 @@ export const mockTrackingWorkOrderAssignments = [
     notes: 'Teknisi trouble menerima ticket untuk replacement ONT.',
     assignedUsername: 'teknisi.trouble01',
     assignedFullName: 'Teknisi Trouble 01',
+    assignedByUserId: 44,
+    assignedByUsername: 'noc.dispatch01',
+    assignedByFullName: 'NOC Dispatch 01',
   },
   {
     id: 9002,
@@ -76,6 +79,9 @@ export const mockTrackingWorkOrderAssignments = [
     notes: 'Delegasi awal instalasi PSB.',
     assignedUsername: 'teknisi.psb01',
     assignedFullName: 'Teknisi PSB 01',
+    assignedByUserId: 44,
+    assignedByUsername: 'noc.dispatch01',
+    assignedByFullName: 'NOC Dispatch 01',
   },
 ]
 
