@@ -1360,11 +1360,16 @@ function resolveWorkOrderTrackingState(query: WorkOrderTrackingQuery) {
 export async function releaseServiceWorkOrderAssignmentMock(params: {
   assignmentId: number
   sessionUserId: number | undefined | null
+  authorizationScope?: 'SELF_ONLY' | 'FULL_ACCESS'
 }): Promise<{ affectedRows: number }> {
   const userIdNum = Number(params.sessionUserId ?? 0)
   const hasValidUserId = Number.isInteger(userIdNum) && userIdNum > 0
+  const scope = params.authorizationScope ?? 'SELF_ONLY'
   const validId = Number.isInteger(params.assignmentId) && params.assignmentId > 0
-  if (!hasValidUserId || !validId) {
+  if (!validId) {
+    return { affectedRows: 0 }
+  }
+  if (scope === 'SELF_ONLY' && !hasValidUserId) {
     return { affectedRows: 0 }
   }
   const activeStatuses = [...Q3_ASSIGNMENT_ACTIVE_STATUSES].map((s) => String(s).trim().toUpperCase())
@@ -1374,11 +1379,12 @@ export async function releaseServiceWorkOrderAssignmentMock(params: {
     const rowUserId = Number(row.assignedUserId ?? 0)
     const rowId = Number(row.id ?? 0)
     const rowReleasedNull = row.releasedAt == null
+    const matchSelf = scope === 'SELF_ONLY' ? rowUserId === userIdNum : true
     return (
       rowRole === String(Q3_ASSIGNMENT_ROLE_CANONICAL).trim().toUpperCase()
       && activeStatuses.includes(rowStatus)
       && rowReleasedNull
-      && rowUserId === userIdNum
+      && matchSelf
       && rowId === params.assignmentId
     )
   })

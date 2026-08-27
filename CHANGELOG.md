@@ -10,6 +10,12 @@ Format mengikuti prinsip `Keep a Changelog`, dan versi mengikuti `Semantic Versi
 
 - penguatan query domain dan action backend setelah MySQL review dipakai penuh
 
+## [0.66.67] - 2026-08-27
+
+### Added
+
+- Enable FULL_ACCESS release authorization for eligible work-order assignments (OWNER, SUPER_ADMIN, ADMIN, NOC_OPERATOR, TT_OPERATOR dapat melepaskan assignment milik teknisi manapun yang masih dalam status ASSIGNED/ACCEPTED dan releasedAt NULL). FIELD_TECHNICIAN tetap SELF_ONLY. Role lain tetap DENY. Release API route menggunakan existing `releaseServiceWorkOrderAssignment` yang sudah mendukung `authorizationScope: 'SELF_ONLY' | 'FULL_ACCESS'` sejak awal — hanya scope resolve di route level yang ditambahkan. Mock `releaseServiceWorkOrderAssignmentMock` parity disesuaikan dengan scope argument agar effectiveMode fallback behavior identik dengan production. S1 `canReleaseAssignment` FULL_ACCESS branch sekarang TRUE (sebelumnya sengaja hidden pada P5.8A karena route masih frozen SELF_ONLY).
+
 ## [0.66.66] - 2026-08-27
 
 ### Added

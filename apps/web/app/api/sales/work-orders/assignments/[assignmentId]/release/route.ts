@@ -24,18 +24,49 @@ export async function POST(
     void request
     const source = getDataSourceSnapshot()
     const actorUserId = session.userId
+
+    const normalizedRole = (session.role ?? '').trim().toUpperCase() as
+      | 'FIELD_TECHNICIAN'
+      | 'OWNER'
+      | 'SUPER_ADMIN'
+      | 'ADMIN'
+      | 'NOC_OPERATOR'
+      | 'TT_OPERATOR'
+      | string
+
+    let resolvedScope: 'SELF_ONLY' | 'FULL_ACCESS' | 'DENY' = 'DENY'
+    if (normalizedRole === 'FIELD_TECHNICIAN') {
+      resolvedScope = 'SELF_ONLY'
+    } else if (
+      normalizedRole === 'OWNER' ||
+      normalizedRole === 'SUPER_ADMIN' ||
+      normalizedRole === 'ADMIN' ||
+      normalizedRole === 'NOC_OPERATOR' ||
+      normalizedRole === 'TT_OPERATOR'
+    ) {
+      resolvedScope = 'FULL_ACCESS'
+    } else {
+      resolvedScope = 'DENY'
+    }
+
+    if (resolvedScope === 'DENY') {
+      return Response.json({ message: 'Assignment tidak ditemukan.' }, { status: 404 })
+    }
+
     let affectedRows = 0
 
     if (source.effectiveMode === 'review-db' && !source.isFallback) {
       const res = await releaseServiceWorkOrderAssignment({
         assignmentId,
         sessionUserId: actorUserId,
+        authorizationScope: resolvedScope,
       })
       affectedRows = Number(res.affectedRows ?? 0)
     } else {
       const res = await releaseServiceWorkOrderAssignmentMock({
         assignmentId,
         sessionUserId: actorUserId,
+        authorizationScope: resolvedScope,
       })
       affectedRows = Number(res.affectedRows ?? 0)
     }

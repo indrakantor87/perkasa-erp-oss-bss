@@ -274,11 +274,7 @@ function canReleaseAssignment(
 
   const isFullAccessReleaseRole = isAssignmentFullAccessRole(session.role)
 
-  if (isFullAccessReleaseRole) {
-    return false
-  }
-
-  return isFieldTechSelf
+  return isFieldTechSelf || isFullAccessReleaseRole
 }
 
 function canReassignAssignment(
