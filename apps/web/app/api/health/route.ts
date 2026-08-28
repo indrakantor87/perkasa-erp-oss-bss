@@ -30,6 +30,7 @@ async function getReviewDbHealth() {
       { table: 'support_isolations', column: 'status' },
       { table: 'support_trouble_tickets', column: 'ticket_code' },
       { table: 'service_subscriptions', column: 'id' },
+      { table: 'service_work_order_assignments', column: 'released_by_user_id' },
     ]
 
     const availability = await Promise.all(
