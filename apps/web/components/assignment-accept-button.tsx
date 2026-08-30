@@ -8,12 +8,14 @@ type AssignmentAcceptButtonProps = {
   assignmentId: number
   canAccept: boolean
   reviewDbReady: boolean
+  endpointBasePath?: string
 }
 
 type AcceptRouteResponse = {
   accepted?: boolean
   alreadyAccepted?: boolean
   workOrderId?: number
+  troubleTicketId?: number
   message?: string
 }
 
@@ -21,6 +23,7 @@ export function AssignmentAcceptButton({
   assignmentId,
   canAccept,
   reviewDbReady,
+  endpointBasePath = '/api/sales/work-orders/assignments',
 }: AssignmentAcceptButtonProps) {
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
@@ -41,7 +44,9 @@ export function AssignmentAcceptButton({
 
     try {
       const safeAssignmentId = encodeURIComponent(String(assignmentId))
-      const response = await fetch(`/api/sales/work-orders/assignments/${safeAssignmentId}/accept`, {
+      const safeBase = endpointBasePath.replace(/\/+$/, '')
+      const endpoint = `${safeBase}/${safeAssignmentId}/accept`
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

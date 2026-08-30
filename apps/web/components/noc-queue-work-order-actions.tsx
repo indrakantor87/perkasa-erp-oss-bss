@@ -82,6 +82,41 @@ export function NocQueueWorkOrderActions({
     setFeedback(null)
 
     try {
+      if (preset.key === 'CLOSE') {
+        const response = await fetch(`/api/sales/work-orders/${workOrderId}/complete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reasonNotes: `${preset.notes} ${supportLaneLabel}`.trim(),
+          }),
+        })
+
+        const payload = (await response.json().catch(() => null)) as
+          | { success?: boolean; idempotent?: boolean; message?: string; workOrderNo?: string; movementIds?: number[] }
+          | null
+        if (!response.ok) {
+          setFeedback({
+            tone: 'error',
+            message: payload?.message || 'Work order gagal diselesaikan (formal completion).',
+          })
+          return
+        }
+        const detail =
+          payload?.idempotent ?
+            ' (sudah pernah diselesaikan sebelumnya — idempotent success)'
+            : payload?.movementIds && payload.movementIds.length > 0 ?
+              ` (material ter-debit ${payload.movementIds.length} movement record)`
+              : ''
+        setFeedback({
+          tone: 'success',
+          message: `Work order ${payload?.workOrderNo ?? ''} berhasil diselesaikan secara formal${detail}.`,
+        })
+        router.refresh()
+        return
+      }
+
       const response = await fetch(`/api/sales/work-orders/${workOrderId}/queue-status`, {
         method: 'POST',
         headers: {

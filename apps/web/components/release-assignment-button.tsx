@@ -8,6 +8,7 @@ type ReleaseAssignmentButtonProps = {
   assignmentId: number
   canRelease: boolean
   reviewDbReady: boolean
+  endpointBasePath?: string
 }
 
 type ReleaseRouteResponse = {
@@ -20,6 +21,7 @@ export function ReleaseAssignmentButton({
   assignmentId,
   canRelease,
   reviewDbReady,
+  endpointBasePath = '/api/sales/work-orders/assignments',
 }: ReleaseAssignmentButtonProps) {
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
@@ -40,7 +42,9 @@ export function ReleaseAssignmentButton({
 
     try {
       const safeAssignmentId = encodeURIComponent(String(assignmentId))
-      const response = await fetch(`/api/sales/work-orders/assignments/${safeAssignmentId}/release`, {
+      const safeBase = endpointBasePath.replace(/\/+$/, '')
+      const endpoint = `${safeBase}/${safeAssignmentId}/release`
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

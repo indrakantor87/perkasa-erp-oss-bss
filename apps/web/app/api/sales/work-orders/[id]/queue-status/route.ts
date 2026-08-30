@@ -4,8 +4,10 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { hasReviewDbColumn, getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import {
   insertServiceWorkOrderStatusLog,
+  REASSIGN_FULL_ACCESS_ROLES_SET,
   resolveReviewAuthUserIdByUsername,
 } from '@/lib/services/field-ops-service'
+import type { AppRole } from '@/lib/types'
 
 type WorkOrderRow = {
   id: number
@@ -73,14 +75,6 @@ export async function POST(
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
 
-  const source = getDataSourceSnapshot()
-  if (source.effectiveMode !== 'review-db' || source.isFallback) {
-    return Response.json(
-      { message: 'Shortcut status work order hanya aktif saat review DB benar-benar tersedia.' },
-      { status: 503 },
-    )
-  }
-
   try {
     const resolvedParams = await params
     const workOrderId = Number.parseInt(String(resolvedParams.id ?? '').trim(), 10)
@@ -97,6 +91,27 @@ export async function POST(
 
     if (!allowedShortcutStatuses.has(queueStatus)) {
       return Response.json({ message: 'Status shortcut work order tidak valid.' }, { status: 400 })
+    }
+
+    const sessionRole = (session.role ?? 'PUBLIC') as AppRole
+    if (queueStatus === 'CLOSE') {
+      const canCreateInventory = canPerformAction(sessionRole, 'inventory', 'create')
+      const canManageInventory = canPerformAction(sessionRole, 'inventory', 'manage')
+      const hasFullAccess = REASSIGN_FULL_ACCESS_ROLES_SET.has(sessionRole)
+      if (!(canCreateInventory || canManageInventory || hasFullAccess)) {
+        return Response.json(
+          { message: 'Forbidden: shortcut CLOSE memerlukan izin inventory create/manage atau operator akses penuh.' },
+          { status: 403 },
+        )
+      }
+    }
+
+    const source = getDataSourceSnapshot()
+    if (source.effectiveMode !== 'review-db' || source.isFallback) {
+      return Response.json(
+        { message: 'Shortcut status work order hanya aktif saat review DB benar-benar tersedia.' },
+        { status: 503 },
+      )
     }
 
     const workOrder = await getWorkOrderById(workOrderId)

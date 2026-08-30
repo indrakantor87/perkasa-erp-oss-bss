@@ -72,6 +72,108 @@ type WorkOrderStatusLogRow = {
   changedAt: string | null
 }
 
+export type TroubleTicketAssignmentRow = {
+  id: number
+  troubleTicketId: number
+  assignedUserId: number
+  assignmentRole: string | null
+  assignmentStatus: string | null
+  isPrimary: number
+  assignedAt: string | null
+  acceptedAt: string | null
+  acceptedByUserId: number | null
+  acceptedByUsername: string | null
+  acceptedByFullName: string | null
+  releasedAt: string | null
+  releasedByUserId: number | null
+  releasedByUsername: string | null
+  releasedByFullName: string | null
+  releasedReason: string | null
+  notes: string | null
+  assignedUsername: string | null
+  assignedFullName: string | null
+  assignedByUserId: number | null
+  assignedByUsername: string | null
+  assignedByFullName: string | null
+}
+
+export type TTProgressLogRow = {
+  id: number
+  troubleTicketId: number
+  progressStatus: string | null
+  ownerName: string | null
+  progressNotes: string | null
+  updatedByUserId: number | null
+  updatedByUsername: string | null
+  updatedByFullName: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export type CurrentHandlerInfo = {
+  userId: number
+  displayName: string | null
+  username: string
+  assignmentId: number
+  status: 'ASSIGNED' | 'ACCEPTED'
+  assignedAt: string
+  acceptedAt: string | null
+}
+
+export type PrimaryTechnicianInfo = CurrentHandlerInfo
+
+export type AssignmentActorInfo = {
+  userId: number
+  displayName: string | null
+  username: string
+}
+
+export type AssignmentHistoryItem = {
+  assignmentId: number
+  technician: {
+    userId: number
+    displayName: string | null
+    username: string
+  }
+  role: string
+  status: 'ASSIGNED' | 'ACCEPTED' | 'RELEASED'
+  isPrimary: 0 | 1
+  assignedAt: string | null
+  acceptedAt: string | null
+  releasedAt: string | null
+  releasedReason: string | null
+  assignedBy: AssignmentActorInfo | null
+  acceptedBy: AssignmentActorInfo | null
+  releasedBy: AssignmentActorInfo | null
+  notes: string | null
+}
+
+export type TTProgressLogItem = {
+  id: number
+  progressStatus: string
+  ownerName: string | null
+  progressNotes: string | null
+  updatedBy: AssignmentActorInfo | null
+  createdAt: string | null
+}
+
+export type TimelineEventType = 'trouble-ticket' | 'assignment' | 'status' | 'movement' | 'close'
+
+export type TimelineEntry = {
+  id: string
+  type: TimelineEventType
+  at: string | null
+  title: string
+  detail?: string
+  href?: string
+  tone?: string
+}
+
+export type NextActionInfo = {
+  label: string
+  tone: 'info' | 'warning' | 'success' | 'default'
+}
+
 type StockMovementRow = {
   id: number
   itemId: number
@@ -990,14 +1092,153 @@ export async function getInventoryRequestTrackingList(query: InventoryRequestTra
   }
 }
 
+function buildUserFallback(userId: number | null | undefined, displayName: string | null | undefined, username: string | null | undefined): { userId: number; displayName: string | null; username: string } {
+  const uid = Number(userId ?? 0)
+  const uname = String(username ?? '').trim()
+  const dname = String(displayName ?? '').trim() || null
+  return {
+    userId: uid,
+    displayName: dname,
+    username: uname || `User #${uid}`,
+  }
+}
+
+function buildActorInfo(userIdRaw: number | null | undefined, fullName: string | null | undefined, username: string | null | undefined): AssignmentActorInfo | null {
+  const uid = Number(userIdRaw ?? 0)
+  if (!Number.isInteger(uid) || uid <= 0) return null
+  const fb = buildUserFallback(uid, fullName, username)
+  return {
+    userId: fb.userId,
+    displayName: fb.displayName,
+    username: fb.username,
+  }
+}
+
+function assignmentRowsToHistory(rows: TroubleTicketAssignmentRow[]): AssignmentHistoryItem[] {
+  const history: AssignmentHistoryItem[] = []
+  for (const row of rows) {
+    const techFb = buildUserFallback(row.assignedUserId, row.assignedFullName, row.assignedUsername)
+    const statusRaw = String(row.assignmentStatus ?? 'ASSIGNED').trim().toUpperCase()
+    const status: 'ASSIGNED' | 'ACCEPTED' | 'RELEASED' =
+      statusRaw === 'ACCEPTED' ? 'ACCEPTED' : statusRaw === 'RELEASED' ? 'RELEASED' : 'ASSIGNED'
+    history.push({
+      assignmentId: row.id,
+      technician: {
+        userId: techFb.userId,
+        displayName: techFb.displayName,
+        username: techFb.username,
+      },
+      role: String(row.assignmentRole ?? 'FIELD_TECHNICIAN').trim().toUpperCase() || 'FIELD_TECHNICIAN',
+      status,
+      isPrimary: (row.isPrimary ? 1 : 0) as 0 | 1,
+      assignedAt: row.assignedAt ?? null,
+      acceptedAt: row.acceptedAt ?? null,
+      releasedAt: row.releasedAt ?? null,
+      releasedReason: row.releasedReason ?? null,
+      assignedBy: buildActorInfo(row.assignedByUserId, row.assignedByFullName, row.assignedByUsername),
+      acceptedBy: buildActorInfo(row.acceptedByUserId, row.acceptedByFullName, row.acceptedByUsername),
+      releasedBy: buildActorInfo(row.releasedByUserId, row.releasedByFullName, row.releasedByUsername),
+      notes: row.notes ?? null,
+    })
+  }
+  history.sort((a, b) => {
+    const aReleased = a.releasedAt ? 1 : 0
+    const bReleased = b.releasedAt ? 1 : 0
+    if (aReleased !== bReleased) return aReleased - bReleased
+    const aActivity = a.acceptedAt || a.releasedAt || a.assignedAt || '0'
+    const bActivity = b.acceptedAt || b.releasedAt || b.assignedAt || '0'
+    if (aActivity !== bActivity) return aActivity > bActivity ? -1 : 1
+    return b.assignmentId - a.assignmentId
+  })
+  return history
+}
+
+function deriveCurrentHandler(history: AssignmentHistoryItem[]): CurrentHandlerInfo | null {
+  const activePrimary = history.find(
+    (h) =>
+      h.isPrimary === 1 &&
+      h.releasedAt == null &&
+      (h.status === 'ASSIGNED' || h.status === 'ACCEPTED'),
+  )
+  if (!activePrimary) {
+    const fallbackAnyActive = history.find(
+      (h) => h.releasedAt == null && (h.status === 'ASSIGNED' || h.status === 'ACCEPTED'),
+    )
+    if (!fallbackAnyActive) return null
+    if (!fallbackAnyActive.assignedAt) return null
+    return {
+      userId: fallbackAnyActive.technician.userId,
+      displayName: fallbackAnyActive.technician.displayName,
+      username: fallbackAnyActive.technician.username,
+      assignmentId: fallbackAnyActive.assignmentId,
+      status: fallbackAnyActive.status as 'ASSIGNED' | 'ACCEPTED',
+      assignedAt: fallbackAnyActive.assignedAt,
+      acceptedAt: fallbackAnyActive.acceptedAt ?? null,
+    }
+  }
+  if (!activePrimary.assignedAt) return null
+  return {
+    userId: activePrimary.technician.userId,
+    displayName: activePrimary.technician.displayName,
+    username: activePrimary.technician.username,
+    assignmentId: activePrimary.assignmentId,
+    status: activePrimary.status as 'ASSIGNED' | 'ACCEPTED',
+    assignedAt: activePrimary.assignedAt,
+    acceptedAt: activePrimary.acceptedAt ?? null,
+  }
+}
+
+function progressRowsToItems(rows: TTProgressLogRow[]): TTProgressLogItem[] {
+  return rows.map((row) => ({
+    id: row.id,
+    progressStatus: String(row.progressStatus ?? 'UNKNOWN').trim().toUpperCase() || 'UNKNOWN',
+    ownerName: row.ownerName ?? null,
+    progressNotes: row.progressNotes ?? null,
+    updatedBy: buildActorInfo(row.updatedByUserId, row.updatedByFullName, row.updatedByUsername),
+    createdAt: row.createdAt ?? null,
+  }))
+}
+
+function deriveNextAction(ticket: TroubleTicketRow | null, handler: CurrentHandlerInfo | null): NextActionInfo {
+  const statusRaw = String(ticket?.status ?? '').trim().toUpperCase()
+  if (statusRaw === 'CLOSED' || statusRaw === 'COMPLETED') {
+    return { label: 'Trouble ticket selesai', tone: 'success' }
+  }
+  if (!handler) {
+    return { label: 'Perlu assign teknisi', tone: 'warning' }
+  }
+  if (handler.status === 'ASSIGNED') {
+    return { label: 'Menunggu teknisi menerima assignment', tone: 'info' }
+  }
+  if (handler.status === 'ACCEPTED') {
+    return { label: 'Teknisi sedang menangani pekerjaan', tone: 'default' }
+  }
+  return { label: 'Perlu assign teknisi kembali', tone: 'warning' }
+}
+
 export async function getTroubleTicketTrackingDetail(troubleTicketId: number) {
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    const troubleTicket = mockTrackingTroubleTickets.find((row) => row.id === troubleTicketId) ?? null
+    const workOrders = mockTrackingWorkOrders.filter((row) => row.troubleTicketId === troubleTicketId)
+    const movements = mockTrackingStockMovements.filter((row) => row.troubleTicketId === troubleTicketId)
+    const rawAssignments: TroubleTicketAssignmentRow[] = []
+    const history = assignmentRowsToHistory(rawAssignments)
+    const currentHandler = deriveCurrentHandler(history)
+    const primaryTechnician = currentHandler ? { ...currentHandler } : null
+    const progressLogs: TTProgressLogItem[] = []
+    const nextAction = deriveNextAction(troubleTicket, currentHandler)
     return {
       source,
-      troubleTicket: mockTrackingTroubleTickets.find((row) => row.id === troubleTicketId) ?? null,
-      workOrders: mockTrackingWorkOrders.filter((row) => row.troubleTicketId === troubleTicketId),
-      movements: mockTrackingStockMovements.filter((row) => row.troubleTicketId === troubleTicketId),
+      troubleTicket,
+      workOrders,
+      movements,
+      assignments: history,
+      progressLogs,
+      currentHandler,
+      primaryTechnician,
+      nextAction,
+      assignmentTimeline: [] as TimelineEntry[],
       error: null as string | null,
     }
   }
@@ -1014,6 +1255,8 @@ export async function getTroubleTicketTrackingDetail(troubleTicketId: number) {
       (await hasReviewDbColumn('inventory_stock_movements', 'to_location_id')) &&
       (await hasReviewDbColumn('inventory_locations', 'id'))
     const hasMovementTechnician = await hasReviewDbColumn('inventory_stock_movements', 'technician_user_id')
+    const hasTTAssignments = await hasReviewDbColumn('service_trouble_ticket_assignments', 'trouble_ticket_id')
+    const hasProgressLogs = await hasReviewDbColumn('support_trouble_ticket_progress_logs', 'trouble_ticket_id')
 
     const [troubleTicket] = await runReviewDbQuery<TroubleTicketRow>(
       `
@@ -1048,12 +1291,18 @@ export async function getTroubleTicketTrackingDetail(troubleTicketId: number) {
         troubleTicket: null as TroubleTicketRow | null,
         workOrders: [] as WorkOrderRow[],
         movements: [] as StockMovementRow[],
+        assignments: [] as AssignmentHistoryItem[],
+        progressLogs: [] as TTProgressLogItem[],
+        currentHandler: null,
+        primaryTechnician: null,
+        nextAction: deriveNextAction(null, null),
+        assignmentTimeline: [] as TimelineEntry[],
         error: null as string | null,
       }
     }
 
-    const workOrders = hasWorkOrderTicketId
-      ? await runReviewDbQuery<WorkOrderRow>(
+    const workOrdersPromise = hasWorkOrderTicketId
+      ? runReviewDbQuery<WorkOrderRow>(
           `
             SELECT
               wo.id AS id,
@@ -1082,10 +1331,10 @@ export async function getTroubleTicketTrackingDetail(troubleTicketId: number) {
           `,
           [troubleTicketId],
         )
-      : []
+      : Promise.resolve([] as WorkOrderRow[])
 
-    const movements = hasMovementTicketId
-      ? await runReviewDbQuery<StockMovementRow>(
+    const movementsPromise = hasMovementTicketId
+      ? runReviewDbQuery<StockMovementRow>(
           `
             SELECT
               m.id AS id,
@@ -1127,15 +1376,114 @@ export async function getTroubleTicketTrackingDetail(troubleTicketId: number) {
           `,
           [troubleTicketId],
         )
-      : []
+      : Promise.resolve([] as StockMovementRow[])
 
-    return { source, troubleTicket, workOrders, movements, error: null as string | null }
+    const assignmentsPromise = hasTTAssignments
+      ? runReviewDbQuery<TroubleTicketAssignmentRow>(
+          `
+            SELECT
+              a.id AS id,
+              a.trouble_ticket_id AS troubleTicketId,
+              a.assigned_user_id AS assignedUserId,
+              a.assignment_role AS assignmentRole,
+              a.assignment_status AS assignmentStatus,
+              a.is_primary AS isPrimary,
+              a.assigned_at AS assignedAt,
+              a.accepted_at AS acceptedAt,
+              a.accepted_by_user_id AS acceptedByUserId,
+              a.released_at AS releasedAt,
+              a.released_by_user_id AS releasedByUserId,
+              a.released_reason AS releasedReason,
+              a.notes AS notes,
+              a.assigned_by_user_id AS assignedByUserId,
+              au.username AS assignedUsername,
+              au.full_name AS assignedFullName,
+              au2.username AS acceptedByUsername,
+              au2.full_name AS acceptedByFullName,
+              au3.username AS assignedByUsername,
+              au3.full_name AS assignedByFullName,
+              au4.username AS releasedByUsername,
+              au4.full_name AS releasedByFullName
+            FROM service_trouble_ticket_assignments a
+            LEFT JOIN auth_users au
+              ON au.id = a.assigned_user_id
+            LEFT JOIN auth_users au2
+              ON au2.id = a.accepted_by_user_id
+            LEFT JOIN auth_users au3
+              ON au3.id = a.assigned_by_user_id
+            LEFT JOIN auth_users au4
+              ON au4.id = a.released_by_user_id
+            WHERE a.trouble_ticket_id = ?
+            ORDER BY a.id DESC
+            LIMIT 200
+          `,
+          [troubleTicketId],
+        )
+      : Promise.resolve([] as TroubleTicketAssignmentRow[])
+
+    const progressPromise = hasProgressLogs
+      ? runReviewDbQuery<TTProgressLogRow>(
+          `
+            SELECT
+              pl.id AS id,
+              pl.trouble_ticket_id AS troubleTicketId,
+              pl.progress_status AS progressStatus,
+              pl.owner_name AS ownerName,
+              pl.progress_notes AS progressNotes,
+              pl.updated_by AS updatedByUserId,
+              pu.username AS updatedByUsername,
+              pu.full_name AS updatedByFullName,
+              pl.created_at AS createdAt,
+              pl.updated_at AS updatedAt
+            FROM support_trouble_ticket_progress_logs pl
+            LEFT JOIN auth_users pu
+              ON pu.id = pl.updated_by
+            WHERE pl.trouble_ticket_id = ?
+            ORDER BY pl.id DESC
+            LIMIT 200
+          `,
+          [troubleTicketId],
+        )
+      : Promise.resolve([] as TTProgressLogRow[])
+
+    const [workOrders, movements, rawAssignments, rawProgress] = await Promise.all([
+      workOrdersPromise,
+      movementsPromise,
+      assignmentsPromise,
+      progressPromise,
+    ])
+
+    const assignments = assignmentRowsToHistory(rawAssignments)
+    const currentHandler = deriveCurrentHandler(assignments)
+    const primaryTechnician = currentHandler ? { ...currentHandler } : null
+    const progressLogs = progressRowsToItems(rawProgress)
+    const nextAction = deriveNextAction(troubleTicket, currentHandler)
+
+    return {
+      source,
+      troubleTicket,
+      workOrders,
+      movements,
+      assignments,
+      progressLogs,
+      currentHandler,
+      primaryTechnician,
+      nextAction,
+      assignmentTimeline: [] as TimelineEntry[],
+      error: null as string | null,
+    }
   } catch (error) {
     return {
       source: getFallbackDataSource(source, error),
       troubleTicket: null,
       workOrders: [],
       movements: [],
+      assignments: [] as AssignmentHistoryItem[],
+      progressLogs: [] as TTProgressLogItem[],
+      currentHandler: null,
+      primaryTechnician: null,
+      nextAction: deriveNextAction(null, null),
+      assignmentTimeline: [] as TimelineEntry[],
       error: getReviewDbErrorDetail(error),
     }
   }

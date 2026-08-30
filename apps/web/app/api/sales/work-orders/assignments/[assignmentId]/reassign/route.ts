@@ -1,11 +1,14 @@
+import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail } from '@/lib/review-db'
 import {
   reassignServiceWorkOrderAssignment,
   type ReassignFieldTechSession,
+  REASSIGN_FULL_ACCESS_ROLES_SET,
 } from '@/lib/services/field-ops-service'
 import { reassignServiceWorkOrderAssignmentMock } from '@/lib/services/tracking-service'
+import type { AppRole } from '@/lib/types'
 
 function resolveOptionalPositiveInt(raw: unknown): number | null {
   if (raw == null) {
@@ -31,6 +34,13 @@ export async function POST(
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
 
+  const sessionRole = (session.role ?? 'PUBLIC') as AppRole
+  const hasFullAccess = REASSIGN_FULL_ACCESS_ROLES_SET.has(sessionRole)
+  const hasSupportUpdate = canPerformAction(sessionRole, 'support', 'update')
+  if (!(hasFullAccess || hasSupportUpdate)) {
+    return Response.json({ message: 'Forbidden' }, { status: 403 })
+  }
+
   try {
     const resolvedParams = await params
     const assignmentIdRaw = String(resolvedParams.assignmentId ?? '').trim()
@@ -50,7 +60,7 @@ export async function POST(
     const source = getDataSourceSnapshot()
     const reassignSession: ReassignFieldTechSession = {
       userId: session.userId,
-      role: session.role,
+      role: sessionRole,
     }
 
     let affectedRows = 0

@@ -16,11 +16,13 @@ import {
   runReviewDbExecute,
   runReviewDbQuery,
   runReviewDbTransaction,
+  type ReviewDbConnection,
 } from '@/lib/review-db'
 import {
   buildServiceWorkOrderInsertPayload,
   ensureServiceWorkOrderStatusLogTable,
   generateServiceWorkOrderNo,
+  insertServiceWorkOrder,
   resolveReviewAuthUserIdByUsername,
 } from '@/lib/services/field-ops-service'
 import type { AppRole, DataSourceSnapshot } from '@/lib/types'
@@ -1675,6 +1677,532 @@ export async function transferPsbListToTicket(params: {
     workOrderNo,
     workOrderId,
   }
+}
+
+export type ActivateErrorCode =
+  | 'PSB_NOT_FOUND'
+  | 'PSB_STATUS_INVALID'
+  | 'PSB_ALREADY_ACTIVATED'
+  | 'CUSTOMER_CREATE_FAILED'
+  | 'SUBSCRIPTION_CREATE_FAILED'
+  | 'WORKORDER_CREATE_FAILED'
+  | 'INTERNAL'
+
+export class ActivateFlowError extends Error {
+  readonly code: ActivateErrorCode
+  constructor(code: ActivateErrorCode, message: string) {
+    super(message)
+    this.name = 'ActivateFlowError'
+    this.code = code
+  }
+}
+
+type ActivateFlowActorCtx = {
+  userId: number | null
+  username: string
+  displayName: string
+  role: AppRole
+  branchId: number | null
+}
+
+export type ActivatePsbFlowResult = {
+  idempotent: boolean
+  psbId: number
+  psbListCode: string
+  status: PsbListStatus
+  customerId: number | null
+  customerCode: string | null
+  subscriptionId: number | null
+  serviceNo: string | null
+  workOrderId: number | null
+  workOrderNo: string | null
+}
+
+function padSequence(value: number, length: number) {
+  return String(value).padStart(length, '0')
+}
+
+function normalizePhone(value: string | null | undefined) {
+  const raw = String(value ?? '').trim().toLowerCase()
+  if (!raw) return ''
+  return raw.replace(/[^0-9]/g, '').replace(/^62/, '0')
+}
+
+function normalizeCustomerKey(fullName: string | null | undefined, phone: string | null | undefined) {
+  const name = String(fullName ?? '').trim().toUpperCase()
+  const p = normalizePhone(phone)
+  return `${name}|${p}`
+}
+
+async function generateCustomerCodeTx(conn: ReviewDbConnection, customerType: string) {
+  const prefix = customerType === 'CORPORATE' ? 'CORP' : customerType === 'RESELLER' ? 'RSL' : 'CUST'
+  const [rows] = await conn.query(
+    `SELECT customer_code AS customerCode FROM crm_customers WHERE customer_code LIKE ? ORDER BY id DESC LIMIT 1`,
+    [`${prefix}-%`],
+  )
+  const arr = rows as Array<{ customerCode?: string }> | undefined
+  const currentCode = String(arr?.[0]?.customerCode ?? '')
+  const lastSequence = Number.parseInt(currentCode.split('-').pop() ?? '0', 10)
+  return `${prefix}-${padSequence(Number.isFinite(lastSequence) ? lastSequence + 1 : 1, 5)}`
+}
+
+async function generateServiceNoTx(conn: ReviewDbConnection) {
+  const [rows] = await conn.query(
+    `SELECT service_no AS serviceNo FROM service_subscriptions WHERE service_no LIKE 'SVC-%' ORDER BY id DESC LIMIT 1`,
+  )
+  const arr = rows as Array<{ serviceNo?: string }> | undefined
+  const currentCode = String(arr?.[0]?.serviceNo ?? '')
+  const lastSequence = Number.parseInt(currentCode.split('-').pop() ?? '0', 10)
+  return `SVC-${padSequence(Number.isFinite(lastSequence) ? lastSequence + 1 : 1, 6)}`
+}
+
+async function ensureColumn(table: string, column: string) {
+  return await hasReviewDbColumn(table, column)
+}
+
+async function ensureCrmTablesAndColumns() {
+  const guards = await Promise.all([
+    ensureColumn('crm_customers', 'id'),
+    ensureColumn('crm_customers', 'customer_code'),
+    ensureColumn('crm_customers', 'customer_type'),
+    ensureColumn('crm_customers', 'full_name'),
+    ensureColumn('crm_customers', 'phone'),
+    ensureColumn('service_subscriptions', 'id'),
+    ensureColumn('service_subscriptions', 'customer_id'),
+    ensureColumn('service_subscriptions', 'service_no'),
+    ensureColumn('service_subscriptions', 'status'),
+  ])
+  if (!guards[0] || !guards[1] || !guards[2] || !guards[3] || !guards[6] || !guards[7] || !guards[8]) {
+    throw new ActivateFlowError(
+      'INTERNAL',
+      'Schema Customer / Subscription belum siap untuk alur aktivasi. Hubungi administrator.',
+    )
+  }
+}
+
+export async function activatePsbFlow(params: {
+  psbListId: number
+  actor: ActivateFlowActorCtx
+}): Promise<ActivatePsbFlowResult> {
+  await ensurePsbListBaselineSeeds()
+  await ensureServiceWorkOrderStatusLogTable()
+  await ensureCrmTablesAndColumns()
+
+  const hasCustomerIdFk = await ensureColumn('sales_psb_lists', 'customer_id')
+  const hasSubscriptionIdFk = await ensureColumn('sales_psb_lists', 'subscription_id')
+  const hasRadiusActivatedAt = await ensureColumn('sales_psb_lists', 'radius_activated_at')
+  const hasCustomerActiveAt = await ensureColumn('sales_psb_lists', 'customer_active_at')
+  const hasBillingStatus = await ensureColumn('sales_psb_lists', 'billing_status')
+  const hasActivationStatus = await ensureColumn('sales_psb_lists', 'activation_status')
+  const hasWorkOrderCode = await ensureColumn('sales_psb_lists', 'work_order_code')
+  const hasTransferredTicketRef = await ensureColumn('sales_psb_lists', 'transferred_ticket_ref')
+  const hasWorkOrderCreatedAt = await ensureColumn('sales_psb_lists', 'work_order_created_at')
+
+  return await runReviewDbTransaction(async (conn) => {
+    const [psbRows] = await conn.query(
+      `
+        SELECT
+          id,
+          psb_list_code AS psbListCode,
+          customer_name AS customerName,
+          customer_phone AS customerPhone,
+          address_text AS addressText,
+          package_label AS packageLabel,
+          sales_owner_name AS salesOwnerName,
+          requested_install_date AS requestedInstallDate,
+          status,
+          transferred_work_order_id AS transferredWorkOrderId,
+          area_label AS areaLabel,
+          google_maps_link AS googleMapsLink,
+          monthly_price AS monthlyPrice,
+          package_id AS packageId,
+          sales_order_id AS salesOrderId
+        FROM sales_psb_lists
+        WHERE id = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [params.psbListId],
+    )
+    const arr = psbRows as Array<Record<string, unknown>> | undefined
+    const row = arr?.[0]
+    if (!row) {
+      throw new ActivateFlowError('PSB_NOT_FOUND', 'Data PSB tidak ditemukan.')
+    }
+    const psbId = Number(row.id)
+    const psbListCode = String(row.psbListCode ?? '-')
+    const currentStatus = normalizeStatus(String(row.status ?? ''))
+    const existingWoId = Number(row.transferredWorkOrderId ?? 0)
+
+    if (currentStatus === 'DITRANSFER_KE_TICKETING' || (Number.isFinite(existingWoId) && existingWoId > 0)) {
+      const customerId = Number((row as unknown as { customerId?: number | null }).customerId ?? 0) || null
+      const subscriptionId = Number((row as unknown as { subscriptionId?: number | null }).subscriptionId ?? 0) || null
+      return {
+        idempotent: true,
+        psbId,
+        psbListCode,
+        status: 'DITRANSFER_KE_TICKETING',
+        customerId,
+        customerCode: null,
+        subscriptionId,
+        serviceNo: null,
+        workOrderId: existingWoId > 0 ? existingWoId : null,
+        workOrderNo: String((row as unknown as { workOrderCode?: string | null }).workOrderCode ?? ''),
+      }
+    }
+
+    if (currentStatus !== 'DISETUJUI') {
+      throw new ActivateFlowError(
+        'PSB_STATUS_INVALID',
+        `Hanya status DISETUJUI yang bisa diaktivasi. Status saat ini: ${currentStatus}.`,
+      )
+    }
+
+    const rawCustomerName = String(row.customerName ?? '').trim()
+    const rawPhone = String(row.customerPhone ?? '').trim()
+    const rawAddress = String(row.addressText ?? '').trim()
+    const rawMaps = String(row.googleMapsLink ?? '').trim() || null
+    const rawMonthlyPrice = String(row.monthlyPrice ?? '').trim()
+    const packageId = Number(row.packageId ?? 0) || null
+    const salesOrderId = Number(row.salesOrderId ?? 0) || null
+    const requestedDateStr = String(row.requestedInstallDate ?? '')
+    const requestedDate = requestedDateStr ? new Date(requestedDateStr) : null
+    const scheduledAt = requestedDate && Number.isFinite(requestedDate.getTime()) ? requestedDate : null
+    const parsedMonthly = (() => {
+      if (!rawMonthlyPrice) return 0
+      const normalized = rawMonthlyPrice.replace(/rp/gi, '').replace(/\s+/g, '').replace(/\./g, '').replace(/,/g, '.')
+      const n = Number(normalized)
+      return Number.isFinite(n) ? n : 0
+    })()
+
+    if (!rawCustomerName) {
+      throw new ActivateFlowError('CUSTOMER_CREATE_FAILED', 'Nama pelanggan pada Data PSB harus diisi sebelum aktivasi.')
+    }
+
+    const customerType = 'HOME'
+
+    const dedupKey = normalizeCustomerKey(rawCustomerName, rawPhone)
+    const normPhone = normalizePhone(rawPhone) || null
+
+    let customerId: number | null = null
+    let customerCode: string | null = null
+    const [existingCustRows] = await conn.query(
+      `
+        SELECT id, customer_code AS customerCode, full_name AS fullName, phone
+        FROM crm_customers
+        WHERE 1=1
+        LIMIT 50
+      `,
+    )
+    const existingCustList = (existingCustRows as Array<Record<string, unknown>> | undefined) ?? []
+    for (const c of existingCustList) {
+      const cKey = normalizeCustomerKey(String(c.fullName ?? ''), String(c.phone ?? ''))
+      if (cKey && cKey === dedupKey) {
+        const maybeId = Number(c.id)
+        if (Number.isInteger(maybeId) && maybeId > 0) {
+          customerId = maybeId
+          customerCode = String(c.customerCode ?? null)
+          break
+        }
+      }
+    }
+
+    if (!customerId) {
+      try {
+        customerCode = await generateCustomerCodeTx(conn, customerType)
+        const columns: string[] = ['customer_code', 'customer_type', 'full_name']
+        const placeholders = ['?', '?', '?']
+        const values: unknown[] = [customerCode, customerType, rawCustomerName]
+        const [hasPhone] = await Promise.all([ensureColumn('crm_customers', 'phone')])
+        if (hasPhone) {
+          columns.push('phone')
+          placeholders.push('?')
+          values.push(normPhone)
+        }
+        const [hasBranchId] = await Promise.all([ensureColumn('crm_customers', 'branch_id')])
+        if (hasBranchId) {
+          columns.push('branch_id')
+          placeholders.push('?')
+          values.push(params.actor.branchId ?? null)
+        }
+        const sql = `INSERT INTO crm_customers (${columns.join(', ')}) VALUES (${placeholders.join(', ')})`
+        const [res] = await conn.query(sql, values)
+        const inserted = Number((res as ExecuteResult).insertId ?? 0)
+        if (!Number.isInteger(inserted) || inserted <= 0) {
+          throw new Error('Insert customer tidak mengembalikan ID valid.')
+        }
+        customerId = inserted
+
+        if (rawAddress) {
+          try {
+            const [hasCustId, hasAddr, hasLabel, hasMaps, hasPrimary] = await Promise.all([
+              ensureColumn('crm_customer_addresses', 'customer_id'),
+              ensureColumn('crm_customer_addresses', 'address'),
+              ensureColumn('crm_customer_addresses', 'label'),
+              ensureColumn('crm_customer_addresses', 'maps_url'),
+              ensureColumn('crm_customer_addresses', 'is_primary'),
+            ])
+            if (hasCustId && hasAddr) {
+              const addrCols = ['customer_id', 'address']
+              const addrPh = ['?', '?']
+              const addrVals: unknown[] = [customerId, rawAddress]
+              if (hasLabel) {
+                addrCols.push('label')
+                addrPh.push('?')
+                addrVals.push('Alamat Utama')
+              }
+              if (hasMaps && rawMaps) {
+                addrCols.push('maps_url')
+                addrPh.push('?')
+                addrVals.push(rawMaps)
+              }
+              if (hasPrimary) {
+                addrCols.push('is_primary')
+                addrPh.push('?')
+                addrVals.push(1)
+              }
+              await conn.query(
+                `INSERT INTO crm_customer_addresses (${addrCols.join(', ')}) VALUES (${addrPh.join(', ')})`,
+                addrVals,
+              )
+            }
+          } catch (_addrErr) {
+            // Address is non-fatal for activation; flow continues.
+          }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        throw new ActivateFlowError(
+          'CUSTOMER_CREATE_FAILED',
+          `Gagal membuat data Pelanggan: ${msg}`,
+        )
+      }
+    }
+
+    if (!customerId) {
+      throw new ActivateFlowError('CUSTOMER_CREATE_FAILED', 'ID Pelanggan tidak tersedia setelah handoff Pelanggan.')
+    }
+
+    let subscriptionId: number | null = null
+    let serviceNo: string | null = null
+    try {
+      serviceNo = await generateServiceNoTx(conn)
+      const subCols = ['customer_id', 'service_no', 'status']
+      const subPh = ['?', '?', '?']
+      const subVals: unknown[] = [customerId, serviceNo, 'ACTIVE']
+      const [hasSubOrderId, hasSubPackageId, hasActivatedAt, hasMonthlyPrice] = await Promise.all([
+        ensureColumn('service_subscriptions', 'order_id'),
+        ensureColumn('service_subscriptions', 'package_id'),
+        ensureColumn('service_subscriptions', 'activated_at'),
+        ensureColumn('service_subscriptions', 'monthly_price'),
+      ])
+      if (hasSubOrderId) {
+        subCols.push('order_id')
+        subPh.push('?')
+        subVals.push(salesOrderId ?? null)
+      }
+      if (hasSubPackageId) {
+        subCols.push('package_id')
+        subPh.push('?')
+        subVals.push(packageId ?? null)
+      }
+      if (hasActivatedAt) {
+        subCols.push('activated_at')
+        subPh.push('?')
+        subVals.push(new Date())
+      }
+      if (hasMonthlyPrice) {
+        subCols.push('monthly_price')
+        subPh.push('?')
+        subVals.push(parsedMonthly > 0 ? parsedMonthly : null)
+      }
+      const subSql = `INSERT INTO service_subscriptions (${subCols.join(', ')}) VALUES (${subPh.join(', ')})`
+      const [subRes] = await conn.query(subSql, subVals)
+      const subInserted = Number((subRes as ExecuteResult).insertId ?? 0)
+      if (!Number.isInteger(subInserted) || subInserted <= 0) {
+        throw new Error('Insert subscription tidak mengembalikan ID valid.')
+      }
+      subscriptionId = subInserted
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      throw new ActivateFlowError(
+        'SUBSCRIPTION_CREATE_FAILED',
+        `Gagal membuat data Langganan: ${msg}`,
+      )
+    }
+
+    let workOrderId: number | null = null
+    let workOrderNo: string | null = null
+    try {
+      workOrderNo = await generateServiceWorkOrderNo()
+      const actorUserId = params.actor.userId ?? (await resolveReviewAuthUserIdByUsername(params.actor.username))
+      const activationNotes = [
+        `[Aktivasi PSB Flow A] ${params.actor.displayName} (${params.actor.username})`,
+        `Sumber ${psbListCode}`,
+        `Pelanggan: ${rawCustomerName}${normPhone ? ` (${normPhone})` : ''}`,
+        rawAddress ? `Alamat: ${rawAddress}` : null,
+      ]
+        .filter(Boolean)
+        .join(' - ')
+
+      const woInserted = await insertServiceWorkOrder(
+        {
+          workOrderNo,
+          workType: 'INSTALLATION',
+          status: 'OPEN',
+          technicianName: null,
+          scheduledAt,
+          notes: activationNotes,
+          branchId: params.actor.branchId ?? null,
+          jobCategory: 'PSB',
+          priority: 'MEDIUM',
+          sourceType: 'SALES_ORDER',
+          currentPicUserId: actorUserId ?? null,
+          scheduledByUserId: actorUserId ?? null,
+          subscriptionId,
+          salesOrderId: salesOrderId ?? null,
+          address: rawAddress || null,
+        },
+        { connection: conn },
+      )
+      workOrderId = woInserted.insertId
+      workOrderNo = woInserted.workOrderNo
+
+      const logUserId = actorUserId ?? null
+      try {
+        await conn.query(
+          `
+            INSERT INTO service_work_order_status_logs (
+              work_order_id,
+              from_status,
+              to_status,
+              reason_code,
+              reason_notes,
+              changed_by_user_id,
+              changed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          `,
+          [
+            workOrderId,
+            null,
+            'OPEN',
+            'AUTO_CREATED',
+            `WO dibuat dari alur aktivasi komposit PSB ${psbListCode}.`,
+            logUserId,
+          ],
+        )
+      } catch (_logErr) {
+        // status log non-fatal; tx continues.
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      throw new ActivateFlowError(
+        'WORKORDER_CREATE_FAILED',
+        `Gagal membuat Work Order: ${msg}`,
+      )
+    }
+
+    try {
+      const assignments: string[] = [
+        "status = 'DITRANSFER_KE_TICKETING'",
+        'transferred_work_order_id = ?',
+        'transferred_by = ?',
+        'transferred_at = CURRENT_TIMESTAMP',
+        'next_action_label = ?',
+        'updated_at = CURRENT_TIMESTAMP',
+      ]
+      const updateVals: unknown[] = [
+        workOrderId,
+        `${params.actor.displayName} (${params.actor.username})`,
+        buildNextActionLabel('DITRANSFER_KE_TICKETING'),
+      ]
+      if (hasWorkOrderCode) {
+        assignments.push('work_order_code = ?')
+        updateVals.push(workOrderNo)
+      }
+      if (hasTransferredTicketRef) {
+        assignments.push('transferred_ticket_ref = ?')
+        updateVals.push(workOrderNo)
+      }
+      if (hasCustomerIdFk) {
+        assignments.push('customer_id = ?')
+        updateVals.push(customerId)
+      }
+      if (hasSubscriptionIdFk) {
+        assignments.push('subscription_id = ?')
+        updateVals.push(subscriptionId)
+      }
+      if (hasActivationStatus) {
+        assignments.push("activation_status = CASE WHEN COALESCE(activation_status, '') = '' THEN 'RADIUS_ACTIVATED' ELSE activation_status END")
+      }
+      if (hasBillingStatus) {
+        assignments.push("billing_status = CASE WHEN COALESCE(billing_status, '') = '' THEN 'INVOICE_DRAFT' ELSE billing_status END")
+      }
+      if (hasWorkOrderCreatedAt) {
+        assignments.push('work_order_created_at = CURRENT_TIMESTAMP')
+      }
+      if (hasRadiusActivatedAt) {
+        assignments.push('radius_activated_at = COALESCE(radius_activated_at, CURRENT_TIMESTAMP)')
+      }
+      if (hasCustomerActiveAt) {
+        assignments.push('customer_active_at = COALESCE(customer_active_at, CURRENT_TIMESTAMP)')
+      }
+
+      assignments.push(`approval_status = CASE WHEN COALESCE(approval_status, '') = '' THEN 'SELESAI' ELSE approval_status END`)
+      assignments.push(`cs_status = CASE WHEN COALESCE(cs_status, '') = '' THEN 'CLOSED' ELSE cs_status END`)
+      assignments.push(`noc_status = CASE WHEN COALESCE(noc_status, '') = '' THEN 'BELUM' ELSE noc_status END`)
+      assignments.push(`field_status = CASE WHEN COALESCE(field_status, '') = '' THEN 'BELUM' ELSE field_status END`)
+
+      updateVals.push(psbId)
+      const updateSql = `UPDATE sales_psb_lists SET ${assignments.join(', ')} WHERE id = ?`
+      await conn.query(updateSql, updateVals)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      throw new ActivateFlowError('INTERNAL', `Gagal memperbarui status Data PSB: ${msg}`)
+    }
+
+    try {
+      await conn.query(
+        `
+          INSERT INTO sales_psb_list_audits (
+            psb_list_id,
+            event_type,
+            from_status,
+            to_status,
+            actor_name,
+            actor_role,
+            notes
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          psbId,
+          'PSB_ACTIVATED',
+          currentStatus,
+          'DITRANSFER_KE_TICKETING',
+          `${params.actor.displayName} (${params.actor.username})`,
+          params.actor.role,
+          `Flow A komposit: Pelanggan #${customerId} / Langganan #${subscriptionId} / WO #${workOrderId} dibuat dalam 1 transaksi.`,
+        ],
+      )
+    } catch (_auditErr) {
+      // audit insert non-fatal
+    }
+
+    return {
+      idempotent: false,
+      psbId,
+      psbListCode,
+      status: 'DITRANSFER_KE_TICKETING',
+      customerId,
+      customerCode,
+      subscriptionId,
+      serviceNo,
+      workOrderId,
+      workOrderNo,
+    }
+  })
 }
 
 export async function getPsbListPageData(query: PsbListQuery, session?: AppSession): Promise<PsbListPagePayload> {

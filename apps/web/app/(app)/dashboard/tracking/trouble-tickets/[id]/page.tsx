@@ -1,5 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { CurrentHandlerCard } from '@/components/current-handler-card'
+import { AssignmentHistoryTable } from '@/components/assignment-history-table'
+import { ReassignAssignmentModal, type TechnicianOption } from '@/components/reassign-assignment-modal'
+import { CreateTTAssignmentModal } from '@/components/create-tt-assignment-modal'
 import { DeviceLifecycleActionForm } from '@/components/device-lifecycle-action-form'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { canPerformAction } from '@/lib/access-control'
@@ -7,8 +11,10 @@ import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import { hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
+import { getAuthUsersPageData, type AuthUserListItem } from '@/lib/services/auth-user-service'
 import { getDeviceLifecycleLogs, getInventoryDeviceLifecycleItemSuggestions, type DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
 import { getTroubleTicketTrackingDetail } from '@/lib/services/tracking-service'
+import { buildTimelineEntries, getTimelineTone, formatDateLocale } from '@/lib/timeline-utils'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
 import type { DataSourceSnapshot } from '@/lib/types'
 
@@ -191,10 +197,13 @@ export default async function TroubleTicketTrackingDetailPage({
     redirect('/dashboard/tracking')
   }
 
-  const [payload, lifecyclePayload, itemSuggestions] = await Promise.all([
+  const [payload, lifecyclePayload, itemSuggestions, authUsersRaw] = await Promise.all([
     getTroubleTicketTrackingDetail(troubleTicketId),
     getDeviceLifecycleLogs({ troubleTicketId, limit: 30 }),
     getInventoryDeviceLifecycleItemSuggestions(200),
+    getAuthUsersPageData()
+      .then((data) => (Array.isArray(data?.users) ? data.users : []))
+      .catch(() => [] as AuthUserListItem[]),
   ])
   const tt = payload.troubleTicket
   const lifecycleItemCodes = Array.from(
@@ -207,6 +216,40 @@ export default async function TroubleTicketTrackingDetailPage({
   const dismantleHistoryRows = await getDismantleHistoryRowsForTroubleTicket(lifecycleItemCodes, payload.source)
   const canCreateDeviceLifecycle = canWriteDeviceLifecycle(session.role)
   const reviewDbReady = payload.source.effectiveMode === 'review-db' && !payload.source.isFallback
+
+  const P58A_FULL_ACCESS = new Set(['OWNER', 'SUPER_ADMIN', 'ADMIN', 'NOC_OPERATOR', 'TT_OPERATOR'])
+  const roleCodeUp = String(session.role ?? '').trim().toUpperCase()
+  const canCreateAssignment =
+    tt && tt.closedAt
+      ? false
+      : P58A_FULL_ACCESS.has(roleCodeUp) || canPerformAction(session.role, 'support', 'update')
+
+  const hasActivePrimaryAssignment =
+    Array.isArray(payload.assignments) &&
+    payload.assignments.some((a) => Boolean(a.isPrimary) && !a.releasedAt && (a.status === 'ASSIGNED' || a.status === 'ACCEPTED'))
+  const defaultPrimary = !hasActivePrimaryAssignment
+  const timelineEntries = buildTimelineEntries({
+    troubleTicket: tt ? { id: tt.id, ticketCode: tt.ticketCode, category: tt.category, type: tt.type, createdAt: tt.createdAt, status: tt.status } : null,
+    assignments: payload.assignments ?? [],
+    progressLogs: payload.progressLogs ?? [],
+    movements: payload.movements ?? [],
+  })
+
+  const technicianOptions: TechnicianOption[] = (authUsersRaw ?? [])
+    .filter((u) => {
+      const status = String(u.status ?? '').trim().toUpperCase()
+      const roleCode = String(u.roleCode ?? '').trim().toUpperCase()
+      return status === 'ACTIVE' && (roleCode === 'TEKNISI' || roleCode === 'TEKNISI_PSB' || roleCode === 'FIELD_TECHNICIAN')
+    })
+    .map((u) => ({
+      id: Number(u.id),
+      label: `${u.fullName ?? u.username ?? `User #${u.id}`} (${u.username ?? `#${u.id}`}${u.roleCode ? ` • ${u.roleCode}` : ''})`,
+      username: String(u.username ?? `user-${u.id}`),
+      roleCode: String(u.roleCode ?? ''),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+
+  const TT_ENDPOINT_BASE = '/api/support/trouble-tickets/assignments'
 
   return (
     <div className="space-y-6">
@@ -270,56 +313,85 @@ export default async function TroubleTicketTrackingDetailPage({
           </div>
         ) : (
           <div className="mt-6 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-            <section className="rounded-3xl border border-line bg-surface p-5">
-              <p className="section-title">Ringkasan Ticket</p>
-              <dl className="mt-4 grid gap-3 text-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <dt className="text-mute">Customer</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.customerName ?? '-'}</dd>
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <dt className="text-mute">Service Ref</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.customerUser ?? '-'}</dd>
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <dt className="text-mute">Kategori</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.category ?? '-'}</dd>
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <dt className="text-mute">Type</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.type ?? '-'}</dd>
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <dt className="text-mute">Status</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.status ?? '-'}</dd>
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <dt className="text-mute">Problem</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.problemCategory ?? '-'}</dd>
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <dt className="text-mute">Opened</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.openedAt ?? '-'}</dd>
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <dt className="text-mute">Closed</dt>
-                  <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.closedAt ?? '-'}</dd>
-                </div>
-              </dl>
-              {tt.notes ? (
-                <div className="mt-5 rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Notes</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{tt.notes}</p>
-                </div>
-              ) : null}
-              {tt.closeNotes ? (
-                <div className="mt-5 rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Close Notes</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{tt.closeNotes}</p>
-                </div>
-              ) : null}
+            <div className="space-y-6">
+              <section className="rounded-3xl border border-line bg-surface p-5">
+                <p className="section-title">Ringkasan Ticket</p>
+                <dl className="mt-4 grid gap-3 text-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <dt className="text-mute">Customer</dt>
+                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.customerName ?? '-'}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-4">
+                    <dt className="text-mute">Service Ref</dt>
+                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.customerUser ?? '-'}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-4">
+                    <dt className="text-mute">Kategori</dt>
+                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.category ?? '-'}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-4">
+                    <dt className="text-mute">Type</dt>
+                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.type ?? '-'}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-4">
+                    <dt className="text-mute">Status</dt>
+                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.status ?? '-'}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-4">
+                    <dt className="text-mute">Problem</dt>
+                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.problemCategory ?? '-'}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-4">
+                    <dt className="text-mute">Opened</dt>
+                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.openedAt ?? '-'}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-4">
+                    <dt className="text-mute">Closed</dt>
+                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.closedAt ?? '-'}</dd>
+                  </div>
+                </dl>
+                {tt.notes ? (
+                  <div className="mt-5 rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Notes</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{tt.notes}</p>
+                  </div>
+                ) : null}
+                {tt.closeNotes ? (
+                  <div className="mt-5 rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Close Notes</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{tt.closeNotes}</p>
+                  </div>
+                ) : null}
+              </section>
 
-              <div className="mt-5 rounded-3xl border border-line bg-surface p-4">
+              <CurrentHandlerCard
+                currentHandler={payload.currentHandler ?? null}
+                nextActionLabel={payload.nextAction?.label}
+                nextActionTone={payload.nextAction?.tone}
+                reviewDbReady={reviewDbReady}
+                endpointBasePath={TT_ENDPOINT_BASE}
+              >
+                {!payload.currentHandler && tt?.ticketCode ? (
+                  <CreateTTAssignmentModal
+                    ticketCode={tt.ticketCode}
+                    technicians={technicianOptions}
+                    canCreateAssignment={canCreateAssignment}
+                    reviewDbReady={reviewDbReady}
+                    defaultPrimary={defaultPrimary}
+                  />
+                ) : null}
+              </CurrentHandlerCard>
+
+              <AssignmentHistoryTable
+                assignments={payload.assignments ?? []}
+                reviewDbReady={reviewDbReady}
+                endpointBasePath={TT_ENDPOINT_BASE}
+                sessionRole={session.role as string}
+                sessionUserId={session.userId ? Number(session.userId) : null}
+                technicianOptions={technicianOptions}
+              />
+
+              <div className="rounded-3xl border border-line bg-surface p-4">
                 <DeviceLifecycleActionForm
                   canCreate={canCreateDeviceLifecycle}
                   reviewDbReady={reviewDbReady}
@@ -332,9 +404,81 @@ export default async function TroubleTicketTrackingDetailPage({
                   description="Catat scan barcode modem/ONT saat NOC cek barang, delegasi ke teknisi troubleshoots, replace unit lama, hingga validasi akhir oleh NOC."
                 />
               </div>
-            </section>
+
+              {payload.progressLogs && payload.progressLogs.length > 0 ? (
+                <section className="rounded-3xl border border-line bg-surface p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="section-title">Log Progress Ticket</p>
+                    <span className="solid-chip">{payload.progressLogs.length}</span>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {payload.progressLogs.map((row) => (
+                      <div key={row.id} className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+                            {row.progressStatus}
+                          </span>
+                          {row.ownerName ? (
+                            <span className="text-xs text-slate-500">PIC: {row.ownerName}</span>
+                          ) : null}
+                          <span className="text-xs text-slate-400">{formatDateLocale(row.createdAt)}</span>
+                        </div>
+                        {row.progressNotes ? (
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{row.progressNotes}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
 
             <section className="space-y-6">
+              <div className="rounded-3xl border border-line bg-surface p-5">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="section-title">Timeline</p>
+                  <span className="solid-chip">{timelineEntries.length}</span>
+                </div>
+                <div className="mt-4 space-y-4">
+                  {timelineEntries.length ? (
+                    timelineEntries.map((entry, index) => (
+                      <div key={entry.id} className="flex gap-4">
+                        <div className="flex w-16 flex-col items-center">
+                          <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] ${getTimelineTone(entry.type)}`}>
+                            {entry.type === 'trouble-ticket' ? 'TT' : entry.type === 'assignment' ? 'ASM' : entry.type === 'status' ? 'STS' : entry.type === 'close' ? 'CLS' : entry.type === 'movement' ? 'MOV' : 'EVT'}
+                          </span>
+                          {index < timelineEntries.length - 1 ? <span className="mt-2 h-full w-px bg-[var(--color-line)]" /> : null}
+                        </div>
+                        <div className="surface-soft flex-1 rounded-2xl border border-line px-4 py-3">
+                          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{entry.title}</p>
+                              {entry.detail ? <p className="mt-1 text-sm leading-6 text-mute">{entry.detail}</p> : null}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <span className="text-xs text-slate-400">{formatDateLocale(entry.at)}</span>
+                              {entry.href ? (
+                                <Link
+                                  href={entry.href}
+                                  className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
+                                >
+                                  Buka Detail
+                                </Link>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
+                      <p className="text-sm font-semibold text-slate-600">Belum ada event timeline</p>
+                      <p className="mt-1 text-xs text-slate-500">Event penugasan, progress, dan movement akan muncul di sini.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="rounded-3xl border border-line bg-surface p-5">
                 <div className="flex items-center justify-between gap-4">
                   <p className="section-title">Work Order Terkait</p>

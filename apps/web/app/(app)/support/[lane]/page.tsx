@@ -6,6 +6,7 @@ import { SupportIsolationWorkspace } from '@/components/support-isolation-worksp
 import { SupportSlaWorkspace } from '@/components/support-sla-workspace'
 import { SupportTroubleTicketWorkspace } from '@/components/support-tt-workspace'
 import { requireSession } from '@/lib/auth'
+import { hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import { getDomainPageData } from '@/lib/services/domain-service'
 import { canAccessSupportLane, getPreferredSupportLane, normalizeSupportLane } from '@/lib/support-lanes'
 import type { SupportDrilldownContext, SupportLaneKey } from '@/lib/types'
@@ -274,6 +275,141 @@ function resolveSupportDrilldown(
   return undefined
 }
 
+type TTCodeIdRow = { id: number | string; ticket_code: string }
+type TTCurrentHandlerRow = {
+  trouble_ticket_id: number | string
+  assignment_status: string
+  assigned_at: string | null
+  accepted_at: string | null
+  assigned_display_name: string | null
+  assigned_username: string | null
+  assigned_user_id: number | string | null
+}
+
+function buildTTUserFallback(display: string | null, username: string | null, id: number | string | null) {
+  if (display && String(display).trim()) return String(display).trim()
+  if (username && String(username).trim()) return String(username).trim()
+  return id != null && String(id).trim() ? `User #${id}` : '-'
+}
+
+async function enrichTroubleTicketRowsWithCurrentHandler(
+  sections: NonNullable<Awaited<ReturnType<typeof getDomainPageData>>>['content']['reviewSections'],
+) {
+  if (!sections || !sections.length) return sections
+  const ttTitles = ['TROUBLE TICKET', 'SLA TICKET OVERDUE', 'SLA TICKET OPEN AKTIF', 'READY CLOSE']
+  const ttSections = (sections ?? []).filter((section) =>
+    ttTitles.some((prefix) => section.title.trim().toUpperCase().includes(prefix)),
+  )
+  const allTicketCodes = Array.from(
+    new Set(
+      ttSections
+        .flatMap((section) => section.rows)
+        .map((row) => String(row.primary ?? '').trim())
+        .filter(Boolean),
+    ),
+  )
+  if (!allTicketCodes.length) return sections
+
+  try {
+    const hasTT = await hasReviewDbColumn('support_trouble_tickets', 'ticket_code')
+    const hasAssign = await hasReviewDbColumn('service_trouble_ticket_assignments', 'trouble_ticket_id')
+    if (!hasTT || !hasAssign) return sections
+
+    const placeholders = allTicketCodes.map(() => '?').join(',')
+    const ttIdRows = await runReviewDbQuery<TTCodeIdRow>(
+      `SELECT id, ticket_code FROM support_trouble_tickets WHERE ticket_code IN (${placeholders}) LIMIT 1000`,
+      allTicketCodes,
+    )
+    if (!ttIdRows || !ttIdRows.length) return sections
+    const ticketIds = ttIdRows.map((r) => String(r.id)).filter(Boolean)
+    const codeToId = new Map<string, string>()
+    ttIdRows.forEach((r) => {
+      if (r.ticket_code) codeToId.set(String(r.ticket_code).trim(), String(r.id))
+    })
+
+    const assignPlaceholders = ticketIds.map(() => '?').join(',')
+    const handlerRows = await runReviewDbQuery<TTCurrentHandlerRow>(
+      `SELECT
+          a.trouble_ticket_id,
+          a.assignment_status,
+          a.assigned_at,
+          a.accepted_at,
+          au.display_name AS assigned_display_name,
+          au.username AS assigned_username,
+          au.id AS assigned_user_id
+        FROM service_trouble_ticket_assignments a
+        LEFT JOIN auth_users au ON au.id = a.assigned_user_id
+        WHERE a.trouble_ticket_id IN (${assignPlaceholders})
+          AND a.assignment_role = 'FIELD_TECHNICIAN'
+          AND a.assignment_status IN ('ASSIGNED','ACCEPTED')
+          AND a.released_at IS NULL
+          AND a.is_primary = 1
+        ORDER BY a.assigned_at DESC LIMIT 500`,
+      ticketIds,
+    )
+    const ticketToHandler = new Map<string, { label: string; status: string }>()
+    if (handlerRows && handlerRows.length) {
+      handlerRows.forEach((row) => {
+        const key = String(row.trouble_ticket_id)
+        if (!ticketToHandler.has(key)) {
+          ticketToHandler.set(key, {
+            label: buildTTUserFallback(row.assigned_display_name, row.assigned_username, row.assigned_user_id),
+            status: String(row.assignment_status ?? '').trim().toUpperCase(),
+          })
+        }
+      })
+    }
+
+    return (sections ?? []).map((section) => {
+      const isTT = ttTitles.some((prefix) => section.title.trim().toUpperCase().includes(prefix))
+      if (!isTT) return section
+      return {
+        ...section,
+        rows: section.rows.map((row) => {
+          const code = String(row.primary ?? '').trim()
+          const ticketId = codeToId.get(code)
+          const authoritative = ticketId ? ticketToHandler.get(ticketId) : undefined
+          const cleanedMeta = row.meta.filter((item) => {
+            const s = String(item)
+            if (s.startsWith('PIC: ')) return false
+            if (s.startsWith('Historis PIC: ')) return false
+            if (s.startsWith('Last Progress: ')) return false
+            return true
+          })
+          const legacyOwnerRaw = (row.meta ?? [])
+            .map((item) => String(item))
+            .find((s) => s.startsWith('PIC: '))
+          const legacyOwner = legacyOwnerRaw ? legacyOwnerRaw.slice(5).trim() : null
+
+          if (authoritative) {
+            const picLabel =
+              authoritative.status === 'ACCEPTED'
+                ? `${authoritative.label} (ONGOING)`
+                : authoritative.status === 'ASSIGNED'
+                  ? `${authoritative.label} (WAITING)`
+                  : authoritative.label
+            const nextMeta = [...cleanedMeta, `PIC: ${picLabel}`]
+            if (legacyOwner && legacyOwner.toLowerCase() !== authoritative.label.toLowerCase()) {
+              nextMeta.push(`Historis PIC: ${legacyOwner}`)
+            }
+            return {
+              ...row,
+              meta: nextMeta,
+            }
+          }
+
+          return {
+            ...row,
+            meta: [...cleanedMeta, 'PIC: Belum ada PIC'],
+          }
+        }),
+      }
+    })
+  } catch (_err) {
+    return sections
+  }
+}
+
 export function generateStaticParams(): SupportLaneParams[] {
   return [
     { lane: 'tt' },
@@ -392,9 +528,11 @@ export default async function SupportLanePage({
   }
 
   if ((normalizedLane as SupportLaneKey) === 'tt') {
+    const enrichedSections = await enrichTroubleTicketRowsWithCurrentHandler(roleScopedContent.reviewSections)
+    const enrichedTTContent = { ...roleScopedContent, reviewSections: enrichedSections }
     return (
       <SupportTroubleTicketWorkspace
-        content={roleScopedContent}
+        content={enrichedTTContent}
         source={payload.source}
         capabilities={payload.capabilities}
         role={session.role}

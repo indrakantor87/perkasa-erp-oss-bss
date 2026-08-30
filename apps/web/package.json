@@ -22,6 +22,7 @@
     "prove:tt-write-side": "node ./scripts/prove-tt-write-side.mjs",
     "prove:odp-write-side": "node ./scripts/prove-odp-write-side.mjs",
     "prove:cs-admin-supervisor-flow": "node ./scripts/prove-cs-admin-supervisor-flow.mjs",
+    "provision:tt-assignment-schema": "tsx ./scripts/provision-tt-assignment-schema.ts",
     "reset:review-auth-password": "node ./scripts/reset-review-auth-password.mjs"
   },
   "dependencies": {

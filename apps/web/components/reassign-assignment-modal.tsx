@@ -17,6 +17,7 @@ type ReassignAssignmentModalProps = {
   reviewDbReady: boolean
   currentTechnicianLabel: string
   technicianOptions: TechnicianOption[]
+  endpointBasePath?: string
 }
 
 type ReassignRouteResponse = {
@@ -31,6 +32,7 @@ export function ReassignAssignmentModal({
   reviewDbReady,
   currentTechnicianLabel,
   technicianOptions,
+  endpointBasePath = '/api/sales/work-orders/assignments',
 }: ReassignAssignmentModalProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -71,7 +73,9 @@ export function ReassignAssignmentModal({
 
     try {
       const safeAssignmentId = encodeURIComponent(String(assignmentId))
-      const response = await fetch(`/api/sales/work-orders/assignments/${safeAssignmentId}/reassign`, {
+      const safeBase = endpointBasePath.replace(/\/+$/, '')
+      const endpoint = `${safeBase}/${safeAssignmentId}/reassign`
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
