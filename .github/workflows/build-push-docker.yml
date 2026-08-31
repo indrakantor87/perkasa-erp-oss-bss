@@ -112,3 +112,39 @@ jobs:
             echo ""
             echo "Digest:"
             docker inspect "$IMG_LATEST" --format '{{index .RepoDigests 0}}' 2>&1 || true
+
+      - name: Export ERP build identity artifacts
+        if: success()
+        run: |
+          set -euo pipefail
+
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          DIR="$RUNNER_TEMP/erp-build-identity"
+
+          mkdir -p "$DIR"
+
+          echo "$SHORT_SHA" > "$DIR/short_sha"
+          echo "${{ steps.build.outputs.IMG_BRANCH }}" > "$DIR/image_tag_branch"
+          echo "${{ steps.build.outputs.IMG_SHA }}" > "$DIR/image_tag_sha"
+          echo "${{ steps.build.outputs.IMG_LATEST }}" > "$DIR/image_tag_latest"
+
+          docker inspect "${{ steps.build.outputs.IMG_BRANCH }}" \
+            --format '{{index .RepoDigests 0}}' \
+            > "$DIR/repo_digest_branch" 2>/dev/null || true
+
+          docker inspect "${{ steps.build.outputs.IMG_SHA }}" \
+            --format '{{index .RepoDigests 0}}' \
+            > "$DIR/repo_digest_sha" 2>/dev/null || true
+
+          echo "SHORT_SHA=$SHORT_SHA"
+          echo "IMAGE_BRANCH=$(cat "$DIR/image_tag_branch")"
+          echo "IMAGE_SHA=$(cat "$DIR/image_tag_sha")"
+          echo "REPO_DIGEST_BRANCH=$(cat "$DIR/repo_digest_branch" 2>/dev/null || true)"
+
+      - name: Upload ERP build identity artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: erp-build-identity-${{ github.sha }}
+          path: ${{ runner.temp }}/erp-build-identity
+          retention-days: 90

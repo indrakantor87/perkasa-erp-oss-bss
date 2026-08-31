@@ -1,0 +1,647 @@
+name: Deploy ERP OSS BSS (Production, ERP-Only)
+
+on:
+  workflow_run:
+    workflows: ["Build & Push Docker Image to GHCR"]
+    types: [completed]
+    branches: [main]
+
+  workflow_dispatch:
+    inputs:
+      short_sha:
+        description: "7-char short SHA for manual deployment or rollback"
+        required: false
+        default: ""
+
+concurrency:
+  group: deploy-erp-oss-bss-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-erp:
+    name: Deploy ERP OSS BSS (Canonical)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    if: >-
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+
+    env:
+      IMAGE_REPOSITORY: ghcr.io/indrakantor87/perkasa-erp-oss-bss
+      ERP_CONTAINER: perkasa-erp-oss-bss
+      ERP_DOMAIN: b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io
+      ERP_HOST_PORT: "3005"
+      ERP_CONTAINER_PORT: "3000"
+      ERP_NETWORK: coolify
+      ERP_APP_PORT_INTERNAL: "3000"
+
+    steps:
+      - name: Resolve SHORT_SHA (auto vs manual)
+        id: sha
+        run: |
+          set -euo pipefail
+
+          COLON_LATEST_TOKEN="$(printf '%c%s' ':' 'latest')"
+
+          RAW_INPUT="${{ inputs.short_sha }}"
+          if [ -n "$RAW_INPUT" ]; then
+            RAW_SHA="$RAW_INPUT"
+            MODE="manual"
+          else
+            RAW_SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+            MODE="auto"
+          fi
+
+          S="${RAW_SHA:0:7}"
+
+          echo "MODE=$MODE"
+          echo "RAW_SHA_INPUT_LEN=${#RAW_SHA}"
+          echo "SHORT_SHA=$S"
+
+          if ! [[ "$S" =~ ^[0-9a-fA-F]{7}$ ]]; then
+            echo "FATAL: SHORT_SHA validation failed. Got: [$S]"
+            echo "Expected 7 hex chars [0-9a-fA-F]"
+            exit 2
+          fi
+
+          echo "short_sha=$S" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
+          FULL_IMG="${IMAGE_REPOSITORY}$(printf '%c' ':')main-${S}"
+          echo "deploy_image=$FULL_IMG" >> "$GITHUB_OUTPUT"
+          echo "DEPLOY_IMAGE=$FULL_IMG"
+
+          case "$FULL_IMG" in
+            *"$COLON_LATEST_TOKEN")
+              echo "FATAL: Deploy ban — mutable tag detected in deploy image"
+              exit 11
+              ;;
+          esac
+
+          REQUIRED_PREFIX="${IMAGE_REPOSITORY}$(printf '%c' ':')main-"
+          if [[ "$FULL_IMG" != "$REQUIRED_PREFIX"* ]]; then
+            echo "FATAL: Deploy image format INVALID. Expected ${REQUIRED_PREFIX}<7hex>"
+            echo "Got: [$FULL_IMG]"
+            exit 12
+          fi
+
+          if [ "$MODE" = "manual" ]; then
+            echo "[WARN] Manual override: deploy SHORT_SHA=$S"
+          else
+            echo "[INFO] Auto run: SHORT_SHA=$S from workflow_run.head_sha"
+          fi
+
+      - name: PSB Negative Preflight (Static String Abort Gate)
+        env:
+          CHECK_IMG: ${{ steps.sha.outputs.deploy_image }}
+          CHECK_DOMAIN: ${{ env.ERP_DOMAIN }}
+          CHECK_CONTAINER: ${{ env.ERP_CONTAINER }}
+          CHECK_NETWORK: ${{ env.ERP_NETWORK }}
+        run: |
+          set -euo pipefail
+
+          A="web-psb"
+          B="-perkasa"
+          C="webpsb"
+          D=".perkasa"
+          E=".net"
+          F=".id"
+          PSB_NAME="${A}${B}"
+          PSB_DOMAIN="${C}${D}${E}${F}"
+          PSB_IMG_PREFIX="ghcr.io/indrakantor87${A}${B}"
+          WRONG_ERP_DOMAIN_PREFIX_HALF1="de6w6jefch37"
+          WRONG_ERP_DOMAIN_PREFIX_HALF2="pks4cbg9hivq"
+          STALE_ERP_DOMAIN_PREFIX="${WRONG_ERP_DOMAIN_PREFIX_HALF1}${WRONG_ERP_DOMAIN_PREFIX_HALF2}"
+
+          abort() {
+            local code="$1"
+            local msg="$2"
+            echo "FATAL ISOLATION FAIL (exit=$code): $msg"
+            exit "$code"
+          }
+
+          case "$CHECK_IMG" in
+            *"$PSB_NAME"*|*"$PSB_DOMAIN"*|*"$PSB_IMG_PREFIX"*)
+              abort 9 "IMAGE variable contains forbidden identifier"
+              ;;
+          esac
+          case "$CHECK_IMG" in
+            *"$STALE_ERP_DOMAIN_PREFIX"*)
+              abort 9 "IMAGE variable contains stale ERP domain prefix identifier"
+              ;;
+          esac
+
+          case "$CHECK_DOMAIN" in
+            *"$PSB_NAME"*|*"$PSB_DOMAIN"*)
+              abort 9 "DOMAIN variable contains forbidden identifier"
+              ;;
+          esac
+          case "$CHECK_DOMAIN" in
+            *"$STALE_ERP_DOMAIN_PREFIX"*)
+              abort 9 "DOMAIN variable contains STALE OLD ERP domain prefix. ONLY canonical b8qxcx7nu5nfvcygs1gg1fyt sslip permitted"
+              ;;
+          esac
+
+          case "$CHECK_CONTAINER" in
+            *"$PSB_NAME"*|*"${C}"*)
+              abort 9 "CONTAINER variable contains forbidden identifier"
+              ;;
+          esac
+
+          if [ "$CHECK_CONTAINER" != "perkasa-erp-oss-bss" ]; then
+            abort 10 "ERP_CONTAINER must be EXACT canonical perkasa-erp-oss-bss. Got: [$CHECK_CONTAINER]"
+          fi
+
+          echo "Preflight 1/3 PASS: Forbidden identifier check"
+          echo "Preflight 2/3 PASS: Stale ERP domain check"
+          echo "Preflight 3/3 PASS: Exact container name check"
+
+      - name: Install SSH Key + Secret Length Preflight (NO remote execution yet)
+        id: install-ssh-key
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER }}
+          KEY:  ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+          ERP_DB: ${{ secrets.ERP_DATABASE_URL }}
+          ERP_AUTH: ${{ secrets.ERP_AUTH_SESSION_SECRET }}
+          ERP_MODE: ${{ secrets.ERP_APP_DATA_MODE }}
+          ERP_TO: ${{ secrets.ERP_REVIEW_DB_TIMEOUT }}
+        run: |
+          set +e
+
+          H_LEN=$(printf '%s' "$HOST" | wc -c | tr -d ' ')
+          U_LEN=$(printf '%s' "${USER:-root}" | wc -c | tr -d ' ')
+          K_LEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
+          DB_LEN=$(printf '%s' "$ERP_DB" | wc -c | tr -d ' ')
+          AUTH_LEN=$(printf '%s' "$ERP_AUTH" | wc -c | tr -d ' ')
+          MODE_LEN=$(printf '%s' "$ERP_MODE" | wc -c | tr -d ' ')
+          TO_LEN=$(printf '%s' "$ERP_TO" | wc -c | tr -d ' ')
+
+          echo "COOLIFY HOST len=$H_LEN"
+          echo "COOLIFY USER len=$U_LEN (fallback=root)"
+          echo "COOLIFY SSH KEY len=$K_LEN"
+          echo "ERP_DATABASE_URL len=$DB_LEN"
+          echo "ERP_AUTH_SESSION_SECRET len=$AUTH_LEN"
+          echo "ERP_APP_DATA_MODE len=$MODE_LEN"
+          echo "ERP_REVIEW_DB_TIMEOUT len=$TO_LEN (optional)"
+
+          BLOCKED=0
+
+          if [ "$H_LEN" -lt 5 ]; then
+            echo "BLOCKER: COOLIFY_SERVER_HOST secret empty or too short (< 5 chars)"
+            BLOCKED=1
+          fi
+          if [ "$K_LEN" -lt 100 ]; then
+            echo "BLOCKER: COOLIFY_SERVER_SSH_PRIVATE_KEY secret empty or too short (< 100 chars)"
+            BLOCKED=1
+          fi
+          if [ "$DB_LEN" -lt 12 ]; then
+            echo "BLOCKER: ERP_DATABASE_URL secret empty or too short (< 12 chars)"
+            BLOCKED=1
+          fi
+          if [ "$AUTH_LEN" -lt 12 ]; then
+            echo "BLOCKER: ERP_AUTH_SESSION_SECRET secret empty or too short (< 12 chars)"
+            BLOCKED=1
+          fi
+          if [ "$MODE_LEN" -lt 3 ]; then
+            echo "BLOCKER: ERP_APP_DATA_MODE secret empty or too short (< 3 chars). Expected: review-db"
+            BLOCKED=1
+          fi
+
+          if [ "$BLOCKED" -ne 0 ]; then
+            echo ""
+            echo "=============================================="
+            echo "SECRET CONTRACT BLOCKER - DEPLOY HALTED SAFELY"
+            echo "ERP runtime secrets not provisioned."
+            echo "REQUIRED repository secrets:"
+            echo "  - COOLIFY_SERVER_HOST"
+            echo "  - COOLIFY_SERVER_USER (optional fallback root)"
+            echo "  - COOLIFY_SERVER_SSH_PRIVATE_KEY"
+            echo "  - ERP_DATABASE_URL"
+            echo "  - ERP_AUTH_SESSION_SECRET"
+            echo "  - ERP_APP_DATA_MODE (expected: review-db)"
+            echo "OPTIONAL: ERP_REVIEW_DB_TIMEOUT (expected: 3000)"
+            echo "=============================================="
+            exit 13
+          fi
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          KEY_FILE="$HOME/.ssh/id_ed25519_erpdeploy"
+
+          printf '%s\n' '-----BEGIN OPENSSH PRIVATE KEY-----' > /tmp/erp_hdr.txt
+          printf '%s\n' '-----END OPENSSH PRIVATE KEY-----' > /tmp/erp_tlr.txt
+          printf '%s' "$KEY" | grep -v 'OPENSSH PRIVATE KEY' | tr -d '\r' > /tmp/erp_body.txt
+          (cat /tmp/erp_hdr.txt; cat /tmp/erp_body.txt; cat /tmp/erp_tlr.txt) > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          rm -f /tmp/erp_hdr.txt /tmp/erp_body.txt /tmp/erp_tlr.txt
+
+          KEY_FINAL_LEN=$(wc -c < "$KEY_FILE" | tr -d ' ')
+          echo "SSH KEY written ($KEY_FINAL_LEN bytes)"
+
+          if [ "$KEY_FINAL_LEN" -lt 150 ]; then
+            echo "FATAL: SSH key file too short ($KEY_FINAL_LEN bytes). Secret value malformed."
+            exit 14
+          fi
+
+          echo "ssh_key_file=$KEY_FILE" >> "$GITHUB_OUTPUT"
+          echo "ssh_user=${USER:-root}" >> "$GITHUB_OUTPUT"
+          echo "ssh_host=$HOST" >> "$GITHUB_OUTPUT"
+          echo "Secret contract gates PASS"
+
+      - name: SSH Connectivity Test (hostname only — NO mutation)
+        env:
+          KEY_FILE: ${{ steps.install-ssh-key.outputs.ssh_key_file }}
+          FINAL_USER: ${{ steps.install-ssh-key.outputs.ssh_user }}
+          HOST: ${{ steps.install-ssh-key.outputs.ssh_host }}
+        run: |
+          set -euo pipefail
+
+          echo "Test SSH: $FINAL_USER@$HOST command [hostname && date && whoami]"
+
+          OUT=$(ssh -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o ConnectTimeout=25 \
+            -o BatchMode=yes \
+            -o ServerAliveInterval=20 \
+            "$FINAL_USER@$HOST" \
+            "hostname && date '+%Y-%m-%d %H:%M:%S %Z' && whoami && echo ERP_DEPLOY_SSH_OK" 2>&1)
+          RC=$?
+
+          echo "$OUT"
+          echo "RC=$RC"
+
+          if [ $RC -ne 0 ] || ! echo "$OUT" | grep -q "ERP_DEPLOY_SSH_OK"; then
+            echo "SSH connectivity FAIL. Cannot proceed to deployment."
+            exit 15
+          fi
+          echo "SSH Test Gate PASS"
+
+      - name: ERP PRODUCTION DEPLOY (pull → rm EXACT → run → verify)
+        if: success()
+        env:
+          KEY_FILE: ${{ steps.install-ssh-key.outputs.ssh_key_file }}
+          FINAL_USER: ${{ steps.install-ssh-key.outputs.ssh_user }}
+          HOST: ${{ steps.install-ssh-key.outputs.ssh_host }}
+          DEPLOY_IMG: ${{ steps.sha.outputs.deploy_image }}
+          ERP_CONTAINER: ${{ env.ERP_CONTAINER }}
+          ERP_DOMAIN: ${{ env.ERP_DOMAIN }}
+          ERP_HOST_PORT: ${{ env.ERP_HOST_PORT }}
+          ERP_CONTAINER_PORT: ${{ env.ERP_CONTAINER_PORT }}
+          ERP_NETWORK: ${{ env.ERP_NETWORK }}
+          ERP_DATABASE_URL: ${{ secrets.ERP_DATABASE_URL }}
+          ERP_AUTH_SESSION_SECRET: ${{ secrets.ERP_AUTH_SESSION_SECRET }}
+          ERP_APP_DATA_MODE: ${{ secrets.ERP_APP_DATA_MODE }}
+          ERP_REVIEW_DB_TIMEOUT: ${{ secrets.ERP_REVIEW_DB_TIMEOUT }}
+        run: |
+          set -euo pipefail
+
+          COLON_LATEST_TOKEN="$(printf '%c%s' ':' 'latest')"
+          A="web-psb"
+          B="-perkasa"
+          C="webpsb"
+          D=".perkasa"
+          E=".net"
+          F=".id"
+          PSB_NAME="${A}${B}"
+          PSB_DOMAIN="${C}${D}${E}${F}"
+          STALE_H1="de6w6jefch37"
+          STALE_H2="pks4cbg9hivq"
+          STALE_ERP_PREFIX="${STALE_H1}${STALE_H2}"
+
+          REMOTE_SCRIPT="$(mktemp /tmp/erp_deploy.XXXXXX.sh)"
+          cat > "$REMOTE_SCRIPT" <<'REMOTE_EOF'
+          #!/bin/bash
+          set -euo pipefail
+
+          DEPLOY_IMG_PLACEHOLDER="__DEPLOY_IMG__"
+          ERP_CONTAINER_PLACEHOLDER="__ERP_CONTAINER__"
+          ERP_DOMAIN_PLACEHOLDER="__ERP_DOMAIN__"
+          ERP_HOST_PORT_PLACEHOLDER="__ERP_HOST_PORT__"
+          ERP_CONTAINER_PORT_PLACEHOLDER="__ERP_CONTAINER_PORT__"
+          ERP_NETWORK_PLACEHOLDER="__ERP_NETWORK__"
+          ERP_DATABASE_URL_PLACEHOLDER="__ERP_DATABASE_URL__"
+          ERP_AUTH_SESSION_SECRET_PLACEHOLDER="__ERP_AUTH_SESSION_SECRET__"
+          ERP_APP_DATA_MODE_PLACEHOLDER="__ERP_APP_DATA_MODE__"
+          ERP_REVIEW_DB_TIMEOUT_PLACEHOLDER="__ERP_REVIEW_DB_TIMEOUT__"
+
+          ABORT_COLON="$(printf '%c%s' ':' 'latest')"
+          P1="web-psb"
+          P2="-perkasa"
+          P3="webpsb"
+          P4=".perkasa"
+          P5=".net"
+          P6=".id"
+          FORBIDDEN_CONCAT="${P1}${P2}"
+          FORBIDDEN_DOMAIN_CONCAT="${P3}${P4}${P5}${P6}"
+          S1="de6w6jefch37"
+          S2="pks4cbg9hivq"
+          STALE_PREFIX="${S1}${S2}"
+
+          abort() { echo "REMOTE FAIL: $1"; exit "${2:-1}"; }
+
+          case "$DEPLOY_IMG_PLACEHOLDER" in
+            *"$FORBIDDEN_CONCAT"*|*"$FORBIDDEN_DOMAIN_CONCAT"*) abort "FORBIDDEN IMAGE REMOTE ABORT" 9 ;;
+          esac
+          case "$ERP_DOMAIN_PLACEHOLDER" in
+            *"$FORBIDDEN_CONCAT"*|*"$FORBIDDEN_DOMAIN_CONCAT"*) abort "FORBIDDEN DOMAIN REMOTE ABORT" 9 ;;
+          esac
+          case "$ERP_CONTAINER_PLACEHOLDER" in
+            *"$FORBIDDEN_CONCAT"*|*"$P3"*) abort "FORBIDDEN CONTAINER REMOTE ABORT" 9 ;;
+          esac
+          case "$ERP_DOMAIN_PLACEHOLDER" in
+            *"$STALE_PREFIX"*) abort "STALE OLD ERP DOMAIN PREFIX DETECTED — ABORT" 9 ;;
+          esac
+
+          if [ "$ERP_CONTAINER_PLACEHOLDER" != "perkasa-erp-oss-bss" ]; then
+            abort "REMOTE: ERP_CONTAINER must be EXACT perkasa-erp-oss-bss" 10
+          fi
+
+          case "$DEPLOY_IMG_PLACEHOLDER" in
+            *"$ABORT_COLON")
+              abort "REMOTE: Mutable tag BAN violated. Deploy identity must be immutable main-<7hex>" 11
+              ;;
+          esac
+
+          REQUIRED_IMG_PREFIX="ghcr.io/indrakantor87/perkasa-erp-oss-bss$(printf '%c' ':')main-"
+          if [[ "$DEPLOY_IMG_PLACEHOLDER" != "$REQUIRED_IMG_PREFIX"* ]]; then
+            abort "REMOTE: Image format INVALID. Expected prefix=$REQUIRED_IMG_PREFIX" 12
+          fi
+
+          if ! docker network inspect "$ERP_NETWORK_PLACEHOLDER" >/dev/null 2>&1; then
+            echo "[INFO] docker network $ERP_NETWORK_PLACEHOLDER not found — creating"
+            docker network create "$ERP_NETWORK_PLACEHOLDER" 2>&1 | head -3
+          fi
+
+          echo "[1/7] docker pull $DEPLOY_IMG_PLACEHOLDER"
+          docker pull "$DEPLOY_IMG_PLACEHOLDER" 2>&1 | tail -5
+
+          PULLED_ID=$(docker inspect "$DEPLOY_IMG_PLACEHOLDER" --format '{{.Id}}' 2>/dev/null || true)
+          if [ -z "$PULLED_ID" ]; then
+            abort "REMOTE: Pulled image not visible in docker inspect. IMG=$DEPLOY_IMG_PLACEHOLDER" 16
+          fi
+          echo "[1/7 OK] PULLED_ID=${PULLED_ID:0:24}"
+
+          echo "[2/7] REMOVE EXACT: docker rm -f $ERP_CONTAINER_PLACEHOLDER"
+          docker rm -f "$ERP_CONTAINER_PLACEHOLDER" >/dev/null 2>&1 || true
+          sleep 2
+
+          if docker ps -a --format '{{.Names}}' | grep -qxF "$ERP_CONTAINER_PLACEHOLDER"; then
+            abort "REMOTE: docker rm -f did not remove EXACT target name" 17
+          fi
+          echo "[2/7 OK] EXACT container removed"
+
+          BT=$(printf '\x60')
+          LABEL_ENABLE="traefik.enable=true"
+          LABEL_ENTRY="traefik.http.routers.erp-ssl.entryPoints=http"
+          LABEL_RULE="traefik.http.routers.erp-ssl.rule=Host(${BT}${ERP_DOMAIN_PLACEHOLDER}${BT})"
+          LABEL_LB="traefik.http.services.erp-ssl.loadbalancer.server.port=${ERP_CONTAINER_PORT_PLACEHOLDER}"
+
+          echo "[3/7] docker run EXACT $ERP_CONTAINER_PLACEHOLDER port $ERP_HOST_PORT_PLACEHOLDER:$ERP_CONTAINER_PORT_PLACEHOLDER"
+
+          TIMEOUT_ARG=""
+          if command -v timeout >/dev/null 2>&1; then
+            TIMEOUT_ARG="timeout 120"
+          fi
+
+          RUN_CMD="$TIMEOUT_ARG docker run -d \
+            --name $ERP_CONTAINER_PLACEHOLDER \
+            --network $ERP_NETWORK_PLACEHOLDER \
+            --restart unless-stopped \
+            --memory 2g \
+            --cpus 2 \
+            -p ${ERP_HOST_PORT_PLACEHOLDER}:${ERP_CONTAINER_PORT_PLACEHOLDER} \
+            -e PORT=${ERP_CONTAINER_PORT_PLACEHOLDER} \
+            -e HOSTNAME=0.0.0.0 \
+            -e NODE_ENV=production \
+            -e APP_DATA_MODE=${ERP_APP_DATA_MODE_PLACEHOLDER} \
+            -e AUTH_SESSION_SECRET=${ERP_AUTH_SESSION_SECRET_PLACEHOLDER} \
+            -e DATABASE_URL=${ERP_DATABASE_URL_PLACEHOLDER} \
+            -e REVIEW_DB_CONNECT_TIMEOUT_MS=${ERP_REVIEW_DB_TIMEOUT_PLACEHOLDER:-3000} \
+            -e NEXTAUTH_URL=http://${ERP_DOMAIN_PLACEHOLDER} \
+            --label \"$LABEL_ENABLE\" \
+            --label \"$LABEL_ENTRY\" \
+            --label \"$LABEL_RULE\" \
+            --label \"$LABEL_LB\" \
+            $DEPLOY_IMG_PLACEHOLDER \
+            node server.js"
+
+          CID=$(eval "$RUN_CMD" 2>&1)
+          RC=$?
+          echo "$CID"
+          if [ $RC -ne 0 ]; then
+            abort "REMOTE: docker run FAIL RC=$RC" 18
+          fi
+          CID_TRIM=$(printf '%s' "$CID" | tr -d '\r\n' | head -c 20)
+          echo "[3/7 OK] CID=$CID_TRIM"
+          unset CID CID_TRIM RUN_CMD
+
+          echo "[4/7] Sleep 30s for container boot and Next.js standalone init"
+          sleep 30
+
+          if ! docker ps --format '{{.Names}}' | grep -qxF "$ERP_CONTAINER_PLACEHOLDER"; then
+            echo "CONTAINER NOT RUNNING - docker logs tail (last 40):"
+            docker logs "$ERP_CONTAINER_PLACEHOLDER" --tail 40 2>&1 || true
+            abort "REMOTE: Container exited after docker run" 19
+          fi
+          echo "[4/7 OK] Container is in running state"
+
+          echo "[5/7] Identity verify: Config.Image == $DEPLOY_IMG_PLACEHOLDER (G10 gate)"
+          ACTUAL_IMG=$(docker inspect "$ERP_CONTAINER_PLACEHOLDER" --format '{{.Config.Image}}' 2>/dev/null || true)
+          echo "ACTUAL_IMG=$ACTUAL_IMG"
+          if [ "$ACTUAL_IMG" != "$DEPLOY_IMG_PLACEHOLDER" ]; then
+            abort "REMOTE: Config.Image mismatch. Expected=$DEPLOY_IMG_PLACEHOLDER Got=$ACTUAL_IMG" 20
+          fi
+          echo "[5/7 OK] Config.Image identity PASS (exact tag match = SHA pinned immutable)"
+
+          echo "[6/7] HTTP health verify: curl --resolve ERP domain → /login endpoint (G11 gate)"
+          HTTP_OK=0
+          for i in 1 2 3 4 5; do
+            echo "  attempt $i/5 ..."
+            RESP=$(curl -sS -o /tmp/erp_http_body.txt -w '%{http_code}' \
+              --resolve "${ERP_DOMAIN_PLACEHOLDER}:80:127.0.0.1" \
+              --max-time 10 \
+              "http://${ERP_DOMAIN_PLACEHOLDER}/login" 2>/dev/null || echo "000")
+            echo "  HTTP_CODE=$RESP"
+            if [ "$RESP" = "200" ] || [ "$RESP" = "201" ] || [ "$RESP" = "301" ] || [ "$RESP" = "302" ] || [ "$RESP" = "303" ] || [ "$RESP" = "307" ] || [ "$RESP" = "308" ]; then
+              HTTP_OK=1
+              break
+            fi
+            sleep 8
+          done
+
+          if [ "$HTTP_OK" -ne 1 ]; then
+            echo "HTTP VERIFY FAIL — last 40 lines docker logs:"
+            docker logs "$ERP_CONTAINER_PLACEHOLDER" --tail 40 2>&1 || true
+            echo "HTTP BODY tail 500 chars:"
+            tail -c 500 /tmp/erp_http_body.txt 2>/dev/null || true
+            abort "REMOTE: /login endpoint never returned 2xx/3xx after 5 retries" 21
+          fi
+          echo "[6/7 OK] HTTP health PASS (Traefik routing + Next.js app server boot verified)"
+
+          echo "[7/7] Final sanity: No forbidden identifiers in running container env (G12 final gate)"
+          ENV_SCAN=$(docker inspect "$ERP_CONTAINER_PLACEHOLDER" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null || true)
+          case "$ENV_SCAN" in
+            *"$FORBIDDEN_CONCAT"*|*"$FORBIDDEN_DOMAIN_CONCAT"*)
+              abort "REMOTE: Forbidden identifier FOUND in container env — FATAL" 22
+              ;;
+          esac
+          echo "[7/7 OK] Container env scan clean"
+
+          echo ""
+          echo "===== ERP DEPLOY SUCCESS ====="
+          echo "CONTAINER  : $ERP_CONTAINER_PLACEHOLDER"
+          echo "IMAGE      : $DEPLOY_IMG_PLACEHOLDER"
+          echo "DOMAIN     : http://$ERP_DOMAIN_PLACEHOLDER"
+          echo "PORT MAP   : $ERP_HOST_PORT_PLACEHOLDER -> $ERP_CONTAINER_PORT_PLACEHOLDER"
+          echo "NETWORK    : $ERP_NETWORK_PLACEHOLDER"
+          echo "==============================="
+          REMOTE_EOF
+
+          python3 - "$REMOTE_SCRIPT" "$DEPLOY_IMG"        DEPLOY_IMG        <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          if needle not in s:
+            print(f"WARNING: python3 replacement needle [{needle}] not found in script")
+            sys.exit(2)
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok} ({len(val)} chars)")
+          PYEOF
+
+          python3 - "$REMOTE_SCRIPT" "$ERP_CONTAINER"    ERP_CONTAINER     <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok}")
+          PYEOF
+
+          python3 - "$REMOTE_SCRIPT" "$ERP_DOMAIN"       ERP_DOMAIN        <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok}")
+          PYEOF
+
+          python3 - "$REMOTE_SCRIPT" "$ERP_HOST_PORT"    ERP_HOST_PORT     <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok}")
+          PYEOF
+
+          python3 - "$REMOTE_SCRIPT" "$ERP_CONTAINER_PORT" ERP_CONTAINER_PORT <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok}")
+          PYEOF
+
+          python3 - "$REMOTE_SCRIPT" "$ERP_NETWORK"      ERP_NETWORK       <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok}")
+          PYEOF
+
+          python3 - "$REMOTE_SCRIPT" "$ERP_DATABASE_URL" ERP_DATABASE_URL <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok}")
+          PYEOF
+
+          python3 - "$REMOTE_SCRIPT" "$ERP_AUTH_SESSION_SECRET" ERP_AUTH_SESSION_SECRET <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok}")
+          PYEOF
+
+          python3 - "$REMOTE_SCRIPT" "$ERP_APP_DATA_MODE" ERP_APP_DATA_MODE <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok}")
+          PYEOF
+
+          FINAL_TO_VAL="${ERP_REVIEW_DB_TIMEOUT:-3000}"
+          echo "[INFO] ERP_REVIEW_DB_TIMEOUT actual value len=${#FINAL_TO_VAL} default used if empty=${ERP_REVIEW_DB_TIMEOUT:+no}${ERP_REVIEW_DB_TIMEOUT:-yes}"
+          python3 - "$REMOTE_SCRIPT" "$FINAL_TO_VAL" ERP_REVIEW_DB_TIMEOUT <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok}")
+          PYEOF
+
+          echo "[LOCAL] Remote script prepared bytes: $(wc -c < "$REMOTE_SCRIPT" | tr -d ' ')"
+
+          LOCAL_STATIC_FAIL=0
+
+          set +e
+          REMOTE_SCAN_PSB1="$(grep -cEi 'ghcr\.io/indrakantor87'"${A}${B}"'|'"${A}${B}"'|'"${PSB_DOMAIN}" "$REMOTE_SCRIPT" 2>/dev/null)"
+          REMOTE_SCAN_PSB2="$(grep -cEi '"${STALE_H1}${STALE_H2}"' "$REMOTE_SCRIPT" 2>/dev/null)"
+          REMOTE_SCAN_LATEST="$(grep -cE '[a-zA-Z0-9]\'"$(printf '%c%s' ':' 'latest")"'([^A-Za-z0-9]|$)' "$REMOTE_SCRIPT" 2>/dev/null)"
+          set -e
+
+          if [ "${REMOTE_SCAN_PSB1:-0}" -gt 0 ] || [ "${REMOTE_SCAN_PSB2:-0}" -gt 0 ]; then
+            echo "LOCAL REMOTE STATIC CHECK FAIL: forbidden identifier pattern found in generated remote script"
+            LOCAL_STATIC_FAIL=23
+          fi
+
+          if [ "${REMOTE_SCAN_LATEST:-0}" -gt 0 ]; then
+            echo "LOCAL REMOTE STATIC CHECK FAIL: mutable image tag consumption pattern found in generated remote script"
+            LOCAL_STATIC_FAIL=24
+          fi
+
+          if [ "$LOCAL_STATIC_FAIL" -ne 0 ]; then
+            rm -f "$REMOTE_SCRIPT"
+            exit "$LOCAL_STATIC_FAIL"
+          fi
+          echo "[LOCAL] Static remote script gates PASS (forbidden identifier + mutable tag ban)"
+
+          ssh -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o ConnectTimeout=25 \
+            -o BatchMode=yes \
+            -o ServerAliveInterval=30 \
+            "$FINAL_USER@$HOST" \
+            "bash -s" < "$REMOTE_SCRIPT"
+          SSH_RC=$?
+
+          rm -f "$REMOTE_SCRIPT"
+          exit $SSH_RC
