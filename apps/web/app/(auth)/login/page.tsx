@@ -176,10 +176,10 @@ export default async function LoginPage({
       : 'Aplikasi sedang memakai mode lokal / fallback. Login bisa memakai akun bootstrap mock yang sengaja diisi pada environment lokal.'
 
   return (
-    <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
-      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-7xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+    <main className="min-h-screen min-w-0 max-w-[100vw] overflow-x-hidden px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
+      <div className="mx-auto grid min-h-[calc(100vh-4rem)] min-w-0 max-w-7xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section
-          className="rounded-[28px] p-8 shadow-2xl lg:p-12"
+          className="min-w-0 overflow-hidden rounded-[28px] p-8 shadow-2xl lg:p-12"
           style={{
             backgroundColor: 'var(--color-sidebar)',
             color: 'var(--color-sidebar-ink)',
@@ -240,8 +240,8 @@ export default async function LoginPage({
           </div>
         </section>
 
-        <section className="panel flex items-center p-6 sm:p-8 lg:p-10">
-          <div className="w-full">
+        <section className="min-w-0 overflow-hidden panel flex items-center p-6 sm:p-8 lg:p-10">
+          <div className="w-full min-w-0">
             <div>
               <p className="section-title">Autentikasi</p>
               <h2
@@ -375,7 +375,7 @@ export default async function LoginPage({
                           Tempel isi di bawah ini ke chat tim IT yang mengelola Coolify. Semua nama kunci environment, contoh nilai, dan keterangan sudah diringkas otomatis dari state server saat ini.
                         </p>
                         <pre
-                          className="max-h-80 overflow-auto rounded-xl border border-line p-3 text-[11px] leading-5"
+                          className="min-w-0 max-w-full break-all max-h-80 overflow-auto overflow-x-auto whitespace-pre-wrap rounded-xl border border-line p-3 text-[11px] leading-5"
                           style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-mute-strong)' }}
                         >
                           {envIssuePayloadJson}

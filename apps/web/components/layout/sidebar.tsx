@@ -11,6 +11,13 @@ import { navigationItems } from '@/lib/navigation'
 import { canAccessSupportLane, getSupportLaneOrder, getSupportLanePath } from '@/lib/support-lanes'
 import type { AppRole } from '@/lib/types'
 import { translateUiText } from '@/lib/ui-language'
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronDown,
+  IconClose,
+  IconMenu,
+} from '@/components/shell-icon-button'
 
 function matchesPrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -1335,29 +1342,15 @@ function SidebarSection({
           onNavigate?.()
         }
 
-        const itemContainerStyle = active
-          ? {
-              borderColor: 'color-mix(in srgb, var(--color-sidebar-line) 160%, transparent)',
-              backgroundColor: 'var(--color-sidebar-soft)',
-              boxShadow: '0 10px 24px rgba(2, 6, 23, 0.28)',
-            }
-          : activeChild
-            ? {
-                borderColor: 'color-mix(in srgb, var(--color-sidebar-line) 120%, transparent)',
-                backgroundColor: 'color-mix(in srgb, var(--color-sidebar-soft) 68%, transparent)',
-                boxShadow: '0 8px 18px rgba(2, 6, 23, 0.18)',
-              }
-            : {
-                borderColor: 'color-mix(in srgb, var(--color-sidebar-line) 90%, transparent)',
-                backgroundColor: 'var(--color-sidebar)',
-                '--hover-border': 'var(--color-sidebar-line)',
-                '--hover-bg': 'var(--color-sidebar-soft)',
-              } as React.CSSProperties
-
         const itemHighlightBarStyle = { backgroundColor: 'color-mix(in srgb, var(--color-sidebar-ink) 90%, white 10%)' }
         const itemTitleStyle = { color: 'var(--color-sidebar-ink)' }
         const itemDescStyle = { color: 'color-mix(in srgb, var(--color-sidebar-ink) 58%, transparent)' }
-        const itemChevronStyle = { color: 'color-mix(in srgb, var(--color-sidebar-ink) 55%, transparent)' }
+
+        const itemBorderBg = active
+          ? '[border-color:color-mix(in_srgb,var(--color-sidebar-line)_160%,transparent)] bg-sidebar-soft shadow-[0_10px_24px_rgba(2,6,23,0.28)]'
+          : activeChild
+            ? '[border-color:color-mix(in_srgb,var(--color-sidebar-line)_120%,transparent)] [background-color:color-mix(in_srgb,var(--color-sidebar-soft)_68%,transparent)] shadow-[0_8px_18px_rgba(2,6,23,0.18)]'
+            : '[border-color:color-mix(in_srgb,var(--color-sidebar-line)_90%,transparent)] bg-sidebar hover:bg-sidebar-soft hover:[border-color:var(--color-sidebar-line)] hover:[box-shadow:var(--shadow-panel)]'
 
         return (
           <div key={item.key} className="space-y-1.5">
@@ -1366,20 +1359,10 @@ function SidebarSection({
               prefetch={false}
               onClick={handleItemClick}
               title={itemTitle}
-              className={`relative block overflow-hidden rounded-xl border transition [&:not(:hover)]:shadow-none hover:[box-shadow:var(--shadow-panel)] ${
+              aria-current={active ? 'page' : undefined}
+              className={`relative block overflow-hidden rounded-xl border transition duration-base ui-standard [&:not(:hover)]:shadow-none ${
                 collapsed ? 'px-3 py-3' : 'px-3.5 py-2.5'
-              }`}
-              style={itemContainerStyle}
-              onMouseEnter={(event: ReactMouseEvent<HTMLAnchorElement>) => {
-                if (active || activeChild) return
-                event.currentTarget.style.borderColor = 'var(--color-sidebar-line)'
-                event.currentTarget.style.backgroundColor = 'var(--color-sidebar-soft)'
-              }}
-              onMouseLeave={(event: ReactMouseEvent<HTMLAnchorElement>) => {
-                if (active || activeChild) return
-                event.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-sidebar-line) 90%, transparent)'
-                event.currentTarget.style.backgroundColor = 'var(--color-sidebar)'
-              }}
+              } ${itemBorderBg}`}
             >
               {itemHighlighted ? (
                 <span
@@ -1412,10 +1395,14 @@ function SidebarSection({
                     </div>
                     {hasChildren ? (
                       <span
-                        className="mt-0.5 shrink-0"
-                        style={itemChevronStyle}
+                        className={`mt-0.5 shrink-0 inline-flex text-[color:color-mix(in_srgb,var(--color-sidebar-ink)_55%,transparent)]`}
+                        aria-hidden="true"
                       >
-                        {expanded ? 'v' : '>'}
+                        <IconChevronRight
+                          className={`h-4 w-4 transition-transform duration-base ui-standard ${
+                            expanded ? 'rotate-90' : ''
+                          }`}
+                        />
                       </span>
                     ) : null}
                   </div>
@@ -1432,16 +1419,9 @@ function SidebarSection({
                   const childActive = isSidebarItemActive(child, pathname, focus, currentQueryParams)
                   const childTitle = translateUiText(child.title, language)
                   const childDescription = translateUiText(child.description, language)
-                  const childStyle = childActive
-                    ? {
-                        borderColor: 'var(--color-sidebar-line)',
-                        backgroundColor: 'var(--color-sidebar-soft)',
-                        color: 'var(--color-sidebar-ink)',
-                      }
-                    : {
-                        borderColor: 'transparent',
-                        color: 'color-mix(in srgb, var(--color-sidebar-ink) 55%, transparent)',
-                      }
+                  const childClass = childActive
+                    ? '[border-color:var(--color-sidebar-line)] bg-sidebar-soft text-sidebar-ink'
+                    : 'border-transparent text-[color-mix(in_srgb,var(--color-sidebar-ink)_55%,transparent)] hover:[border-color:color-mix(in_srgb,var(--color-sidebar-line)_90%,transparent)] hover:bg-sidebar-soft hover:text-[color-mix(in_srgb,var(--color-sidebar-ink)_90%,transparent)]'
 
                   return (
                     <Link
@@ -1450,20 +1430,8 @@ function SidebarSection({
                       prefetch={false}
                       onClick={onNavigate}
                       title={childTitle}
-                      className={`block rounded-lg border px-3 py-1.5 text-sm transition`}
-                      style={childStyle}
-                      onMouseEnter={(event: ReactMouseEvent<HTMLAnchorElement>) => {
-                        if (childActive) return
-                        event.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-sidebar-line) 90%, transparent)'
-                        event.currentTarget.style.backgroundColor = 'var(--color-sidebar-soft)'
-                        event.currentTarget.style.color = 'color-mix(in srgb, var(--color-sidebar-ink) 90%, transparent)'
-                      }}
-                      onMouseLeave={(event: ReactMouseEvent<HTMLAnchorElement>) => {
-                        if (childActive) return
-                        event.currentTarget.style.borderColor = 'transparent'
-                        event.currentTarget.style.backgroundColor = 'transparent'
-                        event.currentTarget.style.color = 'color-mix(in srgb, var(--color-sidebar-ink) 55%, transparent)'
-                      }}
+                      aria-current={childActive ? 'page' : undefined}
+                      className={`block rounded-lg border px-3 py-1.5 text-sm transition duration-fast ui-standard ${childClass}`}
                     >
                       <p className={`truncate ${childActive ? 'font-semibold' : ''}`}>{childTitle}</p>
                       {childActive ? (
@@ -1568,6 +1536,18 @@ export function Sidebar({
     setMobileOpen(false)
   }, [pathname])
 
+  useEffect(() => {
+    if (!mobileOpen) return
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMobileOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [mobileOpen])
+
   const handleToggleExpanded = (key: string, nextExpanded: boolean) => {
     setExpandedItems(nextExpanded ? { [key]: true } : { [key]: false })
   }
@@ -1592,28 +1572,11 @@ export function Sidebar({
             <button
               type="button"
               onClick={() => setCollapsed(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border transition"
-              style={{
-                borderColor: 'var(--color-sidebar-line)',
-                backgroundColor: 'var(--color-sidebar-soft)',
-                color: 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)',
-                '--hover-border': 'color-mix(in srgb, var(--color-sidebar-line) 130%, transparent)',
-                '--hover-text': 'var(--color-sidebar-ink)',
-              } as React.CSSProperties}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-sidebar-line) 130%, transparent)'
-                event.currentTarget.style.color = 'var(--color-sidebar-ink)'
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.borderColor = 'var(--color-sidebar-line)'
-                event.currentTarget.style.color = 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)'
-              }}
+              className="tap-44 flex h-11 w-11 items-center justify-center rounded-full border transition duration-fast ui-standard [border-color:var(--color-sidebar-line)] bg-sidebar-soft text-[color-mix(in_srgb,var(--color-sidebar-ink)_75%,transparent)] hover:[border-color:color-mix(in_srgb,var(--color-sidebar-line)_130%,transparent)] hover:text-sidebar-ink"
               aria-label={translateUiText('Minimalkan sidebar', language)}
               title={translateUiText('Minimalkan sidebar', language)}
             >
-              <span aria-hidden="true" className="text-lg leading-none">
-                <span>{'<'}</span>
-              </span>
+              <IconChevronLeft className="h-5 w-5" aria-hidden="true" />
             </button>
           ) : null}
         </div>
@@ -1623,26 +1586,11 @@ export function Sidebar({
             <button
               type="button"
               onClick={() => setCollapsed(false)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border transition"
-              style={{
-                borderColor: 'var(--color-sidebar-line)',
-                backgroundColor: 'var(--color-sidebar-soft)',
-                color: 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)',
-              }}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-sidebar-line) 130%, transparent)'
-                event.currentTarget.style.color = 'var(--color-sidebar-ink)'
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.borderColor = 'var(--color-sidebar-line)'
-                event.currentTarget.style.color = 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)'
-              }}
+              className="tap-44 flex h-11 w-11 items-center justify-center rounded-full border transition duration-fast ui-standard [border-color:var(--color-sidebar-line)] bg-sidebar-soft text-[color-mix(in_srgb,var(--color-sidebar-ink)_75%,transparent)] hover:[border-color:color-mix(in_srgb,var(--color-sidebar-line)_130%,transparent)] hover:text-sidebar-ink"
               aria-label={translateUiText('Tampilkan sidebar', language)}
               title={translateUiText('Tampilkan sidebar', language)}
             >
-              <span aria-hidden="true" className="text-lg leading-none">
-                <span>{'>'}</span>
-              </span>
+              <IconChevronRight className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
         ) : null}
@@ -1684,15 +1632,11 @@ export function Sidebar({
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink transition hover:[border-color:var(--color-line-strong)]"
+            className="tap-44 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink transition duration-fast ui-standard hover:[border-color:var(--color-line-strong)] focus-visible:shadow-focus"
             aria-label={translateUiText('Tampilkan menu navigasi', language)}
             title={translateUiText('Menu Navigasi', language)}
           >
-            <span aria-hidden="true" className="flex flex-col gap-[5px]">
-              <span className="block h-0.5 w-5 rounded-full bg-current" />
-              <span className="block h-0.5 w-5 rounded-full bg-current" />
-              <span className="block h-0.5 w-5 rounded-full bg-current" />
-            </span>
+            <IconMenu className="h-5 w-5" aria-hidden="true" />
           </button>
           <div className="flex gap-2 overflow-x-auto pb-1">
           {mobileQuickItems.map((item) => {
@@ -1720,7 +1664,7 @@ export function Sidebar({
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0"
+            className="absolute inset-0 content-fade-in"
             style={{
               backgroundColor: 'color-mix(in srgb, var(--color-sidebar) 65%, transparent)',
             }}
@@ -1728,7 +1672,7 @@ export function Sidebar({
             aria-label={translateUiText('Tutup menu', language)}
           />
           <aside
-            className="relative flex h-full w-80 max-w-[88vw] flex-col px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl"
+            className="relative flex h-full w-80 max-w-[88vw] translate-x-0 flex-col px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-base ui-standard"
             style={{
               borderRight: '1px solid var(--color-sidebar-line)',
               backgroundColor: 'var(--color-sidebar)',
@@ -1740,25 +1684,11 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="flex h-11 w-11 items-center justify-center rounded-full border transition"
-                style={{
-                  borderColor: 'var(--color-sidebar-line)',
-                  backgroundColor: 'var(--color-sidebar-soft)',
-                  color: 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)',
-                }}
-                onMouseEnter={(event) => {
-                  event.currentTarget.style.borderColor = 'color-mix(in srgb, var(--color-sidebar-line) 130%, transparent)'
-                  event.currentTarget.style.color = 'var(--color-sidebar-ink)'
-                }}
-                onMouseLeave={(event) => {
-                  event.currentTarget.style.borderColor = 'var(--color-sidebar-line)'
-                  event.currentTarget.style.color = 'color-mix(in srgb, var(--color-sidebar-ink) 75%, transparent)'
-                }}
+                className="tap-44 flex h-11 w-11 items-center justify-center rounded-full border transition duration-fast ui-standard [border-color:var(--color-sidebar-line)] bg-sidebar-soft text-[color-mix(in_srgb,var(--color-sidebar-ink)_75%,transparent)] hover:[border-color:color-mix(in_srgb,var(--color-sidebar-line)_130%,transparent)] hover:text-sidebar-ink focus-visible:shadow-focus"
                 aria-label={translateUiText('Tutup menu', language)}
+                title={translateUiText('Tutup menu', language)}
               >
-                <span aria-hidden="true" className="text-lg leading-none">
-                  ×
-                </span>
+                <IconClose className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
 

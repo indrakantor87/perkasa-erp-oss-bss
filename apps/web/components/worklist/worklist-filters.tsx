@@ -25,20 +25,20 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
     state.overdue
 
   return (
-    <section className="panel p-4 sm:p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex-1">
-          <p className="section-title">Filter Global</p>
+    <section aria-label="Worklist filters" className="card-tier-2 border border-line p-4 sm:p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="section-title">Filter Antrean</p>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="mt-1 text-lg font-semibold text-[var(--color-ink-strong)] sm:text-xl">
+            <h3 className="mt-1 text-lg font-semibold text-inkStrong sm:text-xl">
               Kunci tampilan antrean melalui URL
             </h3>
             <button
               type="button"
               onClick={() => setFiltersOpen((prev) => !prev)}
-              className="surface-soft inline-flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] md:hidden"
               aria-expanded={filtersOpen}
               aria-controls="worklist-filters-form-panel"
+              className="btn-base btn-ghost focus-visible:shadow-focus tap-44 inline-flex h-11 shrink-0 items-center gap-2 rounded-control border border-line bg-surfaceSoft px-4 text-sm font-medium text-ink transition hover:border-lineStrong lg:hidden"
             >
               {filtersOpen ? 'Tutup filter' : anyActiveFilter ? 'Filter aktif ▾' : 'Buka filter ▸'}
             </button>
@@ -49,7 +49,8 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
         </div>
         <Link
           href={resetHref}
-          className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
+          aria-label="Reset semua filter worklist"
+          className="btn-base btn-ghost focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control border border-line bg-surfaceSoft px-4 text-sm font-medium text-ink transition hover:border-lineStrong hover:text-inkStrong"
         >
           Reset filter
         </Link>
@@ -59,11 +60,12 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
         id="worklist-filters-form-panel"
         className={`grid gap-4 md:grid-cols-2 xl:grid-cols-4 ${filtersOpen ? 'mt-5' : 'hidden mt-0 md:mt-6 md:grid'}`}
       >
-        <label className="space-y-2">
+        <label className="space-y-1.5">
           <span className="form-field-label">Antrean</span>
           <select
             name="queue"
             defaultValue={state.queue}
+            aria-label="Pilih antrean kerja"
             className="form-field"
           >
             {queueOptions.map((item) => (
@@ -74,11 +76,12 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
           </select>
         </label>
 
-        <label className="space-y-2">
+        <label className="space-y-1.5">
           <span className="form-field-label">Domain</span>
           <select
             name="domain"
             defaultValue={state.domain || ''}
+            aria-label="Pilih domain kerja"
             className="form-field"
           >
             <option value="">Semua domain</option>
@@ -90,11 +93,12 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
           </select>
         </label>
 
-        <label className="space-y-2">
+        <label className="space-y-1.5">
           <span className="form-field-label">Prioritas</span>
           <select
             name="priority"
             defaultValue={state.priority || ''}
+            aria-label="Pilih prioritas item"
             className="form-field"
           >
             <option value="">Semua prioritas</option>
@@ -106,11 +110,12 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
           </select>
         </label>
 
-        <label className="space-y-2">
+        <label className="space-y-1.5">
           <span className="form-field-label">Status</span>
           <select
             name="status"
             defaultValue={state.status || ''}
+            aria-label="Pilih status item"
             className="form-field"
           >
             <option value="">Semua status</option>
@@ -122,38 +127,47 @@ export function WorklistFilters({ state, queueOptions }: WorklistFiltersProps) {
           </select>
         </label>
 
-        <label className="space-y-2 xl:col-span-2">
+        <label className="space-y-1.5 xl:col-span-2">
           <span className="form-field-label">Customer atau keyword</span>
           <input
             type="text"
             name="q"
             defaultValue={state.q || ''}
             placeholder="Nama customer, kode ticket, work order, lead"
+            aria-label="Cari customer atau keyword"
             className="form-field placeholder:text-mute"
           />
         </label>
 
-        <label className="surface-soft flex items-center gap-3 rounded-xl border px-4 py-3">
-          <input type="checkbox" name="mine" value="1" defaultChecked={state.mine} className="h-4 w-4 rounded accent-[var(--color-accent)]" />
-          <span className="text-sm text-[var(--color-mute-strong)]">Hanya item saya</span>
+        <label className="flex items-center gap-3 rounded-control border border-line bg-surfaceSoft px-4 py-3">
+          <input
+            type="checkbox"
+            name="mine"
+            value="1"
+            defaultChecked={state.mine}
+            aria-label="Hanya tampilkan item saya"
+            className="h-4 w-4 rounded accent"
+          />
+          <span className="text-sm text-muteStrong">Hanya item saya</span>
         </label>
 
-        <label className="surface-soft flex items-center gap-3 rounded-xl border px-4 py-3">
+        <label className="flex items-center gap-3 rounded-control border border-line bg-surfaceSoft px-4 py-3">
           <input
             type="checkbox"
             name="overdue"
             value="1"
             defaultChecked={state.overdue}
-            className="h-4 w-4 rounded accent-[var(--color-accent)]"
+            aria-label="Hanya tampilkan item overdue atau kritikal"
+            className="h-4 w-4 rounded accent"
           />
-          <span className="text-sm text-[var(--color-mute-strong)]">Hanya item overdue / kritikal</span>
+          <span className="text-sm text-muteStrong">Hanya item overdue / kritikal</span>
         </label>
 
-        <div className="xl:col-span-4">
+        <div className="xl:col-span-4 flex items-center gap-3">
           <button
             type="submit"
-            className="inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition hover:opacity-90"
-            style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
+            aria-label="Terapkan filter worklist"
+            className="btn-base btn-primary focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control px-5 text-sm font-semibold transition hover:opacity-90"
           >
             Terapkan filter
           </button>

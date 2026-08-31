@@ -25,26 +25,35 @@ declare global {
 
 const UiThemeContext = createContext<UiThemeContextValue | null>(null)
 
-function writeThemePersistence(theme: UiTheme) {
+function writeThemePersistence(theme: UiTheme, opts?: { skipDispatch?: boolean }) {
   if (typeof window === 'undefined') return
   const normalized = normalizeUiTheme(theme)
   try { window.localStorage.setItem(UI_THEME_STORAGE_KEY, normalized) } catch {}
   try {
     document.cookie = `${UI_THEME_COOKIE_KEY}=${normalized}; path=/; max-age=31536000; samesite=lax`
   } catch {}
+  let mutated = false
   try {
     const docEl = document.documentElement
-    docEl.setAttribute('data-theme', normalized)
-    docEl.style.colorScheme = normalized
+    if (docEl.getAttribute('data-theme') !== normalized) {
+      docEl.setAttribute('data-theme', normalized)
+      mutated = true
+    }
+    if ((docEl.style.colorScheme || '') !== normalized) {
+      docEl.style.colorScheme = normalized
+      mutated = true
+    }
   } catch {}
-  try {
-    const ev = new CustomEvent('perkasa:ui:themechange', {
-      bubbles: true,
-      cancelable: true,
-      detail: { theme: normalized },
-    })
-    window.dispatchEvent(ev)
-  } catch {}
+  if (!opts?.skipDispatch) {
+    try {
+      const ev = new CustomEvent('perkasa:ui:themechange', {
+        bubbles: true,
+        cancelable: true,
+        detail: { theme: normalized },
+      })
+      window.dispatchEvent(ev)
+    } catch {}
+  }
   return normalized
 }
 
@@ -61,9 +70,11 @@ export function ThemeProvider({
   const setTheme = useCallback((nextTheme: UiTheme | string) => {
     const normalized = normalizeUiTheme(nextTheme)
     if (typeof window !== 'undefined') {
+      const docTheme = document.documentElement.getAttribute('data-theme') as UiTheme | null
+      if (docTheme === normalized) return
       writeThemePersistence(normalized)
     }
-    setThemeState(normalized)
+    setThemeState((prev) => (prev === normalized ? prev : normalized))
   }, [])
 
   useEffect(() => {
@@ -93,7 +104,7 @@ export function ThemeProvider({
         target = docAttr
       }
     } catch {}
-    const finalTarget = writeThemePersistence(target) || target
+    const finalTarget = writeThemePersistence(target, { skipDispatch: true }) || target
     if (finalTarget !== theme) setThemeState(finalTarget)
 
     // Global window function (bisa dipanggil dari mana saja tanpa context)
@@ -102,7 +113,12 @@ export function ThemeProvider({
     const listener = (ev: Event) => {
       try {
         const detail = (ev as CustomEvent<{ theme: UiTheme }>).detail
-        if (detail && detail.theme) setTheme(detail.theme)
+        if (!detail || !detail.theme) return
+        const incoming = normalizeUiTheme(detail.theme)
+        const current = document.documentElement.getAttribute('data-theme') as UiTheme | null
+        if (current === incoming) return
+        setThemeState((prev) => (prev === incoming ? prev : incoming))
+        writeThemePersistence(incoming, { skipDispatch: true })
       } catch {}
     }
     window.addEventListener('perkasa:ui:themechange', listener as EventListener)
@@ -115,7 +131,9 @@ export function ThemeProvider({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    writeThemePersistence(theme)
+    const docTheme = document.documentElement.getAttribute('data-theme') as UiTheme | null
+    if (docTheme === theme) return
+    writeThemePersistence(theme, { skipDispatch: true })
   }, [theme])
 
   const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme])
@@ -133,6 +151,8 @@ export function useUiTheme() {
 export function dispatchThemeChange(theme: UiTheme | string): UiTheme {
   const normalized = normalizeUiTheme(theme)
   if (typeof window !== 'undefined') {
+    const docTheme = document.documentElement.getAttribute('data-theme') as UiTheme | null
+    if (docTheme === normalized) return normalized
     if (window.__perkasa_setTheme) {
       try {
         window.__perkasa_setTheme(normalized)
@@ -140,14 +160,6 @@ export function dispatchThemeChange(theme: UiTheme | string): UiTheme {
       } catch {}
     }
     writeThemePersistence(normalized)
-    try {
-      const ev = new CustomEvent('perkasa:ui:themechange', {
-        bubbles: true,
-        cancelable: true,
-        detail: { theme: normalized },
-      })
-      window.dispatchEvent(ev)
-    } catch {}
   }
   return normalized
 }

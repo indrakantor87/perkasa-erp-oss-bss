@@ -7,6 +7,14 @@ import { useUiLanguage, dispatchLanguageChange } from '@/components/layout/ui-la
 import { useUiTheme, dispatchThemeChange } from '@/components/layout/ui-theme'
 import { getRoleMeta } from '@/lib/role-meta'
 import { translateUiText } from '@/lib/ui-language'
+import { PageHeader } from '@/components/page-header'
+import {
+  ShellIconButton,
+  IconSearch,
+  IconSun,
+  IconMoon,
+  IconLogout,
+} from '@/components/shell-icon-button'
 
 type TopbarProps = {
   pathname: string
@@ -20,8 +28,8 @@ function matchesPrefix(pathname: string, prefix: string) {
 
 export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
   const activeItem = findNavigationItem(pathname)
-  const { language, setLanguage } = useUiLanguage()
-  const { theme, setTheme } = useUiTheme()
+  const { language } = useUiLanguage()
+  const { theme } = useUiTheme()
   const canReviewImport =
     session ? allowedPrefixes.some((prefix) => matchesPrefix('/import', prefix)) : false
   const hideQuickControls = session?.role === 'SUPER_ADMIN'
@@ -31,6 +39,12 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
   const importLabel = translateUiText('Buka Import', language)
   const logoutLabel = translateUiText('Keluar', language)
   const themeLabel = translateUiText('Tema', language)
+  const searchLabel = translateUiText('Cari (Ctrl+K)', language)
+  const langLabelId = translateUiText('Gunakan Bahasa Indonesia', language)
+  const langLabelEn = translateUiText('Use English', language)
+  const themeLightLabel = translateUiText('Tema Terang', language)
+  const themeDarkLabel = translateUiText('Tema Gelap', language)
+
   const workspaceDescription =
     session && roleMeta
       ? language === 'en'
@@ -40,121 +54,135 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
         ? 'Open the main workspace, priority queues, and operational modules from one compact shell.'
         : 'Buka area kerja utama, antrean prioritas, dan modul operasional dari satu shell yang lebih ringkas.'
 
-  return (
-    <header className="flex flex-col gap-5 border-b border-line pb-8 lg:flex-row lg:items-end lg:justify-between" suppressHydrationWarning>
-      <div className="space-y-2.5">
-        <span className="section-title">{activeDescription}</span>
-        <div>
-          <h1 className="font-[family-name:var(--font-heading)] text-[28px] font-bold tracking-tight text-[var(--color-ink-strong)] lg:text-3xl">
-            {activeTitle}
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">{workspaceDescription}</p>
-        </div>
-      </div>
+  const breadcrumbs = [
+    { label: translateUiText('Beranda', language), href: '/dashboard' },
+    { label: activeTitle },
+  ]
 
-      <div className="relative z-50 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-          <div className="surface-soft inline-flex items-center rounded-full border p-1">
-            <span className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute select-none">
-              {themeLabel}
-            </span>
-            {([
-              ['light', 'Light'],
-              ['dark', 'Dark'],
-            ] as const).map(([value, label]) => {
-              const active = theme === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => { dispatchThemeChange(value) }}
-                  className={`cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold transition ${
-                    active
-                      ? 'text-[var(--color-accent-ink)]'
-                      : 'text-mute hover:text-[var(--color-ink-strong)]'
-                  }`}
-                  style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
-                  aria-label={label}
-                  title={label}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          <div className="surface-soft inline-flex items-center rounded-full border p-1">
-            {([
-              ['id', 'ID'],
-              ['en', 'EN'],
-            ] as const).map(([value, label]) => {
-              const active = language === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => { dispatchLanguageChange(value) }}
-                  className={`cursor-pointer select-none rounded-full px-3 py-2 text-xs font-semibold transition ${
-                    active
-                      ? 'text-[var(--color-accent-ink)]'
-                      : 'text-mute hover:text-[var(--color-ink-strong)]'
-                  }`}
-                  style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
-                  aria-label={value === 'id' ? 'Gunakan Bahasa Indonesia' : 'Use English'}
-                  title={value === 'id' ? 'Bahasa Indonesia' : 'English'}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          {session ? (
-            <div
-              className="surface-soft flex items-center gap-2 rounded-full border px-2 py-2 sm:gap-3 sm:px-4 sm:py-2.5"
-              title={session.displayName}
-            >
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
-              >
-                {session.displayName
-                  .split(' ')
-                  .slice(0, 2)
-                  .map((part) => part[0] ?? '')
-                  .join('')}
-              </div>
-              <div className="hidden min-w-0 sm:block">
-                <p className="truncate text-sm font-semibold text-ink">{session.displayName}</p>
-                <p className="truncate text-xs text-mute">
-                  {roleMeta ? `${roleMeta.division} / ${roleMeta.subdivision}` : null}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {!hideQuickControls && canReviewImport ? (
-            <Link
-              href="/import"
-              prefetch={false}
-              className="surface-soft rounded-full border px-4 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] cursor-pointer select-none"
-            >
-              {importLabel}
-            </Link>
-          ) : null}
-
-          <form action="/api/auth/logout" method="post">
+  const actions = (
+    <div className="flex flex-wrap items-center justify-end gap-2.5 sm:gap-3">
+      <ShellIconButton
+        variant="soft"
+        label={searchLabel}
+        icon={<IconSearch className="h-5 w-5" />}
+        onClick={() => {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('perkasa:open-command'))
+          }
+        }}
+      />
+      <div
+        className="inline-flex items-center gap-1 rounded-full border border-line bg-surfaceSoft p-1"
+        role="group"
+        aria-label={themeLabel}
+      >
+        {([
+          ['light', themeLightLabel, IconSun] as const,
+          ['dark', themeDarkLabel, IconMoon] as const,
+        ]).map(([value, label, Ico]) => {
+          const active = theme === value
+          return (
             <button
-              type="submit"
-              className="surface-soft inline-flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] sm:px-4"
-              title={logoutLabel}
+              key={value}
+              type="button"
+              onClick={() => { dispatchThemeChange(value) }}
+              aria-label={label}
+              title={label}
+              aria-pressed={active ? 'true' : undefined}
+              className={`tap-44 h-11 w-11 inline-flex items-center justify-center rounded-full transition duration-fast ui-standard focus-visible:shadow-focus ${
+                active
+                  ? 'bg-accent text-accentInk shadow-soft'
+                  : 'text-mute hover:text-inkStrong hover:bg-surface'
+              }`}
             >
-              <span aria-hidden="true" className="sm:hidden">
-                🚪
-              </span>
-              <span className="hidden sm:inline">{logoutLabel}</span>
+              <Ico className="h-5 w-5" aria-hidden="true" />
             </button>
-          </form>
-        </div>
+          )
+        })}
       </div>
+      <div
+        className="inline-flex items-center gap-1 rounded-full border border-line bg-surfaceSoft p-1"
+        role="group"
+        aria-label={translateUiText('Bahasa', language)}
+      >
+        {([
+          ['id', langLabelId, 'ID'] as const,
+          ['en', langLabelEn, 'EN'] as const,
+        ]).map(([value, label, short]) => {
+          const active = language === value
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => { dispatchLanguageChange(value) }}
+              aria-label={label}
+              title={label}
+              aria-pressed={active ? 'true' : undefined}
+              className={`tap-44 h-11 min-w-[52px] inline-flex items-center justify-center rounded-full px-2 text-[11px] font-bold tracking-wide transition duration-fast ui-standard focus-visible:shadow-focus ${
+                active
+                  ? 'bg-accent text-accentInk shadow-soft'
+                  : 'text-mute hover:text-inkStrong hover:bg-surface'
+              }`}
+            >
+              {short}
+            </button>
+          )
+        })}
+      </div>
+      {session ? (
+        <div
+          className="surface-soft flex items-center gap-2 rounded-full border border-line bg-surfaceSoft px-1.5 py-1.5 sm:gap-3 sm:px-2.5"
+          title={session.displayName}
+        >
+          <div
+            className="tap-44 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+            style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
+          >
+            {session.displayName
+              .split(' ')
+              .slice(0, 2)
+              .map((part) => part[0] ?? '')
+              .join('')}
+          </div>
+          <div className="hidden min-w-0 pr-1 sm:block">
+            <p className="truncate text-sm font-semibold text-ink">{session.displayName}</p>
+            <p className="truncate text-xs text-mute">
+              {roleMeta ? `${roleMeta.division} / ${roleMeta.subdivision}` : null}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {!hideQuickControls && canReviewImport ? (
+        <Link
+          href="/import"
+          prefetch={false}
+          className="inline-flex h-11 items-center rounded-full border border-line bg-surfaceSoft px-4 text-sm font-semibold text-ink transition duration-fast ui-standard hover:[border-color:var(--color-line-strong)] hover:bg-surface cursor-pointer select-none focus-visible:shadow-focus"
+        >
+          {importLabel}
+        </Link>
+      ) : null}
+
+      <form action="/api/auth/logout" method="post">
+        <ShellIconButton
+          variant="soft"
+          label={logoutLabel}
+          icon={<IconLogout className="h-5 w-5" />}
+          type="submit"
+        />
+      </form>
+    </div>
+  )
+
+  return (
+    <header className="pb-6 lg:pb-8" suppressHydrationWarning>
+      <PageHeader
+        eyebrow={activeDescription}
+        title={activeTitle}
+        description={workspaceDescription}
+        breadcrumbs={breadcrumbs}
+        actions={actions}
+      />
     </header>
   )
 }

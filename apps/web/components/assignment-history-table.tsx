@@ -1,6 +1,7 @@
 import { AssignmentAcceptButton } from '@/components/assignment-accept-button'
 import { ReleaseAssignmentButton } from '@/components/release-assignment-button'
 import { ReassignAssignmentModal, type TechnicianOption } from '@/components/reassign-assignment-modal'
+import { StatusBadge, type StatusTone } from '@/components/ui-status-badge'
 import type { AssignmentHistoryItem } from '@/lib/services/tracking-service'
 
 type AssignmentHistoryTableProps = {
@@ -12,27 +13,18 @@ type AssignmentHistoryTableProps = {
   technicianOptions: TechnicianOption[]
 }
 
-function getAssignmentStatusBadge(status: 'ASSIGNED' | 'ACCEPTED' | 'RELEASED'): { label: string; className: string } {
+const P58A_FULL_ACCESS_ROLES = new Set(['OWNER', 'SUPER_ADMIN', 'ADMIN', 'NOC_OPERATOR', 'TT_OPERATOR'])
+
+function resolveAssignmentTone(status: 'ASSIGNED' | 'ACCEPTED' | 'RELEASED'): { tone: StatusTone; label: string } {
   switch (status) {
     case 'ACCEPTED':
-      return {
-        label: 'ACCEPTED',
-        className: 'inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700',
-      }
+      return { tone: 'accepted', label: 'ACCEPTED' }
     case 'RELEASED':
-      return {
-        label: 'RELEASED',
-        className: 'inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600',
-      }
+      return { tone: 'released', label: 'RELEASED' }
     default:
-      return {
-        label: 'ASSIGNED',
-        className: 'inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700',
-      }
+      return { tone: 'assigned', label: 'ASSIGNED' }
   }
 }
-
-const P58A_FULL_ACCESS_ROLES = new Set(['OWNER', 'SUPER_ADMIN', 'ADMIN', 'NOC_OPERATOR', 'TT_OPERATOR'])
 
 function formatDate(value: string | null): string {
   if (!value) return '-'
@@ -73,13 +65,13 @@ export function AssignmentHistoryTable({
 
   if (!assignments || assignments.length === 0) {
     return (
-      <section className="rounded-3xl border border-line bg-surface p-5">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted">
+      <section aria-label="Assignment history" className="card-tier-2 border border-line p-5">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
           Riwayat Penugasan
         </p>
-        <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
-          <p className="text-sm font-semibold text-slate-600">Belum ada riwayat penugasan</p>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="mt-4 rounded-2xl border border-dashed border-line bg-cardSubtle px-4 py-8 text-center">
+          <p className="text-sm font-semibold text-ink">Belum ada riwayat penugasan</p>
+          <p className="mt-1 text-xs text-mute">
             Ticket ini belum pernah ditugaskan ke teknisi lapangan.
           </p>
         </div>
@@ -88,20 +80,20 @@ export function AssignmentHistoryTable({
   }
 
   return (
-    <section className="rounded-3xl border border-line bg-surface p-5">
+    <section aria-label="Assignment history" className="card-tier-3 border border-line p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
             Riwayat Penugasan
           </p>
-          <p className="mt-1 text-xs text-slate-500">{assignments.length} total riwayat penugasan</p>
+          <p className="mt-1 text-xs text-mute">{assignments.length} total riwayat penugasan</p>
         </div>
       </div>
 
       <div className="mt-4 hidden overflow-x-auto lg:block">
         <table className="min-w-full border-separate border-spacing-0 text-sm">
           <thead>
-            <tr className="text-left text-xs uppercase tracking-[0.16em] text-slate-500">
+            <tr className="text-left text-xs uppercase tracking-[0.16em] text-muteStrong">
               <th className="border-b border-line px-3 py-3 font-semibold">Teknisi</th>
               <th className="border-b border-line px-3 py-3 font-semibold">Peran</th>
               <th className="border-b border-line px-3 py-3 font-semibold">Status</th>
@@ -109,13 +101,13 @@ export function AssignmentHistoryTable({
               <th className="border-b border-line px-3 py-3 font-semibold">Ditugaskan</th>
               <th className="border-b border-line px-3 py-3 font-semibold">Acceptance</th>
               <th className="border-b border-line px-3 py-3 font-semibold">Released</th>
-              <th className="border-b border-line px-3 py-3 font-semibold">Alasan / Actor</th>
+              <th className="border-b border-line px-3 py-3 font-semibold">Alasan / Catatan</th>
               <th className="border-b border-line px-3 py-3 text-right font-semibold">Aksi</th>
             </tr>
           </thead>
           <tbody>
             {assignments.map((row) => {
-              const statusBadge = getAssignmentStatusBadge(row.status)
+              const status = resolveAssignmentTone(row.status)
               const isReleased = row.status === 'RELEASED'
               const isSelf = sessionUserId != null && Number(row.technician.userId) === Number(sessionUserId)
               const canAccept = !isReleased && row.status === 'ASSIGNED' && sessionRole === 'FIELD_TECHNICIAN' && isSelf
@@ -126,60 +118,58 @@ export function AssignmentHistoryTable({
               const releasedByLabel = actorLabel(row.releasedBy)
 
               return (
-                <tr key={row.assignmentId} className="align-top">
+                <tr key={row.assignmentId} className="align-top group">
                   <td className="border-b border-line px-3 py-3">
-                    <div className="text-sm font-semibold text-slate-900">{techLabel(row.technician)}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">User #{row.technician.userId}</div>
+                    <div className="text-sm font-semibold text-inkStrong">{techLabel(row.technician)}</div>
+                    <div className="mt-0.5 text-xs text-mute">User #{row.technician.userId}</div>
                   </td>
                   <td className="border-b border-line px-3 py-3">
-                    <span className="text-xs font-medium uppercase tracking-wider text-slate-600">{row.role || '-'}</span>
+                    <span className="text-xs font-medium uppercase tracking-wider text-ink">{row.role || '-'}</span>
                   </td>
                   <td className="border-b border-line px-3 py-3">
-                    <span className={statusBadge.className}>{statusBadge.label}</span>
+                    <StatusBadge tone={status.tone} label={status.label} size="sm" uppercase />
                   </td>
                   <td className="border-b border-line px-3 py-3">
                     {row.isPrimary ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                        ★ UTAMA
-                      </span>
+                      <StatusBadge tone="warning" label="UTAMA" size="sm" />
                     ) : (
-                      <span className="text-xs text-slate-400">Support</span>
+                      <span className="text-xs text-muteStrong">Support</span>
                     )}
                   </td>
                   <td className="border-b border-line px-3 py-3">
-                    <div className="text-sm text-slate-800">{formatDate(row.assignedAt)}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">Oleh: {assignedByLabel}</div>
+                    <div className="text-sm text-ink">{formatDate(row.assignedAt)}</div>
+                    <div className="mt-0.5 text-xs text-mute">Oleh: {assignedByLabel}</div>
                   </td>
                   <td className="border-b border-line px-3 py-3">
                     {row.status === 'ACCEPTED' ? (
                       <>
-                        <div className="text-sm text-slate-800">{formatDate(row.acceptedAt)}</div>
-                        <div className="mt-0.5 text-xs text-slate-500">Oleh: {acceptedByLabel}</div>
+                        <div className="text-sm text-ink">{formatDate(row.acceptedAt)}</div>
+                        <div className="mt-0.5 text-xs text-mute">Oleh: {acceptedByLabel}</div>
                       </>
                     ) : (
-                      <span className="text-xs text-slate-400">{row.status === 'ASSIGNED' ? 'Belum diterima' : '-'}</span>
+                      <span className="text-xs text-muteStrong">{row.status === 'ASSIGNED' ? 'Belum diterima' : '-'}</span>
                     )}
                   </td>
                   <td className="border-b border-line px-3 py-3">
                     {isReleased ? (
                       <>
-                        <div className="text-sm text-slate-800">{formatDate(row.releasedAt)}</div>
-                        <div className="mt-0.5 text-xs text-slate-500">Oleh: {releasedByLabel}</div>
+                        <div className="text-sm text-ink">{formatDate(row.releasedAt)}</div>
+                        <div className="mt-0.5 text-xs text-mute">Oleh: {releasedByLabel}</div>
                       </>
                     ) : (
-                      <span className="text-xs text-slate-400">-</span>
+                      <span className="text-xs text-muteStrong">-</span>
                     )}
                   </td>
                   <td className="border-b border-line px-3 py-3">
                     {isReleased && row.releasedReason ? (
-                      <div className="max-w-xs text-xs text-slate-600">
-                        <p className="font-semibold text-slate-700">{row.releasedReason}</p>
-                        {row.notes ? <p className="mt-1 text-slate-500">{row.notes}</p> : null}
+                      <div className="max-w-xs text-xs text-ink">
+                        <p className="font-semibold text-inkStrong">{row.releasedReason}</p>
+                        {row.notes ? <p className="mt-1 text-mute">{row.notes}</p> : null}
                       </div>
                     ) : row.notes ? (
-                      <div className="max-w-xs text-xs text-slate-500">{row.notes}</div>
+                      <div className="max-w-xs text-xs text-mute">{row.notes}</div>
                     ) : (
-                      <span className="text-xs text-slate-400">-</span>
+                      <span className="text-xs text-muteStrong">-</span>
                     )}
                   </td>
                   <td className="border-b border-line px-3 py-3">
@@ -215,51 +205,49 @@ export function AssignmentHistoryTable({
 
       <div className="mt-4 space-y-3 lg:hidden">
         {assignments.map((row) => {
-          const statusBadge = getAssignmentStatusBadge(row.status)
+          const status = resolveAssignmentTone(row.status)
           const isReleased = row.status === 'RELEASED'
           const isSelf = sessionUserId != null && Number(row.technician.userId) === Number(sessionUserId)
           const canAccept = !isReleased && row.status === 'ASSIGNED' && sessionRole === 'FIELD_TECHNICIAN' && isSelf
           const canRelease = !isReleased && (hasFullAccess || (sessionRole === 'FIELD_TECHNICIAN' && isSelf))
           const canReassign = !isReleased && hasFullAccess
           return (
-            <article key={row.assignmentId} className="rounded-2xl border border-line bg-slate-50/50 p-4">
+            <article key={row.assignmentId} className="rounded-2xl border border-line bg-cardSubtle p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{techLabel(row.technician)}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-inkStrong">{techLabel(row.technician)}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className={statusBadge.className}>{statusBadge.label}</span>
+                    <StatusBadge tone={status.tone} label={status.label} size="sm" uppercase />
                     {row.isPrimary ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                        ★ UTAMA
-                      </span>
+                      <StatusBadge tone="warning" label="UTAMA" size="sm" />
                     ) : null}
                   </div>
                 </div>
               </div>
               <dl className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
                 <div>
-                  <dt className="uppercase tracking-wider text-slate-400">Ditugaskan</dt>
-                  <dd className="text-slate-700">{formatDate(row.assignedAt)} • {actorLabel(row.assignedBy)}</dd>
+                  <dt className="uppercase tracking-wider text-muteStrong">Ditugaskan</dt>
+                  <dd className="text-ink">{formatDate(row.assignedAt)} • {actorLabel(row.assignedBy)}</dd>
                 </div>
                 <div>
-                  <dt className="uppercase tracking-wider text-slate-400">Diterima</dt>
-                  <dd className="text-slate-700">
+                  <dt className="uppercase tracking-wider text-muteStrong">Diterima</dt>
+                  <dd className="text-ink">
                     {row.acceptedAt ? `${formatDate(row.acceptedAt)} • ${actorLabel(row.acceptedBy)}` : row.status === 'ASSIGNED' ? 'Belum diterima' : '-'}
                   </dd>
                 </div>
                 {isReleased ? (
                   <>
                     <div className="sm:col-span-2">
-                      <dt className="uppercase tracking-wider text-slate-400">Dilepas</dt>
-                      <dd className="text-slate-700">
+                      <dt className="uppercase tracking-wider text-muteStrong">Dilepas</dt>
+                      <dd className="text-ink">
                         {formatDate(row.releasedAt)} • {actorLabel(row.releasedBy)}
                         {row.releasedReason ? ` • ${row.releasedReason}` : ''}
                       </dd>
                     </div>
                     {row.notes ? (
                       <div className="sm:col-span-2">
-                        <dt className="uppercase tracking-wider text-slate-400">Catatan</dt>
-                        <dd className="text-slate-600">{row.notes}</dd>
+                        <dt className="uppercase tracking-wider text-muteStrong">Catatan</dt>
+                        <dd className="text-mute">{row.notes}</dd>
                       </div>
                     ) : null}
                   </>

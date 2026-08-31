@@ -1,3 +1,4 @@
+import { StatusBadge } from '@/components/ui-status-badge'
 import { translateUiText, type UiLanguage } from '@/lib/ui-language'
 
 type WorklistHeaderProps = {
@@ -18,7 +19,6 @@ type WorklistHeaderProps = {
 
 export function WorklistHeader({
   roleLabel,
-  roleTone,
   division,
   subdivision,
   selectedQueue,
@@ -32,68 +32,65 @@ export function WorklistHeader({
   language,
 }: WorklistHeaderProps) {
   return (
-    <section className="panel p-4">
+    <section aria-label="Worklist summary" className="card-tier-2 border border-line p-4 sm:p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="section-title">{translateUiText('List Kerja Terpadu', language)}</p>
-          <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
+        <div className="space-y-1.5">
+          <p className="section-title">{translateUiText('Ringkasan Antrean Aktif', language)}</p>
+          <h2 className="font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-inkStrong">
             {translateUiText('Queue lintas domain untuk role aktif', language)}
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">
-            {translateUiText('Penjualan, customer, support, inventory, dan import dibaca dari satu layar kerja.', language)}
+          <p className="max-w-3xl text-sm leading-5 text-mute">
+            {translateUiText(
+              'Penjualan, customer, support, inventory, dan import dibaca dari satu layar kerja dengan hierarki tekanan yang jelas.',
+              language
+            )}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <span className={`badge border-transparent ${roleTone}`}>{roleLabel}</span>
-          <span className="solid-chip">
-            {division} / {subdivision}
-          </span>
-          <span className="solid-chip">{selectedQueue}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge tone="info" label={roleLabel} size="sm" ariaLabel={`Peran aktif: ${roleLabel}`} />
+          <StatusBadge tone="neutral" label={`${division} / ${subdivision}`} size="sm" ariaLabel={`Divisi: ${division} ${subdivision}`} />
+          <StatusBadge tone="in_progress" label={selectedQueue} size="sm" uppercase ariaLabel={`Antrean terpilih: ${selectedQueue}`} />
           {readOnly ? (
-            <span className="badge status-chip-warning">
-              {translateUiText('Mode baca saja', language)}
-            </span>
+            <StatusBadge tone="warning" label={translateUiText('Mode baca saja', language)} size="sm" ariaLabel="Mode akses: baca saja" />
           ) : null}
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-        <article className="surface-elevated rounded-md border px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">
+      <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+        <article className="card-tier-1 rounded-control border border-line px-3 py-2.5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muteStrong">
             {translateUiText('Item Aktif', language)}
           </p>
-          <p className="mt-1 text-xl font-semibold text-[var(--color-ink-strong)]">{totalCount}</p>
+          <p className="mt-1 text-lg font-semibold text-inkStrong">{totalCount}</p>
         </article>
-        <article className="status-chip-danger rounded-md border px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">
+        <article className="rounded-control border border-dangerLine bg-dangerSoft px-3 py-2.5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-dangerInk">
             {translateUiText('Kritikal', language)}
           </p>
-          <p className="mt-1 text-xl font-semibold">{criticalCount}</p>
+          <p className="mt-1 text-lg font-semibold text-dangerInk">{criticalCount}</p>
         </article>
-        <article className="status-chip-info rounded-md border px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">Follow Up</p>
-          <p className="mt-1 text-xl font-semibold">{followUpCount}</p>
+        <article className="rounded-control border border-infoLine bg-infoSoft px-3 py-2.5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-infoInk">Follow Up</p>
+          <p className="mt-1 text-lg font-semibold text-infoInk">{followUpCount}</p>
         </article>
-        <article className="status-chip-warning rounded-md border px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">
+        <article className="rounded-control border border-warningLine bg-warningSoft px-3 py-2.5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warningInk">
             {translateUiText('Menunggu', language)}
           </p>
-          <p className="mt-1 text-xl font-semibold">{waitingCount}</p>
+          <p className="mt-1 text-lg font-semibold text-warningInk">{waitingCount}</p>
         </article>
-        <article className="status-chip-success rounded-md border px-3 py-2 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">
+        <article className="rounded-control border border-successLine bg-successSoft px-3 py-2.5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-successInk">
             {translateUiText('Siap Ditutup', language)}
           </p>
-          <p className="mt-1 text-xl font-semibold">{readyCloseCount}</p>
+          <p className="mt-1 text-lg font-semibold text-successInk">{readyCloseCount}</p>
         </article>
       </div>
-      <div className="mt-2">
-        <span className="text-xs text-mute">
-          {language === 'en'
-            ? `Base scope: ${baseCount} items before active filters are applied.`
-            : `Scope dasar: ${baseCount} item sebelum filter aktif diterapkan.`}
-        </span>
-      </div>
+      <p className="mt-3 text-xs text-mute">
+        {language === 'en'
+          ? `Base scope: ${baseCount} items before active filters are applied.`
+          : `Scope dasar: ${baseCount} item sebelum filter aktif diterapkan.`}
+      </p>
     </section>
   )
 }

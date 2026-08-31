@@ -6,6 +6,8 @@ import { ReassignAssignmentModal, type TechnicianOption } from '@/components/rea
 import { CreateTTAssignmentModal } from '@/components/create-tt-assignment-modal'
 import { DeviceLifecycleActionForm } from '@/components/device-lifecycle-action-form'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { PageHeader } from '@/components/page-header'
+import { StatusBadge, type StatusTone } from '@/components/ui-status-badge'
 import { canPerformAction } from '@/lib/access-control'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
@@ -131,6 +133,43 @@ async function getDismantleHistoryRowsForTroubleTicket(itemCodes: string[], sour
   })
 }
 
+function resolveTtStatusTone(statusRaw: string | null | undefined): StatusTone {
+  const s = String(statusRaw ?? '').trim().toUpperCase()
+  if (s === 'CLOSED' || s === 'COMPLETED' || s === 'RESOLVED' || s === 'READY') return 'closed'
+  if (s === 'ACCEPTED' || s === 'IN_PROGRESS' || s === 'ON_PROGRESS' || s.startsWith('ON_')) return 'in_progress'
+  if (s === 'OPEN' || s === 'OVERDUE' || s === 'ESCALATED') return 'danger'
+  if (s === 'PENDING' || s === 'REVIEW' || s === 'WAITING' || s === 'HOLD' || s === 'MONITOR') return 'pending'
+  if (s === 'ASSIGNED') return 'assigned'
+  return 'neutral'
+}
+
+function resolveLifecycleTone(status: string | null): StatusTone {
+  const s = String(status ?? '').trim().toUpperCase()
+  if (s === 'INSTALLED') return 'success'
+  if (s === 'DAMAGED') return 'danger'
+  if (s === 'REPLACE' || s === 'REPLACE_OLD' || s === 'REPLACE_NEW') return 'warning'
+  if (s === 'RETURNED' || s === 'INVENTORY') return 'neutral'
+  if (s === 'PENDING_NOC_VALIDATION') return 'pending'
+  if (s === 'NOC') return 'info'
+  return 'in_progress'
+}
+
+function resolveValidationTone(status: string | null): StatusTone {
+  const s = String(status ?? '').trim().toUpperCase()
+  if (s === 'APPROVED') return 'success'
+  if (s === 'REJECTED') return 'danger'
+  if (s === 'PENDING') return 'warning'
+  return 'neutral'
+}
+
+function resolveProgressTone(statusRaw: string | null | undefined): StatusTone {
+  const s = String(statusRaw ?? '').trim().toUpperCase()
+  if (s === 'CLOSED' || s === 'COMPLETED' || s === 'RESOLVED') return 'closed'
+  if (s === 'ACCEPTED' || s.startsWith('ON_') || s === 'IN_PROGRESS') return 'in_progress'
+  if (s === 'ESCALATED' || s === 'BLOCKED') return 'danger'
+  return 'pending'
+}
+
 function canWriteDeviceLifecycle(role: Awaited<ReturnType<typeof requireSession>>['role']) {
   return (
     role === 'FIELD_TECHNICIAN' ||
@@ -138,47 +177,6 @@ function canWriteDeviceLifecycle(role: Awaited<ReturnType<typeof requireSession>
     canPerformAction(role, 'inventory', 'create') ||
     canPerformAction(role, 'support', 'update')
   )
-}
-
-function getLifecycleTone(status: string | null) {
-  switch (status) {
-    case 'INVENTORY':
-      return 'bg-slate-100 text-slate-700'
-    case 'NOC':
-      return 'bg-sky-100 text-sky-700'
-    case 'TEAM_PSB':
-    case 'TEAM_TROUBLESHOOTS':
-    case 'TEAM_JALUR':
-    case 'TEAM_DISMANTLE':
-      return 'bg-amber-100 text-amber-800'
-    case 'PENDING_NOC_VALIDATION':
-      return 'bg-orange-100 text-orange-700'
-    case 'INSTALLED':
-      return 'bg-emerald-100 text-emerald-700'
-    case 'DAMAGED':
-      return 'bg-rose-100 text-rose-700'
-    case 'REPLACE':
-    case 'REPLACE_OLD':
-    case 'REPLACE_NEW':
-      return 'bg-violet-100 text-violet-700'
-    case 'RETURNED':
-      return 'bg-slate-200 text-slate-700'
-    default:
-      return 'bg-slate-100 text-slate-700'
-  }
-}
-
-function getValidationTone(status: string | null) {
-  switch (status) {
-    case 'APPROVED':
-      return 'bg-emerald-100 text-emerald-700'
-    case 'PENDING':
-      return 'bg-amber-100 text-amber-800'
-    case 'REJECTED':
-      return 'bg-rose-100 text-rose-700'
-    default:
-      return 'bg-slate-100 text-slate-700'
-  }
 }
 
 export default async function TroubleTicketTrackingDetailPage({
@@ -251,458 +249,537 @@ export default async function TroubleTicketTrackingDetailPage({
 
   const TT_ENDPOINT_BASE = '/api/support/trouble-tickets/assignments'
 
+  const ttCodeOrId = tt?.ticketCode ?? `TT #${troubleTicketId}`
+  const descriptionBits = [
+    tt?.customerName,
+    tt?.type,
+    tt?.category,
+  ].filter(Boolean)
+  const breadcrumbs = [
+    { label: 'Workspace', href: '/dashboard' },
+    { label: 'Tracking', href: '/dashboard/tracking' },
+    { label: 'Trouble', href: '/dashboard/tracking/trouble-tickets' },
+    { label: ttCodeOrId },
+  ]
+  const pageActions = tt ? (
+    <>
+      <Link href="/dashboard/tracking/trouble-tickets" className="btn-ghost tap-44 focus-visible:shadow-focus">
+        Kembali
+      </Link>
+      <Link
+        href={`/inventory/requests?inventoryAction=item-request&troubleTicketId=${troubleTicketId}&requestType=TROUBLE_SUPPORT#inventory-action-item-request`}
+        className="btn-secondary tap-44 focus-visible:shadow-focus"
+      >
+        Request Barang
+      </Link>
+      <Link
+        href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=TROUBLE_TICKET&troubleTicketId=${troubleTicketId}#inventory-action-stock-movement`}
+        className="btn-secondary tap-44 focus-visible:shadow-focus"
+      >
+        Buat Movement
+      </Link>
+      {dismantleHistoryRows[0] ? (
+        <Link
+          href={buildSupportLaneHref('dismantle', {
+            focus: 'CLOSED_THIS_PERIOD',
+            customer: dismantleHistoryRows[0].customerName || '',
+            service: dismantleHistoryRows[0].serviceNo || '',
+            dismantleHistory: `${dismantleHistoryRows[0].historyId} | ${dismantleHistoryRows[0].customerName || ''} | ${dismantleHistoryRows[0].serviceNo || ''}`,
+          })}
+          className="btn-ghost tap-44 focus-visible:shadow-focus"
+        >
+          Histori Dismantle
+        </Link>
+      ) : null}
+    </>
+  ) : null
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 content-fade-in">
       <DataSourceStatus source={payload.source} />
-      <section className="panel p-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="section-title">Detail Trouble Ticket</p>
-            <h2 className="mt-2 text-2xl font-semibold text-[var(--color-ink-strong)]">
-              {tt?.ticketCode ?? `TT #${troubleTicketId}`}
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-mute">
-              {tt?.customerName ?? '-'} {tt?.type ? `• ${tt.type}` : ''} {tt?.status ? `• ${tt.status}` : ''}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/dashboard/tracking"
-              className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
-            >
-              Kembali ke tracking
-            </Link>
-            <Link
-              href={`/inventory/requests?inventoryAction=item-request&troubleTicketId=${troubleTicketId}&requestType=TROUBLE_SUPPORT#inventory-action-item-request`}
-              className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
-            >
-              Buat request barang
-            </Link>
-            <Link
-              href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=TROUBLE_TICKET&troubleTicketId=${troubleTicketId}#inventory-action-stock-movement`}
-              className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
-            >
-              Buat movement
-            </Link>
-            {dismantleHistoryRows[0] ? (
-              <Link
-                href={buildSupportLaneHref('dismantle', {
-                  focus: 'CLOSED_THIS_PERIOD',
-                  customer: dismantleHistoryRows[0].customerName || '',
-                  service: dismantleHistoryRows[0].serviceNo || '',
-                  dismantleHistory: `${dismantleHistoryRows[0].historyId} | ${dismantleHistoryRows[0].customerName || ''} | ${dismantleHistoryRows[0].serviceNo || ''}`,
-                })}
-                className="surface-soft inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
-              >
-                Buka Histori Dismantle
-              </Link>
+      <PageHeader
+        breadcrumbs={breadcrumbs}
+        title={ttCodeOrId}
+        description={
+          descriptionBits.length
+            ? `Detail ticket lintas status, penanganan, progress, dan jejak barang — ${descriptionBits.join(' • ')}.`
+            : 'Detail ticket lintas status, penanganan, progress, dan jejak barang.'
+        }
+        actions={pageActions}
+      />
+
+      {payload.error ? (
+        <div className="card-tier-2 border border-warningLine bg-warningSoft p-4 sm:p-5">
+          <p className="text-sm font-semibold text-warningInk">Review DB belum bisa dibaca</p>
+          <p className="mt-2 text-sm leading-6 text-warningInk/90">{payload.error}</p>
+        </div>
+      ) : null}
+
+      {!tt ? (
+        <div className="card-tier-2 border border-line bg-card p-5">
+          <p className="text-sm font-semibold text-inkStrong">Trouble ticket tidak ditemukan.</p>
+        </div>
+      ) : (
+        <>
+          <section aria-label="Ringkasan utama trouble ticket" className="card-tier-1 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muteStrong">Snapshot 4 Pertanyaan</p>
+                <div className="grid gap-2 text-sm sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-mute">Status Sekarang</p>
+                    <p className="mt-1 font-semibold text-inkStrong flex flex-wrap items-center gap-2">
+                      <StatusBadge tone={resolveTtStatusTone(tt.status)} label={tt.status ?? 'DRAFT'} size="sm" />
+                      {tt.type ? <StatusBadge tone="info" label={tt.type} size="sm" /> : null}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-mute">PIC Aktif</p>
+                    <p className="mt-1 font-semibold text-inkStrong">
+                      {payload.currentHandler ? `${payload.currentHandler.displayName ?? payload.currentHandler.username} (${payload.currentHandler.status})` : 'Belum ada assignment aktif'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-mute">Terakhir Update</p>
+                    <p className="mt-1 text-ink">{tt.closedAt ?? tt.openedAt ?? '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-mute">Langkah Berikutnya</p>
+                    <p className="mt-1 text-ink">
+                      {payload.nextAction?.label ?? 'Lakukan assignment jika belum ada, atau follow up status aktif.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <StatusBadge tone="info" label={`TT #${tt.id}`} size="md" />
+            </div>
+          </section>
+          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="space-y-6">
+            <section aria-label="Ringkasan ticket" className="card-tier-2 border border-line p-4 sm:p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge tone={resolveTtStatusTone(tt.status)} label={tt.status ?? 'DRAFT'} uppercase />
+                {tt.type ? <StatusBadge tone="info" label={tt.type} size="sm" /> : null}
+                {tt.category ? <StatusBadge tone="neutral" label={tt.category} size="sm" /> : null}
+                {tt.problemCategory ? <StatusBadge tone="pending" label={tt.problemCategory} size="sm" /> : null}
+              </div>
+              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs uppercase tracking-[0.14em] text-muteStrong">Customer</dt>
+                  <dd className="mt-1 font-semibold text-inkStrong">{tt.customerName ?? '-'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-[0.14em] text-muteStrong">Service Ref</dt>
+                  <dd className="mt-1 font-semibold text-inkStrong">{tt.customerUser ?? '-'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-[0.14em] text-muteStrong">Opened</dt>
+                  <dd className="mt-1 font-medium text-ink">{tt.openedAt ?? '-'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-[0.14em] text-muteStrong">Closed</dt>
+                  <dd className="mt-1 font-medium text-ink">{tt.closedAt ?? '-'}</dd>
+                </div>
+              </dl>
+              {tt.notes ? (
+                <article className="mt-4 rounded-control border border-line bg-cardSubtle px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muteStrong">Notes</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-inkStrong">{tt.notes}</p>
+                </article>
+              ) : null}
+              {tt.closeNotes ? (
+                <article className="mt-3 rounded-control border border-successLine bg-successSoft px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-successInk">Close Notes</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-successInk">{tt.closeNotes}</p>
+                </article>
+              ) : null}
+            </section>
+
+            <AssignmentHistoryTable
+              assignments={payload.assignments ?? []}
+              reviewDbReady={reviewDbReady}
+              endpointBasePath={TT_ENDPOINT_BASE}
+              sessionRole={session.role as string}
+              sessionUserId={session.userId ? Number(session.userId) : null}
+              technicianOptions={technicianOptions}
+            />
+
+            <section aria-label="Form scan lifecycle device" className="card-tier-2 border border-line p-4 sm:p-5">
+              <DeviceLifecycleActionForm
+                canCreate={canCreateDeviceLifecycle}
+                reviewDbReady={reviewDbReady}
+                itemSuggestions={itemSuggestions}
+                troubleTicketId={troubleTicketId}
+                defaultLifecycleStatus="TEAM_TROUBLESHOOTS"
+                defaultTargetTeam="Team Troubleshoots"
+                embedded
+                title="Scan lifecycle device"
+                description="Catat scan barcode modem/ONT saat NOC cek barang, delegasi ke teknisi troubleshoots, replace unit lama, hingga validasi akhir oleh NOC."
+              />
+            </section>
+
+            {payload.progressLogs && payload.progressLogs.length > 0 ? (
+              <section aria-label="Log progress ticket" className="card-tier-3 border border-line p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
+                      Log Progress
+                    </p>
+                    <p className="mt-1 text-xs text-mute">{payload.progressLogs.length} total catatan progress</p>
+                  </div>
+                  <StatusBadge tone="neutral" label={String(payload.progressLogs.length)} size="sm" />
+                </div>
+                <ol className="mt-4 space-y-3">
+                  {payload.progressLogs.map((row) => (
+                    <li key={row.id} className="rounded-control border border-line bg-cardSubtle px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge
+                          tone={resolveProgressTone(row.progressStatus)}
+                          label={String(row.progressStatus ?? 'PROGRESS')}
+                          size="sm"
+                          uppercase
+                        />
+                        {row.ownerName ? (
+                          <span className="text-xs text-mute">
+                            PIC: <span className="font-semibold text-ink">{row.ownerName}</span>
+                          </span>
+                        ) : null}
+                        <span className="text-xs text-mute">{formatDateLocale(row.createdAt)}</span>
+                      </div>
+                      {row.progressNotes ? (
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-inkStrong">
+                          {row.progressNotes}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              </section>
             ) : null}
           </div>
-        </div>
 
-        {payload.error ? (
-          <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-800">
-            <p className="text-sm font-semibold">Review DB belum bisa dibaca</p>
-            <p className="mt-2 text-sm leading-6">{payload.error}</p>
-          </div>
-        ) : null}
-
-        {!tt ? (
-          <div className="mt-6 rounded-3xl border border-line bg-surface px-5 py-4">
-            <p className="text-sm font-semibold text-[var(--color-ink-strong)]">Trouble ticket tidak ditemukan.</p>
-          </div>
-        ) : (
-          <div className="mt-6 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="space-y-6">
-              <section className="rounded-3xl border border-line bg-surface p-5">
-                <p className="section-title">Ringkasan Ticket</p>
-                <dl className="mt-4 grid gap-3 text-sm">
-                  <div className="flex items-start justify-between gap-4">
-                    <dt className="text-mute">Customer</dt>
-                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.customerName ?? '-'}</dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <dt className="text-mute">Service Ref</dt>
-                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.customerUser ?? '-'}</dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <dt className="text-mute">Kategori</dt>
-                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.category ?? '-'}</dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <dt className="text-mute">Type</dt>
-                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.type ?? '-'}</dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <dt className="text-mute">Status</dt>
-                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.status ?? '-'}</dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <dt className="text-mute">Problem</dt>
-                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.problemCategory ?? '-'}</dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <dt className="text-mute">Opened</dt>
-                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.openedAt ?? '-'}</dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <dt className="text-mute">Closed</dt>
-                    <dd className="font-semibold text-[var(--color-ink-strong)]">{tt.closedAt ?? '-'}</dd>
-                  </div>
-                </dl>
-                {tt.notes ? (
-                  <div className="mt-5 rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Notes</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{tt.notes}</p>
-                  </div>
-                ) : null}
-                {tt.closeNotes ? (
-                  <div className="mt-5 rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-mute">Close Notes</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{tt.closeNotes}</p>
-                  </div>
-                ) : null}
-              </section>
-
-              <CurrentHandlerCard
-                currentHandler={payload.currentHandler ?? null}
-                nextActionLabel={payload.nextAction?.label}
-                nextActionTone={payload.nextAction?.tone}
-                reviewDbReady={reviewDbReady}
-                endpointBasePath={TT_ENDPOINT_BASE}
-              >
-                {!payload.currentHandler && tt?.ticketCode ? (
-                  <CreateTTAssignmentModal
-                    ticketCode={tt.ticketCode}
-                    technicians={technicianOptions}
-                    canCreateAssignment={canCreateAssignment}
-                    reviewDbReady={reviewDbReady}
-                    defaultPrimary={defaultPrimary}
-                  />
-                ) : null}
-              </CurrentHandlerCard>
-
-              <AssignmentHistoryTable
-                assignments={payload.assignments ?? []}
-                reviewDbReady={reviewDbReady}
-                endpointBasePath={TT_ENDPOINT_BASE}
-                sessionRole={session.role as string}
-                sessionUserId={session.userId ? Number(session.userId) : null}
-                technicianOptions={technicianOptions}
-              />
-
-              <div className="rounded-3xl border border-line bg-surface p-4">
-                <DeviceLifecycleActionForm
-                  canCreate={canCreateDeviceLifecycle}
+          <section className="space-y-6" aria-label="Handler dan timeline ticket">
+            <CurrentHandlerCard
+              currentHandler={payload.currentHandler ?? null}
+              nextActionLabel={payload.nextAction?.label}
+              nextActionTone={payload.nextAction?.tone}
+              reviewDbReady={reviewDbReady}
+              endpointBasePath={TT_ENDPOINT_BASE}
+            >
+              {!payload.currentHandler && tt?.ticketCode ? (
+                <CreateTTAssignmentModal
+                  ticketCode={tt.ticketCode}
+                  technicians={technicianOptions}
+                  canCreateAssignment={canCreateAssignment}
                   reviewDbReady={reviewDbReady}
-                  itemSuggestions={itemSuggestions}
-                  troubleTicketId={troubleTicketId}
-                  defaultLifecycleStatus="TEAM_TROUBLESHOOTS"
-                  defaultTargetTeam="Team Troubleshoots"
-                  embedded
-                  title="Scan lifecycle device"
-                  description="Catat scan barcode modem/ONT saat NOC cek barang, delegasi ke teknisi troubleshoots, replace unit lama, hingga validasi akhir oleh NOC."
+                  defaultPrimary={defaultPrimary}
                 />
-              </div>
-
-              {payload.progressLogs && payload.progressLogs.length > 0 ? (
-                <section className="rounded-3xl border border-line bg-surface p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <p className="section-title">Log Progress Ticket</p>
-                    <span className="solid-chip">{payload.progressLogs.length}</span>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {payload.progressLogs.map((row) => (
-                      <div key={row.id} className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-                            {row.progressStatus}
-                          </span>
-                          {row.ownerName ? (
-                            <span className="text-xs text-slate-500">PIC: {row.ownerName}</span>
-                          ) : null}
-                          <span className="text-xs text-slate-400">{formatDateLocale(row.createdAt)}</span>
-                        </div>
-                        {row.progressNotes ? (
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-strong)]">{row.progressNotes}</p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </section>
               ) : null}
-            </div>
+            </CurrentHandlerCard>
 
-            <section className="space-y-6">
-              <div className="rounded-3xl border border-line bg-surface p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="section-title">Timeline</p>
-                  <span className="solid-chip">{timelineEntries.length}</span>
-                </div>
-                <div className="mt-4 space-y-4">
-                  {timelineEntries.length ? (
-                    timelineEntries.map((entry, index) => (
-                      <div key={entry.id} className="flex gap-4">
-                        <div className="flex w-16 flex-col items-center">
-                          <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] ${getTimelineTone(entry.type)}`}>
-                            {entry.type === 'trouble-ticket' ? 'TT' : entry.type === 'assignment' ? 'ASM' : entry.type === 'status' ? 'STS' : entry.type === 'close' ? 'CLS' : entry.type === 'movement' ? 'MOV' : 'EVT'}
-                          </span>
-                          {index < timelineEntries.length - 1 ? <span className="mt-2 h-full w-px bg-[var(--color-line)]" /> : null}
-                        </div>
-                        <div className="surface-soft flex-1 rounded-2xl border border-line px-4 py-3">
-                          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                            <div>
-                              <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{entry.title}</p>
-                              {entry.detail ? <p className="mt-1 text-sm leading-6 text-mute">{entry.detail}</p> : null}
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <span className="text-xs text-slate-400">{formatDateLocale(entry.at)}</span>
-                              {entry.href ? (
-                                <Link
-                                  href={entry.href}
-                                  className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
-                                >
-                                  Buka Detail
-                                </Link>
-                              ) : null}
-                            </div>
+            <section aria-label="Timeline event" className="card-tier-3 border border-line p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
+                  Timeline
+                </p>
+                <StatusBadge tone="neutral" label={String(timelineEntries.length)} size="sm" />
+              </div>
+              <ol className="mt-4 space-y-4">
+                {timelineEntries.length ? (
+                  timelineEntries.map((entry, index) => (
+                    <li key={entry.id} className="flex gap-4">
+                      <div className="flex w-16 shrink-0 flex-col items-center">
+                        <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] ${getTimelineTone(entry.type)}`}>
+                          {entry.type === 'trouble-ticket' ? 'TT' : entry.type === 'assignment' ? 'ASM' : entry.type === 'status' ? 'STS' : entry.type === 'close' ? 'CLS' : entry.type === 'movement' ? 'MOV' : 'EVT'}
+                        </span>
+                        {index < timelineEntries.length - 1 ? <span className="mt-2 h-full w-px bg-line" /> : null}
+                      </div>
+                      <div className="min-w-0 flex-1 rounded-control border border-line bg-cardSubtle px-4 py-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-inkStrong">{entry.title}</p>
+                            {entry.detail ? <p className="mt-1 text-sm leading-6 text-mute">{entry.detail}</p> : null}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-mute">{formatDateLocale(entry.at)}</span>
+                            {entry.href ? (
+                              <Link
+                                href={entry.href}
+                                className="btn-ghost tap-44 focus-visible:shadow-focus px-3 py-1 text-xs"
+                                aria-label={`Buka detail event: ${entry.title}`}
+                              >
+                                Buka Detail
+                              </Link>
+                            ) : null}
                           </div>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
-                      <p className="text-sm font-semibold text-slate-600">Belum ada event timeline</p>
-                      <p className="mt-1 text-xs text-slate-500">Event penugasan, progress, dan movement akan muncul di sini.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+                    </li>
+                  ))
+                ) : (
+                  <div className="rounded-control border border-dashed border-line bg-surfaceSoft px-4 py-8 text-center">
+                    <p className="text-sm font-semibold text-ink">Belum ada event timeline</p>
+                    <p className="mt-1 text-xs text-mute">Event penugasan, progress, dan movement akan muncul di sini.</p>
+                  </div>
+                )}
+              </ol>
+            </section>
 
-              <div className="rounded-3xl border border-line bg-surface p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="section-title">Work Order Terkait</p>
-                  <span className="solid-chip">{payload.workOrders.length}</span>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {payload.workOrders.length ? (
-                    payload.workOrders.map((row) => (
-                      <Link
-                        key={row.id}
-                        href={`/dashboard/tracking/work-orders/${row.id}`}
-                        className="surface-soft block rounded-2xl border border-line px-4 py-3 transition hover:[border-color:var(--color-line-strong)]"
-                      >
-                        <p className="text-sm font-semibold text-[var(--color-ink-strong)]">
+            <section aria-label="Work order terkait" className="card-tier-2 border border-line p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
+                  WO Terkait
+                </p>
+                <StatusBadge tone="neutral" label={String(payload.workOrders.length)} size="sm" />
+              </div>
+              <div className="mt-4 space-y-3">
+                {payload.workOrders.length ? (
+                  payload.workOrders.map((row) => (
+                    <Link
+                      key={row.id}
+                      href={`/dashboard/tracking/work-orders/${row.id}`}
+                      className="block rounded-control border border-line bg-cardSubtle px-4 py-3 transition hover:border-lineStrong"
+                      aria-label={`Buka work order terkait ${row.workOrderNo ?? `WO #${row.id}`}`}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-inkStrong">
                           {row.workOrderNo ?? `WO #${row.id}`}
                         </p>
-                        <p className="mt-1 text-sm leading-6 text-mute">
-                          {row.jobCategory ?? row.workType ?? 'WO'} {row.status ? `• ${row.status}` : ''}{' '}
-                          {row.priority ? `• ${row.priority}` : ''}
-                        </p>
-                      </Link>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-mute">
-                      Belum ada work order lapangan yang terhubung ke ticket ini.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-line bg-surface p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="section-title">Movement Terkait</p>
-                  <span className="solid-chip">{payload.movements.length}</span>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {payload.movements.length ? (
-                    payload.movements.map((row) => (
-                      <Link
-                        key={row.id}
-                        href={`/dashboard/tracking/stock-movements/${row.id}`}
-                        className="surface-soft block rounded-2xl border border-line px-4 py-3 transition hover:[border-color:var(--color-line-strong)]"
-                      >
-                        <p className="text-sm font-semibold text-[var(--color-ink-strong)]">
-                          {row.itemCode ?? `Item #${row.itemId}`} • {row.movementType ?? '-'}
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-mute">
-                          {row.qty ?? '-'} unit {row.referenceType ? `• ${row.referenceType}` : ''}{' '}
-                          {row.movementAt ? `• ${row.movementAt}` : ''}
-                        </p>
-                      </Link>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-mute">
-                      Belum ada movement inventory yang terhubung ke ticket ini.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-line bg-surface p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="section-title">Lifecycle Device</p>
-                  <span className="solid-chip">{lifecyclePayload.items.length}</span>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {lifecyclePayload.items.length ? (
-                    lifecyclePayload.items.map((row: DeviceLifecycleLogRow, index) => (
-                      <div key={row.id} className="flex gap-4">
-                        <div className="flex w-16 flex-col items-center">
-                          <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] ${getLifecycleTone(row.lifecycleStatus)}`}>
-                            DEV
-                          </span>
-                          {index < lifecyclePayload.items.length - 1 ? <span className="mt-2 h-full w-px bg-[var(--color-line)]" /> : null}
-                        </div>
-                        <div className="surface-soft flex-1 rounded-2xl border border-line px-4 py-3">
-                          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                            <div>
-                              <p className="text-sm font-semibold text-[var(--color-ink-strong)]">
-                                {row.itemCode ?? `Item #${row.inventoryItemId}`} {row.itemName ? `• ${row.itemName}` : ''}
-                              </p>
-                              <p className="mt-1 text-sm leading-6 text-mute">
-                                {row.eventType ?? '-'} {row.scanSource ? `• ${row.scanSource}` : ''} {row.ticketRef ? `• ${row.ticketRef}` : ''}
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {row.itemCode ? (
-                                <Link
-                                  href={buildInventoryBarcodeDetailPath(row.itemCode)}
-                                  className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
-                                >
-                                  Buka Barcode
-                                </Link>
-                              ) : null}
-                              {row.fromStatus ? (
-                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getLifecycleTone(row.fromStatus)}`}>
-                                  {row.fromStatus}
-                                </span>
-                              ) : null}
-                              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getLifecycleTone(row.lifecycleStatus)}`}>
-                                {row.lifecycleStatus ?? '-'}
-                              </span>
-                              {row.validationStatus && row.validationStatus !== 'NOT_REQUIRED' ? (
-                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getValidationTone(row.validationStatus)}`}>
-                                  {row.validationStatus}
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                          <div className="mt-3 grid gap-2 text-sm text-mute lg:grid-cols-2">
-                            <p>
-                              Actor: <span className="font-semibold text-[var(--color-ink-strong)]">{row.actorName ?? row.actorRole ?? '-'}</span>
-                            </p>
-                            <p>
-                              Waktu: <span className="font-semibold text-[var(--color-ink-strong)]">{row.createdAt ?? '-'}</span>
-                            </p>
-                            <p>
-                              Tim: <span className="font-semibold text-[var(--color-ink-strong)]">{row.targetTeam ?? '-'}</span>
-                            </p>
-                            <p>
-                              Lokasi: <span className="font-semibold text-[var(--color-ink-strong)]">{row.locationName ?? row.locationCode ?? '-'}</span>
-                            </p>
-                            <p className="lg:col-span-2">
-                              Handover: <span className="font-semibold text-[var(--color-ink-strong)]">{row.handoverFromLabel || row.handoverToLabel ? `${row.handoverFromLabel ?? '-'} -> ${row.handoverToLabel ?? '-'}` : '-'}</span>
-                            </p>
-                            <p>
-                              Jenis Proof: <span className="font-semibold text-[var(--color-ink-strong)]">{row.handoverProofType ?? '-'}</span>
-                            </p>
-                            <p>
-                              Ref Proof: <span className="font-semibold text-[var(--color-ink-strong)]">{row.handoverProofRef ?? '-'}</span>
-                            </p>
-                            <p className="lg:col-span-2">
-                              Pasangan Replace:{' '}
-                              <span className="font-semibold text-[var(--color-ink-strong)]">
-                                {row.relatedItemCode || row.relatedItemName
-                                  ? [row.relatedItemCode, row.relatedItemName].filter(Boolean).join(' | ')
-                                  : '-'}
-                              </span>
-                            </p>
-                          </div>
-                          {row.notes ? <p className="mt-3 text-sm leading-6 text-[var(--color-ink-strong)]">{row.notes}</p> : null}
-                        </div>
+                        {row.priority ? <StatusBadge tone="warning" label={row.priority} size="sm" /> : null}
                       </div>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-mute">
-                      Belum ada log lifecycle device untuk trouble ticket ini.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-line bg-surface p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="section-title">Histori Support Dismantle</p>
-                  <span className="solid-chip">{dismantleHistoryRows.length}</span>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-mute">
-                  Backlink ke histori close support yang memakai device return atau replace pada ticket gangguan ini,
-                  supaya operator tetap berada di konteks kasus yang sama saat pindah dari tracking ke support.
-                </p>
-                <div className="mt-4 space-y-3">
-                  {dismantleHistoryRows.length ? (
-                    dismantleHistoryRows.map((row) => {
-                      const returnedItemCodes = parseReturnedItemCodes(row.returnedItemCodes)
-                      return (
-                        <div key={row.historyId} className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3">
-                          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                            <div>
-                              <p className="text-sm font-semibold text-[var(--color-ink-strong)]">
-                                {row.customerName || `Histori Dismantle #${row.historyId}`} {row.serviceNo ? `• ${row.serviceNo}` : ''}
-                              </p>
-                              <p className="mt-1 text-sm leading-6 text-mute">
-                                {row.closeNote?.split('\n').find((line) => line.trim())?.trim() ||
-                                  'Kasus dismantle close yang memakai item return atau replace dari ticket gangguan ini.'}
-                              </p>
-                            </div>
-                            <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">
-                              {row.closedAt || 'Closed'}
-                            </span>
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <span className="badge border-slate-200 bg-white text-slate-600">History ID: {row.historyId}</span>
-                            <span className="badge border-slate-200 bg-white text-slate-600">Service: {row.serviceNo || '-'}</span>
-                            <span className="badge border-slate-200 bg-white text-slate-600">
-                              Returned: {returnedItemCodes.length ? returnedItemCodes.join(', ') : lifecycleItemCodes.join(', ') || '-'}
-                            </span>
-                          </div>
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <Link
-                              href={buildSupportLaneHref('dismantle', {
-                                focus: 'CLOSED_THIS_PERIOD',
-                                customer: row.customerName || '',
-                                service: row.serviceNo || '',
-                                dismantleHistory: `${row.historyId} | ${row.customerName || ''} | ${row.serviceNo || ''}`,
-                              })}
-                              className="inline-flex rounded-full border border-slate-950 bg-slate-950 px-3 py-1 text-xs font-semibold text-white transition hover:bg-slate-800"
-                            >
-                              Buka Histori Support
-                            </Link>
-                            {returnedItemCodes.slice(0, 2).map((itemCode) => (
-                              <Link
-                                key={`${row.historyId}-${itemCode}`}
-                                href={buildInventoryBarcodeDetailPath(itemCode)}
-                                className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
-                              >
-                                Buka Barcode {itemCode}
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div className="rounded-2xl border border-line bg-[var(--color-surface-soft)] px-4 py-3 text-sm text-mute">
-                      Belum ada histori close dismantle yang memakai item dari ticket gangguan ini.
-                    </div>
-                  )}
-                </div>
+                      <p className="mt-1 text-sm leading-6 text-mute">
+                        {row.jobCategory ?? row.workType ?? 'WO'}
+                        {row.status ? ` • ${row.status}` : ''}
+                      </p>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="rounded-control border border-line bg-surfaceSoft px-4 py-3 text-sm text-mute">
+                    Belum ada work order lapangan yang terhubung ke ticket ini.
+                  </div>
+                )}
               </div>
             </section>
-          </div>
-        )}
-      </section>
+
+            <section aria-label="Movement inventory terkait" className="card-tier-2 border border-line p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
+                  Movement Terkait
+                </p>
+                <StatusBadge tone="neutral" label={String(payload.movements.length)} size="sm" />
+              </div>
+              <div className="mt-4 space-y-3">
+                {payload.movements.length ? (
+                  payload.movements.map((row) => (
+                    <Link
+                      key={row.id}
+                      href={`/dashboard/tracking/stock-movements/${row.id}`}
+                      className="block rounded-control border border-line bg-cardSubtle px-4 py-3 transition hover:border-lineStrong"
+                      aria-label={`Buka movement inventory ${row.itemCode ?? `Item #${row.itemId}`}`}
+                    >
+                      <p className="text-sm font-semibold text-inkStrong">
+                        {row.itemCode ?? `Item #${row.itemId}`}
+                        {row.movementType ? ` • ${row.movementType}` : ''}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-mute">
+                        {row.qty ?? '-'} unit
+                        {row.referenceType ? ` • ${row.referenceType}` : ''}
+                        {row.movementAt ? ` • ${row.movementAt}` : ''}
+                      </p>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="rounded-control border border-line bg-surfaceSoft px-4 py-3 text-sm text-mute">
+                    Belum ada movement inventory yang terhubung ke ticket ini.
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section aria-label="Lifecycle device" className="card-tier-3 border border-line p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
+                  Lifecycle Device
+                </p>
+                <StatusBadge tone="neutral" label={String(lifecyclePayload.items.length)} size="sm" />
+              </div>
+              <ol className="mt-4 space-y-4">
+                {lifecyclePayload.items.length ? (
+                  lifecyclePayload.items.map((row: DeviceLifecycleLogRow, index) => (
+                    <li key={row.id} className="flex gap-4">
+                      <div className="flex w-16 shrink-0 flex-col items-center">
+                        <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] ${getTimelineTone('movement')}`}>
+                          DEV
+                        </span>
+                        {index < lifecyclePayload.items.length - 1 ? <span className="mt-2 h-full w-px bg-line" /> : null}
+                      </div>
+                      <div className="min-w-0 flex-1 rounded-control border border-line bg-cardSubtle px-4 py-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-inkStrong">
+                              {row.itemCode ?? `Item #${row.inventoryItemId}`}
+                              {row.itemName ? ` • ${row.itemName}` : ''}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-mute">
+                              {row.eventType ?? '-'}
+                              {row.scanSource ? ` • ${row.scanSource}` : ''}
+                              {row.ticketRef ? ` • ${row.ticketRef}` : ''}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {row.itemCode ? (
+                              <Link
+                                href={buildInventoryBarcodeDetailPath(row.itemCode)}
+                                className="btn-secondary tap-44 focus-visible:shadow-focus px-3 py-1 text-xs"
+                                aria-label={`Buka barcode ${row.itemCode}`}
+                              >
+                                Barcode
+                              </Link>
+                            ) : null}
+                            {row.fromStatus ? (
+                              <StatusBadge tone={resolveLifecycleTone(row.fromStatus)} label={String(row.fromStatus)} size="sm" />
+                            ) : null}
+                            <StatusBadge tone={resolveLifecycleTone(row.lifecycleStatus)} label={String(row.lifecycleStatus ?? '-')} size="sm" uppercase />
+                            {row.validationStatus && row.validationStatus !== 'NOT_REQUIRED' ? (
+                              <StatusBadge tone={resolveValidationTone(row.validationStatus)} label={String(row.validationStatus)} size="sm" />
+                            ) : null}
+                          </div>
+                        </div>
+                        <dl className="mt-3 grid gap-2 text-sm text-mute sm:grid-cols-2">
+                          <div>
+                            <dt className="text-xs uppercase tracking-wider text-muteStrong">Actor</dt>
+                            <dd className="font-semibold text-inkStrong">{row.actorName ?? row.actorRole ?? '-'}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs uppercase tracking-wider text-muteStrong">Waktu</dt>
+                            <dd className="font-semibold text-inkStrong">{row.createdAt ?? '-'}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs uppercase tracking-wider text-muteStrong">Tim</dt>
+                            <dd className="font-semibold text-inkStrong">{row.targetTeam ?? '-'}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs uppercase tracking-wider text-muteStrong">Lokasi</dt>
+                            <dd className="font-semibold text-inkStrong">{row.locationName ?? row.locationCode ?? '-'}</dd>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <dt className="text-xs uppercase tracking-wider text-muteStrong">Handover</dt>
+                            <dd className="font-semibold text-inkStrong">
+                              {row.handoverFromLabel || row.handoverToLabel
+                                ? `${row.handoverFromLabel ?? '-'} → ${row.handoverToLabel ?? '-'}`
+                                : '-'}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs uppercase tracking-wider text-muteStrong">Proof Type</dt>
+                            <dd className="font-semibold text-inkStrong">{row.handoverProofType ?? '-'}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs uppercase tracking-wider text-muteStrong">Proof Ref</dt>
+                            <dd className="font-semibold text-inkStrong">{row.handoverProofRef ?? '-'}</dd>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <dt className="text-xs uppercase tracking-wider text-muteStrong">Pasangan Replace</dt>
+                            <dd className="font-semibold text-inkStrong">
+                              {row.relatedItemCode || row.relatedItemName
+                                ? [row.relatedItemCode, row.relatedItemName].filter(Boolean).join(' | ')
+                                : '-'}
+                            </dd>
+                          </div>
+                        </dl>
+                        {row.notes ? <p className="mt-3 text-sm leading-6 text-inkStrong">{row.notes}</p> : null}
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <div className="rounded-control border border-line bg-surfaceSoft px-4 py-3 text-sm text-mute">
+                    Belum ada log lifecycle device untuk trouble ticket ini.
+                  </div>
+                )}
+              </ol>
+            </section>
+
+            <section aria-label="Histori support dismantle" className="card-tier-2 border border-line p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
+                    Histori Dismantle
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-mute">
+                    Backlink ke histori close support yang memakai device return atau replace pada ticket gangguan ini.
+                  </p>
+                </div>
+                <StatusBadge tone="neutral" label={String(dismantleHistoryRows.length)} size="sm" />
+              </div>
+              <div className="mt-4 space-y-3">
+                {dismantleHistoryRows.length ? (
+                  dismantleHistoryRows.map((row) => {
+                    const returnedItemCodes = parseReturnedItemCodes(row.returnedItemCodes)
+                    const closedLabel = row.closedAt ? formatDateLocale(row.closedAt) : 'Closed'
+                    return (
+                      <article key={row.historyId} className="rounded-control border border-line bg-cardSubtle px-4 py-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-inkStrong">
+                              {row.customerName || `Histori Dismantle #${row.historyId}`}
+                              {row.serviceNo ? ` • ${row.serviceNo}` : ''}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-mute">
+                              {row.closeNote?.split('\n').find((line) => line.trim())?.trim() ||
+                                'Kasus dismantle close yang memakai item return atau replace dari ticket gangguan ini.'}
+                            </p>
+                          </div>
+                          <StatusBadge tone="closed" label={closedLabel} size="sm" />
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <StatusBadge tone="neutral" label={`History ID: ${row.historyId}`} size="sm" />
+                          {row.serviceNo ? (
+                            <StatusBadge tone="info" label={`Service: ${row.serviceNo}`} size="sm" />
+                          ) : null}
+                          <StatusBadge
+                            tone="pending"
+                            label={`Returned: ${returnedItemCodes.length ? returnedItemCodes.length : lifecycleItemCodes.length}`}
+                            size="sm"
+                          />
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Link
+                            href={buildSupportLaneHref('dismantle', {
+                              focus: 'CLOSED_THIS_PERIOD',
+                              customer: row.customerName || '',
+                              service: row.serviceNo || '',
+                              dismantleHistory: `${row.historyId} | ${row.customerName || ''} | ${row.serviceNo || ''}`,
+                            })}
+                            className="btn-primary tap-44 focus-visible:shadow-focus px-3 py-1 text-xs"
+                            aria-label={`Buka histori support dismantle ${row.historyId}`}
+                          >
+                            Buka Histori Support
+                          </Link>
+                          {returnedItemCodes.slice(0, 2).map((itemCode) => (
+                            <Link
+                              key={`${row.historyId}-${itemCode}`}
+                              href={buildInventoryBarcodeDetailPath(itemCode)}
+                              className="btn-secondary tap-44 focus-visible:shadow-focus px-3 py-1 text-xs"
+                              aria-label={`Buka barcode ${itemCode}`}
+                            >
+                              Barcode {itemCode}
+                            </Link>
+                          ))}
+                        </div>
+                      </article>
+                    )
+                  })
+                ) : (
+                  <div className="rounded-control border border-line bg-surfaceSoft px-4 py-3 text-sm text-mute">
+                    Belum ada histori close dismantle yang memakai item dari ticket gangguan ini.
+                  </div>
+                )}
+              </div>
+            </section>
+          </section>
+        </div>
+        </>
+      )}
     </div>
   )
 }

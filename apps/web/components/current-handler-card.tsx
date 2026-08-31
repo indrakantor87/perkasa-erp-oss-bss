@@ -1,4 +1,5 @@
 import type { CurrentHandlerInfo } from '@/lib/services/tracking-service'
+import { StatusBadge, type StatusTone } from '@/components/ui-status-badge'
 
 type CurrentHandlerCardProps = {
   currentHandler: CurrentHandlerInfo | null
@@ -13,29 +14,16 @@ type CurrentHandlerCardProps = {
   compact?: boolean
 }
 
-function getStatusBadge(status: 'ASSIGNED' | 'ACCEPTED'): { label: string; className: string } {
-  if (status === 'ACCEPTED') {
-    return {
-      label: 'DIKERJAKAN',
-      className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-    }
-  }
-  return {
-    label: 'MENUNGGU ACCEPT',
-    className: 'bg-sky-50 text-sky-700 border border-sky-200',
-  }
-}
-
-function getNextActionChip(tone?: 'info' | 'warning' | 'success' | 'default'): string {
+function resolveNextActionTone(tone?: 'info' | 'warning' | 'success' | 'default'): StatusTone {
   switch (tone) {
     case 'warning':
-      return 'bg-amber-50 text-amber-700 border border-amber-200'
+      return 'warning'
     case 'info':
-      return 'bg-sky-50 text-sky-700 border border-sky-200'
+      return 'info'
     case 'success':
-      return 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+      return 'success'
     default:
-      return 'bg-slate-50 text-slate-700 border border-slate-200'
+      return 'neutral'
   }
 }
 
@@ -72,25 +60,24 @@ export function CurrentHandlerCard({
 }: CurrentHandlerCardProps) {
   if (!currentHandler) {
     return (
-      <section className="rounded-3xl border border-line bg-surface p-5">
+      <section aria-label="Current handler panel" className={compact ? 'card-tier-2 border border-line p-4' : 'card-tier-2 border border-line p-5'}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
               Penanganan Saat Ini
             </p>
             <div className="mt-3 flex items-center gap-3">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 text-lg font-semibold shrink-0">
+              <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surfaceStrong text-muteStrong text-lg font-semibold" aria-hidden="true">
                 ?
               </div>
               <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">Belum ada PIC</p>
-                <p className="text-sm text-muted">Belum ada teknisi yang ditugaskan untuk ticket ini.</p>
+                <p className="text-base font-semibold text-inkStrong">Belum ada PIC</p>
+                <p className="text-sm text-mute">Belum ada teknisi yang ditugaskan untuk ticket ini.</p>
               </div>
             </div>
             {nextActionLabel ? (
-              <div className={`mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getNextActionChip(nextActionTone)}`}>
-                <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />
-                {nextActionLabel}
+              <div className="mt-4">
+                <StatusBadge tone={resolveNextActionTone(nextActionTone)} label={nextActionLabel} size="sm" uppercase />
               </div>
             ) : null}
             {children ? <div className="mt-5">{children}</div> : null}
@@ -100,45 +87,46 @@ export function CurrentHandlerCard({
     )
   }
 
-  const badge = getStatusBadge(currentHandler.status)
+  const statusTone: StatusTone = currentHandler.status === 'ACCEPTED' ? 'accepted' : 'assigned'
+  const statusLabel = currentHandler.status === 'ACCEPTED' ? 'DIKERJAKAN' : 'MENUNGGU ACCEPT'
   const display = currentHandler.displayName?.trim() || currentHandler.username || `User #${currentHandler.userId}`
 
   return (
-    <section className={compact ? 'rounded-2xl border border-line bg-surface p-4' : 'rounded-3xl border border-line bg-surface p-5'}>
+    <section aria-label="Current handler panel" className={compact ? 'card-tier-2 border border-line p-4' : 'card-tier-2 border border-line p-5'}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
-          <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-sky-600 text-white text-base font-semibold">
+          <div
+            aria-hidden="true"
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent text-accentInk text-base font-semibold"
+          >
             {getInitials(currentHandler.displayName, currentHandler.username)}
           </div>
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muted">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
               Penanganan Saat Ini
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <p className="text-lg font-bold text-slate-900">{display}</p>
-              <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${badge.className}`}>
-                {badge.label}
-              </span>
+              <p className="text-lg font-bold text-inkStrong truncate">{display}</p>
+              <StatusBadge tone={statusTone} label={statusLabel} size="sm" uppercase ariaLabel={`Status penanganan: ${statusLabel}`} />
             </div>
             {currentHandler.username && (currentHandler.displayName?.trim() !== currentHandler.username.trim()) ? (
-              <p className="mt-1 text-sm text-muted">@{currentHandler.username}</p>
+              <p className="mt-1 text-sm text-mute">@{currentHandler.username}</p>
             ) : null}
-            <div className="mt-3 grid gap-x-6 gap-y-1 text-sm text-slate-600 sm:grid-cols-2">
+            <div className="mt-3 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
               <div>
-                <span className="text-xs uppercase tracking-wider text-slate-400">Ditugaskan</span>
-                <p className="font-medium text-slate-800">{formatDate(currentHandler.assignedAt)}</p>
+                <p className="text-xs uppercase tracking-wider text-mute">Ditugaskan</p>
+                <p className="font-medium text-ink">{formatDate(currentHandler.assignedAt)}</p>
               </div>
               <div>
-                <span className="text-xs uppercase tracking-wider text-slate-400">Diterima</span>
-                <p className="font-medium text-slate-800">
+                <p className="text-xs uppercase tracking-wider text-mute">Diterima</p>
+                <p className="font-medium text-ink">
                   {currentHandler.acceptedAt ? formatDate(currentHandler.acceptedAt) : '-'}
                 </p>
               </div>
             </div>
             {nextActionLabel ? (
-              <div className={`mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getNextActionChip(nextActionTone)}`}>
-                <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />
-                {nextActionLabel}
+              <div className="mt-4">
+                <StatusBadge tone={resolveNextActionTone(nextActionTone)} label={nextActionLabel} size="sm" uppercase />
               </div>
             ) : null}
           </div>

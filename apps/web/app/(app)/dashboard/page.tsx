@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import { CrossDomainAlerts } from '@/components/dashboard/cross-domain-alerts'
 import { DashboardCommandCenter } from '@/components/dashboard/dashboard-command-center'
@@ -26,6 +27,7 @@ import { getPreferredSupportLane } from '@/lib/support-lanes'
 import type { DashboardOperationalDivisionKey } from '@/lib/types'
 import type { AppRole } from '@/lib/types'
 import { getVisibleModuleCards } from '@/lib/ui-access'
+import { PageHeader } from '@/components/page-header'
 
 function parsePositiveNumber(value: string | string[] | undefined, fallback: number) {
   const raw = Array.isArray(value) ? value[0] : value
@@ -205,9 +207,53 @@ export default async function DashboardPage({
       }).catch(() => [])
     : []
   const worklistHref = buildWorklistHref(session.role)
+  const supportLaneHref = canAccessPath(session.role, '/support')
+    ? buildSupportLaneHref(getPreferredSupportLane(session.role))
+    : null
+  const trackingHref = canAccessPath(session.role, '/dashboard/tracking') ? '/dashboard/tracking' : null
+
+  const breadcrumbs = [
+    { label: 'Workspace', href: '/dashboard' },
+    { label: 'Dasbor Operasional', href: '/dashboard' },
+  ]
+
+  const pageActions = (
+    <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+      {worklistHref ? (
+        <Link
+          href={worklistHref}
+          className="btn-base btn-secondary focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control px-4 text-sm font-medium"
+        >
+          Lihat Worklist
+        </Link>
+      ) : null}
+      {trackingHref ? (
+        <Link
+          href={trackingHref}
+          className="btn-base btn-ghost focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control px-4 text-sm font-medium"
+        >
+          Tracking
+        </Link>
+      ) : null}
+      {supportLaneHref ? (
+        <Link
+          href={supportLaneHref}
+          className="btn-base btn-ghost focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control px-4 text-sm font-medium"
+        >
+          Support Lane
+        </Link>
+      ) : null}
+    </div>
+  )
 
   return (
-    <div className="space-y-4">
+    <div className="content-fade-in space-y-4">
+      <PageHeader
+        breadcrumbs={breadcrumbs}
+        title="Dasbor Operasional"
+        description="Ringkasan ritme kerja, tekanan antrean, dan jalur aksi tercepat untuk peran aktif hari ini."
+        actions={pageActions}
+      />
       <DashboardCommandCenter
         roleLabel={roleMeta.label}
         roleShortLabel={roleMeta.shortLabel}

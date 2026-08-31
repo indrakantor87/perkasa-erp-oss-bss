@@ -28,12 +28,14 @@ export function AppShell({
   return (
     <ThemeProvider initialTheme={initialTheme}>
       <LanguageProvider initialLanguage={initialLanguage}>
-        <div className="min-h-screen lg:flex" suppressHydrationWarning>
+        <div className="min-h-screen bg-bg text-ink lg:flex" suppressHydrationWarning>
           <Sidebar session={session} allowedPrefixes={allowedPrefixes} />
           <main className="min-w-0 flex-1">
-            <div className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-6 sm:py-5 lg:px-10 lg:py-10">
+            <div className="mx-auto w-full max-w-7xl px-compact py-compact sm:px-comfort sm:py-comfort lg:px-section lg:py-section xl:max-w-none xl:px-[2.5rem] xl:py-[2rem]">
               <Topbar pathname={pathname} session={session} allowedPrefixes={allowedPrefixes} />
-              <div className="mt-6 sm:mt-8 lg:mt-10">{children}</div>
+              <div className="mt-4 sm:mt-5 lg:mt-6 xl:mt-8 content-fade-in">
+                {children}
+              </div>
             </div>
           </main>
         </div>
