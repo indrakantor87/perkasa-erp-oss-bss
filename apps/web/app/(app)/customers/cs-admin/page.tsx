@@ -276,9 +276,35 @@ export default async function CsAdminWorkspacePage() {
                       <p className="mt-1 text-xs text-slate-500">{item.queue}</p>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">
-                      <p className="font-semibold text-slate-950">{item.title}</p>
-                      <p className="mt-1">{item.subtitle}</p>
-                      <p className="mt-2 text-xs leading-5 text-slate-500">{item.detail}</p>
+                      {(() => {
+                        const normDomain = normalizeDomain(item.domain)
+                        const customerRelevant = new Set(['CUSTOMERS', 'SALES', 'SUPPORT', 'LAYANAN', 'FIELD OPS'])
+                        const identifier = item.title?.trim()
+                        if (customerRelevant.has(normDomain) && identifier) {
+                          const encoded = encodeURIComponent(identifier)
+                          return (
+                            <>
+                              <p className="font-semibold text-slate-950">
+                                <Link
+                                  href={`/customers/${encoded}?name=${encoded}`}
+                                  className="transition hover:underline hover:text-slate-950"
+                                >
+                                  {item.title}
+                                </Link>
+                              </p>
+                              <p className="mt-1">{item.subtitle}</p>
+                              <p className="mt-2 text-xs leading-5 text-slate-500">{item.detail}</p>
+                            </>
+                          )
+                        }
+                        return (
+                          <>
+                            <p className="font-semibold text-slate-950">{item.title}</p>
+                            <p className="mt-1">{item.subtitle}</p>
+                            <p className="mt-2 text-xs leading-5 text-slate-500">{item.detail}</p>
+                          </>
+                        )
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">
                       <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getDomainBadgeTone(item.domain)}`}>

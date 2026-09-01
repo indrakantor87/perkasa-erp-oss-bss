@@ -413,9 +413,23 @@ export default async function WorkOrderTrackingDetailPage({
         Kembali
       </Link>
       <Link
+        href={(() => {
+          const params = new URLSearchParams()
+          params.set('referenceWorkOrder', String(workOrderId))
+          if (wo?.workOrderNo) params.set('workOrderNo', wo.workOrderNo)
+          if (wo?.jobCategory) params.set('activityCategory', wo.jobCategory)
+          if (wo?.workType) params.set('activityType', wo.workType)
+          return `/dashboard/daily-activity?${params.toString()}`
+        })()}
+        aria-label="Buat daily activity dengan konteks work order ini"
+        className="btn-primary tap-44"
+      >
+        Buat Daily Activity
+      </Link>
+      <Link
         href={`/dashboard/tracking/stock-movements?workOrderId=${workOrderId}`}
         aria-label="Lihat stock movement terkait work order ini"
-        className="btn-primary tap-44"
+        className="btn-secondary tap-44"
       >
         Lihat Movement
       </Link>

@@ -294,9 +294,27 @@ export function InventoryRequestOpsPanel({
                           Movement: {audit.movement.primary} · {audit.movement.status || 'NO-REF'}
                         </span>
                       ) : normalizeText(row.status) === 'SELESAI' ? (
-                        <span className="badge border-amber-200 bg-amber-50 text-amber-700">
-                          Movement OUT belum terbaca
-                        </span>
+                        <>
+                          <span className="badge border-amber-200 bg-amber-50 text-amber-700">
+                            Movement OUT belum terbaca
+                          </span>
+                          <Link
+                            href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=REQUEST&requestId=${row.id}#inventory-action-stock-movement`}
+                            className="badge border-slate-900 bg-slate-950 text-white transition hover:bg-slate-800"
+                            aria-label="Buat stock movement keluar untuk request inventory ini"
+                          >
+                            Buat Movement dari Request
+                          </Link>
+                        </>
+                      ) : null}
+                      {!audit?.movement && normalizeText(row.status) !== 'SELESAI' && row.status.trim().toUpperCase() !== 'DRAFT' ? (
+                        <Link
+                          href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=REQUEST&requestId=${row.id}#inventory-action-stock-movement`}
+                          className="badge border-slate-300 bg-white text-slate-700 transition hover:border-slate-400"
+                          aria-label="Buat stock movement keluar untuk request inventory ini"
+                        >
+                          Shortcut Movement
+                        </Link>
                       ) : null}
                       {handover?.handoverFrom && handover?.handoverTo ? (
                         <span className="badge border-violet-200 bg-violet-50 text-violet-700">

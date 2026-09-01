@@ -445,6 +445,10 @@ export type DomainFormPrefill = {
   attendance?: string
   loan?: string
   payroll?: string
+  troubleTicketId?: string
+  subscriptionId?: string
+  jobCategory?: string
+  notes?: string
 }
 
 export type SupportDrilldownContext = {

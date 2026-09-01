@@ -736,7 +736,19 @@ export function SupportTroubleTicketQueuePanel({
                       <tr key={row.id} className={`align-top ${getQueueRowClass(queueReason, queuePriority, slaState)}`}>
                         <td className="px-3 py-3.5">
                           <div className="space-y-2">
-                            <p className="font-mono text-[13px] font-semibold leading-5 text-slate-950">{row.primary}</p>
+                            {(() => {
+                              const code = row.primary
+                              const numericMatch = code.match(/(\d+)/)
+                              const trackingId = numericMatch ? numericMatch[1] : encodeURIComponent(code)
+                              return (
+                                <Link
+                                  href={`/dashboard/tracking/trouble-tickets/${trackingId}`}
+                                  className="transition hover:underline"
+                                >
+                                  <p className="font-mono text-[13px] font-semibold leading-5 text-slate-950">{code}</p>
+                                </Link>
+                              )
+                            })()}
                             <div className="flex flex-wrap gap-1.5">
                               <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
                               <span className="badge border-slate-200 bg-white text-slate-600">{getQueueReasonLabel(queueReason)}</span>
@@ -887,7 +899,19 @@ export function SupportTroubleTicketQueuePanel({
                 <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
+                      {(() => {
+                        const code = row.primary
+                        const numericMatch = code.match(/(\d+)/)
+                        const trackingId = numericMatch ? numericMatch[1] : encodeURIComponent(code)
+                        return (
+                          <Link
+                            href={`/dashboard/tracking/trouble-tickets/${trackingId}`}
+                            className="transition hover:underline"
+                          >
+                            <p className="text-sm font-semibold text-slate-950">{code}</p>
+                          </Link>
+                        )
+                      })()}
                       <p className="mt-1 text-sm text-mute">{row.secondary}</p>
                     </div>
                     <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>

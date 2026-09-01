@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { PageHeader } from '@/components/page-header'
 import { StatusBadge, type StatusTone } from '@/components/ui-status-badge'
+import { TrackingIdentifierSearch } from '@/components/tracking-identifier-search'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import type { AppSession } from '@/lib/auth-session'
@@ -171,6 +172,9 @@ export default async function DashboardTrackingIndexPage() {
         description="Halaman ini menampilkan tracking berbasis review DB untuk work order lapangan dan pergerakan barang."
       />
       <DataSourceStatus source={source} />
+
+      <TrackingIdentifierSearch />
+
       <section aria-label="Ringkasan Tracking" className="card-tier-1 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">

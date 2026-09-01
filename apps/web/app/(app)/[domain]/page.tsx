@@ -335,6 +335,10 @@ export default async function DomainPage({
     payroll?: string | string[]
     inventoryView?: string | string[]
     inventoryAction?: string | string[]
+    troubleTicketId?: string | string[]
+    subscriptionId?: string | string[]
+    jobCategory?: string | string[]
+    notes?: string | string[]
   }>
 }) {
   const session = await requireSession()
@@ -367,6 +371,10 @@ export default async function DomainPage({
     attendance: resolveSearchParam(resolvedSearchParams.attendance),
     loan: resolveSearchParam(resolvedSearchParams.loan),
     payroll: resolveSearchParam(resolvedSearchParams.payroll),
+    troubleTicketId: resolveSearchParam(resolvedSearchParams.troubleTicketId),
+    subscriptionId: resolveSearchParam(resolvedSearchParams.subscriptionId),
+    jobCategory: resolveSearchParam(resolvedSearchParams.jobCategory),
+    notes: resolveSearchParam(resolvedSearchParams.notes),
   }
   const resolvedDomainDrilldown = resolveDomainDrilldown(domain as DomainKey, resolveSearchParam(resolvedSearchParams.focus))
   const salesFocus = resolveSearchParam(resolvedSearchParams.focus)

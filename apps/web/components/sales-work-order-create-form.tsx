@@ -10,6 +10,10 @@ type SalesWorkOrderCreateFormProps = {
   reviewDbReady: boolean
   orderSuggestions: string[]
   initialOrderValue?: string
+  initialTroubleTicketId?: number | string
+  initialSubscriptionId?: number | string
+  initialJobCategory?: 'PSB' | 'TROUBLE' | 'JALUR' | 'EXPAN' | 'JOINTER'
+  initialNotes?: string
 }
 
 const workTypeOptions = ['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'] as const
@@ -27,12 +31,18 @@ export function SalesWorkOrderCreateForm({
   reviewDbReady,
   orderSuggestions,
   initialOrderValue,
+  initialTroubleTicketId,
+  initialSubscriptionId,
+  initialJobCategory,
+  initialNotes,
 }: SalesWorkOrderCreateFormProps) {
   const router = useRouter()
   const [orderValue, setOrderValue] = useState(initialOrderValue?.trim() || orderSuggestions[0] || '')
   const [workType, setWorkType] = useState<(typeof workTypeOptions)[number]>('INSTALLATION')
   const [status, setStatus] = useState<(typeof workStatusOptions)[number]>('SCHEDULED')
-  const [jobCategory, setJobCategory] = useState<(typeof jobCategoryOptions)[number]>('PSB')
+  const [jobCategory, setJobCategory] = useState<(typeof jobCategoryOptions)[number]>(
+    (initialJobCategory as (typeof jobCategoryOptions)[number]) || 'PSB',
+  )
   const [priority, setPriority] = useState<(typeof priorityOptions)[number]>('MEDIUM')
   const [scheduledAt, setScheduledAt] = useState('')
   const [currentPicRaw, setCurrentPicRaw] = useState('')
@@ -41,7 +51,7 @@ export function SalesWorkOrderCreateForm({
   const [address, setAddress] = useState('')
   const [latitude, setLatitude] = useState('')
   const [longitude, setLongitude] = useState('')
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(initialNotes?.trim() || '')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
@@ -53,15 +63,36 @@ export function SalesWorkOrderCreateForm({
     }
   }, [initialOrderValue])
 
+  useEffect(() => {
+    if (initialJobCategory) {
+      const normalized = String(initialJobCategory).trim().toUpperCase() as (typeof jobCategoryOptions)[number]
+      if (jobCategoryOptions.includes(normalized)) {
+        setJobCategory(normalized)
+      }
+    }
+  }, [initialJobCategory])
+
+  useEffect(() => {
+    if (initialNotes?.trim()) {
+      setNotes(initialNotes.trim())
+    }
+  }, [initialNotes])
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (isDisabled) return
 
     const salesOrderId = extractOrderId(orderValue)
-    if (!salesOrderId) {
+    const troubleTicketIdNormalized = initialTroubleTicketId != null ? Number(initialTroubleTicketId) : NaN
+    const subscriptionIdNormalized = initialSubscriptionId != null ? Number(initialSubscriptionId) : NaN
+
+    const hasTroubleTicket = Number.isInteger(troubleTicketIdNormalized) && troubleTicketIdNormalized > 0
+    const hasSalesOrder = Boolean(salesOrderId)
+
+    if (!hasTroubleTicket && !hasSalesOrder) {
       setFeedback({
         tone: 'error',
-        message: 'Pilih sales order yang valid dari daftar saran.',
+        message: 'Pilih sales order yang valid, atau buat work order dari trouble ticket untuk mengisi konteks pekerjaan.',
       })
       return
     }
@@ -70,25 +101,43 @@ export function SalesWorkOrderCreateForm({
     setFeedback(null)
 
     try {
+      const sourceType: 'SALES_ORDER' | 'TROUBLE_TICKET' | 'MANUAL' = hasTroubleTicket
+        ? 'TROUBLE_TICKET'
+        : hasSalesOrder
+          ? 'SALES_ORDER'
+          : 'MANUAL'
+
+      const body: Record<string, unknown> = {
+        sourceType,
+        workType,
+        status,
+        jobCategory,
+        priority,
+        scheduledAt: scheduledAt || null,
+        currentPicUserId,
+        technicianName,
+        address,
+        latitude,
+        longitude,
+        notes,
+      }
+
+      if (salesOrderId) {
+        body.salesOrderId = salesOrderId
+      }
+      if (Number.isInteger(troubleTicketIdNormalized) && troubleTicketIdNormalized > 0) {
+        body.troubleTicketId = troubleTicketIdNormalized
+      }
+      if (Number.isInteger(subscriptionIdNormalized) && subscriptionIdNormalized > 0) {
+        body.subscriptionId = subscriptionIdNormalized
+      }
+
       const response = await fetch('/api/sales/work-orders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          salesOrderId,
-          workType,
-          status,
-          jobCategory,
-          priority,
-          scheduledAt: scheduledAt || null,
-          currentPicUserId,
-          technicianName,
-          address,
-          latitude,
-          longitude,
-          notes,
-        }),
+        body: JSON.stringify(body),
       })
 
       const payload = (await response.json().catch(() => null)) as { message?: string } | null

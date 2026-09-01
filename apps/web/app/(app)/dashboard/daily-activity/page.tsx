@@ -19,6 +19,13 @@ export default async function DailyActivityPage({
     subdivisionName?: string
     planningLevel?: string
     approvalStatus?: string
+    referenceWorkOrder?: string
+    workOrderNo?: string
+    troubleTicketId?: string
+    troubleTicketNo?: string
+    activityCategory?: string
+    activityType?: string
+    notes?: string
   }
 }) {
   const session = await requireSession()
@@ -77,6 +84,23 @@ export default async function DailyActivityPage({
   const querySuffix = querySuffixParts.length ? `&${querySuffixParts.join('&')}` : ''
   const calendarPrevHref = `?month=${calendarPrevMonth}${querySuffix}`
   const calendarNextHref = `?month=${calendarNextMonth}${querySuffix}`
+
+  const prefillReferenceWorkOrderId = searchParams?.referenceWorkOrder?.trim() || ''
+  const prefillWorkOrderNo = searchParams?.workOrderNo?.trim() || ''
+  const prefillTroubleTicketId = searchParams?.troubleTicketId?.trim() || ''
+  const prefillTroubleTicketNo = searchParams?.troubleTicketNo?.trim() || ''
+  const prefillActivityCategory = searchParams?.activityCategory?.trim() || ''
+  const prefillActivityType = searchParams?.activityType?.trim() || ''
+  const prefillNotes = searchParams?.notes?.trim() || ''
+  const hasPrefillContext = Boolean(
+    prefillReferenceWorkOrderId ||
+      prefillWorkOrderNo ||
+      prefillTroubleTicketId ||
+      prefillTroubleTicketNo ||
+      prefillActivityCategory ||
+      prefillActivityType ||
+      prefillNotes,
+  )
 
   return (
     <div className="space-y-4">
@@ -155,6 +179,14 @@ export default async function DailyActivityPage({
                 subdivisionMap={subdivisionMap}
                 defaultDivision={defaultDivision}
                 defaultSubdivision={defaultSubdivision}
+                prefillReferenceWorkOrderId={prefillReferenceWorkOrderId}
+                prefillWorkOrderNo={prefillWorkOrderNo}
+                prefillTroubleTicketId={prefillTroubleTicketId}
+                prefillTroubleTicketNo={prefillTroubleTicketNo}
+                prefillActivityCategory={prefillActivityCategory}
+                prefillActivityType={prefillActivityType}
+                prefillNotes={prefillNotes}
+                hasPrefillContext={hasPrefillContext}
               />
               <DailyActivityCloseForm
                 canUpdate={canUpdate}

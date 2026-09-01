@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { InventoryStockMovementForm } from '@/components/inventory-stock-movement-form'
 import { InventoryStockReceiptForm } from '@/components/inventory-stock-receipt-form'
 import type { DomainReviewSection } from '@/lib/types'
@@ -165,6 +166,16 @@ export function InventoryStockReceiptPanel({
           const ref = pickMeta(row.meta, 'Ref: ')
           const price = pickMeta(row.meta, 'Harga: ')
 
+          const haystack = `${row.primary} ${row.secondary} ${row.detail} ${ref} ${row.meta.join(' ')}`.toUpperCase()
+          const numericPartMatch = ref.match(/(\d+)/) ?? String(row.id).match(/(\d+)/)
+          const numericId = numericPartMatch ? numericPartMatch[1] : ''
+          const isWorkOrderRef = haystack.includes('WORK_ORDER') || haystack.includes('WO ') || haystack.includes('WO-') || haystack.includes('WO/')
+          const isTroubleTicketRef = haystack.includes('TROUBLE_TICKET') || haystack.includes('TT ') || haystack.includes('TT-') || haystack.includes('TT/')
+          const isRequestRef = haystack.includes('REQUEST') || /REQ[ -/]/.test(haystack)
+          let trackingHref = ''
+          if (isWorkOrderRef && numericId) trackingHref = `/dashboard/tracking/work-orders/${numericId}`
+          else if (isTroubleTicketRef && numericId) trackingHref = `/dashboard/tracking/trouble-tickets/${numericId}`
+
           return (
             <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -177,7 +188,32 @@ export function InventoryStockReceiptPanel({
               <p className="mt-3 text-sm leading-6 text-mute">{row.detail}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="badge border-slate-200 bg-white text-slate-600">Qty: {qty || '-'}</span>
-                <span className="badge border-slate-200 bg-white text-slate-600">Ref: {ref || '-'}</span>
+                {(() => {
+                  if (!ref) {
+                    return <span className="badge border-slate-200 bg-white text-slate-600">Ref: -</span>
+                  }
+                  if (trackingHref) {
+                    return (
+                      <Link
+                        href={trackingHref}
+                        className="badge border-sky-300 bg-sky-50 text-sky-700 transition hover:border-sky-400 hover:text-sky-900 hover:underline"
+                      >
+                        Ref: {ref}
+                      </Link>
+                    )
+                  }
+                  if (isRequestRef) {
+                    return (
+                      <Link
+                        href={`/inventory/requests?q=${encodeURIComponent(ref)}`}
+                        className="badge border-amber-300 bg-amber-50 text-amber-700 transition hover:border-amber-400 hover:text-amber-900 hover:underline"
+                      >
+                        Ref: {ref}
+                      </Link>
+                    )
+                  }
+                  return <span className="badge border-slate-200 bg-white text-slate-600">Ref: {ref}</span>
+                })()}
                 <span className="badge border-slate-200 bg-white text-slate-600">Harga: {price || '-'}</span>
                 {hasHandoverProof(row.detail) ? (
                   <span className="badge border-violet-200 bg-violet-50 text-violet-700">Bukti handover tercatat</span>

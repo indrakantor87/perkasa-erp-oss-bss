@@ -3752,6 +3752,10 @@ export function DomainShell({
               reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
               orderSuggestions={salesOrderSuggestions}
               initialOrderValue={salesOrderPrefillValue}
+              initialTroubleTicketId={domainPrefill?.troubleTicketId}
+              initialSubscriptionId={domainPrefill?.subscriptionId}
+              initialJobCategory={domainPrefill?.jobCategory as any}
+              initialNotes={domainPrefill?.notes}
             />
           </div>
           <div id={getSalesActionAnchorId('subscription-activate')} className="scroll-mt-24">

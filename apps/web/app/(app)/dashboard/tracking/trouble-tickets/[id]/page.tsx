@@ -267,6 +267,19 @@ export default async function TroubleTicketTrackingDetailPage({
         Kembali
       </Link>
       <Link
+        href={(() => {
+          const params = new URLSearchParams()
+          params.set('troubleTicketId', String(troubleTicketId))
+          params.set('jobCategory', 'TROUBLE')
+          params.set('notes', tt.ticketCode ? `[Dibuat dari TT ${tt.ticketCode}] ${tt.type ? ` • ${tt.type}` : ''}${tt.customerName ? ` • ${tt.customerName}` : ''}` : `[Dibuat dari TT #${troubleTicketId}] ${tt.type ? ` • ${tt.type}` : ''}${tt.customerName ? ` • ${tt.customerName}` : ''}`)
+          return `/sales?${params.toString()}#sales-action-work-order-create`
+        })()}
+        className="btn-primary tap-44 focus-visible:shadow-focus"
+        aria-label="Buat work order lapangan dari trouble ticket ini"
+      >
+        Buat Work Order dari Ticket
+      </Link>
+      <Link
         href={`/inventory/requests?inventoryAction=item-request&troubleTicketId=${troubleTicketId}&requestType=TROUBLE_SUPPORT#inventory-action-item-request`}
         className="btn-secondary tap-44 focus-visible:shadow-focus"
       >
@@ -366,7 +379,19 @@ export default async function TroubleTicketTrackingDetailPage({
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <dt className="text-xs uppercase tracking-[0.14em] text-muteStrong">Customer</dt>
-                  <dd className="mt-1 font-semibold text-inkStrong">{tt.customerName ?? '-'}</dd>
+                  <dd className="mt-1 font-semibold text-inkStrong">
+                    {tt.customerName ? (
+                      <Link
+                        href={`/customers/${encodeURIComponent(tt.customerName)}?name=${encodeURIComponent(tt.customerName)}${tt.customerUser ? `&subscription=${encodeURIComponent(tt.customerUser)}` : ''}`}
+                        className="hover:underline underline-offset-4 transition"
+                        aria-label={`Buka histori customer ${tt.customerName}`}
+                      >
+                        {tt.customerName}
+                      </Link>
+                    ) : (
+                      '-'
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs uppercase tracking-[0.14em] text-muteStrong">Service Ref</dt>

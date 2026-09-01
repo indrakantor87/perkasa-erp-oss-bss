@@ -20,6 +20,14 @@ type DailyActivityPlanFormProps = {
   subdivisionMap: Record<string, string[]>
   defaultDivision: string
   defaultSubdivision: string
+  prefillReferenceWorkOrderId?: string
+  prefillWorkOrderNo?: string
+  prefillTroubleTicketId?: string
+  prefillTroubleTicketNo?: string
+  prefillActivityCategory?: string
+  prefillActivityType?: string
+  prefillNotes?: string
+  hasPrefillContext?: boolean
 }
 
 const priorityOptions = [
@@ -39,6 +47,14 @@ export function DailyActivityPlanForm({
   subdivisionMap,
   defaultDivision,
   defaultSubdivision,
+  prefillReferenceWorkOrderId,
+  prefillWorkOrderNo,
+  prefillTroubleTicketId,
+  prefillTroubleTicketNo,
+  prefillActivityCategory,
+  prefillActivityType,
+  prefillNotes,
+  hasPrefillContext,
 }: DailyActivityPlanFormProps) {
   const router = useRouter()
   const [activityDate, setActivityDate] = useState(defaultActivityDate)
@@ -66,6 +82,48 @@ export function DailyActivityPlanForm({
       setSubdivisionName(subdivisionOptions[0] ?? '')
     }
   }, [subdivisionName, subdivisionOptions])
+
+  useEffect(() => {
+    if (!hasPrefillContext) return
+
+    const contextParts: string[] = []
+    if (prefillWorkOrderNo) contextParts.push(`WO: ${prefillWorkOrderNo}`)
+    if (prefillReferenceWorkOrderId) contextParts.push(`WO ID: ${prefillReferenceWorkOrderId}`)
+    if (prefillTroubleTicketNo) contextParts.push(`TT: ${prefillTroubleTicketNo}`)
+    if (prefillTroubleTicketId) contextParts.push(`TT ID: ${prefillTroubleTicketId}`)
+
+    const categoryLabel = prefillActivityCategory || prefillActivityType || 'Aktivitas Lapangan'
+    const titleFromContext = (() => {
+      if (prefillWorkOrderNo) return `${categoryLabel} - ${prefillWorkOrderNo}`
+      if (prefillTroubleTicketNo) return `${categoryLabel} - ${prefillTroubleTicketNo}`
+      return categoryLabel
+    })()
+
+    const detailIntro = (() => {
+      if (prefillNotes) return prefillNotes
+      if (prefillWorkOrderNo) return `Mengerjakan Work Order ${prefillWorkOrderNo} sesuai job deskripsi.`
+      if (prefillTroubleTicketNo) return `Tindak lanjut Trouble Ticket ${prefillTroubleTicketNo}.`
+      return ''
+    })()
+
+    const detailBody = contextParts.length ? `\n\nKonteks referensi:\n- ${contextParts.join('\n- ')}` : ''
+    const metricFromContext = detailIntro
+      ? `Selesaikan ${titleFromContext} dengan dokumentasi aktivitas yang jelas.`
+      : ''
+
+    setTaskTitle((prev) => prev || titleFromContext)
+    setTaskDetail((prev) => prev || `${detailIntro}${detailBody}`.trim())
+    setSuccessMetric((prev) => prev || metricFromContext)
+  }, [
+    hasPrefillContext,
+    prefillReferenceWorkOrderId,
+    prefillWorkOrderNo,
+    prefillTroubleTicketId,
+    prefillTroubleTicketNo,
+    prefillActivityCategory,
+    prefillActivityType,
+    prefillNotes,
+  ])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
