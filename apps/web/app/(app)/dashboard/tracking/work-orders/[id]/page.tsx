@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { AssignmentAcceptButton } from '@/components/assignment-accept-button'
 import { ReleaseAssignmentButton } from '@/components/release-assignment-button'
 import { ReassignAssignmentModal, type TechnicianOption } from '@/components/reassign-assignment-modal'
+import { DispatchWorkOrderModal } from '@/components/dispatch-work-order-modal'
 import { DeviceLifecycleActionForm } from '@/components/device-lifecycle-action-form'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { CurrentHandlerCard } from '@/components/current-handler-card'
@@ -358,7 +359,7 @@ export default async function WorkOrderTrackingDetailPage({
     }
   }
 
-  const woEndpointBase = '/api/work-orders/assignments'
+  const woEndpointBase = '/api/sales/work-orders/assignments'
   const canAcceptHandler = derivedCurrentHandler
     ? canAcceptAssignment(session, payload.assignments.find(r => r.id === derivedCurrentHandler!.assignmentId) ?? ({} as WorkOrderAssignmentRow))
     : false
@@ -631,6 +632,29 @@ export default async function WorkOrderTrackingDetailPage({
               nextActionLabel={!derivedCurrentHandler ? 'Belum ada PIC aktif. Buat assignment baru untuk work order ini.' : (derivedCurrentHandler.status === 'ASSIGNED' ? 'Menunggu konfirmasi ACCEPT dari teknisi yang ditugaskan.' : 'Lanjutkan pekerjaan sesuai SOP, atau lakukan REASSIGN jika perlu perubahan PIC.')}
               nextActionTone={!derivedCurrentHandler ? 'warning' : derivedCurrentHandler.status === 'ASSIGNED' ? 'info' : 'success'}
             />
+
+            {!derivedCurrentHandler ? (
+              <section className="card-tier-2 border border-warningLine p-5" aria-label="Dispatch work order ke teknisi">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-warningInk">
+                      Dispatch Teknisi
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-inkStrong">
+                      Work order ini belum memiliki assignment aktif. Gunakan tombol Dispatch untuk memilih teknisi dan menugaskan work order ini ke lapangan.
+                    </p>
+                  </div>
+                  <DispatchWorkOrderModal
+                    workOrderId={workOrderId}
+                    workOrderLabel={woCode}
+                    customerLabel={wo?.picFullName ?? wo?.technicianName ?? null}
+                    canDispatch={canReassignHandler}
+                    reviewDbReady={reviewDbReady}
+                    technicianOptions={technicianOptions}
+                  />
+                </div>
+              </section>
+            ) : null}
 
             <section className="card-tier-3 p-5" aria-label="Timeline tracking work order">
               <div className="flex items-center justify-between gap-4">
