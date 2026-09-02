@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   normalizeUiTheme,
   resolveEffectiveTheme,
@@ -106,14 +106,32 @@ export function ThemeProvider({
     const nextEffective = resolveEffectiveTheme(normalized, mediaDark)
     if (typeof window !== 'undefined') {
       const docEffective = document.documentElement.getAttribute('data-theme')
-      if (docEffective === nextEffective && theme === normalized) return
+      const prevThemeNormalized = normalizeUiTheme(themeStateRef.current)
+      const effectiveSame = docEffective === nextEffective
+      const selectedSame = prevThemeNormalized === normalized
+      if (effectiveSame && selectedSame) return
       const result = writeThemePersistence(normalized)
-      if (result.effective !== resolvedTheme) setResolvedThemeState(result.effective)
-    } else if (nextEffective !== resolvedTheme) {
+      if (result.effective !== resolvedThemeRef.current) setResolvedThemeState(result.effective)
+    } else if (nextEffective !== resolvedThemeRef.current) {
       setResolvedThemeState(nextEffective)
     }
     setThemeState((prev) => (prev === normalized ? prev : normalized))
-  }, [theme, resolvedTheme])
+  }, [])
+
+  const themeStateRef = useRef<UiTheme>(normalizedInitial)
+  const resolvedThemeRef = useRef<'light' | 'dark'>(resolveEffectiveTheme(normalizedInitial, false))
+  const setThemeRef = useRef<typeof setTheme | null>(null)
+  themeStateRef.current = theme
+  resolvedThemeRef.current = resolvedTheme
+  setThemeRef.current = setTheme
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.__perkasa_setTheme = (t) => setThemeRef.current?.(t)
+    return () => {
+      if (window.__perkasa_setTheme) delete window.__perkasa_setTheme
+    }
+  })
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -149,8 +167,6 @@ export function ThemeProvider({
     setThemeState((prev) => (prev === normalized ? prev : normalized))
     setResolvedThemeState((prev) => (prev === effective ? prev : effective))
 
-    window.__perkasa_setTheme = (t) => setTheme(t)
-
     const mediaListener = () => {
       setThemeState((current) => {
         if (normalizeUiTheme(current) !== 'system') return current
@@ -176,19 +192,12 @@ export function ThemeProvider({
       try {
         const detail = (ev as CustomEvent<{ theme: UiTheme }>).detail
         if (!detail || !detail.theme) return
-        const incoming = normalizeUiTheme(detail.theme)
-        const dark = readPrefersDark()
-        const nextEffective = resolveEffectiveTheme(incoming, dark)
-        writeCookie(UI_THEME_SYSTEM_RESOLVED_COOKIE_KEY, nextEffective)
-        applyEffectiveTheme(nextEffective)
-        setThemeState((prev) => (prev === incoming ? prev : incoming))
-        setResolvedThemeState((prev) => (prev === nextEffective ? prev : nextEffective))
+        setThemeRef.current?.(detail.theme)
       } catch {}
     }
     window.addEventListener('perkasa:ui:themechange', listener as EventListener)
     return () => {
       window.removeEventListener('perkasa:ui:themechange', listener as EventListener)
-      if (window.__perkasa_setTheme) delete window.__perkasa_setTheme
       try {
         if (mql && typeof mql.removeEventListener === 'function') {
           mql.removeEventListener('change', mediaListener)
@@ -209,8 +218,8 @@ export function ThemeProvider({
         return false
       }
     })()
-    const expectedEffective = resolveEffectiveTheme(theme, prefersDark)
-    if (expectedEffective === resolvedTheme) return
+    const expectedEffective = resolveEffectiveTheme(themeStateRef.current, prefersDark)
+    if (expectedEffective === resolvedThemeRef.current) return
     writeCookie(UI_THEME_SYSTEM_RESOLVED_COOKIE_KEY, expectedEffective)
     applyEffectiveTheme(expectedEffective)
     setResolvedThemeState(expectedEffective)
