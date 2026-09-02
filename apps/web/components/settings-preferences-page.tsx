@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useUiLanguage, dispatchLanguageChange } from '@/components/layout/ui-language'
-import { useUiTheme } from '@/components/layout/ui-theme'
 
 export function SettingsPreferencesPage({
   canOpenImport,
@@ -10,7 +9,6 @@ export function SettingsPreferencesPage({
   canOpenImport: boolean
 }) {
   const { language, setLanguage } = useUiLanguage()
-  const { theme, setTheme } = useUiTheme()
 
   return (
     <div className="space-y-6">
@@ -20,36 +18,11 @@ export function SettingsPreferencesPage({
           Preferensi Aplikasi
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
-          Atur tema, bahasa, akses cepat import, dan keluar akun.
+          Atur bahasa, akses cepat import, dan keluar akun.
         </p>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <article className="panel p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Tema</p>
-          <div className="mt-4 flex items-center gap-2 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-1">
-            {([
-              ['light', 'Light'],
-              ['dark', 'Dark'],
-            ] as const).map(([value, label]) => {
-              const active = theme === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setTheme(value)}
-                  className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                    active ? 'text-[var(--color-accent-ink)]' : 'text-mute hover:text-[var(--color-ink-strong)]'
-                  }`}
-                  style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        </article>
-
         <article className="panel p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Bahasa</p>
           <div className="mt-4 flex items-center gap-2 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-1">
