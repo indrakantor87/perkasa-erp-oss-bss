@@ -9,6 +9,7 @@ import { DataSourceStatus } from '@/components/data-source-status'
 import { CurrentHandlerCard } from '@/components/current-handler-card'
 import { AssignmentHistoryTable } from '@/components/assignment-history-table'
 import { PageHeader } from '@/components/page-header'
+import { WorkOrderMaterialUsagePanel } from '@/components/work-order-material-usage-panel'
 import { StatusBadge, type StatusTone } from '@/components/ui-status-badge'
 import { canPerformAction } from '@/lib/access-control'
 import { canAccessPath } from '@/lib/access-control-server'
@@ -254,6 +255,75 @@ function canReassignAssignment(
   return isFieldTechSelf
 }
 
+type MaterialUsageInventorySuggestion = {
+  itemCode: string
+  itemName: string
+  rackCode: string | null
+  rackBarcode: string | null
+}
+
+async function getMaterialUsageInventorySuggestions(
+  source: DataSourceSnapshot,
+  limit = 400,
+): Promise<{ itemSuggestions: string[]; rackSuggestions: string[] }> {
+  if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    return { itemSuggestions: [], rackSuggestions: [] }
+  }
+
+  const [hasRackCode, hasRackBarcode, hasCurrentStock, hasItemStatus] = await Promise.all([
+    hasReviewDbColumn('inventory_items', 'rack_code'),
+    hasReviewDbColumn('inventory_items', 'rack_barcode'),
+    hasReviewDbColumn('inventory_items', 'current_stock'),
+    hasReviewDbColumn('inventory_items', 'item_status'),
+  ])
+
+  const whereClauses: string[] = []
+  const whereValues: unknown[] = []
+  if (hasCurrentStock) {
+    whereClauses.push('(COALESCE(current_stock, 0) > 0 OR item_type IS NULL)')
+  }
+  if (hasItemStatus) {
+    whereClauses.push('(UPPER(COALESCE(item_status, \'\')) NOT IN (\'INACTIVE\', \'DISCONTINUED\', \'VOID\'))')
+  }
+  const whereSql = whereClauses.length ? ` WHERE ${whereClauses.join(' AND ')}` : ''
+
+  const rows = await runReviewDbQuery<MaterialUsageInventorySuggestion>(
+    `
+      SELECT
+        item_code AS itemCode,
+        item_name AS itemName,
+        ${hasRackCode ? 'rack_code' : 'NULL'} AS rackCode,
+        ${hasRackBarcode ? 'rack_barcode' : 'NULL'} AS rackBarcode
+      FROM inventory_items
+      ${whereSql}
+      ORDER BY item_code ASC
+      LIMIT ?
+    `,
+    whereValues.concat([limit]),
+  ).catch(() => [] as MaterialUsageInventorySuggestion[])
+
+  const itemSuggestions: string[] = rows
+    .map((row) => {
+      const name = String(row.itemName ?? '').trim()
+      return [row.itemCode?.trim() ?? '', name].filter(Boolean).join(' | ')
+    })
+    .filter(Boolean)
+
+  const rackSuggestions: string[] = rows
+    .map((row) => {
+      const rack = String(row.rackBarcode || row.rackCode || '').trim()
+      if (!rack) return ''
+      return `${rack}|${row.itemCode || ''}${row.itemName ? `|${row.itemName}` : ''}`
+    })
+    .filter(Boolean)
+
+  return { itemSuggestions, rackSuggestions }
+}
+
+function requiresInventoryPickupScan(role: string | null | undefined) {
+  return !['OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(String(role ?? '').trim().toUpperCase())
+}
+
 export default async function WorkOrderTrackingDetailPage({
   params,
 }: {
@@ -287,6 +357,9 @@ export default async function WorkOrderTrackingDetailPage({
   )
   const dismantleHistoryRows = await getDismantleHistoryRowsForWorkOrder(lifecycleItemCodes, payload.source)
   const wo = payload.workOrder
+  const materialSuggestions = await getMaterialUsageInventorySuggestions(payload.source)
+  const canCreateMaterialUsage = canPerformAction(session.role, 'inventory', 'create')
+  const requireMaterialScan = requiresInventoryPickupScan(session.role)
 
   function mapWorkOrderAssignmentToHistoryItem(row: WorkOrderAssignmentRow): AssignmentHistoryItem {
     const statusRaw = String(row.assignmentStatus ?? 'ASSIGNED').trim().toUpperCase()
@@ -939,6 +1012,17 @@ export default async function WorkOrderTrackingDetailPage({
                 )}
               </div>
             </section>
+
+            <WorkOrderMaterialUsagePanel
+              workOrderId={workOrderId}
+              workOrderLabel={woCode}
+              movements={payload.movements}
+              canCreate={canCreateMaterialUsage}
+              reviewDbReady={reviewDbReady}
+              itemSuggestions={materialSuggestions.itemSuggestions}
+              rackSuggestions={materialSuggestions.rackSuggestions}
+              requireScan={requireMaterialScan}
+            />
 
             <section className="card-tier-3 p-5" aria-label="Lifecycle device work order">
               <div className="flex items-center justify-between gap-4">
