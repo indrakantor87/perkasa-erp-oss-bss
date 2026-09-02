@@ -30,16 +30,23 @@ RUN echo "=== [1/3 builder] Start next build ===" \
  && npm run build 2>&1 | tail -80 \
  && echo "=== [2/3 builder] Verify .next/standalone exists ===" \
  && test -d ".next/standalone" \
- && mkdir -p ".next/standalone/.next" \
- && echo "=== [3/3 builder] Assemble standalone: copy static + public + healthcheck ===" \
- && cp -a ".next/static" ".next/standalone/.next/static" \
- && if [ -d "public" ]; then cp -a "public" ".next/standalone/public"; fi \
+ && mkdir -p ".next/standalone/.next/static" \
+ && echo "=== [3/3 builder] Assemble standalone: copy static + public + healthcheck (robust) ===" \
+ && cp -RT ".next/static" ".next/standalone/.next/static" \
+ && if [ -d "public" ]; then cp -RT "public" ".next/standalone/public"; fi \
  && cp "healthcheck.js" ".next/standalone/healthcheck.js" \
+ && if [ -f ".next/BUILD_ID" ]; then cp ".next/BUILD_ID" ".next/standalone/.next/BUILD_ID"; fi \
+ && if [ -d ".next/server" ]; then cp -RT ".next/server" ".next/standalone/.next/server"; fi \
  && echo "=== Standalone verification ===" \
  && ls -la ".next/standalone" | head -30 \
  && test -f ".next/standalone/server.js" \
  && test -f ".next/standalone/healthcheck.js" \
  && test -d ".next/standalone/.next/static" \
+ && test -d ".next/standalone/.next/static/chunks" \
+ && echo "[chunks-js-count] $(find .next/static/chunks -type f -name '*.js' 2>/dev/null | wc -l)" \
+ && echo "[chunks-js-count-standalone] $(find .next/standalone/.next/static/chunks -type f -name '*.js' 2>/dev/null | wc -l)" \
+ && test "$(find .next/static/chunks -type f -name '*.js' 2>/dev/null | wc -l)" \
+      = "$(find .next/standalone/.next/static/chunks -type f -name '*.js' 2>/dev/null | wc -l)" \
  && test -d ".next/standalone/public"
 
 # ---------- STAGE 3/3: runner - production image, only standalone output ----------
