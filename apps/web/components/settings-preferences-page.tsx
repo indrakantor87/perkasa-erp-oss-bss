@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useUiLanguage, dispatchLanguageChange } from '@/components/layout/ui-language'
-import { useUiTheme, dispatchThemeChange } from '@/components/layout/ui-theme'
+import { useUiTheme } from '@/components/layout/ui-theme'
 
 export function SettingsPreferencesPage({
   canOpenImport,
@@ -37,7 +37,7 @@ export function SettingsPreferencesPage({
                 <button
                   key={value}
                   type="button"
-                  onClick={() => dispatchThemeChange(value)}
+                  onClick={() => setTheme(value)}
                   className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
                     active ? 'text-[var(--color-accent-ink)]' : 'text-mute hover:text-[var(--color-ink-strong)]'
                   }`}

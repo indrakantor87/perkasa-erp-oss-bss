@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { findNavigationItem } from '@/lib/navigation'
 import type { AppSession } from '@/lib/auth-session'
 import { useUiLanguage, dispatchLanguageChange } from '@/components/layout/ui-language'
-import { useUiTheme, dispatchThemeChange } from '@/components/layout/ui-theme'
+import { useUiTheme } from '@/components/layout/ui-theme'
 import { getRoleMeta } from '@/lib/role-meta'
 import { translateUiText } from '@/lib/ui-language'
 import { PageHeader } from '@/components/page-header'
@@ -30,7 +30,7 @@ function matchesPrefix(pathname: string, prefix: string) {
 export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
   const activeItem = findNavigationItem(pathname)
   const { language } = useUiLanguage()
-  const { theme } = useUiTheme()
+  const { theme, setTheme } = useUiTheme()
   const canReviewImport =
     session ? allowedPrefixes.some((prefix) => matchesPrefix('/import', prefix)) : false
   const hideQuickControls = session?.role === 'SUPER_ADMIN'
@@ -88,7 +88,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
             <button
               key={value}
               type="button"
-              onClick={() => { dispatchThemeChange(value) }}
+              onClick={() => { setTheme(value) }}
               aria-label={label}
               title={label}
               aria-pressed={active ? 'true' : undefined}
