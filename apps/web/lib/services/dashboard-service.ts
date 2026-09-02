@@ -9,8 +9,6 @@ import {
 import { resolveDashboardKpiTemplateDrilldown } from '@/lib/dashboard-kpi-config'
 import {
   dashboardActivities,
-  dashboardMetrics,
-  dashboardSummary,
   getMockRoleQueues,
   getMockWorklist,
 } from '@/lib/mock-dashboard'
@@ -4334,7 +4332,7 @@ async function getReviewDbDashboardSummary() {
       ) AS overdueInvoices
   `)
 
-  return row ?? dashboardSummary
+  return row ?? EMPTY_DASHBOARD_SUMMARY
 }
 
 async function getReviewDbImportBatchActivities() {
@@ -5077,13 +5075,52 @@ async function getReviewDbActivities(role: AppRole) {
   }))
 }
 
+const EMPTY_DASHBOARD_SUMMARY: DashboardSummary = {
+  customers: 0,
+  orders: 0,
+  troubleTickets: 0,
+  isolations: 0,
+  inventoryItems: 0,
+  employees: 0,
+  overdueInvoices: 0,
+}
+
+function buildUnavailableDashboardMetrics(): DashboardMetric[] {
+  return [
+    {
+      label: 'Customer Aktif',
+      value: '—',
+      change: '—',
+      note: 'Sumber data dashboard tidak tersedia. Mode review-db belum aktif atau koneksi review DB gagal.',
+    },
+    {
+      label: 'Order Berjalan',
+      value: '—',
+      change: '—',
+      note: 'Sumber data dashboard tidak tersedia. Mode review-db belum aktif atau koneksi review DB gagal.',
+    },
+    {
+      label: 'Trouble Ticket Open',
+      value: '—',
+      change: '—',
+      note: 'Sumber data dashboard tidak tersedia. Mode review-db belum aktif atau koneksi review DB gagal.',
+    },
+    {
+      label: 'Invoice Overdue',
+      value: '—',
+      change: '—',
+      note: 'Sumber data dashboard tidak tersedia. Mode review-db belum aktif atau koneksi review DB gagal.',
+    },
+  ]
+}
+
 export async function getDashboardSummary() {
   const source = getDataSourceSnapshot()
 
   if (source.effectiveMode !== 'review-db') {
     return {
       source,
-      summary: dashboardSummary,
+      summary: EMPTY_DASHBOARD_SUMMARY,
     }
   }
 
@@ -5095,7 +5132,7 @@ export async function getDashboardSummary() {
   } catch (error) {
     return {
       source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
-      summary: dashboardSummary,
+      summary: EMPTY_DASHBOARD_SUMMARY,
     }
   }
 }
@@ -5164,13 +5201,13 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
 
     return {
       source,
-      summary: dashboardSummary,
-      metrics: dashboardMetrics,
-      roleQueues: buildRoleQueues(role, dashboardSummary),
+      summary: EMPTY_DASHBOARD_SUMMARY,
+      metrics: buildUnavailableDashboardMetrics(),
+      roleQueues: buildRoleQueues(role, EMPTY_DASHBOARD_SUMMARY),
       worklist: getMockWorklist(role),
-      operationalCards: sanitizeDashboardOperationalCards(role, buildMockOperationalCards(dashboardSummary, resolvedFilters), resolvedFilters),
+      operationalCards: sanitizeDashboardOperationalCards(role, buildMockOperationalCards(EMPTY_DASHBOARD_SUMMARY, resolvedFilters), resolvedFilters),
       dashboardAlerts: buildMockDashboardAlerts({
-        summary: dashboardSummary,
+        summary: EMPTY_DASHBOARD_SUMMARY,
         approvalPending: mockDailyActivityApprovalQueue.totalPending,
         role,
       }),
@@ -5213,17 +5250,17 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
 
         return {
           source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
-          summary: dashboardSummary,
-          metrics: dashboardMetrics,
-          roleQueues: buildRoleQueues(role, dashboardSummary),
+          summary: EMPTY_DASHBOARD_SUMMARY,
+          metrics: buildUnavailableDashboardMetrics(),
+          roleQueues: buildRoleQueues(role, EMPTY_DASHBOARD_SUMMARY),
           worklist: getMockWorklist(role),
           operationalCards: sanitizeDashboardOperationalCards(
             role,
-            buildMockOperationalCards(dashboardSummary, resolvedFilters),
+            buildMockOperationalCards(EMPTY_DASHBOARD_SUMMARY, resolvedFilters),
             resolvedFilters,
           ),
           dashboardAlerts: buildMockDashboardAlerts({
-            summary: dashboardSummary,
+            summary: EMPTY_DASHBOARD_SUMMARY,
             approvalPending: fallbackDailyActivityApprovalQueue.totalPending,
             role,
           }),
