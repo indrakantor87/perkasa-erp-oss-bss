@@ -13,6 +13,7 @@ import {
   IconSearch,
   IconSun,
   IconMoon,
+  IconMonitor,
   IconLogout,
 } from '@/components/shell-icon-button'
 
@@ -44,6 +45,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
   const langLabelEn = translateUiText('Use English', language)
   const themeLightLabel = translateUiText('Tema Terang', language)
   const themeDarkLabel = translateUiText('Tema Gelap', language)
+  const themeSystemLabel = translateUiText('Tema Sistem', language)
 
   const workspaceDescription =
     session && roleMeta
@@ -78,6 +80,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
       >
         {([
           ['light', themeLightLabel, IconSun] as const,
+          ['system', themeSystemLabel, IconMonitor] as const,
           ['dark', themeDarkLabel, IconMoon] as const,
         ]).map(([value, label, Ico]) => {
           const active = theme === value

@@ -186,7 +186,7 @@ export default async function InventoryOverviewPage({
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="section-title">{payload.content.eyebrow}</p>
-              <h1 className="mt-1 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+              <h1 className="mt-1 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-inkStrong">
                 {payload.content.title}
               </h1>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-mute">{payload.content.description}</p>
@@ -194,13 +194,13 @@ export default async function InventoryOverviewPage({
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/inventory/items"
-                className="inline-flex rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                className="inline-flex rounded-full border border-line bg-surfaceSoft px-4 py-2 text-sm font-semibold text-muteStrong transition hover:bg-surface hover:text-inkStrong"
               >
                 Lihat Item
               </Link>
               <Link
                 href={requestHref}
-                className="inline-flex rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="inline-flex rounded-full border border-accent bg-accent px-4 py-2 text-sm font-semibold text-accentInk transition hover:bg-accent/90 focus-visible:shadow-focus"
               >
                 Buka Request
               </Link>
@@ -212,7 +212,7 @@ export default async function InventoryOverviewPage({
           {payload.content.summaries.map((item) => (
             <article key={item.label} className="panel p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">{item.label}</p>
-              <p className="mt-3 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+              <p className="mt-3 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-inkStrong">
                 {item.value}
               </p>
             </article>
@@ -224,7 +224,7 @@ export default async function InventoryOverviewPage({
             <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
               <div>
                 <p className="section-title">Fokus Inventory</p>
-                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
+                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-inkStrong">
                   Jalur kerja prioritas untuk inventory operasional
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-mute">
@@ -232,22 +232,22 @@ export default async function InventoryOverviewPage({
                   request barang, stock movement, dan penataan lokasi fisik.
                 </p>
               </div>
-              <span className="badge border-slate-200 bg-white text-slate-600">{focusCards.length} fokus</span>
+              <span className="badge border-line bg-surfaceMuted text-muteStrong">{focusCards.length} fokus</span>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               {focusCards.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="group block overflow-hidden rounded-3xl border border-line bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg"
+                  className="group block overflow-hidden rounded-3xl border border-line bg-surfaceElevated p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-lineStrong hover:shadow-soft"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <span className="badge border-slate-200 bg-white text-slate-600">{item.badge}</span>
-                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 transition group-hover:border-slate-300">
+                    <span className="badge border-line bg-surfaceMuted text-muteStrong">{item.badge}</span>
+                    <span className="rounded-full border border-line bg-surfaceSoft px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute transition group-hover:border-lineStrong">
                       buka
                     </span>
                   </div>
-                  <h3 className="mt-4 font-[family-name:var(--font-heading)] text-lg font-semibold tracking-tight text-slate-950">
+                  <h3 className="mt-4 font-[family-name:var(--font-heading)] text-lg font-semibold tracking-tight text-inkStrong">
                     {item.title}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-mute">{item.description}</p>
@@ -262,7 +262,7 @@ export default async function InventoryOverviewPage({
             <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
               <div>
                 <p className="section-title">Shortcut Inventory</p>
-                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
+                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-inkStrong">
                   Masuk ke sub menu kerja
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-mute">
@@ -270,22 +270,22 @@ export default async function InventoryOverviewPage({
                   sendiri.
                 </p>
               </div>
-              <span className="badge border-slate-200 bg-white text-slate-600">{shortcuts.length} menu</span>
+              <span className="badge border-line bg-surfaceMuted text-muteStrong">{shortcuts.length} menu</span>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {shortcuts.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="group block overflow-hidden rounded-3xl border border-line bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg"
+                  className="group block overflow-hidden rounded-3xl border border-line bg-surfaceElevated p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-lineStrong hover:shadow-soft"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <span className="badge border-slate-200 bg-white text-slate-600">Sub menu</span>
-                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 transition group-hover:border-slate-300">
+                    <span className="badge border-line bg-surfaceMuted text-muteStrong">Sub menu</span>
+                    <span className="rounded-full border border-line bg-surfaceSoft px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute transition group-hover:border-lineStrong">
                       Masuk
                     </span>
                   </div>
-                  <h3 className="mt-4 font-[family-name:var(--font-heading)] text-lg font-semibold tracking-tight text-slate-950">
+                  <h3 className="mt-4 font-[family-name:var(--font-heading)] text-lg font-semibold tracking-tight text-inkStrong">
                     {item.title}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-mute">{item.description}</p>

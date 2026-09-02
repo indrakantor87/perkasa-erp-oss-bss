@@ -59,19 +59,19 @@ function getTicketTypeIcon(ticketType: NocTicketType) {
 }
 
 function getTypeBadgeClass(ticketType: NocTicketType) {
-  if (ticketType === 'PSB') return 'bg-sky-100 text-sky-700'
-  if (ticketType === 'TROUBLESHOOTS') return 'bg-amber-100 text-amber-800'
-  if (ticketType === 'DISMANTLE') return 'bg-rose-100 text-rose-700'
-  if (ticketType === 'JALUR') return 'bg-violet-100 text-violet-700'
-  return 'bg-slate-100 text-slate-700'
+  if (ticketType === 'PSB') return 'bg-info/15 text-info border-info/40 border'
+  if (ticketType === 'TROUBLESHOOTS') return 'bg-warning/15 text-warning border-warning/40 border'
+  if (ticketType === 'DISMANTLE') return 'bg-danger/15 text-danger border-danger/40 border'
+  if (ticketType === 'JALUR') return 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400 border'
+  return 'border border-line bg-surfaceMuted px-3 py-1 text-muteStrong'
 }
 
 function getStatusBadgeClass(queueStatus: NocQueueStatus) {
-  if (queueStatus === 'OPEN') return 'bg-sky-100 text-sky-700'
-  if (queueStatus === 'ON_PROGRESS') return 'bg-amber-100 text-amber-800'
-  if (queueStatus === 'TEMPORARY') return 'bg-orange-100 text-orange-700'
-  if (queueStatus === 'CLOSE') return 'bg-emerald-100 text-emerald-700'
-  return 'bg-slate-100 text-slate-700'
+  if (queueStatus === 'OPEN') return 'bg-info/15 text-info border-info/40 border'
+  if (queueStatus === 'ON_PROGRESS') return 'bg-warning/15 text-warning border-warning/40 border'
+  if (queueStatus === 'TEMPORARY') return 'bg-orange-500/15 text-orange-700 dark:text-orange-400 border border-orange-500/40'
+  if (queueStatus === 'CLOSE') return 'bg-success/15 text-success border-success/40 border'
+  return 'border border-line bg-surfaceMuted px-3 py-1 text-muteStrong'
 }
 
 function getQueueStatusIcon(queueStatus: NocQueueStatus) {
@@ -83,40 +83,40 @@ function getQueueStatusIcon(queueStatus: NocQueueStatus) {
 }
 
 function getSlaBadgeClass(slaState: NocQueueItem['slaState']) {
-  if (slaState === 'BREACHED') return 'bg-rose-100 text-rose-700'
-  if (slaState === 'WARNING') return 'bg-amber-100 text-amber-800'
-  if (slaState === 'ON_TRACK') return 'bg-emerald-100 text-emerald-700'
-  return 'bg-slate-100 text-slate-700'
+  if (slaState === 'BREACHED') return 'bg-danger/15 text-danger border-danger/40 border'
+  if (slaState === 'WARNING') return 'bg-warning/15 text-warning border-warning/40 border'
+  if (slaState === 'ON_TRACK') return 'bg-success/15 text-success border-success/40 border'
+  return 'border border-line bg-surfaceMuted px-3 py-1 text-muteStrong'
 }
 
 function getOperationalBadgeClass(label: string) {
-  if (label.includes('VALIDASI')) return 'bg-violet-100 text-violet-700'
-  if (label.includes('MATERIAL')) return 'bg-cyan-100 text-cyan-700'
-  if (label.includes('REPLACE') || label.includes('RUSAK')) return 'bg-rose-100 text-rose-700'
-  if (label.includes('FOLLOW')) return 'bg-amber-100 text-amber-800'
-  return 'bg-slate-100 text-slate-700'
+  if (label.includes('VALIDASI')) return 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400 border'
+  if (label.includes('MATERIAL')) return 'border-cyan-500/40 bg-cyan-500/15 text-cyan-700 dark:text-cyan-400 border'
+  if (label.includes('REPLACE') || label.includes('RUSAK')) return 'bg-danger/15 text-danger border-danger/40 border'
+  if (label.includes('FOLLOW')) return 'bg-warning/15 text-warning border-warning/40 border'
+  return 'border border-line bg-surfaceMuted px-3 py-1 text-muteStrong'
 }
 
 function getLifecycleBadgeClass(status: string | null | undefined) {
   const value = String(status ?? '').trim().toUpperCase()
-  if (!value) return 'bg-slate-100 text-slate-600'
-  if (value === 'INVENTORY') return 'bg-slate-100 text-slate-700'
-  if (value === 'NOC') return 'bg-sky-100 text-sky-700'
-  if (value.startsWith('TEAM_')) return 'bg-amber-100 text-amber-800'
-  if (value === 'PENDING_NOC_VALIDATION') return 'bg-orange-100 text-orange-700'
-  if (value === 'INSTALLED') return 'bg-emerald-100 text-emerald-700'
-  if (value === 'DAMAGED') return 'bg-rose-100 text-rose-700'
-  if (value === 'RETURNED') return 'bg-slate-200 text-slate-700'
-  if (value.startsWith('REPLACE')) return 'bg-violet-100 text-violet-700'
-  return 'bg-slate-100 text-slate-700'
+  if (!value) return 'border border-line bg-surfaceMuted px-3 py-1 text-mute'
+  if (value === 'INVENTORY') return 'border border-line bg-surfaceMuted px-3 py-1 text-muteStrong'
+  if (value === 'NOC') return 'bg-info/15 text-info border-info/40 border'
+  if (value.startsWith('TEAM_')) return 'bg-warning/15 text-warning border-warning/40 border'
+  if (value === 'PENDING_NOC_VALIDATION') return 'bg-orange-500/15 text-orange-700 dark:text-orange-400 border border-orange-500/40'
+  if (value === 'INSTALLED') return 'bg-success/15 text-success border-success/40 border'
+  if (value === 'DAMAGED') return 'bg-danger/15 text-danger border-danger/40 border'
+  if (value === 'RETURNED') return 'border border-line bg-surfaceMuted px-3 py-1 text-muteStrong'
+  if (value.startsWith('REPLACE')) return 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400 border'
+  return 'border border-line bg-surfaceMuted px-3 py-1 text-muteStrong'
 }
 
 function getValidationBadgeClass(status: string | null | undefined) {
   const value = String(status ?? '').trim().toUpperCase()
-  if (value === 'APPROVED') return 'bg-emerald-100 text-emerald-700'
-  if (value === 'PENDING') return 'bg-amber-100 text-amber-800'
-  if (value === 'REJECTED') return 'bg-rose-100 text-rose-700'
-  return 'bg-slate-100 text-slate-600'
+  if (value === 'APPROVED') return 'bg-success/15 text-success border-success/40 border'
+  if (value === 'PENDING') return 'bg-warning/15 text-warning border-warning/40 border'
+  if (value === 'REJECTED') return 'bg-danger/15 text-danger border-danger/40 border'
+  return 'border border-line bg-surfaceMuted px-3 py-1 text-mute'
 }
 
 function renderTicketMeta(item: NocQueueItem) {
@@ -220,45 +220,45 @@ export default async function NocQueuePage({
         </div>
 
         <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <article className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Total Ticket</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-950">{totalTickets}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Semua ticket yang muncul pada kombinasi filter saat ini.</p>
+          <article className="rounded-2xl border border-line bg-surface px-4 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">Total Ticket</p>
+            <p className="mt-2 text-3xl font-semibold text-inkStrong">{totalTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-muteStrong">Semua ticket yang muncul pada kombinasi filter saat ini.</p>
           </article>
-          <article className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Masih Berjalan</p>
-            <p className="mt-2 text-3xl font-semibold text-sky-950">{activeTickets}</p>
-            <p className="mt-2 text-sm leading-6 text-sky-800">Ticket open atau on progress yang masih perlu dikawal.</p>
+          <article className="rounded-2xl border border-info/40 bg-info/10 px-4 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-info">Masih Berjalan</p>
+            <p className="mt-2 text-3xl font-semibold text-inkStrong">{activeTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-muteStrong">Ticket open atau on progress yang masih perlu dikawal.</p>
           </article>
-          <article className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Perlu Perhatian</p>
-            <p className="mt-2 text-3xl font-semibold text-amber-950">{riskTickets}</p>
-            <p className="mt-2 text-sm leading-6 text-amber-800">Ticket dengan SLA warning atau breached.</p>
+          <article className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">Perlu Perhatian</p>
+            <p className="mt-2 text-3xl font-semibold text-inkStrong">{riskTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-muteStrong">Ticket dengan SLA warning atau breached.</p>
           </article>
-          <article className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Pekerjaan Saya</p>
-            <p className="mt-2 text-3xl font-semibold text-violet-950">{mineTickets}</p>
-            <p className="mt-2 text-sm leading-6 text-violet-800">Jumlah ticket yang terkait PIC user login.</p>
+          <article className="rounded-2xl border-violet-500/40 bg-violet-500/10 px-4 py-4 border">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-600 dark:text-violet-400">Pekerjaan Saya</p>
+            <p className="mt-2 text-3xl font-semibold text-inkStrong">{mineTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-muteStrong">Jumlah ticket yang terkait PIC user login.</p>
           </article>
         </div>
 
         <form className="mt-6 grid gap-4 lg:grid-cols-6" action="/dashboard/tracking/noc-queue" method="get">
-          <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
-            <span className="font-semibold text-slate-950">Search</span>
+          <label className="flex flex-col gap-2 text-sm text-muteStrong lg:col-span-2">
+            <span className="font-semibold text-inkStrong">Search</span>
             <input
               name="q"
               defaultValue={q}
               placeholder="WO- / TT- / nama customer / teknisi"
-              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+              className="rounded-2xl border border-line bg-surface px-4 py-3 text-ink outline-none transition focus:shadow-focus"
             />
           </label>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="font-semibold text-slate-950">Jenis Ticket</span>
+          <label className="flex flex-col gap-2 text-sm text-muteStrong">
+            <span className="font-semibold text-inkStrong">Jenis Ticket</span>
             <select
               name="ticketType"
               defaultValue={ticketType}
-              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+              className="rounded-2xl border border-line bg-surface px-4 py-3 text-ink outline-none transition focus:shadow-focus"
             >
               <option value="">Semua</option>
               {ticketTypeOptions.map((item) => (
@@ -269,12 +269,12 @@ export default async function NocQueuePage({
             </select>
           </label>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="font-semibold text-slate-950">Status Antrean</span>
+          <label className="flex flex-col gap-2 text-sm text-muteStrong">
+            <span className="font-semibold text-inkStrong">Status Antrean</span>
             <select
               name="queueStatus"
               defaultValue={queueStatus}
-              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+              className="rounded-2xl border border-line bg-surface px-4 py-3 text-ink outline-none transition focus:shadow-focus"
             >
               <option value="">Semua</option>
               {queueStatusOptions.map((item) => (
@@ -285,12 +285,12 @@ export default async function NocQueuePage({
             </select>
           </label>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="font-semibold text-slate-950">SLA</span>
+          <label className="flex flex-col gap-2 text-sm text-muteStrong">
+            <span className="font-semibold text-inkStrong">SLA</span>
             <select
               name="slaState"
               defaultValue={slaState}
-              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+              className="rounded-2xl border border-line bg-surface px-4 py-3 text-ink outline-none transition focus:shadow-focus"
             >
               <option value="">Semua</option>
               {slaStateOptions.map((item) => (
@@ -301,8 +301,8 @@ export default async function NocQueuePage({
             </select>
           </label>
 
-          <div className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="font-semibold text-slate-950">Shortcut</span>
+          <div className="flex flex-col gap-2 text-sm text-muteStrong">
+            <span className="font-semibold text-inkStrong">Shortcut</span>
             <Link
               href="/support/tt"
               className="surface-soft inline-flex h-[52px] items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold text-ink transition hover:[border-color:var(--color-line-strong)] hover:text-[var(--color-ink-strong)]"
@@ -312,7 +312,7 @@ export default async function NocQueuePage({
           </div>
 
           <div className="lg:col-span-5 flex flex-wrap items-center gap-2.5">
-            <label className="inline-flex items-center gap-2 rounded-2xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink">
+            <label className="inline-flex items-center gap-2 rounded-2xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink">
               <input type="checkbox" name="mine" value="1" defaultChecked={mine} className="h-4 w-4" />
               Pekerjaan saya
             </label>
@@ -331,20 +331,20 @@ export default async function NocQueuePage({
             </Link>
             <span className="solid-chip">{payload.items.length} ticket</span>
             {ticketType || queueStatus || slaState || mine ? (
-              <span className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+              <span className="rounded-full border border-line bg-surfaceMuted px-3 py-1.5 text-xs font-semibold text-muteStrong">
                 Filter aktif
               </span>
             ) : null}
           </div>
         </form>
 
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="mt-4 rounded-2xl border border-line bg-surfaceSoft p-4">
           <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Jenis Cepat</span>
+            <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">
+              <span className="rounded-full border border-line bg-surface px-3 py-1.5">Jenis Cepat</span>
               <Link
                 href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { ticketType: '' } })}
-                className={`rounded-full px-3 py-1.5 ${ticketType ? 'border border-slate-200 bg-white text-slate-600' : 'bg-slate-900 text-white'}`}
+                className={`rounded-full px-3 py-1.5 ${ticketType ? 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated' : 'bg-accent text-accentInk'}`}
               >
                 Semua
               </Link>
@@ -352,18 +352,18 @@ export default async function NocQueuePage({
                 <Link
                   key={item}
                   href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { ticketType: item } })}
-                  className={`rounded-full px-3 py-1.5 ${ticketType === item ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}
+                  className={`rounded-full px-3 py-1.5 ${ticketType === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
                 >
                   {item} {typeCounts[item]}
                 </Link>
               ))}
             </div>
 
-            <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Status Cepat</span>
+            <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">
+              <span className="rounded-full border border-line bg-surface px-3 py-1.5">Status Cepat</span>
               <Link
                 href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { queueStatus: '' } })}
-                className={`rounded-full px-3 py-1.5 ${queueStatus ? 'border border-slate-200 bg-white text-slate-600' : 'bg-slate-900 text-white'}`}
+                className={`rounded-full px-3 py-1.5 ${queueStatus ? 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated' : 'bg-accent text-accentInk'}`}
               >
                 Semua
               </Link>
@@ -371,7 +371,7 @@ export default async function NocQueuePage({
                 <Link
                   key={item}
                   href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { queueStatus: item } })}
-                  className={`rounded-full px-3 py-1.5 ${queueStatus === item ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}
+                  className={`rounded-full px-3 py-1.5 ${queueStatus === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
                 >
                   {item}
                 </Link>
@@ -380,7 +380,7 @@ export default async function NocQueuePage({
                 <Link
                   key={item}
                   href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { slaState: item } })}
-                  className={`rounded-full px-3 py-1.5 ${slaState === item ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}
+                  className={`rounded-full px-3 py-1.5 ${slaState === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
                 >
                   SLA {item}
                 </Link>
@@ -390,8 +390,8 @@ export default async function NocQueuePage({
         </div>
 
         {payload.error ? (
-          <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-800">
-            <p className="text-sm font-semibold">Review DB belum bisa dibaca</p>
+          <div className="mt-6 rounded-3xl border border-warning/40 bg-warning/10 px-5 py-4 text-warning">
+            <p className="text-sm font-semibold text-inkStrong">Review DB belum bisa dibaca</p>
             <p className="mt-2 text-sm leading-6">{payload.error}</p>
           </div>
         ) : null}

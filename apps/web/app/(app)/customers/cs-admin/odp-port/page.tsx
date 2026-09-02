@@ -71,14 +71,14 @@ export default async function CsAdminOdpPortPage({
     <div className="space-y-4">
       <DataSourceStatus source={payload.source} />
 
-      <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+      <section className="panel p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">CS & Admin CS</p>
-            <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mute">CS & Admin CS</p>
+            <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-inkStrong">
               ODP dan Port
             </h1>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-muteStrong">
               Workspace ini menjadikan CS sebagai pintu kerja utama untuk membaca kapasitas ODP, status port,
               assignment perangkat, dan return yang berdampak langsung ke customer serta ticketing.
             </p>
@@ -86,13 +86,13 @@ export default async function CsAdminOdpPortPage({
           <div className="flex flex-wrap gap-2">
             <Link
               href="/customers/cs-admin"
-              className="rounded-md border border-slate-500 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
+              className="rounded-md border border-line bg-surfaceSoft px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muteStrong transition hover:bg-surface hover:text-inkStrong"
             >
               Kembali ke Workspace CS
             </Link>
             <Link
               href="/inventory/network"
-              className="rounded-md bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-950"
+              className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-accentInk"
             >
               Buka Engine Inventory
             </Link>

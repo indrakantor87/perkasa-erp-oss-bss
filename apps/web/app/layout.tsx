@@ -151,14 +151,14 @@ const PRECONNECT_ORIGINS = [
 function LoadingSkeleton() {
   return (
     <div className="min-h-[70vh] w-full animate-pulse flex flex-col gap-6 p-6">
-      <div className="h-12 w-1/3 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
+      <div className="h-12 w-1/3 rounded-xl bg-surfaceMuted" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="h-32 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
-        <div className="h-32 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
-        <div className="h-32 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
-        <div className="h-32 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
+        <div className="h-32 rounded-xl bg-surfaceMuted" />
+        <div className="h-32 rounded-xl bg-surfaceMuted" />
+        <div className="h-32 rounded-xl bg-surfaceMuted" />
+        <div className="h-32 rounded-xl bg-surfaceMuted" />
       </div>
-      <div className="h-96 rounded-xl bg-slate-200/70 dark:bg-slate-800/60" />
+      <div className="h-96 rounded-xl bg-surfaceMuted" />
     </div>
   )
 }
@@ -197,6 +197,7 @@ export default async function RootLayout({
             __html: `(function(){try{
   var keyLs='perkasa.ui-theme';
   var keyCk='perkasa-ui-theme';
+  var keyCkResolved='perkasa-ui-theme-system-resolved';
   var pref='';
   try{
     pref=window.localStorage.getItem(keyLs)||'';
@@ -208,16 +209,20 @@ export default async function RootLayout({
     }catch(e){pref='';}
   }
   pref=(pref||'').trim().toLowerCase();
-  if(pref!=='light'&&pref!=='dark'){pref='';}
-  if(!pref){
+  if(pref!=='light'&&pref!=='dark'&&pref!=='system'){pref='system';}
+  var resolved=pref;
+  if(resolved==='system'){
     try{
-      if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches){pref='dark';}
-      else{pref='light';}
-    }catch(e){pref='light';}
+      if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches){resolved='dark';}
+      else{resolved='light';}
+    }catch(e){resolved='light';}
   }
+  try{
+    document.cookie=keyCkResolved+'='+resolved+'; path=/; max-age=31536000; samesite=lax';
+  }catch(e){}
   var el=document.documentElement;
-  if(el.getAttribute('data-theme')!==pref){el.setAttribute('data-theme',pref);}
-  el.style.colorScheme=pref;
+  if(el.getAttribute('data-theme')!==resolved){el.setAttribute('data-theme',resolved);}
+  el.style.colorScheme=resolved;
 }catch(e){try{document.documentElement.setAttribute('data-theme','light');document.documentElement.style.colorScheme='light';}catch(e2){}}})();`
           }}
         />

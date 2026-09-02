@@ -204,18 +204,18 @@ export function BillingInvoiceStatusForm({
   return (
     <section className="panel p-6">
       <p className="section-title">Status Invoice</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-inkStrong">
         {titleText}
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">{helperText}</p>
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
-        <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Mode Update</span>
+        <label className="flex flex-col gap-2 text-sm text-muteStrong">
+          <span className="font-semibold text-inkStrong">Mode Update</span>
           <select
             value={mode}
             onChange={(event) => setMode(event.target.value === 'batch' ? 'batch' : 'single')}
-            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            className="rounded-2xl border border-line bg-surface px-4 py-3 outline-none transition focus:shadow-focus"
             disabled={isDisabled}
           >
             <option value="single">Single invoice</option>
@@ -225,8 +225,8 @@ export function BillingInvoiceStatusForm({
           </select>
         </label>
 
-        <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Aksi Status</span>
+        <label className="flex flex-col gap-2 text-sm text-muteStrong">
+          <span className="font-semibold text-inkStrong">Aksi Status</span>
           <select
             value={nextStatus}
             onChange={(event) => {
@@ -236,7 +236,7 @@ export function BillingInvoiceStatusForm({
                 setMode('single')
               }
             }}
-            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            className="rounded-2xl border border-line bg-surface px-4 py-3 outline-none transition focus:shadow-focus"
             disabled={isDisabled}
           >
             <option value="CANCELLED">Cancel unpaid</option>
@@ -245,13 +245,13 @@ export function BillingInvoiceStatusForm({
           </select>
         </label>
 
-        <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Nomor Invoice</span>
+        <label className="flex flex-col gap-2 text-sm text-muteStrong">
+          <span className="font-semibold text-inkStrong">Nomor Invoice</span>
           <input
             list="billing-status-invoice-suggestions"
             value={invoiceNo}
             onChange={(event) => setInvoiceNo(event.target.value)}
-            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            className="rounded-2xl border border-line bg-surface px-4 py-3 outline-none transition focus:shadow-focus"
             placeholder="INV-202607-0008"
             required={mode === 'single'}
             disabled={isDisabled || mode === 'batch'}
@@ -268,12 +268,12 @@ export function BillingInvoiceStatusForm({
           ) : null}
         </label>
 
-        <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">{notesLabel}</span>
+        <label className="flex flex-col gap-2 text-sm text-muteStrong">
+          <span className="font-semibold text-inkStrong">{notesLabel}</span>
           <textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
-            className="min-h-28 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            className="min-h-28 rounded-2xl border border-line bg-surface px-4 py-3 outline-none transition focus:shadow-focus"
             placeholder={notesPlaceholder}
             required
             disabled={isDisabled}
@@ -281,8 +281,8 @@ export function BillingInvoiceStatusForm({
         </label>
 
         {mode === 'single' && currentSuggestion ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-            <div className="font-semibold text-slate-950">
+          <div className="rounded-2xl border border-line bg-surfaceSoft px-4 py-3 text-sm text-muteStrong">
+            <div className="font-semibold text-inkStrong">
               {currentSuggestion.customerName || '-'} • {currentSuggestion.invoiceNo || '-'}
             </div>
             <div className="mt-1">
@@ -316,7 +316,7 @@ export function BillingInvoiceStatusForm({
           <button
             type="submit"
             disabled={isDisabled}
-            className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-accentInk disabled:cursor-not-allowed disabled:bg-surfaceMuted disabled:text-mute"
           >
             {submitting ? 'Menyimpan Status...' : submitLabel}
           </button>

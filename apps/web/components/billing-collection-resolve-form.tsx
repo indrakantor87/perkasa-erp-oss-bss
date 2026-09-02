@@ -157,19 +157,19 @@ export function BillingCollectionResolveForm({
   return (
     <section className="panel p-6">
       <p className="section-title">Resolve Collection</p>
-      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+      <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-inkStrong">
         Selesaikan follow-up collection
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">{helperText}</p>
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
-        <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Nomor Invoice</span>
+        <label className="flex flex-col gap-2 text-sm text-muteStrong">
+          <span className="font-semibold text-inkStrong">Nomor Invoice</span>
           <input
             list="billing-follow-up-invoice-suggestions"
             value={invoiceNo}
             onChange={(event) => setInvoiceNo(event.target.value)}
-            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            className="rounded-2xl border border-line bg-surface px-4 py-3 outline-none transition focus:shadow-focus"
             placeholder="Masukkan invoice_no"
             required
             disabled={isDisabled}
@@ -182,12 +182,12 @@ export function BillingCollectionResolveForm({
           </datalist>
         </label>
 
-        <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Status Resolve</span>
+        <label className="flex flex-col gap-2 text-sm text-muteStrong">
+          <span className="font-semibold text-inkStrong">Status Resolve</span>
           <select
             value={resolutionStatus}
             onChange={(event) => setResolutionStatus(event.target.value as (typeof resolutionStatusOptions)[number])}
-            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            className="rounded-2xl border border-line bg-surface px-4 py-3 outline-none transition focus:shadow-focus"
             disabled={isDisabled}
           >
             {resolutionStatusOptions.map((item) => (
@@ -199,11 +199,11 @@ export function BillingCollectionResolveForm({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
-          <span className="font-semibold text-slate-950">Catatan Resolve</span>
+          <span className="font-semibold text-inkStrong">Catatan Resolve</span>
           <textarea
             value={resolutionNotes}
             onChange={(event) => setResolutionNotes(event.target.value)}
-            className="min-h-28 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            className="min-h-28 rounded-2xl border border-line bg-surface px-4 py-3 outline-none transition focus:shadow-focus"
             placeholder="Contoh: customer sudah membayar, janji bayar dibatalkan, atau reminder selesai ditindaklanjuti."
             required
             disabled={isDisabled}
@@ -211,8 +211,8 @@ export function BillingCollectionResolveForm({
         </label>
 
         {currentSuggestion ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 lg:col-span-2">
-            <div className="font-semibold text-slate-950">
+          <div className="rounded-2xl border border-line bg-surfaceSoft px-4 py-3 text-sm text-muteStrong lg:col-span-2">
+            <div className="font-semibold text-inkStrong">
               {currentSuggestion.customerName || '-'} • {currentSuggestion.invoiceNo || '-'}
             </div>
             <div className="mt-1">
@@ -245,7 +245,7 @@ export function BillingCollectionResolveForm({
           <button
             type="submit"
             disabled={isDisabled}
-            className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-accentInk disabled:cursor-not-allowed disabled:bg-surfaceMuted disabled:text-mute"
           >
             {submitting ? 'Menyimpan Resolve...' : 'Simpan Resolve Collection'}
           </button>

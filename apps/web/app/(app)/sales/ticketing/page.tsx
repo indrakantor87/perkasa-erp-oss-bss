@@ -82,21 +82,21 @@ export default async function SalesTicketingPage({
     <div className="space-y-4">
       <DataSourceStatus source={payload.source} />
 
-      <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+      <section className="panel p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Penjualan</p>
-            <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mute">Penjualan</p>
+            <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-inkStrong">
               Ticketing Perkasa
             </h1>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-muteStrong">
               Halaman ini memakai pola tabel NOC dari `web-psb-perkasa`, tetapi isi datanya menjadi ticket gabungan ERP: PSB, Troubleshoots, Dismantle, dan Jalur milik user login.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
               href="/sales"
-              className="rounded-md border border-slate-500 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
+              className="rounded-md border border-line bg-surfaceSoft px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muteStrong transition hover:bg-surface hover:text-inkStrong"
             >
               Kembali ke Penjualan
             </Link>
@@ -104,46 +104,46 @@ export default async function SalesTicketingPage({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
-        <div className="rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
+      <section className="panel p-6">
+        <div className="rounded-xl border border-line bg-surfaceSoft px-4 py-3 text-sm text-muteStrong">
           Ticketing Perkasa di menu penjualan hanya menampilkan ticket yang terkait user login agar monitoring progres tetap fokus, ringan, dan tetap mengikuti pola tabel referensi NOC.
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <article className="rounded-2xl border border-slate-700 bg-slate-900/25 px-4 py-4 text-slate-100">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Total Ticket</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{totalTickets}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-200">Semua ticket yang terhubung ke user login.</p>
+          <article className="rounded-2xl border border-line bg-surface px-4 py-4 text-muteStrong">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">Total Ticket</p>
+            <p className="mt-2 text-3xl font-semibold text-inkStrong">{totalTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-muteStrong">Semua ticket yang terhubung ke user login.</p>
           </article>
-          <article className="rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-4 text-sky-50">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">Masih Berjalan</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{openTickets}</p>
-            <p className="mt-2 text-sm leading-6 text-sky-100">Ticket open atau on progress yang masih perlu dipantau.</p>
+          <article className="rounded-2xl border border-info/40 bg-info/10 px-4 py-4 text-info">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-info">Masih Berjalan</p>
+            <p className="mt-2 text-3xl font-semibold text-inkStrong">{openTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-info/90">Ticket open atau on progress yang masih perlu dipantau.</p>
           </article>
-          <article className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-50">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-100">Perlu Perhatian</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{urgentTickets}</p>
-            <p className="mt-2 text-sm leading-6 text-amber-100">Ticket dengan SLA warning atau breached.</p>
+          <article className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-4 text-warning">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">Perlu Perhatian</p>
+            <p className="mt-2 text-3xl font-semibold text-inkStrong">{urgentTickets}</p>
+            <p className="mt-2 text-sm leading-6 text-warning/90">Ticket dengan SLA warning atau breached.</p>
           </article>
         </div>
 
         <form className="mt-4 grid gap-4 lg:grid-cols-4" action="/sales/ticketing" method="get">
-          <label className="flex flex-col gap-2 text-sm text-slate-100 lg:col-span-2">
-            <span className="font-semibold text-white">Search</span>
+          <label className="flex flex-col gap-2 text-sm text-muteStrong lg:col-span-2">
+            <span className="font-semibold text-inkStrong">Search</span>
             <input
               name="q"
               defaultValue={q}
               placeholder="WO- / TT- / nama customer / teknisi"
-              className="rounded-2xl border border-slate-700 bg-slate-900/30 px-4 py-3 text-white outline-none transition focus:border-slate-400"
+              className="rounded-2xl border border-line bg-surface px-4 py-3 text-ink outline-none transition focus:shadow-focus"
             />
           </label>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-100">
-            <span className="font-semibold text-white">Jenis Ticket</span>
+          <label className="flex flex-col gap-2 text-sm text-muteStrong">
+            <span className="font-semibold text-inkStrong">Jenis Ticket</span>
             <select
               name="ticketType"
               defaultValue={ticketType}
-              className="rounded-2xl border border-slate-700 bg-slate-900/30 px-4 py-3 text-white outline-none transition focus:border-slate-400"
+              className="rounded-2xl border border-line bg-surface px-4 py-3 text-ink outline-none transition focus:shadow-focus"
             >
               <option value="">Semua</option>
               {ticketTypeOptions.map((item) => (
@@ -154,12 +154,12 @@ export default async function SalesTicketingPage({
             </select>
           </label>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-100">
-            <span className="font-semibold text-white">Status</span>
+          <label className="flex flex-col gap-2 text-sm text-muteStrong">
+            <span className="font-semibold text-inkStrong">Status</span>
             <select
               name="queueStatus"
               defaultValue={queueStatus}
-              className="rounded-2xl border border-slate-700 bg-slate-900/30 px-4 py-3 text-white outline-none transition focus:border-slate-400"
+              className="rounded-2xl border border-line bg-surface px-4 py-3 text-ink outline-none transition focus:shadow-focus"
             >
               <option value="">Semua</option>
               {queueStatusOptions.map((item) => (
@@ -173,13 +173,13 @@ export default async function SalesTicketingPage({
           <div className="lg:col-span-4 flex flex-wrap gap-2">
             <button
               type="submit"
-              className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-950"
+              className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accentInk"
             >
               Terapkan Filter
             </button>
             <Link
               href="/sales/ticketing"
-              className="inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+              className="inline-flex items-center justify-center rounded-md border border-line bg-surfaceSoft px-3 py-2 text-sm font-semibold text-muteStrong transition hover:bg-surface hover:text-inkStrong"
             >
               Reset
             </Link>
@@ -187,16 +187,16 @@ export default async function SalesTicketingPage({
         </form>
 
         {payload.error ? (
-          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div className="mt-4 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
             {payload.error}
           </div>
         ) : null}
 
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-surfaceElevated shadow-soft">
           <div className="overflow-x-auto">
             <table className="min-w-[1080px] w-full border-collapse">
-              <thead className="bg-[#162d66]">
-                <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-100">
+              <thead className="bg-surfaceStrong">
+                <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-muteStrong">
                   <th className="px-4 py-3">Ticket</th>
                   <th className="px-4 py-3">Customer</th>
                   <th className="px-4 py-3">User / Site</th>
@@ -209,30 +209,30 @@ export default async function SalesTicketingPage({
                   <th className="px-4 py-3">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700 bg-[#1c2b45]">
+              <tbody className="divide-y divide-line bg-surface">
                 {payload.items.map((item) => (
-                  <tr key={item.queueKey} className="align-top transition-colors hover:bg-[#24395c]">
-                    <td className="px-4 py-3 text-sm text-slate-100">
-                      <p className="font-semibold text-white">{item.ticketNo ?? `#${item.sourceId}`}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-300">{item.supportLaneLabel}</p>
+                  <tr key={item.queueKey} className="align-top transition-colors hover:bg-surfaceSoft">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
+                      <p className="font-semibold text-inkStrong">{item.ticketNo ?? `#${item.sourceId}`}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">{item.supportLaneLabel}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
-                      <p className="font-semibold text-white">{item.customerName ?? '-'}</p>
+                    <td className="px-4 py-3 text-sm text-muteStrong">
+                      <p className="font-semibold text-inkStrong">{item.customerName ?? '-'}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <p>{item.customerUser ?? 'Customer / site belum terhubung'}</p>
-                      {item.workOrderId ? <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-300">WO #{item.workOrderId}</p> : null}
-                      {item.troubleTicketId ? <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-300">TT #{item.troubleTicketId}</p> : null}
+                      {item.workOrderId ? <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">WO #{item.workOrderId}</p> : null}
+                      {item.troubleTicketId ? <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">TT #{item.troubleTicketId}</p> : null}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getTypeBadgeClass(item.ticketType)}`}
                       >
                         {item.ticketType}
                       </span>
-                      {item.priority ? <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-300">Priority {item.priority}</p> : null}
+                      {item.priority ? <p className="mt-2 text-xs uppercase tracking-[0.16em] text-mute">Priority {item.priority}</p> : null}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getStatusBadgeClass(item.queueStatus)}`}
                       >
@@ -248,39 +248,39 @@ export default async function SalesTicketingPage({
                         </p>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
-                      <p className="font-semibold text-white">{item.technicianName ?? '-'}</p>
-                      <p className="mt-1 text-slate-300">{item.picName ? `PIC: ${item.picName}` : item.supportLaneLabel}</p>
+                    <td className="px-4 py-3 text-sm text-muteStrong">
+                      <p className="font-semibold text-inkStrong">{item.technicianName ?? '-'}</p>
+                      <p className="mt-1 text-mute">{item.picName ? `PIC: ${item.picName}` : item.supportLaneLabel}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <p>{formatTicketTimestamp(item.queueStartedAt)}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-300">{item.ageLabel ?? '-'}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">{item.ageLabel ?? '-'}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <p>{formatTicketTimestamp(item.lastUpdateAt ?? item.queueStartedAt)}</p>
-                      {item.slaLabel ? <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-300">SLA {item.slaLabel}</p> : null}
+                      {item.slaLabel ? <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">SLA {item.slaLabel}</p> : null}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <p>{item.requestCode ?? item.deviceState ?? '-'}</p>
                       {item.operationalBadges.length ? (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {item.operationalBadges.slice(0, 2).map((badge) => (
                             <span
                               key={`${item.queueKey}-${badge}`}
-                              className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-700"
+                              className="inline-flex rounded-full bg-surfaceMuted px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-muteStrong"
                             >
                               {badge}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <p className="mt-1 text-xs text-slate-300">{item.supportLaneLabel}</p>
+                        <p className="mt-1 text-xs text-mute">{item.supportLaneLabel}</p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <Link
                         href={item.href}
-                        className="inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                        className="inline-flex items-center justify-center rounded-md border border-line bg-surfaceSoft px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muteStrong transition hover:bg-surface hover:text-inkStrong"
                       >
                         Buka
                       </Link>
@@ -289,7 +289,7 @@ export default async function SalesTicketingPage({
                 ))}
                 {!payload.items.length ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-6 text-sm text-slate-300">
+                    <td colSpan={10} className="px-4 py-6 text-sm text-muteStrong">
                       Belum ada ticket yang sesuai filter untuk user login.
                     </td>
                   </tr>

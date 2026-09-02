@@ -101,14 +101,14 @@ export default async function CsAdminWorkspacePage() {
     <div className="space-y-4">
       <DataSourceStatus source={payload.source} />
 
-      <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+      <section className="panel p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">CS & Admin CS</p>
-            <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mute">CS & Admin CS</p>
+            <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-inkStrong">
               Customer / CS & Admin CS
             </h1>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-muteStrong">
               Halaman ini difokuskan untuk pembacaan customer, order berjalan, koreksi data, dan keputusan
               CS harian. Menu lain tetap dibuka dari sidebar agar tiap modul berdiri sendiri dan tidak
               bercampur seperti workspace besar.
@@ -117,19 +117,19 @@ export default async function CsAdminWorkspacePage() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/customers"
-              className="rounded-md bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-950"
+              className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-accentInk"
             >
               Buka Customer
             </Link>
             <Link
               href="/list-psb"
-              className="rounded-md border border-slate-500 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
+              className="rounded-md border border-line bg-surfaceSoft px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muteStrong transition hover:bg-surface hover:text-inkStrong"
             >
               Buka Data PSB
             </Link>
             <Link
               href="/dashboard/tracking/noc-queue"
-              className="rounded-md border border-slate-500 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
+              className="rounded-md border border-line bg-surfaceSoft px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muteStrong transition hover:bg-surface hover:text-inkStrong"
             >
               Buka Ticketing
             </Link>
@@ -161,46 +161,46 @@ export default async function CsAdminWorkspacePage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5">
+        <div className="panel p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="section-title">Arah Kerja CS</p>
-              <h2 className="mt-2 text-xl font-semibold text-slate-950">Menu inti yang dipakai bergantian</h2>
+              <h2 className="mt-2 text-xl font-semibold text-inkStrong">Menu inti yang dipakai bergantian</h2>
             </div>
-            <span className="badge border-slate-200 bg-slate-50 text-slate-600">{payload.baseCount} item scope</span>
+            <span className="badge border-line bg-surfaceMuted text-muteStrong">{payload.baseCount} item scope</span>
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-2">
-            <Link href="/support/isolations" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 transition hover:border-amber-300">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Isolir</p>
-              <p className="mt-2 text-2xl font-semibold text-amber-950">{formatCount(summary.isolationCount)}</p>
-              <p className="mt-2 text-sm leading-6 text-amber-800">Pelanggan suspend aktif untuk follow up dan keputusan layanan.</p>
+            <Link href="/support/isolations" className="rounded-2xl border border-warning/40 bg-warning/10 p-4 transition hover:border-warning/60">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">Isolir</p>
+              <p className="mt-2 text-2xl font-semibold text-inkStrong">{formatCount(summary.isolationCount)}</p>
+              <p className="mt-2 text-sm leading-6 text-muteStrong">Pelanggan suspend aktif untuk follow up dan keputusan layanan.</p>
             </Link>
-            <Link href="/dashboard/tracking/noc-queue" className="rounded-2xl border border-violet-200 bg-violet-50 p-4 transition hover:border-violet-300">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Ticketing</p>
-              <p className="mt-2 text-2xl font-semibold text-violet-950">{formatCount(summary.troubleTicketCount)}</p>
-              <p className="mt-2 text-sm leading-6 text-violet-800">Ticket gabungan untuk kontrol PSB, TT, dismantle, dan jalur.</p>
+            <Link href="/dashboard/tracking/noc-queue" className="rounded-2xl border border-info/40 bg-info/10 p-4 transition hover:border-info/60">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-info">Ticketing</p>
+              <p className="mt-2 text-2xl font-semibold text-inkStrong">{formatCount(summary.troubleTicketCount)}</p>
+              <p className="mt-2 text-sm leading-6 text-muteStrong">Ticket gabungan untuk kontrol PSB, TT, dismantle, dan jalur.</p>
             </Link>
-            <Link href="/customers/cs-admin/odp-port" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 transition hover:border-emerald-300">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">ODP dan Port</p>
-              <p className="mt-2 text-2xl font-semibold text-emerald-950">{formatCount(summary.inventoryCount)}</p>
-              <p className="mt-2 text-sm leading-6 text-emerald-800">Baca kapasitas ODP dan status port tanpa masuk ke shell inventory penuh.</p>
+            <Link href="/customers/cs-admin/odp-port" className="rounded-2xl border border-success/40 bg-success/10 p-4 transition hover:border-success/60">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-success">ODP dan Port</p>
+              <p className="mt-2 text-2xl font-semibold text-inkStrong">{formatCount(summary.inventoryCount)}</p>
+              <p className="mt-2 text-sm leading-6 text-muteStrong">Baca kapasitas ODP dan status port tanpa masuk ke shell inventory penuh.</p>
             </Link>
-            <Link href="/list-dismantle" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">List Dismantle</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCount(summary.transferWaitingCount)}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">Validasi terminasi dan pekerjaan cabut sebelum masuk tiket operasional.</p>
+            <Link href="/list-dismantle" className="rounded-2xl border border-line bg-surfaceSoft p-4 transition hover:bg-surface hover:border-lineStrong">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muteStrong">List Dismantle</p>
+              <p className="mt-2 text-2xl font-semibold text-inkStrong">{formatCount(summary.transferWaitingCount)}</p>
+              <p className="mt-2 text-sm leading-6 text-mute">Validasi terminasi dan pekerjaan cabut sebelum masuk tiket operasional.</p>
             </Link>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-5">
+        <div className="panel p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="section-title">Ringkasan Antrean</p>
-              <h2 className="mt-2 text-xl font-semibold text-slate-950">Koreksi, keputusan, dan risiko aktif</h2>
+              <h2 className="mt-2 text-xl font-semibold text-inkStrong">Koreksi, keputusan, dan risiko aktif</h2>
             </div>
-            <span className="badge border-slate-200 bg-slate-50 text-slate-600">{payload.buckets.length} bucket</span>
+            <span className="badge border-line bg-surfaceMuted text-muteStrong">{payload.buckets.length} bucket</span>
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -208,11 +208,11 @@ export default async function CsAdminWorkspacePage() {
               <Link
                 key={bucket.queue}
                 href={buildWorklistHref(session.role, { queue: bucket.queue })}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white"
+                className="rounded-2xl border border-line bg-surfaceSoft p-4 transition hover:bg-surface hover:border-lineStrong"
               >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{bucket.queue}</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCount(bucket.totalCount)}</p>
-                <p className="mt-2 text-xs leading-5 text-slate-600">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">{bucket.queue}</p>
+                <p className="mt-2 text-2xl font-semibold text-inkStrong">{formatCount(bucket.totalCount)}</p>
+                <p className="mt-2 text-xs leading-5 text-muteStrong">
                   Kritikal {formatCount(bucket.summary.criticalCount)} • Menunggu {formatCount(bucket.summary.waitingCount)}
                 </p>
               </Link>
@@ -220,27 +220,27 @@ export default async function CsAdminWorkspacePage() {
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">Perlu Koreksi</p>
-              <p className="mt-2 text-2xl font-semibold text-amber-950">{formatCount(summary.correctionCount)}</p>
+            <div className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">Perlu Koreksi</p>
+              <p className="mt-2 text-2xl font-semibold text-inkStrong">{formatCount(summary.correctionCount)}</p>
             </div>
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">Risiko Tinggi</p>
-              <p className="mt-2 text-2xl font-semibold text-rose-950">{formatCount(summary.riskCount)}</p>
+            <div className="rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-danger">Risiko Tinggi</p>
+              <p className="mt-2 text-2xl font-semibold text-inkStrong">{formatCount(summary.riskCount)}</p>
             </div>
-            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Keputusan Menunggu</p>
-              <p className="mt-2 text-2xl font-semibold text-sky-950">{formatCount(summary.transferWaitingCount)}</p>
+            <div className="rounded-2xl border border-info/40 bg-info/10 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-info">Keputusan Menunggu</p>
+              <p className="mt-2 text-2xl font-semibold text-inkStrong">{formatCount(summary.transferWaitingCount)}</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-5">
+      <section className="panel p-5">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="section-title">Antrean CS Aktif</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">Daftar tindak lanjut yang paling sering dibaca CS</h2>
+            <h2 className="mt-2 text-xl font-semibold text-inkStrong">Daftar tindak lanjut yang paling sering dibaca CS</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">
               Tabel ini sengaja dipadatkan agar cepat dibaca dan mudah di-screenshot. Detail penuh tetap dibuka dari
               modul tujuan masing-masing.
@@ -248,17 +248,17 @@ export default async function CsAdminWorkspacePage() {
           </div>
           <Link
             href={buildWorklistHref(session.role, { queue: 'Perlu Koreksi' })}
-            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+            className="inline-flex items-center justify-center rounded-2xl border border-line bg-surfaceSoft px-4 py-2 text-sm font-semibold text-muteStrong transition hover:bg-surface hover:text-inkStrong"
           >
             Buka Worklist Lengkap
           </Link>
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200">
+        <div className="mt-5 overflow-hidden rounded-2xl border border-line bg-surfaceElevated shadow-soft">
           <div className="overflow-x-auto">
-            <table className="min-w-[920px] w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <table className="min-w-[920px] w-full">
+              <thead className="bg-surfaceStrong">
+                <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-muteStrong">
                   <th className="px-4 py-3">Antrean</th>
                   <th className="px-4 py-3">Item</th>
                   <th className="px-4 py-3">Domain</th>
@@ -268,14 +268,14 @@ export default async function CsAdminWorkspacePage() {
                   <th className="px-4 py-3">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
+              <tbody className="divide-y divide-line bg-surface">
                 {followUpRows.map((item) => (
-                  <tr key={`${item.bucketQueue}-${item.id}`} className="align-top">
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      <p className="font-semibold text-slate-950">{item.bucketQueue}</p>
-                      <p className="mt-1 text-xs text-slate-500">{item.queue}</p>
+                  <tr key={`${item.bucketQueue}-${item.id}`} className="align-top transition-colors hover:bg-surfaceSoft">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
+                      <p className="font-semibold text-inkStrong">{item.bucketQueue}</p>
+                      <p className="mt-1 text-xs text-mute">{item.queue}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       {(() => {
                         const normDomain = normalizeDomain(item.domain)
                         const customerRelevant = new Set(['CUSTOMERS', 'SALES', 'SUPPORT', 'LAYANAN', 'FIELD OPS'])
@@ -284,50 +284,50 @@ export default async function CsAdminWorkspacePage() {
                           const encoded = encodeURIComponent(identifier)
                           return (
                             <>
-                              <p className="font-semibold text-slate-950">
+                              <p className="font-semibold text-inkStrong">
                                 <Link
                                   href={`/customers/${encoded}?name=${encoded}`}
-                                  className="transition hover:underline hover:text-slate-950"
+                                  className="transition hover:underline hover:text-inkStrong"
                                 >
                                   {item.title}
                                 </Link>
                               </p>
                               <p className="mt-1">{item.subtitle}</p>
-                              <p className="mt-2 text-xs leading-5 text-slate-500">{item.detail}</p>
+                              <p className="mt-2 text-xs leading-5 text-mute">{item.detail}</p>
                             </>
                           )
                         }
                         return (
                           <>
-                            <p className="font-semibold text-slate-950">{item.title}</p>
+                            <p className="font-semibold text-inkStrong">{item.title}</p>
                             <p className="mt-1">{item.subtitle}</p>
-                            <p className="mt-2 text-xs leading-5 text-slate-500">{item.detail}</p>
+                            <p className="mt-2 text-xs leading-5 text-mute">{item.detail}</p>
                           </>
                         )
                       })()}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getDomainBadgeTone(item.domain)}`}>
                         {item.domain}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getStatusBadgeTone(item.status)}`}>
                         {item.status}
                       </span>
-                      {item.dueLabel ? <p className="mt-2 text-xs text-slate-500">Target: {item.dueLabel}</p> : null}
+                      {item.dueLabel ? <p className="mt-2 text-xs text-mute">Target: {item.dueLabel}</p> : null}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      <p className="font-semibold text-slate-950">{item.owner || '-'}</p>
+                    <td className="px-4 py-3 text-sm text-muteStrong">
+                      <p className="font-semibold text-inkStrong">{item.owner || '-'}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      <p className="font-semibold text-slate-950">{item.actionLabel}</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">{item.nextAction || item.reason || '-'}</p>
+                    <td className="px-4 py-3 text-sm text-muteStrong">
+                      <p className="font-semibold text-inkStrong">{item.actionLabel}</p>
+                      <p className="mt-1 text-xs leading-5 text-mute">{item.nextAction || item.reason || '-'}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <Link
                         href={item.href}
-                        className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                        className="inline-flex items-center justify-center rounded-2xl border border-line bg-surfaceSoft px-3 py-2 text-xs font-semibold text-muteStrong transition hover:bg-surface hover:text-inkStrong"
                       >
                         Buka
                       </Link>
@@ -336,7 +336,7 @@ export default async function CsAdminWorkspacePage() {
                 ))}
                 {!followUpRows.length ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6 text-sm text-slate-500">
+                    <td colSpan={7} className="px-4 py-6 text-sm text-mute">
                       Belum ada antrean aktif pada scope CS saat ini.
                     </td>
                   </tr>

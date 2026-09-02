@@ -94,21 +94,21 @@ export default async function SalesIsolationsPage({
     <div className="space-y-4">
       <DataSourceStatus source={payload.source} />
 
-      <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
+      <section className="panel p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Penjualan</p>
-            <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-white">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mute">Penjualan</p>
+            <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-inkStrong">
               List Data Isolir
             </h1>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-muteStrong">
               Halaman ini fokus untuk memantau data isolir milik user login dengan pola tabel monitoring seperti referensi `web-psb-perkasa`, tanpa membawa lane support yang lebih lebar.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
               href="/sales"
-              className="rounded-md border border-slate-500 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
+              className="rounded-md border border-line bg-surfaceSoft px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muteStrong transition hover:bg-surface hover:text-inkStrong"
             >
               Kembali ke Penjualan
             </Link>
@@ -116,46 +116,46 @@ export default async function SalesIsolationsPage({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]">
-        <div className="rounded-xl border border-slate-700 bg-slate-900/20 px-4 py-3 text-sm text-slate-100">
+      <section className="panel p-6">
+        <div className="rounded-xl border border-line bg-surfaceSoft px-4 py-3 text-sm text-muteStrong">
           Data isolir di menu penjualan dibatasi ke customer yang terkait marketing user login, sehingga tabel tetap fokus untuk follow up prospek dan customer aktif.
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <article className="rounded-2xl border border-slate-700 bg-slate-900/25 px-4 py-4 text-slate-100">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Total Isolir</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{totalRows}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-200">Customer isolir aktif sesuai ownership marketing user login.</p>
+          <article className="rounded-2xl border border-line bg-surface px-4 py-4 text-muteStrong">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">Total Isolir</p>
+            <p className="mt-2 text-3xl font-semibold text-inkStrong">{totalRows}</p>
+            <p className="mt-2 text-sm leading-6 text-muteStrong">Customer isolir aktif sesuai ownership marketing user login.</p>
           </article>
-          <article className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-50">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-100">Belum Ada Ticket</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{withoutTicket}</p>
-            <p className="mt-2 text-sm leading-6 text-amber-100">Kasus isolir yang belum masuk ke jalur dismantle.</p>
+          <article className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-4 text-warning">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-warning">Belum Ada Ticket</p>
+            <p className="mt-2 text-3xl font-semibold text-inkStrong">{withoutTicket}</p>
+            <p className="mt-2 text-sm leading-6 text-warning/90">Kasus isolir yang belum masuk ke jalur dismantle.</p>
           </article>
-          <article className="rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-4 text-sky-50">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-100">Sudah Berticket</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{withTicket}</p>
-            <p className="mt-2 text-sm leading-6 text-sky-100">Data isolir yang sudah punya ticket dismantle.</p>
+          <article className="rounded-2xl border border-info/40 bg-info/10 px-4 py-4 text-info">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-info">Sudah Berticket</p>
+            <p className="mt-2 text-3xl font-semibold text-inkStrong">{withTicket}</p>
+            <p className="mt-2 text-sm leading-6 text-info/90">Data isolir yang sudah punya ticket dismantle.</p>
           </article>
         </div>
 
         <form className="mt-4 grid gap-4 lg:grid-cols-4" action="/sales/isolations" method="get">
-          <label className="flex flex-col gap-2 text-sm text-slate-100 lg:col-span-3">
-            <span className="font-semibold text-white">Search</span>
+          <label className="flex flex-col gap-2 text-sm text-muteStrong lg:col-span-3">
+            <span className="font-semibold text-inkStrong">Search</span>
             <input
               name="q"
               defaultValue={resolveSearchParam(resolvedSearchParams.q) ?? ''}
               placeholder="Nama pelanggan / service no / no hp / marketing"
-              className="rounded-2xl border border-slate-700 bg-slate-900/30 px-4 py-3 text-white outline-none transition focus:border-slate-400"
+              className="rounded-2xl border border-line bg-surface px-4 py-3 text-ink outline-none transition focus:shadow-focus"
             />
           </label>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-100">
-            <span className="font-semibold text-white">Radboox</span>
+          <label className="flex flex-col gap-2 text-sm text-muteStrong">
+            <span className="font-semibold text-inkStrong">Radboox</span>
             <select
               name="radboox"
               defaultValue={resolveSearchParam(resolvedSearchParams.radboox) ?? ''}
-              className="rounded-2xl border border-slate-700 bg-slate-900/30 px-4 py-3 text-white outline-none transition focus:border-slate-400"
+              className="rounded-2xl border border-line bg-surface px-4 py-3 text-ink outline-none transition focus:shadow-focus"
             >
               <option value="">Semua</option>
               {radbooxOptions.map((item) => (
@@ -169,24 +169,24 @@ export default async function SalesIsolationsPage({
           <div className="lg:col-span-4 flex flex-wrap gap-2">
             <button
               type="submit"
-              className="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-950"
+              className="inline-flex items-center justify-center rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accentInk"
             >
               Terapkan Filter
             </button>
             <Link
               href="/sales/isolations"
-              className="inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+              className="inline-flex items-center justify-center rounded-md border border-line bg-surfaceSoft px-3 py-2 text-sm font-semibold text-muteStrong transition hover:bg-surface hover:text-inkStrong"
             >
               Reset
             </Link>
           </div>
         </form>
 
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-[#152643] shadow-[0_10px_30px_rgba(2,6,23,0.25)]">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-surfaceElevated shadow-soft">
           <div className="overflow-x-auto">
             <table className="min-w-[1260px] w-full border-collapse">
-              <thead className="bg-[#162d66]">
-                <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-100">
+              <thead className="bg-surfaceStrong">
+                <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-muteStrong">
                   <th className="px-4 py-3">No</th>
                   <th className="px-4 py-3">Nama Pelanggan</th>
                   <th className="px-4 py-3">User / Service</th>
@@ -198,28 +198,28 @@ export default async function SalesIsolationsPage({
                   <th className="px-4 py-3">Ticket</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700 bg-[#1c2b45]">
+              <tbody className="divide-y divide-line bg-surface">
                 {filteredRows.map((row, index) => (
-                  <tr key={row.id} className="align-top transition-colors hover:bg-[#24395c]">
-                    <td className="px-4 py-3 text-sm text-slate-100">{index + 1}</td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
-                      <p className="font-semibold text-white">{row.primary}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-300">{pickMeta(row, 'Customer Code: ') || '-'}</p>
+                  <tr key={row.id} className="align-top transition-colors hover:bg-surfaceSoft">
+                    <td className="px-4 py-3 text-sm text-muteStrong">{index + 1}</td>
+                    <td className="px-4 py-3 text-sm text-muteStrong">
+                      <p className="font-semibold text-inkStrong">{row.primary}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">{pickMeta(row, 'Customer Code: ') || '-'}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">{pickMeta(row, 'Service No: ') || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-slate-100">{pickMeta(row, 'Phone: ') || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-slate-100">{pickMeta(row, 'Marketing: ') || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-slate-100">{row.secondary || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-slate-100">{pickMeta(row, 'Isolasi: ') || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
+                    <td className="px-4 py-3 text-sm text-muteStrong">{pickMeta(row, 'Service No: ') || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-muteStrong">{pickMeta(row, 'Phone: ') || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-muteStrong">{pickMeta(row, 'Marketing: ') || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-muteStrong">{row.secondary || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-muteStrong">{pickMeta(row, 'Isolasi: ') || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <p className="max-w-[320px] leading-6">{row.detail || '-'}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-100">
+                    <td className="px-4 py-3 text-sm text-muteStrong">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${
                           pickMeta(row, 'Ticket Dismantle: ').toUpperCase() === 'SUDAH'
-                            ? 'bg-sky-100 text-sky-700'
-                            : 'bg-amber-100 text-amber-800'
+                            ? 'bg-info/15 text-info'
+                            : 'bg-warning/15 text-warning'
                         }`}
                       >
                         {pickMeta(row, 'Ticket Dismantle: ') || 'Belum'}
@@ -229,7 +229,7 @@ export default async function SalesIsolationsPage({
                 ))}
                 {!filteredRows.length ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-6 text-sm text-slate-300">
+                    <td colSpan={9} className="px-4 py-6 text-sm text-muteStrong">
                       Belum ada data isolir yang sesuai filter untuk user login.
                     </td>
                   </tr>
