@@ -18,7 +18,7 @@ type UiThemeContextValue = {
 
 declare global {
   interface Window {
-    __perkasa_setTheme?: (t: UiTheme | string) => void
+    __perkasa_setTheme?: (t: UiTheme | string) => boolean
   }
   type PerkasaThemeEventDetail = { theme: UiTheme }
   interface WindowEventMap {
@@ -95,6 +95,9 @@ export function ThemeProvider({
 
   const setTheme = useCallback((nextTheme: UiTheme | string) => {
     const normalized = normalizeUiTheme(nextTheme)
+    if (typeof window !== 'undefined' && _internalDispatchInFlight.current) {
+      return
+    }
     const mediaDark = (() => {
       if (typeof window === 'undefined') return false
       try {
@@ -110,8 +113,13 @@ export function ThemeProvider({
       const effectiveSame = docEffective === nextEffective
       const selectedSame = prevThemeNormalized === normalized
       if (effectiveSame && selectedSame) return
-      const result = writeThemePersistence(normalized)
-      if (result.effective !== resolvedThemeRef.current) setResolvedThemeState(result.effective)
+      try {
+        _internalDispatchInFlight.current = true
+        const result = writeThemePersistence(normalized)
+        if (result.effective !== resolvedThemeRef.current) setResolvedThemeState(result.effective)
+      } finally {
+        _internalDispatchInFlight.current = false
+      }
     } else if (nextEffective !== resolvedThemeRef.current) {
       setResolvedThemeState(nextEffective)
     }
@@ -121,17 +129,23 @@ export function ThemeProvider({
   const themeStateRef = useRef<UiTheme>(normalizedInitial)
   const resolvedThemeRef = useRef<'light' | 'dark'>(resolveEffectiveTheme(normalizedInitial, false))
   const setThemeRef = useRef<typeof setTheme | null>(null)
+  const _internalDispatchInFlight = useRef<boolean>(false)
   themeStateRef.current = theme
   resolvedThemeRef.current = resolvedTheme
   setThemeRef.current = setTheme
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    window.__perkasa_setTheme = (t) => setThemeRef.current?.(t)
+    window.__perkasa_setTheme = (t) => {
+      const setter = setThemeRef.current
+      if (!setter) return false
+      setter(t)
+      return true
+    }
     return () => {
       if (window.__perkasa_setTheme) delete window.__perkasa_setTheme
     }
-  })
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -190,10 +204,16 @@ export function ThemeProvider({
 
     const listener = (ev: Event) => {
       try {
+        if (_internalDispatchInFlight.current) return
         const detail = (ev as CustomEvent<{ theme: UiTheme }>).detail
         if (!detail || !detail.theme) return
-        setThemeRef.current?.(detail.theme)
-      } catch {}
+        const setter = setThemeRef.current
+        if (!setter) return
+        setter(detail.theme)
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('[perkasa-erp ui-theme] themechange listener error', error)
+      }
     }
     window.addEventListener('perkasa:ui:themechange', listener as EventListener)
     return () => {
@@ -240,10 +260,13 @@ export function useUiTheme() {
 export function dispatchThemeChange(theme: UiTheme | string): UiTheme {
   const normalized = normalizeUiTheme(theme)
   if (typeof window !== 'undefined') {
-    if (window.__perkasa_setTheme) {
+    const setter = window.__perkasa_setTheme
+    if (setter) {
       try {
-        window.__perkasa_setTheme(normalized)
-        return normalized
+        const invoked = setter(normalized)
+        if (invoked === true) {
+          return normalized
+        }
       } catch {}
     }
     writeThemePersistence(normalized)
