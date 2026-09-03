@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   normalizeUiLanguage,
   UI_LANGUAGE_COOKIE_KEY,
@@ -15,7 +15,7 @@ type UiLanguageContextValue = {
 
 declare global {
   interface Window {
-    __perkasa_setLang?: (l: UiLanguage | string) => void
+    __perkasa_setLang?: (l: UiLanguage | string) => boolean
   }
   type PerkasaLangEventDetail = { language: UiLanguage }
   interface WindowEventMap {
@@ -25,8 +25,12 @@ declare global {
 
 const UiLanguageContext = createContext<UiLanguageContextValue | null>(null)
 
-function writeLanguagePersistence(language: UiLanguage, reloadPage = false) {
-  if (typeof window === 'undefined') return
+function writeLanguagePersistence(
+  language: UiLanguage,
+  reloadPage = false,
+  opts?: { skipDispatch?: boolean; reloadQueuedRef?: { current: boolean } },
+) {
+  if (typeof window === 'undefined') return { normalized: normalizeUiLanguage(language) }
   const normalized = normalizeUiLanguage(language)
   try { window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, normalized) } catch {}
   try {
@@ -35,20 +39,32 @@ function writeLanguagePersistence(language: UiLanguage, reloadPage = false) {
   try {
     document.documentElement.lang = normalized
   } catch {}
-  try {
-    const ev = new CustomEvent('perkasa:ui:langchange', {
-      bubbles: true,
-      cancelable: true,
-      detail: { language: normalized },
-    })
-    window.dispatchEvent(ev)
-  } catch {}
-  if (reloadPage) {
+  if (!opts?.skipDispatch) {
     try {
-      window.setTimeout(() => window.location.reload(), 50)
+      const ev = new CustomEvent('perkasa:ui:langchange', {
+        bubbles: true,
+        cancelable: true,
+        detail: { language: normalized },
+      })
+      window.dispatchEvent(ev)
     } catch {}
   }
-  return normalized
+  if (reloadPage) {
+    try {
+      if (opts?.reloadQueuedRef) {
+        if (!opts.reloadQueuedRef.current) {
+          opts.reloadQueuedRef.current = true
+          window.setTimeout(() => {
+            opts.reloadQueuedRef && (opts.reloadQueuedRef.current = false)
+            window.location.reload()
+          }, 50)
+        }
+      } else {
+        window.setTimeout(() => window.location.reload(), 50)
+      }
+    } catch {}
+  }
+  return { normalized }
 }
 
 export function LanguageProvider({
@@ -61,10 +77,21 @@ export function LanguageProvider({
   const normalizedInitial = normalizeUiLanguage(initialLanguage)
   const [language, setLanguageState] = useState<UiLanguage>(normalizedInitial)
 
+  const _internalLangDispatchInFlight = useRef<boolean>(false)
+  const _reloadQueued = useRef<boolean>(false)
+
   const setLanguage = useCallback((nextLanguage: UiLanguage | string) => {
     const normalized = normalizeUiLanguage(nextLanguage)
+    if (typeof window !== 'undefined' && _internalLangDispatchInFlight.current) {
+      return
+    }
     if (typeof window !== 'undefined') {
-      writeLanguagePersistence(normalized, true)
+      try {
+        _internalLangDispatchInFlight.current = true
+        writeLanguagePersistence(normalized, true, { reloadQueuedRef: _reloadQueued })
+      } finally {
+        _internalLangDispatchInFlight.current = false
+      }
     }
     setLanguageState(normalized)
   }, [])
@@ -96,16 +123,24 @@ export function LanguageProvider({
         target = docAttr
       }
     } catch {}
-    const finalTarget = writeLanguagePersistence(target, false) || target
+    const result = writeLanguagePersistence(target, false)
+    const finalTarget = result.normalized
     if (finalTarget !== language) setLanguageState(finalTarget)
 
     // Global window function (bisa dipanggil tanpa context)
-    window.__perkasa_setLang = (l) => setLanguage(l)
+    window.__perkasa_setLang = (l) => {
+      setLanguage(l)
+      return true
+    }
 
     const listener = (ev: Event) => {
       try {
+        if (_internalLangDispatchInFlight.current) return
         const detail = (ev as CustomEvent<{ language: UiLanguage }>).detail
-        if (detail && detail.language) setLanguage(detail.language)
+        if (detail && detail.language) {
+          const normalized = normalizeUiLanguage(detail.language)
+          setLanguageState((prev) => (prev === normalized ? prev : normalized))
+        }
       } catch {}
     }
     window.addEventListener('perkasa:ui:langchange', listener as EventListener)
@@ -118,7 +153,7 @@ export function LanguageProvider({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    writeLanguagePersistence(language, false)
+    writeLanguagePersistence(language, false, { skipDispatch: true })
   }, [language])
 
   const value = useMemo(() => ({ language, setLanguage }), [language, setLanguage])
@@ -138,19 +173,13 @@ export function dispatchLanguageChange(language: UiLanguage | string, reloadPage
   if (typeof window !== 'undefined') {
     if (window.__perkasa_setLang) {
       try {
-        window.__perkasa_setLang(normalized)
-        return normalized
+        const handled = window.__perkasa_setLang(normalized)
+        if (handled === true) {
+          return normalized
+        }
       } catch {}
     }
     writeLanguagePersistence(normalized, reloadPage)
-    try {
-      const ev = new CustomEvent('perkasa:ui:langchange', {
-        bubbles: true,
-        cancelable: true,
-        detail: { language: normalized },
-      })
-      window.dispatchEvent(ev)
-    } catch {}
   }
   return normalized
 }
