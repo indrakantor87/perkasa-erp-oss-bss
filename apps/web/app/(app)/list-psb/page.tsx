@@ -35,6 +35,7 @@ export default async function ListPsbPage({
   const canApprove =
     canPerformAction(session.role, 'sales', 'approve') ||
     canPerformAction(session.role, 'customers', 'approve')
+  const canExport = canPerformAction(session.role, 'sales', 'export')
 
   return (
     <div className="space-y-6">
@@ -44,6 +45,7 @@ export default async function ListPsbPage({
         roleLabel={roleMeta.label}
         canUpdate={canUpdate}
         canApprove={canApprove}
+        canExport={canExport}
         reviewDbReady={reviewDbReady}
       />
     </div>

@@ -410,12 +410,14 @@ export function PsbListWorkspace({
   roleLabel,
   canUpdate,
   canApprove,
+  canExport,
   reviewDbReady,
 }: {
   payload: PsbListPagePayload
   roleLabel: string
   canUpdate: boolean
   canApprove: boolean
+  canExport: boolean
   reviewDbReady: boolean
 }) {
   const { state, summary, items, selectedItem, renderLimit } = payload
@@ -697,14 +699,16 @@ export function PsbListWorkspace({
             >
               Reset
             </Link>
-            <button
-              type="button"
-              onClick={(e) => void handleExportExcel(e)}
-              disabled={exporting}
-              className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-            >
-              {exporting ? 'Mengekspor...' : 'Export Excel'}
-            </button>
+            {canExport ? (
+              <button
+                type="button"
+                onClick={(e) => void handleExportExcel(e)}
+                disabled={exporting}
+                className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                {exporting ? 'Mengekspor...' : 'Export Excel'}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={(e) => {
