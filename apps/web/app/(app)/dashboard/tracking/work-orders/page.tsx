@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
-import { getWorkOrderTrackingList, type WorkOrderTrackingQuery } from '@/lib/services/tracking-service'
+import { getFieldTechWorkOrderCounters, getWorkOrderTrackingList, type WorkOrderTrackingQuery } from '@/lib/services/tracking-service'
 
 function resolveSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
@@ -19,13 +19,31 @@ export default async function WorkOrderTrackingListPage({
     redirect('/dashboard')
   }
 
+  const roleUp = String(session.role ?? '').trim().toUpperCase()
+  const isFieldTechRole = roleUp === 'FIELD_TECHNICIAN'
+
   const query = (await searchParams) ?? {}
-  const payload = await getWorkOrderTrackingList(query, { session })
+  const explicitMineParam = resolveSearchParam(query.mine)
+  const effectiveMine = explicitMineParam != null && String(explicitMineParam).length > 0
+    ? ['1', 'true', 'yes', 'on'].includes(String(explicitMineParam).trim().toLowerCase())
+    : isFieldTechRole
+  const queryWithOwnership: WorkOrderTrackingQuery = { ...query }
+  if (effectiveMine) queryWithOwnership.mine = explicitMineParam ?? '1'
+
+  const [payload, countersPayload] = await Promise.all([
+    getWorkOrderTrackingList(queryWithOwnership, { session }),
+    isFieldTechRole || roleUp === 'TT_OPERATOR' || roleUp === 'NOC_OPERATOR'
+      ? getFieldTechWorkOrderCounters({ session })
+      : null,
+  ])
   const q = resolveSearchParam(query.q) ?? ''
   const status = resolveSearchParam(query.status) ?? ''
   const jobCategory = resolveSearchParam(query.jobCategory) ?? ''
   const priority = resolveSearchParam(query.priority) ?? ''
-  const mine = ['1', 'true', 'yes', 'on'].includes((resolveSearchParam(query.mine) ?? '').trim().toLowerCase())
+  const mine = effectiveMine
+  const counters = countersPayload?.counters ?? null
+  const countersError = countersPayload?.error ?? null
+  const countersSource = countersPayload?.source ?? null
 
   return (
     <div className="space-y-6">
@@ -46,6 +64,37 @@ export default async function WorkOrderTrackingListPage({
             Kembali
           </Link>
         </div>
+
+        {counters && (counters.total > 0 || countersError) ? (
+          <section aria-label="Ringkasan antrean teknisi" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="card-tier-2 border border-sky-200 bg-sky-50/50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Menunggu ACCEPT</p>
+              <p className="mt-2 text-3xl font-bold text-sky-900">{counters.assigned}</p>
+              <p className="mt-1 text-xs text-sky-700">Assignment ASSIGNED menunggu konfirmasi teknisi.</p>
+            </div>
+            <div className="card-tier-2 border border-indigo-200 bg-indigo-50/50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700">Sudah ACCEPTED</p>
+              <p className="mt-2 text-3xl font-bold text-indigo-900">{counters.accepted}</p>
+              <p className="mt-1 text-xs text-indigo-700">Sudah diterima teknisi, segera mulai eksekusi ON_PROGRESS.</p>
+            </div>
+            <div className="card-tier-2 border border-amber-200 bg-amber-50/50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Sedang On Progress</p>
+              <p className="mt-2 text-3xl font-bold text-amber-900">{counters.onProgress}</p>
+              <p className="mt-1 text-xs text-amber-700">Pekerjaan lapangan sedang berjalan, pastikan material usage tercatat.</p>
+            </div>
+            <div className="card-tier-2 border border-emerald-200 bg-emerald-50/50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Selesai / Closed</p>
+              <p className="mt-2 text-3xl font-bold text-emerald-900">{counters.completed}</p>
+              <p className="mt-1 text-xs text-emerald-700">Work order sudah ditandai COMPLETED pada periode berjalan.</p>
+            </div>
+          </section>
+        ) : null}
+        {countersSource && countersError ? (
+          <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-3 text-amber-800">
+            <p className="text-sm font-semibold">Ringkasan teknisi sementara tidak bisa dibaca</p>
+            <p className="mt-1 text-sm leading-6">{countersError}</p>
+          </div>
+        ) : null}
 
         <form className="mt-6 grid gap-4 lg:grid-cols-5" action="/dashboard/tracking/work-orders" method="get">
           <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">

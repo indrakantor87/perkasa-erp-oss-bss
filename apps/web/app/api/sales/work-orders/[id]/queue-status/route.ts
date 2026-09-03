@@ -16,9 +16,9 @@ type WorkOrderRow = {
   notes: string | null
 }
 
-type QueueShortcutStatus = 'OPEN' | 'ON_PROGRESS' | 'TEMPORARY' | 'CLOSE'
+type QueueShortcutStatus = 'OPEN' | 'ON_PROGRESS' | 'TEMPORARY' | 'CLOSE' | 'FINAL_CLOSE'
 
-const allowedShortcutStatuses = new Set<QueueShortcutStatus>(['OPEN', 'ON_PROGRESS', 'TEMPORARY', 'CLOSE'])
+const allowedShortcutStatuses = new Set<QueueShortcutStatus>(['OPEN', 'ON_PROGRESS', 'TEMPORARY', 'CLOSE', 'FINAL_CLOSE'])
 
 function mapQueueShortcutToWorkOrderStatus(status: QueueShortcutStatus) {
   if (status === 'TEMPORARY') {
@@ -26,6 +26,9 @@ function mapQueueShortcutToWorkOrderStatus(status: QueueShortcutStatus) {
   }
   if (status === 'CLOSE') {
     return 'COMPLETED'
+  }
+  if (status === 'FINAL_CLOSE') {
+    return 'CLOSED'
   }
 
   return status
@@ -40,6 +43,9 @@ function buildShortcutNote(shortcutStatus: QueueShortcutStatus) {
   }
   if (shortcutStatus === 'TEMPORARY') {
     return 'Work order dipindahkan ke temporary / pending untuk follow-up lanjutan.'
+  }
+  if (shortcutStatus === 'FINAL_CLOSE') {
+    return 'Work order di-finalisasi audit CLOSED permanen dari lifecycle action panel.'
   }
 
   return 'Work order diselesaikan dari meja NOC.'
@@ -94,13 +100,20 @@ export async function POST(
     }
 
     const sessionRole = (session.role ?? 'PUBLIC') as AppRole
-    if (queueStatus === 'CLOSE') {
+    if (queueStatus === 'CLOSE' || queueStatus === 'FINAL_CLOSE') {
       const canCreateInventory = canPerformAction(sessionRole, 'inventory', 'create')
       const canManageInventory = canPerformAction(sessionRole, 'inventory', 'manage')
+      const canUpdateSupport = canPerformAction(sessionRole, 'support', 'update')
       const hasFullAccess = REASSIGN_FULL_ACCESS_ROLES_SET.has(sessionRole)
-      if (!(canCreateInventory || canManageInventory || hasFullAccess)) {
+      if (queueStatus === 'CLOSE' && !(canCreateInventory || canManageInventory || hasFullAccess)) {
         return Response.json(
           { message: 'Forbidden: shortcut CLOSE memerlukan izin inventory create/manage atau operator akses penuh.' },
+          { status: 403 },
+        )
+      }
+      if (queueStatus === 'FINAL_CLOSE' && !(canUpdateSupport || hasFullAccess)) {
+        return Response.json(
+          { message: 'Forbidden: shortcut FINAL_CLOSE (audit final CLOSED) memerlukan izin support.update atau operator akses penuh.' },
           { status: 403 },
         )
       }
@@ -155,13 +168,20 @@ export async function POST(
     if (hasCompletedAt) {
       if (queueStatus === 'CLOSE') {
         setClauses.push('completed_at = CURRENT_TIMESTAMP')
+      } else if (queueStatus === 'FINAL_CLOSE') {
+        setClauses.push('completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP)')
       } else {
         setClauses.push('completed_at = NULL')
       }
     }
     if (hasClosedByUserId) {
-      setClauses.push('closed_by_user_id = ?')
-      values.push(queueStatus === 'CLOSE' ? changedByUserId ?? null : null)
+      if (queueStatus === 'CLOSE' || queueStatus === 'FINAL_CLOSE') {
+        setClauses.push('closed_by_user_id = COALESCE(closed_by_user_id, ?)')
+        values.push(changedByUserId ?? null)
+      } else {
+        setClauses.push('closed_by_user_id = ?')
+        values.push(null)
+      }
     }
     if (hasUpdatedAt) {
       setClauses.push('updated_at = CURRENT_TIMESTAMP')

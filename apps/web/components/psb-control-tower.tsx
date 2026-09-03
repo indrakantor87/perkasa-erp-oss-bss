@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, type MouseEvent } from 'react'
 import Link from 'next/link'
 import type {
   PsbActivationStatus,
@@ -306,6 +306,7 @@ export const PsbControlTower = memo(function PsbControlTower({
           label="Customer"
           value={item.customerName}
           subValue={item.customerPhone ?? 'Nomor HP belum diisi'}
+          href={`/customers?q=${encodeURIComponent(item.customerName ?? '')}`}
           icon="👤"
         />
         <InfoTile
@@ -342,10 +343,50 @@ export const PsbControlTower = memo(function PsbControlTower({
         />
         <InfoTile
           label="Work Order"
-          value={item.workOrderCode ?? '-'}
-          subValue={item.transferredTicketRef ? `Ticket: ${item.transferredTicketRef}` : item.transferredWorkOrderId ? `WO id: ${item.transferredWorkOrderId}` : 'Menunggu transfer ke Ticketing'}
+          value={
+            item.transferredWorkOrderId ? (
+              <Link
+                href={`/dashboard/tracking/work-orders/${item.transferredWorkOrderId}`}
+                className="text-base font-semibold leading-6 text-slate-950 underline-offset-4 hover:underline break-words"
+                onClick={(e: MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}
+              >
+                {item.workOrderCode ?? `WO #${item.transferredWorkOrderId}`}
+              </Link>
+            ) : (
+              item.workOrderCode ?? '-'
+            )
+          }
+          subValue={
+            item.transferredWorkOrderId
+              ? item.technicianAssignedAt
+                ? `Assigned: ${formatDateTimeLong(item.technicianAssignedAt)}`
+                : 'Menunggu penugasan teknisi'
+              : 'Menunggu transfer ke Ticketing'
+          }
+          href={
+            item.transferredWorkOrderId
+              ? `/dashboard/tracking/work-orders/${item.transferredWorkOrderId}`
+              : undefined
+          }
           icon="🧾"
         />
+        {item.transferredTicketRef ? (
+          <InfoTile
+            label="Trouble Ticket"
+            value={
+              <Link
+                href={`/dashboard/tracking/noc-queue?ticketType=PSB&q=${encodeURIComponent(item.transferredTicketRef)}`}
+                className="text-base font-semibold leading-6 text-slate-950 underline-offset-4 hover:underline break-words"
+                onClick={(e: MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}
+              >
+                {item.transferredTicketRef}
+              </Link>
+            }
+            subValue={'Kategori PSB · Pemasangan Baru'}
+            href={`/dashboard/tracking/noc-queue?ticketType=PSB&q=${encodeURIComponent(item.transferredTicketRef)}`}
+            icon="🎫"
+          />
+        ) : null}
         <InfoTile
           label="Technician"
           value={item.technicianName ?? '-'}
@@ -357,6 +398,63 @@ export const PsbControlTower = memo(function PsbControlTower({
           value={item.onuSerialNumber ?? '-'}
           subValue={item.onuInstalledAt ? `Terpasang: ${formatDateTimeLong(item.onuInstalledAt)}` : 'Perangkat ONU belum di-assign'}
           icon="📦"
+        />
+        <InfoTile
+          label="Customer Master"
+          value={
+            item.customerId ? (
+              <Link
+                href={`/customers/${encodeURIComponent(String(item.customerId))}`}
+                className="text-base font-semibold leading-6 text-slate-950 underline-offset-4 hover:underline break-words"
+                onClick={(e: MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {item.customerCode ?? `Customer #${item.customerId}`}
+              </Link>
+            ) : (
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                (Belum dibuat)
+              </span>
+            )
+          }
+          subValue={
+            item.customerId
+              ? item.customerCode
+                ? `CRM ID #${item.customerId}`
+                : `CRM ID #${item.customerId} · Finalisasi aktivasi untuk generate kode pelanggan`
+              : 'Finalisasi aktivasi untuk generate data pelanggan otomatis sesuai rule CRM existing.'
+          }
+          href={item.customerId ? `/customers/${encodeURIComponent(String(item.customerId))}` : undefined}
+          icon="🏢"
+        />
+        <InfoTile
+          label="Subscription"
+          value={
+            item.subscriptionId ? (
+              <Link
+                href={`/sales/subscriptions?q=${encodeURIComponent(item.serviceNo ?? String(item.subscriptionId))}`}
+                className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+                onClick={(e: MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Buka subscription ${item.serviceNo ?? `SVC-${String(item.subscriptionId).padStart(6, '0')}`} di halaman sales`}
+              >
+                {item.serviceNo ?? `SVC-${String(item.subscriptionId).padStart(6, '0')}`}
+              </Link>
+            ) : (
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                (Belum dibuat)
+              </span>
+            )
+          }
+          subValue={
+            item.subscriptionId
+              ? `Langganan ID #${item.subscriptionId} · Status ACTIVE (jika finalisasi sukses)`
+              : 'Finalisasi aktivasi untuk generate langganan baru dan linkage ke master pelanggan.'
+          }
+          href={item.subscriptionId ? `/sales/subscriptions?q=${encodeURIComponent(item.serviceNo ?? String(item.subscriptionId))}` : undefined}
+          icon="🔐"
         />
         <InfoTile
           label="Activation"

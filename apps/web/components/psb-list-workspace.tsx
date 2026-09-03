@@ -3,9 +3,9 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import type { ChangeEvent } from 'react'
-import { memo, Suspense, useDeferredValue, useMemo, useState } from 'react'
+import { memo, Suspense, useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { PsbControlTower } from '@/components/psb-control-tower'
-import type { PsbListItem, PsbListPagePayload, PsbListStatus } from '@/lib/psb-list-shared'
+import type { PsbActivationStatus, PsbListItem, PsbListPagePayload, PsbListStatus } from '@/lib/psb-list-shared'
 import { resolvePsbListAvailableActions } from '@/lib/psb-list-shared'
 
 function FormModalSkeleton() {
@@ -29,6 +29,246 @@ const PsbListTransitionForm = dynamic(
   () => import('@/components/psb-list-transition-form').then((mod) => mod.PsbListTransitionForm),
   { ssr: false, loading: FormModalSkeleton },
 )
+
+type PsbActivationAction = 'MARK_ONU' | 'MARK_ODP' | 'MARK_RADIUS' | 'FINALIZE_CUSTOMER'
+
+type PsbActivationPanelProps = {
+  item: PsbListItem
+  canUpdate: boolean
+  canApprove: boolean
+  reviewDbReady: boolean
+}
+
+function activationOrderFor(activationStatus: PsbActivationStatus | null): PsbActivationAction[] {
+  return ['MARK_ONU', 'MARK_ODP', 'MARK_RADIUS', 'FINALIZE_CUSTOMER']
+}
+
+function nextSuggestedAction(item: PsbListItem): PsbActivationAction | null {
+  if (!item.onuInstalledAt) return 'MARK_ONU'
+  if (!item.odpPortAssignedAt) return 'MARK_ODP'
+  if (!item.radiusActivatedAt) return 'MARK_RADIUS'
+  if (!item.customerId || !item.subscriptionId || item.customerActiveAt == null) return 'FINALIZE_CUSTOMER'
+  return null
+}
+
+function isActionDone(item: PsbListItem, action: PsbActivationAction): boolean {
+  switch (action) {
+    case 'MARK_ONU':
+      return Boolean(item.onuInstalledAt)
+    case 'MARK_ODP':
+      return Boolean(item.odpPortAssignedAt)
+    case 'MARK_RADIUS':
+      return Boolean(item.radiusActivatedAt)
+    case 'FINALIZE_CUSTOMER':
+      return Boolean(item.customerActiveAt)
+  }
+}
+
+function actionLabel(action: PsbActivationAction): string {
+  switch (action) {
+    case 'MARK_ONU':
+      return 'Tandai ONU Terpasang'
+    case 'MARK_ODP':
+      return 'Tandai ODP Port Siap'
+    case 'MARK_RADIUS':
+      return 'Aktifkan Radius Pelanggan'
+    case 'FINALIZE_CUSTOMER':
+      return 'Finalisasi: Customer & Subscription Aktif'
+  }
+}
+
+function actionTone(action: PsbActivationAction, suggested: boolean): string {
+  if (action === 'FINALIZE_CUSTOMER') {
+    return suggested
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+  }
+  return suggested
+    ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+}
+
+function PsbActivationPanel({ item, canUpdate, canApprove, reviewDbReady }: PsbActivationPanelProps) {
+  const [pending, setPending] = useState<PsbActivationAction | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
+
+  const actions = activationOrderFor(item.activationStatus)
+  const next = nextSuggestedAction(item)
+  const canMark = canUpdate
+  const canFinalize = canApprove
+  const eligibleForActivation = item.status === 'DISETUJUI' || item.status === 'DITRANSFER_KE_TICKETING'
+
+  const runAction = useCallback(
+    async (action: PsbActivationAction) => {
+      setErrorMsg(null)
+      setSuccessMsg(null)
+      if (!reviewDbReady) {
+        setErrorMsg('Review DB belum tersedia. Aksi hanya bisa dijalankan saat koneksi DB review aktif.')
+        return
+      }
+      if (!eligibleForActivation) {
+        setErrorMsg(
+          `Status Data PSB harus DISETUJUI / DITRANSFER_KE_TICKETING untuk menjalankan aksi aktivasi. Saat ini: ${item.status}.`,
+        )
+        return
+      }
+      if (action !== 'FINALIZE_CUSTOMER' && !canMark) {
+        setErrorMsg('Role Anda tidak diizinkan untuk update tahapan aktivasi (memerlukan izin edit).')
+        return
+      }
+      if (action === 'FINALIZE_CUSTOMER' && !canFinalize) {
+        setErrorMsg('Role Anda tidak diizinkan untuk finalisasi Customer & Subscription (memerlukan izin approve).')
+        return
+      }
+      setPending(action)
+      try {
+        const resp = await fetch('/api/sales/psb/activation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            psbListId: item.id,
+            action,
+          }),
+        })
+        const payload = (await resp.json()) as {
+          success: boolean
+          error?: string
+          message?: string
+          idempotent?: boolean
+          action?: PsbActivationAction
+          psbListCode?: string
+          customerId?: number | null
+          subscriptionId?: number | null
+          serviceNo?: string | null
+        }
+        if (!resp.ok || !payload.success) {
+          throw new Error(payload.message || `Aktivasi gagal (HTTP ${resp.status}).`)
+        }
+        const label = actionLabel(action)
+        const extra =
+          action === 'FINALIZE_CUSTOMER' && payload.customerId && payload.subscriptionId
+            ? ` · Customer #${payload.customerId}${payload.serviceNo ? ` · ${payload.serviceNo}` : ''}`
+            : ''
+        setSuccessMsg(`${label} berhasil dijalankan${payload.idempotent ? ' (idempotent)' : ''} untuk ${payload.psbListCode ?? item.psbListCode}.${extra}`)
+        setTimeout(() => {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('psb:activation-refresh', { detail: { psbListId: item.id } }))
+          }
+        }, 120)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err ?? 'Aksi aktivasi gagal.')
+        setErrorMsg(msg)
+      } finally {
+        setPending(null)
+      }
+    },
+    [canFinalize, canMark, eligibleForActivation, item.id, item.psbListCode, item.status, reviewDbReady],
+  )
+
+  return (
+    <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Aktivasi · Tahapan</p>
+          <h3 className="mt-1 text-lg font-semibold text-slate-950">Progres Aktivasi {item.psbListCode}</h3>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            Jalankan tahapan instalasi secara berurutan (ONU → ODP Port → Radius), lalu finalisasi Customer & Subscription otomatis.
+            Ulur-ulur (retry) aman dan idempotent.
+          </p>
+        </div>
+        <span
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${
+            eligibleForActivation
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-slate-200 bg-slate-50 text-slate-500'
+          }`}
+        >
+          {eligibleForActivation ? 'Siap aktivasi' : 'Menunggu approval / transfer ticketing'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {actions.map((action) => {
+          const done = isActionDone(item, action)
+          const suggested = next === action && !done
+          const disabled =
+            !eligibleForActivation ||
+            done ||
+            pending !== null ||
+            (action !== 'FINALIZE_CUSTOMER' ? !canMark : !canFinalize)
+          const tone = done
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : pending === action
+              ? 'border-sky-200 bg-sky-50 text-sky-700'
+              : actionTone(action, suggested)
+          return (
+            <button
+              key={action}
+              type="button"
+              disabled={disabled}
+              onClick={() => runAction(action)}
+              className={`group relative w-full rounded-2xl border px-4 py-3 text-left text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 ${tone}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    {done ? (
+                      <span aria-hidden className="text-emerald-600">
+                        ✅
+                      </span>
+                    ) : pending === action ? (
+                      <span aria-hidden className="text-sky-600">
+                        ⏳
+                      </span>
+                    ) : suggested ? (
+                      <span aria-hidden className="text-indigo-600">
+                        ➡️
+                      </span>
+                    ) : (
+                      <span aria-hidden className="text-slate-400">
+                        ○
+                      </span>
+                    )}
+                    <span>{actionLabel(action)}</span>
+                  </div>
+                  <p className="text-[11px] font-normal leading-4 text-slate-500">
+                    {action === 'MARK_ONU'
+                      ? 'Set kolom onu_installed_at dan ubah status aktivasi → ONU_ASSIGNED.'
+                      : action === 'MARK_ODP'
+                        ? 'Set kolom odp_port_assigned_at → ODP_PORT_ASSIGNED.'
+                        : action === 'MARK_RADIUS'
+                          ? 'Set kolom radius_activated_at → RADIUS_ACTIVATED.'
+                          : 'Create / link crm_customers + service_subscriptions, verify status ACTIVE → CUSTOMER_ACTIVE.'}
+                  </p>
+                </div>
+                {pending === action ? (
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-sky-300 bg-white animate-pulse" />
+                ) : null}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {errorMsg ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium leading-5 text-rose-700 break-words">
+          ⚠️ {errorMsg}
+        </div>
+      ) : null}
+      {successMsg ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-medium leading-5 text-emerald-700 break-words">
+          ✅ {successMsg}
+        </div>
+      ) : null}
+
+      <div className="text-[11px] leading-5 text-slate-400">
+        Safety rule: status <strong>CUSTOMER_ACTIVE</strong> hanya akan diset <em>setelah</em> Customer valid + Subscription status ACTIVE terverifikasi
+        dalam 1 transaksi atomic. Jika step apa pun gagal → rollback otomatis.
+      </div>
+    </section>
+  )
+}
 const PsbListImportExcelModal = dynamic(
   () => import('@/components/psb-list-import-excel-modal').then((mod) => mod.PsbListImportExcelModal),
   { ssr: false, loading: FormModalSkeleton },
@@ -292,14 +532,56 @@ type PsbTableRowsProps = {
   items: PsbListItem[]
   selectedId: number | null | undefined
   state: PsbListPagePayload['state']
+  isLoading?: boolean
+  errorMessage?: string | null
 }
 
-const PsbTableRows = memo(function PsbTableRows({ items, selectedId, state }: PsbTableRowsProps) {
+const PsbTableRows = memo(function PsbTableRows({ items, selectedId, state, isLoading, errorMessage }: PsbTableRowsProps) {
+  if (isLoading) {
+    return (
+      <tr aria-busy="true">
+        <td colSpan={7} className="px-4 py-12">
+          <div className="flex items-center justify-center gap-3 text-sm text-slate-500">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" aria-hidden="true" />
+            Memuat daftar Data PSB...
+          </div>
+        </td>
+      </tr>
+    )
+  }
+  if (errorMessage) {
+    return (
+      <tr role="alert">
+        <td colSpan={7} className="px-4 py-10">
+          <div className="mx-auto flex max-w-xl flex-col items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">
+              <span className="inline-block h-2 w-2 rounded-full bg-rose-500" aria-hidden="true" />
+              Gagal memuat daftar
+            </span>
+            <p className="text-sm leading-6 text-rose-700">{errorMessage}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center justify-center rounded-xl border border-rose-300 bg-white px-4 py-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-100"
+            >
+              Muat Ulang Halaman
+            </button>
+          </div>
+        </td>
+      </tr>
+    )
+  }
   if (!items.length) {
     return (
       <tr>
-        <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">
-          Tidak ada item yang cocok dengan filter saat ini.
+        <td colSpan={7} className="px-4 py-12">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+              Belum ada data
+            </span>
+            <p className="text-sm text-slate-500">Tidak ada Data PSB yang cocok dengan filter saat ini.</p>
+            <p className="text-xs text-slate-400">Ubah filter status, marketing, atau kata kunci pencarian untuk memperluas hasil.</p>
+          </div>
         </td>
       </tr>
     )
@@ -358,13 +640,47 @@ type PsbCardListProps = {
   items: PsbListItem[]
   selectedId: number | null | undefined
   state: PsbListPagePayload['state']
+  isLoading?: boolean
+  errorMessage?: string | null
 }
 
-const PsbCardList = memo(function PsbCardList({ items, selectedId, state }: PsbCardListProps) {
+const PsbCardList = memo(function PsbCardList({ items, selectedId, state, isLoading, errorMessage }: PsbCardListProps) {
+  if (isLoading) {
+    return (
+      <div aria-busy="true" className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10">
+        <div className="flex items-center justify-center gap-3 text-sm text-slate-500">
+          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" aria-hidden="true" />
+          Memuat daftar Data PSB...
+        </div>
+      </div>
+    )
+  }
+  if (errorMessage) {
+    return (
+      <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-6 text-center">
+        <span className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">
+          <span className="inline-block h-2 w-2 rounded-full bg-rose-500" aria-hidden="true" />
+          Gagal memuat daftar
+        </span>
+        <p className="mt-3 text-sm leading-6 text-rose-700">{errorMessage}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-3 inline-flex items-center justify-center rounded-xl border border-rose-300 bg-white px-4 py-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-100"
+        >
+          Muat Ulang Halaman
+        </button>
+      </div>
+    )
+  }
   if (!items.length) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-        Tidak ada item yang cocok dengan filter saat ini.
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
+        <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+          Belum ada data
+        </span>
+        <p className="mt-3 text-sm text-slate-500">Tidak ada Data PSB yang cocok dengan filter saat ini.</p>
+        <p className="mt-1 text-xs text-slate-400">Ubah filter status, marketing, atau kata kunci pencarian untuk memperluas hasil.</p>
       </div>
     )
   }
@@ -760,13 +1076,25 @@ export function PsbListWorkspace({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                <PsbTableRows items={displayItems} selectedId={deferredSelectedId} state={state} />
+                <PsbTableRows
+                  items={displayItems}
+                  selectedId={deferredSelectedId}
+                  state={state}
+                  isLoading={false}
+                  errorMessage={null}
+                />
               </tbody>
             </table>
           </div>
 
           <div className="space-y-3 p-4 xl:hidden">
-            <PsbCardList items={displayItems} selectedId={deferredSelectedId} state={state} />
+            <PsbCardList
+              items={displayItems}
+              selectedId={deferredSelectedId}
+              state={state}
+              isLoading={false}
+              errorMessage={null}
+            />
           </div>
         </article>
 
@@ -777,16 +1105,24 @@ export function PsbListWorkspace({
               canUpdate={canUpdate}
               canApprove={canApprove}
               TransitionSlot={
-                <Suspense fallback={<FormModalSkeleton />}>
-                  <PsbListTransitionForm
-                    itemId={normalizedSelected.id}
-                    itemCode={normalizedSelected.psbListCode}
-                    currentStatus={normalizedSelected.status}
+                <div className="space-y-5">
+                  <PsbActivationPanel
+                    item={normalizedSelected}
                     canUpdate={canUpdate}
                     canApprove={canApprove}
                     reviewDbReady={reviewDbReady}
                   />
-                </Suspense>
+                  <Suspense fallback={<FormModalSkeleton />}>
+                    <PsbListTransitionForm
+                      itemId={normalizedSelected.id}
+                      itemCode={normalizedSelected.psbListCode}
+                      currentStatus={normalizedSelected.status}
+                      canUpdate={canUpdate}
+                      canApprove={canApprove}
+                      reviewDbReady={reviewDbReady}
+                    />
+                  </Suspense>
+                </div>
               }
             />
           ) : (

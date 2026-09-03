@@ -567,6 +567,76 @@ export default async function NocQueuePage({
           </table>
         </div>
       </section>
+      {payload.otherItems.length > 0 ? (
+        <section className="mt-6 rounded-lg border border-violet-200 bg-violet-50 dark:bg-violet-950/30 dark:border-violet-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-violet-200 dark:border-violet-800">
+            <div>
+              <h2 className="text-sm font-semibold text-violet-900 dark:text-violet-100 flex items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-violet-600 px-2 py-0.5 text-xs font-medium text-white">
+                  REVIEW MANUAL
+                </span>
+                Bucket Review: Ticket Tidak Terklasifikasi ({payload.otherItems.length})
+              </h2>
+              <p className="mt-1 text-xs text-violet-700 dark:text-violet-300">
+                Ticket dengan jenis <code className="rounded bg-white/60 px-1.5 py-0.5 dark:bg-violet-900/40 font-mono">OTHER</code> memerlukan klasifikasi manual oleh NOC Supervisor sebelum diproses ke alur kerja standar.
+              </p>
+            </div>
+            <Link
+              href={buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch: { ticketType: 'OTHER' } })}
+              className="inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-white px-3 py-1.5 text-xs font-medium text-violet-800 hover:bg-violet-100 dark:bg-violet-900/40 dark:border-violet-700 dark:text-violet-200"
+            >
+              Filter Tipe = OTHER
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs">
+              <thead className="bg-violet-100/60 dark:bg-violet-900/20 text-violet-900 dark:text-violet-200">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium w-12">No</th>
+                  <th className="px-4 py-2.5 font-medium">Kode Ticket</th>
+                  <th className="px-4 py-2.5 font-medium">Source</th>
+                  <th className="px-4 py-2.5 font-medium">Customer</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Aksi Detail</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-violet-200 dark:divide-violet-800/60">
+                {payload.otherItems.map((item, idx) => (
+                  <tr key={item.queueKey} className="hover:bg-violet-50/70 dark:hover:bg-violet-900/20">
+                    <td className="px-4 py-2.5 text-violet-700 dark:text-violet-300">{idx + 1}</td>
+                    <td className="px-4 py-2.5 font-mono">
+                      <Link href={item.href} className="text-violet-800 dark:text-violet-200 hover:underline font-medium">
+                        {item.ticketNo}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2.5 text-violet-700 dark:text-violet-300">
+                      <span className="inline-flex items-center rounded border border-violet-200 bg-white px-2 py-0.5 dark:bg-violet-950/40 dark:border-violet-800">
+                        {item.sourceType}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-violet-800 dark:text-violet-200">
+                      {item.customerName ?? <span className="text-violet-500 italic">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-violet-700 dark:text-violet-300">
+                      <span className="inline-flex items-center rounded bg-violet-100 px-2 py-0.5 text-violet-900 dark:bg-violet-900/40 dark:text-violet-200">
+                        {item.rawStatus}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Link
+                        href={item.href}
+                        className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-3 py-1 text-xs font-medium text-white hover:bg-violet-700"
+                      >
+                        Detail
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </div>
   )
 }

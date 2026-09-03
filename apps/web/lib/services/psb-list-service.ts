@@ -53,6 +53,10 @@ type ReviewDbPsbListRow = {
   onuSerialNumber: string | null
   activationStatus: string | null
   billingStatus: string | null
+  customerId: number | null
+  customerCode: string | null
+  subscriptionId: number | null
+  serviceNo: string | null
   createdAt: string | null
   updatedAt: string | null
   reviewedAt: string | null
@@ -115,6 +119,10 @@ const mockPsbListItems: PsbListItem[] = [
     onuSerialNumber: null,
     activationStatus: 'PENDING',
     billingStatus: 'NOT_GENERATED',
+    customerId: null,
+    customerCode: null,
+    subscriptionId: null,
+    serviceNo: null,
     createdAt: '2026-07-19T08:12:00+07:00',
     updatedAt: '2026-07-19T08:12:00+07:00',
     reviewedAt: null,
@@ -172,6 +180,10 @@ const mockPsbListItems: PsbListItem[] = [
     onuSerialNumber: null,
     activationStatus: 'PENDING',
     billingStatus: 'NOT_GENERATED',
+    customerId: null,
+    customerCode: null,
+    subscriptionId: null,
+    serviceNo: null,
     createdAt: '2026-07-18T14:10:00+07:00',
     updatedAt: '2026-07-19T09:45:00+07:00',
     reviewedAt: '2026-07-19T08:30:00+07:00',
@@ -229,6 +241,10 @@ const mockPsbListItems: PsbListItem[] = [
     onuSerialNumber: null,
     activationStatus: 'PENDING',
     billingStatus: 'NOT_GENERATED',
+    customerId: null,
+    customerCode: null,
+    subscriptionId: null,
+    serviceNo: null,
     createdAt: '2026-07-18T11:20:00+07:00',
     updatedAt: '2026-07-19T10:20:00+07:00',
     reviewedAt: '2026-07-19T09:50:00+07:00',
@@ -286,6 +302,10 @@ const mockPsbListItems: PsbListItem[] = [
     onuSerialNumber: null,
     activationStatus: 'ODP_PORT_ASSIGNED',
     billingStatus: 'INVOICE_DRAFT',
+    customerId: null,
+    customerCode: null,
+    subscriptionId: null,
+    serviceNo: null,
     createdAt: '2026-07-18T16:35:00+07:00',
     updatedAt: '2026-07-19T11:05:00+07:00',
     reviewedAt: '2026-07-19T09:00:00+07:00',
@@ -343,6 +363,10 @@ const mockPsbListItems: PsbListItem[] = [
     onuSerialNumber: 'ONU-HW-82104-A1B2',
     activationStatus: 'CUSTOMER_ACTIVE',
     billingStatus: 'FIRST_PAYMENT_RECEIVED',
+    customerId: 2041,
+    customerCode: 'CUST-02041',
+    subscriptionId: 3177,
+    serviceNo: 'SVC-003177',
     createdAt: '2026-07-17T09:00:00+07:00',
     updatedAt: '2026-07-19T07:40:00+07:00',
     reviewedAt: '2026-07-17T15:40:00+07:00',
@@ -400,6 +424,10 @@ const mockPsbListItems: PsbListItem[] = [
     onuSerialNumber: null,
     activationStatus: 'PENDING',
     billingStatus: 'NOT_GENERATED',
+    customerId: null,
+    customerCode: null,
+    subscriptionId: null,
+    serviceNo: null,
     createdAt: '2026-07-17T13:15:00+07:00',
     updatedAt: '2026-07-18T10:10:00+07:00',
     reviewedAt: '2026-07-18T09:40:00+07:00',
@@ -617,6 +645,10 @@ function mapReviewDbRowToPsbListItem(row: ReviewDbPsbListRow): PsbListItem {
     onuSerialNumber: row.onuSerialNumber,
     activationStatus: activationStatus as PsbActivationStatus,
     billingStatus: billingStatus as PsbBillingStatus,
+    customerId: row.customerId != null ? Number(row.customerId) : null,
+    customerCode: row.customerCode ?? null,
+    subscriptionId: row.subscriptionId != null ? Number(row.subscriptionId) : null,
+    serviceNo: row.serviceNo ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     reviewedAt: row.reviewedAt,
@@ -1081,52 +1113,69 @@ async function getReviewDbPsbListPageData(
 
   const selectedId = resolvePositiveInt(state.selected)
 
+  const [hasCustIdFk, hasSubIdFk, hasCrmCustCode, hasSubServiceNo, hasCrmCustId, hasSubId] = await Promise.all([
+    hasReviewDbColumn('sales_psb_lists', 'customer_id'),
+    hasReviewDbColumn('sales_psb_lists', 'subscription_id'),
+    hasReviewDbColumn('crm_customers', 'customer_code'),
+    hasReviewDbColumn('service_subscriptions', 'service_no'),
+    hasReviewDbColumn('crm_customers', 'id'),
+    hasReviewDbColumn('service_subscriptions', 'id'),
+  ])
+  const canJoinCrm = hasCustIdFk && hasCrmCustId && hasCrmCustCode
+  const canJoinSub = hasSubIdFk && hasSubId && hasSubServiceNo
+
   const baseRows = await runReviewDbQuery<ReviewDbPsbListRow>(
     `
       SELECT
-        id,
-        psb_list_code AS psbListCode,
-        customer_name AS customerName,
-        customer_phone AS customerPhone,
-        address_text AS addressText,
-        odp_code AS odpCode,
-        odp_port_label AS odpPortLabel,
-        package_label AS packageLabel,
-        sales_owner_name AS salesOwnerName,
-        requested_install_date AS requestedInstallDate,
-        status,
-        review_notes AS reviewNotes,
-        correction_notes AS correctionNotes,
-        transferred_ticket_ref AS transferredTicketRef,
-        transferred_work_order_id AS transferredWorkOrderId,
-        work_order_code AS workOrderCode,
-        technician_name AS technicianName,
-        onu_serial_number AS onuSerialNumber,
-        activation_status AS activationStatus,
-        billing_status AS billingStatus,
-        created_at AS createdAt,
-        updated_at AS updatedAt,
-        reviewed_at AS reviewedAt,
-        approved_at AS approvedAt,
-        transferred_at AS transferredAt,
-        work_order_created_at AS workOrderCreatedAt,
-        technician_assigned_at AS technicianAssignedAt,
-        installation_started_at AS installationStartedAt,
-        onu_installed_at AS onuInstalledAt,
-        odp_port_assigned_at AS odpPortAssignedAt,
-        radius_activated_at AS radiusActivatedAt,
-        customer_active_at AS customerActiveAt,
-        invoice_generated_at AS invoiceGeneratedAt,
-        first_payment_received_at AS firstPaymentReceivedAt,
-        area_label AS areaLabel,
-        google_maps_link AS googleMapsLink,
-        escort_notes AS escortNotes,
-        activity_notes AS activityNotes,
-        cs_pic_name AS csPicName,
-        next_action_label AS nextActionLabel
-      FROM sales_psb_lists
-      ${whereClause}
-      ORDER BY requested_install_date IS NULL, requested_install_date ASC, id DESC
+        sl.id,
+        sl.psb_list_code AS psbListCode,
+        sl.customer_name AS customerName,
+        sl.customer_phone AS customerPhone,
+        sl.address_text AS addressText,
+        sl.odp_code AS odpCode,
+        sl.odp_port_label AS odpPortLabel,
+        sl.package_label AS packageLabel,
+        sl.sales_owner_name AS salesOwnerName,
+        sl.requested_install_date AS requestedInstallDate,
+        sl.status,
+        sl.review_notes AS reviewNotes,
+        sl.correction_notes AS correctionNotes,
+        sl.transferred_ticket_ref AS transferredTicketRef,
+        sl.transferred_work_order_id AS transferredWorkOrderId,
+        sl.work_order_code AS workOrderCode,
+        sl.technician_name AS technicianName,
+        sl.onu_serial_number AS onuSerialNumber,
+        sl.activation_status AS activationStatus,
+        sl.billing_status AS billingStatus,
+        ${hasCustIdFk ? 'sl.customer_id AS customerId' : 'NULL AS customerId'},
+        ${canJoinCrm ? 'c.customer_code AS customerCode' : 'NULL AS customerCode'},
+        ${hasSubIdFk ? 'sl.subscription_id AS subscriptionId' : 'NULL AS subscriptionId'},
+        ${canJoinSub ? 'ss.service_no AS serviceNo' : 'NULL AS serviceNo'},
+        sl.created_at AS createdAt,
+        sl.updated_at AS updatedAt,
+        sl.reviewed_at AS reviewedAt,
+        sl.approved_at AS approvedAt,
+        sl.transferred_at AS transferredAt,
+        sl.work_order_created_at AS workOrderCreatedAt,
+        sl.technician_assigned_at AS technicianAssignedAt,
+        sl.installation_started_at AS installationStartedAt,
+        sl.onu_installed_at AS onuInstalledAt,
+        sl.odp_port_assigned_at AS odpPortAssignedAt,
+        sl.radius_activated_at AS radiusActivatedAt,
+        sl.customer_active_at AS customerActiveAt,
+        sl.invoice_generated_at AS invoiceGeneratedAt,
+        sl.first_payment_received_at AS firstPaymentReceivedAt,
+        sl.area_label AS areaLabel,
+        sl.google_maps_link AS googleMapsLink,
+        sl.escort_notes AS escortNotes,
+        sl.activity_notes AS activityNotes,
+        sl.cs_pic_name AS csPicName,
+        sl.next_action_label AS nextActionLabel
+      FROM sales_psb_lists sl
+      ${canJoinCrm ? 'LEFT JOIN crm_customers c ON c.id = sl.customer_id' : ''}
+      ${canJoinSub ? 'LEFT JOIN service_subscriptions ss ON ss.id = sl.subscription_id' : ''}
+      ${whereClause.replace(/WHERE\s+/i, (m) => m.includes('WHERE') ? m : m)}
+      ORDER BY sl.requested_install_date IS NULL, sl.requested_install_date ASC, sl.id DESC
       LIMIT ?
     `,
     [...values, PSB_LIST_RENDER_LIMIT * 2],
@@ -1675,6 +1724,7 @@ export async function transferPsbListToTicket(params: {
       const hasTtSubscriptionId = await hasReviewDbColumn('support_trouble_tickets', 'subscription_id')
       const hasTtOpenedAt = await hasReviewDbColumn('support_trouble_tickets', 'opened_at')
       const hasTtClosedAt = await hasReviewDbColumn('support_trouble_tickets', 'closed_at')
+      const hasTtSlaDueAt = await hasReviewDbColumn('support_trouble_tickets', 'sla_due_at')
       const ttColumns: string[] = ['ticket_code', 'customer_name', 'category', 'type', 'status', 'problem_category', 'notes']
       const ttValues: unknown[] = [
         ticketCode,
@@ -1700,6 +1750,30 @@ export async function transferPsbListToTicket(params: {
       }
       if (hasTtClosedAt) {
         // skip closed_at - remain default NULL for OPEN
+      }
+      if (hasTtSlaDueAt) {
+        const hasSupportSlaTable = await hasReviewDbColumn('support_trouble_ticket_sla', 'trouble_type')
+          && await hasReviewDbColumn('support_trouble_ticket_sla', 'duration_days')
+        let slaDueAtValue: Date | null = null
+        if (hasSupportSlaTable && hasTtOpenedAt) {
+          const [slaRowsRaw] = await connection.query(
+            `
+              SELECT duration_days AS durationDays
+              FROM support_trouble_ticket_sla
+              WHERE UPPER(TRIM(trouble_type)) = ?
+              ORDER BY updated_at DESC, id ASC
+              LIMIT 1
+            `,
+            ['PASANG_BARU'],
+          )
+          const firstRow = (slaRowsRaw as unknown as Array<Record<string, unknown>> | undefined)?.[0] ?? null
+          const durationDays = Number(firstRow?.durationDays ?? 0)
+          if (Number.isFinite(durationDays) && durationDays > 0) {
+            slaDueAtValue = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000)
+          }
+        }
+        ttColumns.push('sla_due_at')
+        ttValues.push(slaDueAtValue)
       }
       const [ttInsertResultRaw] = await connection.query(
         `
@@ -2375,6 +2449,381 @@ export async function activatePsbFlow(params: {
       workOrderNo,
     }
   })
+}
+
+export type PsbActivationMarkStep = 'MARK_ONU' | 'MARK_ODP' | 'MARK_RADIUS'
+
+export type PsbActivationFinalizeResult = {
+  idempotent: boolean
+  psbId: number
+  psbListCode: string
+  customerId: number | null
+  subscriptionId: number | null
+  serviceNo: string | null
+}
+
+function getPsbActivationStepPredecessors(step: PsbActivationMarkStep): Array<'onuInstalledAt' | 'odpPortAssignedAt' | 'radiusActivatedAt'> {
+  switch (step) {
+    case 'MARK_ONU':
+      return []
+    case 'MARK_ODP':
+      return ['onuInstalledAt']
+    case 'MARK_RADIUS':
+      return ['onuInstalledAt', 'odpPortAssignedAt']
+  }
+}
+
+export async function markPsbActivationStep(params: {
+  psbListId: number
+  step: PsbActivationMarkStep
+  actorName: string
+  actorRole: string
+  notes?: string | null
+  customAt?: Date | null
+}): Promise<{ psbId: number; psbListCode: string; step: PsbActivationMarkStep; happenedAt: Date }> {
+  await ensurePsbListBaselineSeeds()
+
+  const hasCols = await Promise.all([
+    ensureColumn('sales_psb_lists', 'onu_installed_at'),
+    ensureColumn('sales_psb_lists', 'odp_port_assigned_at'),
+    ensureColumn('sales_psb_lists', 'radius_activated_at'),
+    ensureColumn('sales_psb_lists', 'activation_status'),
+  ])
+  if (!hasCols[0] || !hasCols[1] || !hasCols[2] || !hasCols[3]) {
+    throw new Error('Schema aktivasi PSB (ONU/ODP/Radius) belum siap di review DB.')
+  }
+
+  const at = params.customAt && Number.isFinite(params.customAt.getTime()) ? params.customAt : new Date()
+
+  return await runReviewDbTransaction(async (conn) => {
+    const [rows] = await conn.query(
+      `
+        SELECT
+          id,
+          psb_list_code AS psbListCode,
+          status,
+          onu_installed_at AS onuInstalledAt,
+          odp_port_assigned_at AS odpPortAssignedAt,
+          radius_activated_at AS radiusActivatedAt
+        FROM sales_psb_lists
+        WHERE id = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [params.psbListId],
+    )
+    const arr = rows as Array<Record<string, unknown>> | undefined
+    const row = arr?.[0]
+    if (!row) {
+      throw new Error('Data PSB tidak ditemukan.')
+    }
+    const psbId = Number(row.id)
+    const psbListCode = String(row.psbListCode ?? '-')
+    const currentStatus = normalizeStatus(String(row.status ?? ''))
+
+    if (currentStatus !== 'DISETUJUI' && currentStatus !== 'DITRANSFER_KE_TICKETING') {
+      throw new Error(`Status PSB harus DISETUJUI / DITRANSFER_KE_TICKETING untuk update aktivasi. Saat ini: ${currentStatus}.`)
+    }
+
+    const predecessors = getPsbActivationStepPredecessors(params.step)
+    for (const key of predecessors) {
+      const value = (row as unknown as Record<string, unknown>)[key]
+      if (!value) {
+        const labels: Record<string, string> = {
+          onuInstalledAt: 'ONU Installed',
+          odpPortAssignedAt: 'ODP Port Assigned',
+          radiusActivatedAt: 'Radius Activated',
+        }
+        throw new Error(`Tahapan sebelumnya (${labels[key] ?? key}) belum ditandai selesai.`)
+      }
+    }
+
+    const targetColumnByStep: Record<PsbActivationMarkStep, string> = {
+      MARK_ONU: 'onu_installed_at',
+      MARK_ODP: 'odp_port_assigned_at',
+      MARK_RADIUS: 'radius_activated_at',
+    }
+    const activationStatusByStep: Record<PsbActivationMarkStep, PsbActivationStatus> = {
+      MARK_ONU: 'ONU_ASSIGNED',
+      MARK_ODP: 'ODP_PORT_ASSIGNED',
+      MARK_RADIUS: 'RADIUS_ACTIVATED',
+    }
+    const auditEventTypeByStep: Record<PsbActivationMarkStep, string> = {
+      MARK_ONU: 'ONU_INSTALLED',
+      MARK_ODP: 'ODP_PORT_ASSIGNED',
+      MARK_RADIUS: 'RADIUS_ACTIVATED',
+    }
+    const targetColumn = targetColumnByStep[params.step]
+    const nextActivation = activationStatusByStep[params.step]
+
+    await conn.query(
+      `
+        UPDATE sales_psb_lists
+        SET
+          ${targetColumn} = COALESCE(${targetColumn}, ?),
+          activation_status = CASE
+            WHEN activation_status IS NULL OR activation_status = '' OR FIELD(activation_status, 'PENDING', 'ONU_ASSIGNED', 'ODP_PORT_ASSIGNED', 'RADIUS_ACTIVATED') > 0
+            THEN ?
+            ELSE activation_status
+          END,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [at, nextActivation, psbId],
+    )
+
+    try {
+      await conn.query(
+        `
+          INSERT INTO sales_psb_list_audits (
+            psb_list_id,
+            event_type,
+            from_status,
+            to_status,
+            actor_name,
+            actor_role,
+            notes
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          psbId,
+          auditEventTypeByStep[params.step],
+          String(row.status ?? ''),
+          String(row.status ?? ''),
+          params.actorName,
+          params.actorRole,
+          params.notes?.trim() || `Tahapan ${nextActivation} ditandai.`,
+        ],
+      )
+    } catch (_auditErr) {
+      // audit non-fatal
+    }
+
+    return {
+      psbId,
+      psbListCode,
+      step: params.step,
+      happenedAt: at,
+    }
+  })
+}
+
+export async function finalizePsbCustomerSubscription(params: {
+  psbListId: number
+  actor: ActivateFlowActorCtx
+}): Promise<PsbActivationFinalizeResult> {
+  const raw = await activatePsbFlow({
+    psbListId: params.psbListId,
+    actor: params.actor,
+  })
+
+  let customerId = raw.customerId ?? null
+  let subscriptionId = raw.subscriptionId ?? null
+  let serviceNo = raw.serviceNo ?? null
+  let customerCode = raw.customerCode ?? null
+
+  if (!customerId || !subscriptionId) {
+    try {
+      await ensureCrmTablesAndColumns()
+      await ensureColumn('sales_psb_lists', 'customer_id')
+      await ensureColumn('sales_psb_lists', 'subscription_id')
+      const hasCustomerActiveAt = await ensureColumn('sales_psb_lists', 'customer_active_at')
+      const hasActivationStatus = await ensureColumn('sales_psb_lists', 'activation_status')
+
+      const verify = await runReviewDbTransaction(async (conn) => {
+        const [rows] = await conn.query(
+          `
+            SELECT
+              id,
+              psb_list_code AS psbListCode,
+              status,
+              radius_activated_at AS radiusActivatedAt,
+              customer_active_at AS customerActiveAt,
+              customer_id AS customerId,
+              subscription_id AS subscriptionId
+            FROM sales_psb_lists
+            WHERE id = ?
+            LIMIT 1
+            FOR UPDATE
+          `,
+          [params.psbListId],
+        )
+        const arr = rows as Array<Record<string, unknown>> | undefined
+        const row = arr?.[0]
+        if (!row) {
+          throw new ActivateFlowError('PSB_NOT_FOUND', 'Data PSB tidak ditemukan saat finalisasi Pelanggan.')
+        }
+        const psbId = Number(row.id)
+        const psbListCode = String(row.psbListCode ?? '-')
+        const rawExistingCustId = (row as unknown as { customerId?: number | null }).customerId ?? null
+        const rawExistingSubId = (row as unknown as { subscriptionId?: number | null }).subscriptionId ?? null
+        const existingCustId = rawExistingCustId != null ? Number(rawExistingCustId) : null
+        const existingSubId = rawExistingSubId != null ? Number(rawExistingSubId) : null
+
+        if (!existingCustId || !existingSubId) {
+          throw new ActivateFlowError(
+            'SUBSCRIPTION_CREATE_FAILED',
+            'Data Pelanggan dan Langganan pada Data PSB belum lengkap. Pastikan flow aktivasi komposit dijalankan sebelum finalisasi status CUSTOMER_ACTIVE.',
+          )
+        }
+
+        const hasCustIdCol = await ensureColumn('crm_customers', 'id')
+        const hasSubIdCol = await ensureColumn('service_subscriptions', 'id')
+        const hasSubStatus = await ensureColumn('service_subscriptions', 'status')
+
+        let cCode: string | null = null
+        let sNo: string | null = null
+
+        if (hasCustIdCol) {
+          const [cRows] = await conn.query(
+            `SELECT id, customer_code AS customerCode FROM crm_customers WHERE id = ? LIMIT 1`,
+            [existingCustId],
+          )
+          const cArr = cRows as Array<Record<string, unknown>> | undefined
+          const cRow = cArr?.[0]
+          if (!cRow) {
+            throw new ActivateFlowError(
+              'CUSTOMER_CREATE_FAILED',
+              'ID Pelanggan pada Data PSB tidak ditemukan di master crm_customers.',
+            )
+          }
+          cCode = String((cRow as unknown as { customerCode?: string | null }).customerCode ?? null)
+        }
+        if (hasSubIdCol) {
+          const subCols: string[] = ['id']
+          if (hasSubStatus) subCols.push('status')
+          if (await ensureColumn('service_subscriptions', 'service_no')) subCols.push('service_no')
+          const [sRows] = await conn.query(
+            `SELECT ${subCols.join(', ')} FROM service_subscriptions WHERE id = ? LIMIT 1`,
+            [existingSubId],
+          )
+          const sArr = sRows as Array<Record<string, unknown>> | undefined
+          const sRow = sArr?.[0]
+          if (!sRow) {
+            throw new ActivateFlowError(
+              'SUBSCRIPTION_CREATE_FAILED',
+              'ID Langganan pada Data PSB tidak ditemukan di master service_subscriptions.',
+            )
+          }
+          if (hasSubStatus) {
+            const status = String((sRow as unknown as { status?: string | null }).status ?? '').trim().toUpperCase()
+            if (status !== 'ACTIVE') {
+              throw new ActivateFlowError(
+                'SUBSCRIPTION_CREATE_FAILED',
+                `Status Langganan harus ACTIVE sebelum finalisasi CUSTOMER_ACTIVE. Saat ini: ${status || 'UNKNOWN'}.`,
+              )
+            }
+          }
+          if (await ensureColumn('service_subscriptions', 'service_no')) {
+            sNo = String((sRow as unknown as { serviceNo?: string | null }).serviceNo ?? null)
+          }
+        }
+
+        if (!String(row.radiusActivatedAt ?? '').trim()) {
+          throw new ActivateFlowError(
+            'INTERNAL',
+            'Radius activation belum ditandai. Finalisasi CUSTOMER_ACTIVE hanya diizinkan setelah tahapan RADIUS_ACTIVATED selesai.',
+          )
+        }
+
+        const assignments: string[] = []
+        const vals: unknown[] = []
+        if (hasCustomerActiveAt) {
+          assignments.push('customer_active_at = COALESCE(customer_active_at, CURRENT_TIMESTAMP)')
+        }
+        if (hasActivationStatus) {
+          assignments.push("activation_status = 'CUSTOMER_ACTIVE'")
+        }
+        assignments.push('updated_at = CURRENT_TIMESTAMP')
+        vals.push(psbId)
+        await conn.query(`UPDATE sales_psb_lists SET ${assignments.join(', ')} WHERE id = ?`, vals)
+
+        try {
+          await conn.query(
+            `
+              INSERT INTO sales_psb_list_audits (
+                psb_list_id,
+                event_type,
+                from_status,
+                to_status,
+                actor_name,
+                actor_role,
+                notes
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+            `,
+            [
+              psbId,
+              'CUSTOMER_ACTIVE',
+              String(row.status ?? ''),
+              String(row.status ?? ''),
+              `${params.actor.displayName} (${params.actor.username})`,
+              params.actor.role,
+              `Finalisasi: Pelanggan #${existingCustId} / Langganan #${existingSubId} valid → CUSTOMER_ACTIVE.`,
+            ],
+          )
+        } catch (_auditErr) {
+          // non-fatal
+        }
+
+        return {
+          psbId,
+          psbListCode,
+          customerId: existingCustId,
+          subscriptionId: existingSubId,
+          customerCode: cCode,
+          serviceNo: sNo,
+        }
+      })
+
+      customerId = verify.customerId
+      subscriptionId = verify.subscriptionId
+      customerCode = verify.customerCode
+      serviceNo = verify.serviceNo
+    } catch (err) {
+      if (err instanceof ActivateFlowError) {
+        throw err
+      }
+      const msg = err instanceof Error ? err.message : String(err)
+      throw new ActivateFlowError('INTERNAL', `Finalisasi Pelanggan gagal: ${msg}`)
+    }
+  } else {
+    await (async () => {
+      try {
+        await ensureCrmTablesAndColumns()
+        const hasCustomerActiveAt = await ensureColumn('sales_psb_lists', 'customer_active_at')
+        const hasActivationStatus = await ensureColumn('sales_psb_lists', 'activation_status')
+        if (!hasCustomerActiveAt && !hasActivationStatus) {
+          return
+        }
+        await runReviewDbExecute<ExecuteResult>(
+          `
+            UPDATE sales_psb_lists
+            SET
+              ${hasCustomerActiveAt ? 'customer_active_at = COALESCE(customer_active_at, CURRENT_TIMESTAMP),' : ''}
+              ${hasActivationStatus ? "activation_status = 'CUSTOMER_ACTIVE'," : ''}
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `,
+          [params.psbListId],
+        )
+      } catch (_touchErr) {
+        // existing rows are idempotent; swallow
+      }
+    })()
+  }
+
+  void customerCode
+
+  return {
+    idempotent: raw.idempotent,
+    psbId: raw.psbId,
+    psbListCode: raw.psbListCode,
+    customerId,
+    subscriptionId,
+    serviceNo,
+  }
 }
 
 export async function getPsbListPageData(query: PsbListQuery, session?: AppSession): Promise<PsbListPagePayload> {

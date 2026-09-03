@@ -4,6 +4,9 @@ import { CurrentHandlerCard } from '@/components/current-handler-card'
 import { AssignmentHistoryTable } from '@/components/assignment-history-table'
 import { ReassignAssignmentModal, type TechnicianOption } from '@/components/reassign-assignment-modal'
 import { CreateTTAssignmentModal } from '@/components/create-tt-assignment-modal'
+import { AssignmentAcceptButton } from '@/components/assignment-accept-button'
+import { ReleaseAssignmentButton } from '@/components/release-assignment-button'
+import { DispatchWorkOrderModal } from '@/components/dispatch-work-order-modal'
 import { DeviceLifecycleActionForm } from '@/components/device-lifecycle-action-form'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { PageHeader } from '@/components/page-header'
@@ -222,6 +225,51 @@ export default async function TroubleTicketTrackingDetailPage({
       ? false
       : P58A_FULL_ACCESS.has(roleCodeUp) || canPerformAction(session.role, 'support', 'update')
 
+  const primaryActiveAssignment =
+    Array.isArray(payload.assignments)
+      ? payload.assignments.find(
+          (a) =>
+            Boolean(a.isPrimary) &&
+            !a.releasedAt &&
+            (a.status === 'ASSIGNED' || a.status === 'ACCEPTED'),
+        ) ?? null
+      : null
+  const activeAssignmentId = primaryActiveAssignment?.assignmentId ? Number(primaryActiveAssignment.assignmentId) : null
+  const activeAssignmentStatus = primaryActiveAssignment?.status
+  const currentTechnicianLabel =
+    primaryActiveAssignment?.technician?.displayName ??
+    primaryActiveAssignment?.technician?.username ??
+    payload.currentHandler?.displayName ??
+    payload.currentHandler?.username ??
+    'Teknisi aktif'
+  const activeTechnicianUserId = primaryActiveAssignment?.technician?.userId
+    ? Number(primaryActiveAssignment.technician.userId)
+    : null
+  const canAcceptAssignment =
+    tt && !tt.closedAt && activeAssignmentId && activeAssignmentStatus === 'ASSIGNED'
+      ? P58A_FULL_ACCESS.has(roleCodeUp) ||
+        canPerformAction(session.role, 'support', 'update') ||
+        (session.userId && activeTechnicianUserId && activeTechnicianUserId === Number(session.userId))
+      : false
+  const canReleaseAssignment =
+    tt && !tt.closedAt && activeAssignmentId && (activeAssignmentStatus === 'ASSIGNED' || activeAssignmentStatus === 'ACCEPTED')
+      ? P58A_FULL_ACCESS.has(roleCodeUp) ||
+        canPerformAction(session.role, 'support', 'update') ||
+        (session.userId && activeTechnicianUserId && activeTechnicianUserId === Number(session.userId))
+      : false
+  const canReassignAssignment =
+    tt && !tt.closedAt && activeAssignmentId
+      ? P58A_FULL_ACCESS.has(roleCodeUp) || canPerformAction(session.role, 'support', 'manage')
+      : false
+  const canDispatchWorkOrder =
+    tt && !tt.closedAt && payload.workOrders && payload.workOrders.length > 0
+      ? P58A_FULL_ACCESS.has(roleCodeUp) || canPerformAction(session.role, 'sales', 'create')
+      : false
+  const canEscalateTicket =
+    tt && !tt.closedAt
+      ? P58A_FULL_ACCESS.has(roleCodeUp) || canPerformAction(session.role, 'support', 'approve')
+      : false
+
   const hasActivePrimaryAssignment =
     Array.isArray(payload.assignments) &&
     payload.assignments.some((a) => Boolean(a.isPrimary) && !a.releasedAt && (a.status === 'ASSIGNED' || a.status === 'ACCEPTED'))
@@ -249,6 +297,25 @@ export default async function TroubleTicketTrackingDetailPage({
 
   const TT_ENDPOINT_BASE = '/api/support/trouble-tickets/assignments'
 
+  const canCreateWorkOrderFromTT =
+    tt && !tt.closedAt
+      ? P58A_FULL_ACCESS.has(roleCodeUp) ||
+        canPerformAction(session.role, 'sales', 'create') ||
+        canPerformAction(session.role, 'support', 'update')
+      : false
+  const canCreateInventoryRequest =
+    tt && !tt.closedAt
+      ? P58A_FULL_ACCESS.has(roleCodeUp) ||
+        canPerformAction(session.role, 'inventory', 'create') ||
+        canPerformAction(session.role, 'support', 'update')
+      : false
+  const canCreateStockMovement =
+    tt && !tt.closedAt
+      ? P58A_FULL_ACCESS.has(roleCodeUp) ||
+        canPerformAction(session.role, 'inventory', 'update') ||
+        canPerformAction(session.role, 'inventory', 'manage')
+      : false
+
   const ttCodeOrId = tt?.ticketCode ?? `TT #${troubleTicketId}`
   const descriptionBits = [
     tt?.customerName,
@@ -266,31 +333,37 @@ export default async function TroubleTicketTrackingDetailPage({
       <Link href="/dashboard/tracking/trouble-tickets" className="btn-ghost tap-44 focus-visible:shadow-focus">
         Kembali
       </Link>
-      <Link
-        href={(() => {
-          const params = new URLSearchParams()
-          params.set('troubleTicketId', String(troubleTicketId))
-          params.set('jobCategory', 'TROUBLE')
-          params.set('notes', tt.ticketCode ? `[Dibuat dari TT ${tt.ticketCode}] ${tt.type ? ` • ${tt.type}` : ''}${tt.customerName ? ` • ${tt.customerName}` : ''}` : `[Dibuat dari TT #${troubleTicketId}] ${tt.type ? ` • ${tt.type}` : ''}${tt.customerName ? ` • ${tt.customerName}` : ''}`)
-          return `/sales?${params.toString()}#sales-action-work-order-create`
-        })()}
-        className="btn-primary tap-44 focus-visible:shadow-focus"
-        aria-label="Buat work order lapangan dari trouble ticket ini"
-      >
-        Buat Work Order dari Ticket
-      </Link>
-      <Link
-        href={`/inventory/requests?inventoryAction=item-request&troubleTicketId=${troubleTicketId}&requestType=TROUBLE_SUPPORT#inventory-action-item-request`}
-        className="btn-secondary tap-44 focus-visible:shadow-focus"
-      >
-        Request Barang
-      </Link>
-      <Link
-        href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=TROUBLE_TICKET&troubleTicketId=${troubleTicketId}#inventory-action-stock-movement`}
-        className="btn-secondary tap-44 focus-visible:shadow-focus"
-      >
-        Buat Movement
-      </Link>
+      {canCreateWorkOrderFromTT ? (
+        <Link
+          href={(() => {
+            const params = new URLSearchParams()
+            params.set('troubleTicketId', String(troubleTicketId))
+            params.set('jobCategory', 'TROUBLE')
+            params.set('notes', tt.ticketCode ? `[Dibuat dari TT ${tt.ticketCode}] ${tt.type ? ` • ${tt.type}` : ''}${tt.customerName ? ` • ${tt.customerName}` : ''}` : `[Dibuat dari TT #${troubleTicketId}] ${tt.type ? ` • ${tt.type}` : ''}${tt.customerName ? ` • ${tt.customerName}` : ''}`)
+            return `/sales?${params.toString()}#sales-action-work-order-create`
+          })()}
+          className="btn-primary tap-44 focus-visible:shadow-focus"
+          aria-label="Buat work order lapangan dari trouble ticket ini"
+        >
+          Buat Work Order dari Ticket
+        </Link>
+      ) : null}
+      {canCreateInventoryRequest ? (
+        <Link
+          href={`/inventory/requests?inventoryAction=item-request&troubleTicketId=${troubleTicketId}&requestType=TROUBLE_SUPPORT#inventory-action-item-request`}
+          className="btn-secondary tap-44 focus-visible:shadow-focus"
+        >
+          Request Barang
+        </Link>
+      ) : null}
+      {canCreateStockMovement ? (
+        <Link
+          href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=TROUBLE_TICKET&troubleTicketId=${troubleTicketId}#inventory-action-stock-movement`}
+          className="btn-secondary tap-44 focus-visible:shadow-focus"
+        >
+          Buat Movement
+        </Link>
+      ) : null}
       {dismantleHistoryRows[0] ? (
         <Link
           href={buildSupportLaneHref('dismantle', {
@@ -491,16 +564,82 @@ export default async function TroubleTicketTrackingDetailPage({
               reviewDbReady={reviewDbReady}
               endpointBasePath={TT_ENDPOINT_BASE}
             >
-              {!payload.currentHandler && tt?.ticketCode ? (
-                <CreateTTAssignmentModal
-                  ticketCode={tt.ticketCode}
-                  technicians={technicianOptions}
-                  canCreateAssignment={canCreateAssignment}
-                  reviewDbReady={reviewDbReady}
-                  defaultPrimary={defaultPrimary}
-                />
-              ) : null}
+              <div className="space-y-2.5 w-full">
+                {!payload.currentHandler && tt?.ticketCode ? (
+                  <CreateTTAssignmentModal
+                    ticketCode={tt.ticketCode}
+                    technicians={technicianOptions}
+                    canCreateAssignment={canCreateAssignment}
+                    reviewDbReady={reviewDbReady}
+                    defaultPrimary={defaultPrimary}
+                  />
+                ) : null}
+                {activeAssignmentId && activeAssignmentStatus === 'ASSIGNED' ? (
+                  <AssignmentAcceptButton
+                    assignmentId={activeAssignmentId}
+                    canAccept={Boolean(canAcceptAssignment)}
+                    reviewDbReady={reviewDbReady}
+                    endpointBasePath={TT_ENDPOINT_BASE}
+                  />
+                ) : null}
+                {activeAssignmentId && (activeAssignmentStatus === 'ASSIGNED' || activeAssignmentStatus === 'ACCEPTED') ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ReleaseAssignmentButton
+                      assignmentId={activeAssignmentId}
+                      canRelease={Boolean(canReleaseAssignment)}
+                      reviewDbReady={reviewDbReady}
+                      endpointBasePath={TT_ENDPOINT_BASE}
+                    />
+                    <ReassignAssignmentModal
+                      assignmentId={activeAssignmentId}
+                      canReassign={Boolean(canReassignAssignment)}
+                      reviewDbReady={reviewDbReady}
+                      currentTechnicianLabel={String(currentTechnicianLabel)}
+                      technicianOptions={technicianOptions}
+                      endpointBasePath={TT_ENDPOINT_BASE}
+                    />
+                  </div>
+                ) : null}
+              </div>
             </CurrentHandlerCard>
+
+            {canEscalateTicket ? (
+              <section aria-label="Escalation supervisor" className="card-tier-3 border border-warningLine bg-warningSoft/60 p-4 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-warningInk">
+                      Escalation Supervisor CS
+                    </p>
+                    <p className="mt-1.5 text-xs text-warningInk/90">
+                      Jika penanganan teknisi melebihi SLA atau kategori ticket termasuk kritis, gunakan tombol escalate untuk naik level ke Supervisor CS/NOC.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={`/support?focus=ESCALATION_PENDING&troubleTicketId=${troubleTicketId}#support-trouble-ticket-queue`}
+                      className="btn-secondary tap-44 text-xs"
+                    >
+                      Lihat Antrean Escalation
+                    </Link>
+                    <StatusBadge tone="warning" label="Supervisor only" size="sm" />
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 text-xs sm:grid-cols-3">
+                  <div className="rounded-control border border-warningLine bg-white/60 dark:bg-surface/30 px-3 py-2.5">
+                    <p className="uppercase tracking-[0.14em] text-warningInk/80 text-[10px]">Level 1</p>
+                    <p className="mt-1 text-sm font-semibold text-warningInk">Operator CS / NOC</p>
+                  </div>
+                  <div className="rounded-control border border-warningLine bg-white/60 dark:bg-surface/30 px-3 py-2.5">
+                    <p className="uppercase tracking-[0.14em] text-warningInk/80 text-[10px]">Level 2</p>
+                    <p className="mt-1 text-sm font-semibold text-warningInk">Supervisor / Team Lead</p>
+                  </div>
+                  <div className="rounded-control border border-warningLine bg-white/60 dark:bg-surface/30 px-3 py-2.5">
+                    <p className="uppercase tracking-[0.14em] text-warningInk/80 text-[10px]">Level 3</p>
+                    <p className="mt-1 text-sm font-semibold text-warningInk">Manager / Engineering</p>
+                  </div>
+                </div>
+              </section>
+            ) : null}
 
             <section aria-label="Timeline event" className="card-tier-3 border border-line p-4 sm:p-5">
               <div className="flex items-center justify-between gap-3">
@@ -551,40 +690,111 @@ export default async function TroubleTicketTrackingDetailPage({
             </section>
 
             <section aria-label="Work order terkait" className="card-tier-2 border border-line p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
-                  WO Terkait
-                </p>
-                <StatusBadge tone="neutral" label={String(payload.workOrders.length)} size="sm" />
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-muteStrong">
+                    WO Terkait
+                  </p>
+                  <p className="mt-1 text-xs text-mute">
+                    Assign teknisi lapangan via Dispatch untuk setiap WO yang sudah siap dieksekusi.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone="neutral" label={String(payload.workOrders.length)} size="sm" />
+                  {canDispatchWorkOrder ? <StatusBadge tone="info" label="Dispatch ready" size="sm" /> : null}
+                </div>
               </div>
               <div className="mt-4 space-y-3">
                 {payload.workOrders.length ? (
                   payload.workOrders.map((row) => (
-                    <Link
+                    <div
                       key={row.id}
-                      href={`/dashboard/tracking/work-orders/${row.id}`}
-                      className="block rounded-control border border-line bg-cardSubtle px-4 py-3 transition hover:border-lineStrong"
-                      aria-label={`Buka work order terkait ${row.workOrderNo ?? `WO #${row.id}`}`}
+                      className="rounded-control border border-line bg-cardSubtle transition hover:border-lineStrong"
                     >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-inkStrong">
-                          {row.workOrderNo ?? `WO #${row.id}`}
-                        </p>
-                        {row.priority ? <StatusBadge tone="warning" label={row.priority} size="sm" /> : null}
+                      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <Link
+                          href={`/dashboard/tracking/work-orders/${row.id}`}
+                          className="flex-1 min-w-0 transition hover:text-accent"
+                          aria-label={`Buka work order terkait ${row.workOrderNo ?? `WO #${row.id}`}`}
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-inkStrong">
+                              {row.workOrderNo ?? `WO #${row.id}`}
+                            </p>
+                            {row.priority ? <StatusBadge tone="warning" label={row.priority} size="sm" /> : null}
+                          </div>
+                          <p className="mt-1 text-sm leading-6 text-mute">
+                            {row.jobCategory ?? row.workType ?? 'WO'}
+                            {row.status ? ` • ${row.status}` : ''}
+                          </p>
+                        </Link>
+                        <DispatchWorkOrderModal
+                          workOrderId={Number(row.id)}
+                          workOrderLabel={row.workOrderNo ?? `WO #${row.id}`}
+                          customerLabel={tt?.customerName ?? null}
+                          canDispatch={Boolean(canDispatchWorkOrder)}
+                          reviewDbReady={reviewDbReady}
+                          technicianOptions={technicianOptions}
+                        />
                       </div>
-                      <p className="mt-1 text-sm leading-6 text-mute">
-                        {row.jobCategory ?? row.workType ?? 'WO'}
-                        {row.status ? ` • ${row.status}` : ''}
-                      </p>
-                    </Link>
+                    </div>
                   ))
                 ) : (
                   <div className="rounded-control border border-line bg-surfaceSoft px-4 py-3 text-sm text-mute">
-                    Belum ada work order lapangan yang terhubung ke ticket ini.
+                    Belum ada work order lapangan yang terhubung ke ticket ini. Gunakan tombol <strong className="text-inkStrong">Buat Work Order dari Ticket</strong> di header untuk membuat WO baru.
                   </div>
                 )}
               </div>
             </section>
+
+            {tt?.category && /PSB|PEMASANGAN|PASANG BARU|INSTALLATION/i.test(`${tt.category} ${tt.type ?? ''} ${tt.ticketCode ?? ''}`) ? (
+              <section aria-label="Data PSB sumber ticket" className="card-tier-2 border border-violet-200 bg-violet-50/40 p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-violet-700">
+                      Linked PSB
+                    </p>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-white px-3 py-1 text-[11px] font-semibold text-violet-700">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-500" aria-hidden="true" />
+                      Sumber Penjualan / Pemasangan Baru
+                    </span>
+                  </div>
+                  <StatusBadge tone="neutral" label="PSB" size="sm" />
+                </div>
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-control border border-violet-200 bg-white px-4 py-4">
+                    <p className="text-sm font-semibold text-inkStrong">
+                      Ticket {ttCodeOrId} berasal dari alur Penjualan (PSB)
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-mute">
+                      Ikuti link di bawah ini untuk membuka Control Tower PSB dan melihat end-to-end progress mulai dari Sales input sampai Customer aktif + Billing bulan pertama.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Link
+                        href={`/list-psb?q=${encodeURIComponent(tt.ticketCode ?? String(troubleTicketId))}`}
+                        className="inline-flex items-center justify-center rounded-xl border border-violet-300 bg-white px-4 py-2 text-xs font-semibold text-violet-800 transition hover:bg-violet-100"
+                      >
+                        Cari PSB via Ticket Code
+                      </Link>
+                      {tt.customerName ? (
+                        <Link
+                          href={`/list-psb?q=${encodeURIComponent(tt.customerName)}`}
+                          className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Cari PSB via Nama Customer
+                        </Link>
+                      ) : null}
+                      <Link
+                        href="/list-psb"
+                        className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
+                      >
+                        Buka Daftar PSB
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ) : null}
 
             <section aria-label="Movement inventory terkait" className="card-tier-2 border border-line p-4 sm:p-5">
               <div className="flex items-center justify-between gap-3">

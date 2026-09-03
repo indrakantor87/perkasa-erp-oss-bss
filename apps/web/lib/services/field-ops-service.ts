@@ -686,6 +686,60 @@ export async function acceptServiceWorkOrderAssignment(params: {
     if (affectedRows <= 0) {
       return { affectedRows: 0, accepted: false, alreadyAccepted: false, workOrderId }
     }
+
+    const [woStatusRowsRaw] = await conn.query(
+      `
+        SELECT id, status, started_at, notes, updated_at
+        FROM service_work_orders
+        WHERE id = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [workOrderId],
+    )
+    const woStatusRow = (woStatusRowsRaw as Array<Record<string, unknown>> | undefined)?.[0]
+    if (woStatusRow) {
+      const woFromStatus = String(woStatusRow.status ?? 'OPEN').trim().toUpperCase()
+      const [hasStatusCol, hasStartedAtCol, hasUpdatedAtCol, hasNotesCol] = await Promise.all([
+        hasReviewDbColumn('service_work_orders', 'status'),
+        hasReviewDbColumn('service_work_orders', 'started_at'),
+        hasReviewDbColumn('service_work_orders', 'updated_at'),
+        hasReviewDbColumn('service_work_orders', 'notes'),
+      ])
+      const setParts: string[] = []
+      const setValues: unknown[] = []
+      if (hasStatusCol) {
+        setParts.push('status = ?')
+        setValues.push('ACCEPTED')
+      }
+      if (hasStartedAtCol) {
+        setParts.push('started_at = COALESCE(started_at, CURRENT_TIMESTAMP)')
+      }
+      if (hasUpdatedAtCol) {
+        setParts.push('updated_at = CURRENT_TIMESTAMP')
+      }
+      if (hasNotesCol && !String(woStatusRow.notes ?? '').trim()) {
+        setParts.push("notes = CONCAT(COALESCE(notes, ''), ?)")
+        setValues.push(`[TECH_ACCEPT] user#${actorUserIdNum} on ${new Date().toISOString().slice(0, 10)}\n`)
+      }
+      if (setParts.length) {
+        setValues.push(workOrderId)
+        const woUpdSql = `UPDATE service_work_orders SET ${setParts.join(', ')} WHERE id = ? LIMIT 1`
+        await conn.query(woUpdSql, setValues).catch(() => null)
+      }
+      await insertServiceWorkOrderStatusLog(
+        {
+          workOrderId,
+          fromStatus: woFromStatus,
+          toStatus: 'ACCEPTED',
+          changedByUserId: actorUserIdNum,
+          reasonCode: 'TECH_ACCEPT',
+          reasonNotes: `Assignment diterima oleh user#${actorUserIdNum}`,
+        },
+        { connection: conn },
+      )
+    }
+
     return { affectedRows: 1, accepted: true, alreadyAccepted: false, workOrderId }
   }
 
@@ -771,6 +825,7 @@ type WorkOrderFullRow = {
   status: string
   completed_at: Date | string | null
   closed_by_user_id: number | null
+  trouble_ticket_id: number | null
 }
 
 type MaterialRequestRow = {
@@ -805,9 +860,17 @@ export type CompleteWorkOrderResult = {
   closedAt: string | null
   materials: MaterialDebitResult[]
   movementIds: number[]
+  ttProgressInserted?: boolean
+  ttCascadeClose?: {
+    attempted: boolean
+    success: boolean
+    idempotent: boolean
+    troubleTicketCode: string | null
+    warning?: string | null
+  }
 }
 
-const NON_TERMINAL_WO_STATUSES = new Set(['OPEN', 'SCHEDULED', 'ON_PROGRESS', 'PENDING'])
+const NON_TERMINAL_WO_STATUSES = new Set(['OPEN', 'SCHEDULED', 'ASSIGNED', 'ACCEPTED', 'ON_PROGRESS', 'PENDING'])
 
 async function ensureInventoryStockMovementsWorkOrderColumn() {
   const hasWoId = await hasReviewDbColumn('inventory_stock_movements', 'work_order_id')
@@ -839,7 +902,7 @@ export async function completeWorkOrderWithMaterials(params: {
   const doComplete = async (conn: ReviewDbConnection): Promise<CompleteWorkOrderResult> => {
     const [woRowsRaw] = await conn.query(
       `
-        SELECT id, work_order_no, status, completed_at, closed_by_user_id
+        SELECT id, work_order_no, status, completed_at, closed_by_user_id, trouble_ticket_id
         FROM service_work_orders
         WHERE id = ?
         LIMIT 1
@@ -1058,6 +1121,92 @@ export async function completeWorkOrderWithMaterials(params: {
       { connection: conn },
     )
 
+    let ttProgressInserted = false
+    let ttCascadeClose: CompleteWorkOrderResult['ttCascadeClose'] = {
+      attempted: false,
+      success: false,
+      idempotent: false,
+      troubleTicketCode: null,
+      warning: null,
+    }
+
+    const linkedTtId = Number(wo.trouble_ticket_id ?? 0)
+    if (Number.isInteger(linkedTtId) && linkedTtId > 0) {
+      try {
+        const [ttRowsRaw] = await conn.query(
+          `SELECT id, ticket_code, status FROM support_trouble_tickets WHERE id = ? LIMIT 1`,
+          [linkedTtId],
+        )
+        const ttRow = (ttRowsRaw as Array<Record<string, unknown>> | undefined)?.[0]
+        const ttCode = ttRow ? String(ttRow.ticket_code ?? '').trim() : ''
+        if (ttCode) {
+          ttCascadeClose.troubleTicketCode = ttCode
+        }
+
+        const ttProgressNotes = [
+          `Work Order ${wo.work_order_no} (id#${wo.id}) SELASAI`,
+          `Status: COMPLETED`,
+          `Materials: ${materials.length} line items`,
+          reasonNotesFinal,
+        ].filter(Boolean).join(' | ').slice(0, 1000)
+
+        try {
+          await insertSupportTroubleTicketProgressLog(
+            {
+              troubleTicketId: linkedTtId,
+              progressStatus: 'COMPLETED',
+              ownerName: actorLabel,
+              progressNotes: ttProgressNotes,
+              updatedBy: params.actorUsername ? String(params.actorUsername).slice(0, 150) : 'system',
+            },
+            { connection: conn },
+          )
+          ttProgressInserted = true
+        } catch {
+          ttCascadeClose.warning = 'TT progress log insert gagal (non-fatal)'
+        }
+
+        try {
+          const [woSiblingRaw] = await conn.query(
+            `SELECT COUNT(id) AS n FROM service_work_orders WHERE trouble_ticket_id = ? AND UPPER(TRIM(COALESCE(status,''))) NOT IN ('COMPLETED','CANCELLED','CLOSED')`,
+            [linkedTtId],
+          )
+          const siblingRow = (woSiblingRaw as Array<Record<string, unknown>> | undefined)?.[0]
+          const openSiblingCount = Number(siblingRow?.n ?? 0)
+          if (openSiblingCount <= 0 && ttCode) {
+            ttCascadeClose.attempted = true
+            try {
+              const closeRes = await closeTroubleTicketWithMaterials({
+                ticketCode: ttCode,
+                resolutionAction: 'RESOLVED_BY_WO',
+                closeNotes: reasonNotesFinal,
+                actor: {
+                  userId: actorUserIdNum,
+                  username: params.actorUsername ?? 'system',
+                  displayName: actorLabel,
+                  role: 'TT_OPERATOR',
+                  branchId: null,
+                },
+              })
+              ttCascadeClose.success = true
+              ttCascadeClose.idempotent = Boolean(closeRes?.idempotent ?? false)
+            } catch (closeErr) {
+              const errMsg = closeErr instanceof Error ? closeErr.message : String(closeErr ?? 'Unknown error').slice(0, 200)
+              ttCascadeClose.warning = ttCascadeClose.warning
+                ? `${ttCascadeClose.warning}; TT close cascade: ${errMsg}`
+                : `TT close cascade not applied: ${errMsg}`
+            }
+          }
+        } catch {
+          ttCascadeClose.warning = ttCascadeClose.warning
+            ? `${ttCascadeClose.warning}; sibling WO count check skipped`
+            : 'Sibling WO count check skipped (non-fatal)'
+        }
+      } catch {
+        ttCascadeClose.warning = 'Linked TT lookup error (non-fatal)'
+      }
+    }
+
     return {
       success: true,
       idempotent: false,
@@ -1068,6 +1217,8 @@ export async function completeWorkOrderWithMaterials(params: {
       closedAt: new Date().toISOString(),
       materials,
       movementIds,
+      ttProgressInserted,
+      ttCascadeClose,
     }
   }
 

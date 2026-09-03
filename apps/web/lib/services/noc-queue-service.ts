@@ -4,6 +4,7 @@ import { mockTrackingNocQueueItems } from '@/lib/mock-tracking'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 import { getLatestDeviceLifecycleMaps } from '@/lib/services/device-lifecycle-service'
 import { ensureInventoryLocationsTable } from '@/lib/services/inventory-location-service'
+import { resolveCanonicalSlaState } from '@/lib/services/sla-resolver'
 import type { DataSourceSnapshot } from '@/lib/types'
 
 type WorkOrderQueueRow = {
@@ -317,24 +318,31 @@ function buildSlaSnapshot(params: {
 }) {
   const ageHours = resolveAgeHours(params.startedAt)
   const ageLabel = formatAgeLabel(ageHours)
-  const dueMs = parseDateValue(params.dueAt)
+  const canonicalState = resolveCanonicalSlaState({
+    slaDueAt: params.dueAt ?? null,
+    openedAt: params.startedAt ?? null,
+    fallbackTargetHours: resolveFallbackSlaHours(params.ticketType, params.priority),
+    warningCalendarDays: params.dueAt && String(params.dueAt).trim() ? true : false,
+    warningWindowHours: 2,
+  })
 
+  const dueMs = parseDateValue(params.dueAt)
   if (dueMs !== null) {
     const diffHours = Math.floor((dueMs - Date.now()) / (1000 * 60 * 60))
-    if (diffHours < 0) {
+    if (canonicalState === 'BREACHED') {
       return {
         ageHours,
         ageLabel,
         slaState: 'BREACHED' as const,
-        slaLabel: `Lewat ${Math.abs(diffHours)}j`,
+        slaLabel: `Lewat ${Math.max(0, Math.abs(diffHours))}j`,
       }
     }
-    if (diffHours <= 2) {
+    if (canonicalState === 'WARNING') {
       return {
         ageHours,
         ageLabel,
         slaState: 'WARNING' as const,
-        slaLabel: `Sisa ${diffHours}j`,
+        slaLabel: `Sisa ${Math.max(0, diffHours)}j`,
       }
     }
 
@@ -342,7 +350,7 @@ function buildSlaSnapshot(params: {
       ageHours,
       ageLabel,
       slaState: 'ON_TRACK' as const,
-      slaLabel: `SLA ${diffHours}j`,
+      slaLabel: `SLA ${Math.max(0, diffHours)}j`,
     }
   }
 
@@ -355,7 +363,7 @@ function buildSlaSnapshot(params: {
       slaLabel: null,
     }
   }
-  if (ageHours >= targetHours) {
+  if (canonicalState === 'BREACHED') {
     return {
       ageHours,
       ageLabel,
@@ -363,7 +371,7 @@ function buildSlaSnapshot(params: {
       slaLabel: `>${targetHours}j`,
     }
   }
-  if (ageHours >= Math.max(1, targetHours - 2)) {
+  if (canonicalState === 'WARNING') {
     return {
       ageHours,
       ageLabel,
@@ -662,7 +670,7 @@ export async function getNocQueueList(query: NocQueueQuery, options?: { session?
       .filter((item) => !state.slaState || item.slaState === state.slaState)
       .slice(0, state.limit)
 
-    return { source, items, error: null as string | null, state }
+    return { source, items, otherItems: items.filter((i) => i.ticketType === 'OTHER').slice(0, 50), error: null as string | null, state }
   }
 
   try {
@@ -884,7 +892,7 @@ export async function getNocQueueList(query: NocQueueQuery, options?: { session?
       troubleTicketById.set(row.id, row)
     }
 
-    const items: NocQueueItem[] = [
+    const rawItems: NocQueueItem[] = [
       ...workOrders.map((row) => {
         const linkedTroubleTicket = row.troubleTicketId ? troubleTicketById.get(row.troubleTicketId) ?? null : null
         const ticketType = detectTicketType({
@@ -1046,11 +1054,21 @@ export async function getNocQueueList(query: NocQueueQuery, options?: { session?
         return item
       }),
     ]
-      .filter((item) =>
-        state.mine && session?.username
-          ? normalizeText(item.picUsername) === normalizeText(session.username)
-          : true,
-      )
+
+    const preFiltered = rawItems.filter((item: NocQueueItem) =>
+      state.mine && session?.username
+        ? normalizeText(item.picUsername) === normalizeText(session.username)
+        : true,
+    )
+
+    const otherItems = preFiltered
+      .filter((item) => item.ticketType === 'OTHER')
+      .filter((item) => (state.ticketType ? item.ticketType === state.ticketType : true))
+      .filter((item) => (state.queueStatus ? item.queueStatus === state.queueStatus : true))
+      .filter((item) => (state.slaState ? item.slaState === state.slaState : true))
+      .slice(0, 50)
+
+    const items = preFiltered
       .filter((item) => item.ticketType !== 'OTHER')
       .filter((item) => (state.ticketType ? item.ticketType === state.ticketType : true))
       .filter((item) => (state.queueStatus ? item.queueStatus === state.queueStatus : true))
@@ -1077,11 +1095,12 @@ export async function getNocQueueList(query: NocQueueQuery, options?: { session?
       })
       .slice(0, state.limit)
 
-    return { source, items, error: null as string | null, state }
+    return { source, items, otherItems, error: null as string | null, state }
   } catch (error) {
     return {
       source: getFallbackDataSource(source, error),
       items: [] as NocQueueItem[],
+      otherItems: [] as NocQueueItem[],
       error: getReviewDbErrorDetail(error),
       state,
     }

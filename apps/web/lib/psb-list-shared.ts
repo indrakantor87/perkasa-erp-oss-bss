@@ -62,6 +62,10 @@ export type PsbListItem = {
   onuSerialNumber: string | null
   activationStatus: PsbActivationStatus
   billingStatus: PsbBillingStatus
+  customerId: number | null
+  customerCode: string | null
+  subscriptionId: number | null
+  serviceNo: string | null
   createdAt: string | null
   updatedAt: string | null
   reviewedAt: string | null

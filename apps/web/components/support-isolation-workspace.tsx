@@ -79,6 +79,8 @@ export function SupportIsolationWorkspace({
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
   const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
+  const totalQueueItems = reviewSections.reduce((sum, s) => sum + (s.rows?.length ?? 0), 0)
+  const queueNoCapabilities = capabilities.length === 0 || capabilities.every((c) => !c.enabled)
   const canOpenBillingDecision = canAccessPath(role, '/billing')
   const canOpenDismantleLane = canAccessSupportLane(role, 'dismantle')
   const canOpenSlaLane = canAccessSupportLane(role, 'sla')
@@ -252,15 +254,48 @@ export function SupportIsolationWorkspace({
         </article>
       </section>
 
-      <SupportIsolationQueuePanel
-        sections={reviewSections}
-        actionLinks={visibleActionLinks}
-        role={role}
-        canCreate={canCreate}
-        canUpdate={canUpdate}
-        canApprove={canApprove}
-        supportDrilldown={supportDrilldown ?? null}
-      />
+      {queueNoCapabilities ? (
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-600">Akses Terbatas</p>
+          <h3 className="mt-3 text-lg font-semibold text-rose-950">Tidak ada izin untuk lane Isolir</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-rose-800">
+            Role aktif tidak memiliki kemampuan baca maupun tulis pada lane isolasi. Hubungi admin untuk membuka izin
+            <code className="mx-1 rounded border border-rose-200 bg-white px-1.5 py-0.5">support:update</code> atau
+            <code className="mx-1 rounded border border-rose-200 bg-white px-1.5 py-0.5">support:approve</code>.
+          </p>
+        </section>
+      ) : !reviewDbReady && totalQueueItems === 0 ? (
+        <section className="rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+            Memuat antrean isolir
+          </div>
+          <h3 className="mt-4 text-lg font-semibold text-slate-950">Menyiapkan koneksi ke Review DB</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+            Data kandidat isolir, jalur restore, dan terminate akan muncul segera setelah koneksi siap. Coba refresh
+            jika indikator di atas tidak berubah dalam 10 detik.
+          </p>
+        </section>
+      ) : totalQueueItems === 0 ? (
+        <section className="rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Antrean Kosong</p>
+          <h3 className="mt-3 text-lg font-semibold text-slate-950">Belum ada data isolir untuk filter ini</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+            Coba ubah fokus pencarian, nama pelanggan, atau rentang tanggal. Keputusan restore bisa dilakukan dari
+            form <span className="inline-flex rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-xs font-semibold">Restore Billing</span> bila kandidat isolir sudah masuk ke antrean.
+          </p>
+        </section>
+      ) : (
+        <SupportIsolationQueuePanel
+          sections={reviewSections}
+          actionLinks={visibleActionLinks}
+          role={role}
+          canCreate={canCreate}
+          canUpdate={canUpdate}
+          canApprove={canApprove}
+          supportDrilldown={supportDrilldown ?? null}
+        />
+      )}
 
       <SupportActionFormModal items={supportActionModalItems} heading="Form aksi lane isolir" />
     </div>

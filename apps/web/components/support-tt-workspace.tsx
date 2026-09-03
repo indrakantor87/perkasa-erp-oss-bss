@@ -124,6 +124,8 @@ export function SupportTroubleTicketWorkspace({
   const canUpdate = capabilities.some((item) => item.action === 'update' && item.enabled)
   const canApprove = capabilities.some((item) => item.action === 'approve' && item.enabled)
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
+  const totalQueueItems = reviewSections.reduce((sum, s) => sum + (s.rows?.length ?? 0), 0)
+  const queueNoCapabilities = capabilities.length === 0 || capabilities.every((c) => !c.enabled)
   const canOpenSlaLane = canAccessSupportLane(role, 'sla')
   const canOpenSupervisorWorkspace = canAccessPath(role, '/customers/cs-admin')
   const slaControlHref = canUseSupportAction({ role, actionKey: 'sla-manage', canCreate, canUpdate, canApprove })
@@ -322,7 +324,8 @@ export function SupportTroubleTicketWorkspace({
                 Kontrol SLA
               </Link>
             ) : null}
-            {canOpenSupervisorWorkspace ? (
+            {canOpenSupervisorWorkspace &&
+              canUseSupportAction({ role, actionKey: 'ticket-escalate', canCreate, canUpdate, canApprove }) ? (
               <Link
                 href="/customers/cs-admin?queue=Trouble+Ticket"
                 className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
@@ -487,13 +490,50 @@ export function SupportTroubleTicketWorkspace({
         </section>
       ) : null}
 
-      <SupportTroubleTicketQueuePanel
-        sections={reviewSections}
-        role={role}
-        canUpdate={canUpdate}
-        canApprove={canApprove}
-        preventiveOpenCount={preventiveOpenCount}
-      />
+      {queueNoCapabilities ? (
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-600">Akses Terbatas</p>
+          <h3 className="mt-3 text-lg font-semibold text-rose-950">Tidak ada izin untuk lane Trouble Ticket</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-rose-800">
+            Role aktif tidak memiliki kemampuan baca maupun tulis pada modul ini. Hubungi admin untuk membuka izin
+            <code className="mx-1 rounded border border-rose-200 bg-white px-1.5 py-0.5">support:read</code> atau
+            <code className="mx-1 rounded border border-rose-200 bg-white px-1.5 py-0.5">support:create</code>.
+          </p>
+        </section>
+      ) : !reviewDbReady && totalQueueItems === 0 ? (
+        <section className="rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+            Memuat antrean ticket
+          </div>
+          <h3 className="mt-4 text-lg font-semibold text-slate-950">Menyiapkan koneksi ke Review DB</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+            Data ticket, progress, dan SLA akan muncul segera setelah koneksi database siap. Coba refresh halaman
+            jika indikator di atas tidak berubah dalam 10 detik.
+          </p>
+        </section>
+      ) : totalQueueItems === 0 ? (
+        <section className="rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Antrean Kosong</p>
+          <h3 className="mt-3 text-lg font-semibold text-slate-950">Belum ada ticket untuk kriteria ini</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+            Coba ubah kombinasi fokus, status, tipe trouble, atau kata kunci pencarian pelanggan. Jika ingin membuat
+            ticket baru, gunakan tombol{' '}
+            <span className="inline-flex rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-xs font-semibold">
+              Tambah Ticket
+            </span>{' '}
+            di panel filter atas.
+          </p>
+        </section>
+      ) : (
+        <SupportTroubleTicketQueuePanel
+          sections={reviewSections}
+          role={role}
+          canUpdate={canUpdate}
+          canApprove={canApprove}
+          preventiveOpenCount={preventiveOpenCount}
+        />
+      )}
 
       <SupportActionFormModal items={supportActionModalItems} heading="Form aksi lane TT" />
     </div>

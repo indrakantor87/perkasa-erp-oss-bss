@@ -477,6 +477,16 @@ function buildTroubleTicketQuickActionPayload(params: {
   const queueReason = pickMeta(params.row.meta, 'Queue Reason: ')
   const serviceNo = pickMeta(params.row.meta, 'Service No: ')
   const phone = pickMeta(params.row.meta, 'Phone: ')
+  const linkedWoIdsRaw = pickMeta(params.row.meta, 'Linked Work Order IDs: ')
+  const linkedWoCodesRaw = pickMeta(params.row.meta, 'Linked Work Order Codes: ')
+  const linkedWoIds =
+    linkedWoIdsRaw && linkedWoIdsRaw !== '-' && linkedWoIdsRaw.trim()
+      ? linkedWoIdsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+      : []
+  const linkedWoCodes =
+    linkedWoCodesRaw && linkedWoCodesRaw !== '-' && linkedWoCodesRaw.trim()
+      ? linkedWoCodesRaw.split('|||').map((s) => s.trim()).filter(Boolean)
+      : []
   const rowActions = getRowActionItems({
     queueReason,
     ticket: params.row.primary,
@@ -509,7 +519,8 @@ function buildTroubleTicketQuickActionPayload(params: {
       `SLA: ${slaState}`,
       `Opened: ${opened}`,
       `Keterangan: ${params.row.detail}`,
-    ].join('\n'),
+      linkedWoIds.length ? `Work Orders: ${linkedWoCodes.join(', ') || linkedWoIds.join(', ')}` : '',
+    ].filter(Boolean).join('\n'),
     draftSeed: [
       `Queue: ${getQueueReasonLabel(queueReason)}`,
       `Follow-up: ${followUp}`,
@@ -539,6 +550,16 @@ function buildTroubleTicketQuickActionPayload(params: {
         title: 'Prioritas / SLA',
         value: [`Prioritas: ${queuePriority}`, `SLA: ${slaState}`, `Due: ${slaDue}`].join('\n'),
       },
+      ...(linkedWoIds.length
+        ? [
+            {
+              title: `Work Order Turunan (${linkedWoIds.length})`,
+              value: linkedWoIds
+                .map((woId, idx) => `${linkedWoCodes[idx] || `WO #${woId}`} — /dashboard/tracking/work-orders/${woId}`)
+                .join('\n'),
+            },
+          ]
+        : []),
     ],
     actions: rowActions.map((action) => ({
       label: action.label,
@@ -731,6 +752,16 @@ export function SupportTroubleTicketQueuePanel({
                     const recurringKey = getRecurringKey(row)
                     const recurringCount = recurringKey ? operationalStats.repeatMap.get(recurringKey) ?? 0 : 0
                     const isRecurring = recurringCount > 1
+                    const rowLinkedWoIdsRaw = pickMeta(row.meta, 'Linked Work Order IDs: ')
+                    const rowLinkedWoCodesRaw = pickMeta(row.meta, 'Linked Work Order Codes: ')
+                    const rowLinkedWoIds =
+                      rowLinkedWoIdsRaw && rowLinkedWoIdsRaw !== '-' && rowLinkedWoIdsRaw.trim()
+                        ? rowLinkedWoIdsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+                        : []
+                    const rowLinkedWoCodes =
+                      rowLinkedWoCodesRaw && rowLinkedWoCodesRaw !== '-' && rowLinkedWoCodesRaw.trim()
+                        ? rowLinkedWoCodesRaw.split('|||').map((s) => s.trim()).filter(Boolean)
+                        : []
 
                     return (
                       <tr key={row.id} className={`align-top ${getQueueRowClass(queueReason, queuePriority, slaState)}`}>
@@ -752,7 +783,35 @@ export function SupportTroubleTicketQueuePanel({
                             <div className="flex flex-wrap gap-1.5">
                               <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
                               <span className="badge border-slate-200 bg-white text-slate-600">{getQueueReasonLabel(queueReason)}</span>
+                              {rowLinkedWoIds.length ? (
+                                <span className="badge border-indigo-200 bg-indigo-50 text-indigo-700">
+                                  WO x{rowLinkedWoIds.length}
+                                </span>
+                              ) : null}
                             </div>
+                            {rowLinkedWoIds.length ? (
+                              <div className="flex flex-wrap gap-1">
+                                {rowLinkedWoIds.slice(0, 3).map((woId, idx) => {
+                                  const woCode = rowLinkedWoCodes[idx]
+                                  const woNumericMatch = (woCode || String(woId)).match(/(\d+)/)
+                                  const woTrackingId = woNumericMatch ? woNumericMatch[1] : encodeURIComponent(woCode || String(woId))
+                                  return (
+                                    <Link
+                                      key={`tt-row-${row.id}-wo-${woId}`}
+                                      href={`/dashboard/tracking/work-orders/${woTrackingId}`}
+                                      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 transition"
+                                    >
+                                      {woCode || `WO#${woId}`}
+                                    </Link>
+                                  )
+                                })}
+                                {rowLinkedWoIds.length > 3 ? (
+                                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                                    +{rowLinkedWoIds.length - 3}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
@@ -894,6 +953,16 @@ export function SupportTroubleTicketQueuePanel({
               const recurringKey = getRecurringKey(row)
               const recurringCount = recurringKey ? operationalStats.repeatMap.get(recurringKey) ?? 0 : 0
               const isRecurring = recurringCount > 1
+              const rowMobileWoIdsRaw = pickMeta(row.meta, 'Linked Work Order IDs: ')
+              const rowMobileWoCodesRaw = pickMeta(row.meta, 'Linked Work Order Codes: ')
+              const rowMobileWoIds =
+                rowMobileWoIdsRaw && rowMobileWoIdsRaw !== '-' && rowMobileWoIdsRaw.trim()
+                  ? rowMobileWoIdsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+                  : []
+              const rowMobileWoCodes =
+                rowMobileWoCodesRaw && rowMobileWoCodesRaw !== '-' && rowMobileWoCodesRaw.trim()
+                  ? rowMobileWoCodesRaw.split('|||').map((s) => s.trim()).filter(Boolean)
+                  : []
 
               return (
                 <article key={row.id} className="rounded-2xl border border-line bg-slate-50 p-4">
@@ -925,7 +994,30 @@ export function SupportTroubleTicketQueuePanel({
                         Gangguan berulang x{recurringCount}
                       </span>
                     ) : null}
+                    {rowMobileWoIds.length ? (
+                      <span className="badge border-indigo-200 bg-indigo-50 text-indigo-700">
+                        WO x{rowMobileWoIds.length}
+                      </span>
+                    ) : null}
                   </div>
+                  {rowMobileWoIds.length ? (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {rowMobileWoIds.map((woId, idx) => {
+                        const woCode = rowMobileWoCodes[idx]
+                        const woMatch = (woCode || String(woId)).match(/(\d+)/)
+                        const woTrackingId = woMatch ? woMatch[1] : encodeURIComponent(woCode || String(woId))
+                        return (
+                          <Link
+                            key={`mobile-wo-${row.id}-${woId}`}
+                            href={`/dashboard/tracking/work-orders/${woTrackingId}`}
+                            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 transition"
+                          >
+                            {woCode || `WO #${woId}`}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  ) : null}
                   <p className="mt-3 text-sm leading-5 text-slate-700">{row.detail}</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">

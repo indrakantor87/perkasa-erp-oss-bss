@@ -165,7 +165,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const [hasRackCode, hasRackBarcode, hasWorkOrderId, hasTroubleTicketId, hasRequestId, hasFromLocationId, hasToLocationId, hasTechnicianUserId, hasReferenceType, hasMovementStatus] = await Promise.all([
+    const [hasRackCode, hasRackBarcode, hasWorkOrderId, hasTroubleTicketId, hasRequestId, hasFromLocationId, hasToLocationId, hasTechnicianUserId, hasReferenceType, hasMovementStatus, hasRequestsWorkOrderId, hasRequestsInventoryItemId, hasRequestsStatus] = await Promise.all([
       hasReviewDbColumn('inventory_items', 'rack_code'),
       hasReviewDbColumn('inventory_items', 'rack_barcode'),
       hasReviewDbColumn('inventory_stock_movements', 'work_order_id'),
@@ -176,6 +176,9 @@ export async function POST(request: Request) {
       hasReviewDbColumn('inventory_stock_movements', 'technician_user_id'),
       hasReviewDbColumn('inventory_stock_movements', 'reference_type'),
       hasReviewDbColumn('inventory_stock_movements', 'movement_status'),
+      hasReviewDbColumn('inventory_item_requests', 'work_order_id'),
+      hasReviewDbColumn('inventory_item_requests', 'inventory_item_id'),
+      hasReviewDbColumn('inventory_item_requests', 'request_status'),
     ])
 
     const [item] = await runReviewDbQuery<ItemRow>(
@@ -196,6 +199,36 @@ export async function POST(request: Request) {
     if (!item) {
       return Response.json({ message: 'Item inventory tidak ditemukan di review DB.' }, { status: 404 })
     }
+
+    if (referenceType === 'WORK_ORDER' && workOrderId && hasRequestsWorkOrderId && hasRequestsInventoryItemId && hasRequestsStatus) {
+      const [activeRequestRows] = await runReviewDbQuery<{ id: number; request_code: string | null; request_status: string | null }>(
+        `
+          SELECT id, request_code, request_status
+          FROM inventory_item_requests
+          WHERE work_order_id = ?
+            AND inventory_item_id = ?
+            AND request_status IN ('REQUEST', 'ON_PROGRESS', 'PENDING')
+          LIMIT 1
+        `,
+        [workOrderId, item.id],
+      )
+      if (activeRequestRows && Number((activeRequestRows as unknown as Array<unknown>).length ?? 0) > 0) {
+        const active = (activeRequestRows as unknown as Array<{ id: number; request_code: string | null }>)[0]
+        return Response.json(
+          {
+            message:
+              `Item ${item.itemCode} sudah memiliki permintaan material (${active.request_code ?? '#' + active.id}) yang aktif untuk work order ini. ` +
+              `Material requested wajib diproses melalui WO completion / request flow agar tidak double-deducted. Gunakan panel ini hanya untuk material ad-hoc di luar permintaan.`,
+            workOrderId,
+            inventoryItemId: item.id,
+            requestId: active.id,
+            requestCode: active.request_code,
+          },
+          { status: 409 },
+        )
+      }
+    }
+
     if (movementType === 'OUT' && requiresInventoryPickupScan(session.role)) {
       if (!scannedRackBarcode) {
         return Response.json(
@@ -289,7 +322,7 @@ export async function POST(request: Request) {
     columns.push('notes', 'movement_at')
     values.push(noteText, new Date())
 
-    await runReviewDbExecute<InsertResult>(
+    const mvInsertResult = await runReviewDbExecute<InsertResult>(
       `
         INSERT INTO inventory_stock_movements (
           ${columns.join(',\n          ')}
@@ -298,17 +331,61 @@ export async function POST(request: Request) {
       `,
       values,
     )
+    const mvInsertId = Number(mvInsertResult?.insertId ?? 0) || null
 
-    await runReviewDbExecute<InsertResult>(
-      `
-        UPDATE inventory_items
-        SET
-          current_stock = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `,
-      [nextStock, item.id],
-    )
+    let stockUpdResult: InsertResult | null = null
+    if (movementType === 'OUT' || movementType === 'IN') {
+      stockUpdResult = await runReviewDbExecute<InsertResult>(
+        `
+          UPDATE inventory_items
+          SET
+            current_stock = ${movementType === 'IN' ? 'current_stock + ?' : 'current_stock - ?'},
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+            ${movementType === 'OUT' ? 'AND current_stock >= ?' : ''}
+        `,
+        movementType === 'OUT' ? [qty, item.id, qty] : [qty, item.id],
+      )
+    } else {
+      stockUpdResult = await runReviewDbExecute<InsertResult>(
+        `
+          UPDATE inventory_items
+          SET
+            current_stock = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `,
+        [nextStock, item.id],
+      )
+    }
+    const stockAffected = Number(stockUpdResult?.affectedRows ?? 0)
+    if (stockAffected <= 0) {
+      if (mvInsertId && mvInsertId > 0 && hasMovementStatus) {
+        try {
+          await runReviewDbExecute<InsertResult>(
+            `
+              UPDATE inventory_stock_movements
+              SET movement_status = 'REJECTED',
+                  notes = CONCAT(COALESCE(notes, ''), ' | [ROLLBACK] stock update failed race guard insufficient qty')
+              WHERE id = ?
+            `,
+            [mvInsertId],
+          )
+        } catch {
+        }
+      }
+      return Response.json(
+        {
+          message: movementType === 'OUT'
+            ? 'Stok tidak cukup (konkurensi / concurrent deduction). Movement dibatalkan dan tidak memotong stok.'
+            : 'Gagal mengupdate stok item inventory.',
+          itemCode: item.itemCode,
+          qty,
+          currentStock: item.currentStock,
+        },
+        { status: 409 },
+      )
+    }
 
     return Response.json({
       message: `Stock movement ${movementType} untuk ${item.itemCode} (${item.itemName}) berhasil disimpan${workOrderId ? ` pada WO #${workOrderId}` : troubleTicketId ? ` pada TT #${troubleTicketId}` : ''}.`,

@@ -1,3 +1,8 @@
+import {
+  mapLegacySlaStateToCanonical,
+  resolveCanonicalSlaState,
+  type CanonicalSlaState,
+} from '@/lib/services/sla-resolver'
 import { canPerformAction } from '@/lib/access-control'
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { domainPages } from '@/lib/mock-domains'
@@ -178,6 +183,8 @@ type ReviewDbSupportTicketRow = {
   escalationReason: string | null
   escalatedBy: string | null
   escalatedAt: string | Date | null
+  linkedWorkOrderIds: string | null
+  linkedWorkOrderCodes: string | null
 }
 
 type ReviewDbSupportIsolationRow = {
@@ -1055,10 +1062,10 @@ function getSupportTicketQueueReason(item: ReviewDbSupportTicketRow) {
   }
 
   const slaState = getSlaState(item.slaDueAt)
-  if (slaState === 'OVERDUE') {
+  if (slaState === 'BREACHED') {
     return 'SLA_OVERDUE'
   }
-  if (slaState === 'DUE_TODAY') {
+  if (slaState === 'WARNING') {
     return 'SLA_DUE_TODAY'
   }
 
@@ -1154,27 +1161,11 @@ function isPromiseToPayOverdue(params: {
   return params.actionType.trim().toUpperCase() === 'PROMISE_TO_PAY' && getFollowUpState(params.dueFollowUpAt) === 'OVERDUE'
 }
 
-function getSlaState(value: string | Date | null | undefined) {
-  if (!value) return 'UNSET'
-
-  const date = new Date(value)
-  if (!Number.isFinite(date.getTime())) return 'UNSET'
-
-  const now = new Date()
-  if (date.getTime() < now.getTime()) {
-    return 'OVERDUE'
-  }
-
-  const today = new Date(now)
-  today.setHours(0, 0, 0, 0)
-  const nextDay = new Date(today)
-  nextDay.setDate(nextDay.getDate() + 1)
-
-  if (date.getTime() >= today.getTime() && date.getTime() < nextDay.getTime()) {
-    return 'DUE_TODAY'
-  }
-
-  return 'ON_TRACK'
+function getSlaState(value: string | Date | null | undefined): CanonicalSlaState {
+  return resolveCanonicalSlaState({
+    slaDueAt: value,
+    warningCalendarDays: true,
+  })
 }
 
 function getReadableErrorMessage(error: unknown) {
@@ -1488,6 +1479,11 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
     enabled: wantTickets,
     query: async () => {
       await ticketReadEnsurePromise
+      const hasWoId = await hasReviewDbColumn('field_work_orders', 'id')
+      const hasWoTtId = hasWoId ? await hasReviewDbColumn('field_work_orders', 'trouble_ticket_id') : false
+      const hasWoNo = hasWoId ? await hasReviewDbColumn('field_work_orders', 'work_order_no') : false
+      const canJoinWo = hasWoTtId && hasWoNo && hasWoId
+
       return runReviewDbQuery<ReviewDbSupportTicketRow>(`
     SELECT
       stt.id AS ticketId,
@@ -1517,7 +1513,9 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
       escalations.escalation_level AS escalationLevel,
       escalations.escalation_reason AS escalationReason,
       escalations.escalated_by AS escalatedBy,
-      escalations.escalated_at AS escalatedAt
+      escalations.escalated_at AS escalatedAt,
+      ${canJoinWo ? 'linked_wo.ids_concat' : 'NULL'} AS linkedWorkOrderIds,
+      ${canJoinWo ? 'linked_wo.codes_concat' : 'NULL'} AS linkedWorkOrderCodes
     FROM support_trouble_tickets stt
     LEFT JOIN support_trouble_ticket_sla sla
       ON UPPER(TRIM(sla.trouble_type)) = UPPER(TRIM(stt.type))
@@ -1560,6 +1558,16 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
       ON ss.id = stt.subscription_id
     LEFT JOIN crm_customers c
       ON c.id = ss.customer_id
+    ${canJoinWo ? `LEFT JOIN (
+        SELECT
+          wo.trouble_ticket_id,
+          GROUP_CONCAT(CAST(wo.id AS CHAR) ORDER BY wo.id ASC SEPARATOR ',') AS ids_concat,
+          GROUP_CONCAT(COALESCE(wo.work_order_no, CONCAT('WO#', wo.id)) ORDER BY wo.id ASC SEPARATOR '|||') AS codes_concat
+        FROM field_work_orders wo
+        WHERE wo.trouble_ticket_id IS NOT NULL
+        GROUP BY wo.trouble_ticket_id
+      ) linked_wo
+        ON linked_wo.trouble_ticket_id = stt.id` : ''}
     WHERE stt.closed_at IS NULL
       AND COALESCE(UPPER(TRIM(stt.status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
       ${ticketMonthFilter}
@@ -1749,7 +1757,7 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
     isSupportWaitingProgressQueueReason(getSupportTicketQueueReason(item)),
   )
   const slaOpenTickets = activeTickets.filter((item) => getSlaState(item.slaDueAt) !== 'UNSET')
-  const slaOverdueTickets = activeTickets.filter((item) => getSlaState(item.slaDueAt) === 'OVERDUE')
+  const slaOverdueTickets = activeTickets.filter((item) => getSlaState(item.slaDueAt) === 'BREACHED')
   const showSlaTicketSections = lane === 'sla' || focus === 'SLA_OVERDUE' || focus === 'OVERDUE_RATE'
   const slaRateSummary = [
     { label: 'Ticket Open SLA', value: formatNumber(slaOpenTickets.length) },
@@ -1803,6 +1811,8 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
         `Queue Reason: ${queueReason}`,
         `Close Candidate: ${options.closeCandidate}`,
         `Ticket Notes: ${item.notes?.trim() || '-'}`,
+        `Linked Work Order IDs: ${item.linkedWorkOrderIds || '-'}`,
+        `Linked Work Order Codes: ${item.linkedWorkOrderCodes || '-'}`,
       ],
     }
   }
@@ -6497,4 +6507,698 @@ export async function getDomainPageData(
       }
     },
   )
+}
+
+type SalesDomainListRow = { id: string; primary: string; secondary: string; status: string; updatedAt: string }
+type SalesDomainListPageData = { isLoading: boolean; errorMessage: string | null; rows: SalesDomainListRow[] }
+
+const SALES_LIST_LIMIT = 50
+
+function fmtDate(value: unknown): string {
+  if (!value) return '-'
+  const s = String(value).trim()
+  if (!s) return '-'
+  return s
+}
+
+function joinSecondaryParts(parts: Array<string | null | undefined>): string {
+  const filtered = parts.filter((p) => typeof p === 'string' && p.length > 0)
+  return filtered.length ? filtered.join(' | ') : '-'
+}
+
+export async function getSalesDomainListPageData(
+  entityKey: string,
+  source: ReturnType<typeof getDataSourceSnapshot>,
+  _role: AppRole,
+): Promise<SalesDomainListPageData> {
+  const empty: SalesDomainListPageData = { isLoading: false, errorMessage: null, rows: [] }
+  if (!source) return empty
+  if (source.effectiveMode !== 'review-db' || source.isFallback) return empty
+
+  try {
+    const salesSchema = await getSalesReadSchema()
+
+    const [
+      hasLeadUpdatedAt,
+      hasOrderUpdatedAt,
+      hasOrderCreatedAt,
+      hasQuotationUpdatedAt,
+      hasContractUpdatedAt,
+      hasContractStart,
+      hasContractEnd,
+      hasContractCreatedAt,
+      hasSubsTerminatedAt,
+      hasSubsUpdatedAt,
+      hasSubsCreatedAt,
+      hasSurveyedAt,
+      hasSurveySiteAddress,
+      hasSurveyTechnicalNotes,
+      hasSurveyUpdatedAt,
+      hasCoverageLat,
+      hasCoverageLon,
+      hasCoverageCreatedAt,
+      hasDeliverySalesOrderId,
+      hasDeliveryCreatedAt,
+      hasDeliveryUpdatedAt,
+      hasAcceptanceSalesOrderId,
+      hasAcceptanceNotes,
+      hasAcceptanceCreatedAt,
+      hasAcceptanceUpdatedAt,
+    ] = await Promise.all([
+      hasReviewDbColumn('sales_leads', 'updated_at'),
+      hasReviewDbColumn('sales_orders', 'updated_at'),
+      hasReviewDbColumn('sales_orders', 'created_at'),
+      hasReviewDbColumn('sales_quotations', 'updated_at'),
+      hasReviewDbColumn('sales_contracts', 'updated_at'),
+      hasReviewDbColumn('sales_contracts', 'start_date'),
+      hasReviewDbColumn('sales_contracts', 'end_date'),
+      hasReviewDbColumn('sales_contracts', 'created_at'),
+      hasReviewDbColumn('service_subscriptions', 'terminated_at'),
+      hasReviewDbColumn('service_subscriptions', 'updated_at'),
+      hasReviewDbColumn('service_subscriptions', 'created_at'),
+      hasReviewDbColumn('sales_surveys', 'surveyed_at'),
+      hasReviewDbColumn('sales_surveys', 'site_address'),
+      hasReviewDbColumn('sales_surveys', 'technical_notes'),
+      hasReviewDbColumn('sales_surveys', 'updated_at'),
+      hasReviewDbColumn('sales_covered_areas', 'latitude'),
+      hasReviewDbColumn('sales_covered_areas', 'longitude'),
+      hasReviewDbColumn('sales_covered_areas', 'created_at'),
+      hasReviewDbColumn('sales_corporate_deliveries', 'sales_order_id'),
+      hasReviewDbColumn('sales_corporate_deliveries', 'created_at'),
+      hasReviewDbColumn('sales_corporate_deliveries', 'updated_at'),
+      hasReviewDbColumn('sales_corporate_acceptances', 'sales_order_id'),
+      hasReviewDbColumn('sales_corporate_acceptances', 'notes'),
+      hasReviewDbColumn('sales_corporate_acceptances', 'created_at'),
+      hasReviewDbColumn('sales_corporate_acceptances', 'updated_at'),
+    ])
+
+    switch (entityKey) {
+      case 'leads': {
+        if (!salesSchema.leadId || !salesSchema.leadCustomerName) return empty
+        type Row = {
+          leadId: number
+          customerName: string
+          leadType: string | null
+          status: string | null
+          marketingName: string | null
+          phone: string | null
+          source: string | null
+          createdAt: string | null
+          updatedAt: string | null
+          ordersCount: number
+          quotationsCount: number
+        }
+        const res = await runSafeDomainSectionQuery<Row>({
+          sectionLabel: `sales-list-leads`,
+          enabled: true,
+          query: () =>
+            runReviewDbQuery<Row>(`
+              SELECT
+                sl.id AS leadId,
+                sl.customer_name AS customerName,
+                sl.lead_type AS leadType,
+                sl.status AS status,
+                ${salesSchema.leadMarketingName ? 'sl.marketing_name' : 'NULL'} AS marketingName,
+                ${salesSchema.leadPhone ? 'sl.phone' : 'NULL'} AS phone,
+                ${salesSchema.leadSource ? 'sl.source' : 'NULL'} AS source,
+                ${salesSchema.leadCreatedAt ? 'sl.created_at' : 'NULL'} AS createdAt,
+                ${hasLeadUpdatedAt ? 'sl.updated_at' : 'NULL'} AS updatedAt,
+                (SELECT COUNT(*) FROM sales_orders so WHERE so.lead_id = sl.id) AS ordersCount,
+                (SELECT COUNT(*) FROM sales_quotations sq WHERE sq.lead_id = sl.id) AS quotationsCount
+              FROM sales_leads sl
+              ORDER BY ${hasLeadUpdatedAt ? 'sl.updated_at DESC,' : salesSchema.leadCreatedAt ? 'sl.created_at DESC,' : ''} sl.id DESC
+              LIMIT ${SALES_LIST_LIMIT}
+            `),
+        })
+        return {
+          ...empty,
+          rows: res.rows.map((r) => ({
+            id: `LEAD-${r.leadId}`,
+            primary: r.customerName,
+            secondary: joinSecondaryParts([
+              r.leadType ? `Tipe: ${r.leadType}` : null,
+              r.marketingName ? `Marketing: ${r.marketingName}` : null,
+              r.phone ? `Telp: ${r.phone}` : null,
+              r.source ? `Source: ${r.source}` : null,
+              `Order x${r.ordersCount}`,
+              `Quotation x${r.quotationsCount}`,
+            ]),
+            status: r.status || '-',
+            updatedAt: fmtDate(r.updatedAt || r.createdAt),
+          })),
+        }
+      }
+      case 'orders': {
+        if (!salesSchema.orderId || !salesSchema.orderNo) return empty
+        type Row = {
+          orderId: number
+          orderNo: string
+          status: string | null
+          orderType: string | null
+          marketingName: string | null
+          requestDate: string | null
+          scheduledInstallationAt: string | null
+          leadId: number | null
+          leadCustomerName: string
+          subscriptionId: number | null
+          subscriptionServiceNo: string | null
+          createdAt: string | null
+          updatedAt: string | null
+        }
+        const res = await runSafeDomainSectionQuery<Row>({
+          sectionLabel: `sales-list-orders`,
+          enabled: true,
+          query: () =>
+            runReviewDbQuery<Row>(`
+              SELECT
+                so.id AS orderId,
+                so.order_no AS orderNo,
+                so.status AS status,
+                ${salesSchema.orderType ? 'so.order_type' : 'NULL'} AS orderType,
+                ${salesSchema.orderMarketingName ? 'so.marketing_name' : 'NULL'} AS marketingName,
+                ${salesSchema.orderRequestDate ? 'so.request_date' : 'NULL'} AS requestDate,
+                ${salesSchema.orderScheduledInstallationAt ? 'so.scheduled_installation_at' : 'NULL'} AS scheduledInstallationAt,
+                so.lead_id AS leadId,
+                COALESCE(sl.customer_name, 'Pelanggan belum terpetakan') AS leadCustomerName,
+                ss.id AS subscriptionId,
+                ${salesSchema.subscriptionServiceNo ? 'ss.service_no' : 'NULL'} AS subscriptionServiceNo,
+                ${hasOrderCreatedAt ? 'so.created_at' : 'NULL'} AS createdAt,
+                ${hasOrderUpdatedAt ? 'so.updated_at' : 'NULL'} AS updatedAt
+              FROM sales_orders so
+              LEFT JOIN sales_leads sl ON sl.id = so.lead_id
+              LEFT JOIN service_subscriptions ss ON ss.order_id = so.id
+              ORDER BY ${hasOrderUpdatedAt ? 'so.updated_at DESC,' : hasOrderCreatedAt ? 'so.created_at DESC,' : ''} so.id DESC
+              LIMIT ${SALES_LIST_LIMIT}
+            `),
+        })
+        return {
+          ...empty,
+          rows: res.rows.map((r) => ({
+            id: `ORD-${r.orderId}`,
+            primary: r.orderNo,
+            secondary: joinSecondaryParts([
+              r.leadCustomerName || null,
+              r.orderType ? `Jenis: ${r.orderType}` : null,
+              r.marketingName ? `Marketing: ${r.marketingName}` : null,
+              r.requestDate ? `Tgl: ${r.requestDate}` : null,
+              r.scheduledInstallationAt ? `Jadwal: ${r.scheduledInstallationAt}` : null,
+              r.leadId ? `Lead #${r.leadId}` : null,
+              r.subscriptionServiceNo ? `SVC: ${r.subscriptionServiceNo}` : r.subscriptionId ? `Subs #${r.subscriptionId}` : null,
+            ]),
+            status: r.status || '-',
+            updatedAt: fmtDate(r.updatedAt || r.createdAt),
+          })),
+        }
+      }
+      case 'quotations': {
+        if (!salesSchema.quotationId || !salesSchema.quotationNo) return empty
+        type Row = {
+          quotationId: number
+          quotationNo: string
+          status: string | null
+          monthlyPrice: number | null
+          installationFee: number | null
+          contractMonths: number | null
+          createdAt: string | null
+          updatedAt: string | null
+          leadId: number | null
+          customerName: string
+          contractId: number | null
+          contractNo: string | null
+        }
+        const res = await runSafeDomainSectionQuery<Row>({
+          sectionLabel: `sales-list-quotations`,
+          enabled: true,
+          query: () =>
+            runReviewDbQuery<Row>(`
+              SELECT
+                q.id AS quotationId,
+                q.quotation_no AS quotationNo,
+                q.status AS status,
+                COALESCE(q.monthly_price, NULL) AS monthlyPrice,
+                COALESCE(q.installation_fee, NULL) AS installationFee,
+                COALESCE(q.contract_months, NULL) AS contractMonths,
+                ${salesSchema.quotationCreatedAt ? 'q.created_at' : 'NULL'} AS createdAt,
+                ${hasQuotationUpdatedAt ? 'q.updated_at' : 'NULL'} AS updatedAt,
+                q.lead_id AS leadId,
+                COALESCE(sl.customer_name, 'Pelanggan belum terpetakan') AS customerName,
+                c.id AS contractId,
+                ${salesSchema.contractNo ? 'c.contract_no' : 'NULL'} AS contractNo
+              FROM sales_quotations q
+              LEFT JOIN sales_leads sl ON sl.id = q.lead_id
+              LEFT JOIN sales_contracts c ON c.quotation_id = q.id
+              ORDER BY ${hasQuotationUpdatedAt ? 'q.updated_at DESC,' : salesSchema.quotationCreatedAt ? 'q.created_at DESC,' : ''} q.id DESC
+              LIMIT ${SALES_LIST_LIMIT}
+            `),
+        })
+        return {
+          ...empty,
+          rows: res.rows.map((r) => ({
+            id: `QTN-${r.quotationId}`,
+            primary: r.quotationNo,
+            secondary: joinSecondaryParts([
+              r.customerName || null,
+              typeof r.monthlyPrice === 'number' ? `Bl: ${formatCurrency(r.monthlyPrice)}` : null,
+              typeof r.installationFee === 'number' ? `Instalasi: ${formatCurrency(r.installationFee)}` : null,
+              typeof r.contractMonths === 'number' ? `Durasi: ${r.contractMonths} bln` : null,
+              r.leadId ? `Lead #${r.leadId}` : null,
+              r.contractNo ? `Kontrak: ${r.contractNo}` : r.contractId ? `Kontrak #${r.contractId}` : null,
+            ]),
+            status: r.status || '-',
+            updatedAt: fmtDate(r.updatedAt || r.createdAt),
+          })),
+        }
+      }
+      case 'contracts': {
+        if (!salesSchema.contractId || !salesSchema.contractNo) return empty
+        type Row = {
+          contractId: number
+          contractNo: string
+          status: string | null
+          signedAt: string | null
+          startDate: string | null
+          endDate: string | null
+          createdAt: string | null
+          updatedAt: string | null
+          quotationId: number | null
+          quotationNo: string | null
+          leadId: number | null
+          customerName: string
+          deliveriesCount: number
+          acceptanceId: number | null
+          acceptanceNo: string | null
+          acceptanceStatus: string | null
+        }
+        const res = await runSafeDomainSectionQuery<Row>({
+          sectionLabel: `sales-list-contracts`,
+          enabled: true,
+          query: () =>
+            runReviewDbQuery<Row>(`
+              SELECT
+                c.id AS contractId,
+                c.contract_no AS contractNo,
+                c.status AS status,
+                ${salesSchema.contractSignedAt ? 'c.signed_at' : 'NULL'} AS signedAt,
+                ${hasContractStart ? 'c.start_date' : 'NULL'} AS startDate,
+                ${hasContractEnd ? 'c.end_date' : 'NULL'} AS endDate,
+                ${hasContractCreatedAt ? 'c.created_at' : 'NULL'} AS createdAt,
+                ${hasContractUpdatedAt ? 'c.updated_at' : 'NULL'} AS updatedAt,
+                c.quotation_id AS quotationId,
+                ${salesSchema.quotationNo ? 'q.quotation_no' : 'NULL'} AS quotationNo,
+                c.lead_id AS leadId,
+                COALESCE(sl.customer_name, 'Pelanggan belum terpetakan') AS customerName,
+                (SELECT COUNT(*) FROM sales_corporate_deliveries d WHERE d.contract_id = c.id) AS deliveriesCount,
+                a.id AS acceptanceId,
+                ${salesSchema.corporateAcceptanceNo ? 'a.acceptance_no' : 'NULL'} AS acceptanceNo,
+                ${salesSchema.corporateAcceptanceStatus ? 'a.status' : 'NULL'} AS acceptanceStatus
+              FROM sales_contracts c
+              LEFT JOIN sales_quotations q ON q.id = c.quotation_id
+              LEFT JOIN sales_leads sl ON sl.id = c.lead_id
+              LEFT JOIN sales_corporate_acceptances a ON a.contract_id = c.id
+              ORDER BY ${hasContractUpdatedAt ? 'c.updated_at DESC,' : salesSchema.contractSignedAt ? 'c.signed_at DESC,' : ''} c.id DESC
+              LIMIT ${SALES_LIST_LIMIT}
+            `),
+        })
+        return {
+          ...empty,
+          rows: res.rows.map((r) => ({
+            id: `CTR-${r.contractId}`,
+            primary: r.contractNo,
+            secondary: joinSecondaryParts([
+              r.customerName || null,
+              r.quotationNo ? `QTN: ${r.quotationNo}` : r.quotationId ? `QTN #${r.quotationId}` : null,
+              r.leadId ? `Lead #${r.leadId}` : null,
+              r.signedAt ? `Ditetapkan: ${r.signedAt}` : null,
+              r.startDate ? `Mulai: ${r.startDate}` : null,
+              r.endDate ? `Akhir: ${r.endDate}` : null,
+              `Delivery x${r.deliveriesCount}`,
+              r.acceptanceNo ? `Acceptance: ${r.acceptanceNo} (${r.acceptanceStatus || '-'})` : r.acceptanceStatus ? `Acceptance: ${r.acceptanceStatus}` : null,
+            ]),
+            status: r.status || '-',
+            updatedAt: fmtDate(r.updatedAt || r.signedAt || r.createdAt),
+          })),
+        }
+      }
+      case 'subscriptions': {
+        if (!salesSchema.subscriptionId || !salesSchema.subscriptionServiceNo) return empty
+        type Row = {
+          subscriptionId: number
+          serviceNo: string
+          status: string | null
+          monthlyPrice: number | null
+          activatedAt: string | null
+          terminatedAt: string | null
+          createdAt: string | null
+          updatedAt: string | null
+          customerId: number | null
+          customerFullName: string | null
+          orderId: number | null
+          orderNo: string | null
+          packageId: number | null
+          packageName: string | null
+          packageSpeedLabel: string | null
+        }
+        const res = await runSafeDomainSectionQuery<Row>({
+          sectionLabel: `sales-list-subscriptions`,
+          enabled: true,
+          query: () =>
+            runReviewDbQuery<Row>(`
+              SELECT
+                ss.id AS subscriptionId,
+                ss.service_no AS serviceNo,
+                ss.status AS status,
+                ${salesSchema.subscriptionMonthlyPrice ? 'ss.monthly_price' : 'NULL'} AS monthlyPrice,
+                ${salesSchema.subscriptionActivatedAt ? 'ss.activated_at' : 'NULL'} AS activatedAt,
+                ${hasSubsTerminatedAt ? 'ss.terminated_at' : 'NULL'} AS terminatedAt,
+                ${hasSubsCreatedAt ? 'ss.created_at' : 'NULL'} AS createdAt,
+                ${hasSubsUpdatedAt ? 'ss.updated_at' : 'NULL'} AS updatedAt,
+                ss.customer_id AS customerId,
+                cc.customer_full_name AS customerFullName,
+                ss.order_id AS orderId,
+                so.order_no AS orderNo,
+                ss.package_id AS packageId,
+                sp.package_name AS packageName,
+                sp.package_speed_label AS packageSpeedLabel
+              FROM service_subscriptions ss
+              LEFT JOIN crm_customers cc ON cc.id = ss.customer_id
+              LEFT JOIN sales_orders so ON so.id = ss.order_id
+              LEFT JOIN sales_packages sp ON sp.id = ss.package_id
+              ORDER BY ${hasSubsUpdatedAt ? 'ss.updated_at DESC,' : salesSchema.subscriptionActivatedAt ? 'ss.activated_at DESC,' : hasSubsCreatedAt ? 'ss.created_at DESC,' : ''} ss.id DESC
+              LIMIT ${SALES_LIST_LIMIT}
+            `),
+        })
+        return {
+          ...empty,
+          rows: res.rows.map((r) => ({
+            id: `SUBS-${r.subscriptionId}`,
+            primary: r.serviceNo || `SUB #${r.subscriptionId}`,
+            secondary: joinSecondaryParts([
+              r.customerFullName || (r.customerId ? `Pelanggan #${r.customerId}` : null),
+              r.packageName || r.packageId ? `Paket: ${r.packageName || `#${r.packageId}`}${r.packageSpeedLabel ? ` (${r.packageSpeedLabel})` : ''}` : null,
+              typeof r.monthlyPrice === 'number' ? `Bl: ${formatCurrency(r.monthlyPrice)}` : null,
+              r.orderNo ? `Order: ${r.orderNo}` : r.orderId ? `Order #${r.orderId}` : null,
+              r.activatedAt ? `Aktif: ${r.activatedAt}` : null,
+              r.terminatedAt ? `Nonaktif: ${r.terminatedAt}` : null,
+            ]),
+            status: r.status || '-',
+            updatedAt: fmtDate(r.updatedAt || r.activatedAt || r.createdAt),
+          })),
+        }
+      }
+      case 'surveys': {
+        if (!salesSchema.surveyId || !salesSchema.surveyNo) return empty
+        type Row = {
+          surveyId: number
+          surveyNo: string
+          surveyStatus: string | null
+          feasibilityStatus: string | null
+          scheduledAt: string | null
+          surveyedAt: string | null
+          createdAt: string | null
+          updatedAt: string | null
+          leadId: number | null
+          customerName: string
+          coveredAreaId: number | null
+          coveredAreaCode: string | null
+          siteAddress: string | null
+          technicalNotes: string | null
+        }
+        const res = await runSafeDomainSectionQuery<Row>({
+          sectionLabel: `sales-list-surveys`,
+          enabled: true,
+          query: () =>
+            runReviewDbQuery<Row>(`
+              SELECT
+                ss.id AS surveyId,
+                ss.survey_no AS surveyNo,
+                ss.survey_status AS surveyStatus,
+                ss.feasibility_status AS feasibilityStatus,
+                ss.scheduled_at AS scheduledAt,
+                ${hasSurveyedAt ? 'ss.surveyed_at' : 'NULL'} AS surveyedAt,
+                ss.created_at AS createdAt,
+                ${hasSurveyUpdatedAt ? 'ss.updated_at' : 'NULL'} AS updatedAt,
+                ss.lead_id AS leadId,
+                COALESCE(sl.customer_name, 'Pelanggan belum terpetakan') AS customerName,
+                ss.covered_area_id AS coveredAreaId,
+                ca.area_code AS coveredAreaCode,
+                ${hasSurveySiteAddress ? 'ss.site_address' : 'NULL'} AS siteAddress,
+                ${hasSurveyTechnicalNotes ? 'ss.technical_notes' : 'NULL'} AS technicalNotes
+              FROM sales_surveys ss
+              LEFT JOIN sales_leads sl ON sl.id = ss.lead_id
+              LEFT JOIN sales_covered_areas ca ON ca.id = ss.covered_area_id
+              ORDER BY ${hasSurveyUpdatedAt ? 'ss.updated_at DESC,' : salesSchema.surveyScheduledAt ? 'ss.scheduled_at DESC,' : salesSchema.surveyCreatedAt ? 'ss.created_at DESC,' : ''} ss.id DESC
+              LIMIT ${SALES_LIST_LIMIT}
+            `),
+        })
+        return {
+          ...empty,
+          rows: res.rows.map((r) => ({
+            id: `SVY-${r.surveyId}`,
+            primary: r.surveyNo || `SVY #${r.surveyId}`,
+            secondary: joinSecondaryParts([
+              r.customerName || null,
+              r.leadId ? `Lead #${r.leadId}` : null,
+              r.coveredAreaCode ? `Coverage: ${r.coveredAreaCode}` : r.coveredAreaId ? `Coverage #${r.coveredAreaId}` : null,
+              r.scheduledAt ? `Jadwal: ${r.scheduledAt}` : null,
+              r.surveyedAt ? `Survey: ${r.surveyedAt}` : null,
+              r.feasibilityStatus ? `Kelayakan: ${r.feasibilityStatus}` : null,
+              r.siteAddress ? `Lokasi: ${r.siteAddress}` : null,
+              r.technicalNotes ? `Catatan teknis: ${String(r.technicalNotes).slice(0, 60)}` : null,
+            ]),
+            status: r.surveyStatus || '-',
+            updatedAt: fmtDate(r.updatedAt || r.surveyedAt || r.scheduledAt || r.createdAt),
+          })),
+        }
+      }
+      case 'covered-areas': {
+        if (!salesSchema.coverageId || !salesSchema.coverageAreaCode) return empty
+        type Row = {
+          coverageId: number
+          areaCode: string
+          areaName: string
+          coverageStatus: string | null
+          village: string | null
+          district: string | null
+          city: string | null
+          province: string | null
+          latitude: string | null
+          longitude: string | null
+          notes: string | null
+          createdAt: string | null
+          updatedAt: string | null
+          leadId: number | null
+          leadCustomerName: string | null
+        }
+        const res = await runSafeDomainSectionQuery<Row>({
+          sectionLabel: `sales-list-covered-areas`,
+          enabled: true,
+          query: () =>
+            runReviewDbQuery<Row>(`
+              SELECT
+                ca.id AS coverageId,
+                ca.area_code AS areaCode,
+                ca.area_name AS areaName,
+                ca.coverage_status AS coverageStatus,
+                ${salesSchema.coverageVillage ? 'ca.village' : 'NULL'} AS village,
+                ${salesSchema.coverageDistrict ? 'ca.district' : 'NULL'} AS district,
+                ${salesSchema.coverageCity ? 'ca.city' : 'NULL'} AS city,
+                ${salesSchema.coverageProvince ? 'ca.province' : 'NULL'} AS province,
+                ${hasCoverageLat ? 'ca.latitude' : 'NULL'} AS latitude,
+                ${hasCoverageLon ? 'ca.longitude' : 'NULL'} AS longitude,
+                ${salesSchema.coverageNotes ? 'ca.notes' : 'NULL'} AS notes,
+                ${hasCoverageCreatedAt ? 'ca.created_at' : 'NULL'} AS createdAt,
+                ${salesSchema.coverageUpdatedAt ? 'ca.updated_at' : 'NULL'} AS updatedAt,
+                sl.id AS leadId,
+                sl.customer_name AS leadCustomerName
+              FROM sales_covered_areas ca
+              LEFT JOIN sales_leads sl ON (sl.id = (SELECT MIN(sl2.id) FROM sales_leads sl2 WHERE sl2.address LIKE CONCAT('%', ca.area_name, '%') LIMIT 1))
+              ORDER BY ${salesSchema.coverageUpdatedAt ? 'ca.updated_at DESC,' : hasCoverageCreatedAt ? 'ca.created_at DESC,' : ''} ca.id DESC
+              LIMIT ${SALES_LIST_LIMIT}
+            `),
+        })
+        return {
+          ...empty,
+          rows: res.rows.map((r) => ({
+            id: `COV-${r.coverageId}`,
+            primary: r.areaCode || `COV #${r.coverageId}`,
+            secondary: joinSecondaryParts([
+              r.areaName || null,
+              [r.village, r.district, r.city, r.province].filter(Boolean).join(', ') || null,
+              r.latitude && r.longitude ? `Lat: ${r.latitude}, Lon: ${r.longitude}` : null,
+              r.leadCustomerName ? `Lead: ${r.leadCustomerName}` : r.leadId ? `Lead #${r.leadId}` : null,
+              r.notes ? `Catatan: ${String(r.notes).slice(0, 60)}` : null,
+            ]),
+            status: r.coverageStatus || '-',
+            updatedAt: fmtDate(r.updatedAt || r.createdAt),
+          })),
+        }
+      }
+      case 'corporate-deliveries': {
+        if (!salesSchema.corporateDeliveryId || !salesSchema.corporateDeliveryMilestoneCode) return empty
+        type Row = {
+          deliveryId: number
+          milestoneCode: string
+          milestoneName: string
+          status: string | null
+          ownerName: string | null
+          plannedAt: string | null
+          completedAt: string | null
+          createdAt: string | null
+          updatedAt: string | null
+          contractId: number | null
+          contractNo: string | null
+          salesOrderId: number | null
+          salesOrderNo: string | null
+          leadId: number | null
+          customerName: string
+          linkedAcceptancesCount: number
+        }
+        const linkedAcceptancesCountClause = hasDeliverySalesOrderId && hasAcceptanceSalesOrderId
+          ? `AND (a.sales_order_id = d.sales_order_id OR a.sales_order_id IS NULL OR d.sales_order_id IS NULL)`
+          : ''
+        const orderJoinClause = hasDeliverySalesOrderId ? 'so.id = d.sales_order_id' : 'so.id IS NULL AND 1 = 0'
+        const orderByPieces: string[] = []
+        if (hasDeliveryUpdatedAt) orderByPieces.push('d.updated_at DESC')
+        else if (salesSchema.corporateDeliveryCompletedAt && salesSchema.corporateDeliveryPlannedAt) orderByPieces.push('COALESCE(d.completed_at, d.planned_at) DESC')
+        else if (salesSchema.corporateDeliveryCompletedAt) orderByPieces.push('d.completed_at DESC')
+        else if (salesSchema.corporateDeliveryPlannedAt) orderByPieces.push('d.planned_at DESC')
+        orderByPieces.push('d.id DESC')
+        const res = await runSafeDomainSectionQuery<Row>({
+          sectionLabel: `sales-list-corporate-deliveries`,
+          enabled: true,
+          query: () =>
+            runReviewDbQuery<Row>(`
+              SELECT
+                d.id AS deliveryId,
+                d.milestone_code AS milestoneCode,
+                d.milestone_name AS milestoneName,
+                d.status AS status,
+                ${salesSchema.corporateDeliveryOwnerName ? 'd.owner_name' : 'NULL'} AS ownerName,
+                ${salesSchema.corporateDeliveryPlannedAt ? 'd.planned_at' : 'NULL'} AS plannedAt,
+                ${salesSchema.corporateDeliveryCompletedAt ? 'd.completed_at' : 'NULL'} AS completedAt,
+                ${hasDeliveryCreatedAt ? 'd.created_at' : 'NULL'} AS createdAt,
+                ${hasDeliveryUpdatedAt ? 'd.updated_at' : 'NULL'} AS updatedAt,
+                d.contract_id AS contractId,
+                ${salesSchema.contractNo ? 'c.contract_no' : 'NULL'} AS contractNo,
+                ${hasDeliverySalesOrderId ? 'd.sales_order_id' : 'NULL'} AS salesOrderId,
+                so.order_no AS salesOrderNo,
+                c.lead_id AS leadId,
+                COALESCE(sl.customer_name, 'Pelanggan belum terpetakan') AS customerName,
+                (SELECT COUNT(*) FROM sales_corporate_acceptances a WHERE a.contract_id = d.contract_id ${linkedAcceptancesCountClause}) AS linkedAcceptancesCount
+              FROM sales_corporate_deliveries d
+              LEFT JOIN sales_contracts c ON c.id = d.contract_id
+              LEFT JOIN sales_orders so ON ${orderJoinClause}
+              LEFT JOIN sales_leads sl ON sl.id = c.lead_id
+              ORDER BY ${orderByPieces.join(', ')}
+              LIMIT ${SALES_LIST_LIMIT}
+            `),
+        })
+        return {
+          ...empty,
+          rows: res.rows.map((r) => ({
+            id: `CDL-${r.deliveryId}`,
+            primary: `${r.milestoneCode} — ${r.milestoneName}`,
+            secondary: joinSecondaryParts([
+              r.customerName || null,
+              r.contractNo ? `Kontrak: ${r.contractNo}` : r.contractId ? `Kontrak #${r.contractId}` : null,
+              r.salesOrderNo ? `Order: ${r.salesOrderNo}` : r.salesOrderId ? `Order #${r.salesOrderId}` : null,
+              r.leadId ? `Lead #${r.leadId}` : null,
+              r.ownerName ? `PIC: ${r.ownerName}` : null,
+              r.plannedAt ? `Rencana: ${r.plannedAt}` : null,
+              r.completedAt ? `Selesai: ${r.completedAt}` : null,
+              `Acceptance x${r.linkedAcceptancesCount}`,
+            ]),
+            status: r.status || '-',
+            updatedAt: fmtDate(r.updatedAt || r.completedAt || r.plannedAt || r.createdAt),
+          })),
+        }
+      }
+      case 'corporate-acceptances': {
+        if (!salesSchema.corporateAcceptanceId || !salesSchema.corporateAcceptanceNo) return empty
+        type Row = {
+          acceptanceId: number
+          acceptanceNo: string
+          status: string | null
+          testedAt: string | null
+          acceptedAt: string | null
+          notes: string | null
+          createdAt: string | null
+          updatedAt: string | null
+          contractId: number | null
+          contractNo: string | null
+          salesOrderId: number | null
+          salesOrderNo: string | null
+          leadId: number | null
+          customerName: string
+          linkedDeliveriesCount: number
+        }
+        const linkedDeliveriesCountClause = hasAcceptanceSalesOrderId && hasDeliverySalesOrderId
+          ? `AND (d.sales_order_id = a.sales_order_id OR d.sales_order_id IS NULL OR a.sales_order_id IS NULL)`
+          : ''
+        const orderJoinClause = hasAcceptanceSalesOrderId ? 'so.id = a.sales_order_id' : 'so.id IS NULL AND 1 = 0'
+        const orderByPieces: string[] = []
+        if (hasAcceptanceUpdatedAt) orderByPieces.push('a.updated_at DESC')
+        else if (salesSchema.corporateAcceptanceAcceptedAt && salesSchema.corporateAcceptanceTestedAt) orderByPieces.push('COALESCE(a.accepted_at, a.tested_at) DESC')
+        else if (salesSchema.corporateAcceptanceAcceptedAt) orderByPieces.push('a.accepted_at DESC')
+        else if (salesSchema.corporateAcceptanceTestedAt) orderByPieces.push('a.tested_at DESC')
+        orderByPieces.push('a.id DESC')
+        const res = await runSafeDomainSectionQuery<Row>({
+          sectionLabel: `sales-list-corporate-acceptances`,
+          enabled: true,
+          query: () =>
+            runReviewDbQuery<Row>(`
+              SELECT
+                a.id AS acceptanceId,
+                a.acceptance_no AS acceptanceNo,
+                a.status AS status,
+                ${salesSchema.corporateAcceptanceTestedAt ? 'a.tested_at' : 'NULL'} AS testedAt,
+                ${salesSchema.corporateAcceptanceAcceptedAt ? 'a.accepted_at' : 'NULL'} AS acceptedAt,
+                ${hasAcceptanceNotes ? 'a.notes' : 'NULL'} AS notes,
+                ${hasAcceptanceCreatedAt ? 'a.created_at' : 'NULL'} AS createdAt,
+                ${hasAcceptanceUpdatedAt ? 'a.updated_at' : 'NULL'} AS updatedAt,
+                a.contract_id AS contractId,
+                ${salesSchema.contractNo ? 'c.contract_no' : 'NULL'} AS contractNo,
+                ${hasAcceptanceSalesOrderId ? 'a.sales_order_id' : 'NULL'} AS salesOrderId,
+                so.order_no AS salesOrderNo,
+                c.lead_id AS leadId,
+                COALESCE(sl.customer_name, 'Pelanggan belum terpetakan') AS customerName,
+                (SELECT COUNT(*) FROM sales_corporate_deliveries d WHERE d.contract_id = a.contract_id ${linkedDeliveriesCountClause}) AS linkedDeliveriesCount
+              FROM sales_corporate_acceptances a
+              LEFT JOIN sales_contracts c ON c.id = a.contract_id
+              LEFT JOIN sales_orders so ON ${orderJoinClause}
+              LEFT JOIN sales_leads sl ON sl.id = c.lead_id
+              ORDER BY ${orderByPieces.join(', ')}
+              LIMIT ${SALES_LIST_LIMIT}
+            `),
+        })
+        return {
+          ...empty,
+          rows: res.rows.map((r) => ({
+            id: `UAT-${r.acceptanceId}`,
+            primary: r.acceptanceNo || `UAT #${r.acceptanceId}`,
+            secondary: joinSecondaryParts([
+              r.customerName || null,
+              r.contractNo ? `Kontrak: ${r.contractNo}` : r.contractId ? `Kontrak #${r.contractId}` : null,
+              r.salesOrderNo ? `Order: ${r.salesOrderNo}` : r.salesOrderId ? `Order #${r.salesOrderId}` : null,
+              r.leadId ? `Lead #${r.leadId}` : null,
+              r.testedAt ? `Diuji: ${r.testedAt}` : null,
+              r.acceptedAt ? `Diterima: ${r.acceptedAt}` : null,
+              `Delivery x${r.linkedDeliveriesCount}`,
+              r.notes ? `Catatan: ${String(r.notes).slice(0, 60)}` : null,
+            ]),
+            status: r.status || '-',
+            updatedAt: fmtDate(r.updatedAt || r.acceptedAt || r.testedAt || r.createdAt),
+          })),
+        }
+      }
+      default:
+        return empty
+    }
+  } catch (error) {
+    return {
+      isLoading: false,
+      errorMessage: getReviewDbErrorDetail(error),
+      rows: [],
+    }
+  }
 }

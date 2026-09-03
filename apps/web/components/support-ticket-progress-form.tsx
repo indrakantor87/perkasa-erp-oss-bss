@@ -12,7 +12,7 @@ type SupportTicketProgressFormProps = {
   initialTicketCode?: string
 }
 
-const statusOptions = ['OPEN', 'ON_PROGRESS', 'FOLLOW_UP'] as const
+const statusOptions = ['OPEN', 'ON_PROGRESS', 'FOLLOW_UP', 'PENDING'] as const
 
 function parseTicketSuggestion(value: string) {
   const parts = value.split('|').map((item) => item.trim())

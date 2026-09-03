@@ -478,6 +478,115 @@ export async function getWorkOrderTrackingList(query: WorkOrderTrackingQuery, op
   }
 }
 
+export type FieldTechWorkOrderCounters = {
+  assigned: number
+  accepted: number
+  onProgress: number
+  completed: number
+  total: number
+}
+
+export async function getFieldTechWorkOrderCounters(options?: { session?: AppSession }): Promise<{
+  source: DataSourceSnapshot
+  counters: FieldTechWorkOrderCounters
+  error: string | null
+}> {
+  const source = getDataSourceSnapshot()
+  const empty: FieldTechWorkOrderCounters = { assigned: 0, accepted: 0, onProgress: 0, completed: 0, total: 0 }
+  const session = options?.session
+  if (!session?.userId) {
+    return { source, counters: empty, error: null }
+  }
+  const ownership = buildFieldTechWorkOrderOwnershipWhere(session, 'wo')
+  const sessionUserId = Number(session.userId ?? 0)
+  if (source.effectiveMode !== 'review-db' || source.isFallback) {
+    const rows = mockTrackingWorkOrders
+    const activeAssignments = mockTrackingWorkOrderAssignments.filter(
+      (row) =>
+        Number(row.assignedUserId) === sessionUserId &&
+        row.releasedAt == null &&
+        ['ASSIGNED', 'ACCEPTED'].includes(String(row.assignmentStatus ?? '').trim().toUpperCase()),
+    )
+    const woIdsWithActiveAssignment = new Set(activeAssignments.map((row) => Number(row.workOrderId)))
+    const assignedRows = rows.filter((row) => {
+      const statusUp = String(row.status ?? '').toUpperCase()
+      const isOwner = ownership?.enforced
+        ? (ownership.values[0] != null && Number(row.picUserId) === Number(ownership.values[0])) ||
+          woIdsWithActiveAssignment.has(Number(row.id))
+        : Number(row.picUserId ?? 0) === sessionUserId || woIdsWithActiveAssignment.has(Number(row.id))
+      if (!isOwner) return false
+      return true
+    })
+    const counters: FieldTechWorkOrderCounters = { assigned: 0, accepted: 0, onProgress: 0, completed: 0, total: assignedRows.length }
+    for (const row of assignedRows) {
+      const s = String(row.status ?? '').trim().toUpperCase()
+      if (s === 'ASSIGNED') counters.assigned += 1
+      else if (s === 'ACCEPTED') counters.accepted += 1
+      else if (s === 'ON_PROGRESS' || s === 'IN_PROGRESS' || s.startsWith('ON_')) counters.onProgress += 1
+      else if (s === 'COMPLETED' || s === 'CLOSED') counters.completed += 1
+    }
+    return { source, counters, error: null }
+  }
+  try {
+    const [hasStatus, hasTtId, hasPicUserId, hasAssignment, hasAssignmentStatus, hasReleasedAt] = await Promise.all([
+      hasReviewDbColumn('service_work_orders', 'status'),
+      hasReviewDbColumn('service_work_orders', 'trouble_ticket_id'),
+      hasReviewDbColumn('service_work_orders', 'current_pic_user_id'),
+      hasReviewDbColumn('service_work_order_assignments', 'work_order_id'),
+      hasReviewDbColumn('service_work_order_assignments', 'assignment_status'),
+      hasReviewDbColumn('service_work_order_assignments', 'released_at'),
+    ])
+    if (!hasStatus) {
+      return { source, counters: empty, error: null }
+    }
+    let ownerWhere = ''
+    const ownerValues: unknown[] = []
+    if (ownership?.enforced && ownership.whereFragment) {
+      ownerWhere = `WHERE ${ownership.whereFragment.replace(/\bwo\./g, 'x.')}`
+      ownerValues.push(...ownership.values)
+    } else if (hasPicUserId) {
+      ownerWhere = `WHERE (x.current_pic_user_id = ? OR EXISTS (SELECT 1 FROM service_work_order_assignments ga
+        WHERE ga.work_order_id = x.id AND ga.assigned_user_id = ?
+        ${hasAssignmentStatus ? "AND UPPER(COALESCE(ga.assignment_status,'')) IN ('ASSIGNED','ACCEPTED')" : ''}
+        ${hasReleasedAt ? ' AND ga.released_at IS NULL' : ''}))`
+      ownerValues.push(sessionUserId, sessionUserId)
+    } else {
+      ownerWhere = `WHERE EXISTS (SELECT 1 FROM service_work_order_assignments ga
+        WHERE ga.work_order_id = x.id AND ga.assigned_user_id = ?
+        ${hasAssignmentStatus ? "AND UPPER(COALESCE(ga.assignment_status,'')) IN ('ASSIGNED','ACCEPTED')" : ''}
+        ${hasReleasedAt ? ' AND ga.released_at IS NULL' : ''})`
+      ownerValues.push(sessionUserId)
+    }
+    void hasTtId
+    const rows = await runReviewDbQuery<{ s: string | null; n: number }>(
+      `
+        SELECT UPPER(TRIM(COALESCE(x.status,''))) AS s, COUNT(*) AS n
+        FROM service_work_orders x
+        ${ownerWhere}
+        GROUP BY UPPER(TRIM(COALESCE(x.status,'')))
+      `,
+      ownerValues,
+    )
+    const counters: FieldTechWorkOrderCounters = { assigned: 0, accepted: 0, onProgress: 0, completed: 0, total: 0 }
+    for (const row of rows) {
+      const n = Number(row.n ?? 0)
+      counters.total += n
+      const s = String(row.s ?? '').trim().toUpperCase()
+      if (s === 'ASSIGNED') counters.assigned += n
+      else if (s === 'ACCEPTED') counters.accepted += n
+      else if (s === 'ON_PROGRESS' || s === 'IN_PROGRESS' || s.startsWith('ON_')) counters.onProgress += n
+      else if (s === 'COMPLETED' || s === 'CLOSED') counters.completed += n
+    }
+    return { source, counters, error: null }
+  } catch (error) {
+    return {
+      source: getFallbackDataSource(source, error),
+      counters: empty,
+      error: getReviewDbErrorDetail(error),
+    }
+  }
+}
+
 export async function getWorkOrderTrackingDetail(workOrderId: number, options?: { session?: AppSession }) {
   const source = getDataSourceSnapshot()
   const session = options?.session

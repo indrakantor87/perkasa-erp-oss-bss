@@ -10,6 +10,7 @@ import { CurrentHandlerCard } from '@/components/current-handler-card'
 import { AssignmentHistoryTable } from '@/components/assignment-history-table'
 import { PageHeader } from '@/components/page-header'
 import { WorkOrderMaterialUsagePanel } from '@/components/work-order-material-usage-panel'
+import { WorkOrderLifecycleActionPanel } from '@/components/work-order-lifecycle-action-panel'
 import { StatusBadge, type StatusTone } from '@/components/ui-status-badge'
 import { canPerformAction } from '@/lib/access-control'
 import { canAccessPath } from '@/lib/access-control-server'
@@ -477,6 +478,66 @@ export default async function WorkOrderTrackingDetailPage({
     ? [wo.jobCategory ?? wo.workType, wo.priority ?? ''].filter(Boolean).join(' • ')
     : 'Memuat data work order...'
 
+  const roleCodeUpWO = String(session.role ?? '').trim().toUpperCase()
+  const isWOFullAccess =
+    roleCodeUpWO === 'OWNER' ||
+    roleCodeUpWO === 'SUPER_ADMIN' ||
+    roleCodeUpWO === 'ADMIN' ||
+    roleCodeUpWO === 'NOC_OPERATOR' ||
+    roleCodeUpWO === 'TT_OPERATOR' ||
+    roleCodeUpWO === 'SALES_OPERATOR' ||
+    roleCodeUpWO === 'SALES_SUPERVISOR'
+  const canCreateDailyActivity =
+    (() => {
+      const s = String(wo?.status ?? '').trim().toUpperCase()
+      if (s === 'CLOSED' || s === 'COMPLETED' || s === 'CANCELLED' || s === 'VOID') return false
+      return isWOFullAccess ||
+        canPerformAction(session.role, 'sales', 'create') ||
+        canPerformAction(session.role, 'support', 'update')
+    })()
+  const canCreateInventoryRequestWO =
+    (() => {
+      const s = String(wo?.status ?? '').trim().toUpperCase()
+      if (s === 'CLOSED' || s === 'COMPLETED' || s === 'CANCELLED' || s === 'VOID') return false
+      return isWOFullAccess ||
+        canPerformAction(session.role, 'inventory', 'create') ||
+        canPerformAction(session.role, 'sales', 'update')
+    })()
+  const canCreateStockMovementWO =
+    (() => {
+      const s = String(wo?.status ?? '').trim().toUpperCase()
+      if (s === 'CLOSED' || s === 'COMPLETED' || s === 'CANCELLED' || s === 'VOID') return false
+      return isWOFullAccess ||
+        canPerformAction(session.role, 'inventory', 'update') ||
+        canPerformAction(session.role, 'inventory', 'manage')
+    })()
+
+  const woStatusUp = String(wo?.status ?? 'OPEN').trim().toUpperCase()
+  const isTerminalWO = Boolean(woStatusUp === 'CLOSED' || woStatusUp === 'COMPLETED' || woStatusUp === 'CANCELLED' || woStatusUp === 'VOID')
+  const canTransitionScheduleWO = Boolean(
+    !isTerminalWO &&
+    (isWOFullAccess || canPerformAction(session.role, 'support', 'update') || canPerformAction(session.role, 'sales', 'update')) &&
+    (woStatusUp === 'OPEN'),
+  )
+  const canTransitionOnProgressWO = Boolean(
+    !isTerminalWO &&
+    (isWOFullAccess ||
+      canPerformAction(session.role, 'support', 'update') ||
+      (session.role === 'FIELD_TECHNICIAN' && Boolean(derivedCurrentHandler) && Number(derivedCurrentHandler!.userId) === Number(session.userId))) &&
+    (woStatusUp === 'SCHEDULED' || woStatusUp === 'ASSIGNED' || woStatusUp === 'ACCEPTED' || woStatusUp === 'PENDING'),
+  )
+  const canTransitionCompleteWO = Boolean(
+    !isTerminalWO &&
+    (isWOFullAccess ||
+      (canPerformAction(session.role, 'support', 'update') &&
+        (canPerformAction(session.role, 'inventory', 'create') || canPerformAction(session.role, 'inventory', 'manage') || canPerformAction(session.role, 'inventory', 'update')))) &&
+    (woStatusUp === 'OPEN' || woStatusUp === 'SCHEDULED' || woStatusUp === 'ASSIGNED' || woStatusUp === 'ACCEPTED' || woStatusUp === 'ON_PROGRESS' || woStatusUp === 'PENDING'),
+  )
+  const canTransitionCloseWO = Boolean(
+    (woStatusUp === 'COMPLETED') &&
+    (isWOFullAccess || canPerformAction(session.role, 'support', 'update') || canPerformAction(session.role, 'support', 'manage')),
+  )
+
   const pageActions = (
     <div className="flex flex-wrap gap-3">
       <Link
@@ -486,20 +547,22 @@ export default async function WorkOrderTrackingDetailPage({
       >
         Kembali
       </Link>
-      <Link
-        href={(() => {
-          const params = new URLSearchParams()
-          params.set('referenceWorkOrder', String(workOrderId))
-          if (wo?.workOrderNo) params.set('workOrderNo', wo.workOrderNo)
-          if (wo?.jobCategory) params.set('activityCategory', wo.jobCategory)
-          if (wo?.workType) params.set('activityType', wo.workType)
-          return `/dashboard/daily-activity?${params.toString()}`
-        })()}
-        aria-label="Buat daily activity dengan konteks work order ini"
-        className="btn-primary tap-44"
-      >
-        Buat Daily Activity
-      </Link>
+      {canCreateDailyActivity ? (
+        <Link
+          href={(() => {
+            const params = new URLSearchParams()
+            params.set('referenceWorkOrder', String(workOrderId))
+            if (wo?.workOrderNo) params.set('workOrderNo', wo.workOrderNo)
+            if (wo?.jobCategory) params.set('activityCategory', wo.jobCategory)
+            if (wo?.workType) params.set('activityType', wo.workType)
+            return `/dashboard/daily-activity?${params.toString()}`
+          })()}
+          aria-label="Buat daily activity dengan konteks work order ini"
+          className="btn-primary tap-44"
+        >
+          Buat Daily Activity
+        </Link>
+      ) : null}
       <Link
         href={`/dashboard/tracking/stock-movements?workOrderId=${workOrderId}`}
         aria-label="Lihat stock movement terkait work order ini"
@@ -507,20 +570,24 @@ export default async function WorkOrderTrackingDetailPage({
       >
         Lihat Movement
       </Link>
-      <Link
-        href={`/inventory/requests?inventoryAction=item-request&workOrderId=${workOrderId}&requestType=WO_MATERIAL#inventory-action-item-request`}
-        aria-label="Buat request barang untuk work order ini"
-        className="btn-secondary tap-44"
-      >
-        Request Barang
-      </Link>
-      <Link
-        href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=WORK_ORDER&workOrderId=${workOrderId}#inventory-action-stock-movement`}
-        aria-label="Buat stock movement keluar untuk work order ini"
-        className="btn-secondary tap-44"
-      >
-        Buat Movement
-      </Link>
+      {canCreateInventoryRequestWO ? (
+        <Link
+          href={`/inventory/requests?inventoryAction=item-request&workOrderId=${workOrderId}&requestType=WO_MATERIAL#inventory-action-item-request`}
+          aria-label="Buat request barang untuk work order ini"
+          className="btn-secondary tap-44"
+        >
+          Request Barang
+        </Link>
+      ) : null}
+      {canCreateStockMovementWO ? (
+        <Link
+          href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=WORK_ORDER&workOrderId=${workOrderId}#inventory-action-stock-movement`}
+          aria-label="Buat stock movement keluar untuk work order ini"
+          className="btn-secondary tap-44"
+        >
+          Buat Movement
+        </Link>
+      ) : null}
       {dismantleHistoryRows[0] ? (
         <Link
           href={buildSupportLaneHref('dismantle', {
@@ -609,6 +676,62 @@ export default async function WorkOrderTrackingDetailPage({
               <StatusBadge tone="info" label={`WO #${wo.id}`} size="md" />
             </div>
           </section>
+
+          {/PSB|INSTALLATION|PEMASANGAN|PASANG/i.test(`${wo.jobCategory ?? ''} ${wo.workType ?? ''} ${wo.workOrderNo ?? ''}`) || wo.troubleTicketId ? (
+            <section aria-label="Data PSB sumber work order" className="card-tier-2 border border-violet-200 bg-violet-50/40 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-violet-700">
+                    Linked PSB
+                  </p>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-white px-3 py-1 text-[11px] font-semibold text-violet-700">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-500" aria-hidden="true" />
+                    Alur Pemasangan Baru · PSB End-to-End
+                  </span>
+                </div>
+                <StatusBadge tone="neutral" label="PSB" size="sm" />
+              </div>
+              <div className="mt-4 rounded-control border border-violet-200 bg-white px-4 py-4">
+                <p className="text-sm font-semibold text-inkStrong">
+                  {woCode} berasal dari alur Penjualan (PSB)
+                </p>
+                <p className="mt-1 text-sm leading-6 text-mute">
+                  Ikuti link di bawah ini untuk membuka Control Tower PSB dan melihat timeline end-to-end lengkap: Sales Input → CS Review → Approval → Transfer Ticketing → TT → WO → Teknisi → Aktivasi → Customer Aktif.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    href={`/list-psb?q=${encodeURIComponent(wo.workOrderNo ?? String(workOrderId))}`}
+                    className="inline-flex items-center justify-center rounded-xl border border-violet-300 bg-white px-4 py-2 text-xs font-semibold text-violet-800 transition hover:bg-violet-100"
+                  >
+                    Cari PSB via WO Code
+                  </Link>
+                  {wo.troubleTicketId ? (
+                    <Link
+                      href={`/dashboard/tracking/trouble-tickets/${wo.troubleTicketId}`}
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Buka TT #{wo.troubleTicketId} Terkait
+                    </Link>
+                  ) : null}
+                  {(wo.picFullName ?? wo.picUsername) ? (
+                    <Link
+                      href={`/list-psb?q=${encodeURIComponent(wo.picFullName ?? wo.picUsername ?? '')}`}
+                      className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Cari PSB via Nama Customer
+                    </Link>
+                  ) : null}
+                  <Link
+                    href="/list-psb"
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
+                  >
+                    Buka Daftar PSB
+                  </Link>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
           <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
           <section className="card-tier-2 p-5">
             <div className="flex flex-wrap items-center gap-2">
@@ -704,7 +827,36 @@ export default async function WorkOrderTrackingDetailPage({
               canReassign={canReassignHandler}
               nextActionLabel={!derivedCurrentHandler ? 'Belum ada PIC aktif. Buat assignment baru untuk work order ini.' : (derivedCurrentHandler.status === 'ASSIGNED' ? 'Menunggu konfirmasi ACCEPT dari teknisi yang ditugaskan.' : 'Lanjutkan pekerjaan sesuai SOP, atau lakukan REASSIGN jika perlu perubahan PIC.')}
               nextActionTone={!derivedCurrentHandler ? 'warning' : derivedCurrentHandler.status === 'ASSIGNED' ? 'info' : 'success'}
-            />
+            >
+              <div className="space-y-2.5 w-full">
+                {derivedCurrentHandler && derivedCurrentHandler.status === 'ASSIGNED' ? (
+                  <AssignmentAcceptButton
+                    assignmentId={derivedCurrentHandler.assignmentId}
+                    canAccept={Boolean(canAcceptHandler)}
+                    reviewDbReady={reviewDbReady}
+                    endpointBasePath={woEndpointBase}
+                  />
+                ) : null}
+                {derivedCurrentHandler && (derivedCurrentHandler.status === 'ASSIGNED' || derivedCurrentHandler.status === 'ACCEPTED') ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ReleaseAssignmentButton
+                      assignmentId={derivedCurrentHandler.assignmentId}
+                      canRelease={Boolean(canReleaseHandler)}
+                      reviewDbReady={reviewDbReady}
+                      endpointBasePath={woEndpointBase}
+                    />
+                    <ReassignAssignmentModal
+                      assignmentId={derivedCurrentHandler.assignmentId}
+                      canReassign={Boolean(canReassignHandler)}
+                      reviewDbReady={reviewDbReady}
+                      currentTechnicianLabel={derivedCurrentHandler.displayName ?? derivedCurrentHandler.username}
+                      technicianOptions={technicianOptions}
+                      endpointBasePath={woEndpointBase}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </CurrentHandlerCard>
 
             {!derivedCurrentHandler ? (
               <section className="card-tier-2 border border-warningLine p-5" aria-label="Dispatch work order ke teknisi">
@@ -727,6 +879,20 @@ export default async function WorkOrderTrackingDetailPage({
                   />
                 </div>
               </section>
+            ) : null}
+
+            {(canTransitionScheduleWO || canTransitionOnProgressWO || canTransitionCompleteWO || canTransitionCloseWO) ? (
+              <WorkOrderLifecycleActionPanel
+                workOrderId={workOrderId}
+                currentStatus={wo?.status ?? 'OPEN'}
+                currentStatusLabel={wo?.status ?? 'OPEN'}
+                currentStatusTone={resolveWoStatusTone(wo?.status ?? null)}
+                canSchedule={canTransitionScheduleWO}
+                canStartOnProgress={canTransitionOnProgressWO}
+                canComplete={canTransitionCompleteWO}
+                canClose={canTransitionCloseWO}
+                reviewDbReady={reviewDbReady}
+              />
             ) : null}
 
             <section className="card-tier-3 p-5" aria-label="Timeline tracking work order">
