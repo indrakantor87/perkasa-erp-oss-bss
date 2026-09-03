@@ -79,8 +79,14 @@ export async function POST(
         branchId: session.branchId ?? null,
       })
 
+      const idempotentSuffix = result.idempotent ? ' (sudah ditransfer sebelumnya)' : ''
       return Response.json({
-        message: `Data PSB ${result.psbListCode} (${result.customerName}) berhasil ditransfer ke ticket operasional ${result.workOrderNo}.`,
+        message: `Data PSB ${result.psbListCode} (${result.customerName}) berhasil ditransfer ke ticketing${idempotentSuffix}: Trouble Ticket ${result.ticketCode || '-'} dan Work Order ${result.workOrderNo || '-'}`,
+        workOrderNo: result.workOrderNo,
+        workOrderId: Number.isInteger(result.workOrderId) && result.workOrderId > 0 ? result.workOrderId : null,
+        ticketCode: result.ticketCode || null,
+        troubleTicketId: Number.isInteger(result.troubleTicketId) && result.troubleTicketId > 0 ? result.troubleTicketId : null,
+        idempotent: Boolean(result.idempotent),
       })
     }
 

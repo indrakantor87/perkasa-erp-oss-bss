@@ -172,7 +172,7 @@ export function PsbListTransitionForm({
         </label>
         {action === 'TRANSFER' ? (
           <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
-            Transfer akan membuat work order `INSTALLATION` kategori `PSB` dan menandai item ini sebagai
+            Transfer akan membuat Trouble Ticket tipe PSB dan Work Order INSTALLATION untuk teknisi, serta menandai item ini sebagai
             `DITRANSFER_KE_TICKETING`.
           </div>
         ) : null}

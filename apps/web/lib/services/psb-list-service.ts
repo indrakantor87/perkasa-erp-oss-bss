@@ -726,6 +726,7 @@ export async function ensurePsbListTables() {
     `,
   )
 
+  await ensurePsbListColumn('transferred_trouble_ticket_id', 'transferred_trouble_ticket_id BIGINT UNSIGNED NULL', 'transferred_ticket_ref')
   await ensurePsbListColumn('area_label', 'area_label VARCHAR(120) NULL', 'transferred_ticket_ref')
   await ensurePsbListColumn('google_maps_link', 'google_maps_link TEXT NULL', 'area_label')
   await ensurePsbListColumn('escort_notes', 'escort_notes TEXT NULL', 'google_maps_link')
@@ -1494,6 +1495,63 @@ export async function transitionPsbListStatus(params: {
   }
 }
 
+function padTroubleTicketSequence(value: number) {
+  return String(value).padStart(4, '0')
+}
+
+type TroubleTypeSlaRow = {
+  troubleType: string
+}
+
+type TroubleTicketCodeRow = {
+  ticketCode: string
+}
+
+async function generateTroubleTicketCode(category: string = 'TT') {
+  const prefix = category === 'PV' ? 'PV' : 'TT'
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const likePrefix = `${prefix}-${year}${month}-%`
+  const rows = await runReviewDbQuery<TroubleTicketCodeRow>(
+    `
+      SELECT ticket_code AS ticketCode
+      FROM support_trouble_tickets
+      WHERE ticket_code LIKE ?
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    [likePrefix],
+  )
+  const currentCode = rows[0]?.ticketCode ?? ''
+  const lastSequence = Number.parseInt(currentCode.split('-').pop() ?? '0', 10)
+  return `${prefix}-${year}${month}-${padTroubleTicketSequence(Number.isFinite(lastSequence) ? lastSequence + 1 : 1)}`
+}
+
+async function validateSlaPemasanganBaru() {
+  const hasSupportSlaTroubleType = await hasReviewDbColumn('support_trouble_ticket_sla', 'trouble_type')
+  if (!hasSupportSlaTroubleType) {
+    return
+  }
+  const knownTroubleTypes = await runReviewDbQuery<TroubleTypeSlaRow>(
+    `
+      SELECT trouble_type AS troubleType
+      FROM support_trouble_ticket_sla
+      WHERE UPPER(TRIM(trouble_type)) = UPPER(TRIM(?))
+      LIMIT 1
+    `,
+    ['PASANG_BARU'],
+  )
+  if (!knownTroubleTypes.length) {
+    throw new Error('Tipe ticket PASANG_BARU belum terdaftar pada master SLA trouble ticket.')
+  }
+}
+
+type TransferablePsbListRowExtended = TransferablePsbListRow & {
+  transferredTroubleTicketId: number | null
+  workOrderCode: string | null
+}
+
 export async function transferPsbListToTicket(params: {
   psbListId: number
   notes: string
@@ -1505,119 +1563,219 @@ export async function transferPsbListToTicket(params: {
   await ensurePsbListBaselineSeeds()
   await ensureServiceWorkOrderStatusLogTable()
 
-  const [row] = await runReviewDbQuery<TransferablePsbListRow>(
+  const rowPre = await runReviewDbQuery<TransferablePsbListRow>(
     `
       SELECT
         id,
         psb_list_code AS psbListCode,
-        customer_name AS customerName,
-        customer_phone AS customerPhone,
-        address_text AS addressText,
-        odp_code AS odpCode,
-        package_label AS packageLabel,
-        sales_owner_name AS salesOwnerName,
-        requested_install_date AS requestedInstallDate,
-        status,
-        review_notes AS reviewNotes,
-        correction_notes AS correctionNotes,
-        transferred_ticket_ref AS transferredTicketRef,
-        transferred_work_order_id AS transferredWorkOrderId,
-        created_at AS createdAt,
-        updated_at AS updatedAt,
-        area_label AS areaLabel,
-        google_maps_link AS googleMapsLink,
-        escort_notes AS escortNotes,
-        activity_notes AS activityNotes,
-        cs_pic_name AS csPicName,
-        next_action_label AS nextActionLabel,
-        transferred_work_order_id AS transferredWorkOrderId
+        status
       FROM sales_psb_lists
       WHERE id = ?
       LIMIT 1
     `,
     [params.psbListId],
   )
-
-  if (!row) {
+  if (!rowPre.length) {
     throw new Error('Item Data PSB tidak ditemukan.')
   }
-
-  const currentStatus = normalizeStatus(row.status)
-  if (currentStatus === 'DITRANSFER_KE_TICKETING') {
-    throw new Error('Item Data PSB ini sudah pernah ditransfer ke ticketing.')
-  }
-  if (currentStatus !== 'DISETUJUI') {
-    throw new Error(`Hanya item dengan status DISETUJUI yang bisa ditransfer. Status saat ini: ${currentStatus}.`)
+  const preStatus = normalizeStatus(rowPre[0].status)
+  if (preStatus !== 'DISETUJUI' && preStatus !== 'DITRANSFER_KE_TICKETING') {
+    throw new Error(`Hanya item dengan status DISETUJUI yang bisa ditransfer. Status saat ini: ${preStatus}.`)
   }
 
-  const actorUserId = await resolveReviewAuthUserIdByUsername(params.actorUsername)
-  const workOrderNo = await generateServiceWorkOrderNo()
-  const requestedDate = row.requestedInstallDate ? new Date(row.requestedInstallDate) : null
-  const scheduledAt = requestedDate && Number.isFinite(requestedDate.getTime()) ? requestedDate : null
-  const transferNotes = [
-    `[Transfer PSB] ${params.actorName}`,
-    `Sumber ${row.psbListCode ?? '-'}`,
-    row.reviewNotes?.trim() ? `Review: ${row.reviewNotes.trim()}` : null,
-    params.notes.trim() ? `Catatan: ${params.notes.trim()}` : null,
-  ]
-    .filter(Boolean)
-    .join(' - ')
-
-  const insertPayload = await buildServiceWorkOrderInsertPayload({
-    workOrderNo,
-    workType: 'INSTALLATION',
-    status: 'OPEN',
-    technicianName: null,
-    scheduledAt,
-    notes: transferNotes,
-    branchId: params.branchId ?? null,
-    jobCategory: 'PSB',
-    priority: 'MEDIUM',
-    sourceType: 'MANUAL',
-    currentPicUserId: actorUserId,
-    scheduledByUserId: actorUserId,
-    address: row.addressText ?? null,
-  })
-
+  let workOrderNo = ''
   let workOrderId = 0
-  await runReviewDbTransaction(async (connection) => {
-    const [insertResult] = await connection.query(
-      `
-        INSERT INTO service_work_orders (
-          ${insertPayload.columns.join(',\n          ')}
-        )
-        VALUES (${insertPayload.placeholders.join(', ')})
-      `,
-      insertPayload.values,
-    )
+  let ticketCode = ''
+  let troubleTicketId = 0
+  let idempotent = false
+  let psbListCode = ''
+  let customerName = ''
 
-    workOrderId = Number((insertResult as ExecuteResult).insertId ?? 0)
-    if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
-      throw new Error('Work order PSB berhasil dibuat tetapi ID insert tidak terbaca.')
+  await runReviewDbTransaction(async (connection) => {
+    const [lockedRows] = await connection.query(
+      `
+        SELECT
+          id,
+          psb_list_code AS psbListCode,
+          customer_name AS customerName,
+          customer_phone AS customerPhone,
+          address_text AS addressText,
+          odp_code AS odpCode,
+          package_label AS packageLabel,
+          sales_owner_name AS salesOwnerName,
+          requested_install_date AS requestedInstallDate,
+          status,
+          review_notes AS reviewNotes,
+          correction_notes AS correctionNotes,
+          transferred_ticket_ref AS transferredTicketRef,
+          transferred_work_order_id AS transferredWorkOrderId,
+          transferred_trouble_ticket_id AS transferredTroubleTicketId,
+          work_order_code AS workOrderCode,
+          created_at AS createdAt,
+          updated_at AS updatedAt,
+          area_label AS areaLabel,
+          google_maps_link AS googleMapsLink,
+          escort_notes AS escortNotes,
+          activity_notes AS activityNotes,
+          cs_pic_name AS csPicName,
+          next_action_label AS nextActionLabel
+        FROM sales_psb_lists
+        WHERE id = ?
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [params.psbListId],
+    )
+    const row = ((lockedRows as TransferablePsbListRowExtended[] | undefined)?.[0] ?? null) as TransferablePsbListRowExtended | null
+    if (!row) {
+      throw new Error('Item Data PSB tidak ditemukan di dalam transaksi (lock row).')
     }
 
-    await connection.query(
-      `
-        INSERT INTO service_work_order_status_logs (
-          work_order_id,
-          from_status,
-          to_status,
-          reason_code,
-          reason_notes,
-          changed_by_user_id,
-          changed_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `,
-      [
-        workOrderId,
-        null,
+    psbListCode = String(row.psbListCode ?? '-')
+    customerName = String(row.customerName ?? 'Customer belum diisi')
+
+    const currentStatus = normalizeStatus(row.status)
+    const existingTtId = Number(row.transferredTroubleTicketId ?? 0)
+    const existingWoId = Number(row.transferredWorkOrderId ?? 0)
+    const hasExistingTt = Number.isInteger(existingTtId) && existingTtId > 0
+    const hasExistingWo = Number.isInteger(existingWoId) && existingWoId > 0
+
+    if (currentStatus === 'DITRANSFER_KE_TICKETING' && hasExistingTt && hasExistingWo) {
+      idempotent = true
+      troubleTicketId = existingTtId
+      workOrderId = existingWoId
+      ticketCode = String(row.transferredTicketRef ?? '')
+      workOrderNo = String(row.workOrderCode ?? '')
+      return
+    }
+
+    if (currentStatus !== 'DISETUJUI') {
+      throw new Error(`Hanya item dengan status DISETUJUI yang bisa ditransfer. Status saat ini: ${currentStatus}.`)
+    }
+
+    await validateSlaPemasanganBaru()
+
+    const actorUserId = await resolveReviewAuthUserIdByUsername(params.actorUsername)
+    const requestedDate = row.requestedInstallDate ? new Date(row.requestedInstallDate) : null
+    const scheduledAt = requestedDate && Number.isFinite(requestedDate.getTime()) ? requestedDate : null
+    const transferNotes = [
+      `[Transfer PSB] ${params.actorName}`,
+      `Sumber ${row.psbListCode ?? '-'}`,
+      row.reviewNotes?.trim() ? `Review: ${row.reviewNotes.trim()}` : null,
+      params.notes.trim() ? `Catatan: ${params.notes.trim()}` : null,
+    ]
+      .filter(Boolean)
+      .join(' - ')
+
+    if (hasExistingTt) {
+      troubleTicketId = existingTtId
+      ticketCode = String(row.transferredTicketRef ?? '')
+    } else {
+      ticketCode = await generateTroubleTicketCode('TT')
+      const hasTtSubscriptionId = await hasReviewDbColumn('support_trouble_tickets', 'subscription_id')
+      const hasTtOpenedAt = await hasReviewDbColumn('support_trouble_tickets', 'opened_at')
+      const hasTtClosedAt = await hasReviewDbColumn('support_trouble_tickets', 'closed_at')
+      const ttColumns: string[] = ['ticket_code', 'customer_name', 'category', 'type', 'status', 'problem_category', 'notes']
+      const ttValues: unknown[] = [
+        ticketCode,
+        String(row.customerName ?? 'Customer belum diisi'),
+        'PSB',
+        'PASANG_BARU',
         'OPEN',
-        'AUTO_CREATED',
-        `WO PSB dibuat dari Data PSB ${row.psbListCode ?? '-'}.`,
-        actorUserId,
-      ],
-    )
+        'PSB_PEMASANGAN',
+        transferNotes,
+      ]
+      const hasTtCustomerUser = await hasReviewDbColumn('support_trouble_tickets', 'customer_user')
+      if (hasTtCustomerUser) {
+        ttColumns.push('customer_user')
+        ttValues.push(row.customerPhone ?? null)
+      }
+      if (hasTtSubscriptionId) {
+        ttColumns.push('subscription_id')
+        ttValues.push(null)
+      }
+      if (hasTtOpenedAt) {
+        ttColumns.push('opened_at')
+        ttValues.push(new Date())
+      }
+      if (hasTtClosedAt) {
+        // skip closed_at - remain default NULL for OPEN
+      }
+      const [ttInsertResultRaw] = await connection.query(
+        `
+          INSERT INTO support_trouble_tickets (
+            ${ttColumns.join(',\n            ')}
+          )
+          VALUES (${ttColumns.map(() => '?').join(', ')})
+        `,
+        ttValues,
+      )
+      troubleTicketId = Number((ttInsertResultRaw as ExecuteResult).insertId ?? 0)
+      if (!Number.isInteger(troubleTicketId) || troubleTicketId <= 0) {
+        throw new Error('Trouble ticket PSB berhasil dibuat tetapi ID insert tidak terbaca.')
+      }
+    }
+
+    if (hasExistingWo) {
+      workOrderId = existingWoId
+      workOrderNo = String(row.workOrderCode ?? '')
+    } else {
+      workOrderNo = await generateServiceWorkOrderNo()
+      const insertPayload = await buildServiceWorkOrderInsertPayload({
+        workOrderNo,
+        workType: 'INSTALLATION',
+        status: 'OPEN',
+        technicianName: null,
+        scheduledAt,
+        notes: transferNotes,
+        branchId: params.branchId ?? null,
+        jobCategory: 'PSB',
+        priority: 'MEDIUM',
+        sourceType: 'MANUAL',
+        currentPicUserId: actorUserId,
+        scheduledByUserId: actorUserId,
+        address: row.addressText ?? null,
+        troubleTicketId: troubleTicketId > 0 ? troubleTicketId : null,
+      })
+
+      const [insertResult] = await connection.query(
+        `
+          INSERT INTO service_work_orders (
+            ${insertPayload.columns.join(',\n            ')}
+          )
+          VALUES (${insertPayload.placeholders.join(', ')})
+        `,
+        insertPayload.values,
+      )
+
+      workOrderId = Number((insertResult as ExecuteResult).insertId ?? 0)
+      if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+        throw new Error('Work order PSB berhasil dibuat tetapi ID insert tidak terbaca.')
+      }
+
+      await connection.query(
+        `
+          INSERT INTO service_work_order_status_logs (
+            work_order_id,
+            from_status,
+            to_status,
+            reason_code,
+            reason_notes,
+            changed_by_user_id,
+            changed_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `,
+        [
+          workOrderId,
+          null,
+          'OPEN',
+          'AUTO_CREATED',
+          `WO PSB dibuat dari Data PSB ${row.psbListCode ?? '-'}. Terkait TT ${ticketCode || '-'}`,
+          actorUserId,
+        ],
+      )
+    }
 
     await connection.query(
       `
@@ -1625,6 +1783,7 @@ export async function transferPsbListToTicket(params: {
         SET
           status = 'DITRANSFER_KE_TICKETING',
           transferred_ticket_ref = ?,
+          transferred_trouble_ticket_id = ?,
           transferred_work_order_id = ?,
           work_order_code = ?,
           work_order_created_at = CURRENT_TIMESTAMP,
@@ -1642,40 +1801,53 @@ export async function transferPsbListToTicket(params: {
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `,
-      [workOrderNo, workOrderId, workOrderNo, params.actorName, buildNextActionLabel('DITRANSFER_KE_TICKETING'), row.id],
-    )
-
-    await connection.query(
-      `
-        INSERT INTO sales_psb_list_audits (
-          psb_list_id,
-          event_type,
-          from_status,
-          to_status,
-          actor_name,
-          actor_role,
-          notes
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
       [
-        row.id,
-        'TRANSFER',
-        currentStatus,
-        'DITRANSFER_KE_TICKETING',
+        ticketCode,
+        troubleTicketId > 0 ? troubleTicketId : null,
+        workOrderId > 0 ? workOrderId : null,
+        workOrderNo,
         params.actorName,
-        params.actorRole,
-        params.notes.trim() || `Transfer ke ticketing operasional dengan WO ${workOrderNo}.`,
+        buildNextActionLabel('DITRANSFER_KE_TICKETING'),
+        row.id,
       ],
     )
+
+    if (!hasExistingTt || !hasExistingWo) {
+      await connection.query(
+        `
+          INSERT INTO sales_psb_list_audits (
+            psb_list_id,
+            event_type,
+            from_status,
+            to_status,
+            actor_name,
+            actor_role,
+            notes
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          row.id,
+          'TRANSFER',
+          currentStatus,
+          'DITRANSFER_KE_TICKETING',
+          params.actorName,
+          params.actorRole,
+          params.notes.trim() || `Transfer ke ticketing operasional dengan TT ${ticketCode} dan WO ${workOrderNo}.`,
+        ],
+      )
+    }
   })
 
   return {
-    id: row.id,
-    psbListCode: String(row.psbListCode ?? '-'),
-    customerName: String(row.customerName ?? 'Customer belum diisi'),
+    id: Number(rowPre[0].id ?? 0),
+    psbListCode,
+    customerName,
     workOrderNo,
     workOrderId,
+    ticketCode,
+    troubleTicketId,
+    idempotent,
   }
 }
 
