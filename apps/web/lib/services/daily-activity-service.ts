@@ -13,7 +13,7 @@ import {
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import type { AppSession } from '@/lib/auth-session'
 import { getRoleMeta } from '@/lib/role-meta'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery, type ReviewDbConnection } from '@/lib/review-db'
 import { resolveDailyActivityOrgContext } from '@/lib/services/daily-activity-user-profile-service'
 import type { DataSourceSnapshot } from '@/lib/types'
 
@@ -68,7 +68,7 @@ export type DailyActivityItem = {
   taskDetail: string | null
   successMetric: string | null
   priorityLevel: 'HIGH' | 'MEDIUM' | 'LOW'
-  executionStatus: 'PLANNED' | 'DONE' | 'PENDING'
+  executionStatus: 'PLANNED' | 'DONE' | 'PENDING' | 'CANCEL'
   approvalStatus: DailyActivityApprovalStatus
   approvalNotes: string | null
   approvedBy: string | null
@@ -680,7 +680,7 @@ export async function ensureDailyActivityTable() {
   )
 }
 
-export async function generateDailyActivityCode(activityDate: string) {
+export async function generateDailyActivityCode(activityDate: string, connection?: ReviewDbConnection) {
   const parsedDate = new Date(activityDate)
   if (!Number.isFinite(parsedDate.getTime())) {
     throw new Error('Tanggal aktivitas harian tidak valid.')
@@ -689,16 +689,23 @@ export async function generateDailyActivityCode(activityDate: string) {
   const year = parsedDate.getFullYear()
   const month = parsedDate.getMonth() + 1
   const period = `${year}${String(month).padStart(2, '0')}`
-  const [row] = await runReviewDbQuery<DailyActivityCountRow>(
-    `
-      SELECT COUNT(*) AS total
-      FROM daily_activity_items
-      WHERE YEAR(activity_date) = ?
-        AND MONTH(activity_date) = ?
-    `,
-    [year, month],
-  )
-  const sequence = Number(row?.total ?? 0) + 1
+  const sql = `
+    SELECT COUNT(*) AS total
+    FROM daily_activity_items
+    WHERE YEAR(activity_date) = ?
+      AND MONTH(activity_date) = ?
+  `
+  const values = [year, month]
+  let total: number
+  if (connection) {
+    const [rows] = await connection.query(sql, values)
+    const arr = rows as DailyActivityCountRow[]
+    total = Number(arr?.[0]?.total ?? 0)
+  } else {
+    const [row] = await runReviewDbQuery<DailyActivityCountRow>(sql, values)
+    total = Number(row?.total ?? 0)
+  }
+  const sequence = total + 1
   return `DA-${period}-${String(sequence).padStart(4, '0')}`
 }
 

@@ -2,7 +2,7 @@ import { DailyActivityCloseForm } from '@/components/daily-activity-close-form'
 import { DailyActivityExportForm } from '@/components/daily-activity-export-form'
 import { DailyActivityFilterBar } from '@/components/daily-activity-filter-bar'
 import { DailyActivityManagerApprovalForm } from '@/components/daily-activity-manager-approval-form'
-import { DailyActivityPlanForm } from '@/components/daily-activity-plan-form'
+import { DailyActivitySmartPaste } from '@/components/daily-activity-smart-paste'
 import { DailyActivitySummaryPanel } from '@/components/daily-activity-summary-panel'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { canPerformAction } from '@/lib/access-control-server'
@@ -168,7 +168,7 @@ export default async function DailyActivityPage({
           </p>
           <div className="mt-4 space-y-4">
             <div className="grid gap-4 xl:grid-cols-2">
-              <DailyActivityPlanForm
+              <DailyActivitySmartPaste
                 canCreate={canCreate}
                 reviewDbReady={reviewDbReady}
                 defaultActivityDate={defaultActivityDate}
