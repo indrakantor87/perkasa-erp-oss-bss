@@ -65,7 +65,7 @@ function ModalShell({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/70 px-4 py-4 sm:py-8 backdrop-blur-sm">
       <button
         type="button"
         aria-label="Tutup modal"
@@ -73,9 +73,9 @@ function ModalShell({
         onClick={onClose}
       />
       <div
-        className={`relative z-10 max-h-[92vh] w-full ${maxWidthClass} overflow-y-auto rounded-3xl border border-line bg-white shadow-2xl`}
+        className={`relative z-10 flex max-h-full w-full flex-1 flex-col shrink-0 ${maxWidthClass} overflow-hidden rounded-3xl border border-line bg-white shadow-2xl sm:max-h-[90vh]`}
       >
-        <div className="sticky top-0 z-10 flex flex-col gap-4 border-b border-line bg-white/95 px-6 py-5 backdrop-blur lg:flex-row lg:items-start lg:justify-between">
+        <div className="sticky top-0 z-10 shrink-0 flex flex-col gap-4 border-b border-line bg-white/95 px-6 py-5 backdrop-blur lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="section-title">Daily Activity</p>
             <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
@@ -86,12 +86,12 @@ function ModalShell({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+            className="shrink-0 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
           >
             Tutup
           </button>
         </div>
-        <div className="px-6 py-6">{children}</div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">{children}</div>
       </div>
     </div>
   )
