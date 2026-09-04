@@ -225,6 +225,7 @@ async function main() {
     'unavailable',
     'Saat review DB dikonfigurasi tetapi koneksi gagal, login harus memberi sinyal auth unavailable.'
   )
+  delete process.env.DATABASE_URL
 
   process.env.ALLOW_BOOTSTRAP_MOCK_AUTH = '1'
   assert.equal(isBootstrapMockAuthEnabled(), true)

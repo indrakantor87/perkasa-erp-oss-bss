@@ -233,6 +233,15 @@ function buildSalesSubmenuItems(role: AppRole | null) {
         '/sales/content-analytics',
         '/sales/marketing-activities',
         '/sales/input-psb',
+        '/sales/leads',
+        '/sales/orders',
+        '/sales/quotations',
+        '/sales/contracts',
+        '/sales/subscriptions',
+        '/sales/surveys',
+        '/sales/covered-areas',
+        '/sales/corporate-deliveries',
+        '/sales/corporate-acceptances',
       ],
     }),
   )
@@ -264,6 +273,74 @@ function buildSalesSubmenuItems(role: AppRole | null) {
         description: 'Agenda canvassing, covered area, dan ritme aktivitas tim.',
         href: '/sales/marketing-activities',
         matchPrefixes: ['/sales/marketing-activities'],
+      }),
+    )
+  }
+
+  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING', 'CS_OPERATOR', 'CS_ADMIN'].includes(role)) {
+    items.push(
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-leads',
+        title: 'Pipeline: Leads Prospek',
+        description: 'Daftar calon pelanggan dan validasi awal prospek komersial.',
+        href: '/sales/leads',
+        matchPrefixes: ['/sales/leads'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-covered-areas',
+        title: 'Pipeline: Coverage Area',
+        description: 'Validasi ketersediaan jaringan dan coverage area prospek.',
+        href: '/sales/covered-areas',
+        matchPrefixes: ['/sales/covered-areas'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-surveys',
+        title: 'Pipeline: Survey',
+        description: 'Jadwal dan hasil survey teknis untuk pesanan aktif.',
+        href: '/sales/surveys',
+        matchPrefixes: ['/sales/surveys'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-orders',
+        title: 'Pipeline: Sales Order',
+        description: 'Daftar pesanan penjualan dan progres aktivasi.',
+        href: '/sales/orders',
+        matchPrefixes: ['/sales/orders'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-quotations',
+        title: 'Pipeline: Penawaran (Quotation)',
+        description: 'Draft, review, dan approval corporate quotation.',
+        href: '/sales/quotations',
+        matchPrefixes: ['/sales/quotations'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-contracts',
+        title: 'Pipeline: Kontrak',
+        description: 'Kontrak corporate dan legal sign-off.',
+        href: '/sales/contracts',
+        matchPrefixes: ['/sales/contracts'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-corporate-deliveries',
+        title: 'Pipeline: Delivery Milestone',
+        description: 'Tahapan delivery dan progres implementasi corporate.',
+        href: '/sales/corporate-deliveries',
+        matchPrefixes: ['/sales/corporate-deliveries'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-corporate-acceptances',
+        title: 'Pipeline: Acceptance / UAT',
+        description: 'BAST, UAT, dan acceptance sign-off pelanggan.',
+        href: '/sales/corporate-acceptances',
+        matchPrefixes: ['/sales/corporate-acceptances'],
+      }),
+      buildSidebarNavItem('/sales', {
+        key: 'sales-sub-subscriptions',
+        title: 'Pipeline: Subscription Aktif',
+        description: 'Pelanggan aktif, paket langganan, dan lifecycle billing.',
+        href: '/sales/subscriptions',
+        matchPrefixes: ['/sales/subscriptions'],
       }),
     )
   }

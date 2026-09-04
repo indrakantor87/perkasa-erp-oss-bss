@@ -9,6 +9,7 @@ import {
 import { resolveDashboardKpiTemplateDrilldown } from '@/lib/dashboard-kpi-config'
 import {
   dashboardActivities,
+  dashboardSummary,
   getMockRoleQueues,
   getMockWorklist,
 } from '@/lib/mock-dashboard'
@@ -5120,7 +5121,7 @@ export async function getDashboardSummary() {
   if (source.effectiveMode !== 'review-db') {
     return {
       source,
-      summary: EMPTY_DASHBOARD_SUMMARY,
+      summary: source.isFallback ? dashboardSummary : EMPTY_DASHBOARD_SUMMARY,
     }
   }
 
@@ -5130,9 +5131,10 @@ export async function getDashboardSummary() {
       summary: await getReviewDbDashboardSummary(),
     }
   } catch (error) {
+    const fallbackSource = getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error))
     return {
-      source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
-      summary: EMPTY_DASHBOARD_SUMMARY,
+      source: fallbackSource,
+      summary: fallbackSource.isFallback ? dashboardSummary : EMPTY_DASHBOARD_SUMMARY,
     }
   }
 }
@@ -5198,16 +5200,17 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
 
   if (source.effectiveMode !== 'review-db') {
     const mockDailyActivityApprovalQueue = getEmptyDailyActivityApprovalQueue()
+    const resolvedSummary = source.isFallback ? dashboardSummary : EMPTY_DASHBOARD_SUMMARY
 
     return {
       source,
-      summary: EMPTY_DASHBOARD_SUMMARY,
+      summary: resolvedSummary,
       metrics: buildUnavailableDashboardMetrics(),
-      roleQueues: buildRoleQueues(role, EMPTY_DASHBOARD_SUMMARY),
+      roleQueues: buildRoleQueues(role, resolvedSummary),
       worklist: getMockWorklist(role),
-      operationalCards: sanitizeDashboardOperationalCards(role, buildMockOperationalCards(EMPTY_DASHBOARD_SUMMARY, resolvedFilters), resolvedFilters),
+      operationalCards: sanitizeDashboardOperationalCards(role, buildMockOperationalCards(resolvedSummary, resolvedFilters), resolvedFilters),
       dashboardAlerts: buildMockDashboardAlerts({
-        summary: EMPTY_DASHBOARD_SUMMARY,
+        summary: resolvedSummary,
         approvalPending: mockDailyActivityApprovalQueue.totalPending,
         role,
       }),
@@ -5247,20 +5250,22 @@ export async function getDashboardPageData(session: AppSession, filters?: Dashbo
         }
       } catch (error) {
         const fallbackDailyActivityApprovalQueue = getEmptyDailyActivityApprovalQueue()
+        const fallbackSource = getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error))
+        const fallbackSummary = fallbackSource.isFallback ? dashboardSummary : EMPTY_DASHBOARD_SUMMARY
 
         return {
-          source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
-          summary: EMPTY_DASHBOARD_SUMMARY,
+          source: fallbackSource,
+          summary: fallbackSummary,
           metrics: buildUnavailableDashboardMetrics(),
-          roleQueues: buildRoleQueues(role, EMPTY_DASHBOARD_SUMMARY),
+          roleQueues: buildRoleQueues(role, fallbackSummary),
           worklist: getMockWorklist(role),
           operationalCards: sanitizeDashboardOperationalCards(
             role,
-            buildMockOperationalCards(EMPTY_DASHBOARD_SUMMARY, resolvedFilters),
+            buildMockOperationalCards(fallbackSummary, resolvedFilters),
             resolvedFilters,
           ),
           dashboardAlerts: buildMockDashboardAlerts({
-            summary: EMPTY_DASHBOARD_SUMMARY,
+            summary: fallbackSummary,
             approvalPending: fallbackDailyActivityApprovalQueue.totalPending,
             role,
           }),

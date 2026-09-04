@@ -380,7 +380,7 @@ async function exportPsbListToExcel(items: PsbListItem[]) {
   XLSX.utils.book_append_sheet(workbook, sheet, 'Data PSB')
   const stamp = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
-  const filename = `data-psb-${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}-${pad(stamp.getHours())}${pad(stamp.getMinutes())}.xlsx`
+  const filename = `psb-list-${stamp.getFullYear()}-${pad(stamp.getMonth() + 1)}-${pad(stamp.getDate())}.xlsx`
   XLSX.writeFile(workbook, filename, { compression: true })
 }
 
@@ -880,23 +880,56 @@ export function PsbListWorkspace({
         setFeedback({ tone: 'warning', message: 'Tidak ada baris data PSB untuk diekspor saat filter ini. Coba reset filter terlebih dahulu.' })
         return
       }
-      await exportPsbListToExcel(displayItems)
-      setFeedback({
-        tone: 'success',
-        message: `Berhasil ekspor ${displayItems.length.toLocaleString('id-ID')} baris Data PSB ke file Excel.`,
-      })
+      try {
+        const url = new URL('/api/sales/psb-lists/export', window.location.origin)
+        const res = await fetch(url.toString(), {
+          method: 'GET',
+          credentials: 'same-origin',
+          headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json; q=0.9' },
+        })
+        if (res.status === 200) {
+          const blob = await res.blob()
+          const stamp = new Date()
+          const pad = (n: number) => String(n).padStart(2, '0')
+          const filename = `psb-list-${stamp.getFullYear()}-${pad(stamp.getMonth() + 1)}-${pad(stamp.getDate())}.xlsx`
+          const link = document.createElement('a')
+          link.href = URL.createObjectURL(blob)
+          link.download = filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          setTimeout(() => URL.revokeObjectURL(link.href), 1500)
+          setFeedback({
+            tone: 'success',
+            message: `Berhasil ekspor ${displayItems.length.toLocaleString('id-ID')} baris Data PSB ke file Excel.`,
+          })
+          return
+        }
+        if (res.status === 401 || res.status === 403) {
+          throw new Error(res.status === 401 ? 'Sesi habis. Silakan login ulang sebelum ekspor.' : 'Anda tidak memiliki izin ekspor PSB (memerlukan sales:export).')
+        }
+        if (res.status === 503) {
+          throw new Error('Server belum siap ekspor: review DB tidak tersedia.')
+        }
+        if (res.headers.get('content-type')?.includes('application/json')) {
+          const payload = await res.json().catch(() => null)
+          const msg = payload && typeof payload.message === 'string' ? payload.message : `Server error HTTP ${res.status}.`
+          throw new Error(msg)
+        }
+        throw new Error(`Server error HTTP ${res.status}.`)
+      } catch (serverError) {
+        await exportPsbListToExcel(displayItems)
+        setFeedback({
+          tone: 'success',
+          message: `Berhasil ekspor ${displayItems.length.toLocaleString('id-ID')} baris Data PSB ke file Excel (mode lokal).`,
+        })
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Gagal mengekspor Excel.'
       setFeedback({
         tone: 'error',
         message: msg,
       })
-      try {
-        // eslint-disable-next-line no-alert
-        window.alert(`[Export Excel] ${msg}`)
-      } catch {
-        /* ignore */
-      }
     } finally {
       setExporting(false)
     }

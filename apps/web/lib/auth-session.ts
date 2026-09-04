@@ -1,7 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import type { AppRole } from '@/lib/types'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { runReviewDbQuery } from '@/lib/review-db'
+import { runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 
 export type AppSession = {
   userId?: number
@@ -248,6 +248,11 @@ async function authenticateReviewDbUser(username: string, password: string): Pro
 
   try {
     const normalizedUsername = username.trim().toLowerCase()
+
+    await runReviewDbTransaction(async (conn) => {
+      await conn.query('SELECT 1 AS conn_probe')
+    })
+
     const users = await runReviewDbQuery<ReviewAuthUserRow>(
       `
         SELECT
@@ -347,9 +352,7 @@ export async function authenticateUser(username: string, password: string): Prom
     return { session: null, reason: 'unavailable' }
   }
 
-  return reviewAttempt.reason === 'unavailable' && bootstrapEnabled
-    ? { session: null, reason: 'not_found' }
-    : reviewAttempt
+  return reviewAttempt
 }
 
 export function createSessionToken(session: AppSession): string | null {

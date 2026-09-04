@@ -1297,93 +1297,119 @@ async function getSupportNonTicketReadSchema(): Promise<SupportNonTicketReadSche
   }
 }
 
-async function getReviewDbDomainStats() {
-  const [row] = await runReviewDbQuery<DomainStatsRow>(`
-    SELECT
-      (SELECT COUNT(*) FROM sales_leads) AS salesLeads,
-      (SELECT COUNT(*) FROM sales_orders) AS salesOrders,
-      (
-        SELECT COUNT(*)
-        FROM sales_surveys
-        WHERE survey_status IN ('REQUESTED', 'SCHEDULED', 'ON_PROGRESS')
-      ) AS pendingSurveys,
-      (SELECT COUNT(*) FROM crm_customers) AS customers,
-      (
-        SELECT COUNT(*)
-        FROM service_subscriptions
-        WHERE status = 'ACTIVE'
-      ) AS activeSubscriptions,
-      (SELECT COUNT(*) FROM crm_customer_addresses) AS customerAddresses,
-      (
-        SELECT COUNT(*)
-        FROM support_trouble_tickets
-        WHERE closed_at IS NULL
-          AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
-          AND COALESCE(UPPER(TRIM(category)), 'TT') <> 'PV'
-          AND COALESCE(UPPER(TRIM(type)), '') <> 'PREVENTIVE'
-      ) AS openTroubleTickets,
-      (
-        SELECT COUNT(*)
-        FROM support_trouble_tickets
-        WHERE closed_at IS NULL
-          AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
-          AND (
-            COALESCE(UPPER(TRIM(category)), 'TT') = 'PV'
-            OR COALESCE(UPPER(TRIM(type)), '') = 'PREVENTIVE'
-          )
-      ) AS preventiveOpen,
-      (
-        SELECT COUNT(*)
-        FROM support_isolations
-        WHERE status = 'OPEN'
-          AND is_archived = 0
-      ) AS activeIsolations,
-      (
-        SELECT COUNT(*)
-        FROM inventory_items
-        WHERE status = 'ACTIVE'
-      ) AS inventoryItems,
-      (
-        SELECT COUNT(*)
-        FROM inventory_stock_movements
-        WHERE YEAR(movement_at) = YEAR(CURRENT_DATE)
-          AND MONTH(movement_at) = MONTH(CURRENT_DATE)
-      ) AS currentMonthMovements,
-      (SELECT COUNT(*) FROM network_odp) AS odpCount,
-      (SELECT COUNT(*) FROM hr_employees) AS employees,
-      (
-        SELECT COUNT(*)
-        FROM hr_attendance
-        WHERE attendance_date = CURRENT_DATE
-      ) AS attendanceToday,
-      (
-        SELECT COUNT(*)
-        FROM hr_loans
-        WHERE status = 'ACTIVE'
-      ) AS activeLoans,
-      (
-        SELECT COUNT(*)
-        FROM billing_invoices
-        WHERE invoice_status = 'OVERDUE'
-          OR (
-            due_date < CURRENT_DATE
-            AND COALESCE(paid_amount, 0) < COALESCE(total_amount, 0)
-            AND invoice_status NOT IN ('PAID', 'CANCELLED')
-          )
-      ) AS overdueInvoices,
-      (
-        SELECT COUNT(*)
-        FROM billing_invoices
-        WHERE invoice_status = 'PARTIAL'
-      ) AS partialInvoices,
-      (
-        SELECT COUNT(*)
-        FROM billing_invoices
-        WHERE suspend_candidate = 1
-      ) AS suspendCandidates
-  `)
-
-  return row
+async function getReviewDbDomainStats(): Promise<DomainStatsRow> {
+  const zeroStats: DomainStatsRow = {
+    salesLeads: 0,
+    salesOrders: 0,
+    pendingSurveys: 0,
+    customers: 0,
+    activeSubscriptions: 0,
+    customerAddresses: 0,
+    openTroubleTickets: 0,
+    preventiveOpen: 0,
+    activeIsolations: 0,
+    inventoryItems: 0,
+    currentMonthMovements: 0,
+    odpCount: 0,
+    employees: 0,
+    attendanceToday: 0,
+    activeLoans: 0,
+    overdueInvoices: 0,
+    partialInvoices: 0,
+    suspendCandidates: 0,
+  }
+  try {
+    const [row] = await runReviewDbQuery<DomainStatsRow>(`
+      SELECT
+        (SELECT COUNT(*) FROM sales_leads) AS salesLeads,
+        (SELECT COUNT(*) FROM sales_orders) AS salesOrders,
+        (
+          SELECT COUNT(*)
+          FROM sales_surveys
+          WHERE survey_status IN ('REQUESTED', 'SCHEDULED', 'ON_PROGRESS')
+        ) AS pendingSurveys,
+        (SELECT COUNT(*) FROM crm_customers) AS customers,
+        (
+          SELECT COUNT(*)
+          FROM service_subscriptions
+          WHERE status = 'ACTIVE'
+        ) AS activeSubscriptions,
+        CASE WHEN (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'crm_customer_addresses') > 0
+          THEN (SELECT COUNT(*) FROM crm_customer_addresses)
+          ELSE 0
+        END AS customerAddresses,
+        (
+          SELECT COUNT(*)
+          FROM support_trouble_tickets
+          WHERE closed_at IS NULL
+            AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+            AND COALESCE(UPPER(TRIM(category)), 'TT') <> 'PV'
+            AND COALESCE(UPPER(TRIM(type)), '') <> 'PREVENTIVE'
+        ) AS openTroubleTickets,
+        (
+          SELECT COUNT(*)
+          FROM support_trouble_tickets
+          WHERE closed_at IS NULL
+            AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+            AND (
+              COALESCE(UPPER(TRIM(category)), 'TT') = 'PV'
+              OR COALESCE(UPPER(TRIM(type)), '') = 'PREVENTIVE'
+            )
+        ) AS preventiveOpen,
+        (
+          SELECT COUNT(*)
+          FROM support_isolations
+          WHERE status = 'OPEN'
+            AND is_archived = 0
+        ) AS activeIsolations,
+        (
+          SELECT COUNT(*)
+          FROM inventory_items
+          WHERE status = 'ACTIVE'
+        ) AS inventoryItems,
+        (
+          SELECT COUNT(*)
+          FROM inventory_stock_movements
+          WHERE YEAR(movement_at) = YEAR(CURRENT_DATE)
+            AND MONTH(movement_at) = MONTH(CURRENT_DATE)
+        ) AS currentMonthMovements,
+        (SELECT COUNT(*) FROM network_odp) AS odpCount,
+        (SELECT COUNT(*) FROM hr_employees) AS employees,
+        (
+          SELECT COUNT(*)
+          FROM hr_attendance
+          WHERE attendance_date = CURRENT_DATE
+        ) AS attendanceToday,
+        (
+          SELECT COUNT(*)
+          FROM hr_loans
+          WHERE status = 'ACTIVE'
+        ) AS activeLoans,
+        (
+          SELECT COUNT(*)
+          FROM billing_invoices
+          WHERE invoice_status = 'OVERDUE'
+            OR (
+              due_date < CURRENT_DATE
+              AND COALESCE(paid_amount, 0) < COALESCE(total_amount, 0)
+              AND invoice_status NOT IN ('PAID', 'CANCELLED')
+            )
+        ) AS overdueInvoices,
+        (
+          SELECT COUNT(*)
+          FROM billing_invoices
+          WHERE invoice_status = 'PARTIAL'
+        ) AS partialInvoices,
+        (
+          SELECT COUNT(*)
+          FROM billing_invoices
+          WHERE suspend_candidate = 1
+        ) AS suspendCandidates
+    `)
+    return row ?? zeroStats
+  } catch {
+    return zeroStats
+  }
 }
 
 async function getReviewDbSupportSections(session: AppSession, params?: {
@@ -6088,60 +6114,80 @@ async function getReviewDbHrSections(filters?: DomainReviewDrilldownFilters): Pr
   ].filter((section) => section.rows.length > 0)
 }
 
-function applyReviewDbSummaries(content: DomainPageContent, stats: DomainStatsRow): DomainPageContent {
+function applyReviewDbSummaries(content: DomainPageContent, stats: DomainStatsRow | null | undefined): DomainPageContent {
+  const s: DomainStatsRow = stats ?? {
+    salesLeads: 0,
+    salesOrders: 0,
+    pendingSurveys: 0,
+    customers: 0,
+    activeSubscriptions: 0,
+    customerAddresses: 0,
+    openTroubleTickets: 0,
+    preventiveOpen: 0,
+    activeIsolations: 0,
+    inventoryItems: 0,
+    currentMonthMovements: 0,
+    odpCount: 0,
+    employees: 0,
+    attendanceToday: 0,
+    activeLoans: 0,
+    overdueInvoices: 0,
+    partialInvoices: 0,
+    suspendCandidates: 0,
+  }
   switch (content.key) {
     case 'sales':
       return {
         ...content,
         summaries: [
-          { label: 'Lead Review', value: formatNumber(stats.salesLeads) },
-          { label: 'Order Aktif', value: formatNumber(stats.salesOrders) },
-          { label: 'Survey Pending', value: formatNumber(stats.pendingSurveys) },
+          { label: 'Lead Review', value: formatNumber(s.salesLeads) },
+          { label: 'Order Aktif', value: formatNumber(s.salesOrders) },
+          { label: 'Survey Pending', value: formatNumber(s.pendingSurveys) },
         ],
       }
     case 'customers':
       return {
         ...content,
         summaries: [
-          { label: 'Customer Aktif', value: formatNumber(stats.customers) },
-          { label: 'Subscription Aktif', value: formatNumber(stats.activeSubscriptions) },
-          { label: 'Address Terkait', value: formatNumber(stats.customerAddresses) },
+          { label: 'Customer Aktif', value: formatNumber(s.customers) },
+          { label: 'Subscription Aktif', value: formatNumber(s.activeSubscriptions) },
+          { label: 'Address Terkait', value: formatNumber(s.customerAddresses) },
         ],
       }
     case 'support':
       return {
         ...content,
         summaries: [
-          { label: 'TT Open', value: formatNumber(stats.openTroubleTickets) },
-          { label: 'Preventive Open', value: formatNumber(stats.preventiveOpen) },
-          { label: 'Isolir Aktif', value: formatNumber(stats.activeIsolations) },
+          { label: 'TT Open', value: formatNumber(s.openTroubleTickets) },
+          { label: 'Preventive Open', value: formatNumber(s.preventiveOpen) },
+          { label: 'Isolir Aktif', value: formatNumber(s.activeIsolations) },
         ],
       }
     case 'inventory':
       return {
         ...content,
         summaries: [
-          { label: 'Item Master', value: formatNumber(stats.inventoryItems) },
-          { label: 'Movement Bulan Ini', value: formatNumber(stats.currentMonthMovements) },
-          { label: 'ODP Terdeteksi', value: formatNumber(stats.odpCount) },
+          { label: 'Item Master', value: formatNumber(s.inventoryItems) },
+          { label: 'Movement Bulan Ini', value: formatNumber(s.currentMonthMovements) },
+          { label: 'ODP Terdeteksi', value: formatNumber(s.odpCount) },
         ],
       }
     case 'hr':
       return {
         ...content,
         summaries: [
-          { label: 'Employee', value: formatNumber(stats.employees) },
-          { label: 'Attendance Hari Ini', value: formatNumber(stats.attendanceToday) },
-          { label: 'Loan Aktif', value: formatNumber(stats.activeLoans) },
+          { label: 'Employee', value: formatNumber(s.employees) },
+          { label: 'Attendance Hari Ini', value: formatNumber(s.attendanceToday) },
+          { label: 'Loan Aktif', value: formatNumber(s.activeLoans) },
         ],
       }
     case 'billing':
       return {
         ...content,
         summaries: [
-          { label: 'Invoice Overdue', value: formatNumber(stats.overdueInvoices) },
-          { label: 'Payment Partial', value: formatNumber(stats.partialInvoices) },
-          { label: 'Suspend Candidate', value: formatNumber(stats.suspendCandidates) },
+          { label: 'Invoice Overdue', value: formatNumber(s.overdueInvoices) },
+          { label: 'Payment Partial', value: formatNumber(s.partialInvoices) },
+          { label: 'Suspend Candidate', value: formatNumber(s.suspendCandidates) },
         ],
       }
     default:

@@ -1,0 +1,238 @@
+name: Schema Preflight ERP OSS BSS (DRY RUN ONLY, Artifact Producer)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_mode:
+        description: "Schema preflight execution mode. LOCKED to dry-run-only safety. NO APPLY/MIGRATION allowed."
+        required: false
+        default: "DRY_RUN_VERIFY_ONLY"
+        type: choice
+        options:
+          - DRY_RUN_VERIFY_ONLY
+
+concurrency:
+  group: schema-preflight-erp-oss-bss
+  cancel-in-progress: false
+
+jobs:
+  produce-artifact:
+    name: Schema Preflight Artifact Producer (DRY RUN metadata only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    env:
+      NODE_VERSION: "20"
+      WORKING_DIR: "apps/web"
+      # ----------------------------------------------------------------
+      # FAIL-CLOSED DB BOUNDARY (§7 rule enforcement):
+      # Production review-db credentials MUST be set by operator via
+      # GitHub repository secrets if they want this workflow to
+      # evaluate real schema. IF these secrets are not present → the
+      # orchestrator script honestly classifies every module as
+      # NOT_COVERED REVIEW_DB_NOT_CONFIGURED and overallStatus != PASS.
+      # We NEVER read production secrets from .env.* files, Coolify UI,
+      # or fallback staging credentials.
+      # ----------------------------------------------------------------
+      REVIEW_DB_DRYRUN_DATABASE_URL: ${{ secrets.ERP_DATABASE_URL }}
+      NO_PRODUCTION_APPLY: "1"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: 01 Preflight mode assertion (LOCKED DRY RUN ONLY — NO --apply)
+        id: mode-lock
+        run: |
+          set -euo pipefail
+
+          MODE="${{ github.event.inputs.target_mode || 'DRY_RUN_VERIFY_ONLY' }}"
+
+          if [ "$MODE" != "DRY_RUN_VERIFY_ONLY" ]; then
+            echo "FATAL: mode lock FAIL. Expected DRY_RUN_VERIFY_ONLY got [$MODE]"
+            echo "This workflow NEVER allows --apply / --confirm-host / --confirm-database / --confirm-table flags."
+            exit 4
+          fi
+
+          echo "MODE=$MODE (locked DRY RUN ONLY — no writes to any DB target ever by this producer)"
+          echo "dry_run_mode_assertion=PASS" >> "$GITHUB_OUTPUT"
+
+      - name: 02 Checkout repository source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 03 Resolve SHORT_SHA + commit SHA identity anchors
+        id: sha
+        run: |
+          set -euo pipefail
+
+          FULL="${GITHUB_SHA}"
+          SHORT="${FULL:0:7}"
+
+          if ! [[ "$SHORT" =~ ^[0-9a-fA-F]{7}$ ]]; then
+            echo "FATAL: GITHUB_SHA invalid or truncated short. Got short=[$SHORT] full=[$FULL]"
+            exit 2
+          fi
+
+          echo "commit_sha=$FULL" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT"   >> "$GITHUB_OUTPUT"
+          echo "COMMIT_SHA=$FULL"
+          echo "SHORT_SHA=$SHORT"
+          echo "ARTIFACT_EXPECTED_NAME=provision-all-schema-preflight-${SHORT}"
+          echo "ARTIFACT_EXPECTED_FILE=provision-all-schema-preflight-${SHORT}.json"
+
+      - name: 04 Node.js setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: "${{ env.NODE_VERSION }}"
+
+      - name: 05 Install apps/web dependencies (npm ci, skip if lock missing)
+        working-directory: "${{ env.WORKING_DIR }}"
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "package-lock.json" ]; then
+            echo "[WARN] No package-lock.json in apps/web — attempting legacy install (may be slow)."
+            npm install --no-audit --no-fund --prefer-offline 2>&1 | tail -20
+          else
+            npm ci --no-audit --no-fund --prefer-offline 2>&1 | tail -20
+          fi
+
+          echo "npm install complete."
+          node -v
+          npx tsx --version || echo "[INFO] tsx not globally installed; script package.json dependency will be used via npm run"
+
+      - name: 06 Execute DRY RUN schema preflight (NO --apply NO --confirm flags EVER)
+        id: run
+        working-directory: "${{ env.WORKING_DIR }}"
+        env:
+          GITHUB_WORKFLOW_COMMIT_SHA_OVERRIDE: ${{ steps.sha.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+
+          EXIT=0
+          # NOTE: provision:all-schema-preflight = defined in apps/web/package.json L38 previous audit
+          npm run provision:all-schema-preflight || EXIT=$?
+
+          echo "preflight_script_exit=$EXIT" >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "========== PRODUCER EXIT CLASSIFICATION (metadata only — NO secret values) =========="
+          case "$EXIT" in
+            0) echo "  exit=$EXIT → overallStatus likely PASS (artifact should be present in out/schema-preflight/)" ;;
+            1) echo "  exit=$EXIT → overallStatus NOT_READY (common if REVIEW_DB_NOT_CONFIGURED no secret provided — honest NOT_COVERED)" ;;
+            2) echo "  exit=$EXIT → overallStatus FATAL (orchestrator unexpected exception)" ;;
+            *) echo "  exit=$EXIT → UNKNOWN (treat as NOT_READY fail-closed)" ;;
+          esac
+          echo ""
+
+          ARTIFACT_DIR="out/schema-preflight"
+          EXPECTED_FILE="provision-all-schema-preflight-${{ steps.sha.outputs.short_sha }}.json"
+
+          if [ -f "$ARTIFACT_DIR/$EXPECTED_FILE" ]; then
+            echo "[OK] Artifact file FOUND: $ARTIFACT_DIR/$EXPECTED_FILE"
+          else
+            echo "[WARN] Artifact file not found at expected path $ARTIFACT_DIR/$EXPECTED_FILE (script may have changed write path — fail-closed uploader below)"
+            ls -la "$ARTIFACT_DIR" 2>/dev/null || echo "[INFO] no $ARTIFACT_DIR directory (artifact NOT written)"
+          fi
+
+      - name: 07 Artifact SHA / identity validation (§6 rule: commitSha/shortSha must match GITHUB_SHA exactly)
+        id: identity
+        working-directory: "${{ env.WORKING_DIR }}"
+        run: |
+          set -euo pipefail
+
+          ARTIFACT_DIR="out/schema-preflight"
+          EXPECTED_FILE="provision-all-schema-preflight-${{ steps.sha.outputs.short_sha }}.json"
+          EXPECTED_PATH="$ARTIFACT_DIR/$EXPECTED_FILE"
+
+          if [ ! -f "$EXPECTED_PATH" ]; then
+            echo "FATAL: §6 identity check — artifact file missing at [$EXPECTED_PATH]. Cannot validate identity. Producer INVALID."
+            echo "Artifact INVALID classification: CANNOT UPLOAD (fail-closed §6 mismatch = artifact invalid)."
+            exit 17
+          fi
+
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "FATAL: jq not available. Cannot validate structural fields. Exit 17 fail-closed."
+            exit 17
+          fi
+
+          # JSON valid?
+          if ! jq empty "$EXPECTED_PATH" >/dev/null 2>&1; then
+            echo "FATAL: §6 — artifact NOT valid parseable JSON. Exit17 fail-closed."
+            exit 17
+          fi
+
+          # 8 required structural keys (§D §5 contracts)
+          for KEY in schemaPreflightVersion commitSha shortSha overallStatus coverageSummary backfillSummary artifactDryRunOnly modules; do
+            EXISTS=$(jq -r "if has(\"$KEY\") then \"EXISTS\" else \"MISSING\" end" "$EXPECTED_PATH")
+            echo "  field $KEY classified: $EXISTS"
+            if [ "$EXISTS" != "EXISTS" ]; then
+              echo "FATAL: missing required structural field [$KEY]. §6 identity gate fail-closed exit17."
+              exit 17
+            fi
+          done
+
+          EXTRACTED_COMMIT=$(jq -r '.commitSha // empty' "$EXPECTED_PATH")
+          EXTRACTED_SHORT=$(jq -r  '.shortSha  // empty' "$EXPECTED_PATH")
+          EXTRACTED_DRYRUN=$(jq -r '.artifactDryRunOnly // "UNKNOWN"' "$EXPECTED_PATH")
+
+          # §6: MUST match GITHUB_SHA — mismatch = FAIL CLOSED.
+          if [ "$EXTRACTED_COMMIT" != "${{ steps.sha.outputs.commit_sha }}" ]; then
+            echo "FATAL: §6 commitSha MISMATCH"
+            echo "  Expected full: ${{ steps.sha.outputs.commit_sha }}"
+            echo "  Got artifact commitSha len=${#EXTRACTED_COMMIT}: (not printed beyond length — classified) → FAIL-CLOSED"
+            exit 17
+          fi
+          if [ "$EXTRACTED_SHORT" != "${{ steps.sha.outputs.short_sha }}" ]; then
+            echo "FATAL: §6 shortSha MISMATCH"
+            echo "  Expected: ${{ steps.sha.outputs.short_sha }}"
+            echo "  Got:      [$EXTRACTED_SHORT] → FAIL-CLOSED exit17."
+            exit 17
+          fi
+          if [ "$EXTRACTED_DRYRUN" != "true" ]; then
+            echo "FATAL: §7/§5 artifactDryRunOnly strict = [$EXTRACTED_DRYRUN] expected strict true. Security fail exit17."
+            exit 17
+          fi
+
+          # SHA256 checksum (§11 rule: optional checksum supplementary identity NOT a replacement for commit identity)
+          SHA256=$(sha256sum "$EXPECTED_PATH" | awk '{print $1}')
+          echo "artifact_sha256_checksum=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "artifact_path=$EXPECTED_PATH" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=provision-all-schema-preflight-${{ steps.sha.outputs.short_sha }}" >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "Producer §6 Identity Gate PASS (commitSha+shortSha+dryrun validated) — UPLOAD allowed."
+          echo "Checksum SHA256 (§11 supplementary): $SHA256"
+
+      - name: 08 Upload schema preflight artifact (§4 actions/upload-artifact@v4)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provision-all-schema-preflight-${{ steps.sha.outputs.short_sha }}
+          path: ${{ steps.identity.outputs.artifact_path }}
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: 09 Producer summary (metadata only classification, NO secret values EVER printed)
+        if: always()
+        run: |
+          echo ""
+          echo "=============================================="
+          echo "SCHEMA PREFLIGHT PRODUCER SUMMARY (metadata-only safe classification)"
+          echo "=============================================="
+          echo "  commitSha:                 ${{ steps.sha.outputs.commit_sha }}"
+          echo "  shortSha:                  ${{ steps.sha.outputs.short_sha }}"
+          echo "  expected artifact name:    provision-all-schema-preflight-${{ steps.sha.outputs.short_sha }}"
+          echo "  mode locked:               DRY_RUN_VERIFY_ONLY (--apply = NEVER passed by this producer §3/§7)"
+          echo "  identity gate result:      ${{ steps.identity.conclusion }} (§6 SHA match = PASS → uploaded)"
+          echo "  script raw exit code:      ${{ steps.run.outputs.preflight_script_exit || 'unknown' }}"
+          echo "  Artifact SHA256 checksum:  ${{ steps.identity.outputs.artifact_sha256_checksum || 'N/A' }}"
+          echo ""
+          echo "  Producer contract = HONEST FAIL CLOSED:"
+          echo "    - No secret value output (mask protocol §5 preserved)"
+          echo "    - No DB writes attempted (DRY RUN ONLY)"
+          echo "    - No migration, no backup creation, no APPLY flags (§3)"
+          echo "    - No Production credential fallback (§7 boundary). If ERP_DATABASE_URL not set — honest NOT_READY only."
+          echo "=============================================="
