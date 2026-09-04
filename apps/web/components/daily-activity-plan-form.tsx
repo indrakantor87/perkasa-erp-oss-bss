@@ -28,6 +28,7 @@ type DailyActivityPlanFormProps = {
   prefillActivityType?: string
   prefillNotes?: string
   hasPrefillContext?: boolean
+  onSavedSuccess?: () => void
 }
 
 const priorityOptions = [
@@ -55,6 +56,7 @@ export function DailyActivityPlanForm({
   prefillActivityType,
   prefillNotes,
   hasPrefillContext,
+  onSavedSuccess,
 }: DailyActivityPlanFormProps) {
   const router = useRouter()
   const [activityDate, setActivityDate] = useState(defaultActivityDate)
@@ -169,6 +171,7 @@ export function DailyActivityPlanForm({
       setDivisionName(defaultDivision)
       setSubdivisionName(defaultSubdivision)
       router.refresh()
+      onSavedSuccess?.()
     } finally {
       setSubmitting(false)
     }

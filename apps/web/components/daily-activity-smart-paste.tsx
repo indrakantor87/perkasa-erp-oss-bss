@@ -18,6 +18,8 @@ type DailyActivityOption = {
   label: string
 }
 
+type TabKey = 'smart' | 'manual'
+
 type DailyActivitySmartPasteProps = {
   canCreate: boolean
   reviewDbReady: boolean
@@ -37,9 +39,9 @@ type DailyActivitySmartPasteProps = {
   prefillActivityType?: string
   prefillNotes?: string
   hasPrefillContext?: boolean
+  forceMode?: TabKey
+  onSavedSuccess?: () => void
 }
-
-type TabKey = 'smart' | 'manual'
 
 const priorityOptions = [
   { value: 'HIGH', label: 'Tinggi' },
@@ -67,10 +69,13 @@ export function DailyActivitySmartPaste(props: DailyActivitySmartPasteProps) {
     subdivisionMap,
     defaultDivision,
     defaultSubdivision,
+    forceMode,
+    onSavedSuccess,
   } = props
 
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<TabKey>('smart')
+  const [activeTab, setActiveTab] = useState<TabKey>(forceMode ?? 'smart')
+  const showTabs = forceMode === undefined
   const [pasteText, setPasteText] = useState('')
   const [activityDate, setActivityDate] = useState(defaultActivityDate)
   const [dateSource, setDateSource] = useState<'detected' | 'fallback-today' | 'manual'>('manual')
@@ -214,6 +219,7 @@ export function DailyActivitySmartPaste(props: DailyActivitySmartPasteProps) {
       setItems([])
       setPasteText('')
       router.refresh()
+      onSavedSuccess?.()
     } catch (err) {
       const cause = err instanceof Error ? err.message : String(err ?? 'Network error')
       setFeedback({
@@ -236,37 +242,39 @@ export function DailyActivitySmartPaste(props: DailyActivitySmartPasteProps) {
             Smart Paste = tempel dari Notepad → pecah otomatis per aktivitas. Input Manual = 1 record per submit (form lama).
           </p>
         </div>
-        <div role="tablist" aria-label="Daily Activity input mode" className="flex rounded-lg border border-line bg-slate-50 p-1 text-xs font-semibold">
-          <button
-            role="tab"
-            aria-selected={activeTab === 'smart'}
-            type="button"
-            onClick={() => setActiveTab('smart')}
-            className={
-              'rounded-md px-3 py-1.5 transition ' +
-              (activeTab === 'smart' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700')
-            }
-          >
-            Smart Paste (Cepat)
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'manual'}
-            type="button"
-            onClick={() => setActiveTab('manual')}
-            className={
-              'rounded-md px-3 py-1.5 transition ' +
-              (activeTab === 'manual' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700')
-            }
-          >
-            Input Manual
-          </button>
-        </div>
+        {showTabs ? (
+          <div role="tablist" aria-label="Daily Activity input mode" className="flex rounded-lg border border-line bg-slate-50 p-1 text-xs font-semibold">
+            <button
+              role="tab"
+              aria-selected={activeTab === 'smart'}
+              type="button"
+              onClick={() => setActiveTab('smart')}
+              className={
+                'rounded-md px-3 py-1.5 transition ' +
+                (activeTab === 'smart' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700')
+              }
+            >
+              Smart Paste (Cepat)
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'manual'}
+              type="button"
+              onClick={() => setActiveTab('manual')}
+              className={
+                'rounded-md px-3 py-1.5 transition ' +
+                (activeTab === 'manual' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700')
+              }
+            >
+              Input Manual
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {activeTab === 'manual' ? (
         <div className="mt-2">
-          <DailyActivityPlanForm {...props} />
+          <DailyActivityPlanForm {...props} onSavedSuccess={onSavedSuccess} />
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">

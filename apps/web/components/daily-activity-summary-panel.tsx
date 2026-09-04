@@ -1,58 +1,9 @@
-import { dailyActivityPlanningLevelLabels } from '@/lib/daily-activity-org'
 import type {
   DailyActivityCalendarDay,
   DailyActivityItem,
   DailyActivityPerformancePeriod,
   DailyActivitySummary,
 } from '@/lib/services/daily-activity-service'
-
-function formatDateTime(value: string | null) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (!Number.isFinite(date.getTime())) return '-'
-  return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
-
-function getStatusBadge(status: DailyActivityItem['executionStatus']) {
-  switch (status) {
-    case 'DONE':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-    case 'PENDING':
-      return 'border-amber-200 bg-amber-50 text-amber-700'
-    default:
-      return 'border-slate-200 bg-white text-slate-600'
-  }
-}
-
-function getApprovalBadge(status: DailyActivityItem['approvalStatus']) {
-  switch (status) {
-    case 'APPROVED':
-      return { label: 'APPROVED', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
-    case 'PENDING':
-      return { label: 'PENDING APPROVAL', className: 'border-sky-200 bg-sky-50 text-sky-700' }
-    case 'REJECTED':
-      return { label: 'REJECTED', className: 'border-rose-200 bg-rose-50 text-rose-700' }
-    default:
-      return null
-  }
-}
-
-function getPriorityBadge(priority: DailyActivityItem['priorityLevel']) {
-  switch (priority) {
-    case 'HIGH':
-      return 'border-rose-200 bg-rose-50 text-rose-700'
-    case 'LOW':
-      return 'border-slate-200 bg-white text-slate-600'
-    default:
-      return 'border-sky-200 bg-sky-50 text-sky-700'
-  }
-}
 
 type DailyActivitySummaryPanelProps = {
   summary: DailyActivitySummary
@@ -76,8 +27,6 @@ export function DailyActivitySummaryPanel({
   summary,
   todayLabel,
   scopeLabel,
-  todayItems,
-  recentItems,
   performance,
   calendarMonth,
   calendarPrevHref,
@@ -272,136 +221,6 @@ export function DailyActivitySummaryPanel({
                 </div>
               </article>
             ),
-          )}
-        </div>
-      </section>
-
-      <section className="panel p-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="section-title">Agenda Hari Ini</p>
-            <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-              Daftar aktivitas yang direncanakan dan ditutup hari ini
-            </h3>
-          </div>
-          <span className="badge border-slate-200 bg-white text-slate-600">{todayItems.length} aktivitas</span>
-        </div>
-
-        <div className="mt-6 space-y-3">
-          {todayItems.length ? (
-            todayItems.map((item) => (
-              <article key={item.id} className="rounded-2xl border border-line bg-slate-50 p-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-950">{item.taskTitle}</p>
-                    <p className="mt-1 text-sm text-mute">
-                      {item.activityCode} • {item.plannedBy} • {dailyActivityPlanningLevelLabels[item.planningLevel]}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className={`badge ${getStatusBadge(item.executionStatus)}`}>{item.executionStatus}</span>
-                    {getApprovalBadge(item.approvalStatus) ? (
-                      <span className={`badge ${getApprovalBadge(item.approvalStatus)?.className}`}>
-                        {getApprovalBadge(item.approvalStatus)?.label}
-                      </span>
-                    ) : null}
-                    <span className={`badge ${getPriorityBadge(item.priorityLevel)}`}>{item.priorityLevel}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-2 text-sm leading-6 text-mute">
-                  <p>{item.taskDetail || 'Detail aktivitas belum ditambahkan.'}</p>
-                  <p>
-                    <span className="font-semibold text-slate-700">Target:</span>{' '}
-                    {item.successMetric || '-'}
-                  </p>
-                  <p>
-                    <span className="font-semibold text-slate-700">Level:</span>{' '}
-                    {dailyActivityPlanningLevelLabels[item.planningLevel]}
-                  </p>
-                  <p>
-                    <span className="font-semibold text-slate-700">Divisi:</span>{' '}
-                    {item.divisionName || '-'} / {item.subdivisionName || '-'}
-                  </p>
-                  <p>
-                    <span className="font-semibold text-slate-700">Direncanakan:</span>{' '}
-                    {formatDateTime(item.plannedAt)}
-                  </p>
-                  {item.closeNotes ? (
-                    <p>
-                      <span className="font-semibold text-slate-700">Closing:</span>{' '}
-                      {item.closeNotes}
-                    </p>
-                  ) : null}
-                  {item.pendingReason ? (
-                    <p>
-                      <span className="font-semibold text-slate-700">Alasan pending:</span>{' '}
-                      {item.pendingReason}
-                    </p>
-                  ) : null}
-                  {item.followUpAction ? (
-                    <p>
-                      <span className="font-semibold text-slate-700">Aksi lanjut:</span>{' '}
-                      {item.followUpAction}
-                    </p>
-                  ) : null}
-                </div>
-              </article>
-            ))
-          ) : (
-            <article className="rounded-2xl border border-dashed border-line bg-slate-50 p-6 text-sm leading-6 text-mute">
-              Belum ada daily activity yang tercatat hari ini. Mulai dari plan pagi agar closing sore bisa terlihat jelas.
-            </article>
-          )}
-        </div>
-      </section>
-
-      <section className="panel p-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="section-title">Riwayat Ringkas</p>
-            <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-              Aktivitas terbaru untuk evaluasi mingguan
-            </h3>
-          </div>
-          <span className="badge border-slate-200 bg-white text-slate-600">7 hari terakhir</span>
-        </div>
-
-        <div className="mt-6 space-y-3">
-          {recentItems.length ? (
-            recentItems.map((item) => (
-              <article key={`${item.id}-${item.activityDate}`} className="rounded-2xl border border-line bg-white p-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-950">{item.taskTitle}</p>
-                    <p className="mt-1 text-sm text-mute">
-                      {item.activityDate} • {item.plannedBy} • {dailyActivityPlanningLevelLabels[item.planningLevel]} • {item.activityCode}
-                    </p>
-                  </div>
-                  <span className={`badge ${getStatusBadge(item.executionStatus)}`}>{item.executionStatus}</span>
-                </div>
-                {item.pendingReason || item.followUpAction ? (
-                  <div className="mt-4 space-y-2 text-sm leading-6 text-mute">
-                    {item.pendingReason ? (
-                      <p>
-                        <span className="font-semibold text-slate-700">Alasan pending:</span>{' '}
-                        {item.pendingReason}
-                      </p>
-                    ) : null}
-                    {item.followUpAction ? (
-                      <p>
-                        <span className="font-semibold text-slate-700">Aksi lanjut:</span>{' '}
-                        {item.followUpAction}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </article>
-            ))
-          ) : (
-            <article className="rounded-2xl border border-dashed border-line bg-slate-50 p-6 text-sm leading-6 text-mute">
-              Riwayat daily activity 7 hari terakhir belum tersedia.
-            </article>
           )}
         </div>
       </section>
