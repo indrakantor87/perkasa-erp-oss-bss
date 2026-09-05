@@ -73,7 +73,7 @@ function ModalShell({
         onClick={onClose}
       />
       <div
-        className={`relative z-10 flex max-h-full w-full flex-1 flex-col shrink-0 ${maxWidthClass} overflow-hidden rounded-3xl border border-line bg-white shadow-2xl sm:max-h-[90vh]`}
+        className={`relative z-10 flex max-h-full w-full flex-col ${maxWidthClass} overflow-hidden rounded-3xl border border-line bg-white shadow-2xl sm:max-h-[90vh]`}
       >
         <div className="sticky top-0 z-10 shrink-0 flex flex-col gap-4 border-b border-line bg-white/95 px-6 py-5 backdrop-blur lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -119,9 +119,9 @@ export function DailyActivityWorkspaceToolbar(props: DailyActivityWorkspaceToolb
 
   return (
     <>
-      <section className="panel p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
+      <section className="panel p-4 min-w-0">
+        <div className="flex flex-col gap-3 w-full min-w-0 lg:flex-row lg:items-center lg:justify-between lg:flex-wrap">
+          <div className="min-w-0">
             <p className="section-title">Aktivitas {todayLabel}</p>
             <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
               {todayItemsCount > 0
@@ -132,13 +132,17 @@ export function DailyActivityWorkspaceToolbar(props: DailyActivityWorkspaceToolb
               Gunakan toolbar disamping untuk input cepat, buat manual, atau filter.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row lg:flex-row">
+          <div className="flex flex-col gap-2 w-full sm:w-auto sm:justify-start justify-center items-stretch sm:items-center sm:flex-row sm:flex-wrap">
             <button
               type="button"
               disabled={isActionDisabled}
               onClick={() => setInputModalOpen(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
-              title="Tempel daftar aktivitas dari Notepad sekaligus (Smart Paste)"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:ring-2 disabled:ring-slate-200"
+              title={
+                isActionDisabled
+                  ? (!canCreate ? 'Akun Anda tidak memiliki izin create daily activity' : 'Review DB belum siap — tunggu koneksi data source')
+                  : 'Tempel daftar aktivitas dari Notepad sekaligus (Smart Paste)'
+              }
             >
               <span aria-hidden>+</span>
               <span>INPUT</span>
@@ -147,8 +151,12 @@ export function DailyActivityWorkspaceToolbar(props: DailyActivityWorkspaceToolb
               type="button"
               disabled={isActionDisabled}
               onClick={() => setCreateModalOpen(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-white px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
-              title="Buat 1 aktivitas manual"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-white px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:border-slate-300 disabled:text-slate-500"
+              title={
+                isActionDisabled
+                  ? (!canCreate ? 'Akun Anda tidak memiliki izin create daily activity' : 'Review DB belum siap — tunggu koneksi data source')
+                  : 'Buat 1 aktivitas manual'
+              }
             >
               <span aria-hidden>+</span>
               <span>CREATE</span>
@@ -163,6 +171,12 @@ export function DailyActivityWorkspaceToolbar(props: DailyActivityWorkspaceToolb
               <span>FILTER</span>
             </button>
           </div>
+          {isActionDisabled ? (
+            <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 lg:w-auto">
+              <strong className="font-semibold">Toolbar dinonaktifkan:</strong>{' '}
+              {!canCreate ? 'Role Anda belum memiliki izin <create> untuk Daily Activity (hubungi admin).' : 'Review DB fallback aktif — koneksi staging review-db belum ready.'}
+            </div>
+          ) : null}
         </div>
       </section>
 
