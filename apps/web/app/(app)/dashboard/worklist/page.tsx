@@ -112,7 +112,7 @@ export default async function DashboardWorklistPage({
       <WorklistTabs queueOptions={payload.queueOptions} state={{ ...state, queue: payload.selectedQueue }} />
       <section
         aria-label="Worklist table and detail panel"
-        className={useStackedWorklistLayout ? 'grid items-start gap-6' : 'grid items-start gap-6 xl:grid-cols-[1.25fr_0.75fr]'}
+        className="grid items-start gap-6"
       >
         <WorklistTable items={payload.items} selectedItemId={payload.selectedItem?.id} state={{ ...state, queue: payload.selectedQueue }} />
         <WorklistDetailPanel item={payload.selectedItem} role={session.role} />
