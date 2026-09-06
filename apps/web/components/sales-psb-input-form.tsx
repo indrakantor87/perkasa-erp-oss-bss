@@ -685,11 +685,14 @@ export function SalesPsbInputForm({
               value={marketingName}
               onChange={(event) => setMarketingName(event.target.value)}
               disabled={isFormFieldDisabled || isMarketingRole}
+              readOnly={isMarketingRole}
               placeholder="Masukkan nama marketing"
               className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
             />
             <span className="text-xs text-slate-400">
-              Untuk role selain `MARKETING`, kolom ini bisa diisi manual.
+              {isMarketingRole
+                ? 'Otomatis sesuai user login (tidak dapat diubah).'
+                : 'Untuk role selain PENJUALAN/SALES_MARKETING, kolom ini bisa diisi manual.'}
             </span>
           </label>
         </div>

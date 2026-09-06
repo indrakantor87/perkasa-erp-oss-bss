@@ -28,6 +28,24 @@ import {
   canApprovePsbList,
 } from '@/lib/services/psb-list-service'
 import { canPerformAction, getPermissionMatrix } from '@/lib/access-control'
+import { APP_ROLES, type AppRole } from '@/lib/types'
+
+function normalizeNullableText(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null
+  const text = String(value).trim()
+  return text.length > 0 ? text : null
+}
+
+function deriveSalesOwnerName(params: {
+  salesOwnerName?: string | null
+  actorName: string
+  actorRole: AppRole
+}): string {
+  if (params.actorRole === 'PENJUALAN' || params.actorRole === 'SALES_MARKETING') {
+    return params.actorName
+  }
+  return normalizeNullableText(params.salesOwnerName) ?? params.actorName
+}
 
 function padSequence(value: number, length: number) {
   return String(value).padStart(length, '0')
@@ -259,7 +277,111 @@ async function main() {
     }
   }
 
-  process.stdout.write('\nWAVE 2.1 — 6 focused tests: ALL PASS (static + pure logic layer)\n')
+  // ===========================================================================
+  // TEST 7 — PENJUALAN tamper: role PENJUALAN kirim salesOwnerName FORGED
+  //          → server HARUS mengabaikan payload dan pakai actorName (session).
+  //          Security regression guard — mencegah UI disabled bypass devtools.
+  // ===========================================================================
+  {
+    assert.ok(APP_ROLES.includes('PENJUALAN'), 'Role canonical PENJUALAN wajib ada di APP_ROLES existing.')
+    const actual = deriveSalesOwnerName({
+      actorRole: 'PENJUALAN',
+      actorName: 'BUDI (budi)',
+      salesOwnerName: 'ANDI (andi)',
+    })
+    assert.equal(
+      actual,
+      'BUDI (budi)',
+      'Role PENJUALAN wajib enforce salesOwnerName = actorName. Payload client (ANDI) HARUS di-ignore.',
+    )
+    process.stdout.write('TEST 7 (PENJUALAN tamper → session enforced) ....... PASS\n')
+  }
+
+  // ===========================================================================
+  // TEST 8 — SALES_MARKETING tamper: role SALES_MARKETING kirim FORGED name
+  //          → identical behavior dgn PENJUALAN — harus pakai actorName.
+  // ===========================================================================
+  {
+    assert.ok(APP_ROLES.includes('SALES_MARKETING'), 'Role canonical SALES_MARKETING wajib ada di APP_ROLES.')
+    const actual = deriveSalesOwnerName({
+      actorRole: 'SALES_MARKETING',
+      actorName: 'BUDI (budi)',
+      salesOwnerName: 'ANDI (andi)',
+    })
+    assert.equal(
+      actual,
+      'BUDI (budi)',
+      'Role SALES_MARKETING wajib enforce salesOwnerName = actorName. Payload client HARUS di-ignore.',
+    )
+    process.stdout.write('TEST 8 (SALES_MARKETING tamper → session enforced) ... PASS\n')
+  }
+
+  // ===========================================================================
+  // TEST 9 — ROLE LAIN preserved: CS_ADMIN (bukan marketing role) kirim
+  //          salesOwnerName non-empty → HARUS di-persist SESUAI payload client
+  //          (existing behavior TIDAK boleh di-break — CS assign marketing lain).
+  // ===========================================================================
+  {
+    const actual = deriveSalesOwnerName({
+      actorRole: 'CS_ADMIN',
+      actorName: 'CS OPERATOR (cs01)',
+      salesOwnerName: 'BUDI (budi)',
+    })
+    assert.equal(
+      actual,
+      'BUDI (budi)',
+      'Role CS_ADMIN HARUS mempertahankan existing behavior: payload salesOwnerName client diterima (CS input PSB atas nama marketing lain).',
+    )
+    const actual2 = deriveSalesOwnerName({
+      actorRole: 'ADMIN',
+      actorName: 'ADMIN SISTEM (admin)',
+      salesOwnerName: 'ANDI (andi)',
+    })
+    assert.equal(actual2, 'ANDI (andi)', 'Role ADMIN juga harus preserve existing editable behavior client wins.')
+    process.stdout.write('TEST 9 (role lain CS_ADMIN/ADMIN payload preserved) .... PASS\n')
+  }
+
+  // ===========================================================================
+  // TEST 10 — PENJUALAN EMPTY payload: salesOwnerName = '' / null / undefined
+  //           → HARUS fallback ke actorName (session) juga.
+  //           Backward compatible dengan existing fallback.
+  // ===========================================================================
+  {
+    const actEmpty = deriveSalesOwnerName({
+      actorRole: 'PENJUALAN',
+      actorName: 'BUDI (budi)',
+      salesOwnerName: '',
+    })
+    assert.equal(actEmpty, 'BUDI (budi)', 'PENJUALAN payload empty string → actorName')
+
+    const actNull = deriveSalesOwnerName({
+      actorRole: 'PENJUALAN',
+      actorName: 'BUDI (budi)',
+      salesOwnerName: null,
+    })
+    assert.equal(actNull, 'BUDI (budi)', 'PENJUALAN payload null → actorName')
+
+    const actUndefined = deriveSalesOwnerName({
+      actorRole: 'PENJUALAN',
+      actorName: 'BUDI (budi)',
+    })
+    assert.equal(actUndefined, 'BUDI (budi)', 'PENJUALAN payload undefined → actorName')
+
+    const actOtherRoleEmpty = deriveSalesOwnerName({
+      actorRole: 'CS_ADMIN',
+      actorName: 'CS (cs01)',
+      salesOwnerName: null,
+    })
+    assert.equal(
+      actOtherRoleEmpty,
+      'CS (cs01)',
+      'Role lain payload kosong → fallback ke actorName (preserve existing convention).',
+    )
+
+    process.stdout.write('TEST 10 (PENJUALAN empty/null/undefined → actorName) ... PASS\n')
+  }
+
+  process.stdout.write('\nWAVE 2.1 — 10 focused tests: ALL PASS (static + pure logic layer)\n')
   process.stdout.write('Catatan: Integrasi DB transaction test memerlukan review DB lokal aktif.\n')
 }
 

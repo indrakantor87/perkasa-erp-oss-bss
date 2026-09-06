@@ -1317,7 +1317,7 @@ export async function createPsbListItem(params: {
   escortNotes?: string | null
   activityNotes?: string | null
   actorName: string
-  actorRole: string
+  actorRole: AppRole
 }) {
   await ensurePsbListTables()
 
@@ -1334,7 +1334,12 @@ export async function createPsbListItem(params: {
   const customerPhone = normalizeNullableText(params.customerPhone)
   const odpCode = normalizeNullableText(params.odpCode)
   const packageLabel = normalizeNullableText(params.packageLabel)
-  const salesOwnerName = normalizeNullableText(params.salesOwnerName) ?? params.actorName
+  let salesOwnerName: string
+  if (params.actorRole === 'PENJUALAN' || params.actorRole === 'SALES_MARKETING') {
+    salesOwnerName = params.actorName
+  } else {
+    salesOwnerName = normalizeNullableText(params.salesOwnerName) ?? params.actorName
+  }
   const requestedInstallDate = normalizeRequestedInstallDate(params.requestedInstallDate)
   const areaLabel = normalizeNullableText(params.areaLabel)
   const googleMapsLink = normalizeNullableText(params.googleMapsLink)
