@@ -63,7 +63,7 @@ function getPriorityBadge(priority: DailyActivityItem['priorityLevel']) {
 export default async function DailyActivityPage({
   searchParams,
 }: {
-  searchParams?: {
+  searchParams?: Promise<{
     month?: string
     divisionName?: string
     subdivisionName?: string
@@ -76,9 +76,10 @@ export default async function DailyActivityPage({
     activityCategory?: string
     activityType?: string
     notes?: string
-  }
+  }>
 }) {
   const session = await requireSession()
+  const params = (await searchParams) || {}
   const {
     source,
     summary,
@@ -108,11 +109,11 @@ export default async function DailyActivityPage({
     calendarMonthLabel,
     calendarDays,
   } = await getDailyActivityPageData(session, {
-    month: searchParams?.month,
-    divisionName: searchParams?.divisionName,
-    subdivisionName: searchParams?.subdivisionName,
-    planningLevel: searchParams?.planningLevel,
-    approvalStatus: searchParams?.approvalStatus,
+    month: params?.month,
+    divisionName: params?.divisionName,
+    subdivisionName: params?.subdivisionName,
+    planningLevel: params?.planningLevel,
+    approvalStatus: params?.approvalStatus,
   })
   const roleMeta = getRoleMeta(session.role)
   const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
@@ -135,13 +136,13 @@ export default async function DailyActivityPage({
   const calendarPrevHref = `?month=${calendarPrevMonth}${querySuffix}`
   const calendarNextHref = `?month=${calendarNextMonth}${querySuffix}`
 
-  const prefillReferenceWorkOrderId = searchParams?.referenceWorkOrder?.trim() || ''
-  const prefillWorkOrderNo = searchParams?.workOrderNo?.trim() || ''
-  const prefillTroubleTicketId = searchParams?.troubleTicketId?.trim() || ''
-  const prefillTroubleTicketNo = searchParams?.troubleTicketNo?.trim() || ''
-  const prefillActivityCategory = searchParams?.activityCategory?.trim() || ''
-  const prefillActivityType = searchParams?.activityType?.trim() || ''
-  const prefillNotes = searchParams?.notes?.trim() || ''
+  const prefillReferenceWorkOrderId = params?.referenceWorkOrder?.trim() || ''
+  const prefillWorkOrderNo = params?.workOrderNo?.trim() || ''
+  const prefillTroubleTicketId = params?.troubleTicketId?.trim() || ''
+  const prefillTroubleTicketNo = params?.troubleTicketNo?.trim() || ''
+  const prefillActivityCategory = params?.activityCategory?.trim() || ''
+  const prefillActivityType = params?.activityType?.trim() || ''
+  const prefillNotes = params?.notes?.trim() || ''
   const hasPrefillContext = Boolean(
     prefillReferenceWorkOrderId ||
       prefillWorkOrderNo ||

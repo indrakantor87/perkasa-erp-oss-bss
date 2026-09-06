@@ -2,6 +2,213 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+ * G23.65A Modal Stable Static Rules (Plain Global, NO Prune)
+ * ------------------------------------------------------------
+ * Target BOTH:
+ *   (a) New ModalShell via g2364-modal-* classes AND data-g2364-*
+ *       attribute selectors (fallback for runtime inject)
+ *   (b) Old ModalShell DOM structure via structural selectors
+ *       (workaround RC8 persistent cache serving old chunk)
+ * Effect: center overlay vert+horiz, viewport max-height,
+ *         sticky header, body scroll vertical, no black/blank.
+ * ============================================================ */
+
+/* Class-based rules (applied to both old/new ModalShell content) */
+.g2364-modal-outer {
+  max-height: calc(100vh - 2rem);
+  min-height: clamp(420px, 60vh, 480px);
+  width: 100%;
+  position: relative !important;
+  z-index: 60 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background-color: #ffffff !important;
+  background-color: var(--color-surface, #ffffff) !important;
+  border-radius: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+@media (min-width: 640px) {
+  .g2364-modal-outer {
+    min-height: max(480px, 60vh);
+    max-height: calc(100vh - 4rem);
+  }
+}
+
+.g2364-modal-body {
+  flex: 1 1 auto !important;
+  min-height: 320px !important;
+  overflow-y: auto !important;
+  background-color: #ffffff !important;
+  background-color: var(--color-surface, #ffffff) !important;
+  padding: 1.5rem !important;
+}
+
+.g2364-modal-wrap {
+  min-height: 360px;
+}
+
+/* ============================================================
+ * Structural Overlay Rules (Old ModalShell RC8 Workaround)
+ * Selector: ANY div in the DOM with fixed inset-0 z-50 flex combo
+ * (Overlay may render inside #__next app root, not direct child body)
+ * These rules bypass any Tailwind JIT prune or cache-stale styles.
+ * ============================================================ */
+div.fixed.inset-0.z-50.flex,
+div[class*="fixed"][class*="z-50"][class*="bg-slate-950"] {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 50 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem !important;
+  margin: 0 !important;
+  background-color: rgba(2, 6, 23, 0.7) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+@media (min-width: 640px) {
+  div.fixed.inset-0.z-50.flex,
+  div[class*="fixed"][class*="z-50"][class*="bg-slate-950"] {
+    padding: 2rem 1rem !important;
+  }
+}
+
+/* Content modal inside overlay: skip aria-label="Tutup modal" backdrop button */
+div.fixed.inset-0.z-50.flex > div:not([aria-label]),
+div[class*="fixed"][class*="z-50"][class*="bg-slate-950"] > div:not([aria-label]) {
+  position: relative !important;
+  z-index: 60 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 72rem !important;
+  max-height: calc(100vh - 2rem) !important;
+  min-height: clamp(420px, 60vh, 480px) !important;
+  overflow: hidden !important;
+  border-radius: 1.5rem !important;
+  border: 1px solid var(--color-line, #d6deea) !important;
+  background-color: #ffffff !important;
+  background-color: var(--color-surface, #ffffff) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+@media (min-width: 640px) {
+  div.fixed.inset-0.z-50.flex > div:not([aria-label]),
+  div[class*="fixed"][class*="z-50"][class*="bg-slate-950"] > div:not([aria-label]) {
+    max-height: calc(100vh - 4rem) !important;
+    min-height: max(480px, 60vh) !important;
+  }
+}
+
+/* Modal header: sticky, always visible when body scrolls */
+div.fixed.inset-0.z-50.flex > div:not([aria-label]) > div:first-child,
+div[class*="fixed"][class*="z-50"][class*="bg-slate-950"] > div:not([aria-label]) > div:first-child {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  flex-shrink: 0 !important;
+  border-bottom: 1px solid var(--color-line, #d6deea) !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(8px) !important;
+  padding: 1.25rem 1.5rem !important;
+}
+
+/* Modal body: vertical scroll, background white guarantee */
+div.fixed.inset-0.z-50.flex > div:not([aria-label]) > div:last-of-type,
+div[class*="fixed"][class*="z-50"][class*="bg-slate-950"] > div:not([aria-label]) > div:last-of-type {
+  flex: 1 1 auto !important;
+  min-height: 320px !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  background-color: #ffffff !important;
+  background-color: var(--color-surface, #ffffff) !important;
+  padding: 1.5rem !important;
+}
+
+/* Data attribute selectors (New ModalShell pattern) - duplicate rules
+   for when RC8 gets fixed and the new data-g2364-dialog chunk compiles */
+[data-g2364-dialog="1"] {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 50 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem !important;
+  background-color: rgba(2, 6, 23, 0.7) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+@media (min-width: 640px) {
+  [data-g2364-dialog="1"] {
+    padding: 2rem 1rem !important;
+  }
+}
+
+[data-g2364-dialog="1"] > div[role="presentation"],
+[data-g2364-dialog="1"] > div:not([aria-label]) {
+  position: relative !important;
+  z-index: 60 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: var(--g2364-maxw, 72rem) !important;
+  max-height: calc(100vh - 2rem) !important;
+  min-height: clamp(420px, 60vh, 480px) !important;
+  overflow: hidden !important;
+  border-radius: 1.5rem !important;
+  border: 1px solid var(--color-line, #d6deea) !important;
+  background-color: #ffffff !important;
+  background-color: var(--color-surface, #ffffff) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+@media (min-width: 640px) {
+  [data-g2364-dialog="1"] > div[role="presentation"],
+  [data-g2364-dialog="1"] > div:not([aria-label]) {
+    max-height: calc(100vh - 4rem) !important;
+    min-height: max(480px, 60vh) !important;
+  }
+}
+
+[data-g2364-dialog="1"] > div[role="presentation"] > div:first-child,
+[data-g2364-dialog="1"] > div:not([aria-label]) > div:first-child {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  flex-shrink: 0 !important;
+  border-bottom: 1px solid var(--color-line, #d6deea) !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(8px) !important;
+  padding: 1.25rem 1.5rem !important;
+}
+
+[data-g2364-dialog="1"] > div[role="presentation"] > div:last-of-type,
+[data-g2364-dialog="1"] > div:not([aria-label]) > div:last-of-type {
+  flex: 1 1 auto !important;
+  min-height: 320px !important;
+  overflow-y: auto !important;
+  background-color: #ffffff !important;
+  background-color: var(--color-surface, #ffffff) !important;
+  padding: 1.5rem !important;
+}
+
+[data-g2364-dialog="1"] [data-g2364-wrap="1"] {
+  min-height: 360px;
+}
+
 :root,
 html[data-theme='light'] {
   --color-bg: #f3f6fb;

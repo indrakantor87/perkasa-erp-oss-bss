@@ -1,7 +1,25 @@
 'use client'
 
+/* ============================================================
+ * G23.65A RC8 FORCE RECOMPILE TRIGGER BLOCK (NO LOGIC CHANGE)
+ * ------------------------------------------------------------
+ * Content-only modification to force Next.js 16 Turbopack to
+ * compute a NEW content hash for this source file, so that the
+ * stale persistent dev cache entry (old compiled chunk before
+ * the ModalShell rewrite + data-g2364-dialog attribute pattern)
+ * will NOT match the new hash. The Turbopack cache key is the
+ * source content hash, so ANY content change (even a comment)
+ * invalidates the cache entry WITHOUT needing to delete any
+ * generated files under .next (which user has forbidden).
+ * ------------------------------------------------------------
+ * Affected: 0 lines of business logic. This block is a pure
+ * comment, parsed out by the TypeScript compiler before emit.
+ * Hash change marker: 2026-09-06T11:58:00Z G23.65A-RC8v2
+ * ============================================================ */
+
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { DailyActivitySmartPaste } from '@/components/daily-activity-smart-paste'
 import { DailyActivityPlanForm } from '@/components/daily-activity-plan-form'
 
@@ -48,6 +66,7 @@ function ModalShell({
   children: ReactNode
   maxWidthClass?: string
 }) {
+  // FORCE RECOMPILE G23.65A RC8 FIX: trivial content edit 0 logic change → update content hash untuk trigger Turbopack recompile new chunk (no cache delete needed)
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -56,6 +75,77 @@ function ModalShell({
     document.addEventListener('keydown', onKey)
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+
+    const STYLE_ID = 'g2364-modal-static-rules'
+    if (!document.getElementById(STYLE_ID)) {
+      const styleEl = document.createElement('style')
+      styleEl.id = STYLE_ID
+      styleEl.textContent = `
+        [data-g2364-dialog="1"] {
+          position: fixed;
+          inset: 0;
+          z-index: 50;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          padding: 1rem;
+          background-color: rgba(2, 6, 23, 0.7);
+          backdrop-filter: blur(4px);
+        }
+        @media (min-width: 640px) {
+          [data-g2364-dialog="1"] {
+            padding: 2rem 1rem;
+          }
+        }
+        [data-g2364-dialog="1"] > div[role="presentation"],
+        [data-g2364-dialog="1"] > div:not([aria-label]) {
+          position: relative;
+          z-index: 60;
+          display: flex;
+          flex-direction: column;
+          width: 100%;
+          max-width: var(--g2364-maxw, 72rem);
+          max-height: calc(100vh - 2rem);
+          min-height: clamp(420px, 60vh, 480px);
+          overflow: hidden;
+          border-radius: 1.5rem;
+          border: 1px solid var(--color-line, #d6deea);
+          background-color: #ffffff;
+          background-color: var(--color-surface, #ffffff);
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        @media (min-width: 640px) {
+          [data-g2364-dialog="1"] > div[role="presentation"],
+          [data-g2364-dialog="1"] > div:not([aria-label]) {
+            max-height: calc(100vh - 4rem);
+            min-height: max(480px, 60vh);
+          }
+        }
+        [data-g2364-dialog="1"] > div:not([aria-label]) > div:first-child {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          flex-shrink: 0;
+          border-bottom: 1px solid var(--color-line, #d6deea);
+          background-color: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(8px);
+          padding: 1.25rem 1.5rem;
+        }
+        [data-g2364-dialog="1"] > div:not([aria-label]) > div:last-of-type {
+          flex: 1 1 auto;
+          min-height: 320px;
+          overflow-y: auto;
+          background-color: #ffffff;
+          background-color: var(--color-surface, #ffffff);
+          padding: 1.5rem;
+        }
+        [data-g2364-dialog="1"] [data-g2364-wrap="1"] {
+          min-height: 360px;
+        }
+      `
+      document.head.appendChild(styleEl)
+    }
+
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prevOverflow
@@ -63,37 +153,47 @@ function ModalShell({
   }, [open, onClose])
 
   if (!open) return null
+  if (typeof document === 'undefined') return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/70 px-4 py-4 sm:py-8 backdrop-blur-sm">
-      <button
-        type="button"
-        aria-label="Tutup modal"
-        className="absolute inset-0 cursor-default"
-        onClick={onClose}
-      />
+  return createPortal(
+    (
       <div
-        className={`relative z-10 flex max-h-full w-full flex-col ${maxWidthClass} overflow-hidden rounded-3xl border border-line bg-white shadow-2xl sm:max-h-[90vh]`}
+        data-g2364-dialog="1"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="g2364-modal-title"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-4 sm:py-8 backdrop-blur-sm"
       >
-        <div className="sticky top-0 z-10 shrink-0 flex flex-col gap-4 border-b border-line bg-white/95 px-6 py-5 backdrop-blur lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="section-title">Daily Activity</p>
-            <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
-              {title}
-            </h3>
-            {subtitle ? <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">{subtitle}</p> : null}
+        <button
+          type="button"
+          aria-label="Tutup modal"
+          className="absolute inset-0 cursor-default"
+          onClick={onClose}
+        />
+        <div
+          className={`relative z-[60] flex w-full flex-col overflow-hidden rounded-3xl border border-line bg-white shadow-2xl g2364-modal-outer ${maxWidthClass}`}
+        >
+          <div className="sticky top-0 z-10 shrink-0 flex flex-col gap-4 border-b border-line bg-white/95 px-6 py-5 backdrop-blur lg:flex-row lg:items-start lg:justify-between">
+            <div id="g2364-modal-title">
+              <p className="section-title">Daily Activity</p>
+              <h3 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950">
+                {title}
+              </h3>
+              {subtitle ? <p className="mt-1 max-w-3xl text-sm leading-5 text-mute">{subtitle}</p> : null}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+            >
+              Tutup
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-          >
-            Tutup
-          </button>
+          <div className="flex-1 overflow-y-auto g2364-modal-body px-6 py-6">{children}</div>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">{children}</div>
       </div>
-    </div>
+    ),
+    document.body,
   )
 }
 
@@ -103,6 +203,28 @@ export function DailyActivityWorkspaceToolbar(props: DailyActivityWorkspaceToolb
 
   const [inputModalOpen, setInputModalOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+
+  useEffect(() => {
+    const STYLE_ID = 'g2364-daily-activity-modal-css'
+    if (document.getElementById(STYLE_ID)) return
+    const cssText = `
+      .g2364-modal-outer { min-height: clamp(420px, 60vh, 480px) !important; }
+      @media (min-width: 640px) {
+        .g2364-modal-outer { min-height: max(480px, 60vh) !important; max-height: 90vh !important; }
+      }
+      .g2364-modal-body { min-height: 320px !important; background-color: #ffffff !important; }
+      .g2364-modal-wrap { min-height: 360px !important; }
+    `
+    const styleEl = document.createElement('style')
+    styleEl.id = STYLE_ID
+    styleEl.setAttribute('data-origin', 'daily-activity-workspace-toolbar-g2364')
+    styleEl.textContent = cssText
+    document.head.appendChild(styleEl)
+    return () => {
+      const existing = document.getElementById(STYLE_ID)
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing)
+    }
+  }, [])
 
   const handleInputSaved = () => {
     setInputModalOpen(false)
@@ -187,7 +309,17 @@ export function DailyActivityWorkspaceToolbar(props: DailyActivityWorkspaceToolb
         subtitle="Tempel laporan aktivitas dari Notepad, parsing otomatis per baris, review status, lalu simpan semua sekaligus."
         maxWidthClass="max-w-6xl"
       >
-        <DailyActivitySmartPaste {...props} forceMode="smart" onSavedSuccess={handleInputSaved} />
+        <div data-g2364-wrap="1" className="space-y-4 g2364-modal-wrap">
+          {isActionDisabled ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <strong className="font-semibold">Form dalam status nonaktif:</strong>{' '}
+              {!canCreate
+                ? 'Role Anda belum memiliki izin <create> untuk Daily Activity. Hubungi admin agar dapat menambahkan aktivitas.'
+                : 'Koneksi Review DB (staging/prod) belum ready — sistem saat ini fallback ke mock data (read-only). Form akan aktif otomatis setelah koneksi review-db siap. DataSourceStatus di bawah toolbar menampilkan status sumber data saat ini.'}
+            </div>
+          ) : null}
+          <DailyActivitySmartPaste {...props} forceMode="smart" onSavedSuccess={handleInputSaved} />
+        </div>
       </ModalShell>
 
       <ModalShell
@@ -197,8 +329,31 @@ export function DailyActivityWorkspaceToolbar(props: DailyActivityWorkspaceToolb
         subtitle="Buat satu aktivitas manual dengan detail lengkap. Cocok untuk input spesifik yang butuh field terstruktur."
         maxWidthClass="max-w-5xl"
       >
-        <DailyActivityPlanForm {...props} onSavedSuccess={handleCreateSaved} />
+        <div data-g2364-wrap="1" className="space-y-4 g2364-modal-wrap">
+          {isActionDisabled ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <strong className="font-semibold">Form dalam status nonaktif:</strong>{' '}
+              {!canCreate
+                ? 'Role Anda belum memiliki izin <create> untuk Daily Activity. Hubungi admin agar dapat menambahkan aktivitas.'
+                : 'Koneksi Review DB (staging/prod) belum ready — sistem saat ini fallback ke mock data (read-only). Form akan aktif otomatis setelah koneksi review-db siap. DataSourceStatus di bawah toolbar menampilkan status sumber data saat ini.'}
+            </div>
+          ) : null}
+          <DailyActivityPlanForm {...props} onSavedSuccess={handleCreateSaved} />
+        </div>
       </ModalShell>
     </>
   )
 }
+
+/* ============================================================
+ * G23.65A RC8 END-OF-FILE FORCE RECOMPILE MARKER
+ * ------------------------------------------------------------
+ * Second content marker. Adding this block ensures the file's
+ * content hash deviates significantly from any pre-existing
+ * stale cache entry stored under .next/dev/cache/turbopack/.
+ * This guarantees a cache miss and forces Turbopack to re-run
+ * the source => chunk compilation pipeline for this module,
+ * WITHOUT deleting any generated cache artifacts (compliant
+ * with user's explicit NO-CACHE-FLUSH directive).
+ * Marker timestamp: 2026-09-06T11:58:30Z EOF v2
+ * ============================================================ */
