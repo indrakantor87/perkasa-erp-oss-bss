@@ -3,6 +3,9 @@
 import type { ChangeEvent, FormEvent } from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BATCH_SCOPE_NAMES } from '@/lib/import-batch-capabilities'
+
+type FeedbackTone = 'success' | 'error' | 'warning'
 
 type ImportBatchUploadFormProps = {
   batchId: string
@@ -11,7 +14,11 @@ type ImportBatchUploadFormProps = {
   hasExistingRows: boolean
   canUpload: boolean
   reviewDbReady: boolean
+  batchScope?: string
 }
+
+const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.json'] as const
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 export function ImportBatchUploadForm({
   batchId,
@@ -20,15 +27,17 @@ export function ImportBatchUploadForm({
   hasExistingRows,
   canUpload,
   reviewDbReady,
+  batchScope,
 }: ImportBatchUploadFormProps) {
   const router = useRouter()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(
-    null
-  )
+  const [feedback, setFeedback] = useState<{ tone: FeedbackTone; message: string } | null>(null)
 
   const isDisabled = !canUpload || !reviewDbReady || hasExistingRows || submitting
+
+  const normalizedScope = String(batchScope ?? '').trim().toUpperCase()
+  const hasValidScope = batchScope && (BATCH_SCOPE_NAMES as readonly string[]).includes(normalizedScope)
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null
@@ -42,8 +51,36 @@ export function ImportBatchUploadForm({
       return
     }
 
+    const fname = selectedFile.name.toLowerCase()
+    const extIdx = fname.lastIndexOf('.')
+    const ext = extIdx >= 0 ? fname.slice(extIdx) : ''
+    if (!(ALLOWED_EXT as readonly string[]).includes(ext)) {
+      setFeedback({
+        tone: 'error',
+        message: 'Format file tidak didukung. Pilih file XLSX, XLS, CSV, atau JSON.',
+      })
+      return
+    }
+
+    if (selectedFile.size > MAX_UPLOAD_BYTES) {
+      setFeedback({
+        tone: 'error',
+        message: 'Ukuran file melebihi batas maksimal 10MB. Kompres atau pecah file jika diperlukan.',
+      })
+      return
+    }
+
+    const hasPathSep = selectedFile.name.includes('/') || selectedFile.name.includes('\\')
+    if (hasPathSep) {
+      setFeedback({
+        tone: 'warning',
+        message: 'Nama file mengandung path separator. Nama akan disanitasi otomatis di server.',
+      })
+    } else {
+      setFeedback(null)
+    }
+
     setSubmitting(true)
-    setFeedback(null)
 
     try {
       const formData = new FormData()
@@ -64,10 +101,11 @@ export function ImportBatchUploadForm({
         return
       }
 
-      setFeedback({
-        tone: 'success',
-        message: payload?.message || 'File sumber berhasil diunggah ke batch.',
-      })
+      const msg = payload?.message || 'File sumber berhasil diunggah ke batch.'
+      const prefix = hasPathSep
+        ? 'PERHATIAN: Nama file mengandung path separator dan telah disanitasi. '
+        : ''
+      setFeedback({ tone: 'success', message: prefix + msg })
       setSelectedFile(null)
       router.refresh()
     } finally {
@@ -86,11 +124,25 @@ export function ImportBatchUploadForm({
             ? 'Mode review database belum aktif, jadi upload file dinonaktifkan agar tidak menyimpan file ke mode mock.'
             : hasExistingRows
               ? `Batch ${batchCode} sudah memiliki row staging. Upload ulang dikunci agar review tetap non-destruktif, jadi gunakan batch baru untuk file revisi.`
-            : `File akan disimpan lokal untuk batch ${batchCode}, lalu parser akan mencoba memuat row staging otomatis sesuai scope batch.`}
+              : `File akan disimpan lokal untuk batch ${batchCode}, lalu parser akan mencoba memuat row staging otomatis sesuai scope batch.`}
       </p>
 
-      <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-700">
-        File sumber saat ini: <span className="font-semibold text-slate-950">{sourceFileName || '-'}</span>
+      <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-700 space-y-1">
+        <div>
+          File sumber saat ini: <span className="font-semibold text-slate-950">{sourceFileName || '-'}</span>
+        </div>
+        {hasValidScope ? (
+          <div>
+            <a
+            href={`/api/import/template?scope=${encodeURIComponent(normalizedScope)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sky-700 underline decoration-dotted underline-offset-2 hover:text-sky-900"
+          >
+            Butuh template? Unduh template XLSX {normalizedScope}
+          </a>
+          </div>
+        ) : null}
       </div>
 
         {hasExistingRows ? (
@@ -116,6 +168,20 @@ export function ImportBatchUploadForm({
           />
         </label>
 
+        {feedback ? (
+          <div
+            className={`rounded-2xl border px-4 py-3 text-sm ${
+              feedback.tone === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : feedback.tone === 'warning'
+                  ? 'border-amber-200 bg-amber-50 text-amber-900'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+            }`}
+          >
+            {feedback.message}
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-3 text-sm text-mute sm:flex-row sm:items-center sm:justify-between">
           <span>{selectedFile ? `Siap upload: ${selectedFile.name}` : 'Belum ada file dipilih.'}</span>
           <button
@@ -127,18 +193,6 @@ export function ImportBatchUploadForm({
           </button>
         </div>
       </form>
-
-      {feedback ? (
-        <div
-          className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
-            feedback.tone === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-rose-200 bg-rose-50 text-rose-700'
-          }`}
-        >
-          {feedback.message}
-        </div>
-      ) : null}
     </section>
   )
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { canAccessPath, canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
+import { BATCH_SCOPE_NAMES } from '@/lib/import-batch-capabilities'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { recordImportBatchAction } from '@/lib/services/import-write-service'
@@ -112,6 +113,18 @@ export async function POST(request: Request) {
     if (!scope || scope.length < 3) {
       return NextResponse.json(
         { message: 'Import scope wajib diisi minimal 3 karakter.' },
+        { status: 400 }
+      )
+    }
+    if (scope.endsWith('_SAMPLE')) {
+      return NextResponse.json(
+        { message: 'Scope produksi tidak boleh menggunakan suffix _SAMPLE. Pilih scope canonical resmi.' },
+        { status: 400 }
+      )
+    }
+    if (!(BATCH_SCOPE_NAMES as readonly string[]).includes(scope)) {
+      return NextResponse.json(
+        { message: `Import scope "${scope}" tidak didukung. Pilih scope: ${BATCH_SCOPE_NAMES.join(', ')}.` },
         { status: 400 }
       )
     }

@@ -253,6 +253,7 @@ export function ImportBatchDetailView({
             hasExistingRows={hasExistingRows}
             canUpload={canUpload}
             reviewDbReady={reviewDbReady}
+            batchScope={detail.scope}
           />
         </div>
 

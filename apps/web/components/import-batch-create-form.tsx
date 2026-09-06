@@ -1,23 +1,42 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { BATCH_SCOPE_NAMES, getBatchScopeCapability } from '@/lib/import-batch-capabilities'
+import {
+  getScopeContract,
+  type BatchScopeName,
+} from '@/lib/import-column-contract'
 
 type ImportBatchCreateFormProps = {
   canCreate: boolean
   reviewDbReady: boolean
 }
 
+type FeedbackTone = 'success' | 'error' | 'warning'
+
 const sourceOptions = ['WEB_PSB', 'FINANCE', 'GA'] as const
-const scopeSuggestions = [
-  'USER_AND_ORDER',
-  'BILLING',
-  'INVENTORY',
-  'HR',
-  'CUSTOMER_REVIEW',
-  'SUPPORT_REVIEW',
-] as const
+const scopeSuggestions: readonly BatchScopeName[] = BATCH_SCOPE_NAMES
+
+const allowedFileExts = new Set(['xlsx', 'xls', 'csv', 'json'])
+
+function normalizeScopeClient(value: string): string {
+  return String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+/, '')
+    .replace(/_+$/, '')
+}
+
+const typeBadge: Record<string, string> = {
+  string: 'bg-sky-100 text-sky-700',
+  number: 'bg-indigo-100 text-indigo-700',
+  integer: 'bg-violet-100 text-violet-700',
+  boolean: 'bg-amber-100 text-amber-700',
+  date: 'bg-emerald-100 text-emerald-700',
+}
 
 export function ImportBatchCreateForm({
   canCreate,
@@ -29,18 +48,79 @@ export function ImportBatchCreateForm({
   const [sourceFileName, setSourceFileName] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(
+  const [feedback, setFeedback] = useState<{ tone: FeedbackTone; message: string } | null>(
     null
   )
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+  const normalizedScope = useMemo(() => normalizeScopeClient(scope), [scope])
+  const scopeContract = useMemo(
+    () =>
+      BATCH_SCOPE_NAMES.includes(normalizedScope as BatchScopeName)
+        ? getScopeContract(normalizedScope as BatchScopeName)
+        : undefined,
+    [normalizedScope]
+  )
+  const capabilityDisplay = scopeContract
+    ? getBatchScopeCapability(normalizedScope as BatchScopeName)?.displayName ??
+      (normalizedScope as BatchScopeName)
+    : null
+  const templateBtnDisabled =
+    !scopeContract || isDisabled
+
+  async function handleDownloadTemplate() {
+    if (!scopeContract) return
+    try {
+      const url = `/api/import/template?scope=${encodeURIComponent(scopeContract.scope)}`
+      window.location.assign(url)
+    } catch {
+      setFeedback({
+        tone: 'error',
+        message: 'Gagal generate template untuk scope ini.',
+      })
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (isDisabled) return
 
+    const normalized = normalizeScopeClient(scope)
+
+    if (!BATCH_SCOPE_NAMES.includes(normalized as BatchScopeName)) {
+      setFeedback({
+        tone: 'error',
+        message:
+          'Pilih scope dari 6 pilihan canonical (USER_AND_ORDER, BILLING, INVENTORY, HR, CUSTOMER_REVIEW, SUPPORT_REVIEW). Scope custom tidak didukung untuk batch baru.',
+      })
+      return
+    }
+
+    if (normalized.endsWith('_SAMPLE')) {
+      setFeedback({
+        tone: 'error',
+        message:
+          "Scope dengan suffix '_SAMPLE' adalah internal legacy parser alias. JANGAN gunakan untuk membuat batch baru. Pilih scope canonical tanpa suffix.",
+      })
+      return
+    }
+
+    const srcFileName = sourceFileName.trim()
+    if (srcFileName) {
+      const parts = srcFileName.toLowerCase().split('.')
+      const ext = parts.length > 1 ? (parts.pop() ?? '') : ''
+      if (ext && !allowedFileExts.has(ext)) {
+        setFeedback({
+          tone: 'warning',
+          message:
+            'Nama file sumber berekstensi diluar XLSX/XLS/CSV/JSON. Upload hanya menerima 4 ekstensi tersebut. Lanjutkan jika ini hanya placeholder label (bukan upload langsung).',
+        })
+      }
+    } else {
+      setFeedback(null)
+    }
+
     setSubmitting(true)
-    setFeedback(null)
 
     try {
       const response = await fetch('/api/import/batches', {
@@ -50,7 +130,7 @@ export function ImportBatchCreateForm({
         },
         body: JSON.stringify({
           sourceSystem,
-          scope,
+          scope: normalized,
           sourceFileName,
           notes,
         }),
@@ -115,7 +195,17 @@ export function ImportBatchCreateForm({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Import Scope</span>
+          <span className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-slate-950">Import Scope</span>
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              disabled={templateBtnDisabled}
+              className="rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              ⬇ Template XLSX
+            </button>
+          </span>
           <input
             list="import-scope-suggestions"
             value={scope}
@@ -131,6 +221,119 @@ export function ImportBatchCreateForm({
             ))}
           </datalist>
         </label>
+
+        {!scopeContract ? (
+          <p className="lg:col-span-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/40 px-4 py-3 text-xs italic text-mute">
+            Pilih scope canonical dari suggestion di atas untuk melihat kolom dan sheet yang
+            diperlukan, serta untuk mengaktifkan tombol unduh template.
+          </p>
+        ) : (
+          <section className="lg:col-span-2 mt-1 space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+            <header className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-slate-950">
+                📋 Informasi Kolom: {capabilityDisplay}
+              </p>
+              <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs text-mute">
+                {scopeContract.sheets.length} sheets ·{' '}
+                {scopeContract.sheets.reduce(
+                  (acc, s) =>
+                    acc + s.columns.filter((c2) => c2.templateHeader).length,
+                  0
+                )}{' '}
+                kolom
+              </span>
+            </header>
+
+            <div className="grid gap-3">
+              {scopeContract.sheets.map((sheet, idx) => {
+                const visibleCols = sheet.columns.filter((c) => c.templateHeader)
+                const reqCount = visibleCols.filter((c) => c.required).length
+                return (
+                  <details
+                    key={sheet.key}
+                    open={idx === 0}
+                    className="rounded-xl border border-line bg-white p-3"
+                  >
+                    <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-800">
+                      Sheet:{' '}
+                      <code className="rounded bg-slate-100 px-2 py-0.5 text-xs">
+                        {sheet.key}
+                      </code>
+                      <span className="text-mute text-[11px] italic">
+                        {sheet.displayName}
+                      </span>
+                      <span className="ml-auto rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                        {reqCount} wajib
+                      </span>
+                    </summary>
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-50">
+                          <tr className="text-slate-500">
+                            <th className="px-2 py-2 text-left font-semibold">Column</th>
+                            <th className="px-2 py-2 text-left font-semibold">Required</th>
+                            <th className="px-2 py-2 text-left font-semibold">Type</th>
+                            <th className="px-2 py-2 text-left font-semibold">
+                              Format &amp; Keterangan
+                            </th>
+                            <th className="px-2 py-2 text-left font-semibold">
+                              Contoh Format
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {visibleCols.map((c) => (
+                            <tr key={c.parserField}>
+                              <td className="px-2 py-1.5 align-top">
+                                <code className="rounded bg-slate-50 px-1 py-0.5 font-mono text-[11px]">
+                                  {c.parserField}
+                                </code>
+                              </td>
+                              <td className="px-2 py-1.5 align-top">
+                                {c.required ? (
+                                  <span className="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose-700">
+                                    WAJIB
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-500">
+                                    Opsional
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5 align-top">
+                                <span
+                                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                                    typeBadge[c.type] ??
+                                    'bg-slate-100 text-slate-600'
+                                  }`}
+                                >
+                                  {c.type}
+                                </span>
+                              </td>
+                              <td className="px-2 py-1.5 align-top">
+                                <div className="space-y-0.5">
+                                  <p className="text-slate-700">{c.description}</p>
+                                  {c.format ? (
+                                    <p className="italic text-mute">Format: {c.format}</p>
+                                  ) : null}
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 align-top">
+                                <code className="whitespace-nowrap rounded bg-slate-50 px-1 py-0.5 text-[10px] text-slate-500">
+                                  {c.example}
+                                </code>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
           <span className="font-semibold text-slate-950">Nama File Sumber</span>
@@ -173,7 +376,9 @@ export function ImportBatchCreateForm({
           className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
             feedback.tone === 'success'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-rose-200 bg-rose-50 text-rose-700'
+              : feedback.tone === 'warning'
+                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                : 'border-rose-200 bg-rose-50 text-rose-700'
           }`}
         >
           {feedback.message}

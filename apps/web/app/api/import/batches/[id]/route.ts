@@ -3,6 +3,8 @@ import path from 'node:path'
 import { NextResponse } from 'next/server'
 import { canAccessPath, canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
+import { BATCH_SCOPE_NAMES } from '@/lib/import-batch-capabilities'
+import { getScopeContract } from '@/lib/import-column-contract'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { loadImportFileToStaging } from '@/lib/services/import-file-loader'
@@ -100,6 +102,14 @@ export async function POST(
       return NextResponse.json({ message: 'Batch tidak ditemukan.' }, { status: 404 })
     }
 
+    if (!(BATCH_SCOPE_NAMES as readonly string[]).includes(batch.scope)) {
+      return NextResponse.json(
+        { message: `Scope batch "${batch.scope}" bukan scope canonical resmi. Upload hanya berlaku untuk 6 scope produksi.` },
+        { status: 400 }
+      )
+    }
+    const scopeContract = getScopeContract(batch.scope)
+
     const formData = await request.formData()
     const file = formData.get('file')
 
@@ -126,6 +136,16 @@ export async function POST(
       )
     }
 
+    if (scopeContract && extension === '.csv' && scopeContract.sheets.length > 1) {
+      return NextResponse.json(
+        {
+          message:
+            `Scope ${batch.scope} memiliki ${scopeContract.sheets.length} section (${scopeContract.sheets.map(s=>s.key).join(', ')}) dan membutuhkan format XLSX multi-sheet. CSV hanya berlaku untuk scope single-section.`,
+        },
+        { status: 400 }
+      )
+    }
+
     const storageDir = path.join(process.cwd(), 'storage', 'import-batches')
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
@@ -139,6 +159,21 @@ export async function POST(
       buffer,
       extension
     )
+
+    let compatWarningPrefix = ''
+    if (scopeContract) {
+      const expectedKeys = new Set(scopeContract.sheets.map((s) => s.key))
+      const loadedKeys = new Set(loadResult.sectionsLoaded)
+      const missing = [...expectedKeys].filter((k) => !loadedKeys.has(k))
+      const unexpected = [...loadedKeys].filter((k) => !expectedKeys.has(k))
+      if (missing.length > 0 || unexpected.length > 0) {
+        const parts: string[] = []
+        if (missing.length) parts.push(`sheet kurang: ${missing.join(', ')}`)
+        if (unexpected.length) parts.push(`sheet di luar kontrak: ${unexpected.join(', ')}`)
+        compatWarningPrefix = `PERHATIAN KOMPATIBILITAS HEADER (${parts.join('; ')}). ` +
+          'Template resmi disarankan agar parser dapat memuat seluruh section sesuai scope. '
+      }
+    }
 
     await mkdir(storageDir, { recursive: true })
     const storedFileName = `${batch.batchCode.toLowerCase()}--source${extension}`
@@ -162,7 +197,8 @@ export async function POST(
       [
         originalName,
         loadResult.insertedRows,
-        `File sumber ${originalName} diunggah dari web oleh ${session.displayName} (${session.username}) dan memuat ${loadResult.insertedRows} row staging dari section ${loadResult.sectionsLoaded.join(', ')}.`,
+        (compatWarningPrefix ? compatWarningPrefix.trim() + ' — ' : '') +
+          `File sumber ${originalName} diunggah dari web oleh ${session.displayName} (${session.username}) dan memuat ${loadResult.insertedRows} row staging dari section ${loadResult.sectionsLoaded.join(', ')}.`,
         batch.id,
       ]
     )
@@ -172,14 +208,14 @@ export async function POST(
         actionType: 'UPLOAD',
         status: 'SUCCESS',
         actor: `${session.displayName} (${session.username})`,
-        detail: `File ${originalName} diunggah dan memuat ${loadResult.insertedRows} row staging dari section ${loadResult.sectionsLoaded.join(', ')}.`,
+        detail: `${compatWarningPrefix}File ${originalName} diunggah dan memuat ${loadResult.insertedRows} row staging dari section ${loadResult.sectionsLoaded.join(', ')}.`,
       })
     } catch {
       // Histori aksi tidak boleh membatalkan upload utama.
     }
 
     return NextResponse.json({
-      message: `File ${originalName} berhasil diunggah ke batch ${batch.batchCode} dan memuat ${loadResult.insertedRows} row staging.`,
+      message: `${compatWarningPrefix}File ${originalName} berhasil diunggah ke batch ${batch.batchCode} dan memuat ${loadResult.insertedRows} row staging.`,
     })
   } catch (error) {
     if (error instanceof Error && error.message.trim()) {
