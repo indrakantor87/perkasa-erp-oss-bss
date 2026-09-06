@@ -1606,6 +1606,18 @@ export function Sidebar({
   }, [collapsed])
 
   useEffect(() => {
+    if (typeof document === 'undefined') return
+    const root = document.documentElement
+    const width = collapsed ? '96px' : '320px'
+    root.style.setProperty('--sidebar-width', width)
+    root.dataset.sidebarState = collapsed ? 'collapsed' : 'expanded'
+    return () => {
+      root.style.removeProperty('--sidebar-width')
+      delete root.dataset.sidebarState
+    }
+  }, [collapsed])
+
+  useEffect(() => {
     window.localStorage.setItem('perkasa.sidebar.expanded-items', JSON.stringify(expandedItems))
   }, [expandedItems])
 

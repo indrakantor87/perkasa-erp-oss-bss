@@ -84,6 +84,23 @@ div[class*="fixed"][class*="z-50"][class*="bg-slate-950"] {
   }
 }
 
+@media (min-width: 1024px) {
+  div.fixed.inset-0.z-50.flex,
+  div[class*="fixed"][class*="z-50"][class*="bg-slate-950"] {
+    /* Reserve desktop sidebar width + 1rem gutter so modal centers in the remaining main area */
+    padding-left: calc(var(--sidebar-width, 320px) + 1rem) !important;
+    padding-right: 1rem !important;
+    padding-top: 2rem !important;
+    padding-bottom: 2rem !important;
+  }
+
+  div.fixed.inset-0.z-50.flex > div:not([aria-label]),
+  div[class*="fixed"][class*="z-50"][class*="bg-slate-950"] > div:not([aria-label]) {
+    /* Shrink wide modals to fit content area after sidebar (1rem gutter each side = 2rem total) */
+    max-width: min(72rem, calc(100vw - var(--sidebar-width, 320px) - 2rem)) !important;
+  }
+}
+
 /* Content modal inside overlay: skip aria-label="Tutup modal" backdrop button */
 div.fixed.inset-0.z-50.flex > div:not([aria-label]),
 div[class*="fixed"][class*="z-50"][class*="bg-slate-950"] > div:not([aria-label]) {
