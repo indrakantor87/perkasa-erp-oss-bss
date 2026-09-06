@@ -907,8 +907,8 @@ export function MarketingActivityManager({
 
       {isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl rounded-3xl border border-line bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
+          <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-line bg-white shadow-2xl max-h-[calc(100vh-2rem)]">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-5">
               <div>
                 <h3 className="font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
                   {editingItem ? 'Edit Aktivitas Marketing' : 'Tambah Aktivitas Marketing'}
@@ -919,6 +919,7 @@ export function MarketingActivityManager({
               </div>
               <button
                 type="button"
+                aria-label="Tutup popup aktivitas marketing"
                 onClick={() => setIsModalOpen(false)}
                 className="rounded-full border border-line bg-white p-2 text-slate-500 transition hover:text-slate-950"
               >
@@ -926,95 +927,99 @@ export function MarketingActivityManager({
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="grid gap-4 px-6 py-5 lg:grid-cols-2">
-              <label className="flex flex-col gap-2 text-sm text-slate-700">
-                <span className="font-semibold text-slate-950">Tanggal</span>
-                <input
-                  type="date"
-                  required
-                  value={formData.date}
-                  onChange={(event) => setFormData((previous) => ({ ...previous, date: event.target.value }))}
-                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                />
-              </label>
+            <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+                <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2">
+                  <label className="flex flex-col gap-2 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-950">Tanggal</span>
+                    <input
+                      type="date"
+                      required
+                      value={formData.date}
+                      onChange={(event) => setFormData((previous) => ({ ...previous, date: event.target.value }))}
+                      className="h-11 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                    />
+                  </label>
 
-              <label className="flex flex-col gap-2 text-sm text-slate-700">
-                <span className="font-semibold text-slate-950">Marketing</span>
-                {isMarketingRole ? (
-                  <input
-                    value={displayName}
-                    readOnly
-                    className="rounded-2xl border border-line bg-slate-50 px-4 py-3 text-slate-600 outline-none"
-                  />
-                ) : (
-                  <select
-                    required
-                    value={formData.marketingName}
-                    onChange={(event) =>
-                      setFormData((previous) => ({ ...previous, marketingName: event.target.value }))
-                    }
-                    className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                  >
-                    {marketingOptions.map((item) => (
-                      <option key={item.username} value={item.fullName}>
-                        {item.fullName}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </label>
+                  <label className="flex flex-col gap-2 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-950">Marketing</span>
+                    {isMarketingRole ? (
+                      <input
+                        value={displayName}
+                        readOnly
+                        className="h-11 rounded-2xl border border-line bg-slate-50 px-4 py-3 text-slate-600 outline-none"
+                      />
+                    ) : (
+                      <select
+                        required
+                        value={formData.marketingName}
+                        onChange={(event) =>
+                          setFormData((previous) => ({ ...previous, marketingName: event.target.value }))
+                        }
+                        className="h-11 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                      >
+                        {marketingOptions.map((item) => (
+                          <option key={item.username} value={item.fullName}>
+                            {item.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </label>
 
-              {areaFields.map((field, index) => (
-                <label key={field} className="flex flex-col gap-2 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-950">Area {index + 1}</span>
-                  <select
-                    value={formData[field]}
-                    onChange={(event) => updateAreaField(field, event.target.value)}
-                    className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                  >
-                    <option value="">- Pilih Area -</option>
-                    {getAvailableAreas(formData[field]).map((area) => (
-                      <option key={area.id} value={area.id}>
-                        {area.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
+                  {areaFields.map((field, index) => (
+                    <label key={field} className="flex flex-col gap-2 text-sm text-slate-700">
+                      <span className="font-semibold text-slate-950">Area {index + 1}</span>
+                      <select
+                        value={formData[field]}
+                        onChange={(event) => updateAreaField(field, event.target.value)}
+                        className="h-11 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                      >
+                        <option value="">- Pilih Area -</option>
+                        {getAvailableAreas(formData[field]).map((area) => (
+                          <option key={area.id} value={area.id}>
+                            {area.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
 
-              <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
-                <span className="font-semibold text-slate-950">Aktivitas</span>
-                <textarea
-                  rows={3}
-                  value={formData.activity}
-                  onChange={(event) => setFormData((previous) => ({ ...previous, activity: event.target.value }))}
-                  placeholder="Contoh: canvassing area, follow up prospek, survey awal, koordinasi lapangan"
-                  className="min-h-24 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                />
-              </label>
+                  <label className="flex flex-col gap-2 text-sm text-slate-700 sm:col-span-1 md:col-span-2 lg:col-span-2">
+                    <span className="font-semibold text-slate-950">Aktivitas</span>
+                    <textarea
+                      rows={3}
+                      value={formData.activity}
+                      onChange={(event) => setFormData((previous) => ({ ...previous, activity: event.target.value }))}
+                      placeholder="Contoh: canvassing area, follow up prospek, survey awal, koordinasi lapangan"
+                      className="min-h-24 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                    />
+                  </label>
 
-              <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
-                <span className="font-semibold text-slate-950">Keterangan</span>
-                <input
-                  value={formData.notes}
-                  onChange={(event) => setFormData((previous) => ({ ...previous, notes: event.target.value }))}
-                  placeholder="Catatan tambahan hasil kunjungan"
-                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                />
-              </label>
+                  <label className="flex flex-col gap-2 text-sm text-slate-700 sm:col-span-1 md:col-span-2 lg:col-span-2">
+                    <span className="font-semibold text-slate-950">Keterangan</span>
+                    <input
+                      value={formData.notes}
+                      onChange={(event) => setFormData((previous) => ({ ...previous, notes: event.target.value }))}
+                      placeholder="Catatan tambahan hasil kunjungan"
+                      className="h-11 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                    />
+                  </label>
+                </div>
+              </div>
 
-              <div className="flex flex-wrap justify-end gap-3 lg:col-span-2">
+              <div className="shrink-0 flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-6 py-4">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700"
+                  className="rounded-full border border-line bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
                   {submitting ? 'Menyimpan...' : editingItem ? 'Simpan Perubahan' : 'Tambah Aktivitas'}
                 </button>
