@@ -1634,7 +1634,7 @@ export function Sidebar({
   return (
     <>
       <aside
-        className={`hidden flex-col py-8 transition-all duration-200 lg:flex ${desktopWidthClass}`}
+        className={`hidden shrink-0 flex-col py-8 transition-all duration-200 lg:flex ${desktopWidthClass}`}
         style={{
           borderRight: '1px solid var(--color-sidebar-line)',
           backgroundColor: 'var(--color-sidebar)',

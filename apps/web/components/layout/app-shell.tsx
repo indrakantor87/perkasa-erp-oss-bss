@@ -28,7 +28,7 @@ export function AppShell({
   return (
     <ThemeProvider initialTheme={initialTheme}>
       <LanguageProvider initialLanguage={initialLanguage}>
-        <div className="min-h-screen bg-bg text-ink lg:flex" suppressHydrationWarning>
+        <div className="min-h-screen overflow-x-hidden bg-bg text-ink lg:flex" suppressHydrationWarning>
           <Sidebar session={session} allowedPrefixes={allowedPrefixes} />
           <main className="min-w-0 flex-1">
             <div className="mx-auto w-full max-w-7xl px-compact py-compact sm:px-comfort sm:py-comfort lg:px-section lg:py-section xl:max-w-none xl:px-[2.5rem] xl:py-[2rem]">
