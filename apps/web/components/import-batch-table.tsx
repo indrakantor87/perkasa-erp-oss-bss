@@ -1,4 +1,8 @@
+'use client'
+
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import type { ImportBatch } from '@/lib/types'
 
 const statusTone: Record<ImportBatch['status'], string> = {
@@ -35,7 +39,55 @@ function buildBatchSummary(item: ImportBatch) {
   }
 }
 
-export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
+export function ImportBatchTable({
+  items,
+  canCleanup = false,
+  reviewDbReady = false,
+}: {
+  items: ImportBatch[]
+  canCleanup?: boolean
+  reviewDbReady?: boolean
+}) {
+  const router = useRouter()
+  const [busyBatchId, setBusyBatchId] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+
+  async function handleCleanup(item: ImportBatch) {
+    if (item.status === 'IMPORTED') return
+    if (busyBatchId === item.id) return
+
+    const confirmed = window.confirm(
+      `Anda yakin ingin membersihkan batch ${item.batchCode}?\n\n` +
+        `Hanya record staging (batch, actions, transforms, legacy rows) yang akan dihapus. Data bisnis final (customer, order, billing, dll.) TIDAK akan terhapus.\n\n` +
+        `Lanjutkan pembersihan permanen?`
+    )
+    if (!confirmed) return
+
+    setBusyBatchId(item.id)
+    setFeedback(null)
+
+    try {
+      const response = await fetch(`/api/import/batches/${item.id}`, {
+        method: 'DELETE',
+      })
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null
+      if (!response.ok) {
+        setFeedback({
+          tone: 'error',
+          message: payload?.message || `Pembersihan batch ${item.batchCode} gagal.`,
+        })
+        return
+      }
+      setFeedback({
+        tone: 'success',
+        message: payload?.message || `Batch ${item.batchCode} berhasil dibersihkan.`,
+      })
+      router.refresh()
+    } finally {
+      setBusyBatchId(null)
+    }
+  }
+
   return (
     <div className="panel overflow-hidden">
       <div className="border-b border-line px-6 py-5">
@@ -44,6 +96,18 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
           Pusat import dan review data
         </h2>
       </div>
+
+      {feedback ? (
+        <div
+          className={`px-6 py-3 text-sm ${
+            feedback.tone === 'success'
+              ? 'bg-emerald-50 text-emerald-800 border-b border-emerald-100'
+              : 'bg-rose-50 text-rose-800 border-b border-rose-100'
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
 
       <div className="hidden md:block">
         <table className="min-w-full divide-y divide-line text-left text-sm">
@@ -54,12 +118,26 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
               <th className="px-6 py-4 font-semibold">Status</th>
               <th className="px-6 py-4 font-semibold">Baris</th>
               <th className="px-6 py-4 font-semibold">Ringkasan</th>
-              <th className="px-6 py-4 font-semibold">Detail</th>
+              <th className="px-6 py-4 font-semibold">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line bg-white">
+            {items.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={canCleanup ? 6 : 6}
+                  className="px-6 py-10 text-center text-sm text-mute"
+                >
+                  {reviewDbReady
+                    ? 'Tidak ada batch import saat ini. Buat batch baru di formulir di atas untuk memulai.'
+                    : 'Mode review database belum aktif. Setelah tersedia, daftar batch akan tampil di sini.'}
+                </td>
+              </tr>
+            ) : null}
             {items.map((item) => {
               const summary = buildBatchSummary(item)
+              const eligibleCleanup = canCleanup && item.status !== 'IMPORTED'
+              const busy = busyBatchId === item.id
 
               return (
               <tr key={item.id}>
@@ -84,9 +162,30 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
                   </div>
                 </td>
                 <td className="px-6 py-5">
-                  <Link href={`/import/${item.id}`} className="text-sm font-semibold text-blue-700">
-                    Buka batch
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/import/${item.id}`} className="text-sm font-semibold text-blue-700">
+                      Buka batch
+                    </Link>
+                    {canCleanup ? (
+                      item.status === 'IMPORTED' ? (
+                        <span
+                          className="badge border-transparent bg-slate-100 text-slate-600"
+                          title="Batch berhasil diimport tidak dapat dihapus langsung (butuh approval bisnis terpisah)."
+                        >
+                          Terkunci
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleCleanup(item)}
+                          disabled={busy}
+                          className="rounded-full bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white disabled:bg-slate-300"
+                        >
+                          {busy ? 'Proses…' : 'Bersihkan'}
+                        </button>
+                      )
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             )})}
@@ -95,8 +194,17 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
       </div>
 
       <div className="space-y-4 p-4 md:hidden">
+        {items.length === 0 ? (
+          <div className="rounded-2xl border border-line bg-slate-50 p-6 text-center text-sm text-mute">
+            {reviewDbReady
+              ? 'Tidak ada batch import saat ini. Buat batch baru di formulir di atas untuk memulai.'
+              : 'Mode review database belum aktif. Setelah tersedia, daftar batch akan tampil di sini.'}
+          </div>
+        ) : null}
         {items.map((item) => {
           const summary = buildBatchSummary(item)
+          const eligibleCleanup = canCleanup && item.status !== 'IMPORTED'
+          const busy = busyBatchId === item.id
 
           return (
           <article key={item.id} className="rounded-2xl border border-line bg-slate-50 p-4">
@@ -116,6 +224,22 @@ export function ImportBatchTable({ items }: { items: ImportBatch[] }) {
               </Link>
             </div>
             <p className="mt-2 text-xs text-mute">{summary.detail}</p>
+            {eligibleCleanup ? (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => handleCleanup(item)}
+                  disabled={busy}
+                  className="w-full rounded-full bg-rose-700 px-4 py-2 text-xs font-semibold text-white disabled:bg-slate-300"
+                >
+                  {busy ? 'Memproses pembersihan…' : `Bersihkan batch ${item.batchCode}`}
+                </button>
+              </div>
+            ) : canCleanup && item.status === 'IMPORTED' ? (
+              <p className="mt-4 rounded-full border border-slate-200 bg-white px-4 py-2 text-center text-xs font-semibold text-slate-600">
+                Batch IMPORTED terkunci (butuh approval bisnis terpisah untuk hapus).
+              </p>
+            ) : null}
           </article>
         )})}
       </div>

@@ -348,7 +348,13 @@ export async function recordImportBatchAction(params: {
 
 function normalizeActionType(value: string): ImportBatchAction['actionType'] {
   const normalized = value.trim().toUpperCase()
-  if (normalized === 'UPLOAD' || normalized === 'VALIDATE' || normalized === 'TRANSFORM') {
+  if (
+    normalized === 'UPLOAD' ||
+    normalized === 'VALIDATE' ||
+    normalized === 'TRANSFORM' ||
+    normalized === 'RETRY' ||
+    normalized === 'DELETE'
+  ) {
     return normalized
   }
 
@@ -768,4 +774,210 @@ export function getImportWriteErrorMessage(error: unknown) {
   }
 
   return getReviewDbErrorDetail(error)
+}
+
+export type DeleteImportBatchResult = {
+  batchId: number
+  batchCode: string
+  deletedLegacyRows: number
+  deletedTransformRuns: number
+  deletedActions: number
+  deletedBatch: number
+  reason: string
+  actor: string
+  deletedAt: string
+}
+
+export type RetryImportBatchResult =
+  | ({ mode: 'validate' } & ValidationResult)
+  | ({ mode: 'transform' } & TransformResult)
+
+function formatActionTimeRetry() {
+  const now = new Date()
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+}
+
+export async function deleteImportBatch(batchId: string | number | bigint, actorName: string): Promise<DeleteImportBatchResult> {
+  const numericBatchId = Number(batchId)
+  if (!Number.isFinite(numericBatchId) || numericBatchId <= 0) {
+    throw new Error('Batch ID tidak valid untuk pembersihan.')
+  }
+
+  const preBatch = await getImportBatchLookup(String(batchId))
+  if (!preBatch) {
+    throw new Error('Batch tidak ditemukan.')
+  }
+  if (preBatch.status === 'IMPORTED') {
+    throw new Error('Batch berhasil diimport tidak dapat dihapus langsung (butuh approval bisnis terpisah).')
+  }
+
+  const runningRows = await runReviewDbQuery<{ runningCount?: number }>(
+    `SELECT COUNT(*) AS runningCount FROM staging_import_batch_transform_runs WHERE batch_id = ? AND run_status = 'RUNNING' LIMIT 1`,
+    [numericBatchId]
+  )
+  const running = Number((runningRows as unknown as { runningCount?: number }[] | undefined)?.[0]?.runningCount ?? 0)
+  if (running > 0) {
+    throw new Error('Batch sedang menjalankan transform, tidak dapat dihapus. Tunggu proses selesai.')
+  }
+
+  let deletedLegacyRows = 0
+  let deletedTransformRuns = 0
+  let deletedActions = 0
+  let deletedBatch = 0
+
+  await runReviewDbTransaction(async (connection) => {
+    const [lockRows] = await connection.query(
+      `SELECT id, batch_code AS batchCode, import_status AS status FROM staging_import_batches WHERE id = ? FOR UPDATE`,
+      [numericBatchId]
+    )
+    const lockedBatch = ((lockRows as unknown[])?.[0] as { batchCode?: string; status?: string } | undefined)
+    if (!lockedBatch || !lockedBatch.batchCode) {
+      throw new Error('Batch tidak ditemukan untuk dikunci (batch ID tidak sesuai).')
+    }
+    if (lockedBatch.status === 'IMPORTED') {
+      throw new Error('Batch berhasil diimport tidak dapat dihapus langsung (butuh approval bisnis terpisah).')
+    }
+
+    const legacyTableNames = validationRules.map((rule) => rule.tableName)
+    const [schemaRows] = await connection.query(
+      `SELECT table_name AS tn FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND table_name IN (${legacyTableNames.map(() => '?').join(', ')})`,
+      legacyTableNames
+    )
+    const rowsArr = Array.isArray(schemaRows) ? (schemaRows as unknown[]) : [schemaRows]
+    const existingTables = new Set(
+      rowsArr
+        .map((row) => (row as { tn?: string | null | undefined } | undefined)?.tn)
+        .filter((tn): tn is string => typeof tn === 'string' && legacyTableNames.includes(tn))
+    )
+
+    for (const rule of validationRules) {
+      if (!existingTables.has(rule.tableName)) continue
+      const [delResult] = await connection.query(
+        `DELETE FROM \`${rule.tableName}\` WHERE batch_id = ?`,
+        [numericBatchId]
+      )
+      deletedLegacyRows += Number((delResult as { affectedRows?: number } | undefined)?.affectedRows ?? 0)
+    }
+
+    const [delRuns] = await connection.query(
+      `DELETE FROM staging_import_batch_transform_runs WHERE batch_id = ?`,
+      [numericBatchId]
+    )
+    deletedTransformRuns = Number((delRuns as { affectedRows?: number } | undefined)?.affectedRows ?? 0)
+
+    const [delActions] = await connection.query(
+      `DELETE FROM staging_import_batch_actions WHERE batch_id = ?`,
+      [numericBatchId]
+    )
+    deletedActions = Number((delActions as { affectedRows?: number } | undefined)?.affectedRows ?? 0)
+
+    const [delBatch] = await connection.query(
+      `DELETE FROM staging_import_batches WHERE id = ?`,
+      [numericBatchId]
+    )
+    deletedBatch = Number((delBatch as { affectedRows?: number } | undefined)?.affectedRows ?? 0)
+  })
+
+  const finalBatch = await getImportBatchLookup(String(batchId))
+  const batchCode = preBatch.batchCode
+  const reason =
+    finalBatch === null
+      ? `Batch ${batchCode} dibersihkan permanen dari staging area oleh ${actorName}. Data bisnis final TIDAK terhapus.`
+      : `Batch ${batchCode} diproses pembersihan (batch record masih ada; cek child records).`
+
+  void recordImportBatchAction({
+    batchId: numericBatchId,
+    actionType: 'DELETE',
+    status: 'INFO',
+    actor: actorName,
+    detail: reason,
+  }).catch(() => null)
+
+  return {
+    batchId: numericBatchId,
+    batchCode,
+    deletedLegacyRows,
+    deletedTransformRuns,
+    deletedActions,
+    deletedBatch,
+    reason,
+    actor: actorName,
+    deletedAt: formatActionTimeRetry(),
+  }
+}
+
+export async function retryImportBatch(
+  batchId: string,
+  actor: string,
+  stageOverride?: TransformStage
+): Promise<RetryImportBatchResult> {
+  const batch = await getImportBatchLookup(batchId)
+  if (!batch) {
+    throw new Error('Batch tidak ditemukan.')
+  }
+  if (batch.status === 'IMPORTED') {
+    throw new Error('Batch sudah IMPORTED. Retry hanya untuk batch yang belum final.')
+  }
+  const runningRows = await runReviewDbQuery<{ runningCount?: number }>(
+    `SELECT COUNT(*) AS runningCount FROM staging_import_batch_transform_runs WHERE batch_id = ? AND run_status = 'RUNNING' LIMIT 1`,
+    [batch.id]
+  )
+  const running = Number((runningRows as unknown as { runningCount?: number }[] | undefined)?.[0]?.runningCount ?? 0)
+  if (running > 0) {
+    throw new Error('Batch sedang menjalankan transform lain. Tunggu proses selesai.')
+  }
+
+  const summary = await getImportBatchSummary(batch.id)
+  const needsValidateFirst =
+    (summary.totalRows > 0 && summary.validRows === 0 && summary.invalidRows === 0) ||
+    batch.status === 'DRAFT' ||
+    batch.status === 'UPLOADED' ||
+    batch.status === 'MAPPED'
+
+  if (needsValidateFirst && !stageOverride) {
+    try {
+      await recordImportBatchAction({
+        batchId: batch.id,
+        actionType: 'RETRY',
+        status: 'SUCCESS',
+        actor,
+        detail: `Retry auto dimulai: validasi ulang batch ${batch.batchCode} karena status ${batch.status} atau row valid belum ditentukan.`,
+      })
+    } catch {
+      // Histori aksi tidak boleh memblokir retry utama
+    }
+    const validate = await validateImportBatch(batchId, actor)
+    return { mode: 'validate', ...validate }
+  }
+
+  let targetStage: TransformStage
+  if (stageOverride) {
+    targetStage = stageOverride
+  } else {
+    const lastFailed = await runReviewDbQuery<{ stage?: string }>(
+      `SELECT stage FROM staging_import_batch_transform_runs WHERE batch_id = ? AND run_status = 'FAILED' ORDER BY id DESC LIMIT 1`,
+      [batch.id]
+    )
+    const failedStage = (lastFailed as unknown as { stage?: string }[] | undefined)?.[0]?.stage
+    targetStage =
+      failedStage && ['01', '02', '03', '04'].includes(failedStage)
+        ? (failedStage as TransformStage)
+        : '01'
+  }
+
+  try {
+    await recordImportBatchAction({
+      batchId: batch.id,
+      actionType: 'RETRY',
+      status: 'SUCCESS',
+      actor,
+      detail: `Retry transform tahap ${targetStage} untuk batch ${batch.batchCode} (retry actor: ${actor}).`,
+    })
+  } catch {
+    // Histori aksi tidak boleh memblokir retry utama
+  }
+
+  const transform = await transformImportBatch(batchId, targetStage, actor)
+  return { mode: 'transform', ...transform }
 }

@@ -9,6 +9,7 @@ type ImportBatchActionPanelProps = {
   batch: ImportBatch
   rows: BatchDetail['rows']
   canApprove: boolean
+  canCleanup: boolean
   reviewDbReady: boolean
 }
 
@@ -158,6 +159,7 @@ export function ImportBatchActionPanel({
   batch,
   rows,
   canApprove,
+  canCleanup,
   reviewDbReady,
 }: ImportBatchActionPanelProps) {
   const router = useRouter()
@@ -172,6 +174,8 @@ export function ImportBatchActionPanel({
     !reviewDbReady ||
     busyAction !== null ||
     (batch.status !== 'VALIDATED' && batch.status !== 'IMPORTED')
+  const retryDisabled = !canApprove || !reviewDbReady || busyAction !== null
+  const cleanupDisabled = !canCleanup || busyAction !== null || batch.status === 'IMPORTED'
   const guidance = buildNextStepGuidance(batch, rows)
 
   async function runValidate() {
@@ -238,6 +242,81 @@ export function ImportBatchActionPanel({
     }
   }
 
+  async function runRetry(targetStage?: (typeof transformStages)[number]['stage']) {
+    if (retryDisabled) return
+
+    setBusyAction(targetStage ? `retry-${targetStage}` : 'retry-auto')
+    setFeedback(null)
+
+    try {
+      const response = await fetch(`/api/import/batches/${batchId}/retry`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(targetStage ? { stage: targetStage } : {}),
+      })
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null
+
+      if (!response.ok) {
+        setFeedback({
+          tone: 'error',
+          message: payload?.message || targetStage
+            ? `Retry tahap ${targetStage} batch gagal dijalankan.`
+            : 'Retry otomatis batch gagal dijalankan.',
+        })
+        return
+      }
+
+      setFeedback({
+        tone: 'success',
+        message: payload?.message || 'Retry batch berhasil dijalankan.',
+      })
+      router.refresh()
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function runCleanup() {
+    if (cleanupDisabled) return
+    if (batch.status === 'IMPORTED') return
+
+    const confirmed = window.confirm(
+      `Anda yakin ingin membersihkan batch ${batch.batchCode} secara permanen?\n\n` +
+        `Hanya record staging (batch, actions, transforms, legacy rows) yang akan dihapus. Data bisnis final (customer, order, billing, dll.) TIDAK akan terhapus.\n\n` +
+        `Lanjutkan pembersihan permanen?`
+    )
+    if (!confirmed) return
+
+    setBusyAction('cleanup')
+    setFeedback(null)
+
+    try {
+      const response = await fetch(`/api/import/batches/${batchId}`, {
+        method: 'DELETE',
+      })
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null
+
+      if (!response.ok) {
+        setFeedback({
+          tone: 'error',
+          message: payload?.message || `Pembersihan batch ${batch.batchCode} gagal.`,
+        })
+        return
+      }
+
+      setFeedback({
+        tone: 'success',
+        message: payload?.message || `Batch ${batch.batchCode} berhasil dibersihkan. Kembali ke daftar batch...`,
+      })
+      router.refresh()
+      setTimeout(() => router.push('/import'), 700)
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-line bg-slate-50 p-5">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Approval & Transform</p>
@@ -293,6 +372,99 @@ export function ImportBatchActionPanel({
       <p className="mt-4 text-xs leading-5 text-mute">
         Tahap yang lebih tinggi akan mengeksekusi baseline SQL review secara berurutan dari tahap 1 hingga tahap terpilih.
       </p>
+
+      {batch.status === 'FAILED' ? (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">Retry Status Gagal</p>
+          <h4 className="mt-3 text-sm font-semibold text-amber-950">
+            Retry batch dari status FAILED
+          </h4>
+          <p className="mt-2 text-sm leading-6 text-amber-900">
+            Retry otomatis akan menjalankan validasi ulang (bila diperlukan), lalu lanjut ke tahap transform terakhir yang tercatat gagal.
+            Pilih tombol tahap spesifik bila ingin override target retry.
+          </p>
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => runRetry()}
+              disabled={retryDisabled}
+              className="rounded-full bg-amber-700 px-5 py-3 text-sm font-semibold text-white disabled:bg-slate-300"
+            >
+              {busyAction === 'retry-auto' ? 'Menjalankan retry otomatis...' : 'Retry Otomatis'}
+            </button>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {transformStages.map((item) => (
+              <button
+                key={item.stage}
+                type="button"
+                onClick={() => runRetry(item.stage)}
+                disabled={retryDisabled}
+                className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-left transition hover:border-amber-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+              >
+                <p className="text-sm font-semibold text-slate-950">
+                  Retry {item.title} ({item.stage})
+                </p>
+                <p className="mt-1 text-xs text-mute">{item.detail}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {canCleanup ? (
+        <div
+          className={`mt-6 rounded-2xl border-2 border-dashed px-5 py-4 ${
+            batch.status === 'IMPORTED'
+              ? 'border-slate-200 bg-slate-50'
+              : 'border-rose-300 bg-rose-50/60'
+          }`}
+        >
+          <p
+            className={`text-xs font-semibold uppercase tracking-[0.18em] ${
+              batch.status === 'IMPORTED' ? 'text-slate-600' : 'text-rose-700'
+            }`}
+          >
+            Pembersihan Batch Permanen
+          </p>
+          <h4
+            className={`mt-3 text-lg font-semibold ${
+              batch.status === 'IMPORTED' ? 'text-slate-900' : 'text-rose-950'
+            }`}
+          >
+            {batch.status === 'IMPORTED'
+              ? 'Batch IMPORTED terkunci'
+              : 'Bersihkan staging batch ini'}
+          </h4>
+          <p
+            className={`mt-2 text-sm leading-6 ${
+              batch.status === 'IMPORTED' ? 'text-slate-700' : 'text-rose-900'
+            }`}
+          >
+            {batch.status === 'IMPORTED'
+              ? 'Batch yang sudah berhasil diimport tidak dapat dihapus langsung melalui Import Center. Menghapus batch IMPORTED membutuhkan approval bisnis terpisah dan tidak akan dilakukan dalam scope ini.'
+              : 'Aksi ini menghapus record staging (batch, actions, transform runs, legacy rows) SELAMANYA. Data bisnis final (customer, sales, inventory, billing, hr, auth) TIDAK akan ikut terhapus.'}
+          </p>
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={runCleanup}
+              disabled={cleanupDisabled}
+              className={`rounded-full px-5 py-3 text-sm font-semibold text-white ${
+                batch.status === 'IMPORTED'
+                  ? 'bg-slate-300 cursor-not-allowed'
+                  : 'bg-rose-700 disabled:bg-slate-300'
+              }`}
+            >
+              {batch.status === 'IMPORTED'
+                ? 'Batch IMPORTED Terkunci'
+                : busyAction === 'cleanup'
+                  ? 'Memproses pembersihan...'
+                  : 'Bersihkan Batch Ini'}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {feedback ? (
         <div

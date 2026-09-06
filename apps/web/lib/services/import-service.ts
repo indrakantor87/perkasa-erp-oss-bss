@@ -415,10 +415,10 @@ export async function getImportOverview() {
     return {
       source: getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error)),
       overview: {
-        items: importBatches,
+        items: [],
         stages: transformStages,
-        totalRows: importBatches.reduce((total, item) => total + item.totalRows, 0),
-        importedBatches: importBatches.filter((item) => item.status === 'IMPORTED').length,
+        totalRows: 0,
+        importedBatches: 0,
       },
     }
   }

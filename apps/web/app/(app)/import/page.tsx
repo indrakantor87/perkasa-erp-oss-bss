@@ -15,6 +15,10 @@ export default async function ImportPage() {
 
   const { source, overview } = await getImportOverview()
   const canCreate = canPerformAction(session.role, 'import_center', 'create')
+  const canCleanup =
+    session.role === 'SUPER_ADMIN' &&
+    canPerformAction(session.role, 'import_center', 'approve')
+  const reviewDbReady = source.effectiveMode === 'review-db' && !source.isFallback
 
   return (
     <div className="space-y-6">
@@ -42,10 +46,10 @@ export default async function ImportPage() {
 
       <ImportBatchCreateForm
         canCreate={canCreate}
-        reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
+        reviewDbReady={reviewDbReady}
       />
 
-      <ImportBatchTable items={overview.items} />
+      <ImportBatchTable items={overview.items} canCleanup={canCleanup} reviewDbReady={reviewDbReady} />
       <ImportTransformStageList items={overview.stages} />
     </div>
   )

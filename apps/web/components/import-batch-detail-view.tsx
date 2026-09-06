@@ -59,12 +59,14 @@ export function ImportBatchDetailView({
   detail,
   canUpload,
   canApprove,
+  canCleanup,
   reviewDbReady,
 }: {
   batch: ImportBatch
   detail: BatchDetail
   canUpload: boolean
   canApprove: boolean
+  canCleanup: boolean
   reviewDbReady: boolean
 }) {
   const rowSummary = buildRowStatusSummary(detail.rows)
@@ -259,6 +261,7 @@ export function ImportBatchDetailView({
           batch={batch}
           rows={detail.rows}
           canApprove={canApprove}
+          canCleanup={canCleanup}
           reviewDbReady={reviewDbReady}
         />
       </section>

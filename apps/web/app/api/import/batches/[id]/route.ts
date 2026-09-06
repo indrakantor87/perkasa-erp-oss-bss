@@ -6,7 +6,7 @@ import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { loadImportFileToStaging } from '@/lib/services/import-file-loader'
-import { recordImportBatchAction } from '@/lib/services/import-write-service'
+import { deleteImportBatch, getImportWriteErrorMessage, recordImportBatchAction } from '@/lib/services/import-write-service'
 import { getImportBatchDetail } from '@/lib/services/import-service'
 
 export async function GET(
@@ -187,5 +187,29 @@ export async function POST(
     }
 
     return NextResponse.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getSession()
+  if (!session) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  }
+  if (session.role !== 'SUPER_ADMIN' || !canPerformAction(session.role, 'import_center', 'approve')) {
+    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+  }
+
+  try {
+    const { id } = await params
+    const result = await deleteImportBatch(id, `${session.displayName} (${session.username})`)
+    return NextResponse.json({ message: `Batch ${result.batchCode} berhasil dibersihkan.`, result })
+  } catch (error) {
+    if (error instanceof Error && error.message.trim()) {
+      return NextResponse.json({ message: error.message.trim() }, { status: 400 })
+    }
+    return NextResponse.json({ message: getImportWriteErrorMessage(error) }, { status: 500 })
   }
 }

@@ -310,7 +310,7 @@ export type BatchRow = {
 
 export type ImportBatchAction = {
   id: string
-  actionType: 'CREATE' | 'UPLOAD' | 'VALIDATE' | 'TRANSFORM'
+  actionType: 'CREATE' | 'UPLOAD' | 'VALIDATE' | 'TRANSFORM' | 'RETRY' | 'DELETE'
   status: 'SUCCESS' | 'FAILED' | 'INFO'
   actor: string
   detail: string

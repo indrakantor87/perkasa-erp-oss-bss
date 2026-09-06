@@ -19,6 +19,9 @@ export default async function ImportBatchDetailPage({
   const { source, batch, detail } = await getImportBatchDetail(batchId)
   const canUpload = canPerformAction(session.role, 'import_center', 'create')
   const canApprove = canPerformAction(session.role, 'import_center', 'approve')
+  const canCleanup =
+    session.role === 'SUPER_ADMIN' &&
+    canPerformAction(session.role, 'import_center', 'approve')
 
   if (!batch || !detail) {
     notFound()
@@ -32,6 +35,7 @@ export default async function ImportBatchDetailPage({
         detail={detail!}
         canUpload={canUpload}
         canApprove={canApprove}
+        canCleanup={canCleanup}
         reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
       />
     </div>
