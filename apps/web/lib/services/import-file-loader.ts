@@ -19,6 +19,10 @@ type ImportSectionKey =
   | 'attendance'
   | 'salaries'
   | 'loans'
+  | 'coverage'
+  | 'marketing_activities'
+  | 'marketing_activity_areas'
+  | 'odp'
 
 type BatchContext = {
   id: number
@@ -813,18 +817,193 @@ async function insertLoanRows(batch: BatchContext, rows: Record<string, unknown>
   return inserted
 }
 
+async function insertSalesCoverageRows(batch: BatchContext, rows: Record<string, unknown>[]) {
+  let inserted = 0
+  for (const row of rows) {
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        INSERT INTO staging_legacy_sales_coverage_records (
+          batch_id,
+          source_system,
+          legacy_id,
+          branch_code,
+          area_code,
+          area_name,
+          coverage_status,
+          village,
+          district,
+          city,
+          province,
+          latitude,
+          longitude,
+          notes,
+          raw_payload,
+          normalized_key,
+          import_status,
+          validation_notes
+        )
+        VALUES (?, 'WEB_PSB', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NULL)
+      `,
+      [
+        batch.id,
+        toText(getValue(row, ['legacy_id', 'legacyId'])),
+        toText(getValue(row, ['branch_code', 'branchCode'])),
+        toText(getValue(row, ['area_code', 'areaCode'])),
+        toText(getValue(row, ['area_name', 'areaName'])),
+        toText(getValue(row, ['coverage_status', 'coverageStatus'])),
+        toText(getValue(row, ['village', 'kelurahan', 'desa'])),
+        toText(getValue(row, ['district', 'kecamatan'])),
+        toText(getValue(row, ['city', 'kota', 'kabupaten'])),
+        toText(getValue(row, ['province', 'provinsi'])),
+        toNumber(getValue(row, ['latitude', 'lat'])),
+        toNumber(getValue(row, ['longitude', 'lng', 'lon'])),
+        toText(getValue(row, ['notes', 'note', 'catatan'])),
+        toJsonText(getValue(row, ['raw_payload', 'rawPayload']), row),
+        toText(getValue(row, ['normalized_key', 'normalizedKey'])) ||
+          buildNormalizedKey(row, ['legacy_id', 'area_code', 'area_name']),
+      ]
+    )
+    inserted += 1
+  }
+  return inserted
+}
+
+async function insertMarketingActivityRows(batch: BatchContext, rows: Record<string, unknown>[]) {
+  let inserted = 0
+  for (const row of rows) {
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        INSERT INTO staging_legacy_marketing_activity_records (
+          batch_id,
+          source_system,
+          legacy_id,
+          branch_code,
+          activity_date,
+          marketing_name,
+          activity_type,
+          notes,
+          raw_payload,
+          normalized_key,
+          import_status,
+          validation_notes
+        )
+        VALUES (?, 'WEB_PSB', ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NULL)
+      `,
+      [
+        batch.id,
+        toText(getValue(row, ['legacy_id', 'legacyId'])),
+        toText(getValue(row, ['branch_code', 'branchCode'])),
+        toText(getValue(row, ['activity_date', 'activityDate', 'tanggal'])),
+        toText(getValue(row, ['marketing_name', 'marketingName', 'nama_kegiatan'])),
+        toText(getValue(row, ['activity_type', 'activityType', 'jenis_kegiatan'])),
+        toText(getValue(row, ['notes', 'note', 'catatan'])),
+        toJsonText(getValue(row, ['raw_payload', 'rawPayload']), row),
+        toText(getValue(row, ['normalized_key', 'normalizedKey'])) ||
+          buildNormalizedKey(row, ['legacy_id', 'activity_date', 'marketing_name']),
+      ]
+    )
+    inserted += 1
+  }
+  return inserted
+}
+
+async function insertMarketingActivityAreaRows(batch: BatchContext, rows: Record<string, unknown>[]) {
+  let inserted = 0
+  for (const row of rows) {
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        INSERT INTO staging_legacy_marketing_activity_area_records (
+          batch_id,
+          source_system,
+          legacy_activity_id,
+          legacy_area_id,
+          sort_order,
+          raw_payload,
+          normalized_key,
+          import_status,
+          validation_notes
+        )
+        VALUES (?, 'WEB_PSB', ?, ?, ?, ?, ?, 'PENDING', NULL)
+      `,
+      [
+        batch.id,
+        toText(getValue(row, ['legacy_activity_id', 'legacyActivityId', 'activity_id', 'activityId'])),
+        toText(getValue(row, ['legacy_area_id', 'legacyAreaId', 'area_id', 'areaId'])),
+        toInteger(getValue(row, ['sort_order', 'sortOrder', 'urutan'])),
+        toJsonText(getValue(row, ['raw_payload', 'rawPayload']), row),
+        toText(getValue(row, ['normalized_key', 'normalizedKey'])) ||
+          buildNormalizedKey(row, ['legacy_activity_id', 'legacy_area_id', 'sort_order']),
+      ]
+    )
+    inserted += 1
+  }
+  return inserted
+}
+
+async function insertNetworkOdpRows(batch: BatchContext, rows: Record<string, unknown>[]) {
+  let inserted = 0
+  for (const row of rows) {
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        INSERT INTO staging_legacy_network_odp_records (
+          batch_id,
+          source_system,
+          legacy_id,
+          odp_code,
+          odp_name,
+          region_name,
+          location_text,
+          latitude,
+          longitude,
+          total_ports,
+          active_ports,
+          pole_status,
+          is_active,
+          raw_payload,
+          normalized_key,
+          import_status,
+          validation_notes
+        )
+        VALUES (?, 'WEB_PSB', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', NULL)
+      `,
+      [
+        batch.id,
+        toText(getValue(row, ['legacy_id', 'legacyId'])),
+        toText(getValue(row, ['odp_code', 'odpCode', 'kode_odp'])),
+        toText(getValue(row, ['odp_name', 'odpName', 'nama_odp'])),
+        toText(getValue(row, ['region_name', 'regionName', 'wilayah', 'region'])),
+        toText(getValue(row, ['location_text', 'locationText', 'lokasi', 'alamat'])),
+        toNumber(getValue(row, ['latitude', 'lat'])),
+        toNumber(getValue(row, ['longitude', 'lng', 'lon'])),
+        toInteger(getValue(row, ['total_ports', 'totalPorts', 'total_port', 'jumlah_port'])),
+        toInteger(getValue(row, ['active_ports', 'activePorts', 'port_aktif', 'port_active'])),
+        toText(getValue(row, ['pole_status', 'poleStatus', 'status_tiang'])),
+        toBooleanInt(getValue(row, ['is_active', 'isActive', 'aktif', 'active'])),
+        toJsonText(getValue(row, ['raw_payload', 'rawPayload']), row),
+        toText(getValue(row, ['normalized_key', 'normalizedKey'])) ||
+          buildNormalizedKey(row, ['legacy_id', 'odp_code']),
+      ]
+    )
+    inserted += 1
+  }
+  return inserted
+}
+
 const scopeDefinitions: Record<string, ScopeDefinition> = {
-  USER_AND_ORDER_SAMPLE: {
-    scope: 'USER_AND_ORDER_SAMPLE',
+  USER_AND_ORDER: {
+    scope: 'USER_AND_ORDER',
     sections: [
       { key: 'users', aliases: ['users', 'user', 'auth_users'], clearTable: 'staging_legacy_user_records', insertRows: insertUserRows },
       { key: 'customers', aliases: ['customers', 'customer'], clearTable: 'staging_legacy_customer_records', insertRows: insertCustomerRows },
       { key: 'orders', aliases: ['orders', 'order'], clearTable: 'staging_legacy_order_records', insertRows: insertOrderRows },
       { key: 'support', aliases: ['support', 'support_records', 'trouble_tickets'], clearTable: 'staging_legacy_support_records', insertRows: insertSupportRows },
+      { key: 'coverage', aliases: ['coverage', 'sales_coverage', 'covered_areas', 'coverage_areas'], clearTable: 'staging_legacy_sales_coverage_records', insertRows: insertSalesCoverageRows },
+      { key: 'marketing_activities', aliases: ['marketing_activities', 'marketing', 'marketing_activity', 'activities'], clearTable: 'staging_legacy_marketing_activity_records', insertRows: insertMarketingActivityRows },
+      { key: 'marketing_activity_areas', aliases: ['marketing_activity_areas', 'activity_areas', 'activity_area_mapping'], clearTable: 'staging_legacy_marketing_activity_area_records', insertRows: insertMarketingActivityAreaRows },
     ],
   },
-  BILLING_SAMPLE: {
-    scope: 'BILLING_SAMPLE',
+  BILLING: {
+    scope: 'BILLING',
     sections: [
       { key: 'invoices', aliases: ['invoices', 'billing_invoices'], clearTable: 'staging_legacy_billing_invoice_records', insertRows: insertBillingInvoiceRows },
       { key: 'items', aliases: ['items', 'billing_items', 'invoice_items'], clearTable: 'staging_legacy_billing_item_records', insertRows: insertBillingItemRows },
@@ -832,15 +1011,16 @@ const scopeDefinitions: Record<string, ScopeDefinition> = {
       { key: 'collections', aliases: ['collections', 'billing_collections', 'collection_actions'], clearTable: 'staging_legacy_billing_collection_records', insertRows: insertBillingCollectionRows },
     ],
   },
-  INVENTORY_SAMPLE: {
-    scope: 'INVENTORY_SAMPLE',
+  INVENTORY: {
+    scope: 'INVENTORY',
     sections: [
       { key: 'items', aliases: ['items', 'inventory_items'], clearTable: 'staging_legacy_inventory_item_records', insertRows: insertInventoryItemRows },
       { key: 'movements', aliases: ['movements', 'inventory_movements', 'stock_movements'], clearTable: 'staging_legacy_inventory_movement_records', insertRows: insertInventoryMovementRows },
+      { key: 'odp', aliases: ['odp', 'network_odp', 'network_odp_records', 'odp_records'], clearTable: 'staging_legacy_network_odp_records', insertRows: insertNetworkOdpRows },
     ],
   },
-  HR_SAMPLE: {
-    scope: 'HR_SAMPLE',
+  HR: {
+    scope: 'HR',
     sections: [
       { key: 'employees', aliases: ['employees', 'employee'], clearTable: 'staging_legacy_employee_records', insertRows: insertEmployeeRows },
       { key: 'attendance', aliases: ['attendance', 'attendances'], clearTable: 'staging_legacy_attendance_records', insertRows: insertAttendanceRows },
@@ -951,7 +1131,11 @@ export async function loadImportFileToStaging(
   fileBuffer: Buffer,
   extension: string
 ): Promise<LoadImportFileResult> {
-  const definition = scopeDefinitions[batch.scope]
+  let definition = scopeDefinitions[batch.scope]
+  if (!definition && batch.scope.endsWith('_SAMPLE')) {
+    const compatKey = batch.scope.replace(/_SAMPLE$/, '')
+    definition = scopeDefinitions[compatKey]
+  }
   if (!definition) {
     throw new Error(`Scope ${batch.scope} belum didukung untuk parser staging otomatis.`)
   }

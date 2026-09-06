@@ -11,10 +11,10 @@ type ImportBatchCreateFormProps = {
 
 const sourceOptions = ['WEB_PSB', 'FINANCE', 'GA'] as const
 const scopeSuggestions = [
-  'USER_AND_ORDER_SAMPLE',
-  'BILLING_SAMPLE',
-  'INVENTORY_SAMPLE',
-  'HR_SAMPLE',
+  'USER_AND_ORDER',
+  'BILLING',
+  'INVENTORY',
+  'HR',
   'CUSTOMER_REVIEW',
   'SUPPORT_REVIEW',
 ] as const
@@ -121,7 +121,7 @@ export function ImportBatchCreateForm({
             value={scope}
             onChange={(event) => setScope(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            placeholder="USER_AND_ORDER_SAMPLE"
+            placeholder="USER_AND_ORDER"
             required
             disabled={isDisabled}
           />

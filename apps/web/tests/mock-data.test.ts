@@ -53,10 +53,11 @@ async function main() {
   assert.equal(dashboardSummary.customers, 10284)
   assert.ok(dashboardSummary.overdueInvoices > 0, 'Summary billing harus punya angka overdue.')
 
-  assert.equal(importBatches.length, 4)
+  assert.equal(importBatches.length, 0, 'Setelah G23.67 production mock cleanup, importBatches harus KOSONG agar TIDAK mengemulasikan SAMPLE fake batch.')
   assert.equal(transformStages.length, 4)
-  assert.equal(getImportBatch('sample-webpsb-user-001')?.sourceSystem, 'WEB_PSB')
-  assert.ok(getBatchDetail('sample-webpsb-billing-001')?.rows.length, 'Batch billing harus punya row review.')
+  assert.equal(getImportBatch('sample-webpsb-user-001'), undefined, 'SAMPLE mock batch ID setelah cleanup TIDAK BOLEH return object (harus undefined).')
+  assert.equal(getBatchDetail('sample-webpsb-billing-001'), undefined, 'Detail SAMPLE billing batch setelah cleanup harus undefined (tidak ada fake imported data).')
+  assert.equal(transformStages.every((s) => s.status === 'pending'), true, 'Transform stages setelah cleanup harus status PENDING SEMUA (tidak mensimulasikan done/review palsu).')
 
   assert.equal(domainPages.support.summaries[0]?.label, 'TT Open')
   assert.equal(domainPages.access.primaryAction.href, '/dashboard')
@@ -463,16 +464,15 @@ async function main() {
   assert.equal(sanitizedSupportNarrativeItem.actionOutcomeSummary, undefined)
 
   const importOverview = await getImportOverview()
-  assert.equal(importOverview.overview.items.length, 4)
-  assert.equal(importOverview.overview.importedBatches, 1)
-  assert.equal(importOverview.overview.items[0]?.sourceFileName?.includes('.'), true)
+  assert.equal(importOverview.overview.items.length, 0, 'Setelah G23.67 cleanup, fallback mode import overview items = 0 (tidak ada SAMPLE batch default).')
+  assert.equal(importOverview.overview.importedBatches, 0, 'Tidak ada imported batch pada fallback mode bersih.')
+  assert.equal(importOverview.overview.totalRows, 0, 'Total rows = 0 ketika items kosong.')
   assert.equal(importOverview.source.isFallback, true)
 
   const importDetail = await getImportBatchDetail('sample-webpsb-user-001')
-  assert.equal(importDetail.batch?.sourceSystem, 'WEB_PSB')
-  assert.ok(importDetail.detail?.rows.length, 'Detail batch harus tersedia dari service layer.')
-  assert.equal((importDetail.detail?.actions.length ?? 0) > 0, true)
-  assert.equal(importDetail.source.isFallback, true)
+  assert.equal(importDetail.batch, undefined, 'Fallback mode detail batch sample = undefined (production TIDAK punya SAMPLE instance).')
+  assert.equal(importDetail.detail, undefined, 'Detail rows/actions = undefined ketika tidak ada SAMPLE batch.')
+  assert.equal(importDetail.source.isFallback, true, 'Tetap isFallback true karena mode tidak review-db / DB tidak tersedia.')
 
   const authUsersPage = await getAuthUsersPageData()
   assert.equal(authUsersPage.users.length >= 2, true)

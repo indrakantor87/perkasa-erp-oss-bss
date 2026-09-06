@@ -170,6 +170,27 @@ const validationRules: ValidationRule[] = [
     invalidMessage: 'Validasi web: loan wajib punya legacy employee, amount, dan normalized key.',
     validMessage: 'Validasi web: loan siap ditransform.',
   },
+  {
+    tableName: 'staging_legacy_sales_coverage_records',
+    validCondition:
+      "NULLIF(TRIM(area_name), '') IS NOT NULL",
+    invalidMessage: 'Validasi web: coverage area wajib punya nama area coverage dan normalized key.',
+    validMessage: 'Validasi web: sales coverage area siap ditransform.',
+  },
+  {
+    tableName: 'staging_legacy_marketing_activity_records',
+    validCondition:
+      "NULLIF(TRIM(marketing_name), '') IS NOT NULL AND activity_date IS NOT NULL",
+    invalidMessage: 'Validasi web: marketing activity wajib punya nama kegiatan dan tanggal.',
+    validMessage: 'Validasi web: marketing activity siap ditransform.',
+  },
+  {
+    tableName: 'staging_legacy_network_odp_records',
+    validCondition:
+      "NULLIF(TRIM(odp_code), '') IS NOT NULL",
+    invalidMessage: 'Validasi web: network ODP wajib punya kode ODP dan normalized key.',
+    validMessage: 'Validasi web: network ODP siap ditransform.',
+  },
 ]
 
 const transformStageFiles: Record<TransformStage, string> = {

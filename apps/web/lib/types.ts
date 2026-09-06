@@ -294,8 +294,8 @@ export type ImportBatch = {
 export type TransformStage = {
   stage: string
   title: string
-  status: 'ready' | 'review' | 'done'
-  href: string
+  status: 'pending' | 'ready' | 'review' | 'done'
+  href?: string
   summary: string
 }
 
@@ -511,4 +511,29 @@ export type DomainPageData = {
   content: DomainPageContent
   capabilities: DomainCapability[]
   supportFocus?: DomainSupportFocus
+}
+
+export type RowDomain = 'ALL' | 'USER' | 'CUSTOMER' | 'SALES' | 'SUPPORT' | 'BILLING' | 'INVENTORY' | 'HR' | 'OTHER'
+
+export type BatchScopeName =
+  | 'USER_AND_ORDER'
+  | 'BILLING'
+  | 'INVENTORY'
+  | 'HR'
+  | 'CUSTOMER_REVIEW'
+  | 'SUPPORT_REVIEW'
+
+export type BatchTemplateSheet = { sheetName: string }
+
+export type BatchCapabilityDefinition = {
+  scope: BatchScopeName
+  displayName: string
+  domainPrimer: Exclude<RowDomain, 'ALL' | 'OTHER'>
+  domainTercover: RowDomain[]
+  description: string
+  targetEntities: string[]
+  sheetCount: number
+  transformStageCoverage: { min: '01' | '02' | '03' | '04'; max: '01' | '02' | '03' | '04' }
+  requiredForOperator: boolean
+  supported: boolean
 }

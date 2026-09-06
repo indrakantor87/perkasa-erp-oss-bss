@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { TransformStage } from '@/lib/types'
 
 const statusTone: Record<TransformStage['status'], string> = {
+  pending: 'bg-slate-200 text-slate-500',
   ready: 'bg-slate-100 text-slate-700',
   review: 'bg-amber-50 text-amber-700',
   done: 'bg-emerald-50 text-emerald-700',
@@ -32,9 +33,13 @@ export function ImportTransformStageList({ items }: { items: TransformStage[] })
                 <p className="mt-2 text-sm leading-6 text-mute">{item.summary}</p>
               </div>
 
-              <Link href={item.href} className="text-sm font-semibold text-blue-700">
-                Lihat batch terkait
-              </Link>
+              {item.href ? (
+                <Link href={item.href} className="text-sm font-semibold text-blue-700">
+                  Lihat batch terkait
+                </Link>
+              ) : (
+                <span className="text-sm font-medium text-slate-400">Belum ada batch terkait</span>
+              )}
             </div>
           </article>
         ))}
