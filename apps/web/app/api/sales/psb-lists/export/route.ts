@@ -2,6 +2,7 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { resolveOwnedPsbListOwnerAliases } from '@/lib/services/psb-list-service'
 
 type PsbListExportRow = {
   id: number
@@ -72,6 +73,13 @@ export async function GET(request: Request) {
 
     const filters: string[] = ['1 = 1']
     const values: unknown[] = []
+
+    const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+    if (ownerAliases.length) {
+      const placeholders = ownerAliases.map(() => '?').join(', ')
+      filters.push(`LOWER(COALESCE(psb.sales_owner_name, '')) IN (${placeholders})`)
+      values.push(...ownerAliases)
+    }
 
     if (status) {
       filters.push('UPPER(COALESCE(psb.status, \'\')) = UPPER(?)')

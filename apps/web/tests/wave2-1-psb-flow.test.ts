@@ -26,9 +26,11 @@ import {
   type ActivateErrorCode,
   type ActivatePsbFlowResult,
   canApprovePsbList,
+  resolveOwnedPsbListOwnerAliases,
 } from '@/lib/services/psb-list-service'
 import { canPerformAction, getPermissionMatrix } from '@/lib/access-control'
 import { APP_ROLES, type AppRole } from '@/lib/types'
+import type { AppSession } from '@/lib/auth-session'
 
 function normalizeNullableText(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null
@@ -381,7 +383,359 @@ async function main() {
     process.stdout.write('TEST 10 (PENJUALAN empty/null/undefined → actorName) ... PASS\n')
   }
 
-  process.stdout.write('\nWAVE 2.1 — 10 focused tests: ALL PASS (static + pure logic layer)\n')
+  // ===========================================================================
+  // TEST 11 — SALES_MARKETING owner aliases setara dengan PENJUALAN.
+  //          Kedua role wajib menghasilkan aliases (displayName, username,
+  //          composite) non-empty. Regression guard untuk audit isolasi data.
+  // ===========================================================================
+  {
+    assert.ok(
+      APP_ROLES.includes('SALES_MARKETING'),
+      'Role SALES_MARKETING wajib tersedia di APP_ROLES canonical set.',
+    )
+    const smSession: AppSession = {
+      role: 'SALES_MARKETING',
+      username: 'budi',
+      displayName: 'BUDI',
+      branchIds: [],
+    } as AppSession
+    const smAliases = resolveOwnedPsbListOwnerAliases(smSession)
+    assert.ok(
+      Array.isArray(smAliases) && smAliases.length >= 1,
+      'SALES_MARKETING harus menghasilkan aliases non-empty. Prior gap: SALES_MARKETING return empty karena PENJUALAN only condition.',
+    )
+    const smSet = new Set(smAliases.map((a) => String(a).toUpperCase()))
+    assert.ok(smSet.has('BUDI'), `SALES_MARKETING aliases harus contain displayName. Ditemukan: ${[...smSet].join(', ')}`)
+    assert.ok(smSet.has('BUDI (BUDI)'), 'SALES_MARKETING aliases harus contain composite displayName (username).')
+
+    const pnSession: AppSession = {
+      role: 'PENJUALAN',
+      username: 'budi',
+      displayName: 'BUDI',
+      branchIds: [],
+    } as AppSession
+    const pnAliases = resolveOwnedPsbListOwnerAliases(pnSession)
+    assert.equal(
+      pnAliases.length,
+      smAliases.length,
+      'Panjang set aliases SALES_MARKETING harus SETARA dengan PENJUALAN untuk identitas session yang sama.',
+    )
+    for (const alias of pnAliases) {
+      assert.ok(
+        smAliases.includes(alias),
+        `Alias PENJUALAN (${alias}) harus muncul juga di set SALES_MARKETING untuk session identik.`,
+      )
+    }
+
+    const otherSession: AppSession = {
+      role: 'ADMIN',
+      username: 'admin',
+      displayName: 'ADMIN SISTEM',
+      branchIds: [],
+    } as AppSession
+    assert.deepEqual(
+      resolveOwnedPsbListOwnerAliases(otherSession),
+      [],
+      'Role NON-isolated (ADMIN/CS/OWNER/SUPER_ADMIN) harus return empty aliases — existing behavior preserved.',
+    )
+
+    process.stdout.write('TEST 11 (SALES_MARKETING owner aliases = PENJUALAN) .... PASS\n')
+  }
+
+  // ===========================================================================
+  // TEST 12 — PSB LIST / EXPORT client owner override tidak boleh bypass
+  //          scope security authenticated. Kedua role (PENJUALAN &
+  //          SALES_MARKETING): client kirim ANDI → server enforce BUDI.
+  //          Ini pure logic test mirror where-clause builder.
+  // ===========================================================================
+  {
+    type BuildWhereParams = {
+      role: AppRole
+      authenticated: { username: string; displayName: string }
+      clientOwnerRaw?: string | null
+    }
+    const buildWhereMirror = (params: BuildWhereParams): { where: string[]; values: unknown[] } => {
+      const session: AppSession = {
+        role: params.role,
+        username: params.authenticated.username,
+        displayName: params.authenticated.displayName,
+        branchIds: [],
+      } as AppSession
+      const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+      const where: string[] = []
+      const values: unknown[] = []
+      if (ownerAliases.length) {
+        where.push(`LOWER(COALESCE(sales_owner_name, '')) IN (${ownerAliases.map(() => '?').join(', ')})`)
+        values.push(...ownerAliases)
+      } else if (params.clientOwnerRaw) {
+        where.push('sales_owner_name = ?')
+        values.push(params.clientOwnerRaw)
+      }
+      return { where, values }
+    }
+
+    const rolesIsolated: Array<AppRole> = ['PENJUALAN', 'SALES_MARKETING']
+    for (const role of rolesIsolated) {
+      const out = buildWhereMirror({
+        role,
+        authenticated: { username: 'budi', displayName: 'BUDI' },
+        clientOwnerRaw: 'ANDI',
+      })
+      const budiInWhere = out.where.some((clause) => /IN\s*\(/.test(clause))
+      assert.ok(budiInWhere, `${role}: Jika ownerAliases not empty → harus ada IN clause scope authenticated (BUDI).`)
+      const hasAndiExactMatch = out.values.includes('ANDI')
+      assert.equal(
+        hasAndiExactMatch,
+        false,
+        `${role}: client owner=ANDI TIDAK BOLEH di-inject ke values SAAT ownerAliases active. Security scope server BUDI harus menang — client override NOT PERMITTED via priority rule ownerAliases first. Values: ${JSON.stringify(out.values)}`,
+      )
+      const valuesUpper = out.values.map((v) => String(v ?? '').toUpperCase())
+      assert.ok(
+        valuesUpper.some((v) => v === 'BUDI' || v.includes('BUDI')),
+        `${role}: values wajib contain normalized aliases BUDI (own scope).`,
+      )
+    }
+
+    const adminOut = buildWhereMirror({
+      role: 'ADMIN',
+      authenticated: { username: 'admin', displayName: 'ADMIN' },
+      clientOwnerRaw: 'ANDI',
+    })
+    assert.ok(
+      adminOut.values.includes('ANDI'),
+      'Role ADMIN (non-isolated): client owner=ANDI HARUS di-persist (existing client param behavior preserved — tidak boleh broken regression).',
+    )
+    assert.equal(
+      adminOut.where.some((c) => /IN\s*\(/.test(c)),
+      false,
+      'Role ADMIN: TIDAK BOLEH ada server scope IN clause (ownerAliases empty).',
+    )
+
+    process.stdout.write('TEST 12 (client owner=ANDI vs auth BUDI → server wins) .... PASS\n')
+  }
+
+  // ===========================================================================
+  // TEST 13 — PSB EXPORT scoping logic. Pure logic mirror helper:
+  //          a) PENJUALAN → owner scope SELALU di-inject terlepas dari client param.
+  //          b) SALES_MARKETING → owner scope SELALU di-inject.
+  //          c) Other role → client owner=ANDI tetap dipakai LIKE search.
+  // ===========================================================================
+  {
+    type BuildExportParams = { role: AppRole; username: string; displayName: string; clientOwnerParam?: string }
+    const buildExportFilters = (p: BuildExportParams) => {
+      const session: AppSession = {
+        role: p.role,
+        username: p.username,
+        displayName: p.displayName,
+        branchIds: [],
+      } as AppSession
+      const filters: string[] = ['1 = 1']
+      const values: unknown[] = []
+      const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+      if (ownerAliases.length) {
+        const placeholders = ownerAliases.map(() => '?').join(', ')
+        filters.push(`LOWER(COALESCE(psb.sales_owner_name, '')) IN (${placeholders})`)
+        values.push(...ownerAliases)
+      }
+      if (p.clientOwnerParam) {
+        const ownerLike = `%${p.clientOwnerParam}%`
+        filters.push('UPPER(COALESCE(psb.sales_owner_name, \'\')) LIKE UPPER(?)')
+        values.push(ownerLike)
+      }
+      return { filters, values, whereJoined: filters.join(' AND ') }
+    }
+
+    const pExp = buildExportFilters({
+      role: 'PENJUALAN',
+      username: 'budi',
+      displayName: 'BUDI',
+      clientOwnerParam: 'ANDI',
+    })
+    assert.ok(/IN\s*\([^)]+\)/.test(pExp.whereJoined), 'PENJUALAN export: Wajib ada IN clause scope BUDI (not client ANDI).')
+    assert.ok(
+      pExp.values.some((v) => String(v ?? '').toUpperCase().includes('BUDI')),
+      'PENJUALAN export values wajib contain aliases BUDI.',
+    )
+    assert.ok(
+      pExp.values.some((v) => String(v) === '%ANDI%'),
+      'PENJUALAN export: client param ANDI LIKE TETAP di-APPLY sebagai FILTER REFINE (AND — bukan OR). Jadi user BUDI tetap bisa search di-dalam own data scope untuk ANDI keyword — TAPI tidak bisa keluar dari security boundary.',
+    )
+    const securityInjected = pExp.values.filter((v) => {
+      const up = String(v ?? '').toUpperCase()
+      return up.includes('BUDI')
+    })
+    assert.ok(
+      securityInjected.length >= 1,
+      `Minimal aliases BUDI ter-inject sbg security scope (unique setelah Set dedup). Jumlah ditemukan: ${securityInjected.length}. Values raw: ${JSON.stringify(pExp.values)}`,
+    )
+    const uniqueAliasElements = new Set(pExp.values.filter((v) => typeof v === 'string' && /BUDI/.test(v.toUpperCase())).map((v) => String(v).toUpperCase()))
+    assert.ok(
+      uniqueAliasElements.has('BUDI') || uniqueAliasElements.has('BUDI (BUDI)'),
+      `Security scope BUDI wajib ada. Found unique set: ${[...uniqueAliasElements].join(', ')}`,
+    )
+
+    const smExp = buildExportFilters({
+      role: 'SALES_MARKETING',
+      username: 'siti',
+      displayName: 'SITI AYU',
+      clientOwnerParam: 'RUDI',
+    })
+    assert.ok(/IN\s*\([^)]+\)/.test(smExp.whereJoined), 'SALES_MARKETING export: scope IN clause wajib ada.')
+    assert.ok(
+      smExp.values.some((v) => String(v ?? '').toUpperCase().includes('SITI')),
+      'SALES_MARKETING export values wajib contain authenticated SITI scope.',
+    )
+
+    const csExp = buildExportFilters({
+      role: 'CS_ADMIN',
+      username: 'cs01',
+      displayName: 'CS OPERATOR',
+      clientOwnerParam: 'ANDI',
+    })
+    assert.ok(
+      !/IN\s*\([^)]+\)/.test(csExp.whereJoined.replace(/1 = 1/, '')),
+      'Role CS_ADMIN export: TIDAK BOLEH ada security scope IN clause. Only client param LIKE.',
+    )
+    assert.equal(
+      csExp.values.length,
+      1,
+      'CS_ADMIN export tanpa client owner null → cuma 1 value (LIKE ANDI). Aliases empty = TIDAK inject scope.',
+    )
+
+    process.stdout.write('TEST 13 (export scope logic PENJUALAN/SM/OTHER) ...... PASS\n')
+  }
+
+  // ===========================================================================
+  // TEST 14 — DASHBOARD SALES KPI owner scope clause presence.
+  //          Mirror exact filter builder pattern di dashboard-service.
+  //          Verify PENJUALAN → where clause memuat marketing_name IN aliases.
+  //          Verify ADMIN → TANPA owner scope (global aggregate).
+  // ===========================================================================
+  {
+    const buildActiveLeadWhere = (p: { role: AppRole; username: string; displayName: string }) => {
+      const session: AppSession = {
+        role: p.role,
+        username: p.username,
+        displayName: p.displayName,
+        branchIds: [],
+      } as AppSession
+      const salesOwnerAliases = resolveOwnedPsbListOwnerAliases(session)
+      const salesOwnerClause = salesOwnerAliases.length
+        ? `LOWER(COALESCE(marketing_name, '')) IN (${salesOwnerAliases.map(() => '?').join(', ')})`
+        : null
+      const whereParts: string[] = [`COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')`]
+      if (salesOwnerClause) whereParts.push(salesOwnerClause)
+      return { where: whereParts.join(' AND '), ownerArgs: salesOwnerAliases }
+    }
+
+    const pnDash = buildActiveLeadWhere({ role: 'PENJUALAN', username: 'budi', displayName: 'BUDI' })
+    assert.ok(
+      /marketing_name/.test(pnDash.where),
+      'PENJUALAN dashboard activeLeads WHERE wajib memuat marketing_name restriction.',
+    )
+    assert.ok(/IN\s*\(/.test(pnDash.where), 'PENJUALAN dashboard: ada IN placeholders.')
+    assert.ok(pnDash.ownerArgs.length >= 1, `PENJUALAN dashboard: minimal 1 owner args (bisa 2 setelah Set dedup displayName+username identik). Ditemukan: ${pnDash.ownerArgs.length}`)
+    const pnDashArgsSet = new Set(pnDash.ownerArgs.map((v) => String(v).toUpperCase()))
+    assert.ok(
+      pnDashArgsSet.has('BUDI'),
+      `PENJUALAN dashboard owner args set wajib contain BUDI. Found: ${[...pnDashArgsSet].join(', ')}`,
+    )
+
+    const smDash = buildActiveLeadWhere({ role: 'SALES_MARKETING', username: 'rudi', displayName: 'RUDI' })
+    assert.ok(/marketing_name/.test(smDash.where), 'SALES_MARKETING dashboard: scope marketing_name wajib ada.')
+    assert.ok(smDash.ownerArgs.length >= 1, 'SALES_MARKETING dashboard: owner args non-empty.')
+
+    const adminDash = buildActiveLeadWhere({ role: 'ADMIN', username: 'admin', displayName: 'ADMIN' })
+    assert.equal(
+      /marketing_name/.test(adminDash.where),
+      false,
+      'ADMIN dashboard: TIDAK BOLEH ada owner marketing scope — global aggregate preserved.',
+    )
+    assert.deepEqual(adminDash.ownerArgs, [], 'ADMIN ownerArgs = [] empty, no injection.')
+
+    process.stdout.write('TEST 14 (dashboard KPI owner scope clause isolation) ... PASS\n')
+  }
+
+  // ===========================================================================
+  // TEST 15 — WORKLIST SECURITY: mine=false atau queue=All client tamper
+  //           TETAP menghasilkan own items only untuk isolated roles.
+  //           Defense via in-memory base data filter (mirror getWorklistBaseData).
+  //           Role lain: full data preserved tanpa enforcement.
+  // ===========================================================================
+  {
+    type TestWorklistItem = { id: string; owner?: string | null; subtitle?: string | null; queue?: string }
+    const applyWorklistOwnershipGuard = (
+      items: TestWorklistItem[],
+      p: { role: AppRole; username: string; displayName: string },
+    ) => {
+      const session: AppSession = {
+        role: p.role,
+        username: p.username,
+        displayName: p.displayName,
+        branchIds: [],
+      } as AppSession
+      const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+      if (!ownerAliases.length) return [...items]
+      const aliasSet = new Set(ownerAliases.map((v) => String(v ?? '').trim().toUpperCase()))
+      const matchOwned = (value: unknown): boolean => {
+        const normalized = String(value ?? '').trim().toUpperCase()
+        if (!normalized) return false
+        if (aliasSet.has(normalized)) return true
+        for (const alias of aliasSet) {
+          if (alias && normalized.includes(alias)) return true
+        }
+        return false
+      }
+      return items.filter((item) => matchOwned(item.owner) || matchOwned(item.subtitle))
+    }
+
+    const sampleItems: TestWorklistItem[] = [
+      { id: 'lead-1', owner: null, subtitle: 'BUDI', queue: 'Lead Follow Up' },
+      { id: 'lead-2', owner: 'ANDI', subtitle: 'Marketing belum terisi', queue: 'Lead Follow Up' },
+      { id: 'order-1', owner: 'BUDI (budi)', subtitle: null, queue: 'Order dan Aktivasi' },
+      { id: 'order-2', owner: 'ANDI (andi)', subtitle: 'Order baru', queue: 'Order dan Aktivasi' },
+      { id: 'tt-1', owner: 'CS TEAM', subtitle: null, queue: 'TT Teknis' },
+    ]
+
+    const pMineFalse = applyWorklistOwnershipGuard(sampleItems, {
+      role: 'PENJUALAN',
+      username: 'budi',
+      displayName: 'BUDI',
+    })
+    const pIds = pMineFalse.map((i) => i.id)
+    assert.ok(pIds.includes('lead-1'), `PENJUALAN mine=false: lead-1 (subtitle BUDI) tetap masuk. Result: ${pIds.join(', ')}`)
+    assert.ok(pIds.includes('order-1'), `PENJUALAN mine=false: order-1 (owner BUDI (budi)) tetap masuk.`)
+    assert.equal(pIds.includes('lead-2'), false, 'PENJUALAN mine=false: lead milik ANDI (lead-2) DIBLOKIR — security boundary.')
+    assert.equal(pIds.includes('order-2'), false, 'PENJUALAN mine=false: order milik ANDI (order-2) DIBLOKIR.')
+    assert.equal(pIds.includes('tt-1'), false, 'PENJUALAN mine=false: TT Teknis CS team DIBLOKIR, bukan milik BUDI.')
+    assert.equal(pMineFalse.length, 2, `PENJUALAN: exact 2 item BUDI retained. Jumlah: ${pMineFalse.length}`)
+
+    const smQueueAll = applyWorklistOwnershipGuard(sampleItems, {
+      role: 'SALES_MARKETING',
+      username: 'budi',
+      displayName: 'BUDI',
+    })
+    assert.equal(
+      smQueueAll.length,
+      2,
+      `SALES_MARKETING queue=All: defence-in-depth harus tetap 2 item BUDI. Result ids: ${smQueueAll.map((i) => i.id).join(', ')}`,
+    )
+
+    const adminAll = applyWorklistOwnershipGuard(sampleItems, {
+      role: 'ADMIN',
+      username: 'admin',
+      displayName: 'ADMIN',
+    })
+    assert.equal(
+      adminAll.length,
+      sampleItems.length,
+      `Role ADMIN: TIDAK BOLEH ada enforcement. Semua ${sampleItems.length} items retained untouched.`,
+    )
+
+    process.stdout.write('TEST 15 (worklist mine=false / queue=All → own only) ... PASS\n')
+  }
+
+  process.stdout.write('\nWAVE 2.1 — 15 focused tests: ALL PASS (static + pure logic + data isolation regression layer)\n')
   process.stdout.write('Catatan: Integrasi DB transaction test memerlukan review DB lokal aktif.\n')
 }
 

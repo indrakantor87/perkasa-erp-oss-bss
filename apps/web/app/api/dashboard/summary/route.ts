@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   }
 
-  const payload = await getDashboardSummary()
+  const payload = await getDashboardSummary(session)
 
   return NextResponse.json(payload, {
     headers: { 'Cache-Control': 'no-store' },

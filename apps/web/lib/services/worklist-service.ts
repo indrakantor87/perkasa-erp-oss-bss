@@ -3,6 +3,7 @@ import { canAccessPath, canPerformAction, getDefaultLandingPath } from '@/lib/ac
 import { readThroughServerTtlCache } from '@/lib/server-ttl-cache'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
 import { getDashboardWorklistBaseData } from '@/lib/services/dashboard-service'
+import { resolveOwnedPsbListOwnerAliases } from '@/lib/services/psb-list-service'
 import { canAccessSupportLane, canUseSupportAction, normalizeSupportLane } from '@/lib/support-lanes'
 import type {
   AppRole,
@@ -726,7 +727,22 @@ async function getWorklistBaseData(session: AppSession) {
       const dashboardData = await getDashboardWorklistBaseData(session)
       const queueOptions = getWorklistQueues(session.role)
       const approvalItems = buildDailyActivityApprovalWorklistItems(session.role, dashboardData.dailyActivityApprovalQueue)
-      const items = upgradeDashboardItems(session.role, [...dashboardData.worklist, ...approvalItems])
+      let items = upgradeDashboardItems(session.role, [...dashboardData.worklist, ...approvalItems])
+
+      const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+      if (ownerAliases.length) {
+        const aliasSet = new Set(ownerAliases.map((v) => String(v ?? '').trim().toUpperCase()))
+        const matchOwned = (value: unknown): boolean => {
+          const normalized = String(value ?? '').trim().toUpperCase()
+          if (!normalized) return false
+          if (aliasSet.has(normalized)) return true
+          for (const alias of aliasSet) {
+            if (alias && normalized.includes(alias)) return true
+          }
+          return false
+        }
+        items = items.filter((item) => matchOwned(item.owner) || matchOwned(item.subtitle))
+      }
 
       return {
         source: dashboardData.source,

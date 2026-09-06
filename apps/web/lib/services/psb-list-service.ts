@@ -1002,8 +1002,8 @@ async function getOwnerOptionsFromReviewDb() {
     .filter(Boolean)
 }
 
-function resolveOwnedPsbListOwnerAliases(session?: AppSession) {
-  if (!session || session.role !== 'PENJUALAN') {
+export function resolveOwnedPsbListOwnerAliases(session?: AppSession) {
+  if (!session || (session.role !== 'PENJUALAN' && session.role !== 'SALES_MARKETING')) {
     return []
   }
 
@@ -1021,7 +1021,7 @@ function resolveOwnedPsbListOwnerAliases(session?: AppSession) {
 }
 
 function filterVisiblePsbListOwnerOptions(items: PsbListItem[], ownerOptions: string[], session?: AppSession) {
-  if (session?.role !== 'PENJUALAN') {
+  if (session?.role !== 'PENJUALAN' && session?.role !== 'SALES_MARKETING') {
     return ownerOptions
   }
 

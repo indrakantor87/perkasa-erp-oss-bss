@@ -24,6 +24,7 @@ import { resolveDailyActivityOrgContext } from '@/lib/services/daily-activity-us
 import { listMergedDashboardKpiDefinitions, resolveDashboardKpiManagerScope } from '@/lib/services/dashboard-kpi-service'
 import { getRecentHrAudits } from '@/lib/services/hr-audit-service'
 import { ensureImportBatchActionTable } from '@/lib/services/import-write-service'
+import { resolveOwnedPsbListOwnerAliases } from '@/lib/services/psb-list-service'
 import { ensureSupportDismantleQueueTable } from '@/lib/services/support-dismantle-service'
 import { ensureSupportTroubleTicketEscalationTable } from '@/lib/services/support-ticket-escalation-service'
 import { ensureSupportTroubleTicketProgressTable } from '@/lib/services/support-ticket-progress-service'
@@ -1860,6 +1861,18 @@ async function getReviewDbOperationalCards(
   const digitalSourceConditions = digitalSources.map(() => '?').join(', ')
   await ensureDashboardSupportReadTables()
 
+  const salesOwnerAliases = resolveOwnedPsbListOwnerAliases(session)
+  const salesOwnerClause = salesOwnerAliases.length
+    ? `LOWER(COALESCE(marketing_name, '')) IN (${salesOwnerAliases.map(() => '?').join(', ')})`
+    : null
+  const salesOwnerArgs = salesOwnerClause ? [...salesOwnerAliases] : []
+  const marketingNameExpression = (tableAlias?: string) => {
+    const prefix = tableAlias ? `${tableAlias}.` : ''
+    return salesOwnerClause
+      ? `LOWER(COALESCE(${prefix}marketing_name, '')) IN (${salesOwnerAliases.map(() => '?').join(', ')})`
+      : null
+  }
+
   const [
     hasSupportSlaDueAt,
     hasSupportSlaTroubleType,
@@ -2004,14 +2017,18 @@ async function getReviewDbOperationalCards(
   const salesActiveLeadFilter = hasSalesLeadStatus
     ? `
             FROM sales_leads
-            WHERE COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')`
+            WHERE COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')${
+              salesOwnerClause ? `\n              AND ${salesOwnerClause}` : ''
+            }`
     : `
             FROM sales_leads`
   const salesMonthlyOrderFilter = hasSalesOrderRequestDate
     ? `
             FROM sales_orders
             WHERE request_date >= ?
-              AND request_date < ?`
+              AND request_date < ?${
+                salesOwnerClause ? `\n              AND ${salesOwnerClause}` : ''
+              }`
     : `
             FROM (SELECT NULL AS request_date) sales_orders
             WHERE 1 = 0`
@@ -2224,7 +2241,7 @@ async function getReviewDbOperationalCards(
             ${salesMonthlyActivationFilter}
           ) AS monthlyActivations
       `,
-      [...salesMonthlyOrderArgs, ...salesMonthlyActivationArgs]
+      [...salesOwnerArgs, ...salesMonthlyOrderArgs, ...salesOwnerArgs, ...salesMonthlyActivationArgs]
     ),
     runReviewDbQuery<DashboardCsOperationalRow>(
       `
@@ -3059,7 +3076,19 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         getDashboardCustomerCompletenessQueryParts(),
         getDashboardSalesOrderQueryParts(),
       ])
-      const leads = await runReviewDbQuery<DashboardLeadRow>(`
+      const worklistOwnerAliases = resolveOwnedPsbListOwnerAliases(session)
+      const worklistOwnerClause = worklistOwnerAliases.length
+        ? `LOWER(COALESCE(marketing_name, '')) IN (${worklistOwnerAliases.map(() => '?').join(', ')})`
+        : null
+      const worklistSoOwnerClause = worklistOwnerAliases.length
+        ? `LOWER(COALESCE(so.marketing_name, '')) IN (${worklistOwnerAliases.map(() => '?').join(', ')})`
+        : null
+      const leadsWhereParts: string[] = [
+        `COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')`,
+      ]
+      if (worklistOwnerClause) leadsWhereParts.push(worklistOwnerClause)
+      const leads = await runReviewDbQuery<DashboardLeadRow>(
+        `
         SELECT
           id AS leadId,
           customer_name AS customerName,
@@ -3067,10 +3096,12 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
           marketing_name AS marketingName,
           source
         FROM sales_leads
-        WHERE COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSED', 'CANCELLED', 'DONE')
+        WHERE ${leadsWhereParts.join(' AND ')}
         ORDER BY created_at DESC, id DESC
         LIMIT 2
-      `)
+      `,
+        worklistOwnerClause ? [...worklistOwnerAliases] : [],
+      )
       const customers = customerCompletenessQueryParts.enabled
         ? await runReviewDbQuery<DashboardMarketingCustomerRow>(`
             SELECT
@@ -3100,7 +3131,12 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         ORDER BY updated_at DESC, id DESC
         LIMIT 1
       `)
-      const orders = await runReviewDbQuery<DashboardMarketingOrderRow>(`
+      const ordersWhereParts: string[] = [
+        `COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')`,
+      ]
+      if (worklistSoOwnerClause) ordersWhereParts.push(worklistSoOwnerClause)
+      const orders = await runReviewDbQuery<DashboardMarketingOrderRow>(
+        `
         SELECT
           so.id AS orderId,
           so.order_no AS orderNo,
@@ -3112,10 +3148,12 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
         FROM sales_orders so
         ${salesOrderQueryParts.leadJoin}
         ${salesOrderQueryParts.customerJoin}
-        WHERE COALESCE(UPPER(TRIM(so.status)), 'REGISTERED') NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED')
+        WHERE ${ordersWhereParts.join(' AND ')}
         ORDER BY ${salesOrderQueryParts.orderByExpression}
         LIMIT 1
-      `)
+      `,
+        worklistSoOwnerClause ? [...worklistOwnerAliases] : [],
+      )
 
       return [
         ...leads.map((item) => ({
@@ -4287,7 +4325,7 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
   }
 }
 
-async function getReviewDbDashboardSummary() {
+async function getReviewDbDashboardSummary(_session?: AppSession) {
   const [hasIsolationStatus, hasIsolationIsArchived] = await Promise.all([
     hasReviewDbColumn('support_isolations', 'status'),
     hasReviewDbColumn('support_isolations', 'is_archived'),
@@ -5115,7 +5153,7 @@ function buildUnavailableDashboardMetrics(): DashboardMetric[] {
   ]
 }
 
-export async function getDashboardSummary() {
+export async function getDashboardSummary(session?: AppSession) {
   const source = getDataSourceSnapshot()
 
   if (source.effectiveMode !== 'review-db') {
@@ -5128,7 +5166,7 @@ export async function getDashboardSummary() {
   try {
     return {
       source,
-      summary: await getReviewDbDashboardSummary(),
+      summary: await getReviewDbDashboardSummary(session),
     }
   } catch (error) {
     const fallbackSource = getFallbackDataSourceSnapshot(getReviewDbErrorDetail(error))
