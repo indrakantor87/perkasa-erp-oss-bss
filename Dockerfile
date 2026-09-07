@@ -26,8 +26,16 @@ WORKDIR /app/apps/web
 COPY --from=deps /app/apps/web/node_modules ./node_modules
 COPY apps/web ./
 
-RUN echo "=== [1/3 builder] Start next build ===" \
- && npm run build 2>&1 | tail -80 \
+RUN /bin/bash -eo pipefail -c '\
+  echo "=== [1/3 builder] Start next build ==="; \
+  npm run build 2>&1 | tee /tmp/build.log | tail -200; \
+  rc=${PIPESTATUS[0]}; \
+  echo "=== BUILD EXIT CODE: ${rc} ==="; \
+  if [ "${rc}" -ne 0 ]; then \
+    echo "=== BUILD FAILURE LOG (last 500 lines) ==="; \
+    tail -500 /tmp/build.log; \
+  fi; \
+  exit "${rc}"' \
  && echo "=== [2/3 builder] Verify .next/standalone exists ===" \
  && test -d ".next/standalone" \
  && mkdir -p ".next/standalone/.next/static" \
