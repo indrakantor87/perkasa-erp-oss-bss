@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { MouseEvent as ReactMouseEvent } from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppSession } from '@/lib/auth-session'
 import { useUiLanguage } from '@/components/layout/ui-language'
 import { navigationItems } from '@/lib/navigation'
@@ -1581,6 +1581,7 @@ export function Sidebar({
     }
   })
   const [mobileOpen, setMobileOpen] = useState(false)
+  const asideRef = useRef<HTMLElement | null>(null)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(() => {
     if (typeof window === 'undefined') return {}
     try {
@@ -1618,6 +1619,32 @@ export function Sidebar({
   }, [collapsed])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const el = asideRef.current
+    if (!el) return
+    const root = document.documentElement
+    const publish = () => {
+      const rect = el.getBoundingClientRect()
+      const outer = Number.isFinite(rect.width) ? `${Math.round(rect.width)}px` : '0px'
+      root.style.setProperty('--sidebar-outer-width', outer)
+    }
+    publish()
+    if (typeof (window as unknown as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver === 'undefined') {
+      window.addEventListener('resize', publish)
+      return () => {
+        window.removeEventListener('resize', publish)
+        root.style.removeProperty('--sidebar-outer-width')
+      }
+    }
+    const ro = new ResizeObserver(() => publish())
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      root.style.removeProperty('--sidebar-outer-width')
+    }
+  }, [])
+
+  useEffect(() => {
     window.localStorage.setItem('perkasa.sidebar.expanded-items', JSON.stringify(expandedItems))
   }, [expandedItems])
 
@@ -1646,6 +1673,7 @@ export function Sidebar({
   return (
     <>
       <aside
+        ref={asideRef}
         className={`hidden shrink-0 flex-col py-8 transition-all duration-200 lg:flex ${desktopWidthClass}`}
         style={{
           borderRight: '1px solid var(--color-sidebar-line)',
