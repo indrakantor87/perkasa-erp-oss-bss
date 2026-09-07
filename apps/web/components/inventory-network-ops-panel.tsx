@@ -7,6 +7,7 @@ import { InventoryDeviceReturnForm } from '@/components/inventory-device-return-
 import { InventoryOdpCreateForm } from '@/components/inventory-odp-create-form'
 import { InventoryOdpPortAssignForm } from '@/components/inventory-odp-port-assign-form'
 import { InventoryOdpPortStatusForm } from '@/components/inventory-odp-port-status-form'
+import { InventoryOdpPortMap } from '@/components/inventory-odp-port-map'
 import type { TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { buildInventoryBarcodeDetailPath, extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
 import { useEffect, useMemo, useState } from 'react'
@@ -482,6 +483,7 @@ export function InventoryNetworkOpsPanel({
       }),
     [normalizedSearch, odpRows],
   )
+
   const visibleOdpRows = useMemo(() => filteredOdpRows.slice(0, pageSize), [filteredOdpRows, pageSize])
   const routeDistanceMeters = useMemo(() => buildRouteDistanceMeters(routePoints), [routePoints])
   const allOdpPoints = useMemo(
@@ -1707,6 +1709,11 @@ export function InventoryNetworkOpsPanel({
           heading="Aksi cepat dari tabel ODP"
         />
       ) : null}
+
+      <InventoryOdpPortMap
+        selectedRow={selectedOdpData?.row ?? null}
+        reviewDbReady={reviewDbReady}
+      />
     </section>
   )
 }
