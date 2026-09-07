@@ -16,12 +16,41 @@ function toNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function getPortCapacityTone(params: { totalPorts: number; activePorts: number }) {
-  if (params.totalPorts <= 0) return '#64748b'
-  const ratio = params.activePorts / params.totalPorts
-  if (params.activePorts >= params.totalPorts) return '#ef4444'
-  if (ratio >= 0.5) return '#f59e0b'
-  return '#10b981'
+export type OdpCapacityStatus = 'AVAILABLE' | 'LIMITED' | 'FULL' | 'UNKNOWN'
+
+const ODP_CAPACITY_COLORS: Record<OdpCapacityStatus, string> = {
+  AVAILABLE: '#10b981',
+  LIMITED: '#f59e0b',
+  FULL: '#ef4444',
+  UNKNOWN: '#64748b',
+}
+
+export function getOdpCapacityStatus(params: { totalPorts: number; usedPorts: number }): OdpCapacityStatus {
+  if (params.totalPorts <= 0) return 'UNKNOWN'
+  const safeTotal = Number.isFinite(params.totalPorts) ? Math.max(0, Math.floor(params.totalPorts)) : 0
+  const safeUsed = Number.isFinite(params.usedPorts) ? Math.max(0, Math.min(safeTotal, Math.floor(params.usedPorts))) : 0
+  const available = safeTotal - safeUsed
+  if (available <= 0) return 'FULL'
+  if (available <= 4) return 'LIMITED'
+  return 'AVAILABLE'
+}
+
+export function odpCapacityStatusLabel(status: OdpCapacityStatus): string {
+  switch (status) {
+    case 'AVAILABLE':
+      return 'AVAILABLE / AMAN'
+    case 'LIMITED':
+      return 'LIMITED / HAMPIR PENUH'
+    case 'FULL':
+      return 'FULL / PENUH'
+    default:
+      return 'UNKNOWN'
+  }
+}
+
+export function getPortCapacityTone(params: { totalPorts: number; activePorts: number }) {
+  const status = getOdpCapacityStatus({ totalPorts: params.totalPorts, usedPorts: params.activePorts })
+  return ODP_CAPACITY_COLORS[status]
 }
 
 function buildOdpMarkerIcon(tone: string, selected = false) {
@@ -58,6 +87,15 @@ function buildProspectMarkerIcon() {
   })
 }
 
+function buildDeviceMarkerIcon() {
+  return L.divIcon({
+    className: '',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    html: `<span style="display:block;position:relative;width:26px;height:26px;border-radius:9999px;"><span style="position:absolute;inset:0;border-radius:9999px;border:3px solid rgba(37,99,235,0.55);background:rgba(59,130,246,0.35);box-shadow:0 0 0 4px rgba(59,130,246,0.22);"></span><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:block;width:12px;height:12px;border-radius:9999px;background:rgba(37,99,235,0.98);border:2px solid rgba(255,255,255,0.98);"></span></span>`,
+  })
+}
+
 function normalizePoint(point?: { lat: number; lng: number; label?: string } | null) {
   if (!point) return null
   return Number.isFinite(point.lat) && Number.isFinite(point.lng) ? point : null
@@ -75,6 +113,8 @@ export function InventoryOdpLeafletMap({
   selectedRowId,
   prospectPoint,
   focusPoints,
+  buildDetailHref,
+  devicePoint,
 }: {
   rows: DomainReviewRow[]
   height?: number
@@ -87,11 +127,14 @@ export function InventoryOdpLeafletMap({
   selectedRowId?: string | null
   prospectPoint?: { lat: number; lng: number; label?: string } | null
   focusPoints?: Array<{ lat: number; lng: number; label?: string }>
+  buildDetailHref?: (row: DomainReviewRow) => string | undefined | null
+  devicePoint?: { lat: number; lng: number; label?: string } | null
 }) {
   const mapId = useId()
   const mapRef = useRef<L.Map | null>(null)
   const markerLayerRef = useRef<L.LayerGroup | L.MarkerClusterGroup | null>(null)
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
+  const deviceLayerRef = useRef<L.LayerGroup | null>(null)
 
   const markerItems = useMemo(() => {
     return rows
@@ -103,15 +146,24 @@ export function InventoryOdpLeafletMap({
         }
         const totalPorts = Number.parseInt(pickMeta(row.meta, 'Total Ports: ') || '0', 10) || 0
         const activePorts = Number.parseInt(pickMeta(row.meta, 'Active Ports: ') || '0', 10) || 0
-        const tone = getPortCapacityTone({ totalPorts, activePorts })
+        const usedPorts = activePorts
+        const availablePorts = Math.max(0, totalPorts - usedPorts)
+        const status = getOdpCapacityStatus({ totalPorts, usedPorts })
+        const tone = ODP_CAPACITY_COLORS[status]
+        const statusLabel = odpCapacityStatusLabel(status)
+        const detailHref = buildDetailHref?.(row) ?? null
 
         return {
           row,
           latitude,
           longitude,
           tone,
+          status,
+          statusLabel,
           totalPorts,
           activePorts,
+          availablePorts,
+          detailHref,
         }
       })
       .filter(Boolean) as Array<{
@@ -119,14 +171,19 @@ export function InventoryOdpLeafletMap({
       latitude: number
       longitude: number
       tone: string
+      status: OdpCapacityStatus
+      statusLabel: string
       totalPorts: number
       activePorts: number
+      availablePorts: number
+      detailHref: string | null
     }>
-  }, [rows])
+  }, [rows, buildDetailHref])
 
   const safeRoutePoints = useMemo(() => normalizeRoutePoints(routePoints), [routePoints])
   const safeProspectPoint = useMemo(() => normalizePoint(prospectPoint), [prospectPoint])
   const safeFocusPoints = useMemo(() => normalizeRoutePoints(focusPoints), [focusPoints])
+  const safeDevicePoint = useMemo(() => normalizePoint(devicePoint), [devicePoint])
   const selectedMarkerItem = useMemo(
     () => markerItems.find((item) => item.row.id === selectedRowId) ?? null,
     [markerItems, selectedRowId],
@@ -153,15 +210,18 @@ export function InventoryOdpLeafletMap({
       })
       markerLayerRef.current.addTo(mapRef.current)
       routeLayerRef.current = L.layerGroup().addTo(mapRef.current)
+      deviceLayerRef.current = L.layerGroup().addTo(mapRef.current)
     }
 
     const map = mapRef.current
     const markerLayer = markerLayerRef.current
     const routeLayer = routeLayerRef.current
+    const deviceLayer = deviceLayerRef.current
     if (!map || !markerLayer) return
 
     markerLayer.clearLayers()
     routeLayer?.clearLayers()
+    deviceLayer?.clearLayers()
 
     const markerBounds = L.latLngBounds([])
     markerItems.forEach((item) => {
@@ -169,15 +229,50 @@ export function InventoryOdpLeafletMap({
         icon: buildOdpMarkerIcon(item.tone, item.row.id === selectedRowId),
         riseOnHover: true,
       })
+      const statusTone =
+        item.status === 'AVAILABLE'
+          ? '#065f46'
+          : item.status === 'LIMITED'
+            ? '#b45309'
+            : item.status === 'FULL'
+              ? '#991b1b'
+              : '#334155'
       const popupContent = `
-        <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.4;">
-          <div style="font-weight: 700; margin-bottom: 4px;">${item.row.primary}</div>
-          <div style="opacity: 0.85; margin-bottom: 6px;">${item.row.detail || ''}</div>
-          <div style="opacity: 0.85;">Port ${item.activePorts}/${item.totalPorts}</div>
-          <div style="opacity: 0.85;">${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}</div>
+        <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.55; min-width: 220px;">
+          <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${item.row.secondary || item.row.primary}</div>
+          <div style="opacity: 0.8; margin-bottom: 8px;">${item.row.primary}${item.row.detail && item.row.detail !== item.row.secondary ? ` · ${String(item.row.detail).slice(0, 60)}` : ''}</div>
+          <div style="display:inline-block; padding: 2px 8px; border-radius: 9999px; background:${item.tone}; color:#ffffff; font-weight:700; margin-bottom:10px; font-size:11px; letter-spacing: 0.02em;">
+            Status: ${item.status}
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-bottom: 10px;">
+            <div>
+              <div style="opacity: 0.7;">Port Tersedia:</div>
+              <div style="font-weight:700; color:${statusTone};">${item.availablePorts}</div>
+            </div>
+            <div>
+              <div style="opacity: 0.7;">Total Port:</div>
+              <div style="font-weight:700;">${item.totalPorts}</div>
+            </div>
+            <div>
+              <div style="opacity: 0.7;">Terpakai:</div>
+              <div style="font-weight:700;">${item.activePorts}</div>
+            </div>
+            <div>
+              <div style="opacity: 0.7;">${item.statusLabel.split(' / ')[0]}:</div>
+              <div style="font-weight:700; color:${statusTone};">${item.availablePorts} / ${item.totalPorts}</div>
+            </div>
+          </div>
+          <div style="opacity:0.7; margin-bottom: 10px; border-top: 1px solid rgba(15,23,42,0.08); padding-top: 8px;">
+            Koordinat: ${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}
+          </div>
+          ${
+            item.detailHref
+              ? `<a href="${item.detailHref.replace(/"/g, '&quot;')}" style="display:inline-block; text-decoration:none; padding:6px 10px; border-radius:6px; background:#0f172a; color:#ffffff; font-weight:600; font-size:11px;">Lihat Detail ODP</a>`
+              : '<div style="opacity:0.6; font-size:11px;">Belum ada tautan detail ODP.</div>'
+          }
         </div>
       `
-      marker.bindPopup(popupContent, { closeButton: true, autoPan: true })
+      marker.bindPopup(popupContent, { closeButton: true, autoPan: true, maxWidth: 320 })
       marker.on('click', () => {
         onSelectRow?.(item.row)
         if (!routeMode) {
@@ -249,6 +344,39 @@ export function InventoryOdpLeafletMap({
       }
     }
 
+    if (deviceLayer && safeDevicePoint) {
+      const deviceMarker = L.marker([safeDevicePoint.lat, safeDevicePoint.lng], {
+        icon: buildDeviceMarkerIcon(),
+        riseOnHover: true,
+      })
+      deviceMarker.bindPopup(
+        `
+          <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.4;">
+            <div style="font-weight: 700; margin-bottom: 4px;">${safeDevicePoint.label || 'Lokasi Saya'}</div>
+            <div style="opacity: 0.85;">${safeDevicePoint.lat.toFixed(6)}, ${safeDevicePoint.lng.toFixed(6)}</div>
+          </div>
+        `,
+        { closeButton: true, autoPan: true },
+      )
+      deviceMarker.addTo(deviceLayer)
+    }
+
+    let finalBounds = L.latLngBounds([])
+    let hasFinalBounds = false
+    if (markerBounds.isValid()) {
+      finalBounds.extend(markerBounds.getSouthWest())
+      finalBounds.extend(markerBounds.getNorthEast())
+      hasFinalBounds = true
+    }
+    if (safeDevicePoint) {
+      finalBounds.extend([safeDevicePoint.lat, safeDevicePoint.lng])
+      hasFinalBounds = true
+    }
+    if (safeProspectPoint) {
+      finalBounds.extend([safeProspectPoint.lat, safeProspectPoint.lng])
+      hasFinalBounds = true
+    }
+
     if (fitMode === 'route' && routeBounds && safeRoutePoints.length >= 2) {
       map.fitBounds(routeBounds.pad(0.2))
     } else if (fitMode === 'selection' && selectionBounds?.isValid()) {
@@ -259,14 +387,18 @@ export function InventoryOdpLeafletMap({
       } else {
         map.fitBounds(selectionBounds.pad(0.2))
       }
+    } else if (hasFinalBounds && finalBounds.isValid()) {
+      map.fitBounds(finalBounds.pad(0.3))
     } else if (markerItems.length && markerBounds.isValid()) {
       map.fitBounds(markerBounds.pad(0.2))
+    } else if (safeDevicePoint) {
+      map.setView([safeDevicePoint.lat, safeDevicePoint.lng], 16)
     } else {
       map.setView([-6.9, 110.4], 10)
     }
 
     map.invalidateSize()
-  }, [mapId, markerItems, onSelectRow, mapKey, routeMode, safeRoutePoints, fitMode, selectedRowId, safeProspectPoint, safeFocusPoints, onPickRoutePoint, selectedMarkerItem])
+  }, [mapId, markerItems, onSelectRow, mapKey, routeMode, safeRoutePoints, fitMode, selectedRowId, safeProspectPoint, safeFocusPoints, onPickRoutePoint, selectedMarkerItem, safeDevicePoint])
 
   useEffect(() => {
     return () => {
@@ -275,6 +407,7 @@ export function InventoryOdpLeafletMap({
         mapRef.current = null
         markerLayerRef.current = null
         routeLayerRef.current = null
+        deviceLayerRef.current = null
       }
     }
   }, [])
