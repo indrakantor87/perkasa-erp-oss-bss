@@ -3785,6 +3785,7 @@ export function DomainShell({
           shouldShowInventoryAction('device-return') ? (
             <InventoryNetworkOpsPanel
               sections={visibleSections}
+              reviewDiagnostics={content.reviewDiagnostics ?? []}
               canCreate={canCreate}
               canUpdate={canUpdate}
               reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
