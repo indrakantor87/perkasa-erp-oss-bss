@@ -16,10 +16,12 @@ declare global {
 }
 
 const reviewDbColumnCache = new Map<string, boolean>()
+const reviewDbTableCache = new Map<string, boolean>()
 
 export function invalidateReviewDbColumnCache(tableName?: string, columnName?: string) {
   if (!tableName) {
     reviewDbColumnCache.clear()
+    reviewDbTableCache.clear()
     return
   }
 
@@ -34,6 +36,14 @@ export function invalidateReviewDbColumnCache(tableName?: string, columnName?: s
       reviewDbColumnCache.delete(key)
     }
   }
+}
+
+export function invalidateReviewDbTableCache(tableName?: string) {
+  if (!tableName) {
+    reviewDbTableCache.clear()
+    return
+  }
+  reviewDbTableCache.delete(tableName.toLowerCase())
 }
 
 type DatabaseConfig = {
@@ -129,6 +139,26 @@ export async function runReviewDbQuery<T>(sql: string, values: unknown[] = []) {
   }
 }
 
+export async function runReviewDbQueryWithError<T>(
+  sql: string,
+  values: unknown[] = [],
+): Promise<{ rows: T[]; error: string | null; disabled: boolean }> {
+  const pool = await getPool()
+  if (isDisabledPool(pool)) {
+    return { rows: [] as T[], error: 'REVIEW_DB_NOT_CONFIGURED', disabled: true }
+  }
+  try {
+    const [rows] = await pool.query(sql, values)
+    return { rows: rows as T[], error: null, disabled: false }
+  } catch (error) {
+    if (typeof window === 'undefined') {
+      const message = error instanceof Error ? error.message.trim() : 'UNKNOWN_ERROR'
+      return { rows: [] as T[], error: message || 'UNKNOWN_ERROR', disabled: false }
+    }
+    throw error
+  }
+}
+
 export async function runReviewDbExecute<T>(sql: string, values: unknown[] = []) {
   const pool = await getPool()
   if (isDisabledPool(pool)) {
@@ -168,6 +198,32 @@ export async function hasReviewDbColumn(tableName: string, columnName: string) {
     return exists
   } catch {
     reviewDbColumnCache.set(cacheKey, false)
+    return false
+  }
+}
+
+export async function hasReviewDbTable(tableName: string) {
+  const cacheKey = tableName.toLowerCase()
+  if (reviewDbTableCache.has(cacheKey)) {
+    return reviewDbTableCache.get(cacheKey) ?? false
+  }
+
+  try {
+    const rows = await runReviewDbQuery<{ total: number }>(
+      `
+        SELECT COUNT(*) AS total
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+          AND table_name = ?
+      `,
+      [tableName],
+    )
+
+    const exists = Number(rows[0]?.total ?? 0) > 0
+    reviewDbTableCache.set(cacheKey, exists)
+    return exists
+  } catch {
+    reviewDbTableCache.set(cacheKey, false)
     return false
   }
 }

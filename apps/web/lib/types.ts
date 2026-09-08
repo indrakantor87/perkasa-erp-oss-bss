@@ -396,6 +396,23 @@ export type DomainReviewSection = {
   rows: DomainReviewRow[]
 }
 
+export type DomainReviewDiagnosticStatus =
+  | 'READY_WITH_DATA'
+  | 'READY_EMPTY'
+  | 'TABLE_MISSING'
+  | 'COLUMN_MISSING'
+  | 'QUERY_ERROR'
+  | 'DISABLED'
+
+export type DomainReviewDiagnostic = {
+  key: string
+  title: string
+  status: DomainReviewDiagnosticStatus
+  detail: string
+  missingTables?: string[]
+  missingColumns?: Array<{ table: string; column: string }>
+}
+
 export type SupportLaneKey = 'tt' | 'isolations' | 'dismantle' | 'sla'
 
 export type SupportLaneSnapshot = {
@@ -504,6 +521,7 @@ export type DomainPageContent = {
   summaries: DomainSummary[]
   highlights: DomainHighlight[]
   reviewSections?: DomainReviewSection[]
+  reviewDiagnostics?: DomainReviewDiagnostic[]
 }
 
 export type DomainPageData = {

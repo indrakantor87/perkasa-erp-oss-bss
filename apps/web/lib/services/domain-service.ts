@@ -6,7 +6,13 @@ import {
 import { canPerformAction } from '@/lib/access-control'
 import { getDataSourceSnapshot, getFallbackDataSourceSnapshot } from '@/lib/data-source'
 import { domainPages } from '@/lib/mock-domains'
-import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
+import {
+  getReviewDbErrorDetail,
+  hasReviewDbColumn,
+  hasReviewDbTable,
+  runReviewDbQuery,
+  runReviewDbQueryWithError,
+} from '@/lib/review-db'
 import { readThroughServerTtlCache, runOncePerServer } from '@/lib/server-ttl-cache'
 import { getServerUiLanguage } from '@/lib/ui-language-server'
 import { getHrAttendanceFaceConfig } from '@/lib/services/hr-attendance-face-service'
@@ -23,6 +29,7 @@ import { ensureHrEmployeeKpiTable, listRecentHrEmployeeKpis } from '@/lib/servic
 import { ensureInventoryLoanTable } from '@/lib/services/inventory-loan-service'
 import { ensureInventoryRequestTable } from '@/lib/services/inventory-request-service'
 import { ensureHrSalarySlipVoidTable } from '@/lib/services/hr-salary-slip-void-service'
+import { buildReviewDiagnostic } from '@/lib/services/review-diagnostic-builder'
 import {
   ensureSupportDismantleQueueTable,
   parseStructuredSupportNote,
@@ -47,6 +54,7 @@ import type {
   DomainCapability,
   DomainKey,
   DomainPageContent,
+  DomainReviewDiagnostic,
   DomainReviewSection,
   DomainSupportFocus,
   SupportLaneKey,
@@ -4807,13 +4815,14 @@ async function getReviewDbSalesSections(session: AppSession, filters?: DomainRev
   ].filter((section) => section.rows.length > 0)
 }
 
-async function getReviewDbInventorySections(filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
+async function getReviewDbInventorySections(
+  filters?: DomainReviewDrilldownFilters,
+): Promise<{ sections: DomainReviewSection[]; diagnostics: DomainReviewDiagnostic[] }> {
   const focus = String(filters?.focus ?? '')
     .trim()
     .toUpperCase()
   const period = resolveSqlPeriodRange(filters)
 
-  await ensureDomainInventoryReadTables()
   const inventorySchema = await getInventoryReadSchema()
   const canJoinItemCategory = inventorySchema.itemCategoryId && inventorySchema.categoryId
   const canJoinItemUnit = inventorySchema.itemUnitId && inventorySchema.unitId
@@ -4827,6 +4836,181 @@ async function getReviewDbInventorySections(filters?: DomainReviewDrilldownFilte
   const canJoinAssignmentCustomer = inventorySchema.deviceAssignmentCustomerId && inventorySchema.customerId
   const canJoinRequestItem = inventorySchema.requestInventoryItemId && inventorySchema.itemId
   const canJoinLoanItem = inventorySchema.loanInventoryItemId && inventorySchema.itemId
+
+  const diagnostics: DomainReviewDiagnostic[] = []
+  const [hasOdpTable, hasOdpPortsTable, hasDeviceAssignmentTable, hasLegacyPortStatusColumn] = await Promise.all([
+    hasReviewDbTable('network_odp'),
+    hasReviewDbTable('network_odp_ports'),
+    hasReviewDbTable('service_device_assignments'),
+    hasReviewDbColumn('network_odp_ports', 'status'),
+  ])
+
+  async function readCount(sql: string, values: unknown[] = []) {
+    const result = await runReviewDbQueryWithError<{ total: number }>(sql, values)
+    const total = Number(result.rows[0]?.total ?? 0)
+    return {
+      total: Number.isFinite(total) ? total : 0,
+      error: result.error,
+      disabled: result.disabled,
+    }
+  }
+
+  function pushSchemaDiagnostic(params: {
+    key: string
+    title: string
+    requiredTables: Array<{ table: string; exists: boolean }>
+    requiredColumns: Array<{ table: string; column: string; exists: boolean }>
+    data: { total: number; error: string | null; disabled: boolean } | null
+    extraDetail?: string
+  }) {
+    diagnostics.push(
+      buildReviewDiagnostic({
+        key: params.key,
+        title: params.title,
+        requiredTables: params.requiredTables,
+        requiredColumns: params.requiredColumns,
+        data: params.data,
+        detailWhenColumnMissing: params.extraDetail,
+      }),
+    )
+  }
+
+  const odpCount =
+    hasOdpTable &&
+    inventorySchema.odpId &&
+    inventorySchema.odpCode &&
+    inventorySchema.odpName &&
+    inventorySchema.odpTotalPorts &&
+    inventorySchema.odpActivePorts
+      ? await readCount('SELECT COUNT(*) AS total FROM network_odp')
+      : null
+
+  pushSchemaDiagnostic({
+    key: 'inventory-odp-latest',
+    title: 'ODP TERBARU',
+    requiredTables: [{ table: 'network_odp', exists: hasOdpTable }],
+    requiredColumns: [
+      { table: 'network_odp', column: 'id', exists: inventorySchema.odpId },
+      { table: 'network_odp', column: 'code', exists: inventorySchema.odpCode },
+      { table: 'network_odp', column: 'name', exists: inventorySchema.odpName },
+      { table: 'network_odp', column: 'total_ports', exists: inventorySchema.odpTotalPorts },
+      { table: 'network_odp', column: 'active_ports', exists: inventorySchema.odpActivePorts },
+    ],
+    data: odpCount,
+  })
+
+  const portStatusDetail =
+    hasLegacyPortStatusColumn && !inventorySchema.odpPortStatus
+      ? 'Kolom legacy `network_odp_ports.status` terdeteksi, tetapi kontrak Phase 1.1 membutuhkan `network_odp_ports.port_status`. Legacy status tidak diinterpretasi ulang otomatis.'
+      : undefined
+
+  const usedPortCount =
+    hasOdpPortsTable &&
+    inventorySchema.odpPortStatus &&
+    inventorySchema.odpPortNo
+      ? await readCount(`SELECT COUNT(*) AS total FROM network_odp_ports WHERE port_status = 'USED'`)
+      : null
+
+  pushSchemaDiagnostic({
+    key: 'inventory-odp-ports-used',
+    title: 'PORT TERPAKAI',
+    requiredTables: [
+      { table: 'network_odp_ports', exists: hasOdpPortsTable },
+      { table: 'network_odp', exists: hasOdpTable },
+    ],
+    requiredColumns: [
+      { table: 'network_odp_ports', column: 'id', exists: inventorySchema.odpPortId },
+      { table: 'network_odp_ports', column: 'odp_id', exists: inventorySchema.odpPortOdpId },
+      { table: 'network_odp_ports', column: 'port_no', exists: inventorySchema.odpPortNo },
+      { table: 'network_odp_ports', column: 'port_status', exists: inventorySchema.odpPortStatus },
+      { table: 'network_odp', column: 'id', exists: inventorySchema.odpId },
+      { table: 'network_odp', column: 'code', exists: inventorySchema.odpCode },
+    ],
+    data: usedPortCount,
+    extraDetail: portStatusDetail,
+  })
+
+  const issuePortCount =
+    hasOdpPortsTable &&
+    inventorySchema.odpPortStatus &&
+    inventorySchema.odpPortNo
+      ? await readCount(
+          `SELECT COUNT(*) AS total FROM network_odp_ports WHERE port_status IN ('RESERVED','FAULTY','DISABLED')`,
+        )
+      : null
+
+  pushSchemaDiagnostic({
+    key: 'inventory-odp-ports-issues',
+    title: 'PORT BERMASALAH',
+    requiredTables: [
+      { table: 'network_odp_ports', exists: hasOdpPortsTable },
+      { table: 'network_odp', exists: hasOdpTable },
+    ],
+    requiredColumns: [
+      { table: 'network_odp_ports', column: 'id', exists: inventorySchema.odpPortId },
+      { table: 'network_odp_ports', column: 'odp_id', exists: inventorySchema.odpPortOdpId },
+      { table: 'network_odp_ports', column: 'port_no', exists: inventorySchema.odpPortNo },
+      { table: 'network_odp_ports', column: 'port_status', exists: inventorySchema.odpPortStatus },
+      { table: 'network_odp', column: 'id', exists: inventorySchema.odpId },
+      { table: 'network_odp', column: 'code', exists: inventorySchema.odpCode },
+    ],
+    data: issuePortCount,
+    extraDetail: portStatusDetail,
+  })
+
+  const assignmentCount =
+    hasDeviceAssignmentTable &&
+    inventorySchema.deviceAssignmentId &&
+    inventorySchema.deviceAssignmentInventoryItemId &&
+    inventorySchema.deviceAssignmentStatus &&
+    inventorySchema.deviceAssignmentAssignedAt
+      ? await readCount('SELECT COUNT(*) AS total FROM service_device_assignments')
+      : null
+
+  pushSchemaDiagnostic({
+    key: 'inventory-device-assignment',
+    title: 'DEVICE ASSIGNMENT',
+    requiredTables: [{ table: 'service_device_assignments', exists: hasDeviceAssignmentTable }],
+    requiredColumns: [
+      { table: 'service_device_assignments', column: 'id', exists: inventorySchema.deviceAssignmentId },
+      {
+        table: 'service_device_assignments',
+        column: 'inventory_item_id',
+        exists: inventorySchema.deviceAssignmentInventoryItemId,
+      },
+      { table: 'service_device_assignments', column: 'assignment_status', exists: inventorySchema.deviceAssignmentStatus },
+      { table: 'service_device_assignments', column: 'assigned_at', exists: inventorySchema.deviceAssignmentAssignedAt },
+    ],
+    data: assignmentCount,
+  })
+
+  const returnCount =
+    hasDeviceAssignmentTable &&
+    inventorySchema.deviceAssignmentId &&
+    inventorySchema.deviceAssignmentInventoryItemId &&
+    inventorySchema.deviceAssignmentStatus &&
+    inventorySchema.deviceAssignmentReturnedAt
+      ? await readCount(
+          `SELECT COUNT(*) AS total FROM service_device_assignments WHERE returned_at IS NOT NULL`,
+        )
+      : null
+
+  pushSchemaDiagnostic({
+    key: 'inventory-device-return',
+    title: 'DEVICE RETURN',
+    requiredTables: [{ table: 'service_device_assignments', exists: hasDeviceAssignmentTable }],
+    requiredColumns: [
+      { table: 'service_device_assignments', column: 'id', exists: inventorySchema.deviceAssignmentId },
+      {
+        table: 'service_device_assignments',
+        column: 'inventory_item_id',
+        exists: inventorySchema.deviceAssignmentInventoryItemId,
+      },
+      { table: 'service_device_assignments', column: 'assignment_status', exists: inventorySchema.deviceAssignmentStatus },
+      { table: 'service_device_assignments', column: 'returned_at', exists: inventorySchema.deviceAssignmentReturnedAt },
+    ],
+    data: returnCount,
+  })
 
   const itemsResult = await runSafeDomainSectionQuery<ReviewDbInventoryItemRow>({
     sectionLabel: 'inventory-items',
@@ -5253,7 +5437,7 @@ async function getReviewDbInventorySections(filters?: DomainReviewDrilldownFilte
   })
   const loans = loansResult.rows
 
-  return [
+  const sections = [
     {
       title: 'Item Inventory Terbaru',
       description: 'Item master terbaru dari review DB untuk memulai kontrol stok, kategori, dan satuan barang.',
@@ -5445,6 +5629,8 @@ async function getReviewDbInventorySections(filters?: DomainReviewDrilldownFilte
       })),
     },
   ].filter((section) => section.rows.length > 0)
+
+  return { sections, diagnostics }
 }
 
 async function getReviewDbHrSections(filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
@@ -6239,13 +6425,25 @@ function applyReviewDbSalesSections(content: DomainPageContent, reviewSections: 
   }
 }
 
-function applyReviewDbInventorySections(content: DomainPageContent, reviewSections: DomainReviewSection[]) {
-  if (content.key !== 'inventory' || reviewSections.length === 0) {
+function applyReviewDbInventorySections(
+  content: DomainPageContent,
+  reviewSections: DomainReviewSection[],
+  reviewDiagnostics: DomainReviewDiagnostic[],
+) {
+  if (content.key !== 'inventory') {
     return content
   }
 
+  const nextContent: DomainPageContent = reviewDiagnostics.length
+    ? { ...content, reviewDiagnostics }
+    : content
+
+  if (reviewSections.length === 0) {
+    return nextContent
+  }
+
   return {
-    ...content,
+    ...nextContent,
     reviewSections,
   }
 }
@@ -6492,7 +6690,7 @@ export async function getDomainPageData(
           month: options?.month,
           year: options?.year,
         }
-        const [stats, salesSectionsRaw, supportSections, customerSections, billingSectionsRaw, inventorySectionsRaw, hrSectionsRaw] =
+        const [stats, salesSectionsRaw, supportSections, customerSections, billingSectionsRaw, inventoryBundle, hrSectionsRaw] =
           await Promise.all([
             getReviewDbDomainStats(),
             domain === 'sales'
@@ -6510,12 +6708,17 @@ export async function getDomainPageData(
               : Promise.resolve([] as DomainReviewSection[]),
             domain === 'inventory'
               ? getReviewDbInventorySections(reviewFilters)
-              : Promise.resolve([] as DomainReviewSection[]),
+              : Promise.resolve({
+                  sections: [] as DomainReviewSection[],
+                  diagnostics: [] as DomainReviewDiagnostic[],
+                }),
             domain === 'hr' ? getReviewDbHrSections(reviewFilters) : Promise.resolve([] as DomainReviewSection[]),
           ])
         const salesSections = domain === 'sales' ? filterReviewSectionsForDomain(domain, salesSectionsRaw, reviewFilters) : []
         const billingSections =
           domain === 'billing' ? filterReviewSectionsForDomain(domain, billingSectionsRaw, reviewFilters) : []
+        const inventorySectionsRaw = domain === 'inventory' ? inventoryBundle.sections : []
+        const inventoryDiagnostics = domain === 'inventory' ? inventoryBundle.diagnostics : []
         const inventorySections =
           domain === 'inventory' ? filterReviewSectionsForDomain(domain, inventorySectionsRaw, reviewFilters) : []
         const hrSections = domain === 'hr' ? filterReviewSectionsForDomain(domain, hrSectionsRaw, reviewFilters) : []
@@ -6533,6 +6736,7 @@ export async function getDomainPageData(
               salesSections,
             ),
             inventorySections,
+            inventoryDiagnostics,
           ),
           hrSections,
         )

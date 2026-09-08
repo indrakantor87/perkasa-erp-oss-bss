@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Download, Map, Pencil, Plus, Upload } from 'lucide-react'
 import type { DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
-import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
+import type { DomainReviewDiagnostic, DomainReviewRow, DomainReviewSection } from '@/lib/types'
 
 const InventoryOdpLeafletMap = dynamic(
   () => import('@/components/inventory-odp-leaflet-map').then((module) => module.InventoryOdpLeafletMap),
@@ -419,6 +419,7 @@ function getLifecycleBarcodeHref(item: DeviceLifecycleLogRow) {
 
 export function InventoryNetworkOpsPanel({
   sections,
+  reviewDiagnostics,
   canCreate,
   canUpdate,
   reviewDbReady,
@@ -430,6 +431,7 @@ export function InventoryNetworkOpsPanel({
   mode = 'full',
 }: {
   sections: DomainReviewSection[]
+  reviewDiagnostics?: DomainReviewDiagnostic[]
   canCreate: boolean
   canUpdate: boolean
   reviewDbReady: boolean
@@ -484,6 +486,54 @@ export function InventoryNetworkOpsPanel({
   const canWrite = canCreate && reviewDbReady
   const useReferenceLikeLayout = true // isInventoryOdpFocus — Override: selalu pakai light theme layout standar agar theme-aware & readable (tidak ada navy hardcode)
   const hasInventoryNetworkData = Boolean(odpSection || usedPortSection || issuePortSection || assignmentSection || returnSection)
+
+  const portOdpWarning = useMemo(() => {
+    if (hasInventoryNetworkData) return null
+    const fallback = {
+      title: 'Data section `Port ODP` belum terbaca dari review DB.',
+      lines: [
+        'Halaman tetap dibuka supaya tombol, filter, dan tabel tidak hilang total saat data jaringan belum siap atau schema belum lengkap.',
+      ],
+    }
+
+    const diagnostics = (reviewDiagnostics ?? []).filter((item) =>
+      ['ODP TERBARU', 'PORT TERPAKAI', 'PORT BERMASALAH', 'DEVICE ASSIGNMENT', 'DEVICE RETURN'].includes(item.title),
+    )
+    if (diagnostics.length === 0) return fallback
+
+    const blocking = diagnostics.filter((item) => ['TABLE_MISSING', 'COLUMN_MISSING', 'QUERY_ERROR'].includes(item.status))
+    if (blocking.length > 0) {
+      const lines = blocking.map((item) => {
+        const missingTables = item.missingTables?.length ? ` missing tables: ${item.missingTables.join(', ')}` : ''
+        const missingColumns = item.missingColumns?.length
+          ? ` missing columns: ${item.missingColumns.map((c) => `${c.table}.${c.column}`).join(', ')}`
+          : ''
+        return `${item.title}: ${item.detail}${missingTables}${missingColumns}`
+      })
+      return {
+        title: 'Schema inventory review DB belum sesuai kontrak Phase 1.1.',
+        lines,
+      }
+    }
+
+    const allEmpty = diagnostics.every((item) => item.status === 'READY_EMPTY')
+    if (allEmpty) {
+      return {
+        title: 'Schema inventory sudah siap, tetapi data ODP/port masih kosong di review DB.',
+        lines: ['Jalankan proses import/transform ODP supaya `network_odp` dan `network_odp_ports` terisi.'],
+      }
+    }
+
+    const inconsistent = diagnostics.some((item) => item.status === 'READY_WITH_DATA')
+    if (inconsistent) {
+      return {
+        title: 'Review DB melaporkan data tersedia, tetapi section tidak ter-render.',
+        lines: ['Periksa wiring attach reviewSections dan filter section titles pada panel inventory.'],
+      }
+    }
+
+    return fallback
+  }, [hasInventoryNetworkData, reviewDiagnostics])
 
   useEffect(() => {
     if (!mapFullscreenActive) return
@@ -1182,14 +1232,20 @@ export function InventoryNetworkOpsPanel({
           : 'Fokus ke data PORT ODP untuk kebutuhan operasional sales, CS, dan Admin CS: baca detail ODP, lihat marker di peta, lalu ukur jarak prospek ke titik ODP terdekat.'}
       </div>
 
-      {!hasInventoryNetworkData ? (
+      {portOdpWarning ? (
         <div
           className={`mt-4 rounded-2xl border px-4 py-4 text-sm leading-6 ${
             useReferenceLikeLayout ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-amber-400/30 bg-amber-500/10 text-amber-100'
           }`}
         >
-          Data section `Port ODP` belum terbaca dari review DB. Halaman tetap dibuka supaya tombol, filter, dan tabel tidak hilang total
-          saat data jaringan belum siap atau schema belum lengkap.
+          <p className="font-semibold">{portOdpWarning.title}</p>
+          {portOdpWarning.lines.length ? (
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {portOdpWarning.lines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 
