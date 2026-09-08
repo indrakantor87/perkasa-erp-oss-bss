@@ -11,6 +11,7 @@ import { InventoryOdpPortMap } from '@/components/inventory-odp-port-map'
 import type { TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { buildInventoryBarcodeDetailPath, extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Download, Map, Pencil, Plus, Upload } from 'lucide-react'
 import type { DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
 import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
@@ -54,16 +55,26 @@ function isAccessoryCategory(value: string) {
   return normalized.includes('AKSES') || normalized.includes('ACCESS')
 }
 
-function buildOdpMapHref(row: DomainReviewRow) {
-  const latitude = pickMeta(row.meta, 'Latitude: ')
-  const longitude = pickMeta(row.meta, 'Longitude: ')
-  const lat = Number(latitude)
-  const lng = Number(longitude)
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return ''
+export function buildOdpMapHref(row: DomainReviewRow) {
+  const lat = parseOdpGeoCoordinate(pickMeta(row.meta, 'Latitude: '), 'lat')
+  const lng = parseOdpGeoCoordinate(pickMeta(row.meta, 'Longitude: '), 'lng')
+  if (lat == null || lng == null) return ''
+  if (lat === 0 && lng === 0) return ''
   const zoom = 18
   return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(String(lat))}&mlon=${encodeURIComponent(String(lng))}#map=${zoom}/${encodeURIComponent(
     String(lat),
   )}/${encodeURIComponent(String(lng))}`
+}
+
+export function parseOdpGeoCoordinate(value: string, kind: 'lat' | 'lng') {
+  const raw = String(value ?? '').trim()
+  if (!raw || raw === '-') return null
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed)) return null
+  if (kind === 'lat') {
+    return parsed >= -90 && parsed <= 90 ? parsed : null
+  }
+  return parsed >= -180 && parsed <= 180 ? parsed : null
 }
 
 function getStatusTone(status: string) {
@@ -273,11 +284,12 @@ function parseGoogleMapsLocation(rawValue: string) {
   return null
 }
 
-function extractOdpPoint(row: DomainReviewRow | null | undefined) {
+export function extractOdpPoint(row: DomainReviewRow | null | undefined) {
   if (!row) return null
-  const lat = Number(pickMeta(row.meta, 'Latitude: '))
-  const lng = Number(pickMeta(row.meta, 'Longitude: '))
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  const lat = parseOdpGeoCoordinate(pickMeta(row.meta, 'Latitude: '), 'lat')
+  const lng = parseOdpGeoCoordinate(pickMeta(row.meta, 'Longitude: '), 'lng')
+  if (lat == null || lng == null) return null
+  if (lat === 0 && lng === 0) return null
   return {
     lat,
     lng,
@@ -472,6 +484,18 @@ export function InventoryNetworkOpsPanel({
   const canWrite = canCreate && reviewDbReady
   const useReferenceLikeLayout = true // isInventoryOdpFocus — Override: selalu pakai light theme layout standar agar theme-aware & readable (tidak ada navy hardcode)
   const hasInventoryNetworkData = Boolean(odpSection || usedPortSection || issuePortSection || assignmentSection || returnSection)
+
+  useEffect(() => {
+    if (!mapFullscreenActive) return
+    const previousBodyOverflow = document.body.style.overflow
+    const previousHtmlOverflow = document.documentElement.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousHtmlOverflow
+    }
+  }, [mapFullscreenActive])
 
   const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
   const filteredOdpRows = useMemo(
@@ -870,267 +894,278 @@ export function InventoryNetworkOpsPanel({
       </div>
 
       {showMap ? (
-        <div
-          className={`mt-4 overflow-hidden rounded-2xl ${
-            useReferenceLikeLayout ? 'border border-slate-200 bg-white' : 'border border-slate-700 bg-slate-900/20'
-          }`}
-        >
-          <div
-            className={`flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between ${
-              useReferenceLikeLayout ? 'border-b border-slate-200' : 'border-b border-slate-700'
-            }`}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setRouteMode((current) => !current)}
-                className={
-                  useReferenceLikeLayout
-                    ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
-                    : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
-                }
-              >
-                Mode Rute: {routeMode ? 'ON' : 'OFF'}
-              </button>
-              <button
-                type="button"
-                disabled={routePoints.length === 0}
-                onClick={() =>
-                  setRoutePoints((current) => {
-                    if (current.length === 0) return current
-                    return current.slice(0, -1)
-                  })
-                }
-                className={
-                  routePoints.length === 0
-                    ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-                    : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
-                }
-              >
-                Undo
-              </button>
-              <button
-                type="button"
-                disabled={routePoints.length === 0}
-                onClick={() => setRoutePoints([])}
-                className={
-                  routePoints.length === 0
-                    ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-                    : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
-                }
-              >
-                Reset Rute
-              </button>
-              <details className="relative">
-                <summary className="cursor-pointer list-none rounded-md border border-slate-600 bg-slate-800/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700">
-                  Jarak: {formatDistanceMetersWithUnit(routeDistanceMeters, routeDistanceUnit)}
-                </summary>
-                <div className="absolute left-0 top-[calc(100%+6px)] z-[600] w-[180px] rounded-xl border border-slate-700 bg-slate-950/95 p-2 shadow-[0_16px_40px_rgba(2,6,23,0.45)]">
-                  {(
-                    [
-                      { key: 'auto' as const, label: 'Auto' },
-                      { key: 'm' as const, label: 'Meter (m)' },
-                      { key: 'km' as const, label: 'Kilometer (km)' },
-                    ] as const
-                  ).map((item) => {
-                    const active = routeDistanceUnit === item.key
-                    return (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => setRouteDistanceUnit(item.key)}
-                        className={
-                          active
-                            ? 'w-full rounded-md border border-white bg-white px-3 py-2 text-left text-xs font-semibold text-slate-950'
-                            : 'w-full rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-left text-xs font-semibold text-white transition hover:bg-slate-800/70'
-                        }
-                      >
-                        {item.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </details>
-              <button
-                type="button"
-                onClick={() => setMapFitKey((current) => current + 1)}
-                className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
-              >
-                Reset View
-              </button>
-              <button
-                type="button"
-                disabled={routePoints.length < 2}
-                onClick={() => {
-                  if (routePoints.length < 2) return
-                  setMapFitMode((current) => (current === 'markers' ? 'route' : 'markers'))
-                  setMapFitKey((current) => current + 1)
-                }}
-                className={
-                  routePoints.length < 2
-                    ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-                    : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
-                }
-              >
-                Fit: {routePoints.length >= 2 && mapFitMode === 'route' ? 'Rute' : prospectPoint ? 'Prospek' : 'Marker'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMapRefreshKey((current) => current + 1)}
-                className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
-              >
-                Refresh Peta
-              </button>
-              <button
-                type="button"
-                disabled={capturingDeviceLocation}
-                onClick={async () => {
-                  if (capturingDeviceLocation) return
-                  if (!globalThis.navigator?.geolocation) {
-                    setDeviceLocationMessage('Browser ini belum mendukung geolocation.')
-                    return
-                  }
-                  setCapturingDeviceLocation(true)
-                  setDeviceLocationMessage(null)
-                  try {
-                    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                      globalThis.navigator.geolocation.getCurrentPosition(resolve, reject, {
-                        enableHighAccuracy: true,
-                        timeout: 10_000,
-                        maximumAge: 0,
-                      })
-                    })
-                    const lat = Number(position.coords.latitude)
-                    const lng = Number(position.coords.longitude)
-                    setDevicePoint({ lat, lng, label: 'Lokasi Saya' })
-                    setMapFitKey((current) => current + 1)
-                    setDeviceLocationMessage('Lokasi perangkat berhasil ditampilkan di peta.')
-                  } catch {
-                    setDevicePoint(null)
-                    setDeviceLocationMessage('Lokasi perangkat tidak dapat diambil. Peta tetap berjalan normal.')
-                  } finally {
-                    setCapturingDeviceLocation(false)
-                  }
-                }}
-                className={
-                  capturingDeviceLocation
-                    ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-                    : useReferenceLikeLayout
-                    ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
-                    : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
-                }
-              >
-                {capturingDeviceLocation ? 'Mengambil Lokasi...' : 'Lokasi Saya'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const container = document.getElementById('odp-leaflet-map-shell')
-                  if (!container) return
-                  if (!document.fullscreenElement) {
-                    container.requestFullscreen?.().then(() => setMapFullscreenActive(true)).catch(() => null)
-                  } else {
-                    document.exitFullscreen?.().then(() => setMapFullscreenActive(false)).catch(() => null)
-                  }
-                }}
-                className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
-              >
-                {mapFullscreenActive ? 'Keluar Fullscreen' : 'Fullscreen'}
-              </button>
-            </div>
-              <span className={useReferenceLikeLayout ? 'text-sm text-slate-500' : 'badge border-slate-600 bg-slate-800/70 text-slate-100'}>
-                {useReferenceLikeLayout ? `Marker: ${filteredOdpRows.length}` : `${filteredOdpRows.length} marker`}
-              </span>
-          </div>
-          {deviceLocationMessage ? (
+        (() => {
+          const mapPanel = (
             <div
               className={
-                useReferenceLikeLayout
-                  ? 'border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600'
-                  : 'border-b border-slate-700 bg-slate-950/30 px-3 py-2 text-xs text-slate-200'
+                mapFullscreenActive
+                  ? 'fixed inset-0 z-[9999] flex min-h-0 flex-col overflow-hidden bg-slate-950'
+                  : `mt-4 overflow-hidden rounded-2xl ${
+                      useReferenceLikeLayout ? 'border border-slate-200 bg-white' : 'border border-slate-700 bg-slate-900/20'
+                    }`
               }
             >
-              {deviceLocationMessage}
-            </div>
-          ) : null}
-          {routeMode ? (
-            <div className="border-b border-slate-700 bg-slate-950/30 px-3 py-2 text-xs text-slate-200">
-              Mode Rute aktif. Klik marker untuk menambahkan titik rute. Gunakan Undo/Reset Rute untuk koreksi urutan.
-            </div>
-          ) : null}
-          <div id="odp-leaflet-map-shell" className="relative h-[520px] w-full bg-slate-950">
-            <div className="pointer-events-none absolute left-3 top-3 z-[500] flex flex-wrap items-center gap-2">
-              <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
-                Mode Rute: {routeMode ? 'ON' : 'OFF'}
-              </span>
-              <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
-                Titik: {routePoints.length}
-              </span>
-            </div>
-            <div className="pointer-events-none absolute right-3 top-3 z-[500] flex flex-wrap items-center gap-2">
-              <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
-                Marker: {filteredOdpRows.length}
-              </span>
-              <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
-                Fit: {routePoints.length >= 2 && mapFitMode === 'route' ? 'Rute' : prospectPoint ? 'Prospek' : 'Marker'}
-              </span>
-            </div>
-            <InventoryOdpLeafletMap
-              rows={filteredOdpRows}
-              height={520}
-              mapKey={`${mapRefreshKey}:${mapFitKey}`}
-              routeMode={routeMode}
-              routePoints={routePoints}
-              fitMode={routePoints.length >= 2 && mapFitMode === 'route' ? 'route' : mapSelectionPoints.length ? 'selection' : 'markers'}
-              selectedRowId={selectedOdpData?.row.id ?? null}
-              prospectPoint={prospectPoint}
-              focusPoints={mapSelectionPoints}
-              devicePoint={devicePoint}
-              onSelectRow={(row) => {
-                setSelectedOdpId(row.id)
-                setShowMap(true)
-              }}
-              onPickRoutePoint={({ row, lat, lng }) => {
-                if (!routeMode) return
-                setRoutePoints((current) => [...current, { lat, lng, label: row.primary }].slice(0, 24))
-              }}
-            />
-          </div>
-          {routeMode && routePoints.length ? (
-            <div className="border-t border-slate-700 bg-slate-950/30 px-3 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-200">Daftar Titik Rute</p>
-                <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">{routePoints.length} titik</span>
-              </div>
-              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {routePoints.map((point, index) => (
-                  <div key={`${point.lat}-${point.lng}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">
-                        {index + 1}. {point.label}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-slate-300">
-                        {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
-                      </p>
+              <div
+                className={`flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between ${
+                  useReferenceLikeLayout ? 'border-b border-slate-200' : 'border-b border-slate-700'
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRouteMode((current) => !current)}
+                    className={
+                      useReferenceLikeLayout
+                        ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                    }
+                  >
+                    Mode Rute: {routeMode ? 'ON' : 'OFF'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={routePoints.length === 0}
+                    onClick={() =>
+                      setRoutePoints((current) => {
+                        if (current.length === 0) return current
+                        return current.slice(0, -1)
+                      })
+                    }
+                    className={
+                      routePoints.length === 0
+                        ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                    }
+                  >
+                    Undo
+                  </button>
+                  <button
+                    type="button"
+                    disabled={routePoints.length === 0}
+                    onClick={() => setRoutePoints([])}
+                    className={
+                      routePoints.length === 0
+                        ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                    }
+                  >
+                    Reset Rute
+                  </button>
+                  <details className="relative">
+                    <summary className="cursor-pointer list-none rounded-md border border-slate-600 bg-slate-800/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700">
+                      Jarak: {formatDistanceMetersWithUnit(routeDistanceMeters, routeDistanceUnit)}
+                    </summary>
+                    <div className="absolute left-0 top-[calc(100%+6px)] z-[600] w-[180px] rounded-xl border border-slate-700 bg-slate-950/95 p-2 shadow-[0_16px_40px_rgba(2,6,23,0.45)]">
+                      {(
+                        [
+                          { key: 'auto' as const, label: 'Auto' },
+                          { key: 'm' as const, label: 'Meter (m)' },
+                          { key: 'km' as const, label: 'Kilometer (km)' },
+                        ] as const
+                      ).map((item) => {
+                        const active = routeDistanceUnit === item.key
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => setRouteDistanceUnit(item.key)}
+                            className={
+                              active
+                                ? 'w-full rounded-md border border-white bg-white px-3 py-2 text-left text-xs font-semibold text-slate-950'
+                                : 'w-full rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-left text-xs font-semibold text-white transition hover:bg-slate-800/70'
+                            }
+                          >
+                            {item.label}
+                          </button>
+                        )
+                      })}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setRoutePoints((current) => {
-                          if (index < 0 || index >= current.length) return current
-                          return current.filter((_, itemIndex) => itemIndex !== index)
-                        })
+                  </details>
+                  <button
+                    type="button"
+                    onClick={() => setMapFitKey((current) => current + 1)}
+                    className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                  >
+                    Reset View
+                  </button>
+                  <button
+                    type="button"
+                    disabled={routePoints.length < 2}
+                    onClick={() => {
+                      if (routePoints.length < 2) return
+                      setMapFitMode((current) => (current === 'markers' ? 'route' : 'markers'))
+                      setMapFitKey((current) => current + 1)
+                    }}
+                    className={
+                      routePoints.length < 2
+                        ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                    }
+                  >
+                    Fit: {routePoints.length >= 2 && mapFitMode === 'route' ? 'Rute' : prospectPoint ? 'Prospek' : 'Marker'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapRefreshKey((current) => current + 1)}
+                    className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                  >
+                    Refresh Peta
+                  </button>
+                  <button
+                    type="button"
+                    disabled={capturingDeviceLocation}
+                    onClick={async () => {
+                      if (capturingDeviceLocation) return
+                      if (!globalThis.navigator?.geolocation) {
+                        setDeviceLocationMessage('Browser ini belum mendukung geolocation.')
+                        return
                       }
-                      className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                ))}
+                      setCapturingDeviceLocation(true)
+                      setDeviceLocationMessage(null)
+                      try {
+                        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                          globalThis.navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            enableHighAccuracy: true,
+                            timeout: 10_000,
+                            maximumAge: 0,
+                          })
+                        })
+                        const lat = Number(position.coords.latitude)
+                        const lng = Number(position.coords.longitude)
+                        setDevicePoint({ lat, lng, label: 'Lokasi Saya' })
+                        setMapFitKey((current) => current + 1)
+                        setDeviceLocationMessage('Lokasi perangkat berhasil ditampilkan di peta.')
+                      } catch {
+                        setDevicePoint(null)
+                        setDeviceLocationMessage('Lokasi perangkat tidak dapat diambil. Peta tetap berjalan normal.')
+                      } finally {
+                        setCapturingDeviceLocation(false)
+                      }
+                    }}
+                    className={
+                      capturingDeviceLocation
+                        ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+                        : useReferenceLikeLayout
+                        ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                    }
+                  >
+                    {capturingDeviceLocation ? 'Mengambil Lokasi...' : 'Lokasi Saya'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapFullscreenActive((current) => !current)}
+                    className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                  >
+                    {mapFullscreenActive ? 'Keluar Fullscreen' : 'Fullscreen'}
+                  </button>
+                </div>
+                <span className={useReferenceLikeLayout ? 'text-sm text-slate-500' : 'badge border-slate-600 bg-slate-800/70 text-slate-100'}>
+                  {useReferenceLikeLayout ? `Marker: ${filteredOdpRows.length}` : `${filteredOdpRows.length} marker`}
+                </span>
               </div>
+              {deviceLocationMessage ? (
+                <div
+                  className={
+                    useReferenceLikeLayout
+                      ? 'border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600'
+                      : 'border-b border-slate-700 bg-slate-950/30 px-3 py-2 text-xs text-slate-200'
+                  }
+                >
+                  {deviceLocationMessage}
+                </div>
+              ) : null}
+              {routeMode ? (
+                <div className="border-b border-slate-700 bg-slate-950/30 px-3 py-2 text-xs text-slate-200">
+                  Mode Rute aktif. Klik marker untuk menambahkan titik rute. Gunakan Undo/Reset Rute untuk koreksi urutan.
+                </div>
+              ) : null}
+              <div
+                id="odp-leaflet-map-shell"
+                className={
+                  mapFullscreenActive
+                    ? 'relative flex-1 min-h-0 w-full bg-slate-950'
+                    : 'relative h-[520px] w-full bg-slate-950'
+                }
+              >
+                <div className="pointer-events-none absolute left-3 top-3 z-[500] flex flex-wrap items-center gap-2">
+                  <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+                    Mode Rute: {routeMode ? 'ON' : 'OFF'}
+                  </span>
+                  <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+                    Titik: {routePoints.length}
+                  </span>
+                </div>
+                <div className="pointer-events-none absolute right-3 top-3 z-[500] flex flex-wrap items-center gap-2">
+                  <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+                    Marker: {filteredOdpRows.length}
+                  </span>
+                  <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+                    Fit: {routePoints.length >= 2 && mapFitMode === 'route' ? 'Rute' : prospectPoint ? 'Prospek' : 'Marker'}
+                  </span>
+                </div>
+                <InventoryOdpLeafletMap
+                  rows={filteredOdpRows}
+                  height={mapFullscreenActive ? undefined : 520}
+                  mapKey={`${mapRefreshKey}:${mapFitKey}`}
+                  routeMode={routeMode}
+                  routePoints={routePoints}
+                  fitMode={routePoints.length >= 2 && mapFitMode === 'route' ? 'route' : mapSelectionPoints.length ? 'selection' : 'markers'}
+                  selectedRowId={selectedOdpData?.row.id ?? null}
+                  prospectPoint={prospectPoint}
+                  focusPoints={mapSelectionPoints}
+                  devicePoint={devicePoint}
+                  onSelectRow={(row) => {
+                    setSelectedOdpId(row.id)
+                    setShowMap(true)
+                  }}
+                  onPickRoutePoint={({ row, lat, lng }) => {
+                    if (!routeMode) return
+                    setRoutePoints((current) => [...current, { lat, lng, label: row.primary }].slice(0, 24))
+                  }}
+                />
+              </div>
+              {routeMode && routePoints.length ? (
+                <div className="border-t border-slate-700 bg-slate-950/30 px-3 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-200">Daftar Titik Rute</p>
+                    <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">{routePoints.length} titik</span>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {routePoints.map((point, index) => (
+                      <div key={`${point.lat}-${point.lng}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-900/30 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">
+                            {index + 1}. {point.label}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-slate-300">
+                            {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRoutePoints((current) => {
+                              if (index < 0 || index >= current.length) return current
+                              return current.filter((_, itemIndex) => itemIndex !== index)
+                            })
+                          }
+                          className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
+          )
+
+          const portalTarget = globalThis.document?.body ?? null
+          if (!mapFullscreenActive || !portalTarget) return mapPanel
+          return createPortal(mapPanel, portalTarget)
+        })()
       ) : null}
 
       <div

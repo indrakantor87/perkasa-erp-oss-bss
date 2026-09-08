@@ -16,6 +16,15 @@ function toNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function parseGeoCoordinate(value: string, kind: 'lat' | 'lng') {
+  const parsed = toNumber(value)
+  if (parsed == null) return null
+  if (kind === 'lat') {
+    return parsed >= -90 && parsed <= 90 ? parsed : null
+  }
+  return parsed >= -180 && parsed <= 180 ? parsed : null
+}
+
 export type OdpCapacityStatus = 'AVAILABLE' | 'LIMITED' | 'FULL' | 'UNKNOWN'
 
 const ODP_CAPACITY_COLORS: Record<OdpCapacityStatus, string> = {
@@ -103,7 +112,7 @@ function normalizePoint(point?: { lat: number; lng: number; label?: string } | n
 
 export function InventoryOdpLeafletMap({
   rows,
-  height = 420,
+  height,
   onSelectRow,
   onPickRoutePoint,
   mapKey,
@@ -135,13 +144,20 @@ export function InventoryOdpLeafletMap({
   const markerLayerRef = useRef<L.LayerGroup | L.MarkerClusterGroup | null>(null)
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
   const deviceLayerRef = useRef<L.LayerGroup | null>(null)
+  const resizeRafRef = useRef<number | null>(null)
+  const lastSizeRef = useRef<{ width: number; height: number } | null>(null)
+  const layoutRafRef = useRef<number | null>(null)
+  const layoutRaf2Ref = useRef<number | null>(null)
 
   const markerItems = useMemo(() => {
     return rows
       .map((row) => {
-        const latitude = toNumber(pickMeta(row.meta, 'Latitude: '))
-        const longitude = toNumber(pickMeta(row.meta, 'Longitude: '))
+        const latitude = parseGeoCoordinate(pickMeta(row.meta, 'Latitude: '), 'lat')
+        const longitude = parseGeoCoordinate(pickMeta(row.meta, 'Longitude: '), 'lng')
         if (latitude === null || longitude === null) {
+          return null
+        }
+        if (latitude === 0 && longitude === 0) {
           return null
         }
         const totalPorts = Number.parseInt(pickMeta(row.meta, 'Total Ports: ') || '0', 10) || 0
@@ -188,6 +204,77 @@ export function InventoryOdpLeafletMap({
     () => markerItems.find((item) => item.row.id === selectedRowId) ?? null,
     [markerItems, selectedRowId],
   )
+
+  useEffect(() => {
+    const element = document.getElementById(mapId)
+    if (!element) return
+    if (!('ResizeObserver' in globalThis)) return
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      const { width, height } = entry.contentRect
+      if (!(width > 0 && height > 0)) return
+
+      const lastSize = lastSizeRef.current
+      if (lastSize && Math.abs(lastSize.width - width) < 0.5 && Math.abs(lastSize.height - height) < 0.5) return
+      lastSizeRef.current = { width, height }
+
+      if (resizeRafRef.current) {
+        cancelAnimationFrame(resizeRafRef.current)
+      }
+
+      resizeRafRef.current = requestAnimationFrame(() => {
+        resizeRafRef.current = null
+        mapRef.current?.invalidateSize()
+      })
+    })
+
+    observer.observe(element)
+
+    return () => {
+      observer.disconnect()
+      if (resizeRafRef.current) {
+        cancelAnimationFrame(resizeRafRef.current)
+        resizeRafRef.current = null
+      }
+      lastSizeRef.current = null
+    }
+  }, [mapId])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (layoutRafRef.current) {
+      cancelAnimationFrame(layoutRafRef.current)
+      layoutRafRef.current = null
+    }
+
+    if (layoutRaf2Ref.current) {
+      cancelAnimationFrame(layoutRaf2Ref.current)
+      layoutRaf2Ref.current = null
+    }
+
+    layoutRafRef.current = requestAnimationFrame(() => {
+      layoutRafRef.current = null
+      map.invalidateSize()
+      layoutRaf2Ref.current = requestAnimationFrame(() => {
+        layoutRaf2Ref.current = null
+        map.invalidateSize()
+      })
+    })
+
+    return () => {
+      if (layoutRafRef.current) {
+        cancelAnimationFrame(layoutRafRef.current)
+        layoutRafRef.current = null
+      }
+      if (layoutRaf2Ref.current) {
+        cancelAnimationFrame(layoutRaf2Ref.current)
+        layoutRaf2Ref.current = null
+      }
+    }
+  }, [height])
 
   useEffect(() => {
     const element = document.getElementById(mapId)
@@ -409,8 +496,17 @@ export function InventoryOdpLeafletMap({
         routeLayerRef.current = null
         deviceLayerRef.current = null
       }
+      if (layoutRafRef.current) {
+        cancelAnimationFrame(layoutRafRef.current)
+        layoutRafRef.current = null
+      }
+      if (layoutRaf2Ref.current) {
+        cancelAnimationFrame(layoutRaf2Ref.current)
+        layoutRaf2Ref.current = null
+      }
     }
   }, [])
 
-  return <div id={mapId} style={{ height, width: '100%' }} />
+  const resolvedHeight = typeof height === 'number' ? `${height}px` : '100%'
+  return <div id={mapId} style={{ height: resolvedHeight, width: '100%' }} />
 }
