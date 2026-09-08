@@ -43,12 +43,14 @@ RUN /bin/bash -eo pipefail -c '\
  && cp -RT ".next/static" ".next/standalone/.next/static" \
  && if [ -d "public" ]; then cp -RT "public" ".next/standalone/public"; fi \
  && cp "healthcheck.js" ".next/standalone/healthcheck.js" \
+ && ./node_modules/.bin/tsc "scripts/migrate-phase-1-1-odp.ts" --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --outDir ".next/standalone" \
  && if [ -f ".next/BUILD_ID" ]; then cp ".next/BUILD_ID" ".next/standalone/.next/BUILD_ID"; fi \
  && if [ -d ".next/server" ]; then cp -RT ".next/server" ".next/standalone/.next/server"; fi \
  && echo "=== Standalone verification ===" \
  && ls -la ".next/standalone" | head -30 \
  && test -f ".next/standalone/server.js" \
  && test -f ".next/standalone/healthcheck.js" \
+ && test -f ".next/standalone/migrate-phase-1-1-odp.js" \
  && test -d ".next/standalone/.next/static" \
  && test -d ".next/standalone/.next/static/chunks" \
  && echo "[chunks-js-count] $(find .next/static/chunks -type f -name '*.js' 2>/dev/null | wc -l)" \
