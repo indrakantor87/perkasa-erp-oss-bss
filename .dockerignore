@@ -38,6 +38,9 @@ docs
 .vscode
 
 apps/web/scripts
+!apps/web/scripts/
+apps/web/scripts/*
+!apps/web/scripts/migrate-phase-1-1-odp.ts
 apps/web/tests
 apps/web/docs
 apps/web/README.md
