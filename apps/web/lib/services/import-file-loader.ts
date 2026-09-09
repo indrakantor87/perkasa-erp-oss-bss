@@ -53,6 +53,20 @@ function normalizeKey(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '')
 }
 
+function getValuePreferAliases(record: Record<string, unknown>, aliases: string[]) {
+  const map = new Map<string, unknown>()
+  for (const [key, value] of Object.entries(record)) {
+    map.set(normalizeKey(key), value)
+  }
+  for (const alias of aliases) {
+    const normalized = normalizeKey(alias)
+    if (map.has(normalized)) {
+      return map.get(normalized) ?? null
+    }
+  }
+  return null
+}
+
 function getValue(record: Record<string, unknown>, aliases: string[]) {
   for (const [key, value] of Object.entries(record)) {
     if (aliases.some((alias) => normalizeKey(alias) === normalizeKey(key))) {
@@ -87,6 +101,16 @@ function toInteger(value: unknown) {
   return parsed == null ? null : Math.trunc(parsed)
 }
 
+function toIntegerStrict(value: unknown) {
+  if (value == null || value === '') return null
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value)
+  const raw = String(value).trim()
+  if (!raw) return null
+  if (!/^[+-]?\d[\d\s,.\-]*$/.test(raw)) return null
+  const parsed = toNumber(raw)
+  return parsed == null ? null : Math.trunc(parsed)
+}
+
 function toBooleanInt(value: unknown) {
   if (value == null || value === '') return null
   if (typeof value === 'boolean') return value ? 1 : 0
@@ -106,6 +130,40 @@ function toJsonText(value: unknown, fallback: Record<string, unknown>) {
 function buildNormalizedKey(record: Record<string, unknown>, fields: string[]) {
   const parts = fields.map((field) => toText(getValue(record, [field]))).filter(Boolean)
   return parts.length ? parts.join('|').toLowerCase() : null
+}
+
+function buildNormalizedKeyFromParts(parts: Array<string | null>) {
+  const cleaned = parts.filter(Boolean)
+  if (!cleaned.length) return null
+  return normalizeKey(cleaned.join('|'))
+}
+
+function parseLegacyCoordinatePair(value: string): { latitude: number; longitude: number } | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const dotPair = trimmed.match(/^\s*([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)\s*$/)
+  if (dotPair) {
+    const latitude = Number(dotPair[1])
+    const longitude = Number(dotPair[2])
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null
+    if (latitude < -90 || latitude > 90) return null
+    if (longitude < -180 || longitude > 180) return null
+    return { latitude, longitude }
+  }
+
+  const commaPair = trimmed.match(/^\s*([+-]?\d+)\s*,\s*(\d+)\s*,\s*([+-]?\d+)\s*,\s*(\d+)\s*$/)
+  if (commaPair) {
+    if (commaPair[2].length < 3 || commaPair[4].length < 3) return null
+    const latitude = Number(`${commaPair[1]}.${commaPair[2]}`)
+    const longitude = Number(`${commaPair[3]}.${commaPair[4]}`)
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null
+    if (latitude < -90 || latitude > 90) return null
+    if (longitude < -180 || longitude > 180) return null
+    return { latitude, longitude }
+  }
+
+  return null
 }
 
 async function insertUserRows(batch: BatchContext, rows: Record<string, unknown>[]) {
@@ -943,6 +1001,64 @@ async function insertMarketingActivityAreaRows(batch: BatchContext, rows: Record
 async function insertNetworkOdpRows(batch: BatchContext, rows: Record<string, unknown>[]) {
   let inserted = 0
   for (const row of rows) {
+    const warnings: string[] = []
+
+    const legacyId = toText(getValuePreferAliases(row, ['legacy_id', 'legacyId']))
+    const odpCode = toText(
+      getValuePreferAliases(row, ['odp_code', 'odpCode', 'kode_odp', 'nama_odp', 'nama odp', 'nama_odp_legacy'])
+    )
+    const odpName = toText(getValuePreferAliases(row, ['odp_name', 'odpName', 'nama_odp']))
+    const regionName = toText(getValuePreferAliases(row, ['region_name', 'regionName', 'wilayah', 'region', 'pop']))
+    const locationText = toText(getValuePreferAliases(row, ['location_text', 'locationText', 'lokasi', 'alamat']))
+
+    let latitude = toNumber(getValuePreferAliases(row, ['latitude', 'lat']))
+    let longitude = toNumber(getValuePreferAliases(row, ['longitude', 'lng', 'lon']))
+
+    if (latitude == null && longitude == null && locationText) {
+      const parsed = parseLegacyCoordinatePair(locationText)
+      if (parsed) {
+        latitude = parsed.latitude
+        longitude = parsed.longitude
+      } else if (locationText.includes(',')) {
+        warnings.push('LEGACY_ODP_COORDINATE_PARSE_REJECTED')
+      }
+    }
+
+    const totalPortsRaw = getValuePreferAliases(row, [
+      'total_ports',
+      'totalPorts',
+      'total_port',
+      'jumlah_port',
+      'kapasitas',
+    ])
+    const activePortsRaw = getValuePreferAliases(row, [
+      'active_ports',
+      'activePorts',
+      'port_aktif',
+      'port_active',
+      'terpakai',
+    ])
+
+    const totalPorts = toIntegerStrict(totalPortsRaw)
+    const activePorts = toIntegerStrict(activePortsRaw)
+
+    if (totalPortsRaw != null && totalPorts == null && String(totalPortsRaw).trim()) {
+      warnings.push('LEGACY_ODP_TOTAL_PORTS_INVALID')
+    }
+    if (activePortsRaw != null && activePorts == null && String(activePortsRaw).trim()) {
+      warnings.push('LEGACY_ODP_ACTIVE_PORTS_INVALID')
+    }
+
+    const poleStatus = toText(getValuePreferAliases(row, ['pole_status', 'poleStatus', 'status_tiang']))
+    const isActive = toBooleanInt(getValuePreferAliases(row, ['is_active', 'isActive', 'aktif', 'active']))
+
+    const normalizedKey =
+      toText(getValuePreferAliases(row, ['normalized_key', 'normalizedKey'])) ||
+      buildNormalizedKeyFromParts([legacyId, odpCode])
+
+    const rawPayloadFallback =
+      warnings.length > 0 ? ({ ...row, __legacy_parse_warnings: warnings } as Record<string, unknown>) : row
+
     await runReviewDbExecute<ExecuteResult>(
       `
         INSERT INTO staging_legacy_network_odp_records (
@@ -968,20 +1084,19 @@ async function insertNetworkOdpRows(batch: BatchContext, rows: Record<string, un
       `,
       [
         batch.id,
-        toText(getValue(row, ['legacy_id', 'legacyId'])),
-        toText(getValue(row, ['odp_code', 'odpCode', 'kode_odp'])),
-        toText(getValue(row, ['odp_name', 'odpName', 'nama_odp'])),
-        toText(getValue(row, ['region_name', 'regionName', 'wilayah', 'region'])),
-        toText(getValue(row, ['location_text', 'locationText', 'lokasi', 'alamat'])),
-        toNumber(getValue(row, ['latitude', 'lat'])),
-        toNumber(getValue(row, ['longitude', 'lng', 'lon'])),
-        toInteger(getValue(row, ['total_ports', 'totalPorts', 'total_port', 'jumlah_port'])),
-        toInteger(getValue(row, ['active_ports', 'activePorts', 'port_aktif', 'port_active'])),
-        toText(getValue(row, ['pole_status', 'poleStatus', 'status_tiang'])),
-        toBooleanInt(getValue(row, ['is_active', 'isActive', 'aktif', 'active'])),
-        toJsonText(getValue(row, ['raw_payload', 'rawPayload']), row),
-        toText(getValue(row, ['normalized_key', 'normalizedKey'])) ||
-          buildNormalizedKey(row, ['legacy_id', 'odp_code']),
+        legacyId,
+        odpCode,
+        odpName,
+        regionName,
+        locationText,
+        latitude,
+        longitude,
+        totalPorts,
+        activePorts,
+        poleStatus,
+        isActive,
+        toJsonText(getValuePreferAliases(row, ['raw_payload', 'rawPayload']), rawPayloadFallback),
+        normalizedKey,
       ]
     )
     inserted += 1
@@ -1058,9 +1173,46 @@ async function readWorkbookSections(
       .map((alias) => sheetMap.get(normalizeKey(alias)))
       .find(Boolean)
 
-    if (!matchedSheet) continue
+    let sheetName = matchedSheet || null
 
-    const sheet = workbook.Sheets[matchedSheet]
+    if (!sheetName && section.key === 'odp') {
+      const signature = new Set(['namaodp', 'lokasi', 'kapasitas'])
+      const candidates: string[] = []
+      for (const name of workbook.SheetNames) {
+        const sheet = workbook.Sheets[name]
+        const aoa = xlsx.utils.sheet_to_json<unknown[]>(sheet, {
+          header: 1,
+          range: 0,
+          blankrows: false,
+          defval: null,
+          raw: false,
+        })
+        const headers = Array.isArray(aoa?.[0]) ? aoa[0] : []
+        const normalizedHeaders = new Set(
+          headers
+            .map((header) => (header == null ? '' : normalizeKey(String(header))))
+            .filter(Boolean)
+        )
+        let ok = true
+        for (const required of signature) {
+          if (!normalizedHeaders.has(required)) {
+            ok = false
+            break
+          }
+        }
+        if (ok) {
+          candidates.push(name)
+        }
+      }
+
+      if (candidates.length === 1) {
+        sheetName = candidates[0]
+      }
+    }
+
+    if (!sheetName) continue
+
+    const sheet = workbook.Sheets[sheetName]
     const rows = xlsx.utils.sheet_to_json<Record<string, unknown>>(sheet, {
       defval: null,
       raw: false,
