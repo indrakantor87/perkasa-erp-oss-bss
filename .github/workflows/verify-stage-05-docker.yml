@@ -41,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "IMAGE=$IMAGE"
-          docker build --no-cache --progress=plain -t "$IMAGE" .
+          docker buildx build --load --no-cache --progress=plain -t "$IMAGE" .
 
       - name: Final image inspection (SQL stage files)
         env:
