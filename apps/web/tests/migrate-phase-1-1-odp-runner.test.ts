@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict'
-import { getMigrationId, getPortStatusEnumValues, parseMode, validateBackupEvidence } from '../scripts/migrate-phase-1-1-odp'
+import {
+  getMigrationId,
+  getPortStatusEnumValues,
+  parseInformationSchemaColumnRow,
+  parseMode,
+  validateBackupEvidence,
+} from '../scripts/migrate-phase-1-1-odp'
 
 async function main() {
   assert.equal(getMigrationId(), 'phase-1.1-odp-2026-09-08')
@@ -11,6 +17,24 @@ async function main() {
   assert.equal(parseMode(['--mode=postcheck']), 'postcheck')
   assert.equal(parseMode(['--mode=unknown']), null)
   assert.equal(parseMode([]), null)
+
+  assert.deepEqual(
+    parseInformationSchemaColumnRow({
+      COLUMN_NAME: 'port_no',
+      COLUMN_TYPE: 'varchar(30)',
+      IS_NULLABLE: 'NO',
+      COLUMN_DEFAULT: null,
+    }),
+    { column_name: 'port_no', column_type: 'varchar(30)', is_nullable: 'NO', column_default: null },
+  )
+
+  assert.equal(
+    parseInformationSchemaColumnRow({
+      COLUMN_NAME: 'port_no',
+      IS_NULLABLE: 'NO',
+    }),
+    null,
+  )
 
   assert.deepEqual(
     validateBackupEvidence({
@@ -47,4 +71,3 @@ async function main() {
 }
 
 main()
-

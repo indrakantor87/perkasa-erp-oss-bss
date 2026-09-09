@@ -158,7 +158,9 @@ async function getTableEngine(pool: mysql.Pool, tableName: string) {
   const row = await querySingleRow<TableInfo>(
     pool,
     `
-      SELECT table_name, engine
+      SELECT
+        table_name AS table_name,
+        engine AS engine
       FROM information_schema.tables
       WHERE table_schema = DATABASE()
         AND table_name = ?
@@ -173,11 +175,48 @@ async function getTableCount(pool: mysql.Pool, tableName: string) {
   return Number(row?.total ?? 0)
 }
 
-async function getColumn(pool: mysql.Pool, tableName: string, columnName: string) {
-  const row = await querySingleRow<ColumnInfo>(
+function pickRowValue(row: Record<string, unknown>, key: string) {
+  if (key in row) return row[key]
+  const upper = key.toUpperCase()
+  if (upper in row) return row[upper]
+  return undefined
+}
+
+export function parseInformationSchemaColumnRow(row: Record<string, unknown>): ColumnInfo | null {
+  const columnName = pickRowValue(row, 'column_name')
+  const columnType = pickRowValue(row, 'column_type')
+  const isNullable = pickRowValue(row, 'is_nullable')
+  const columnDefault = pickRowValue(row, 'column_default')
+
+  if (typeof columnName !== 'string' || !columnName.trim()) return null
+  if (typeof columnType !== 'string' || !columnType.trim()) return null
+  if (isNullable !== 'YES' && isNullable !== 'NO') return null
+  if (columnDefault !== null && columnDefault !== undefined && typeof columnDefault !== 'string') return null
+
+  return {
+    column_name: columnName,
+    column_type: columnType,
+    is_nullable: isNullable,
+    column_default: columnDefault ?? null,
+  }
+}
+
+async function getColumnStrict(
+  pool: mysql.Pool,
+  tableName: string,
+  columnName: string,
+): Promise<
+  | { ok: true; column: ColumnInfo }
+  | { ok: false; kind: 'MISSING' | 'INVALID_METADATA'; reason: string }
+> {
+  const raw = await querySingleRow<Record<string, unknown>>(
     pool,
     `
-      SELECT column_name, column_type, is_nullable, column_default
+      SELECT
+        column_name AS column_name,
+        column_type AS column_type,
+        is_nullable AS is_nullable,
+        column_default AS column_default
       FROM information_schema.columns
       WHERE table_schema = DATABASE()
         AND table_name = ?
@@ -185,14 +224,33 @@ async function getColumn(pool: mysql.Pool, tableName: string, columnName: string
     `,
     [tableName, columnName],
   )
-  return row
+
+  if (!raw) {
+    return { ok: false, kind: 'MISSING', reason: `${tableName}.${columnName} missing.` }
+  }
+
+  const parsed = parseInformationSchemaColumnRow(raw)
+  if (!parsed) {
+    return {
+      ok: false,
+      kind: 'INVALID_METADATA',
+      reason: `information_schema.columns returned unexpected shape for ${tableName}.${columnName}.`,
+    }
+  }
+
+  return { ok: true, column: parsed }
 }
 
 async function incomingFkToTable(pool: mysql.Pool, tableName: string) {
   const rows = await queryRows<IncomingFkInfo>(
     pool,
     `
-      SELECT constraint_name, table_name, column_name, referenced_table_name, referenced_column_name
+      SELECT
+        constraint_name AS constraint_name,
+        table_name AS table_name,
+        column_name AS column_name,
+        referenced_table_name AS referenced_table_name,
+        referenced_column_name AS referenced_column_name
       FROM information_schema.key_column_usage
       WHERE table_schema = DATABASE()
         AND referenced_table_name = ?
@@ -221,7 +279,9 @@ async function getConstraints(pool: mysql.Pool, tableName: string) {
   return queryRows<ConstraintInfo>(
     pool,
     `
-      SELECT constraint_name, constraint_type
+      SELECT
+        constraint_name AS constraint_name,
+        constraint_type AS constraint_type
       FROM information_schema.table_constraints
       WHERE table_schema = DATABASE()
         AND table_name = ?
@@ -234,7 +294,12 @@ async function getOutgoingFks(pool: mysql.Pool, tableName: string) {
   const rows = await queryRows<IncomingFkInfo>(
     pool,
     `
-      SELECT constraint_name, table_name, column_name, referenced_table_name, referenced_column_name
+      SELECT
+        constraint_name AS constraint_name,
+        table_name AS table_name,
+        column_name AS column_name,
+        referenced_table_name AS referenced_table_name,
+        referenced_column_name AS referenced_column_name
       FROM information_schema.key_column_usage
       WHERE table_schema = DATABASE()
         AND table_name = ?
@@ -307,10 +372,11 @@ async function verifyServiceDeviceAssignmentsCanonical(pool: mysql.Pool): Promis
   }
 
   for (const expected of expectServiceAssignmentColumns()) {
-    const col = await getColumn(pool, 'service_device_assignments', expected.column)
-    if (!col) {
-      return fail(`service_device_assignments missing required column ${expected.column}.`)
+    const colRes = await getColumnStrict(pool, 'service_device_assignments', expected.column)
+    if (!colRes.ok) {
+      return fail(`service_device_assignments ${colRes.kind}: ${colRes.reason}`)
     }
+    const col = colRes.column
     if (expected.column === 'assignment_status') {
       if (!normalizeAssignmentStatusEnum(col.column_type)) {
         return fail('service_device_assignments.assignment_status enum mismatch.')
@@ -386,12 +452,18 @@ async function precheck(pool: mysql.Pool): Promise<MigrationResult> {
   }
   logLine('P1 PASS')
 
-  const portNo = await getColumn(pool, 'network_odp_ports', 'port_no')
-  const legacyStatus = await getColumn(pool, 'network_odp_ports', 'status')
-  const portStatus = await getColumn(pool, 'network_odp_ports', 'port_status')
+  const portNoRes = await getColumnStrict(pool, 'network_odp_ports', 'port_no')
+  if (!portNoRes.ok) return fail(`P2 FAIL: port_no ${portNoRes.kind}: ${portNoRes.reason}`)
+  const portNo = portNoRes.column
 
-  if (!portNo) {
-    return fail('P2 FAIL: network_odp_ports.port_no missing.')
+  const legacyStatusRes = await getColumnStrict(pool, 'network_odp_ports', 'status')
+  if (!legacyStatusRes.ok) return fail(`P2 FAIL: status ${legacyStatusRes.kind}: ${legacyStatusRes.reason}`)
+  const legacyStatus = legacyStatusRes.column
+
+  const portStatusRes = await getColumnStrict(pool, 'network_odp_ports', 'port_status')
+  const portStatus = portStatusRes.ok ? portStatusRes.column : null
+  if (!portStatusRes.ok && portStatusRes.kind === 'INVALID_METADATA') {
+    return fail(`P2 FAIL: port_status ${portStatusRes.kind}: ${portStatusRes.reason}`)
   }
 
   const portNoType = normalizeType(portNo.column_type)
@@ -406,9 +478,6 @@ async function precheck(pool: mysql.Pool): Promise<MigrationResult> {
     return fail('P2 FAIL: network_odp_ports.port_no must be NOT NULL.')
   }
 
-  if (!legacyStatus) {
-    return fail('P2 FAIL: network_odp_ports.status missing. Unexpected intermediate state.')
-  }
   if (!isLegacyStatusEnumType(legacyStatus.column_type)) {
     return fail(`P2 FAIL: network_odp_ports.status unexpected enum/type (${legacyStatus.column_type}).`)
   }
@@ -443,10 +512,9 @@ async function precheck(pool: mysql.Pool): Promise<MigrationResult> {
     if (!engine || engine.trim().toLowerCase() !== 'innodb') {
       return fail(`P4 FAIL: ${table} engine mismatch (expected InnoDB).`)
     }
-    const idColumn = await getColumn(pool, table, 'id')
-    if (!idColumn) {
-      return fail(`P4 FAIL: ${table}.id missing.`)
-    }
+    const idRes = await getColumnStrict(pool, table, 'id')
+    if (!idRes.ok) return fail(`P4 FAIL: id ${idRes.kind}: ${idRes.reason}`)
+    const idColumn = idRes.column
     if (!isBigintUnsigned(idColumn.column_type) || idColumn.is_nullable !== 'NO') {
       return fail(`P4 FAIL: ${table}.id must be BIGINT UNSIGNED NOT NULL.`)
     }
@@ -467,8 +535,9 @@ async function precheck(pool: mysql.Pool): Promise<MigrationResult> {
 }
 
 async function verifyPortStatus(pool: mysql.Pool): Promise<MigrationResult> {
-  const col = await getColumn(pool, 'network_odp_ports', 'port_status')
-  if (!col) return fail('VERIFY FAIL: port_status missing after DDL.')
+  const colRes = await getColumnStrict(pool, 'network_odp_ports', 'port_status')
+  if (!colRes.ok) return fail(`VERIFY FAIL: port_status ${colRes.kind}: ${colRes.reason}`)
+  const col = colRes.column
   if (!isPortStatusEnumType(col.column_type)) return fail('VERIFY FAIL: port_status enum mismatch after DDL.')
   if (col.is_nullable !== 'NO') return fail('VERIFY FAIL: port_status nullability mismatch after DDL.')
   if (!equalsDefaultAvailable(col.column_default)) return fail('VERIFY FAIL: port_status default mismatch after DDL.')
@@ -476,8 +545,9 @@ async function verifyPortStatus(pool: mysql.Pool): Promise<MigrationResult> {
 }
 
 async function verifyPortNoInt(pool: mysql.Pool): Promise<MigrationResult> {
-  const col = await getColumn(pool, 'network_odp_ports', 'port_no')
-  if (!col) return fail('VERIFY FAIL: port_no missing after DDL.')
+  const colRes = await getColumnStrict(pool, 'network_odp_ports', 'port_no')
+  if (!colRes.ok) return fail(`VERIFY FAIL: port_no ${colRes.kind}: ${colRes.reason}`)
+  const col = colRes.column
   if (!isInt(col.column_type)) return fail(`VERIFY FAIL: port_no type mismatch after DDL (${col.column_type}).`)
   if (col.is_nullable !== 'NO') return fail('VERIFY FAIL: port_no must be NOT NULL after DDL.')
   return pass('READY')
@@ -500,7 +570,8 @@ async function applyMigration(pool: mysql.Pool): Promise<MigrationResult> {
     return gate
   }
 
-  const portStatus = await getColumn(pool, 'network_odp_ports', 'port_status')
+  const portStatusRes = await getColumnStrict(pool, 'network_odp_ports', 'port_status')
+  const portStatus = portStatusRes.ok ? portStatusRes.column : null
   if (!portStatus) {
     logLine('DDL STEP 1: ADD port_status')
     await execute(
@@ -518,8 +589,9 @@ async function applyMigration(pool: mysql.Pool): Promise<MigrationResult> {
     logLine('STEP 1 SKIP (already present)')
   }
 
-  const portNo = await getColumn(pool, 'network_odp_ports', 'port_no')
-  if (!portNo) return fail('Unexpected state: port_no missing before step 2.')
+  const portNoRes = await getColumnStrict(pool, 'network_odp_ports', 'port_no')
+  if (!portNoRes.ok) return fail(`Unexpected state: port_no ${portNoRes.kind}: ${portNoRes.reason}`)
+  const portNo = portNoRes.column
   if (!isInt(portNo.column_type)) {
     logLine('DDL STEP 2: MODIFY port_no INT NOT NULL')
     await execute(pool, `ALTER TABLE network_odp_ports MODIFY COLUMN port_no INT NOT NULL`)
