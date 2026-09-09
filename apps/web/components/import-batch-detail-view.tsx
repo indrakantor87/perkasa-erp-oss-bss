@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ImportBatchActionPanel } from '@/components/import-batch-action-panel'
 import { ImportBatchUploadForm } from '@/components/import-batch-upload-form'
 import { ImportBatchRowReview } from '@/components/import-batch-row-review'
+import { deriveHasExistingRows } from '@/lib/import-batch-ui'
 import type { BatchDetail, ImportBatch } from '@/lib/types'
 
 const actionTone: Record<BatchDetail['actions'][number]['status'], string> = {
@@ -74,7 +75,7 @@ export function ImportBatchDetailView({
   const finalizedRows = rowSummary.imported + rowSummary.invalid + rowSummary.skipped
   const targetBreakdown = buildTargetBreakdown(detail.rows)
   const completionRate = batch.totalRows > 0 ? Math.round((finalizedRows / batch.totalRows) * 100) : 0
-  const hasExistingRows = batch.totalRows > 0 || detail.rows.length > 0 || Boolean(batch.sourceFileName)
+  const hasExistingRows = deriveHasExistingRows(batch, detail)
 
   return (
     <div className="space-y-6">
