@@ -223,6 +223,16 @@ const transformStageFiles: Record<TransformStage, string> = {
   '05': 'xampp_review_transform_stage_5.sql',
 }
 
+export function resolveTransformStageSqlPath(stage: TransformStage, cwd = process.cwd()) {
+  const stageFile = transformStageFiles[stage]
+  const pathModule = cwd.startsWith('/') ? path.posix : path
+  const baseDir =
+    pathModule.basename(cwd) === 'standalone'
+      ? pathModule.join(cwd, '..', 'database')
+      : pathModule.join(cwd, '..', '..', 'database')
+  return pathModule.join(baseDir, stageFile)
+}
+
 let importBatchActionTableEnsured = false
 let importBatchTransformRunTableEnsured = false
 
@@ -753,13 +763,7 @@ async function executeTransformSqlUpTo(
   let executedStatements = 0
 
   for (const currentStage of stageOrder) {
-    const filePath = path.join(
-      process.cwd(),
-      '..',
-      '..',
-      'database',
-      transformStageFiles[currentStage]
-    )
+    const filePath = resolveTransformStageSqlPath(currentStage)
     const content = await readFile(filePath, 'utf8')
     const statements = parseSqlStatements(content)
 

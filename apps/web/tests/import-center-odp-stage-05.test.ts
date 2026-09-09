@@ -2,7 +2,12 @@ import { describe, it, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { preflightOdpOnlyImportBatch, retryImportBatch, TRANSFORM_STAGE_ORDER } from '../lib/services/import-write-service'
+import {
+  preflightOdpOnlyImportBatch,
+  resolveTransformStageSqlPath,
+  retryImportBatch,
+  TRANSFORM_STAGE_ORDER,
+} from '../lib/services/import-write-service'
 
 async function readStage5Sql() {
   const url = new URL('../../../database/xampp_review_transform_stage_5.sql', import.meta.url)
@@ -119,6 +124,22 @@ describe('Import Center Stage 05 (ODP) integration', () => {
       assert.ok(
         dockerfile.includes(`/app/apps/web/database/xampp_review_transform_stage_${n}.sql`),
         `Dockerfile runner verification must check stage_${String(n).padStart(2, '0')} exists.`,
+      )
+    }
+  })
+
+  it('runtime resolver contract: standalone cwd resolves to /app/apps/web/database', () => {
+    const cwd = '/app/apps/web/standalone'
+
+    for (const stage of ['01', '02', '03', '04', '05'] as const) {
+      const resolved = resolveTransformStageSqlPath(stage, cwd)
+      assert.ok(
+        resolved.startsWith('/app/apps/web/database/'),
+        `Stage ${stage} must resolve under /app/apps/web/database/. Got: ${resolved}`,
+      )
+      assert.ok(
+        !resolved.startsWith('/app/apps/database/'),
+        `Stage ${stage} must not resolve under /app/apps/database/. Got: ${resolved}`,
       )
     }
   })
