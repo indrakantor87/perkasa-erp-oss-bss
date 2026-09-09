@@ -1,0 +1,91 @@
+name: Verify Stage 05 Docker Packaging (No Push)
+
+on:
+  workflow_dispatch:
+
+env:
+  DOCKER_BUILDKIT: "1"
+  COMPOSE_DOCKER_CLI_BUILD: "1"
+  NEXT_TELEMETRY_DISABLED: "1"
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
+jobs:
+  verify-stage-05-docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Docker version
+        run: |
+          set -e
+          docker version
+          docker info
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+
+      - name: Build production image (no push)
+        env:
+          IMAGE: perkasa-erp-stage05-verify:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          echo "IMAGE=$IMAGE"
+          docker build --no-cache --progress=plain -t "$IMAGE" .
+
+      - name: Final image inspection (SQL stage files)
+        env:
+          IMAGE: perkasa-erp-stage05-verify:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint sh "$IMAGE" -lc "set -eu;
+            ls -la /app/apps/web/database/;
+            for f in 1 2 3 4 5; do
+              test -f /app/apps/web/database/xampp_review_transform_stage_${f}.sql;
+            done;
+            echo 'OK: stage_01..05 exist'"
+
+      - name: Node readFileSync proof (SQL bytes)
+        env:
+          IMAGE: perkasa-erp-stage05-verify:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint node "$IMAGE" -e "const fs=require('node:fs');
+            for (const i of [1,2,3,4,5]) {
+              const p='/app/apps/web/database/xampp_review_transform_stage_'+i+'.sql';
+              const s=fs.readFileSync(p,'utf8');
+              console.log(p,'bytes=',Buffer.byteLength(s));
+            }"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install apps/web dependencies
+        run: |
+          set -euo pipefail
+          npm --prefix apps/web ci --ignore-scripts --no-audit --no-fund
+
+      - name: Stage 05 tests (tsx)
+        run: |
+          set -euo pipefail
+          cd apps/web
+          npx tsx tests/import-center-odp-stage-05.test.ts
+
+      - name: Typecheck (apps/web)
+        run: |
+          set -euo pipefail
+          npm --prefix apps/web run check
+
+      - name: Next production build (apps/web)
+        run: |
+          set -euo pipefail
+          npm --prefix apps/web run build
