@@ -321,9 +321,9 @@ async function getOutgoingFks(pool: mysql.Pool, tableName: string) {
   return rows
 }
 
-function isPortStatusEnumType(type: string) {
+export function isPortStatusEnumType(type: string) {
   const normalized = normalizeType(type)
-  const target = `enum('${PORT_STATUS_ENUM.join("','")}')`
+  const target = normalizeType(`enum('${PORT_STATUS_ENUM.join("','")}')`)
   return normalized === target
 }
 

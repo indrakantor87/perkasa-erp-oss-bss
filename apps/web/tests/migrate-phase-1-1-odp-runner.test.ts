@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {
   getMigrationId,
   getPortStatusEnumValues,
+  isPortStatusEnumType,
   parseInformationSchemaColumnRow,
   parseMode,
   validateBackupEvidence,
@@ -34,6 +35,16 @@ async function main() {
       IS_NULLABLE: 'NO',
     }),
     null,
+  )
+
+  assert.equal(
+    isPortStatusEnumType("enum('AVAILABLE','USED','RESERVED','FAULTY','DISABLED')"),
+    true,
+  )
+
+  assert.equal(
+    isPortStatusEnumType("enum('AVAILABLE','USED','BLOCKED')"),
+    false,
   )
 
   assert.deepEqual(
