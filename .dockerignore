@@ -30,6 +30,8 @@ apps/web/*.log
 
 production-data
 database/generated
+database/*
+!database/xampp_review_transform_stage_*.sql
 .github
 CHANGELOG.md
 README.md

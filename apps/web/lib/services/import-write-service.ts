@@ -1,11 +1,31 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
+import {
+  getReviewDbErrorDetail,
+  runReviewDbExecute,
+  runReviewDbQuery,
+  runReviewDbQueryWithError,
+  runReviewDbTransaction,
+} from '@/lib/review-db'
 import type { ImportBatchAction, ImportBatchTransformRun } from '@/lib/types'
+
+declare global {
+  var __perkasaImportWriteServiceHooks:
+    | {
+        preflightOdpOnlyImportBatch?: (batchId: string) => Promise<unknown>
+        transformImportBatch?: (
+          batchId: string,
+          stage: TransformStage,
+          actor: string
+        ) => Promise<unknown>
+      }
+    | undefined
+}
 
 type BatchLookup = {
   id: number
   batchCode: string
+  importScope: string
   status: string
   note: string | null
 }
@@ -54,7 +74,9 @@ type ValidationResult = BatchSummary & {
   status: 'VALIDATED'
 }
 
-type TransformStage = '01' | '02' | '03' | '04'
+export const TRANSFORM_STAGE_ORDER = ['01', '02', '03', '04', '05'] as const
+
+export type TransformStage = (typeof TRANSFORM_STAGE_ORDER)[number]
 
 type TransformResult = BatchSummary & {
   batchId: number
@@ -198,6 +220,7 @@ const transformStageFiles: Record<TransformStage, string> = {
   '02': 'xampp_review_transform_stage_2.sql',
   '03': 'xampp_review_transform_stage_3.sql',
   '04': 'xampp_review_transform_stage_4.sql',
+  '05': 'xampp_review_transform_stage_5.sql',
 }
 
 let importBatchActionTableEnsured = false
@@ -242,7 +265,7 @@ export async function ensureImportBatchTransformRunTable() {
     CREATE TABLE IF NOT EXISTS staging_import_batch_transform_runs (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       batch_id BIGINT UNSIGNED NOT NULL,
-      stage ENUM('01','02','03','04') NOT NULL,
+      stage ENUM('01','02','03','04','05') NOT NULL,
       run_status ENUM('RUNNING','SUCCESS','FAILED') NOT NULL DEFAULT 'RUNNING',
       actor_name VARCHAR(150) NULL,
       started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -255,6 +278,26 @@ export async function ensureImportBatchTransformRunTable() {
       CONSTRAINT fk_staging_import_batch_transform_runs_batch FOREIGN KEY (batch_id) REFERENCES staging_import_batches(id)
     )
   `)
+
+  const [row] = await runReviewDbQuery<{ columnType: string | null }>(
+    `
+      SELECT column_type AS columnType
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'staging_import_batch_transform_runs'
+        AND column_name = 'stage'
+      LIMIT 1
+    `,
+  )
+  const currentType = String(row?.columnType ?? '')
+  if (currentType && !currentType.includes("'05'")) {
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        ALTER TABLE staging_import_batch_transform_runs
+        MODIFY COLUMN stage ENUM('01','02','03','04','05') NOT NULL
+      `,
+    )
+  }
 
   importBatchTransformRunTableEnsured = true
 }
@@ -440,6 +483,7 @@ export async function getImportBatchLookup(batchId: string) {
       SELECT
         id,
         batch_code AS batchCode,
+        import_scope AS importScope,
         import_status AS status,
         notes AS note
       FROM staging_import_batches
@@ -452,6 +496,94 @@ export async function getImportBatchLookup(batchId: string) {
   )
 
   return row ?? null
+}
+
+type OdpOnlyPreflightResult = {
+  batchPk: number
+  batchCode: string
+  odpRows: number
+  nonOdpCounts: Record<string, number>
+}
+
+const ODP_ONLY_REQUIRED_SCOPE = 'INVENTORY'
+const ODP_ONLY_TABLE = 'staging_legacy_network_odp_records'
+const ODP_ONLY_NON_ODP_TABLES = [
+  'staging_legacy_inventory_item_records',
+  'staging_legacy_inventory_movement_records',
+  'staging_legacy_user_records',
+  'staging_legacy_employee_records',
+  'staging_legacy_attendance_records',
+  'staging_legacy_salary_records',
+  'staging_legacy_loan_records',
+  'staging_legacy_customer_records',
+  'staging_legacy_order_records',
+  'staging_legacy_support_records',
+  'staging_legacy_billing_invoice_records',
+  'staging_legacy_billing_item_records',
+  'staging_legacy_billing_payment_records',
+  'staging_legacy_billing_collection_records',
+] as const
+
+async function countBatchRowsStrict(tableName: string, batchId: number) {
+  const { rows, error, disabled } = await runReviewDbQueryWithError<CountRow>(
+    `
+      SELECT COUNT(*) AS total
+      FROM ${tableName}
+      WHERE batch_id = ?
+      LIMIT 1
+    `,
+    [batchId],
+  )
+
+  if (disabled) {
+    throw new Error('Transform batch hanya aktif saat review DB benar-benar tersedia.')
+  }
+  if (error) {
+    throw new Error(`Tidak bisa verifikasi ODP-only batch karena query gagal pada ${tableName}.`)
+  }
+
+  return Number(rows[0]?.total ?? 0)
+}
+
+export async function preflightOdpOnlyImportBatch(batchId: string): Promise<OdpOnlyPreflightResult> {
+  const batch = await getImportBatchLookup(batchId)
+  if (!batch) {
+    throw new Error('Batch tidak ditemukan.')
+  }
+
+  const scope = batch.importScope?.trim().toUpperCase()
+  if (scope !== ODP_ONLY_REQUIRED_SCOPE) {
+    throw new Error('Stage 05 membutuhkan batch INVENTORY khusus ODP-only.')
+  }
+
+  const odpRows = await countBatchRowsStrict(ODP_ONLY_TABLE, batch.id)
+  if (odpRows <= 0) {
+    throw new Error('Stage 05 membutuhkan batch INVENTORY dengan staging ODP > 0.')
+  }
+
+  const nonOdpCounts: Record<string, number> = {}
+  for (const tableName of ODP_ONLY_NON_ODP_TABLES) {
+    const total = await countBatchRowsStrict(tableName, batch.id)
+    if (total > 0) {
+      nonOdpCounts[tableName] = total
+    }
+  }
+
+  if (Object.keys(nonOdpCounts).length > 0) {
+    const detail = Object.entries(nonOdpCounts)
+      .map(([table, total]) => `${table}=${total}`)
+      .join(', ')
+    throw new Error(
+      `Stage 05 membutuhkan batch INVENTORY ODP-only; stage 01–04 bersifat cumulative. Non-ODP staging rows terdeteksi: ${detail}`,
+    )
+  }
+
+  return {
+    batchPk: batch.id,
+    batchCode: batch.batchCode,
+    odpRows,
+    nonOdpCounts,
+  }
 }
 
 async function countTableRows(tableName: string, batchId: number, status?: string) {
@@ -617,10 +749,7 @@ async function executeTransformSqlUpTo(
   batchPk: number,
   stage: TransformStage,
 ) {
-  const stageOrder = (['01', '02', '03', '04'] as TransformStage[]).slice(
-    0,
-    ['01', '02', '03', '04'].indexOf(stage) + 1
-  )
+  const stageOrder = TRANSFORM_STAGE_ORDER.slice(0, TRANSFORM_STAGE_ORDER.indexOf(stage) + 1)
   let executedStatements = 0
 
   for (const currentStage of stageOrder) {
@@ -982,7 +1111,7 @@ export async function retryImportBatch(
     )
     const failedStage = (lastFailed as unknown as { stage?: string }[] | undefined)?.[0]?.stage
     targetStage =
-      failedStage && ['01', '02', '03', '04'].includes(failedStage)
+      failedStage && (TRANSFORM_STAGE_ORDER as readonly string[]).includes(failedStage)
         ? (failedStage as TransformStage)
         : '01'
   }
@@ -999,6 +1128,14 @@ export async function retryImportBatch(
     // Histori aksi tidak boleh memblokir retry utama
   }
 
-  const transform = await transformImportBatch(batchId, targetStage, actor)
+  const hooks = globalThis.__perkasaImportWriteServiceHooks
+  const preflight = hooks?.preflightOdpOnlyImportBatch ?? preflightOdpOnlyImportBatch
+  const transformFn = hooks?.transformImportBatch ?? transformImportBatch
+
+  if (targetStage === '05') {
+    await preflight(batchId)
+  }
+
+  const transform = (await transformFn(batchId, targetStage, actor)) as TransformResult
   return { mode: 'transform', ...transform }
 }

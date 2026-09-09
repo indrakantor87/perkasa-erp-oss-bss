@@ -25,6 +25,7 @@ WORKDIR /app/apps/web
 
 COPY --from=deps /app/apps/web/node_modules ./node_modules
 COPY apps/web ./
+COPY database/xampp_review_transform_stage_*.sql /app/database/
 
 RUN /bin/bash -eo pipefail -c '\
   echo "=== [1/3 builder] Start next build ==="; \
@@ -74,6 +75,7 @@ ENV HOSTNAME=0.0.0.0
 
 WORKDIR /app/apps/web/standalone
 COPY --from=builder /app/apps/web/.next/standalone/ /app/apps/web/standalone/
+COPY --from=builder /app/database/ /app/apps/web/database/
 
 RUN echo "=== Runner post-copy verification ===" \
  && test -f "/app/apps/web/standalone/server.js"          && echo "  ✓ server.js" \
@@ -82,6 +84,11 @@ RUN echo "=== Runner post-copy verification ===" \
  && test -d "/app/apps/web/standalone/node_modules/mysql2" && echo "  ✓ node_modules/mysql2" \
  && test -d "/app/apps/web/standalone/.next/static"       && echo "  ✓ .next/static" \
  && test -d "/app/apps/web/standalone/public"             && echo "  ✓ public" \
+ && test -f "/app/apps/web/database/xampp_review_transform_stage_1.sql" && echo "  ✓ stage_01.sql" \
+ && test -f "/app/apps/web/database/xampp_review_transform_stage_2.sql" && echo "  ✓ stage_02.sql" \
+ && test -f "/app/apps/web/database/xampp_review_transform_stage_3.sql" && echo "  ✓ stage_03.sql" \
+ && test -f "/app/apps/web/database/xampp_review_transform_stage_4.sql" && echo "  ✓ stage_04.sql" \
+ && test -f "/app/apps/web/database/xampp_review_transform_stage_5.sql" && echo "  ✓ stage_05.sql" \
  && node -e "const path=require('node:path');const {createRequire}=require('module');const entry=path.resolve('./migrate-phase-1-1-odp.js');const req=createRequire(entry);req('mysql2/promise');console.log('  ✓ mysql2/promise resolves');" \
  && echo "=== All runner checks passed ==="
 
