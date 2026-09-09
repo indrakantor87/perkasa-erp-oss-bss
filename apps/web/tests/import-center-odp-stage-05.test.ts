@@ -2,7 +2,7 @@ import { describe, it, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { preflightOdpOnlyImportBatch, TRANSFORM_STAGE_ORDER } from '../lib/services/import-write-service'
+import { preflightOdpOnlyImportBatch, retryImportBatch, TRANSFORM_STAGE_ORDER } from '../lib/services/import-write-service'
 
 async function readStage5Sql() {
   const url = new URL('../../../database/xampp_review_transform_stage_5.sql', import.meta.url)
@@ -69,6 +69,8 @@ describe('Import Center Stage 05 (ODP) integration', () => {
   afterEach(() => {
     // @ts-expect-error test cleanup
     delete globalThis.__perkasaReviewDbPool
+    ;(globalThis as unknown as { __perkasaImportWriteServiceHooks?: unknown }).__perkasaImportWriteServiceHooks =
+      undefined
   })
 
   it('stage order includes 05', () => {
@@ -254,4 +256,196 @@ describe('Import Center Stage 05 (ODP) integration', () => {
       (err: Error) => String(err.message).includes('query gagal'),
     )
   })
+
+  it('retry stage 01–04 does not call ODP-only preflight', async () => {
+    const calls: string[] = []
+    ;(globalThis as unknown as { __perkasaImportWriteServiceHooks?: unknown }).__perkasaImportWriteServiceHooks =
+      {
+        preflightOdpOnlyImportBatch: async () => {
+          calls.push('preflight')
+        },
+        transformImportBatch: async () => {
+          calls.push('transform')
+          return {
+            batchId: 10,
+            batchCode: 'BATCH-ODP-001',
+            stage: '04',
+            executedStatements: 0,
+            status: 'VALIDATED',
+            totalRows: 1,
+            validRows: 1,
+            invalidRows: 0,
+            importedRows: 0,
+            skippedRows: 0,
+            duplicateRows: 0,
+          }
+        },
+      }
+
+    const pool = createRetryMockPool({
+      batchRow: { id: 10, batchCode: 'BATCH-ODP-001', importScope: 'INVENTORY', status: 'VALIDATED', note: null },
+      failedStage: null,
+      counts: {
+        staging_legacy_network_odp_records: { total: 1, VALID: 1 },
+      },
+    })
+    // @ts-expect-error test hook
+    globalThis.__perkasaReviewDbPool = Promise.resolve(pool)
+
+    const result = await retryImportBatch('10', 'Tester', '04')
+    assert.equal(result.mode, 'transform')
+    assert.deepEqual(calls, ['transform'])
+  })
+
+  it('retry stage 05 calls ODP-only preflight before transform', async () => {
+    const calls: string[] = []
+    ;(globalThis as unknown as { __perkasaImportWriteServiceHooks?: unknown }).__perkasaImportWriteServiceHooks =
+      {
+        preflightOdpOnlyImportBatch: async () => {
+          calls.push('preflight')
+        },
+        transformImportBatch: async () => {
+          calls.push('transform')
+          return {
+            batchId: 10,
+            batchCode: 'BATCH-ODP-001',
+            stage: '05',
+            executedStatements: 0,
+            status: 'VALIDATED',
+            totalRows: 1,
+            validRows: 1,
+            invalidRows: 0,
+            importedRows: 0,
+            skippedRows: 0,
+            duplicateRows: 0,
+          }
+        },
+      }
+
+    const pool = createRetryMockPool({
+      batchRow: { id: 10, batchCode: 'BATCH-ODP-001', importScope: 'INVENTORY', status: 'VALIDATED', note: null },
+      failedStage: '05',
+      counts: {
+        staging_legacy_network_odp_records: { total: 1, VALID: 1 },
+      },
+    })
+    // @ts-expect-error test hook
+    globalThis.__perkasaReviewDbPool = Promise.resolve(pool)
+
+    const result = await retryImportBatch('10', 'Tester')
+    assert.equal(result.mode, 'transform')
+    assert.deepEqual(calls, ['preflight', 'transform'])
+  })
+
+  it('retry stage 05 blocks when preflight fails', async () => {
+    const calls: string[] = []
+    ;(globalThis as unknown as { __perkasaImportWriteServiceHooks?: unknown }).__perkasaImportWriteServiceHooks =
+      {
+        preflightOdpOnlyImportBatch: async () => {
+          calls.push('preflight')
+          throw new Error('BLOCKED_PREFLIGHT')
+        },
+        transformImportBatch: async () => {
+          calls.push('transform')
+          return {}
+        },
+      }
+
+    const pool = createRetryMockPool({
+      batchRow: { id: 10, batchCode: 'BATCH-ODP-001', importScope: 'INVENTORY', status: 'VALIDATED', note: null },
+      failedStage: '05',
+      counts: {
+        staging_legacy_network_odp_records: { total: 1, VALID: 1 },
+      },
+    })
+    // @ts-expect-error test hook
+    globalThis.__perkasaReviewDbPool = Promise.resolve(pool)
+
+    await assert.rejects(
+      () => retryImportBatch('10', 'Tester'),
+      (err: Error) => String(err.message).includes('BLOCKED_PREFLIGHT'),
+    )
+    assert.deepEqual(calls, ['preflight'])
+  })
+
+  it('retry stage 05 blocks on preflight query error (fail-closed)', async () => {
+    const calls: string[] = []
+    ;(globalThis as unknown as { __perkasaImportWriteServiceHooks?: unknown }).__perkasaImportWriteServiceHooks =
+      {
+        transformImportBatch: async () => {
+          calls.push('transform')
+          return {}
+        },
+      }
+
+    const pool = createRetryMockPool({
+      batchRow: { id: 10, batchCode: 'BATCH-ODP-001', importScope: 'INVENTORY', status: 'VALIDATED', note: null },
+      failedStage: '05',
+      counts: {
+        staging_legacy_network_odp_records: { total: 1, VALID: 1 },
+      },
+      throwOnTable: 'staging_legacy_support_records',
+    })
+    // @ts-expect-error test hook
+    globalThis.__perkasaReviewDbPool = Promise.resolve(pool)
+
+    await assert.rejects(
+      () => retryImportBatch('10', 'Tester'),
+      (err: Error) => String(err.message).includes('query gagal'),
+    )
+    assert.deepEqual(calls, [])
+  })
 })
+
+function createRetryMockPool(params: {
+  batchRow: { id: number; batchCode: string; importScope: string; status: string; note: string | null }
+  failedStage: string | null
+  counts: Record<string, { total: number; VALID?: number; INVALID?: number; IMPORTED?: number; SKIPPED?: number; duplicate?: number }>
+  throwOnTable?: string
+}) {
+  return {
+    query: async (sql: string, values?: unknown[]): Promise<[unknown[], unknown]> => {
+      const normalized = String(sql).replace(/\s+/g, ' ').trim()
+
+      if (normalized.includes('FROM staging_import_batches')) {
+        return [[params.batchRow], {}]
+      }
+
+      if (normalized.includes('FROM staging_import_batch_transform_runs')) {
+        if (normalized.includes("run_status = 'RUNNING'")) {
+          return [[{ runningCount: 0 }], {}]
+        }
+        if (normalized.includes("run_status = 'FAILED'")) {
+          return [[{ stage: params.failedStage }], {}]
+        }
+        return [[{ total: 0 }], {}]
+      }
+
+      const match = normalized.match(/\bFROM\s+([a-zA-Z0-9_]+)/i)
+      const table = match?.[1]
+      if (table && params.throwOnTable && table === params.throwOnTable) {
+        throw new Error('SIMULATED_QUERY_ERROR')
+      }
+
+      if (table && Object.prototype.hasOwnProperty.call(params.counts, table)) {
+        const meta = params.counts[table]
+        if (normalized.includes('COUNT(DISTINCT')) {
+          return [[{ total: meta.duplicate ?? 0 }], {}]
+        }
+        if (normalized.includes('COUNT(*) AS total')) {
+          const status = typeof values?.[1] === 'string' ? String(values?.[1]) : null
+          if (!status) {
+            return [[{ total: meta.total }], {}]
+          }
+          return [[{ total: (meta as Record<string, number | undefined>)[status] ?? 0 }], {}]
+        }
+      }
+
+      if (/^(CREATE|ALTER|INSERT|UPDATE|DELETE)\b/i.test(normalized)) {
+        return [[{ affectedRows: 1, insertId: 1 }], {}]
+      }
+
+      return [[{ total: 0 }], {}]
+    },
+  }
+}

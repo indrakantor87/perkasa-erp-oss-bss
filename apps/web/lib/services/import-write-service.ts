@@ -9,6 +9,19 @@ import {
 } from '@/lib/review-db'
 import type { ImportBatchAction, ImportBatchTransformRun } from '@/lib/types'
 
+declare global {
+  var __perkasaImportWriteServiceHooks:
+    | {
+        preflightOdpOnlyImportBatch?: (batchId: string) => Promise<unknown>
+        transformImportBatch?: (
+          batchId: string,
+          stage: TransformStage,
+          actor: string
+        ) => Promise<unknown>
+      }
+    | undefined
+}
+
 type BatchLookup = {
   id: number
   batchCode: string
@@ -1115,6 +1128,14 @@ export async function retryImportBatch(
     // Histori aksi tidak boleh memblokir retry utama
   }
 
-  const transform = await transformImportBatch(batchId, targetStage, actor)
+  const hooks = globalThis.__perkasaImportWriteServiceHooks
+  const preflight = hooks?.preflightOdpOnlyImportBatch ?? preflightOdpOnlyImportBatch
+  const transformFn = hooks?.transformImportBatch ?? transformImportBatch
+
+  if (targetStage === '05') {
+    await preflight(batchId)
+  }
+
+  const transform = (await transformFn(batchId, targetStage, actor)) as TransformResult
   return { mode: 'transform', ...transform }
 }
