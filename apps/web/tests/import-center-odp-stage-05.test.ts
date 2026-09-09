@@ -24,6 +24,11 @@ async function readTransformRouteSource() {
   return readFile(fileURLToPath(url), 'utf8')
 }
 
+async function readPreflightRouteSource() {
+  const url = new URL('../app/api/import/batches/[id]/preflight/route.ts', import.meta.url)
+  return readFile(fileURLToPath(url), 'utf8')
+}
+
 function splitSqlStatements(sql: string) {
   const cleaned = sql
     .split(/\r?\n/)
@@ -164,6 +169,13 @@ describe('Import Center Stage 05 (ODP) integration', () => {
     assert.ok(idxPreflight < idxTransform, 'Preflight must happen before transformImportBatch.')
 
     assert.ok(src.includes("if (stage === '05')"), 'Preflight must be conditional for stage 05.')
+  })
+
+  it('preflight endpoint exists for stage 05 and does not execute transform', async () => {
+    const src = await readPreflightRouteSource()
+    assert.ok(src.includes('preflightOdpOnlyImportBatch'))
+    assert.ok(!src.includes('transformImportBatch'))
+    assert.ok(src.includes("stage !== '05'"))
   })
 
   it('ODP-only preflight allows INVENTORY + odp>0 + all non-ODP=0', async () => {
