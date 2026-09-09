@@ -4,10 +4,17 @@ import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import {
   getImportWriteErrorMessage,
+  preflightOdpOnlyImportBatch,
+  TRANSFORM_STAGE_ORDER,
+  type TransformStage,
   transformImportBatch,
 } from '@/lib/services/import-write-service'
 
-const allowedStages = new Set(['01', '02', '03', '04'])
+const allowedStages = new Set(TRANSFORM_STAGE_ORDER)
+
+function isTransformStage(value: string): value is TransformStage {
+  return allowedStages.has(value as TransformStage)
+}
 
 export async function POST(
   request: Request,
@@ -32,15 +39,21 @@ export async function POST(
   try {
     const { id } = await params
     const payload = (await request.json()) as { stage?: unknown }
-    const stage = String(payload.stage ?? '').trim().padStart(2, '0')
+    const rawStage = String(payload.stage ?? '').trim().padStart(2, '0')
 
-    if (!allowedStages.has(stage)) {
+    if (!isTransformStage(rawStage)) {
       return NextResponse.json({ message: 'Stage transform tidak valid.' }, { status: 400 })
+    }
+
+    const stage = rawStage
+
+    if (stage === '05') {
+      await preflightOdpOnlyImportBatch(id)
     }
 
     const result = await transformImportBatch(
       id,
-      stage as '01' | '02' | '03' | '04',
+      stage,
       `${session.displayName} (${session.username})`
     )
 
