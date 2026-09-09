@@ -1,6 +1,11 @@
 name: Verify Stage 05 Docker Packaging (No Push)
 
 on:
+  push:
+    branches:
+      - verify/stage-05-docker-packaging
+    paths:
+      - .github/workflows/verify-stage-05-docker.yml
   workflow_dispatch:
 
 env:
