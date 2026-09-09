@@ -34,9 +34,21 @@ const transformStages = [
     title: 'Tahap 4',
     detail: 'Billing, payment, collection',
   },
+  {
+    stage: '05',
+    title: 'Tahap 5',
+    detail: 'Memproses batch ODP-only untuk membentuk network_odp dan network_odp_ports.',
+  },
 ] as const
 
-type ActionStage = (typeof transformStages)[number]['stage']
+type TransformStageItem = (typeof transformStages)[number]
+type ActionStage = TransformStageItem['stage']
+type RetryStage = Exclude<ActionStage, '05'>
+type RetryStageItem = Exclude<TransformStageItem, { stage: '05' }>
+
+function isRetryStageItem(item: TransformStageItem): item is RetryStageItem {
+  return item.stage !== '05'
+}
 
 function resolveRowDomain(row: BatchDetail['rows'][number]) {
   const target = row.targetId.trim().toLowerCase()
@@ -168,6 +180,13 @@ export function ImportBatchActionPanel({
     null
   )
 
+  const visibleTransformStages =
+    batch.scope === 'INVENTORY'
+      ? transformStages
+      : transformStages.filter((item) => item.stage !== '05')
+
+  const retryStages = transformStages.filter(isRetryStageItem)
+
   const validationDisabled = !canApprove || !reviewDbReady || busyAction !== null
   const transformDisabled =
     !canApprove ||
@@ -208,7 +227,7 @@ export function ImportBatchActionPanel({
     }
   }
 
-  async function runTransform(stage: (typeof transformStages)[number]['stage']) {
+  async function runTransform(stage: ActionStage) {
     if (transformDisabled) return
 
     setBusyAction(`transform-${stage}`)
@@ -242,7 +261,7 @@ export function ImportBatchActionPanel({
     }
   }
 
-  async function runRetry(targetStage?: (typeof transformStages)[number]['stage']) {
+  async function runRetry(targetStage?: RetryStage) {
     if (retryDisabled) return
 
     setBusyAction(targetStage ? `retry-${targetStage}` : 'retry-auto')
@@ -350,7 +369,7 @@ export function ImportBatchActionPanel({
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-2">
-        {transformStages.map((item) => (
+        {visibleTransformStages.map((item) => (
           <button
             key={item.stage}
             type="button"
@@ -394,7 +413,7 @@ export function ImportBatchActionPanel({
             </button>
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {transformStages.map((item) => (
+            {retryStages.map((item) => (
               <button
                 key={item.stage}
                 type="button"
