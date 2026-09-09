@@ -51,7 +51,7 @@ jobs:
           docker run --rm --entrypoint sh "$IMAGE" -lc "set -eu;
             ls -la /app/apps/web/database/;
             for f in 1 2 3 4 5; do
-              test -f /app/apps/web/database/xampp_review_transform_stage_${f}.sql;
+              test -f /app/apps/web/database/xampp_review_transform_stage_\${f}.sql;
             done;
             echo 'OK: stage_01..05 exist'"
 
