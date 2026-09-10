@@ -1,0 +1,405 @@
+name: Backup Production DB Coolify -> GitHub Artifact (Manual-Only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_manual_only:
+        description: "Must equal: I_CONFIRM_MANUAL_DISPATCH_ONLY"
+        required: true
+        type: string
+      confirm_no_mutation:
+        description: "Must equal: NO_SQL_NO_MIGRATION_NO_DROP_NO_MOVE"
+        required: true
+        type: string
+
+concurrency:
+  group: backup-production-to-github-manual-only
+  cancel-in-progress: false
+
+jobs:
+  transfer-backup-and-verify:
+    name: Transfer Production Backup + SHA-256 Verify + Upload Artifact (Read-Only, No SQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
+
+    env:
+      SOURCE_BACKUP_PATH: "/root/perkasa_erp_production_backup_20260910.sql"
+      EXPECTED_SHA256: "c2f7392b27fcbfe40a39377c6622e565a58dd09195035fbd4eea7fd7041f6249"
+      ARTIFACT_NAME: "perkasa-erp-production-backup-20260910"
+      ARTIFACT_RETENTION_DAYS: 90
+      LOCAL_WORKDIR: "${{ github.workspace }}/backup-staging"
+      LOCAL_BACKUP_FILE: "perkasa_erp_production_backup_20260910.sql"
+
+    steps:
+      - name: 01 Human Gate — Manual Dispatch + No Mutation Contract
+        env:
+          CONFIRM_MANUAL: ${{ github.event.inputs.confirm_manual_only }}
+          CONFIRM_NO_MUTATION: ${{ github.event.inputs.confirm_no_mutation }}
+        run: |
+          set -euo pipefail
+
+          if [ "$CONFIRM_MANUAL" != "I_CONFIRM_MANUAL_DISPATCH_ONLY" ]; then
+            echo "FATAL: confirm_manual_only mismatch"
+            exit 2
+          fi
+
+          if [ "$CONFIRM_NO_MUTATION" != "NO_SQL_NO_MIGRATION_NO_DROP_NO_MOVE" ]; then
+            echo "FATAL: confirm_no_mutation mismatch"
+            exit 2
+          fi
+
+          echo "HUMAN GATE PASS"
+          echo "SCOPE LOCKED: NO SQL / NO MIGRATION / NO DROP / NO MOVE SOURCE FILE"
+
+      - name: 02 Secret Length Preflight + Install SSH Key (NO remote execution yet)
+        id: install-ssh-key
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER }}
+          KEY: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.COOLIFY_SERVER_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          H_LEN=$(printf '%s' "$HOST" | wc -c | tr -d ' ')
+          U_LEN=$(printf '%s' "${USER:-root}" | wc -c | tr -d ' ')
+          K_LEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
+          KH_LEN=$(printf '%s' "$KNOWN_HOSTS" | wc -c | tr -d ' ')
+
+          echo "COOLIFY HOST len=$H_LEN"
+          echo "COOLIFY USER len=$U_LEN (fallback=root)"
+          echo "COOLIFY SSH KEY len=$K_LEN"
+          echo "COOLIFY_SERVER_SSH_KNOWN_HOSTS len=$KH_LEN"
+
+          BLOCKED=0
+
+          if [ "$H_LEN" -lt 5 ]; then
+            echo "BLOCKER: COOLIFY_SERVER_HOST secret empty or too short (< 5 chars)"
+            BLOCKED=1
+          fi
+          if [ "$K_LEN" -lt 100 ]; then
+            echo "BLOCKER: COOLIFY_SERVER_SSH_PRIVATE_KEY secret empty or too short (< 100 chars)"
+            BLOCKED=1
+          fi
+          if [ "$KH_LEN" -lt 40 ]; then
+            echo "BLOCKER: COOLIFY_SERVER_SSH_KNOWN_HOSTS secret empty or too short (< 40 chars)"
+            BLOCKED=1
+          fi
+
+          if [ "$BLOCKED" -ne 0 ]; then
+            echo ""
+            echo "=============================================="
+            echo "SECRET CONTRACT BLOCKER - TRANSFER HALTED SAFELY"
+            echo "REQUIRED repository secrets:"
+            echo "  - COOLIFY_SERVER_HOST"
+            echo "  - COOLIFY_SERVER_USER (optional fallback root)"
+            echo "  - COOLIFY_SERVER_SSH_PRIVATE_KEY"
+            echo "  - COOLIFY_SERVER_SSH_KNOWN_HOSTS"
+            echo "=============================================="
+            exit 13
+          fi
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          KEY_FILE="$HOME/.ssh/id_ed25519_erpbackup"
+          printf '%s' "$KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+
+          KEY_FINAL_LEN=$(wc -c < "$KEY_FILE" | tr -d ' ')
+          echo "SSH KEY written ($KEY_FINAL_LEN bytes)"
+          if [ "$KEY_FINAL_LEN" -lt 150 ]; then
+            echo "FATAL: SSH key file too short ($KEY_FINAL_LEN bytes). Secret malformed."
+            exit 14
+          fi
+
+          echo "ssh_key_file=$KEY_FILE" >> "$GITHUB_OUTPUT"
+          echo "ssh_user=${USER:-root}" >> "$GITHUB_OUTPUT"
+          echo "ssh_host=$HOST" >> "$GITHUB_OUTPUT"
+
+      - name: 03 SSH Known Hosts Preflight + Connectivity Test (hostname only — NO mutation)
+        id: ssh-test
+        env:
+          KEY_FILE: ${{ steps.install-ssh-key.outputs.ssh_key_file }}
+          FINAL_USER: ${{ steps.install-ssh-key.outputs.ssh_user }}
+          HOST: ${{ steps.install-ssh-key.outputs.ssh_host }}
+          KNOWN_HOSTS: ${{ secrets.COOLIFY_SERVER_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          KH_LEN=$(printf '%s' "$KNOWN_HOSTS" | wc -c | tr -d ' ')
+          if [ "$KH_LEN" -lt 40 ]; then
+            echo "FATAL: COOLIFY_SERVER_SSH_KNOWN_HOSTS too short or empty."
+            exit 16
+          fi
+
+          KNOWN_HOSTS_FILE="$(mktemp /tmp/erp_backup_known_hosts.XXXXXX)"
+          cleanup() { rm -f "$KNOWN_HOSTS_FILE"; }
+          trap cleanup EXIT
+          printf '%s\n' "$KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
+          chmod 600 "$KNOWN_HOSTS_FILE"
+
+          set +e
+          OUT=$(ssh -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            -o ConnectTimeout=25 \
+            -o BatchMode=yes \
+            -o ServerAliveInterval=20 \
+            "$FINAL_USER@$HOST" \
+            "hostname && date '+%Y-%m-%d %H:%M:%S %Z' && whoami && echo ERP_BACKUP_SSH_OK" 2>&1)
+          RC=$?
+          set -e
+
+          echo "$OUT"
+          echo "RC=$RC"
+          if [ $RC -ne 0 ] || ! echo "$OUT" | grep -q "ERP_BACKUP_SSH_OK"; then
+            echo "SSH connectivity FAIL."
+            exit 15
+          fi
+          echo "SSH Test Gate PASS"
+
+          echo "known_hosts_file=$KNOWN_HOSTS_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: 04 Verify Source Backup EXISTS on Server + Metadata Only (NO download, NO mutation)
+        id: source-meta
+        env:
+          KEY_FILE: ${{ steps.install-ssh-key.outputs.ssh_key_file }}
+          FINAL_USER: ${{ steps.install-ssh-key.outputs.ssh_user }}
+          HOST: ${{ steps.install-ssh-key.outputs.ssh_host }}
+          KNOWN_HOSTS: ${{ secrets.COOLIFY_SERVER_SSH_KNOWN_HOSTS }}
+          SOURCE_PATH: ${{ env.SOURCE_BACKUP_PATH }}
+        run: |
+          set -euo pipefail
+
+          KNOWN_HOSTS_FILE="$(mktemp /tmp/erp_backup_known_hosts.XXXXXX)"
+          cleanup() { rm -f "$KNOWN_HOSTS_FILE"; }
+          trap cleanup EXIT
+          printf '%s\n' "$KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
+          chmod 600 "$KNOWN_HOSTS_FILE"
+
+          echo "Inspecting SOURCE backup metadata at $SOURCE_PATH"
+          echo ""
+          echo "=== SERVER METADATA (ls -la + sha256sum SOURCE) ==="
+          set +e
+          OUT=$(ssh -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            -o ConnectTimeout=25 \
+            -o BatchMode=yes \
+            -o ServerAliveInterval=20 \
+            "$FINAL_USER@$HOST" \
+            "
+              set -euo pipefail
+              PATH_RW=\"$SOURCE_PATH\"
+              if [ ! -f \"\$PATH_RW\" ]; then
+                echo 'SOURCE_FILE_MISSING'
+                exit 61
+              fi
+              ls -la \"\$PATH_RW\"
+              sha256sum \"\$PATH_RW\"
+              stat -c 'SIZE_BYTES=%s|MTIME_UTC=%y|INODE=%i' \"\$PATH_RW\"
+              echo 'SOURCE_FILE_PRESENT'
+            " 2>&1)
+          RC=$?
+          set -e
+
+          echo "$OUT"
+          echo "RC=$RC"
+          if [ $RC -ne 0 ]; then
+            echo "FATAL: Source file missing or server command failure (RC=$RC)."
+            exit 60
+          fi
+          if ! echo "$OUT" | grep -q "SOURCE_FILE_PRESENT"; then
+            echo "FATAL: SOURCE_FILE_PRESENT marker absent."
+            exit 62
+          fi
+
+          SRC_SHA_INLINE=$(echo "$OUT" | awk '{print $1}' | grep -E '^[0-9a-fA-F]{64}$' | head -n1)
+          SRC_SIZE_BYTES=$(echo "$OUT" | sed -n 's/^SIZE_BYTES=\([0-9]*\)|.*/\1/p' | tr -d '\n')
+          SRC_MTIME_UTC=$(echo "$OUT" | sed -n 's/.*MTIME_UTC=\([^|]*\)|INODE.*/\1/p' | tr -d '\n')
+
+          if [ -z "${SRC_SIZE_BYTES:-}" ]; then
+            echo "FATAL: Unable to parse SIZE_BYTES from server stat."
+            exit 63
+          fi
+          if [ "$SRC_SIZE_BYTES" -lt 1000 ]; then
+            echo "FATAL: Source backup smaller than 1KB ($SRC_SIZE_BYTES bytes). Likely invalid."
+            exit 64
+          fi
+
+          echo "source_sha256_server_side=$SRC_SHA_INLINE" >> "$GITHUB_OUTPUT"
+          echo "source_size_bytes=$SRC_SIZE_BYTES" >> "$GITHUB_OUTPUT"
+          echo "source_mtime_utc=$SRC_MTIME_UTC" >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "Server-side metadata PASS: file exists, size sensible."
+
+      - name: 05 Transfer Backup via SCP (COPY only — server source file UNTOUCHED)
+        id: transfer
+        env:
+          KEY_FILE: ${{ steps.install-ssh-key.outputs.ssh_key_file }}
+          FINAL_USER: ${{ steps.install-ssh-key.outputs.ssh_user }}
+          HOST: ${{ steps.install-ssh-key.outputs.ssh_host }}
+          KNOWN_HOSTS: ${{ secrets.COOLIFY_SERVER_SSH_KNOWN_HOSTS }}
+          SOURCE_PATH: ${{ env.SOURCE_BACKUP_PATH }}
+          WORKDIR: ${{ env.LOCAL_WORKDIR }}
+          TARGET_BASENAME: ${{ env.LOCAL_BACKUP_FILE }}
+        run: |
+          set -euo pipefail
+
+          KNOWN_HOSTS_FILE="$(mktemp /tmp/erp_backup_known_hosts.XXXXXX)"
+          cleanup() { rm -f "$KNOWN_HOSTS_FILE"; }
+          trap cleanup EXIT
+          printf '%s\n' "$KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
+          chmod 600 "$KNOWN_HOSTS_FILE"
+
+          mkdir -p "$WORKDIR"
+          chmod 700 "$WORKDIR"
+          TARGET_FULL="$WORKDIR/$TARGET_BASENAME"
+
+          echo "Begin SCP transfer (server source path UNTOUCHED):"
+          echo "  user@host:  $FINAL_USER@$HOST"
+          echo "  source:     $SOURCE_PATH"
+          echo "  local dest: $TARGET_FULL"
+          echo ""
+
+          set +e
+          scp -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            -o ConnectTimeout=25 \
+            -o BatchMode=yes \
+            -o ServerAliveInterval=20 \
+            "$FINAL_USER@$HOST:$SOURCE_PATH" \
+            "$TARGET_FULL" 2>&1
+          RC=$?
+          set -e
+
+          echo "SCP RC=$RC"
+          if [ $RC -ne 0 ]; then
+            echo "FATAL: SCP transfer failed (RC=$RC)."
+            exit 70
+          fi
+          if [ ! -f "$TARGET_FULL" ]; then
+            echo "FATAL: Target local file missing after SCP."
+            exit 71
+          fi
+
+          LOCAL_SIZE=$(wc -c < "$TARGET_FULL" | tr -d ' ')
+          SERVER_SIZE="${{ steps.source-meta.outputs.source_size_bytes }}"
+          if [ "$LOCAL_SIZE" -ne "$SERVER_SIZE" ]; then
+            echo "FATAL: Size mismatch after transfer. local=$LOCAL_SIZE vs server=$SERVER_SIZE."
+            exit 72
+          fi
+
+          chmod 600 "$TARGET_FULL"
+          echo "local_target_path=$TARGET_FULL" >> "$GITHUB_OUTPUT"
+          echo "local_size_bytes=$LOCAL_SIZE" >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "Transfer PASS: local size matches server size ($LOCAL_SIZE bytes)."
+
+      - name: 06 SHA-256 Integrity Verify (FAIL IF DIFFERENT — NO artifact upload)
+        id: verify
+        env:
+          EXPECTED: ${{ env.EXPECTED_SHA256 }}
+          TARGET_FULL: ${{ steps.transfer.outputs.local_target_path }}
+          SERVER_SHA: ${{ steps.source-meta.outputs.source_sha256_server_side }}
+        run: |
+          set -euo pipefail
+
+          ACTUAL=$(sha256sum "$TARGET_FULL" | awk '{print $1}')
+
+          echo ""
+          echo "=== SHA-256 INTEGRITY CHECK ==="
+          echo "Server (server-side sha256sum):   ${SERVER_SHA:-(unknown or not reported)}"
+          echo "Expected (pinned in workflow):    $EXPECTED"
+          echo "Actual   (local runner sha256sum): $ACTUAL"
+          echo ""
+
+          MATCH_EXPECTED=0
+          MATCH_SERVER=0
+
+          if [ "$ACTUAL" = "$EXPECTED" ]; then
+            MATCH_EXPECTED=1
+          fi
+          if [ -n "${SERVER_SHA:-}" ] && [ "$ACTUAL" = "$SERVER_SHA" ]; then
+            MATCH_SERVER=1
+          fi
+
+          if [ $MATCH_EXPECTED -ne 1 ]; then
+            echo ""
+            echo "FATAL: SHA-256 MISMATCH against pinned expected value."
+            echo "       Workflow policy: HALT. DO NOT upload artifact."
+            echo ""
+            exit 80
+          fi
+          if [ -n "${SERVER_SHA:-}" ] && [ $MATCH_SERVER -ne 1 ]; then
+            echo ""
+            echo "WARNING: Actual vs server-side SHA not equal (server parsing may be off)."
+            echo "         (Pinned expected MATCHED; proceeding with caution.)"
+            echo ""
+          fi
+
+          HUMAN_SIZE=$(du -h "$TARGET_FULL" | awk '{print $1}')
+          echo "sha256_actual=$ACTUAL" >> "$GITHUB_OUTPUT"
+          echo "sha256_match=YES" >> "$GITHUB_OUTPUT"
+          echo "human_size=$HUMAN_SIZE" >> "$GITHUB_OUTPUT"
+
+          echo ""
+          echo "SHA-256 Integrity PASS: actual == pinned expected ($ACTUAL)."
+          echo "Size (human-readable): $HUMAN_SIZE"
+          echo ""
+          echo "SAFETY: DO NOT print SQL contents. File accessible only via private artifact link after upload."
+          echo ""
+
+      - name: 07 Upload GitHub Actions PRIVATE Artifact (retention 90 days explicit)
+        if: success()
+        id: upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ steps.transfer.outputs.local_target_path }}
+          retention-days: 90
+          if-no-files-found: error
+          overwrite: false
+          compression-level: 6
+
+      - name: 08 Final Report (metadata only — NO secret values, NO SQL content)
+        if: always()
+        env:
+          REPORT_SOURCE_PATH: ${{ env.SOURCE_BACKUP_PATH }}
+          REPORT_ARTIFACT_NAME: ${{ env.ARTIFACT_NAME }}
+          REPORT_RETENTION: ${{ env.ARTIFACT_RETENTION_DAYS }} days
+          REPORT_SHA: ${{ steps.verify.outputs.sha256_actual || 'NOT_COMPUTED (prior step failed)' }}
+          REPORT_SIZE_HUMAN: ${{ steps.verify.outputs.human_size || 'UNKNOWN' }}
+          REPORT_SIZE_BYTES: ${{ steps.transfer.outputs.local_size_bytes || steps.source-meta.outputs.source_size_bytes || 'UNKNOWN' }}
+        run: |
+          set -euo pipefail
+
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          echo ""
+          echo "============================================================"
+          echo "PRODUCTION BACKUP COOLIFY -> GITHUB ARTIFACT — FINAL REPORT"
+          echo "============================================================"
+          echo ""
+          echo "  source path:       $REPORT_SOURCE_PATH"
+          echo "  file size:         $REPORT_SIZE_HUMAN  ($REPORT_SIZE_BYTES bytes)"
+          echo "  SHA-256:           $REPORT_SHA"
+          echo "  artifact name:     $REPORT_ARTIFACT_NAME"
+          echo "  retention:         $REPORT_RETENTION"
+          echo "  workflow run URL:  $RUN_URL"
+          echo ""
+          echo "============================================================"
+          echo "POLICY SUMMARY (fail-closed, no SQL, no mutation):"
+          echo "  - NO SQL executed at any step"
+          echo "  - NO migration / Stage 05 / DROP / DELETE"
+          echo "  - Server-side backup file: COPIED only (not moved/deleted/overwritten)"
+          echo "  - SHA-256 mismatch => JOB FAILS before upload-artifact"
+          echo "  - Artifact = PRIVATE repo-scope GitHub Actions artifact"
+          echo "  - NO .sql pushed to git tree (artifact only)"
+          echo "============================================================"
