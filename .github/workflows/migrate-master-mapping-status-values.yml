@@ -498,11 +498,11 @@ jobs:
               }
             }
             main().catch(e => { console.error(sanitizeErrorMessage(e && e.message ? e.message : e)); process.exit(12); });
-JS_EOF
+          JS_EOF
 
             echo "MIGRATION_WORKFLOW_DONE"
           '
-SSH_CMD_EOF
+          SSH_CMD_EOF
 
           printf '%s\n' "$ERP_DATABASE_URL" | ssh -i "$KEY_FILE" \
             -o StrictHostKeyChecking=yes \
