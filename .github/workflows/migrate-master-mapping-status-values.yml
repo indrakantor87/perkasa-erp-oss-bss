@@ -1,0 +1,516 @@
+name: Migrate Master Mapping Status Values (Production)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_schema_migration:
+        description: "Must equal: YES_I_UNDERSTAND_THIS_RUNS_DDL_ON_PRODUCTION"
+        required: true
+        type: string
+      confirm_no_auto_run:
+        description: "Must equal: I_CONFIRM_MANUAL_DISPATCH_ONLY"
+        required: true
+        type: string
+      backup_identifier:
+        description: "Durable off-host backup identifier (opaque)"
+        required: true
+        type: string
+      backup_timestamp_utc:
+        description: "ISO-8601 timestamp"
+        required: true
+        type: string
+      backup_location:
+        description: "Durable/off-host location identifier (opaque)"
+        required: true
+        type: string
+      backup_checksum_sha256:
+        description: "64 hex chars"
+        required: true
+        type: string
+      confirm_backup_durable:
+        description: "Must equal: YES_DURABLE_OFFHOST_CONFIRMED"
+        required: true
+        type: string
+
+concurrency:
+  group: migrate-master-mapping-status-values-production
+  cancel-in-progress: false
+
+jobs:
+  migrate-master-mapping-status-values:
+    name: Master Mapping Status Values Migration (Manual, Fail-Closed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    env:
+      IMAGE_REPOSITORY: ghcr.io/indrakantor87/perkasa-erp-oss-bss
+      ERP_CONTAINER: perkasa-erp-oss-bss
+      ERP_NETWORK: coolify
+
+    steps:
+      - name: Validate Human Gate + Durable Backup Evidence
+        env:
+          CONFIRM_SCHEMA: ${{ inputs.confirm_schema_migration }}
+          CONFIRM_NO_AUTO: ${{ inputs.confirm_no_auto_run }}
+          BACKUP_ID: ${{ inputs.backup_identifier }}
+          BACKUP_TS: ${{ inputs.backup_timestamp_utc }}
+          BACKUP_LOC: ${{ inputs.backup_location }}
+          BACKUP_SHA: ${{ inputs.backup_checksum_sha256 }}
+          CONFIRM_BACKUP: ${{ inputs.confirm_backup_durable }}
+        run: |
+          set -euo pipefail
+
+          if [ "$CONFIRM_SCHEMA" != "YES_I_UNDERSTAND_THIS_RUNS_DDL_ON_PRODUCTION" ]; then
+            echo "FATAL: confirm_schema_migration mismatch"
+            exit 2
+          fi
+          if [ "$CONFIRM_NO_AUTO" != "I_CONFIRM_MANUAL_DISPATCH_ONLY" ]; then
+            echo "FATAL: confirm_no_auto_run mismatch"
+            exit 2
+          fi
+
+          if [ -z "$(printf '%s' "$BACKUP_ID" | tr -d '[:space:]')" ]; then
+            echo "FATAL: backup_identifier empty"
+            exit 3
+          fi
+          if [ -z "$(printf '%s' "$BACKUP_LOC" | tr -d '[:space:]')" ]; then
+            echo "FATAL: backup_location empty"
+            exit 3
+          fi
+          if echo "$BACKUP_LOC" | grep -q "/tmp/"; then
+            echo "FATAL: backup_location points to /tmp (non-durable)"
+            exit 3
+          fi
+
+          if ! date -u -d "$BACKUP_TS" "+%Y-%m-%dT%H:%M:%SZ" >/dev/null 2>&1; then
+            echo "FATAL: backup_timestamp_utc invalid ISO-8601"
+            exit 3
+          fi
+
+          if ! echo "$BACKUP_SHA" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+            echo "FATAL: backup_checksum_sha256 invalid (expected 64 hex chars)"
+            exit 3
+          fi
+
+          if [ "$CONFIRM_BACKUP" != "YES_DURABLE_OFFHOST_CONFIRMED" ]; then
+            echo "FATAL: confirm_backup_durable mismatch"
+            exit 3
+          fi
+
+          echo "HUMAN GATE PASS"
+          echo "BACKUP EVIDENCE GATE PASS"
+
+      - name: Resolve Target Image from Workflow SHA
+        id: sha
+        run: |
+          set -euo pipefail
+          RAW_SHA="${{ github.sha }}"
+          SHORT_SHA="${RAW_SHA:0:7}"
+          if ! [[ "$SHORT_SHA" =~ ^[0-9a-fA-F]{7}$ ]]; then
+            echo "FATAL: SHORT_SHA validation failed"
+            exit 4
+          fi
+          DEPLOY_IMG="${{ env.IMAGE_REPOSITORY }}:main-${SHORT_SHA}"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "deploy_image=$DEPLOY_IMG" >> "$GITHUB_OUTPUT"
+          echo "SHORT_SHA=$SHORT_SHA"
+          echo "DEPLOY_IMG=$DEPLOY_IMG"
+
+      - name: Install SSH Key + Secret Length Preflight (NO remote execution yet)
+        id: install-ssh-key
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER }}
+          KEY: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+          ERP_DB: ${{ secrets.ERP_DATABASE_URL }}
+          KNOWN_HOSTS: ${{ secrets.COOLIFY_SERVER_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          H_LEN=$(printf '%s' "$HOST" | wc -c | tr -d ' ')
+          U_LEN=$(printf '%s' "${USER:-root}" | wc -c | tr -d ' ')
+          K_LEN=$(printf '%s' "$KEY" | wc -c | tr -d ' ')
+          DB_LEN=$(printf '%s' "$ERP_DB" | wc -c | tr -d ' ')
+          KH_LEN=$(printf '%s' "$KNOWN_HOSTS" | wc -c | tr -d ' ')
+
+          echo "COOLIFY HOST len=$H_LEN"
+          echo "COOLIFY USER len=$U_LEN (fallback=root)"
+          echo "COOLIFY SSH KEY len=$K_LEN"
+          echo "ERP_DATABASE_URL len=$DB_LEN"
+          echo "COOLIFY_SERVER_SSH_KNOWN_HOSTS len=$KH_LEN"
+
+          BLOCKED=0
+
+          if [ "$H_LEN" -lt 5 ]; then
+            echo "BLOCKER: COOLIFY_SERVER_HOST secret empty or too short (< 5 chars)"
+            BLOCKED=1
+          fi
+          if [ "$K_LEN" -lt 100 ]; then
+            echo "BLOCKER: COOLIFY_SERVER_SSH_PRIVATE_KEY secret empty or too short (< 100 chars)"
+            BLOCKED=1
+          fi
+          if [ "$DB_LEN" -lt 12 ]; then
+            echo "BLOCKER: ERP_DATABASE_URL secret empty or too short (< 12 chars)"
+            BLOCKED=1
+          fi
+          if [ "$KH_LEN" -lt 40 ]; then
+            echo "BLOCKER: COOLIFY_SERVER_SSH_KNOWN_HOSTS secret empty or too short (< 40 chars)"
+            BLOCKED=1
+          fi
+
+          if [ "$BLOCKED" -ne 0 ]; then
+            echo ""
+            echo "=============================================="
+            echo "SECRET CONTRACT BLOCKER - MIGRATION HALTED SAFELY"
+            echo "REQUIRED repository secrets:"
+            echo "  - COOLIFY_SERVER_HOST"
+            echo "  - COOLIFY_SERVER_USER (optional fallback root)"
+            echo "  - COOLIFY_SERVER_SSH_PRIVATE_KEY"
+            echo "  - COOLIFY_SERVER_SSH_KNOWN_HOSTS"
+            echo "  - ERP_DATABASE_URL"
+            echo "=============================================="
+            exit 13
+          fi
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          KEY_FILE="$HOME/.ssh/id_ed25519_erpmigrate"
+          printf '%s' "$KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+
+          KEY_FINAL_LEN=$(wc -c < "$KEY_FILE" | tr -d ' ')
+          echo "SSH KEY written ($KEY_FINAL_LEN bytes)"
+          if [ "$KEY_FINAL_LEN" -lt 150 ]; then
+            echo "FATAL: SSH key file too short ($KEY_FINAL_LEN bytes). Secret malformed."
+            exit 14
+          fi
+
+          echo "ssh_key_file=$KEY_FILE" >> "$GITHUB_OUTPUT"
+          echo "ssh_user=${USER:-root}" >> "$GITHUB_OUTPUT"
+          echo "ssh_host=$HOST" >> "$GITHUB_OUTPUT"
+
+      - name: SSH Known Hosts Preflight (NO remote execution)
+        env:
+          KNOWN_HOSTS: ${{ secrets.COOLIFY_SERVER_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          KH_LEN=$(printf '%s' "$KNOWN_HOSTS" | wc -c | tr -d ' ')
+          echo "KNOWN_HOSTS len=$KH_LEN"
+
+          if [ "$KH_LEN" -lt 40 ]; then
+            echo "FATAL: COOLIFY_SERVER_SSH_KNOWN_HOSTS too short or empty."
+            exit 16
+          fi
+
+          KNOWN_HOSTS_FILE="$(mktemp /tmp/erp_known_hosts.XXXXXX)"
+          cleanup() { rm -f "$KNOWN_HOSTS_FILE"; }
+          trap cleanup EXIT
+
+          printf '%s\n' "$KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
+          chmod 600 "$KNOWN_HOSTS_FILE"
+
+      - name: SSH Connectivity Test (hostname only — NO mutation)
+        env:
+          KEY_FILE: ${{ steps.install-ssh-key.outputs.ssh_key_file }}
+          FINAL_USER: ${{ steps.install-ssh-key.outputs.ssh_user }}
+          HOST: ${{ steps.install-ssh-key.outputs.ssh_host }}
+          KNOWN_HOSTS: ${{ secrets.COOLIFY_SERVER_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          KNOWN_HOSTS_FILE="$(mktemp /tmp/erp_known_hosts.XXXXXX)"
+          cleanup() { rm -f "$KNOWN_HOSTS_FILE"; }
+          trap cleanup EXIT
+          printf '%s\n' "$KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
+          chmod 600 "$KNOWN_HOSTS_FILE"
+
+          set +e
+          OUT=$(ssh -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            -o ConnectTimeout=25 \
+            -o BatchMode=yes \
+            -o ServerAliveInterval=20 \
+            "$FINAL_USER@$HOST" \
+            "hostname && date '+%Y-%m-%d %H:%M:%S %Z' && whoami && echo ERP_MIGRATE_SSH_OK" 2>&1)
+          RC=$?
+          set -e
+
+          echo "$OUT"
+          echo "RC=$RC"
+          if [ $RC -ne 0 ] || ! echo "$OUT" | grep -q "ERP_MIGRATE_SSH_OK"; then
+            echo "SSH connectivity FAIL."
+            exit 15
+          fi
+          echo "SSH Test Gate PASS"
+
+      - name: Run Master Mapping Status Values Migration in Production Network (NO deploy)
+        env:
+          KEY_FILE: ${{ steps.install-ssh-key.outputs.ssh_key_file }}
+          FINAL_USER: ${{ steps.install-ssh-key.outputs.ssh_user }}
+          HOST: ${{ steps.install-ssh-key.outputs.ssh_host }}
+          DEPLOY_IMG: ${{ steps.sha.outputs.deploy_image }}
+          SHORT_SHA: ${{ steps.sha.outputs.short_sha }}
+          ERP_NETWORK: ${{ env.ERP_NETWORK }}
+          ERP_DATABASE_URL: ${{ secrets.ERP_DATABASE_URL }}
+          KNOWN_HOSTS: ${{ secrets.COOLIFY_SERVER_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          LOCAL_SSH_SCRIPT="$(mktemp /tmp/erp_migrate_master_mapping_status_values.XXXXXX.cmd)"
+          KNOWN_HOSTS_FILE="$(mktemp /tmp/erp_known_hosts.XXXXXX)"
+          cleanup() {
+            rm -f "$LOCAL_SSH_SCRIPT"
+            rm -f "$KNOWN_HOSTS_FILE"
+          }
+          trap cleanup EXIT
+          printf '%s\n' "$KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
+          chmod 600 "$KNOWN_HOSTS_FILE"
+
+          cat > "$LOCAL_SSH_SCRIPT" <<'SSH_CMD_EOF'
+          DEPLOY_IMG="$DEPLOY_IMG" ERP_NETWORK="$ERP_NETWORK" SHORT_SHA="$SHORT_SHA" bash -lc '
+            set -euo pipefail
+            IFS= read -r DATABASE_URL
+            export DATABASE_URL
+
+            docker pull "$DEPLOY_IMG" >/dev/null
+
+            CONTAINER_NAME="perkasa-erp-oss-bss-migrate-master-mapping-status-values-${SHORT_SHA}"
+            if docker ps -a --format "{{.Names}}" | grep -Fxq "$CONTAINER_NAME"; then
+              docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+            fi
+
+            docker run --rm \
+              --name "$CONTAINER_NAME" \
+              --network "$ERP_NETWORK" \
+              -e DATABASE_URL \
+              "$DEPLOY_IMG" \
+              node - <<'\''JS_EOF'\''
+            const mysql = require("mysql2/promise");
+            const MIGRATION_ID = "master-mapping-status-values-2026-09-10";
+            const TABLE_NAME = "mapping_legacy_status_values";
+            const UNIQUE_KEY_NAME = "uq_mapping_legacy_status_values";
+            const SEED_ROWS = [
+              ["WEB_PSB","SUPPORT","OPEN","OPEN","status open support"],
+              ["WEB_PSB","SUPPORT","CLOSE","CLOSED","normalisasi close lama"],
+              ["WEB_PSB","SUPPORT","CLOSED","CLOSED","status closed support"],
+              ["WEB_PSB","SUPPORT","Selesai","CLOSED","normalisasi bahasa Indonesia"],
+              ["WEB_PSB","ORDER","NEW","REGISTERED","lead/order baru"],
+              ["WEB_PSB","ORDER","REGISTERED","REGISTERED","status order standar"],
+              ["WEB_PSB","ORDER","INSTALLED","INSTALLED","status instalasi selesai"],
+              ["WEB_PSB","ORDER","ACTIVE","ACTIVE","status layanan aktif"],
+              ["FINANCE","EMPLOYEE","ACTIVE","ACTIVE","pegawai aktif"],
+              ["FINANCE","EMPLOYEE","INACTIVE","INACTIVE","pegawai nonaktif"],
+              ["FINANCE","ATTENDANCE","PRESENT","PRESENT","hadir"],
+              ["FINANCE","ATTENDANCE","SICK","SICK","sakit"],
+              ["FINANCE","ATTENDANCE","PERMIT","PERMIT","izin"],
+              ["FINANCE","ATTENDANCE","ALPHA","ALPHA","tanpa keterangan"],
+              ["GA","INVENTORY","aktif","ACTIVE","status aktif lowercase"],
+              ["GA","INVENTORY","nonaktif","INACTIVE","status nonaktif lowercase"],
+              ["GA","MOVEMENT","IN","IN","barang masuk"],
+              ["GA","MOVEMENT","OUT","OUT","barang keluar"],
+            ];
+            const EXPECTED_GROUPS = [
+              ["WEB_PSB","SUPPORT",4],
+              ["WEB_PSB","ORDER",4],
+              ["FINANCE","EMPLOYEE",2],
+              ["FINANCE","ATTENDANCE",4],
+              ["GA","INVENTORY",2],
+              ["GA","MOVEMENT",2],
+            ];
+            function logLine(m){ process.stdout.write(String(m)+"\n"); }
+            function normalizeType(v){ return String(v||"").trim().toLowerCase().replace(/\s+/g," "); }
+            function normalizeDefault(v){
+              if(v==null) return null;
+              const n = String(v).trim().toLowerCase();
+              if(!n) return null;
+              if(n==="current_timestamp()") return "current_timestamp";
+              return n;
+            }
+            function normalizeExtra(v){ return String(v||"").trim().toLowerCase().replace(/\s+/g," "); }
+            function sanitizeErrorMessage(input){
+              const raw = String(input||"");
+              return raw
+                .replace(/mysql:\/\/[^\/\s]+:[^\/\s]+@/gi, "mysql://***:***@")
+                .replace(/(password[\s"' :=]*)([^\s,;"']+)/gi, "$1***")
+                .replace(/(DATABASE_URL[\s"' :=]*)([^\s,;"']+)/gi, "$1***")
+                .slice(0, 2000);
+            }
+            function fail(msg){ throw new Error(String(msg||"UNKNOWN_ERROR")); }
+            async function tableExists(pool){
+              const [rows] = await pool.query(
+                "SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?",
+                [TABLE_NAME]
+              );
+              return Number((rows && rows[0] && rows[0].total) || 0) > 0;
+            }
+            async function getColumns(pool){
+              const [rows] = await pool.query(
+                "SELECT column_name, column_type, is_nullable, column_default, extra FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position",
+                [TABLE_NAME]
+              );
+              return Array.isArray(rows) ? rows : [];
+            }
+            async function getIndexes(pool){
+              const [rows] = await pool.query(
+                "SELECT index_name, non_unique, seq_in_index, column_name FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? ORDER BY index_name ASC, seq_in_index ASC",
+                [TABLE_NAME]
+              );
+              const map = new Map();
+              for(const r of (Array.isArray(rows) ? rows : [])){
+                const name = String(r.index_name||"").trim();
+                if(!name) continue;
+                const nu = Number(r.non_unique==null ? 1 : r.non_unique);
+                const col = String(r.column_name||"").trim();
+                if(!col) continue;
+                if(!map.has(name)) map.set(name, { non_unique: nu, cols: [] });
+                map.get(name).cols.push(col);
+              }
+              return [...map.entries()].map(([name, v]) => ({ index_name: name, non_unique: v.non_unique, columns: v.cols }));
+            }
+            async function hasOutgoingForeignKey(pool){
+              const [rows] = await pool.query(
+                "SELECT COUNT(*) AS total FROM information_schema.key_column_usage WHERE table_schema = DATABASE() AND table_name = ? AND referenced_table_name IS NOT NULL",
+                [TABLE_NAME]
+              );
+              return Number((rows && rows[0] && rows[0].total) || 0) > 0;
+            }
+            function assertColumn(actual, exp){
+              if(!actual) fail("SCHEMA_MISMATCH: missing column "+TABLE_NAME+"."+exp.name);
+              const gotType = normalizeType(actual.column_type);
+              const expType = normalizeType(exp.type);
+              if(gotType !== expType) fail("SCHEMA_MISMATCH: "+TABLE_NAME+"."+exp.name+" type expected="+exp.type+" actual="+actual.column_type);
+              const gotNullable = String(actual.is_nullable||"").trim().toUpperCase();
+              if(gotNullable !== exp.nullable) fail("SCHEMA_MISMATCH: "+TABLE_NAME+"."+exp.name+" nullability expected="+exp.nullable+" actual="+gotNullable);
+              const gotDefault = normalizeDefault(actual.column_default);
+              const expDefault = normalizeDefault(exp.default);
+              if(gotDefault !== expDefault) fail("SCHEMA_MISMATCH: "+TABLE_NAME+"."+exp.name+" default expected="+String(exp.default)+" actual="+String(actual.column_default));
+              const gotExtra = normalizeExtra(actual.extra);
+              for(const token of exp.extraIncludes){
+                const t = normalizeExtra(token);
+                if(t && !gotExtra.includes(t)) fail("SCHEMA_MISMATCH: "+TABLE_NAME+"."+exp.name+" extra missing token="+token+" actual="+String(actual.extra||""));
+              }
+            }
+            function validateColumns(rows){
+              const expected = [
+                { name:"id", type:"bigint unsigned", nullable:"NO", default:null, extraIncludes:["auto_increment"] },
+                { name:"source_system", type:"enum('WEB_PSB','FINANCE','GA')", nullable:"NO", default:null, extraIncludes:[] },
+                { name:"domain_name", type:"varchar(50)", nullable:"NO", default:null, extraIncludes:[] },
+                { name:"legacy_status_value", type:"varchar(100)", nullable:"NO", default:null, extraIncludes:[] },
+                { name:"target_status_value", type:"varchar(100)", nullable:"NO", default:null, extraIncludes:[] },
+                { name:"notes", type:"text", nullable:"YES", default:null, extraIncludes:[] },
+                { name:"is_active", type:"tinyint(1)", nullable:"NO", default:"1", extraIncludes:[] },
+                { name:"created_at", type:"datetime", nullable:"NO", default:"current_timestamp", extraIncludes:[] },
+                { name:"updated_at", type:"datetime", nullable:"NO", default:"current_timestamp", extraIncludes:["on update current_timestamp"] },
+              ];
+              if(!Array.isArray(rows)) fail("SCHEMA_MISMATCH: information_schema.columns probe failed");
+              if(rows.length !== expected.length) fail("SCHEMA_MISMATCH: column count expected="+expected.length+" actual="+rows.length);
+              const byName = new Map(rows.map(r => [String(r.column_name||"").toLowerCase(), r]));
+              for(const exp of expected){
+                assertColumn(byName.get(exp.name.toLowerCase()), exp);
+              }
+            }
+            function validateIndexes(indexes){
+              const byName = new Map(indexes.map(i => [String(i.index_name||"").toLowerCase(), i]));
+              const expected = [
+                { name:"PRIMARY", unique:true, columns:["id"] },
+                { name:UNIQUE_KEY_NAME, unique:true, columns:["source_system","domain_name","legacy_status_value"] },
+              ];
+              for(const exp of expected){
+                const got = byName.get(String(exp.name).toLowerCase());
+                if(!got) fail("SCHEMA_MISMATCH: missing index "+TABLE_NAME+"."+exp.name);
+                const unique = Number(got.non_unique||1) === 0;
+                if(unique !== exp.unique) fail("SCHEMA_MISMATCH: index "+TABLE_NAME+"."+exp.name+" unique expected="+exp.unique+" actual="+unique);
+                const gotCols = (got.columns||[]).map(c => String(c).trim().toLowerCase());
+                const expCols = exp.columns.map(c => String(c).trim().toLowerCase());
+                if(gotCols.length !== expCols.length) fail("SCHEMA_MISMATCH: index "+TABLE_NAME+"."+exp.name+" column count mismatch");
+                for(let i=0;i<expCols.length;i++){
+                  if(gotCols[i] !== expCols[i]) fail("SCHEMA_MISMATCH: index "+TABLE_NAME+"."+exp.name+" columns expected="+exp.columns.join(",")+" actual="+(got.columns||[]).join(","));
+                }
+              }
+            }
+            async function validateExistingTableContract(pool){
+              const outgoing = await hasOutgoingForeignKey(pool);
+              if(outgoing) fail("SCHEMA_MISMATCH: "+TABLE_NAME+" must not have foreign keys");
+              const cols = await getColumns(pool);
+              validateColumns(cols);
+              const idx = await getIndexes(pool);
+              validateIndexes(idx);
+            }
+            async function verifyCanonicalSeedPresent(pool){
+              const tuples = SEED_ROWS.map(r => "('"+String(r[0]).replace(/'/g,"''")+"','"+String(r[1]).replace(/'/g,"''")+"','"+String(r[2]).replace(/'/g,"''")+"')").join(",");
+              const [cntRows] = await pool.query("SELECT COUNT(*) AS total FROM "+TABLE_NAME+" WHERE (source_system,domain_name,legacy_status_value) IN ("+tuples+")");
+              const present = Number((cntRows && cntRows[0] && cntRows[0].total) || 0);
+              if(present !== SEED_ROWS.length) fail("POSTCHECK_FAIL: canonical seed presence expected="+SEED_ROWS.length+" actual="+present);
+              const [grpRows] = await pool.query("SELECT source_system, domain_name, COUNT(*) AS total FROM "+TABLE_NAME+" WHERE (source_system,domain_name,legacy_status_value) IN ("+tuples+") GROUP BY source_system, domain_name ORDER BY source_system, domain_name");
+              for(const exp of EXPECTED_GROUPS){
+                const m = (grpRows||[]).find(r => String(r.source_system||'').toUpperCase()===exp[0] && String(r.domain_name||'').toUpperCase()===exp[1]);
+                const tot = Number((m && m.total) || 0);
+                if(tot !== exp[2]) fail("POSTCHECK_FAIL: seed group mismatch "+exp[0]+"."+exp[1]+" expected="+exp[2]+" actual="+tot);
+              }
+            }
+            async function main(){
+              logLine("MASTER_MAPPING_STATUS_VALUES");
+              logLine("MIGRATION_ID="+MIGRATION_ID);
+              const url = process.env.DATABASE_URL || "";
+              if(!url.trim()) throw new Error("DATABASE_URL missing.");
+              const pool = await mysql.createPool({ uri: url, waitForConnections:true, connectionLimit:1, queueLimit:0, connectTimeout:5000 });
+              try{
+                const [dbRows] = await pool.query("SELECT DATABASE() AS db");
+                const db = String((dbRows && dbRows[0] && dbRows[0].db) || "").trim();
+                logLine("DATABASE="+(db||"UNKNOWN"));
+                if(db !== "default") throw new Error("P0 FAIL: database must be default (got "+(db||"UNKNOWN")+").");
+                const exists = await tableExists(pool);
+                logLine(TABLE_NAME+".exists="+(exists?"YES":"NO"));
+                if(exists){
+                  await validateExistingTableContract(pool);
+                } else {
+                  await pool.query(
+                    "CREATE TABLE IF NOT EXISTS "+TABLE_NAME+" ("+
+                      "id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,"+
+                      "source_system ENUM('WEB_PSB','FINANCE','GA') NOT NULL,"+
+                      "domain_name VARCHAR(50) NOT NULL,"+
+                      "legacy_status_value VARCHAR(100) NOT NULL,"+
+                      "target_status_value VARCHAR(100) NOT NULL,"+
+                      "notes TEXT NULL,"+
+                      "is_active TINYINT(1) NOT NULL DEFAULT 1,"+
+                      "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
+                      "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
+                      "PRIMARY KEY (id),"+
+                      "UNIQUE KEY "+UNIQUE_KEY_NAME+" (source_system, domain_name, legacy_status_value)"+
+                    ")"
+                  );
+                  await validateExistingTableContract(pool);
+                }
+                const valueSql = SEED_ROWS.map(r => "('"+r.map(v => String(v).replace(/'/g,\"''\")).join(\"','\")+"')").join(",\n");
+                await pool.query(
+                  "INSERT INTO "+TABLE_NAME+" (source_system,domain_name,legacy_status_value,target_status_value,notes) VALUES\n"+
+                  valueSql+
+                  "\nON DUPLICATE KEY UPDATE target_status_value=VALUES(target_status_value), notes=VALUES(notes), is_active=1"
+                );
+                await verifyCanonicalSeedPresent(pool);
+                logLine("MIGRATION PASS");
+              } finally {
+                await pool.end().catch(()=>null);
+              }
+            }
+            main().catch(e => { console.error(sanitizeErrorMessage(e && e.message ? e.message : e)); process.exit(12); });
+JS_EOF
+
+            echo "MIGRATION_WORKFLOW_DONE"
+          '
+SSH_CMD_EOF
+
+          printf '%s\n' "$ERP_DATABASE_URL" | ssh -i "$KEY_FILE" \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            -o ConnectTimeout=25 \
+            -o BatchMode=yes \
+            -o ServerAliveInterval=20 \
+            "$FINAL_USER@$HOST" \
+            "$(cat "$LOCAL_SSH_SCRIPT")"
+
+          echo "MIGRATION PASS"
