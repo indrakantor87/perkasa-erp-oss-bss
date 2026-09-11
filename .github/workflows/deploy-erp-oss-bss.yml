@@ -297,6 +297,7 @@ jobs:
           ERP_AUTH_SESSION_SECRET: ${{ secrets.ERP_AUTH_SESSION_SECRET }}
           ERP_APP_DATA_MODE: ${{ secrets.ERP_APP_DATA_MODE }}
           ERP_REVIEW_DB_TIMEOUT: ${{ secrets.ERP_REVIEW_DB_TIMEOUT }}
+          GHCR_PAT_TOKEN: ${{ secrets.GHCR_PAT_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -328,6 +329,7 @@ jobs:
           ERP_AUTH_SESSION_SECRET_PLACEHOLDER="__ERP_AUTH_SESSION_SECRET__"
           ERP_APP_DATA_MODE_PLACEHOLDER="__ERP_APP_DATA_MODE__"
           ERP_REVIEW_DB_TIMEOUT_PLACEHOLDER="__ERP_REVIEW_DB_TIMEOUT__"
+          GHCR_PAT_TOKEN_PLACEHOLDER="__GHCR_PAT_TOKEN__"
 
           ABORT_COLON="$(printf '%c%s' ':' 'latest')"
           P1="web-psb"
@@ -375,6 +377,20 @@ jobs:
           if ! docker network inspect "$ERP_NETWORK_PLACEHOLDER" >/dev/null 2>&1; then
             echo "[INFO] docker network $ERP_NETWORK_PLACEHOLDER not found — creating"
             docker network create "$ERP_NETWORK_PLACEHOLDER" 2>&1 | head -3
+          fi
+
+          echo "[0/7] GHCR Docker Login Gate: PAT provided ? login ghcr.io with user indrakantor87"
+          if [[ -n "${GHCR_PAT_TOKEN_PLACEHOLDER}" && ${#GHCR_PAT_TOKEN_PLACEHOLDER} -gt 20 ]]; then
+            echo "[0/7] GHCR_PAT_TOKEN len=${#GHCR_PAT_TOKEN_PLACEHOLDER} detected. docker login ghcr.io"
+            LOGIN_OUT=$(printf '%s' "${GHCR_PAT_TOKEN_PLACEHOLDER}" | docker login ghcr.io -u indrakantor87 --password-stdin 2>&1 || true)
+            GHCR_LOGIN_RC=$?
+            printf '%s\n' "$LOGIN_OUT" | tail -6
+            if [ "$GHCR_LOGIN_RC" -ne 0 ] || ! echo "$LOGIN_OUT" | grep -qiE "Login Succeeded|login succeeded|succeeded"; then
+              abort "REMOTE: docker login ghcr.io FAIL RC=$GHCR_LOGIN_RC. Check PAT scope packages:read" 15
+            fi
+            echo "[0/7 OK] GHCR login PASS (authenticated pull BISA)"
+          else
+            echo "[0/7 SKIP] GHCR_PAT_TOKEN tidak ada / terlalu pendek. Pull anonymous (package harus visibility PUBLIC)"
           fi
 
           echo "[1/7] docker pull $DEPLOY_IMG_PLACEHOLDER"
@@ -605,6 +621,21 @@ jobs:
           s = s.replace(needle, val)
           with open(path, 'w', encoding='utf-8') as f: f.write(s)
           print(f"replaced placeholder: {tok}")
+          PYEOF
+
+          FINAL_GHCR_PAT_VAL="${GHCR_PAT_TOKEN:-}"
+          echo "[INFO] GHCR_PAT_TOKEN actual value len=${#FINAL_GHCR_PAT_VAL} default used if empty=${FINAL_GHCR_PAT_VAL:+no}${FINAL_GHCR_PAT_VAL:-yes} (len>20 = authenticated pull mode, else anonymous)"
+          python3 - "$REMOTE_SCRIPT" "$FINAL_GHCR_PAT_VAL" GHCR_PAT_TOKEN <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          if needle not in s:
+            print(f"WARNING: python3 replacement needle [{needle}] not found in script")
+            sys.exit(2)
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok} ({len(val)} chars)")
           PYEOF
 
           echo "[LOCAL] Remote script prepared bytes: $(wc -c < "$REMOTE_SCRIPT" | tr -d ' ')"
