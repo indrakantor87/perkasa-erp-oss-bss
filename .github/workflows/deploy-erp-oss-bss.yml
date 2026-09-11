@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["Build & Push Docker Image to GHCR"]
     types: [completed]
-    branches: [main]
+    branches: [main, fix/import-stage-05-ui]
 
   workflow_dispatch:
     inputs:
@@ -27,7 +27,7 @@ jobs:
 
     if: >-
       (github.event_name == 'workflow_dispatch') ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+      (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'fix/import-stage-05-ui'))
 
     env:
       IMAGE_REPOSITORY: ghcr.io/indrakantor87/perkasa-erp-oss-bss
