@@ -1,4 +1,4 @@
-INSERT INTO network_odp (
+INSERT IGNORE INTO network_odp (
   code,
   name,
   location_text,
@@ -53,7 +53,7 @@ WITH RECURSIVE seq AS (
   FROM seq
   WHERE port_no < 512
 )
-INSERT INTO network_odp_ports (
+INSERT IGNORE INTO network_odp_ports (
   odp_id,
   port_no,
   port_status,
