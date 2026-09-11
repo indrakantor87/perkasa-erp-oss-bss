@@ -49,22 +49,12 @@ WHERE so.batch_id = @batch_id
 INSERT INTO network_odp_ports (
   odp_id,
   port_no,
-  port_status,
-  notes
+  status
 )
 SELECT
   o.id,
   seq.port_no,
-  'AVAILABLE',
-  CONCAT(
-    'Import Center ODP bootstrap (batch #',
-    @batch_id,
-    '). Legacy active_ports=',
-    COALESCE(o.active_ports, 0),
-    '/',
-    COALESCE(o.total_ports, 0),
-    '.'
-  )
+  'AVAILABLE'
 FROM (
   SELECT DISTINCT target_odp_id AS odp_id
   FROM staging_legacy_network_odp_records
