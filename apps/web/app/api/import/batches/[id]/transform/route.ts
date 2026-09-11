@@ -38,8 +38,9 @@ export async function POST(
 
   try {
     const { id } = await params
-    const payload = (await request.json()) as { stage?: unknown }
+    const payload = (await request.json()) as { stage?: unknown; odp05NonCumulative?: unknown }
     const rawStage = String(payload.stage ?? '').trim().padStart(2, '0')
+    const odp05NonCumulativeRaw = payload.odp05NonCumulative === true
 
     if (!isTransformStage(rawStage)) {
       return NextResponse.json({ message: 'Stage transform tidak valid.' }, { status: 400 })
@@ -47,14 +48,24 @@ export async function POST(
 
     const stage = rawStage
 
+    if (odp05NonCumulativeRaw && stage !== '05') {
+      return NextResponse.json(
+        { message: 'Mode non-cumulative hanya diperbolehkan hanya untuk tahap 05 ODP saja.' },
+        { status: 400 },
+      )
+    }
+
+    let odp05NonCumulative = false
     if (stage === '05') {
       await preflightOdpOnlyImportBatch(id)
+      odp05NonCumulative = odp05NonCumulativeRaw
     }
 
     const result = await transformImportBatch(
       id,
       stage,
-      `${session.displayName} (${session.username})`
+      `${session.displayName} (${session.username})`,
+      odp05NonCumulative ? { odp05NonCumulative: true } : undefined,
     )
 
     return NextResponse.json({
