@@ -12,6 +12,10 @@ on:
         description: "7-char short SHA for manual deployment or rollback"
         required: false
         default: ""
+      erp_host_port:
+        description: "Host port for ERP container (avoid WEB PSB default 3005 if port conflict). Example: 3006, 3010, 8080. Default 3006."
+        required: false
+        default: "3006"
 
 concurrency:
   group: deploy-erp-oss-bss-production
@@ -33,7 +37,7 @@ jobs:
       IMAGE_REPOSITORY: ghcr.io/indrakantor87/perkasa-erp-oss-bss
       ERP_CONTAINER: perkasa-erp-oss-bss
       ERP_DOMAIN: b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io
-      ERP_HOST_PORT: "3005"
+      ERP_HOST_PORT: "3006"
       ERP_CONTAINER_PORT: "3000"
       ERP_NETWORK: coolify
       ERP_APP_PORT_INTERNAL: "3000"
@@ -93,6 +97,23 @@ jobs:
           else
             echo "[INFO] Auto run: SHORT_SHA=$S from workflow_run.head_sha"
           fi
+
+          RAW_PORT_INPUT="${{ inputs.erp_host_port }}"
+          DEFAULT_PORT="${{ env.ERP_HOST_PORT }}"
+          if [ -n "$RAW_PORT_INPUT" ]; then
+            FINAL_PORT="$RAW_PORT_INPUT"
+            PORT_SRC="input manual"
+          else
+            FINAL_PORT="$DEFAULT_PORT"
+            PORT_SRC="env default ERP_HOST_PORT"
+          fi
+          if ! [[ "$FINAL_PORT" =~ ^[0-9]+$ ]] || [ "$FINAL_PORT" -lt 1024 ] || [ "$FINAL_PORT" -gt 65535 ]; then
+            echo "FATAL: ERP_HOST_PORT validation INVALID. Got: [$FINAL_PORT] source=$PORT_SRC. Expected numeric 1024-65535. Avoid port 3005 (conflict WEB PSB default)."
+            exit 2
+          fi
+          echo "[INFO] ERP_HOST_PORT final=$FINAL_PORT source=$PORT_SRC. (Port 3005 AVOIDED = WEB PSB default)"
+          echo "erp_host_port=$FINAL_PORT" >> "$GITHUB_OUTPUT"
+          echo "ERP_HOST_PORT=$FINAL_PORT"
 
       - name: PSB Negative Preflight (Static String Abort Gate)
         env:
@@ -290,7 +311,7 @@ jobs:
           DEPLOY_IMG: ${{ steps.sha.outputs.deploy_image }}
           ERP_CONTAINER: ${{ env.ERP_CONTAINER }}
           ERP_DOMAIN: ${{ env.ERP_DOMAIN }}
-          ERP_HOST_PORT: ${{ env.ERP_HOST_PORT }}
+          ERP_HOST_PORT: ${{ steps.sha.outputs.erp_host_port }}
           ERP_CONTAINER_PORT: ${{ env.ERP_CONTAINER_PORT }}
           ERP_NETWORK: ${{ env.ERP_NETWORK }}
           ERP_DATABASE_URL: ${{ secrets.ERP_DATABASE_URL }}
@@ -446,15 +467,46 @@ jobs:
             $DEPLOY_IMG_PLACEHOLDER \
             node server.js"
 
-          CID=$(eval "$RUN_CMD" 2>&1)
+          echo "[3/7 INFO] Expanded docker run command preview (masked env, first 500 chars):"
+          echo "  ${RUN_CMD:0:500}"
+          echo "[3/7 INFO] Executing docker run (capturing stderr)..."
+
+          RUN_LOG_FILE="/tmp/erp_docker_run_$$.log"
+          CID=$(eval "$RUN_CMD" 2>"$RUN_LOG_FILE")
           RC=$?
-          echo "$CID"
+          if [ -n "$CID" ]; then
+            echo "  docker run stdout CID: $CID"
+          fi
+          if [ -f "$RUN_LOG_FILE" ] && [ -s "$RUN_LOG_FILE" ]; then
+            echo "[3/7 DOCKER_RUN_STDERR] ============= START STDERR DOCKER RUN =============:"
+            sed 's/^/  [DOCKER_RUN_ERR] /' "$RUN_LOG_FILE" | tail -60
+            echo "[3/7 DOCKER_RUN_STDERR] ============= END STDERR DOCKER RUN =============:"
+          fi
+          rm -f "$RUN_LOG_FILE"
+
           if [ $RC -ne 0 ]; then
-            abort "REMOTE: docker run FAIL RC=$RC" 18
+            echo "======================================================"
+            echo "  REMOTE: docker run FAIL RC=$RC"
+            if [ "$RC" -eq 125 ]; then
+              echo "  ⚠️  RC=125 = DOCKER DAEMON INVOCATION ERROR (common causes):"
+              echo "    #1 = PORT CONFLICT (host port $ERP_HOST_PORT_PLACEHOLDER sedang dipakai container lain, misal WEB PSB default port 3005/3006)."
+              echo "       SOLUSI: Run workflow ulang manual → isi input erp_host_port dengan PORT BARU (contoh: 3007, 3010, 8080, 9000, dst)."
+              echo "       ATAU stop container di server yang sedang memakai port $ERP_HOST_PORT_PLACEHOLDER (docker ps → docker rm -f <nama>)."
+              echo "    #2 = TRAEFIK LABEL CONFLICT (sudah ada resource lain dengan rule Host($ERP_DOMAIN_PLACEHOLDER) di Coolify)."
+              echo "       SOLUSI: Hapus resource / container yang memakai domain ERP ini di Coolify UI."
+              echo "    #3 = DOCKER ARGS INVALID (salah nama flag, volume tidak ada, dll - biasanya bukan ini)."
+            elif [ "$RC" -eq 124 ]; then
+              echo "  ⚠️  RC=124 = timeout 120s (docker run terlalu lama pulling / lock daemon issue)."
+              echo "       SOLUSI: Re-run jobs deploy (coba lagi)."
+            else
+              echo "  ⚠️  RC=$RC = lihat STDERR DOCKER_RUN_STDERR di ATAS untuk detail error persis."
+            fi
+            echo "======================================================"
+            abort "REMOTE: docker run FAIL RC=$RC (lihat STDERR output di atas log ini)" 18
           fi
           CID_TRIM=$(printf '%s' "$CID" | tr -d '\r\n' | head -c 20)
           echo "[3/7 OK] CID=$CID_TRIM"
-          unset CID CID_TRIM RUN_CMD
+          unset CID CID_TRIM RUN_CMD RUN_LOG_FILE RC
 
           echo "[4/7] Sleep 30s for container boot and Next.js standalone init"
           sleep 30
