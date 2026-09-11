@@ -46,13 +46,6 @@ WHERE so.batch_id = @batch_id
   AND so.import_status IN ('MAPPED', 'VALID')
   AND so.target_odp_id IS NULL;
 
-WITH RECURSIVE seq AS (
-  SELECT 1 AS port_no
-  UNION ALL
-  SELECT port_no + 1
-  FROM seq
-  WHERE port_no < 512
-)
 INSERT INTO network_odp_ports (
   odp_id,
   port_no,
@@ -80,7 +73,21 @@ FROM (
 ) linked
 JOIN network_odp o
   ON o.id = linked.odp_id
-JOIN seq
+JOIN (
+  SELECT ones.n + 10*tens.n + 100*hundreds.n AS port_no
+  FROM (
+    SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL
+    SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
+  ) ones
+  CROSS JOIN (
+    SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL
+    SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
+  ) tens
+  CROSS JOIN (
+    SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
+  ) hundreds
+  WHERE ones.n + 10*tens.n + 100*hundreds.n BETWEEN 1 AND 512
+) seq
   ON seq.port_no <= o.total_ports
 LEFT JOIN network_odp_ports p
   ON p.odp_id = o.id
