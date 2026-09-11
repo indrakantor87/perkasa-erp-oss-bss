@@ -7,7 +7,7 @@ import {
   retryImportBatch,
 } from '@/lib/services/import-write-service'
 
-const allowedStages = new Set(['01', '02', '03', '04'])
+const allowedStages = new Set(['01', '02', '03', '04', '05'])
 
 export async function POST(
   request: Request,
@@ -32,14 +32,14 @@ export async function POST(
   try {
     const { id } = await params
     const payload = (await request.json().catch(() => ({}))) as { stage?: unknown }
-    let stageOverride: undefined | '01' | '02' | '03' | '04'
+    let stageOverride: undefined | '01' | '02' | '03' | '04' | '05'
 
     if (payload.stage !== undefined && payload.stage !== null) {
       const stage = String(payload.stage).trim().padStart(2, '0')
       if (!allowedStages.has(stage)) {
         return NextResponse.json({ message: 'Stage transform tidak valid untuk retry.' }, { status: 400 })
       }
-      stageOverride = stage as '01' | '02' | '03' | '04'
+      stageOverride = stage as '01' | '02' | '03' | '04' | '05'
     }
 
     const result = await retryImportBatch(
