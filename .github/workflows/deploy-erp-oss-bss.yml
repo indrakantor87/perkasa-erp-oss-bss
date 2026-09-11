@@ -614,7 +614,8 @@ jobs:
           set +e
           REMOTE_SCAN_PSB1="$(grep -cEi 'ghcr\.io/indrakantor87'"${A}${B}"'|'"${A}${B}"'|'"${PSB_DOMAIN}" "$REMOTE_SCRIPT" 2>/dev/null)"
           REMOTE_SCAN_PSB2="$(grep -cEi '"${STALE_H1}${STALE_H2}"' "$REMOTE_SCRIPT" 2>/dev/null)"
-          REMOTE_SCAN_LATEST="$(grep -cE '[a-zA-Z0-9]\'"$(printf '%c%s' ':' 'latest")"'([^A-Za-z0-9]|$)' "$REMOTE_SCRIPT" 2>/dev/null)"
+          LATEST_GRE_PATTERN='[a-zA-Z0-9]'"$COLON_LATEST_TOKEN"'([^A-Za-z0-9]|$)'
+          REMOTE_SCAN_LATEST="$(grep -cE -- "$LATEST_GRE_PATTERN" "$REMOTE_SCRIPT" 2>/dev/null)"
           set -e
 
           if [ "${REMOTE_SCAN_PSB1:-0}" -gt 0 ] || [ "${REMOTE_SCAN_PSB2:-0}" -gt 0 ]; then
