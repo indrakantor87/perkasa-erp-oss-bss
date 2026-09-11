@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["Build & Push Docker Image to GHCR"]
     types: [completed]
-    branches: [main]
+    branches: [main, fix/import-stage-05-ui]
 
   workflow_dispatch:
     inputs:
@@ -12,6 +12,10 @@ on:
         description: "7-char short SHA for manual deployment or rollback"
         required: false
         default: ""
+      erp_host_port:
+        description: "Host port for ERP container (avoid WEB PSB default 3005 if port conflict). Example: 3006, 3010, 8080. Default 3006."
+        required: false
+        default: "3006"
 
 concurrency:
   group: deploy-erp-oss-bss-production
@@ -27,13 +31,13 @@ jobs:
 
     if: >-
       (github.event_name == 'workflow_dispatch') ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+      (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'fix/import-stage-05-ui'))
 
     env:
       IMAGE_REPOSITORY: ghcr.io/indrakantor87/perkasa-erp-oss-bss
       ERP_CONTAINER: perkasa-erp-oss-bss
       ERP_DOMAIN: b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io
-      ERP_HOST_PORT: "3005"
+      ERP_HOST_PORT: "3006"
       ERP_CONTAINER_PORT: "3000"
       ERP_NETWORK: coolify
       ERP_APP_PORT_INTERNAL: "3000"
@@ -93,6 +97,23 @@ jobs:
           else
             echo "[INFO] Auto run: SHORT_SHA=$S from workflow_run.head_sha"
           fi
+
+          RAW_PORT_INPUT="${{ inputs.erp_host_port }}"
+          DEFAULT_PORT="${{ env.ERP_HOST_PORT }}"
+          if [ -n "$RAW_PORT_INPUT" ]; then
+            FINAL_PORT="$RAW_PORT_INPUT"
+            PORT_SRC="input manual"
+          else
+            FINAL_PORT="$DEFAULT_PORT"
+            PORT_SRC="env default ERP_HOST_PORT"
+          fi
+          if ! [[ "$FINAL_PORT" =~ ^[0-9]+$ ]] || [ "$FINAL_PORT" -lt 1024 ] || [ "$FINAL_PORT" -gt 65535 ]; then
+            echo "FATAL: ERP_HOST_PORT validation INVALID. Got: [$FINAL_PORT] source=$PORT_SRC. Expected numeric 1024-65535. Avoid port 3005 (conflict WEB PSB default)."
+            exit 2
+          fi
+          echo "[INFO] ERP_HOST_PORT final=$FINAL_PORT source=$PORT_SRC. (Port 3005 AVOIDED = WEB PSB default)"
+          echo "erp_host_port=$FINAL_PORT" >> "$GITHUB_OUTPUT"
+          echo "ERP_HOST_PORT=$FINAL_PORT"
 
       - name: PSB Negative Preflight (Static String Abort Gate)
         env:
@@ -290,13 +311,14 @@ jobs:
           DEPLOY_IMG: ${{ steps.sha.outputs.deploy_image }}
           ERP_CONTAINER: ${{ env.ERP_CONTAINER }}
           ERP_DOMAIN: ${{ env.ERP_DOMAIN }}
-          ERP_HOST_PORT: ${{ env.ERP_HOST_PORT }}
+          ERP_HOST_PORT: ${{ steps.sha.outputs.erp_host_port }}
           ERP_CONTAINER_PORT: ${{ env.ERP_CONTAINER_PORT }}
           ERP_NETWORK: ${{ env.ERP_NETWORK }}
           ERP_DATABASE_URL: ${{ secrets.ERP_DATABASE_URL }}
           ERP_AUTH_SESSION_SECRET: ${{ secrets.ERP_AUTH_SESSION_SECRET }}
           ERP_APP_DATA_MODE: ${{ secrets.ERP_APP_DATA_MODE }}
           ERP_REVIEW_DB_TIMEOUT: ${{ secrets.ERP_REVIEW_DB_TIMEOUT }}
+          GHCR_PAT_TOKEN: ${{ secrets.GHCR_PAT_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -328,6 +350,7 @@ jobs:
           ERP_AUTH_SESSION_SECRET_PLACEHOLDER="__ERP_AUTH_SESSION_SECRET__"
           ERP_APP_DATA_MODE_PLACEHOLDER="__ERP_APP_DATA_MODE__"
           ERP_REVIEW_DB_TIMEOUT_PLACEHOLDER="__ERP_REVIEW_DB_TIMEOUT__"
+          GHCR_PAT_TOKEN_PLACEHOLDER="__GHCR_PAT_TOKEN__"
 
           ABORT_COLON="$(printf '%c%s' ':' 'latest')"
           P1="web-psb"
@@ -375,6 +398,20 @@ jobs:
           if ! docker network inspect "$ERP_NETWORK_PLACEHOLDER" >/dev/null 2>&1; then
             echo "[INFO] docker network $ERP_NETWORK_PLACEHOLDER not found — creating"
             docker network create "$ERP_NETWORK_PLACEHOLDER" 2>&1 | head -3
+          fi
+
+          echo "[0/7] GHCR Docker Login Gate: PAT provided ? login ghcr.io with user indrakantor87"
+          if [[ -n "${GHCR_PAT_TOKEN_PLACEHOLDER}" && ${#GHCR_PAT_TOKEN_PLACEHOLDER} -gt 20 ]]; then
+            echo "[0/7] GHCR_PAT_TOKEN len=${#GHCR_PAT_TOKEN_PLACEHOLDER} detected. docker login ghcr.io"
+            LOGIN_OUT=$(printf '%s' "${GHCR_PAT_TOKEN_PLACEHOLDER}" | docker login ghcr.io -u indrakantor87 --password-stdin 2>&1 || true)
+            GHCR_LOGIN_RC=$?
+            printf '%s\n' "$LOGIN_OUT" | tail -6
+            if [ "$GHCR_LOGIN_RC" -ne 0 ] || ! echo "$LOGIN_OUT" | grep -qiE "Login Succeeded|login succeeded|succeeded"; then
+              abort "REMOTE: docker login ghcr.io FAIL RC=$GHCR_LOGIN_RC. Check PAT scope packages:read" 15
+            fi
+            echo "[0/7 OK] GHCR login PASS (authenticated pull BISA)"
+          else
+            echo "[0/7 SKIP] GHCR_PAT_TOKEN tidak ada / terlalu pendek. Pull anonymous (package harus visibility PUBLIC)"
           fi
 
           echo "[1/7] docker pull $DEPLOY_IMG_PLACEHOLDER"
@@ -430,15 +467,46 @@ jobs:
             $DEPLOY_IMG_PLACEHOLDER \
             node server.js"
 
-          CID=$(eval "$RUN_CMD" 2>&1)
+          echo "[3/7 INFO] Expanded docker run command preview (masked env, first 500 chars):"
+          echo "  ${RUN_CMD:0:500}"
+          echo "[3/7 INFO] Executing docker run (capturing stderr)..."
+
+          RUN_LOG_FILE="/tmp/erp_docker_run_$$.log"
+          CID=$(eval "$RUN_CMD" 2>"$RUN_LOG_FILE")
           RC=$?
-          echo "$CID"
+          if [ -n "$CID" ]; then
+            echo "  docker run stdout CID: $CID"
+          fi
+          if [ -f "$RUN_LOG_FILE" ] && [ -s "$RUN_LOG_FILE" ]; then
+            echo "[3/7 DOCKER_RUN_STDERR] ============= START STDERR DOCKER RUN =============:"
+            sed 's/^/  [DOCKER_RUN_ERR] /' "$RUN_LOG_FILE" | tail -60
+            echo "[3/7 DOCKER_RUN_STDERR] ============= END STDERR DOCKER RUN =============:"
+          fi
+          rm -f "$RUN_LOG_FILE"
+
           if [ $RC -ne 0 ]; then
-            abort "REMOTE: docker run FAIL RC=$RC" 18
+            echo "======================================================"
+            echo "  REMOTE: docker run FAIL RC=$RC"
+            if [ "$RC" -eq 125 ]; then
+              echo "  ⚠️  RC=125 = DOCKER DAEMON INVOCATION ERROR (common causes):"
+              echo "    #1 = PORT CONFLICT (host port $ERP_HOST_PORT_PLACEHOLDER sedang dipakai container lain, misal WEB PSB default port 3005/3006)."
+              echo "       SOLUSI: Run workflow ulang manual → isi input erp_host_port dengan PORT BARU (contoh: 3007, 3010, 8080, 9000, dst)."
+              echo "       ATAU stop container di server yang sedang memakai port $ERP_HOST_PORT_PLACEHOLDER (docker ps → docker rm -f <nama>)."
+              echo "    #2 = TRAEFIK LABEL CONFLICT (sudah ada resource lain dengan rule Host($ERP_DOMAIN_PLACEHOLDER) di Coolify)."
+              echo "       SOLUSI: Hapus resource / container yang memakai domain ERP ini di Coolify UI."
+              echo "    #3 = DOCKER ARGS INVALID (salah nama flag, volume tidak ada, dll - biasanya bukan ini)."
+            elif [ "$RC" -eq 124 ]; then
+              echo "  ⚠️  RC=124 = timeout 120s (docker run terlalu lama pulling / lock daemon issue)."
+              echo "       SOLUSI: Re-run jobs deploy (coba lagi)."
+            else
+              echo "  ⚠️  RC=$RC = lihat STDERR DOCKER_RUN_STDERR di ATAS untuk detail error persis."
+            fi
+            echo "======================================================"
+            abort "REMOTE: docker run FAIL RC=$RC (lihat STDERR output di atas log ini)" 18
           fi
           CID_TRIM=$(printf '%s' "$CID" | tr -d '\r\n' | head -c 20)
           echo "[3/7 OK] CID=$CID_TRIM"
-          unset CID CID_TRIM RUN_CMD
+          unset CID CID_TRIM RUN_CMD RUN_LOG_FILE RC
 
           echo "[4/7] Sleep 30s for container boot and Next.js standalone init"
           sleep 30
@@ -607,6 +675,21 @@ jobs:
           print(f"replaced placeholder: {tok}")
           PYEOF
 
+          FINAL_GHCR_PAT_VAL="${GHCR_PAT_TOKEN:-}"
+          echo "[INFO] GHCR_PAT_TOKEN actual value len=${#FINAL_GHCR_PAT_VAL} default used if empty=${FINAL_GHCR_PAT_VAL:+no}${FINAL_GHCR_PAT_VAL:-yes} (len>20 = authenticated pull mode, else anonymous)"
+          python3 - "$REMOTE_SCRIPT" "$FINAL_GHCR_PAT_VAL" GHCR_PAT_TOKEN <<'PYEOF'
+          import sys
+          path, val, tok = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path, 'r', encoding='utf-8') as f: s = f.read()
+          needle = f"__{tok}__"
+          if needle not in s:
+            print(f"WARNING: python3 replacement needle [{needle}] not found in script")
+            sys.exit(2)
+          s = s.replace(needle, val)
+          with open(path, 'w', encoding='utf-8') as f: f.write(s)
+          print(f"replaced placeholder: {tok} ({len(val)} chars)")
+          PYEOF
+
           echo "[LOCAL] Remote script prepared bytes: $(wc -c < "$REMOTE_SCRIPT" | tr -d ' ')"
 
           LOCAL_STATIC_FAIL=0
@@ -614,7 +697,8 @@ jobs:
           set +e
           REMOTE_SCAN_PSB1="$(grep -cEi 'ghcr\.io/indrakantor87'"${A}${B}"'|'"${A}${B}"'|'"${PSB_DOMAIN}" "$REMOTE_SCRIPT" 2>/dev/null)"
           REMOTE_SCAN_PSB2="$(grep -cEi '"${STALE_H1}${STALE_H2}"' "$REMOTE_SCRIPT" 2>/dev/null)"
-          REMOTE_SCAN_LATEST="$(grep -cE '[a-zA-Z0-9]\'"$(printf '%c%s' ':' 'latest")"'([^A-Za-z0-9]|$)' "$REMOTE_SCRIPT" 2>/dev/null)"
+          LATEST_GRE_PATTERN='[a-zA-Z0-9]'"$COLON_LATEST_TOKEN"'([^A-Za-z0-9]|$)'
+          REMOTE_SCAN_LATEST="$(grep -cE -- "$LATEST_GRE_PATTERN" "$REMOTE_SCRIPT" 2>/dev/null)"
           set -e
 
           if [ "${REMOTE_SCAN_PSB1:-0}" -gt 0 ] || [ "${REMOTE_SCAN_PSB2:-0}" -gt 0 ]; then

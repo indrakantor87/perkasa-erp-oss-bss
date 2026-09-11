@@ -43,11 +43,11 @@ const transformStages = [
 
 type TransformStageItem = (typeof transformStages)[number]
 type ActionStage = TransformStageItem['stage']
-type RetryStage = Exclude<ActionStage, '05'>
-type RetryStageItem = Exclude<TransformStageItem, { stage: '05' }>
+type RetryStage = ActionStage
+type RetryStageItem = TransformStageItem
 
 function isRetryStageItem(item: TransformStageItem): item is RetryStageItem {
-  return item.stage !== '05'
+  return true
 }
 
 function resolveRowDomain(row: BatchDetail['rows'][number]) {
@@ -234,12 +234,16 @@ export function ImportBatchActionPanel({
     setFeedback(null)
 
     try {
+      const bodyPayload: Record<string, unknown> = { stage }
+      if (stage === '05') {
+        bodyPayload.odp05NonCumulative = true
+      }
       const response = await fetch(`/api/import/batches/${batchId}/transform`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ stage }),
+        body: JSON.stringify(bodyPayload),
       })
       const payload = (await response.json().catch(() => null)) as { message?: string } | null
 

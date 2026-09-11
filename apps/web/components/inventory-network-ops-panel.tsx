@@ -420,6 +420,7 @@ function getLifecycleBarcodeHref(item: DeviceLifecycleLogRow) {
 export function InventoryNetworkOpsPanel({
   sections,
   reviewDiagnostics,
+  odpMapRows,
   canCreate,
   canUpdate,
   reviewDbReady,
@@ -432,6 +433,7 @@ export function InventoryNetworkOpsPanel({
 }: {
   sections: DomainReviewSection[]
   reviewDiagnostics?: DomainReviewDiagnostic[]
+  odpMapRows?: DomainReviewRow[]
   canCreate: boolean
   canUpdate: boolean
   reviewDbReady: boolean
@@ -453,6 +455,7 @@ export function InventoryNetworkOpsPanel({
     [assignmentSection],
   )
   const odpRows = odpSection?.rows ?? []
+  const odpMapDataset = odpMapRows && odpMapRows.length > 0 ? odpMapRows : odpRows
   const usedPortRows = usedPortSection?.rows ?? []
   const issuePortRows = issuePortSection?.rows ?? []
   const assignmentRows = assignmentSection?.rows ?? []
@@ -548,7 +551,7 @@ export function InventoryNetworkOpsPanel({
   }, [mapFullscreenActive])
 
   const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
-  const filteredOdpRows = useMemo(
+  const filteredPreviewOdpRows = useMemo(
     () =>
       odpRows.filter((row) => {
         if (!normalizedSearch) return true
@@ -562,12 +565,26 @@ export function InventoryNetworkOpsPanel({
       }),
     [normalizedSearch, odpRows],
   )
+  const filteredMapOdpRows = useMemo(
+    () =>
+      odpMapDataset.filter((row) => {
+        if (!normalizedSearch) return true
+        const latitude = pickMeta(row.meta, 'Latitude: ')
+        const longitude = pickMeta(row.meta, 'Longitude: ')
+        return [row.primary, row.secondary, row.detail, latitude, longitude].some((value) =>
+          String(value ?? '')
+            .toLowerCase()
+            .includes(normalizedSearch),
+        )
+      }),
+    [normalizedSearch, odpMapDataset],
+  )
 
-  const visibleOdpRows = useMemo(() => filteredOdpRows.slice(0, pageSize), [filteredOdpRows, pageSize])
+  const visibleOdpRows = useMemo(() => filteredPreviewOdpRows.slice(0, pageSize), [filteredPreviewOdpRows, pageSize])
   const routeDistanceMeters = useMemo(() => buildRouteDistanceMeters(routePoints), [routePoints])
   const allOdpPoints = useMemo(
     () =>
-      odpRows
+      odpMapDataset
         .map((row) => {
           const point = extractOdpPoint(row)
           if (!point) return null
@@ -588,7 +605,7 @@ export function InventoryNetworkOpsPanel({
         activePorts: number
         remainingPorts: number
       }>,
-    [odpRows],
+    [odpMapDataset],
   )
   const selectedOdpData = useMemo(
     () => allOdpPoints.find((item) => item.row.id === selectedOdpId) ?? allOdpPoints[0] ?? null,
@@ -809,14 +826,14 @@ export function InventoryNetworkOpsPanel({
   }, [routeMode, routePoints.length])
 
   useEffect(() => {
-    if (!filteredOdpRows.length) {
+    if (!filteredMapOdpRows.length) {
       setSelectedOdpId(null)
       return
     }
-    if (!selectedOdpId || !filteredOdpRows.some((row) => row.id === selectedOdpId)) {
-      setSelectedOdpId(filteredOdpRows[0]?.id ?? null)
+    if (!selectedOdpId || !filteredMapOdpRows.some((row) => row.id === selectedOdpId)) {
+      setSelectedOdpId(filteredMapOdpRows[0]?.id ?? null)
     }
-  }, [filteredOdpRows, selectedOdpId])
+  }, [filteredMapOdpRows, selectedOdpId])
 
   useEffect(() => {
     if (!prospectPoint || selectedOdpPoint) return
@@ -1111,7 +1128,7 @@ export function InventoryNetworkOpsPanel({
                   </button>
                 </div>
                 <span className={useReferenceLikeLayout ? 'text-sm text-slate-500' : 'badge border-slate-600 bg-slate-800/70 text-slate-100'}>
-                  {useReferenceLikeLayout ? `Marker: ${filteredOdpRows.length}` : `${filteredOdpRows.length} marker`}
+                  {useReferenceLikeLayout ? `Marker: ${filteredMapOdpRows.length}` : `${filteredMapOdpRows.length} marker`}
                 </span>
               </div>
               {deviceLocationMessage ? (
@@ -1148,14 +1165,14 @@ export function InventoryNetworkOpsPanel({
                 </div>
                 <div className="pointer-events-none absolute right-3 top-3 z-[500] flex flex-wrap items-center gap-2">
                   <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
-                    Marker: {filteredOdpRows.length}
+                    Marker: {filteredMapOdpRows.length}
                   </span>
                   <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
                     Fit: {routePoints.length >= 2 && mapFitMode === 'route' ? 'Rute' : prospectPoint ? 'Prospek' : 'Marker'}
                   </span>
                 </div>
                 <InventoryOdpLeafletMap
-                  rows={filteredOdpRows}
+                  rows={filteredMapOdpRows}
                   height={mapFullscreenActive ? undefined : 520}
                   mapKey={`${mapRefreshKey}:${mapFitKey}`}
                   routeMode={routeMode}

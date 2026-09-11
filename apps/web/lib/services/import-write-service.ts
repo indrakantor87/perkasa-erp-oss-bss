@@ -758,8 +758,15 @@ async function executeTransformSqlUpTo(
   connection: { query: (sql: string, values?: unknown[]) => Promise<[unknown[], unknown]> },
   batchPk: number,
   stage: TransformStage,
+  options?: { odp05NonCumulative?: boolean },
 ) {
-  const stageOrder = TRANSFORM_STAGE_ORDER.slice(0, TRANSFORM_STAGE_ORDER.indexOf(stage) + 1)
+  const stageOrder =
+    (options?.odp05NonCumulative === true && stage === '05')
+      ? (['05'] as readonly TransformStage[])
+      : TRANSFORM_STAGE_ORDER.slice(
+        0,
+        TRANSFORM_STAGE_ORDER.indexOf(stage) + 1
+      );
   let executedStatements = 0
 
   for (const currentStage of stageOrder) {
@@ -779,7 +786,8 @@ async function executeTransformSqlUpTo(
 export async function transformImportBatch(
   batchId: string,
   stage: TransformStage,
-  actor: string
+  actor: string,
+  options?: { odp05NonCumulative?: boolean },
 ): Promise<TransformResult> {
   const batch = await getImportBatchLookup(batchId)
   if (!batch) {
@@ -827,7 +835,7 @@ export async function transformImportBatch(
         throw new Error('Transform batch sedang berjalan. Tunggu proses sebelumnya selesai.')
       }
 
-      return executeTransformSqlUpTo(connection, batch.id, stage)
+      return executeTransformSqlUpTo(connection, batch.id, stage, options)
     })
     const afterSummary = await getImportBatchSummary(batch.id)
     const nextStatus =
@@ -1136,10 +1144,13 @@ export async function retryImportBatch(
   const preflight = hooks?.preflightOdpOnlyImportBatch ?? preflightOdpOnlyImportBatch
   const transformFn = hooks?.transformImportBatch ?? transformImportBatch
 
+  const nonCumulativeRetry = targetStage === '05'
   if (targetStage === '05') {
     await preflight(batchId)
   }
 
-  const transform = (await transformFn(batchId, targetStage, actor)) as TransformResult
+  const transform = (await (nonCumulativeRetry
+    ? transformFn(batchId, targetStage, actor, { odp05NonCumulative: true })
+    : transformFn(batchId, targetStage, actor))) as TransformResult
   return { mode: 'transform', ...transform }
 }

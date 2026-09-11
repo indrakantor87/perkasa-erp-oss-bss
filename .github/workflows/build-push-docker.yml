@@ -2,7 +2,7 @@ name: Build & Push Docker Image to GHCR
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/import-stage-05-ui]
   workflow_dispatch:
 
 env:
