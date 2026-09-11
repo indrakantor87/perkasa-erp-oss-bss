@@ -55,6 +55,7 @@ import type {
   DomainKey,
   DomainPageContent,
   DomainReviewDiagnostic,
+  DomainReviewRow,
   DomainReviewSection,
   DomainSupportFocus,
   SupportLaneKey,
@@ -4817,7 +4818,7 @@ async function getReviewDbSalesSections(session: AppSession, filters?: DomainRev
 
 async function getReviewDbInventorySections(
   filters?: DomainReviewDrilldownFilters,
-): Promise<{ sections: DomainReviewSection[]; diagnostics: DomainReviewDiagnostic[] }> {
+): Promise<{ sections: DomainReviewSection[]; diagnostics: DomainReviewDiagnostic[]; odpMapRows?: DomainReviewRow[] }> {
   const focus = String(filters?.focus ?? '')
     .trim()
     .toUpperCase()
@@ -5123,6 +5124,32 @@ async function getReviewDbInventorySections(
       `),
   })
   const odps = odpsResult.rows
+
+  const odpMapResult = await runSafeDomainSectionQuery<ReviewDbInventoryOdpRow>({
+    sectionLabel: 'inventory-odp-map-rows',
+    enabled:
+      inventorySchema.odpId &&
+      inventorySchema.odpCode &&
+      inventorySchema.odpName &&
+      inventorySchema.odpTotalPorts &&
+      inventorySchema.odpActivePorts,
+    query: () =>
+      runReviewDbQuery<ReviewDbInventoryOdpRow>(`
+        SELECT
+          id AS odpId,
+          code AS odpCode,
+          name AS odpName,
+          total_ports AS totalPorts,
+          active_ports AS activePorts,
+          ${inventorySchema.odpLocationText ? 'location_text' : 'NULL'} AS locationText,
+          ${inventorySchema.odpLatitude ? 'latitude' : 'NULL'} AS latitude,
+          ${inventorySchema.odpLongitude ? 'longitude' : 'NULL'} AS longitude
+        FROM network_odp
+        ORDER BY id ASC
+        LIMIT 10000
+      `),
+  })
+  const odpMapRows = odpMapResult.rows
 
   const portServiceExpression = canJoinPortSubscription && inventorySchema.subscriptionServiceNo ? 'ss.service_no' : 'NULL'
   const portCustomerCodeExpression = canJoinPortCustomer && inventorySchema.customerCode ? 'c.customer_code' : 'NULL'
@@ -5630,7 +5657,21 @@ async function getReviewDbInventorySections(
     },
   ].filter((section) => section.rows.length > 0)
 
-  return { sections, diagnostics }
+  const odpMapRowsFormatted: DomainReviewRow[] = odpMapRows.map((item) => ({
+    id: `ODP-${item.odpId}`,
+    primary: item.odpCode,
+    secondary: item.odpName,
+    status: `${formatNumber(item.activePorts)}/${formatNumber(item.totalPorts)}`,
+    detail: item.locationText?.trim() || 'Lokasi ODP belum diisi.',
+    meta: [
+      `Total Ports: ${formatNumber(item.totalPorts)}`,
+      `Active Ports: ${formatNumber(item.activePorts)}`,
+      `Latitude: ${item.latitude ?? '-'}`,
+      `Longitude: ${item.longitude ?? '-'}`,
+    ],
+  }))
+
+  return { sections, diagnostics, odpMapRows: odpMapRowsFormatted }
 }
 
 async function getReviewDbHrSections(filters?: DomainReviewDrilldownFilters): Promise<DomainReviewSection[]> {
@@ -6429,14 +6470,19 @@ function applyReviewDbInventorySections(
   content: DomainPageContent,
   reviewSections: DomainReviewSection[],
   reviewDiagnostics: DomainReviewDiagnostic[],
+  odpMapRows?: DomainReviewRow[],
 ) {
   if (content.key !== 'inventory') {
     return content
   }
 
-  const nextContent: DomainPageContent = reviewDiagnostics.length
+  let nextContent: DomainPageContent = reviewDiagnostics.length
     ? { ...content, reviewDiagnostics }
     : content
+
+  if (odpMapRows) {
+    nextContent = { ...nextContent, odpMapRows }
+  }
 
   if (reviewSections.length === 0) {
     return nextContent
@@ -6708,9 +6754,10 @@ export async function getDomainPageData(
               : Promise.resolve([] as DomainReviewSection[]),
             domain === 'inventory'
               ? getReviewDbInventorySections(reviewFilters)
-              : Promise.resolve({
+              : Promise.resolve<{ sections: DomainReviewSection[]; diagnostics: DomainReviewDiagnostic[]; odpMapRows?: DomainReviewRow[] }>({
                   sections: [] as DomainReviewSection[],
                   diagnostics: [] as DomainReviewDiagnostic[],
+                  odpMapRows: [] as DomainReviewRow[],
                 }),
             domain === 'hr' ? getReviewDbHrSections(reviewFilters) : Promise.resolve([] as DomainReviewSection[]),
           ])
@@ -6719,6 +6766,7 @@ export async function getDomainPageData(
           domain === 'billing' ? filterReviewSectionsForDomain(domain, billingSectionsRaw, reviewFilters) : []
         const inventorySectionsRaw = domain === 'inventory' ? inventoryBundle.sections : []
         const inventoryDiagnostics = domain === 'inventory' ? inventoryBundle.diagnostics : []
+        const inventoryOdpMapRows = domain === 'inventory' ? inventoryBundle.odpMapRows : undefined
         const inventorySections =
           domain === 'inventory' ? filterReviewSectionsForDomain(domain, inventorySectionsRaw, reviewFilters) : []
         const hrSections = domain === 'hr' ? filterReviewSectionsForDomain(domain, hrSectionsRaw, reviewFilters) : []
@@ -6737,6 +6785,7 @@ export async function getDomainPageData(
             ),
             inventorySections,
             inventoryDiagnostics,
+            inventoryOdpMapRows,
           ),
           hrSections,
         )

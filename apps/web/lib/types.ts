@@ -522,6 +522,7 @@ export type DomainPageContent = {
   highlights: DomainHighlight[]
   reviewSections?: DomainReviewSection[]
   reviewDiagnostics?: DomainReviewDiagnostic[]
+  odpMapRows?: DomainReviewRow[]
 }
 
 export type DomainPageData = {

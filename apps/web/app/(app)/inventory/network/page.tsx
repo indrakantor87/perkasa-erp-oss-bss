@@ -42,12 +42,14 @@ export default async function InventoryNetworkPage({
 
   const reviewSections = payload.content.reviewSections ?? []
   const reviewDiagnostics = payload.content.reviewDiagnostics ?? []
+  const odpMapRows = payload.content.odpMapRows ?? []
 
   return (
     <div>
       <InventoryNetworkOpsPanel
         sections={reviewSections}
         reviewDiagnostics={reviewDiagnostics}
+        odpMapRows={odpMapRows}
         canCreate={canPerformAction(session.role, 'inventory', 'create')}
         canUpdate={canPerformAction(session.role, 'inventory', 'update')}
         reviewDbReady={payload.source.effectiveMode === 'review-db' && !payload.source.isFallback}
