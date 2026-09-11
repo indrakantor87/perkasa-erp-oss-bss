@@ -879,7 +879,16 @@ export function InventoryNetworkOpsPanel({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setShowMap((current) => !current)}
+            onClick={() =>
+              setShowMap((current) => {
+                const next = !current
+                if (next) {
+                  setMapRefreshKey((k) => k + 1)
+                  setMapFitKey((k) => k + 1)
+                }
+                return next
+              })
+            }
             className={
               useReferenceLikeLayout
                 ? 'inline-flex items-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white'

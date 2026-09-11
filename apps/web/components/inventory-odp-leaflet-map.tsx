@@ -304,6 +304,23 @@ export function InventoryOdpLeafletMap({
     const markerLayer = markerLayerRef.current
     const routeLayer = routeLayerRef.current
     const deviceLayer = deviceLayerRef.current
+
+    const chromeFixTimer1 = window.setTimeout(() => {
+      map.invalidateSize()
+      const chromeFixTimer2 = window.setTimeout(() => {
+        map.invalidateSize()
+        const chromeFixTimer3 = window.setTimeout(() => {
+          map.invalidateSize()
+          const chromeFixTimer4 = window.setTimeout(() => {
+            map.invalidateSize()
+          }, 160)
+          return () => window.clearTimeout(chromeFixTimer4)
+        }, 100)
+        return () => window.clearTimeout(chromeFixTimer3)
+      }, 60)
+      return () => window.clearTimeout(chromeFixTimer2)
+    }, 30)
+
     if (!map || !markerLayer) return
 
     markerLayer.clearLayers()
