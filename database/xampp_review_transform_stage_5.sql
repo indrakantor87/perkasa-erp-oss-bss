@@ -53,7 +53,7 @@ WITH RECURSIVE seq AS (
   FROM seq
   WHERE port_no < 512
 )
-INSERT IGNORE INTO network_odp_ports (
+INSERT INTO network_odp_ports (
   odp_id,
   port_no,
   port_status,
