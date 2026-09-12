@@ -84,21 +84,24 @@ export function getPortCapacityTone(params: { totalPorts: number; activePorts: n
 }
 
 function buildOdpMarkerIcon(tone: string, selected = false, highlighted = false) {
-  const baseSize = selected ? 18 : 14
-  const size = highlighted ? baseSize + 5 : baseSize
+  const baseSize = selected ? 14 : 11
+  const size = highlighted ? baseSize + 2 : baseSize
+  const iconBox = size + 3
   const border = selected
-    ? '3px solid rgba(255,255,255,0.95)'
+    ? '2px solid rgba(255,255,255,0.95)'
     : highlighted
-      ? '3px solid rgba(37,99,235,0.98)'
-      : '2px solid rgba(15,23,42,0.9)'
+      ? '2px solid rgba(37,99,235,0.95)'
+      : '1.5px solid rgba(15,23,42,0.78)'
   const shadow = highlighted
-    ? '0 0 0 3px rgba(59,130,246,0.35), 0 0 18px rgba(59,130,246,0.55)'
-    : '0 0 0 2px rgba(15,23,42,0.28)'
+    ? '0 0 0 2px rgba(59,130,246,0.35), 0 0 12px rgba(59,130,246,0.45), 0 1px 2px rgba(15,23,42,0.18)'
+    : selected
+      ? '0 0 0 2px rgba(37,99,235,0.35), 0 2px 6px rgba(15,23,42,0.3)'
+      : '0 1px 2px rgba(15,23,42,0.2), 0 0 0 1px rgba(255,255,255,0.45)'
   return L.divIcon({
     className: '',
-    iconSize: [size + 4, size + 4],
-    iconAnchor: [(size + 4) / 2, (size + 4) / 2],
-    html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:9999px;background:${tone};border:${border};box-shadow:${shadow}"></span>`,
+    iconSize: [iconBox, iconBox],
+    iconAnchor: [iconBox / 2, iconBox / 2],
+    html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:9999px;background:${tone};border:${border};box-shadow:${shadow};opacity:${selected ? '1' : highlighted ? '1' : '0.9'};backdrop-filter:blur(0.2px)"></span>`,
   })
 }
 
@@ -168,6 +171,10 @@ export function InventoryOdpLeafletMap({
   const lastSizeRef = useRef<{ width: number; height: number } | null>(null)
   const layoutRafRef = useRef<number | null>(null)
   const layoutRaf2Ref = useRef<number | null>(null)
+  const userInteractedRef = useRef<boolean>(false)
+  const firstPresetAppliedRef = useRef<boolean>(false)
+  const repaintTimersRef = useRef<number[]>([])
+  const lastMapKeyRef = useRef<string | null>(null)
 
   const markerItems = useMemo(() => {
     return rows
@@ -316,11 +323,24 @@ export function InventoryOdpLeafletMap({
       markerLayerRef.current = L.layerGroup()
       markerLayerRef.current.addTo(mapRef.current)
       routeLayerRef.current = L.layerGroup().addTo(mapRef.current)
+
+      const onUserInteract = () => {
+        userInteractedRef.current = true
+      }
+      mapRef.current.on('zoomstart', onUserInteract)
+      mapRef.current.on('dragstart', onUserInteract)
+      mapRef.current.on('movestart', onUserInteract)
     }
 
     const map = mapRef.current
     const markerLayer = markerLayerRef.current
     const routeLayer = routeLayerRef.current
+
+    if (lastMapKeyRef.current !== String(mapKey)) {
+      lastMapKeyRef.current = String(mapKey)
+      userInteractedRef.current = false
+      firstPresetAppliedRef.current = false
+    }
 
     const chromeFixTimer1 = window.setTimeout(() => {
       map.invalidateSize()
@@ -368,24 +388,18 @@ export function InventoryOdpLeafletMap({
     const markerBounds = L.latLngBounds([])
 
     const tileLayer = tileLayerRef.current
-    if (tileLayer && tileLayer.on) {
+    if (tileLayer && tileLayer.on && !(tileLayer as any)._odpOnLoadBound) {
+      ;(tileLayer as any)._odpOnLoadBound = true
       tileLayer.on('load', () => {
         window.setTimeout(() => {
           map.invalidateSize()
           window.requestAnimationFrame(() => {
             map.invalidateSize()
-            if (markerItems.length > 0 && markerBounds.isValid()) {
+            if (!userInteractedRef.current && markerItems.length > 0 && markerBounds.isValid()) {
               try {
                 map.fitBounds(markerBounds.pad(0.25))
                 window.setTimeout(() => {
                   map.invalidateSize()
-                  try {
-                    if (markerBounds.isValid()) {
-                      map.fitBounds(markerBounds.pad(0.25))
-                      const z = map.getZoom()
-                      if (z) map.setZoom(z)
-                    }
-                  } catch (_e) { /* ignore */ }
                 }, 80)
               } catch (_e) {
                 /* ignore */
@@ -537,8 +551,14 @@ export function InventoryOdpLeafletMap({
       hasFinalBounds = true
     }
 
+    if (fitMode === 'route' || fitMode === 'selection') {
+      userInteractedRef.current = false
+    }
+
+    const userDidInteract = userInteractedRef.current
+    const firstRunNoPresetYet = !firstPresetAppliedRef.current
     const isFirstLoadPresetOnly =
-      fitMode === 'markers' && !safeProspectPoint && !hasFinalBounds ? false : fitMode === 'markers' && !safeProspectPoint
+      fitMode === 'markers' && !safeProspectPoint && firstRunNoPresetYet && !userDidInteract
 
     if (fitMode === 'route' && routeBounds && safeRoutePoints.length >= 2) {
       map.fitBounds(routeBounds.pad(0.2))
@@ -550,38 +570,32 @@ export function InventoryOdpLeafletMap({
       } else {
         map.fitBounds(selectionBounds.pad(0.2))
       }
+    } else if (userDidInteract) {
+      // User sudah melakukan zoom / drag manual. JANGAN override posisi view map.
     } else if (isFirstLoadPresetOnly) {
       map.fitBounds(PRESET_PATI_BOUNDS.pad(0.02), { maxZoom: 15 })
+      firstPresetAppliedRef.current = true
     } else if (hasFinalBounds && finalBounds.isValid()) {
       map.fitBounds(finalBounds.pad(0.3))
     } else if (markerItems.length && markerBounds.isValid()) {
       map.fitBounds(markerBounds.pad(0.25))
-    } else {
+    } else if (!userDidInteract) {
       map.fitBounds(PRESET_PATI_BOUNDS.pad(0.02), { maxZoom: 15 })
+      firstPresetAppliedRef.current = true
     }
 
     map.invalidateSize()
 
     const markerCount = markerItems.length
     if (markerCount > 0) {
+      // Cleanup timers lama sebelum buat yang baru (anti leak rerun).
+      repaintTimersRef.current.forEach((t) => window.clearTimeout(t))
+      repaintTimersRef.current = []
+
       const longRepaintT1 = window.setTimeout(() => {
         map.invalidateSize()
-        if (markerBounds.isValid()) {
-          try {
-            map.fitBounds(markerBounds.pad(0.2))
-          } catch (_e) {
-            /* ignore */
-          }
-        }
         const longRepaintT2 = window.setTimeout(() => {
           map.invalidateSize()
-          if (markerBounds.isValid()) {
-            try {
-              map.fitBounds(markerBounds.pad(0.25))
-            } catch (_e) {
-              /* ignore */
-            }
-          }
           window.requestAnimationFrame(() => {
             map.invalidateSize()
           })
@@ -589,29 +603,20 @@ export function InventoryOdpLeafletMap({
             map.invalidateSize()
             window.requestAnimationFrame(() => {
               map.invalidateSize()
-              if (markerBounds.isValid()) {
-                try {
-                  map.fitBounds(markerBounds.pad(0.3))
-                  window.setTimeout(() => {
-                    map.invalidateSize()
-                    const z = map.getZoom()
-                    if (z) map.setZoom(z)
-                  }, 80)
-                } catch (_e) {
-                  /* ignore */
-                }
-              }
             })
           }, 1200)
-          return () => window.clearTimeout(longRepaintT3)
+          repaintTimersRef.current.push(longRepaintT3)
         }, 600)
-        return () => window.clearTimeout(longRepaintT2)
+        repaintTimersRef.current.push(longRepaintT2)
       }, 180)
+      repaintTimersRef.current.push(longRepaintT1)
     }
   }, [mapId, markerItems, onSelectRow, mapKey, routeMode, safeRoutePoints, fitMode, selectedRowId, safeProspectPoint, safeFocusPoints, onPickRoutePoint, selectedMarkerItem, safeHighlightRowIds])
 
   useEffect(() => {
     return () => {
+      repaintTimersRef.current.forEach((t) => window.clearTimeout(t))
+      repaintTimersRef.current = []
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null
@@ -627,6 +632,9 @@ export function InventoryOdpLeafletMap({
         cancelAnimationFrame(layoutRaf2Ref.current)
         layoutRaf2Ref.current = null
       }
+      userInteractedRef.current = false
+      firstPresetAppliedRef.current = false
+      lastMapKeyRef.current = null
     }
   }, [])
 
