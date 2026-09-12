@@ -490,6 +490,24 @@ export function InventoryNetworkOpsPanel({
   const useReferenceLikeLayout = true // isInventoryOdpFocus — Override: selalu pakai light theme layout standar agar theme-aware & readable (tidak ada navy hardcode)
   const hasInventoryNetworkData = Boolean(odpSection || usedPortSection || issuePortSection || assignmentSection || returnSection)
 
+  useEffect(() => {
+    if (!(showMap || isSalesOdpFocus || isInventoryOdpFocus || isOpsOdpFocus)) return
+    setMapRefreshKey((k) => k + 1)
+    setMapFitKey((k) => k + 1)
+    const t0 = window.setTimeout(() => {
+      setMapRefreshKey((k) => k + 1)
+      setMapFitKey((k) => k + 1)
+    }, 0)
+    const t1 = window.setTimeout(() => {
+      setMapRefreshKey((k) => k + 1)
+      setMapFitKey((k) => k + 1)
+    }, 120)
+    return () => {
+      window.clearTimeout(t0)
+      window.clearTimeout(t1)
+    }
+  }, [showMap, isSalesOdpFocus, isInventoryOdpFocus, isOpsOdpFocus])
+
   const portOdpWarning = useMemo(() => {
     if (hasInventoryNetworkData) return null
     const fallback = {

@@ -351,12 +351,33 @@ export function InventoryOdpLeafletMap({
 
     if (!map || !markerLayer) return
 
+    const markerBounds = L.latLngBounds([])
+
     const tileLayer = tileLayerRef.current
     if (tileLayer && tileLayer.on) {
       tileLayer.on('load', () => {
         window.setTimeout(() => {
           map.invalidateSize()
-          window.requestAnimationFrame(() => map.invalidateSize())
+          window.requestAnimationFrame(() => {
+            map.invalidateSize()
+            if (markerItems.length > 0 && markerBounds.isValid()) {
+              try {
+                map.fitBounds(markerBounds.pad(0.25))
+                window.setTimeout(() => {
+                  map.invalidateSize()
+                  try {
+                    if (markerBounds.isValid()) {
+                      map.fitBounds(markerBounds.pad(0.25))
+                      const z = map.getZoom()
+                      if (z) map.setZoom(z)
+                    }
+                  } catch (_e) { /* ignore */ }
+                }, 80)
+              } catch (_e) {
+                /* ignore */
+              }
+            }
+          })
         }, 0)
       })
     }
@@ -365,7 +386,6 @@ export function InventoryOdpLeafletMap({
     routeLayer?.clearLayers()
     deviceLayer?.clearLayers()
 
-    const markerBounds = L.latLngBounds([])
     markerItems.forEach((item) => {
       const marker = L.marker([item.latitude, item.longitude], {
         icon: buildOdpMarkerIcon(item.tone, item.row.id === selectedRowId),
@@ -571,6 +591,11 @@ export function InventoryOdpLeafletMap({
               if (markerBounds.isValid()) {
                 try {
                   map.fitBounds(markerBounds.pad(0.3))
+                  window.setTimeout(() => {
+                    map.invalidateSize()
+                    const z = map.getZoom()
+                    if (z) map.setZoom(z)
+                  }, 80)
                 } catch (_e) {
                   /* ignore */
                 }
@@ -606,5 +631,5 @@ export function InventoryOdpLeafletMap({
   }, [])
 
   const resolvedHeight = typeof height === 'number' ? `${height}px` : '100%'
-  return <div id={mapId} style={{ height: resolvedHeight, width: '100%' }} />
+  return <div id={mapId} style={{ position: 'absolute', inset: 0, height: resolvedHeight, width: '100%', display: 'block', overflow: 'hidden' }} />
 }
