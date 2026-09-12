@@ -43,6 +43,7 @@ export default async function SalesPortOdpPage({
 
   const reviewSections = payload.content.reviewSections ?? []
   const reviewDiagnostics = payload.content.reviewDiagnostics ?? []
+  const odpMapRows = payload.content.odpMapRows ?? []
 
   return (
     <div className="space-y-4">
@@ -74,6 +75,7 @@ export default async function SalesPortOdpPage({
       <InventoryNetworkOpsPanel
         sections={reviewSections}
         reviewDiagnostics={reviewDiagnostics}
+        odpMapRows={odpMapRows ?? []}
         canCreate={false}
         canUpdate={false}
         reviewDbReady={payload.source.effectiveMode === 'review-db' && !payload.source.isFallback}
