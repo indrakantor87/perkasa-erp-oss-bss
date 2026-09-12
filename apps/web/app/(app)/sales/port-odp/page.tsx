@@ -46,32 +46,8 @@ export default async function SalesPortOdpPage({
   const odpMapRows = payload.content.odpMapRows ?? []
 
   return (
-    <div className="space-y-4">
+    <div>
       <DataSourceStatus source={payload.source} />
-
-      <section className="panel p-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mute">Penjualan</p>
-            <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-inkStrong">
-              Port ODP
-            </h1>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-muteStrong">
-              Halaman ini berdiri sendiri khusus untuk membaca coverage area, kapasitas ODP, marker peta, dan jarak rumah prospek ke ODP terdekat
-              tanpa membawa workspace inventory yang tidak relevan ke UI penjualan.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/sales"
-              className="rounded-md border border-line bg-surfaceSoft px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muteStrong transition hover:bg-surface hover:text-inkStrong"
-            >
-              Kembali ke Penjualan
-            </Link>
-          </div>
-        </div>
-      </section>
-
       <InventoryNetworkOpsPanel
         sections={reviewSections}
         reviewDiagnostics={reviewDiagnostics}
@@ -85,6 +61,30 @@ export default async function SalesPortOdpPage({
         lifecycleItems={[]}
         showDeviceReturnForm={false}
         mode="sales-odp-focus"
+        salesHeaderNode={
+          <section className="panel p-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mute">Penjualan</p>
+                <h1 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-inkStrong">
+                  Port ODP
+                </h1>
+                <p className="mt-2 max-w-4xl text-sm leading-6 text-muteStrong">
+                  Halaman ini berdiri sendiri khusus untuk membaca coverage area, kapasitas ODP, marker peta, dan jarak rumah prospek ke ODP terdekat
+                  tanpa membawa workspace inventory yang tidak relevan ke UI penjualan.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/sales"
+                  className="rounded-md border border-line bg-surfaceSoft px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muteStrong transition hover:bg-surface hover:text-inkStrong"
+                >
+                  Kembali ke Penjualan
+                </Link>
+              </div>
+            </div>
+          </section>
+        }
       />
     </div>
   )
