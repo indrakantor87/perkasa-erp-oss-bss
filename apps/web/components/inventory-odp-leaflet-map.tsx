@@ -83,7 +83,12 @@ export function getPortCapacityTone(params: { totalPorts: number; activePorts: n
   return ODP_CAPACITY_COLORS[status]
 }
 
+const ODP_ICON_CACHE = new Map<string, L.DivIcon>()
+
 function buildOdpMarkerIcon(tone: string, selected = false, highlighted = false) {
+  const cacheKey = `${tone}:${selected ? 'S' : 'X'}:${highlighted ? 'H' : 'X'}`
+  const cached = ODP_ICON_CACHE.get(cacheKey)
+  if (cached) return cached
   const baseSize = selected ? 14 : 11
   const size = highlighted ? baseSize + 2 : baseSize
   const iconBox = size + 3
@@ -97,12 +102,14 @@ function buildOdpMarkerIcon(tone: string, selected = false, highlighted = false)
     : selected
       ? '0 0 0 2px rgba(37,99,235,0.35), 0 2px 6px rgba(15,23,42,0.3)'
       : '0 1px 2px rgba(15,23,42,0.2), 0 0 0 1px rgba(255,255,255,0.45)'
-  return L.divIcon({
+  const icon = L.divIcon({
     className: '',
     iconSize: [iconBox, iconBox],
     iconAnchor: [iconBox / 2, iconBox / 2],
     html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:9999px;background:${tone};border:${border};box-shadow:${shadow};opacity:${selected ? '1' : highlighted ? '1' : '0.9'};backdrop-filter:blur(0.2px)"></span>`,
   })
+  ODP_ICON_CACHE.set(cacheKey, icon)
+  return icon
 }
 
 function normalizeRoutePoints(points?: Array<{ lat: number; lng: number }>) {
@@ -175,6 +182,11 @@ export function InventoryOdpLeafletMap({
   const firstPresetAppliedRef = useRef<boolean>(false)
   const repaintTimersRef = useRef<number[]>([])
   const lastMapKeyRef = useRef<string | null>(null)
+  const markerInstanceMapRef = useRef<Map<string, L.Marker>>(new Map())
+  const lastMarkerItemsSignatureRef = useRef<string>('')
+  const chromeTimersRef = useRef<number[]>([])
+  const lastSelectedRef = useRef<string | null>(null)
+  const lastHighlightSigRef = useRef<string>('')
 
   const markerItems = useMemo(() => {
     return rows
@@ -340,48 +352,35 @@ export function InventoryOdpLeafletMap({
       lastMapKeyRef.current = String(mapKey)
       userInteractedRef.current = false
       firstPresetAppliedRef.current = false
+      lastMarkerItemsSignatureRef.current = ''
+      lastSelectedRef.current = null
+      lastHighlightSigRef.current = ''
     }
 
-    const chromeFixTimer1 = window.setTimeout(() => {
+    const needFullMarkerRebuild = () => {
+      try {
+        const sig = markerItems.map((i) => `${i.row.id}|${i.latitude.toFixed(6)}|${i.longitude.toFixed(6)}|${i.tone}|${i.totalPorts}|${i.activePorts}|${i.status}`).join(';')
+        if (sig !== lastMarkerItemsSignatureRef.current) {
+          lastMarkerItemsSignatureRef.current = sig
+          return true
+        }
+        return false
+      } catch {
+        return true
+      }
+    }
+
+    chromeTimersRef.current.forEach((t) => window.clearTimeout(t))
+    chromeTimersRef.current = []
+
+    const chromePaint1 = window.setTimeout(() => {
       map.invalidateSize()
-      const chromeFixTimer2 = window.setTimeout(() => {
+      const chromePaint2 = window.setTimeout(() => {
         map.invalidateSize()
-        const chromeFixTimer3 = window.setTimeout(() => {
-          map.invalidateSize()
-          const chromeFixTimer4 = window.setTimeout(() => {
-            map.invalidateSize()
-            const chromeFixTimer5 = window.setTimeout(() => {
-              map.invalidateSize()
-              const chromeRaf1 = window.requestAnimationFrame(() => {
-                map.invalidateSize()
-                const chromeFixTimer6 = window.setTimeout(() => {
-                    map.invalidateSize()
-                    const chromeFixTimer7 = window.setTimeout(() => {
-                      map.invalidateSize()
-                      const chromeRaf2 = window.requestAnimationFrame(() => {
-                        map.invalidateSize()
-                        const chromeFixTimer8 = window.setTimeout(() => {
-                          map.invalidateSize()
-                          const chromeFixTimer9 = window.setTimeout(() => {
-                            map.invalidateSize()
-                            window.requestAnimationFrame(() => {
-                              map.invalidateSize()
-                            })
-                          }, 1000)
-                        }, 600)
-                      })
-                    }, 300)
-                  }, 120)
-              })
-            }, 220)
-            return () => window.clearTimeout(chromeFixTimer4)
-          }, 160)
-          return () => window.clearTimeout(chromeFixTimer3)
-        }, 100)
-        return () => window.clearTimeout(chromeFixTimer2)
-      }, 60)
-      return () => window.clearTimeout(chromeFixTimer1)
-    }, 30)
+      }, 220)
+      chromeTimersRef.current.push(chromePaint2)
+    }, 60)
+    chromeTimersRef.current.push(chromePaint1)
 
     if (!map || !markerLayer) return
 
@@ -410,72 +409,96 @@ export function InventoryOdpLeafletMap({
       })
     }
 
-    markerLayer.clearLayers()
+    const fullRebuild = needFullMarkerRebuild()
+    if (fullRebuild) {
+      markerInstanceMapRef.current.forEach((m) => {
+        try { m.remove() } catch { /* ignore */ }
+      })
+      markerInstanceMapRef.current.clear()
+      markerLayer.clearLayers()
+    }
     routeLayer?.clearLayers()
+
+    const highlightSet = new Set(safeHighlightRowIds)
+    const highlightSig = [...highlightSet].sort().join('|')
+    const selectedChanged = lastSelectedRef.current !== (selectedRowId ?? null)
+    const highlightChanged = lastHighlightSigRef.current !== highlightSig
+    if (selectedChanged) lastSelectedRef.current = selectedRowId ?? null
+    if (highlightChanged) lastHighlightSigRef.current = highlightSig
 
     markerItems.forEach((item) => {
       const isSelected = item.row.id === selectedRowId
-      const isHighlighted = safeHighlightRowIds.includes(item.row.id)
-      const marker = L.marker([item.latitude, item.longitude], {
-        icon: buildOdpMarkerIcon(item.tone, isSelected, isHighlighted),
-        riseOnHover: true,
-      })
-      const statusTone =
-        item.status === 'EMPTY_FREE'
-          ? '#065f46'
-          : item.status === 'AVAILABLE_UNDER50'
-            ? '#065f46'
-            : item.status === 'OVER50'
-              ? '#b45309'
-              : item.status === 'FULL'
-                ? '#991b1b'
-                : '#334155'
-      const namaOdp = item.row.primary ? String(item.row.primary).trim() : item.row.secondary ? String(item.row.secondary).trim() : `ODP (id: ${String(item.row.id).slice(0, 8)})`
-      const popHuman = item.row.secondary ? String(item.row.secondary).trim() : namaOdp
-      const shortBadge =
-        item.status === 'FULL'
-          ? 'PENUH'
-          : item.status === 'OVER50'
-            ? '> 50%'
-            : item.status === 'UNKNOWN'
-              ? 'N/A'
-              : '< 50%'
-      const popupContent = `
-        <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.55; min-width: 230px;">
-          <div style="font-weight: 700; font-size: 15px; margin-bottom: 2px;">${namaOdp}</div>
-          <div style="opacity: 0.78; margin-bottom: 8px;">${popHuman}${item.row.detail && String(item.row.detail) !== popHuman ? ` · ${String(item.row.detail).slice(0, 60)}` : ''}</div>
-          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-            <span style="display:inline-block; padding: 2px 10px; border-radius: 9999px; background:${item.tone}; color:#ffffff; font-weight:700; font-size:11px; letter-spacing: 0.02em;">
-              Terpakai: ${item.activePorts}/${item.totalPorts}
-            </span>
-            <span style="display:inline-block; padding: 2px 10px; border-radius: 9999px; background:rgba(15,23,42,0.9); color:#ffffff; font-weight:600; font-size:11px;">
-              ${shortBadge}
-            </span>
-          </div>
-          <div style="opacity:0.78; border-top: 1px solid rgba(15,23,42,0.08); padding-top: 8px;">
-            ${Number.isFinite(item.latitude) && Number.isFinite(item.longitude) ? `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}` : 'Koordinat tidak terbaca'}
-          </div>
-          ${
-            item.totalPorts <= 0
-              ? '<div style="margin-top:8px; padding:6px 8px; border-radius:8px; background:rgba(100,116,139,0.12); color:#475569; font-size:11px;">Data kapasitas ODP ini belum terbaca lengkap.</div>'
-              : ''
-          }
-          ${
-            item.detailHref
-              ? `<a href="${item.detailHref.replace(/"/g, '&quot;')}" style="display:inline-block; margin-top:10px; text-decoration:none; padding:6px 10px; border-radius:6px; background:#0f172a; color:#ffffff; font-weight:600; font-size:11px;">Lihat Detail ODP</a>`
-              : '<div style="margin-top:8px; opacity:0.6; font-size:11px;">Klik marker ini untuk pilih ODP di panel samping.</div>'
-          }
-        </div>
-      `
-      marker.bindPopup(popupContent, { closeButton: true, autoPan: true, maxWidth: 320 })
-      marker.on('click', () => {
-        onSelectRow?.(item.row)
-        if (!routeMode) {
-          return
+      const isHighlighted = highlightSet.has(item.row.id)
+      let marker: L.Marker | undefined
+      if (!fullRebuild) {
+        marker = markerInstanceMapRef.current.get(item.row.id)
+        if (marker && (selectedChanged || highlightChanged)) {
+          marker.setIcon(buildOdpMarkerIcon(item.tone, isSelected, isHighlighted))
         }
-        onPickRoutePoint?.({ row: item.row, lat: item.latitude, lng: item.longitude })
-      })
-      marker.addTo(markerLayer)
+      }
+      if (!marker) {
+        marker = L.marker([item.latitude, item.longitude], {
+          icon: buildOdpMarkerIcon(item.tone, isSelected, isHighlighted),
+          riseOnHover: true,
+        })
+        markerInstanceMapRef.current.set(item.row.id, marker)
+        const statusTone =
+          item.status === 'EMPTY_FREE'
+            ? '#065f46'
+            : item.status === 'AVAILABLE_UNDER50'
+              ? '#065f46'
+              : item.status === 'OVER50'
+                ? '#b45309'
+                : item.status === 'FULL'
+                  ? '#991b1b'
+                  : '#334155'
+        const namaOdp = item.row.primary ? String(item.row.primary).trim() : item.row.secondary ? String(item.row.secondary).trim() : `ODP (id: ${String(item.row.id).slice(0, 8)})`
+        const popHuman = item.row.secondary ? String(item.row.secondary).trim() : namaOdp
+        const shortBadge =
+          item.status === 'FULL'
+            ? 'PENUH'
+            : item.status === 'OVER50'
+              ? '> 50%'
+              : item.status === 'UNKNOWN'
+                ? 'N/A'
+                : '< 50%'
+        const popupContent = `
+          <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.55; min-width: 230px;">
+            <div style="font-weight: 700; font-size: 15px; margin-bottom: 2px;">${namaOdp}</div>
+            <div style="opacity: 0.78; margin-bottom: 8px;">${popHuman}${item.row.detail && String(item.row.detail) !== popHuman ? ` · ${String(item.row.detail).slice(0, 60)}` : ''}</div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+              <span style="display:inline-block; padding: 2px 10px; border-radius: 9999px; background:${item.tone}; color:#ffffff; font-weight:700; font-size:11px; letter-spacing: 0.02em;">
+                Terpakai: ${item.activePorts}/${item.totalPorts}
+              </span>
+              <span style="display:inline-block; padding: 2px 10px; border-radius: 9999px; background:rgba(15,23,42,0.9); color:#ffffff; font-weight:600; font-size:11px;">
+                ${shortBadge}
+              </span>
+            </div>
+            <div style="opacity:0.78; border-top: 1px solid rgba(15,23,42,0.08); padding-top: 8px;">
+              ${Number.isFinite(item.latitude) && Number.isFinite(item.longitude) ? `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}` : 'Koordinat tidak terbaca'}
+            </div>
+            ${
+              item.totalPorts <= 0
+                ? '<div style="margin-top:8px; padding:6px 8px; border-radius:8px; background:rgba(100,116,139,0.12); color:#475569; font-size:11px;">Data kapasitas ODP ini belum terbaca lengkap.</div>'
+                : ''
+            }
+            ${
+              item.detailHref
+                ? `<a href="${item.detailHref.replace(/"/g, '&quot;')}" style="display:inline-block; margin-top:10px; text-decoration:none; padding:6px 10px; border-radius:6px; background:#0f172a; color:#ffffff; font-weight:600; font-size:11px;">Lihat Detail ODP</a>`
+                : '<div style="margin-top:8px; opacity:0.6; font-size:11px;">Klik marker ini untuk pilih ODP di panel samping.</div>'
+            }
+          </div>
+        `
+        marker.bindPopup(popupContent, { closeButton: true, autoPan: true, maxWidth: 320 })
+        marker.on('click', () => {
+          onSelectRow?.(item.row)
+          if (!routeMode) {
+            return
+          }
+          onPickRoutePoint?.({ row: item.row, lat: item.latitude, lng: item.longitude })
+        })
+        marker.addTo(markerLayer)
+      }
       markerBounds.extend([item.latitude, item.longitude])
     })
 
@@ -583,40 +606,15 @@ export function InventoryOdpLeafletMap({
       map.fitBounds(PRESET_PATI_BOUNDS.pad(0.02), { maxZoom: 15 })
       firstPresetAppliedRef.current = true
     }
-
-    map.invalidateSize()
-
-    const markerCount = markerItems.length
-    if (markerCount > 0) {
-      // Cleanup timers lama sebelum buat yang baru (anti leak rerun).
-      repaintTimersRef.current.forEach((t) => window.clearTimeout(t))
-      repaintTimersRef.current = []
-
-      const longRepaintT1 = window.setTimeout(() => {
-        map.invalidateSize()
-        const longRepaintT2 = window.setTimeout(() => {
-          map.invalidateSize()
-          window.requestAnimationFrame(() => {
-            map.invalidateSize()
-          })
-          const longRepaintT3 = window.setTimeout(() => {
-            map.invalidateSize()
-            window.requestAnimationFrame(() => {
-              map.invalidateSize()
-            })
-          }, 1200)
-          repaintTimersRef.current.push(longRepaintT3)
-        }, 600)
-        repaintTimersRef.current.push(longRepaintT2)
-      }, 180)
-      repaintTimersRef.current.push(longRepaintT1)
-    }
-  }, [mapId, markerItems, onSelectRow, mapKey, routeMode, safeRoutePoints, fitMode, selectedRowId, safeProspectPoint, safeFocusPoints, onPickRoutePoint, selectedMarkerItem, safeHighlightRowIds])
+  }, [mapId, markerItems, onSelectRow, mapKey, routeMode, safeRoutePoints, fitMode, safeProspectPoint, safeFocusPoints, onPickRoutePoint, selectedMarkerItem, selectedRowId, safeHighlightRowIds])
 
   useEffect(() => {
     return () => {
       repaintTimersRef.current.forEach((t) => window.clearTimeout(t))
       repaintTimersRef.current = []
+      chromeTimersRef.current.forEach((t) => window.clearTimeout(t))
+      chromeTimersRef.current = []
+      markerInstanceMapRef.current.clear()
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null
