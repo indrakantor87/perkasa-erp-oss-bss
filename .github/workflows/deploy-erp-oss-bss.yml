@@ -36,7 +36,7 @@ jobs:
     env:
       IMAGE_REPOSITORY: ghcr.io/indrakantor87/perkasa-erp-oss-bss
       ERP_CONTAINER: perkasa-erp-oss-bss
-      ERP_DOMAIN: b8qxcx7nu5nfvcygs1gg1fyt.103.162.17.178.sslip.io
+      ERP_DOMAIN: umymkc4b8uje128dq8in0ua6.103.162.17.178.sslip.io
       ERP_HOST_PORT: "3006"
       ERP_CONTAINER_PORT: "3000"
       ERP_NETWORK: coolify
@@ -162,7 +162,7 @@ jobs:
           esac
           case "$CHECK_DOMAIN" in
             *"$STALE_ERP_DOMAIN_PREFIX"*)
-              abort 9 "DOMAIN variable contains STALE OLD ERP domain prefix. ONLY canonical b8qxcx7nu5nfvcygs1gg1fyt sslip permitted"
+              abort 9 "DOMAIN variable contains STALE OLD ERP domain prefix. ONLY canonical umymkc4b8uje128dq8in0ua6 sslip permitted"
               ;;
           esac
 
@@ -432,10 +432,10 @@ jobs:
           fi
           echo "[2/7 OK] EXACT container removed"
 
-          BT=$(printf '\x60')
+          SQ=$(printf '\x27')
           LABEL_ENABLE="traefik.enable=true"
           LABEL_ENTRY="traefik.http.routers.erp-ssl.entryPoints=http"
-          LABEL_RULE="traefik.http.routers.erp-ssl.rule=Host(${BT}${ERP_DOMAIN_PLACEHOLDER}${BT})"
+          LABEL_RULE="traefik.http.routers.erp-ssl.rule=Host(${SQ}${ERP_DOMAIN_PLACEHOLDER}${SQ})"
           LABEL_LB="traefik.http.services.erp-ssl.loadbalancer.server.port=${ERP_CONTAINER_PORT_PLACEHOLDER}"
 
           echo "[3/7] docker run EXACT $ERP_CONTAINER_PLACEHOLDER port $ERP_HOST_PORT_PLACEHOLDER:$ERP_CONTAINER_PORT_PLACEHOLDER"
@@ -526,14 +526,14 @@ jobs:
           fi
           echo "[5/7 OK] Config.Image identity PASS (exact tag match = SHA pinned immutable)"
 
-          echo "[6/7] HTTP health verify: curl --resolve ERP domain → /login endpoint (G11 gate)"
+          echo "[6/7] HTTP health verify: curl --resolve ERP domain → / root endpoint (G11 gate)"
           HTTP_OK=0
           for i in 1 2 3 4 5; do
             echo "  attempt $i/5 ..."
             RESP=$(curl -sS -o /tmp/erp_http_body.txt -w '%{http_code}' \
               --resolve "${ERP_DOMAIN_PLACEHOLDER}:80:127.0.0.1" \
               --max-time 10 \
-              "http://${ERP_DOMAIN_PLACEHOLDER}/login" 2>/dev/null || echo "000")
+              "http://${ERP_DOMAIN_PLACEHOLDER}/" 2>/dev/null || echo "000")
             echo "  HTTP_CODE=$RESP"
             if [ "$RESP" = "200" ] || [ "$RESP" = "201" ] || [ "$RESP" = "301" ] || [ "$RESP" = "302" ] || [ "$RESP" = "303" ] || [ "$RESP" = "307" ] || [ "$RESP" = "308" ]; then
               HTTP_OK=1
@@ -547,7 +547,7 @@ jobs:
             docker logs "$ERP_CONTAINER_PLACEHOLDER" --tail 40 2>&1 || true
             echo "HTTP BODY tail 500 chars:"
             tail -c 500 /tmp/erp_http_body.txt 2>/dev/null || true
-            abort "REMOTE: /login endpoint never returned 2xx/3xx after 5 retries" 21
+            abort "REMOTE: root / endpoint never returned 2xx/3xx after 5 retries. Check Next.js standalone server startup logs." 21
           fi
           echo "[6/7 OK] HTTP health PASS (Traefik routing + Next.js app server boot verified)"
 
