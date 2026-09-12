@@ -887,7 +887,12 @@ export function InventoryNetworkOpsPanel({
                   setMapFitKey((k) => k + 1)
                   window.setTimeout(() => {
                     setMapRefreshKey((k) => k + 1)
+                    setMapFitKey((k) => k + 1)
                   }, 0)
+                  window.setTimeout(() => {
+                    setMapRefreshKey((k) => k + 1)
+                    setMapFitKey((k) => k + 1)
+                  }, 120)
                 }
                 return next
               })
@@ -1168,8 +1173,19 @@ export function InventoryNetworkOpsPanel({
                 id="odp-leaflet-map-shell"
                 className={
                   mapFullscreenActive
-                    ? 'relative flex-1 min-h-0 w-full bg-slate-950'
-                    : 'relative h-[520px] w-full bg-slate-950'
+                    ? 'relative flex-1 min-h-0 w-full bg-slate-950 overflow-hidden'
+                    : 'relative h-[520px] w-full bg-slate-950 overflow-hidden block'
+                }
+                style={
+                  !mapFullscreenActive
+                    ? {
+                        display: 'block',
+                        height: '520px',
+                        width: '100%',
+                        minHeight: '520px',
+                        overflow: 'hidden',
+                      }
+                    : undefined
                 }
               >
                 <div className="pointer-events-none absolute left-3 top-3 z-[500] flex flex-wrap items-center gap-2">

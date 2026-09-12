@@ -321,8 +321,23 @@ export function InventoryOdpLeafletMap({
               const chromeRaf1 = window.requestAnimationFrame(() => {
                 map.invalidateSize()
                 const chromeFixTimer6 = window.setTimeout(() => {
-                  map.invalidateSize()
-                }, 360)
+                    map.invalidateSize()
+                    const chromeFixTimer7 = window.setTimeout(() => {
+                      map.invalidateSize()
+                      const chromeRaf2 = window.requestAnimationFrame(() => {
+                        map.invalidateSize()
+                        const chromeFixTimer8 = window.setTimeout(() => {
+                          map.invalidateSize()
+                          const chromeFixTimer9 = window.setTimeout(() => {
+                            map.invalidateSize()
+                            window.requestAnimationFrame(() => {
+                              map.invalidateSize()
+                            })
+                          }, 1000)
+                        }, 600)
+                      })
+                    }, 300)
+                  }, 120)
               })
             }, 220)
             return () => window.clearTimeout(chromeFixTimer4)
@@ -525,6 +540,48 @@ export function InventoryOdpLeafletMap({
     }
 
     map.invalidateSize()
+
+    const markerCount = markerItems.length
+    if (markerCount > 0) {
+      const longRepaintT1 = window.setTimeout(() => {
+        map.invalidateSize()
+        if (markerBounds.isValid()) {
+          try {
+            map.fitBounds(markerBounds.pad(0.2))
+          } catch (_e) {
+            /* ignore */
+          }
+        }
+        const longRepaintT2 = window.setTimeout(() => {
+          map.invalidateSize()
+          if (markerBounds.isValid()) {
+            try {
+              map.fitBounds(markerBounds.pad(0.25))
+            } catch (_e) {
+              /* ignore */
+            }
+          }
+          window.requestAnimationFrame(() => {
+            map.invalidateSize()
+          })
+          const longRepaintT3 = window.setTimeout(() => {
+            map.invalidateSize()
+            window.requestAnimationFrame(() => {
+              map.invalidateSize()
+              if (markerBounds.isValid()) {
+                try {
+                  map.fitBounds(markerBounds.pad(0.3))
+                } catch (_e) {
+                  /* ignore */
+                }
+              }
+            })
+          }, 1200)
+          return () => window.clearTimeout(longRepaintT3)
+        }, 600)
+        return () => window.clearTimeout(longRepaintT2)
+      }, 180)
+    }
   }, [mapId, markerItems, onSelectRow, mapKey, routeMode, safeRoutePoints, fitMode, selectedRowId, safeProspectPoint, safeFocusPoints, onPickRoutePoint, selectedMarkerItem, safeDevicePoint])
 
   useEffect(() => {
