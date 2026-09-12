@@ -323,6 +323,8 @@ export function InventoryOdpLeafletMap({
       mapRef.current = L.map(element, {
         zoomControl: true,
         attributionControl: true,
+        preferCanvas: false,
+        renderer: L.svg({ padding: 0.5 }),
       })
 
       const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -333,8 +335,17 @@ export function InventoryOdpLeafletMap({
       tileLayerRef.current = tileLayer
 
       markerLayerRef.current = L.layerGroup()
-      markerLayerRef.current.addTo(mapRef.current)
-      routeLayerRef.current = L.layerGroup().addTo(mapRef.current)
+      routeLayerRef.current = L.layerGroup()
+      try {
+        markerLayerRef.current.addTo(mapRef.current)
+        routeLayerRef.current.addTo(mapRef.current)
+      } catch (_e) {
+        // ignore race init
+      }
+      if (mapRef.current && !mapRef.current.hasLayer(markerLayerRef.current)) {
+        try { markerLayerRef.current.addTo(mapRef.current) } catch { /* ignore */ }
+        try { routeLayerRef.current.addTo(mapRef.current) } catch { /* ignore */ }
+      }
 
       const onUserInteract = () => {
         userInteractedRef.current = true
@@ -377,9 +388,13 @@ export function InventoryOdpLeafletMap({
       map.invalidateSize()
       const chromePaint2 = window.setTimeout(() => {
         map.invalidateSize()
-      }, 220)
+        const chromePaint3 = window.setTimeout(() => {
+          map.invalidateSize()
+        }, 450)
+        chromeTimersRef.current.push(chromePaint3)
+      }, 250)
       chromeTimersRef.current.push(chromePaint2)
-    }, 60)
+    }, 120)
     chromeTimersRef.current.push(chromePaint1)
 
     if (!map || !markerLayer) return
@@ -629,5 +644,5 @@ export function InventoryOdpLeafletMap({
   }, [])
 
   const resolvedHeight = typeof height === 'number' ? `${height}px` : '100%'
-  return <div id={mapId} style={{ position: 'absolute', inset: 0, height: resolvedHeight, width: '100%', display: 'block', overflow: 'hidden' }} />
+  return <div id={mapId} style={{ position: 'absolute', inset: 0, top: 0, left: 0, right: 0, bottom: 0, height: resolvedHeight, width: '100%', minWidth: '100%', minHeight: resolvedHeight, display: 'block', overflow: 'hidden', margin: 0, padding: 0 }} />
 }

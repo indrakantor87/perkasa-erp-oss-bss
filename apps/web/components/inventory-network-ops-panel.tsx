@@ -1125,49 +1125,7 @@ export function InventoryNetworkOpsPanel({
                   <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
                     Titik: {routePoints.length}
                   </span>
-                </div>
-                <div className="absolute left-3 top-[48px] z-[500] flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRouteMode((current) => !current)}
-                    className={
-                      routeMode
-                        ? 'rounded-md border border-sky-500 bg-sky-600/90 px-3 py-1.5 text-xs font-semibold text-white shadow-[0_8px_20px_rgba(2,6,23,0.35)] transition hover:bg-sky-500'
-                        : 'rounded-md border border-slate-600 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-slate-100 shadow-[0_8px_20px_rgba(2,6,23,0.35)] transition hover:bg-slate-800'
-                    }
-                  >
-                    Mode Rute: {routeMode ? 'ON' : 'OFF'}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={routePoints.length === 0}
-                    onClick={() =>
-                      setRoutePoints((current) => {
-                        if (current.length === 0) return current
-                        return current.slice(0, -1)
-                      })
-                    }
-                    className={
-                      routePoints.length === 0
-                        ? 'rounded-md border border-slate-700 bg-slate-950/40 px-3 py-1.5 text-xs font-semibold text-slate-500'
-                        : 'rounded-md border border-slate-600 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-slate-100 shadow-[0_8px_20px_rgba(2,6,23,0.35)] transition hover:bg-slate-800'
-                    }
-                  >
-                    Undo
-                  </button>
-                  <button
-                    type="button"
-                    disabled={routePoints.length === 0}
-                    onClick={() => setRoutePoints([])}
-                    className={
-                      routePoints.length === 0
-                        ? 'rounded-md border border-slate-700 bg-slate-950/40 px-3 py-1.5 text-xs font-semibold text-slate-500'
-                        : 'rounded-md border border-slate-600 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-slate-100 shadow-[0_8px_20px_rgba(2,6,23,0.35)] transition hover:bg-slate-800'
-                    }
-                  >
-                    Reset
-                  </button>
-                  <span className="rounded-md border border-slate-600 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-slate-100 shadow-[0_8px_20px_rgba(2,6,23,0.35)]">
+                  <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
                     Jarak: {formatDistanceMetersWithUnit(routeDistanceMeters, routeDistanceUnit)}
                   </span>
                 </div>
