@@ -384,18 +384,39 @@ export function InventoryOdpLeafletMap({
     chromeTimersRef.current.forEach((t) => window.clearTimeout(t))
     chromeTimersRef.current = []
 
-    const chromePaint1 = window.setTimeout(() => {
-      map.invalidateSize()
-      const chromePaint2 = window.setTimeout(() => {
-        map.invalidateSize()
-        const chromePaint3 = window.setTimeout(() => {
-          map.invalidateSize()
-        }, 450)
-        chromeTimersRef.current.push(chromePaint3)
-      }, 250)
-      chromeTimersRef.current.push(chromePaint2)
-    }, 120)
-    chromeTimersRef.current.push(chromePaint1)
+    const runChromePaintChain = () => {
+      const delays = [0, 40, 90, 160, 260, 400, 600, 850, 1150]
+      delays.forEach((delay, idx) => {
+        const t = window.setTimeout(() => {
+          try {
+            map.invalidateSize()
+            if (idx === delays.length - 1) {
+              try {
+                map.setZoom(map.getZoom())
+                map.setView(map.getCenter())
+              } catch (_e) { /* ignore */ }
+            }
+          } catch (_e) { /* ignore */ }
+        }, delay)
+        chromeTimersRef.current.push(t)
+      })
+    }
+
+    const container = document.getElementById(mapId)
+    if (container && (container.offsetWidth < 150 || container.offsetHeight < 150)) {
+      let sizeRetries = 0
+      const sizeCheckTimer = window.setInterval(() => {
+        sizeRetries += 1
+        const el = document.getElementById(mapId)
+        if ((el && el.offsetWidth > 150 && el.offsetHeight > 150) || sizeRetries >= 25) {
+          window.clearInterval(sizeCheckTimer)
+          runChromePaintChain()
+        }
+      }, 40)
+      chromeTimersRef.current.push(sizeCheckTimer as unknown as number)
+    } else {
+      runChromePaintChain()
+    }
 
     if (!map || !markerLayer) return
 
@@ -405,22 +426,32 @@ export function InventoryOdpLeafletMap({
     if (tileLayer && tileLayer.on && !(tileLayer as any)._odpOnLoadBound) {
       ;(tileLayer as any)._odpOnLoadBound = true
       tileLayer.on('load', () => {
-        window.setTimeout(() => {
-          map.invalidateSize()
-          window.requestAnimationFrame(() => {
-            map.invalidateSize()
-            if (!userInteractedRef.current && markerItems.length > 0 && markerBounds.isValid()) {
-              try {
-                map.fitBounds(markerBounds.pad(0.25))
-                window.setTimeout(() => {
-                  map.invalidateSize()
-                }, 80)
-              } catch (_e) {
-                /* ignore */
+        const tileDelays = [0, 30, 70, 130, 220, 340, 500]
+        tileDelays.forEach((d, idx) => {
+          const t = window.setTimeout(() => {
+            try {
+              map.invalidateSize()
+              if (idx === tileDelays.length - 1) {
+                try {
+                  map.setZoom(map.getZoom())
+                  map.setView(map.getCenter())
+                } catch (_e) { /* ignore */ }
+                if (!userInteractedRef.current && markerItems.length > 0 && markerBounds.isValid()) {
+                  try {
+                    map.fitBounds(markerBounds.pad(0.25))
+                    const fitT = window.setTimeout(() => {
+                      try { map.invalidateSize() } catch (_e) { /* ignore */ }
+                    }, 100)
+                    chromeTimersRef.current.push(fitT)
+                  } catch (_e) {
+                    /* ignore */
+                  }
+                }
               }
-            }
-          })
-        }, 0)
+            } catch (_e) { /* ignore */ }
+          }, d)
+          chromeTimersRef.current.push(t)
+        })
       })
     }
 

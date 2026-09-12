@@ -451,6 +451,7 @@ export function InventoryNetworkOpsPanel({
   lifecycleItems,
   showDeviceReturnForm,
   mode = 'full',
+  salesHeaderNode,
 }: {
   sections: DomainReviewSection[]
   reviewDiagnostics?: DomainReviewDiagnostic[]
@@ -464,6 +465,7 @@ export function InventoryNetworkOpsPanel({
   lifecycleItems: DeviceLifecycleLogRow[]
   showDeviceReturnForm: boolean
   mode?: 'full' | 'sales-odp-focus' | 'ops-odp-focus' | 'inventory-odp-focus'
+  salesHeaderNode?: React.ReactNode
 }) {
   const odpSection = findSection(sections, 'ODP TERBARU')
   const usedPortSection = findSection(sections, 'PORT TERPAKAI')
@@ -481,9 +483,14 @@ export function InventoryNetworkOpsPanel({
   const issuePortRows = issuePortSection?.rows ?? []
   const assignmentRows = assignmentSection?.rows ?? []
   const returnRows = returnSection?.rows ?? []
+  const isSalesOdpFocus = mode === 'sales-odp-focus'
+  const isOpsOdpFocus = mode === 'ops-odp-focus'
+  const isInventoryOdpFocus = mode === 'inventory-odp-focus'
+  const isFocusedOdpMode = isSalesOdpFocus || isOpsOdpFocus || isInventoryOdpFocus
+
   const [quickActionItem, setQuickActionItem] = useState<TableQuickActionPayload | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showMap, setShowMap] = useState(false)
+  const [showMap, setShowMap] = useState<boolean>(isFocusedOdpMode)
   const [showImportModal, setShowImportModal] = useState(false)
   const [pageSize, setPageSize] = useState(10)
   const [searchQuery, setSearchQuery] = useState('')
@@ -498,31 +505,32 @@ export function InventoryNetworkOpsPanel({
   const [prospectQuery, setProspectQuery] = useState('')
   const [prospectPoint, setProspectPoint] = useState<{ lat: number; lng: number; label: string; sourceLabel: string } | null>(null)
   const [prospectMessage, setProspectMessage] = useState<string>('')
-  const isSalesOdpFocus = mode === 'sales-odp-focus'
-  const isOpsOdpFocus = mode === 'ops-odp-focus'
-  const isInventoryOdpFocus = mode === 'inventory-odp-focus'
-  const isFocusedOdpMode = isSalesOdpFocus || isOpsOdpFocus || isInventoryOdpFocus
   const canWrite = canCreate && reviewDbReady
-  const useReferenceLikeLayout = true // isInventoryOdpFocus — Override: selalu pakai light theme layout standar agar theme-aware & readable (tidak ada navy hardcode)
+  const useReferenceLikeLayout = true
   const hasInventoryNetworkData = Boolean(odpSection || usedPortSection || issuePortSection || assignmentSection || returnSection)
 
   useEffect(() => {
-    if (!(showMap || isSalesOdpFocus || isInventoryOdpFocus || isOpsOdpFocus)) return
-    setMapRefreshKey((k) => k + 1)
-    setMapFitKey((k) => k + 1)
-    const t0 = window.setTimeout(() => {
-      setMapRefreshKey((k) => k + 1)
-      setMapFitKey((k) => k + 1)
-    }, 0)
-    const t1 = window.setTimeout(() => {
-      setMapRefreshKey((k) => k + 1)
-      setMapFitKey((k) => k + 1)
-    }, 120)
-    return () => {
-      window.clearTimeout(t0)
-      window.clearTimeout(t1)
+    if (!(showMap || isFocusedOdpMode)) return
+    const bumpTimers: number[] = []
+    const bump = (delay: number) => {
+      const t = window.setTimeout(() => {
+        setMapRefreshKey((k) => k + 1)
+        setMapFitKey((k) => k + 1)
+      }, delay)
+      bumpTimers.push(t)
     }
-  }, [showMap, isSalesOdpFocus, isInventoryOdpFocus, isOpsOdpFocus])
+    bump(0)
+    bump(60)
+    bump(140)
+    bump(260)
+    bump(420)
+    bump(640)
+    bump(900)
+    bump(1300)
+    return () => {
+      bumpTimers.forEach((t) => window.clearTimeout(t))
+    }
+  }, [showMap, isFocusedOdpMode])
 
   const portOdpWarning = useMemo(() => {
     if (hasInventoryNetworkData) return null
@@ -845,6 +853,7 @@ export function InventoryNetworkOpsPanel({
           : 'overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-b from-[#071a3e] via-[#0b1f45] to-[#10284f] p-4 shadow-[0_28px_80px_rgba(2,6,23,0.28)]'
       }
     >
+      {salesHeaderNode ? <div className="mb-2">{salesHeaderNode}</div> : null}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h3
@@ -999,8 +1008,12 @@ export function InventoryNetworkOpsPanel({
                     }
                     className={
                       routePoints.length === 0
-                        ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                        ? useReferenceLikeLayout
+                          ? 'rounded-md border border-slate-200 bg-white/50 px-3 py-1.5 text-xs font-semibold text-slate-400'
+                          : 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+                        : useReferenceLikeLayout
+                          ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                          : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
                     }
                   >
                     Undo
@@ -1011,17 +1024,29 @@ export function InventoryNetworkOpsPanel({
                     onClick={() => setRoutePoints([])}
                     className={
                       routePoints.length === 0
-                        ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                        ? useReferenceLikeLayout
+                          ? 'rounded-md border border-slate-200 bg-white/50 px-3 py-1.5 text-xs font-semibold text-slate-400'
+                          : 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+                        : useReferenceLikeLayout
+                          ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                          : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
                     }
                   >
                     Reset Rute
                   </button>
                   <details className="relative">
-                    <summary className="cursor-pointer list-none rounded-md border border-slate-600 bg-slate-800/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700">
+                    <summary className={
+                      useReferenceLikeLayout
+                        ? 'cursor-pointer list-none rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                        : 'cursor-pointer list-none rounded-md border border-slate-600 bg-slate-800/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                    }>
                       Jarak: {formatDistanceMetersWithUnit(routeDistanceMeters, routeDistanceUnit)}
                     </summary>
-                    <div className="absolute left-0 top-[calc(100%+6px)] z-[600] w-[180px] rounded-xl border border-slate-700 bg-slate-950/95 p-2 shadow-[0_16px_40px_rgba(2,6,23,0.45)]">
+                    <div className={
+                      useReferenceLikeLayout
+                        ? 'absolute left-0 top-[calc(100%+6px)] z-[600] w-[180px] rounded-xl border border-slate-200 bg-white p-2 shadow-[0_16px_40px_rgba(15,23,42,0.08)]'
+                        : 'absolute left-0 top-[calc(100%+6px)] z-[600] w-[180px] rounded-xl border border-slate-700 bg-slate-950/95 p-2 shadow-[0_16px_40px_rgba(2,6,23,0.45)]'
+                    }>
                       {(
                         [
                           { key: 'auto' as const, label: 'Auto' },
@@ -1037,8 +1062,12 @@ export function InventoryNetworkOpsPanel({
                             onClick={() => setRouteDistanceUnit(item.key)}
                             className={
                               active
-                                ? 'w-full rounded-md border border-white bg-white px-3 py-2 text-left text-xs font-semibold text-slate-950'
-                                : 'w-full rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-left text-xs font-semibold text-white transition hover:bg-slate-800/70'
+                                ? useReferenceLikeLayout
+                                  ? 'w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-left text-xs font-semibold text-white'
+                                  : 'w-full rounded-md border border-white bg-white px-3 py-2 text-left text-xs font-semibold text-slate-950'
+                                : useReferenceLikeLayout
+                                  ? 'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                                  : 'w-full rounded-md border border-slate-700 bg-slate-900/30 px-3 py-2 text-left text-xs font-semibold text-white transition hover:bg-slate-800/70'
                             }
                           >
                             {item.label}
@@ -1050,7 +1079,11 @@ export function InventoryNetworkOpsPanel({
                   <button
                     type="button"
                     onClick={() => setMapFitKey((current) => current + 1)}
-                    className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                    className={
+                      useReferenceLikeLayout
+                        ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                    }
                   >
                     Reset View
                   </button>
@@ -1064,8 +1097,12 @@ export function InventoryNetworkOpsPanel({
                     }}
                     className={
                       routePoints.length < 2
-                        ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                        ? useReferenceLikeLayout
+                          ? 'rounded-md border border-slate-200 bg-white/50 px-3 py-1.5 text-xs font-semibold text-slate-400'
+                          : 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+                        : useReferenceLikeLayout
+                          ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                          : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
                     }
                   >
                     Fit: {routePoints.length >= 2 && mapFitMode === 'route' ? 'Rute' : prospectPoint ? 'Prospek' : 'Marker'}
@@ -1073,29 +1110,47 @@ export function InventoryNetworkOpsPanel({
                   <button
                     type="button"
                     onClick={() => setMapRefreshKey((current) => current + 1)}
-                    className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                    className={
+                      useReferenceLikeLayout
+                        ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                    }
                   >
                     Refresh Peta
                   </button>
                   <button
                     type="button"
                     onClick={() => setMapFullscreenActive((current) => !current)}
-                    className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
+                    className={
+                      useReferenceLikeLayout
+                        ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
+                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
+                    }
                   >
                     {mapFullscreenActive ? 'Keluar Fullscreen' : 'Fullscreen'}
                   </button>
                 </div>
-                <span className={useReferenceLikeLayout ? 'text-sm text-slate-500' : 'badge border-slate-600 bg-slate-800/70 text-slate-100'}>
-                  {useReferenceLikeLayout ? `Marker: ${filteredMapOdpRows.length}` : `${filteredMapOdpRows.length} marker`}
-                </span>
+                {!isFocusedOdpMode ? (
+                  <span className={useReferenceLikeLayout ? 'text-sm text-slate-500' : 'badge border-slate-600 bg-slate-800/70 text-slate-100'}>
+                    {useReferenceLikeLayout ? `Marker: ${filteredMapOdpRows.length}` : `${filteredMapOdpRows.length} marker`}
+                  </span>
+                ) : null}
               </div>
               {routeMode ? (
-                <div className="border-b border-slate-700 bg-slate-950/30 px-3 py-2 text-xs text-slate-200">
+                <div className={
+                  useReferenceLikeLayout
+                    ? 'border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700'
+                    : 'border-b border-slate-700 bg-slate-950/30 px-3 py-2 text-xs text-slate-200'
+                }>
                   Mode Rute aktif. Klik marker untuk menambahkan titik rute. Gunakan Undo/Reset Rute untuk koreksi urutan.
                 </div>
               ) : null}
               {showMap && odpMapDataset.length === 0 && odpRows.length > 0 ? (
-                <div className="border-b border-amber-700 bg-amber-950/40 px-3 py-2 text-xs text-amber-100">
+                <div className={
+                  useReferenceLikeLayout
+                    ? 'border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800'
+                    : 'border-b border-amber-700 bg-amber-950/40 px-3 py-2 text-xs text-amber-100'
+                }>
                   Data peta ODP lengkap sedang dimuat ulang. Menunggu sinkronisasi cache review DB — tekan Refresh Peta atau buka ulang halaman setelah 15 detik.
                 </div>
               ) : null}
@@ -1104,36 +1159,60 @@ export function InventoryNetworkOpsPanel({
                 className={
                   mapFullscreenActive
                     ? 'relative flex-1 min-h-0 w-full bg-slate-950 overflow-hidden'
-                    : 'relative h-[520px] w-full bg-slate-950 overflow-hidden block'
+                    : useReferenceLikeLayout
+                      ? 'relative h-[520px] w-full bg-white overflow-hidden block'
+                      : 'relative h-[520px] w-full bg-slate-950 overflow-hidden block'
                 }
                 style={
                   !mapFullscreenActive
                     ? {
+                        position: 'relative',
                         display: 'block',
                         height: '520px',
                         width: '100%',
                         minHeight: '520px',
                         overflow: 'hidden',
+                        contain: 'layout paint size',
                       }
                     : undefined
                 }
               >
                 <div className="pointer-events-none absolute left-3 top-3 z-[500] flex flex-wrap items-center gap-2">
-                  <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+                  <span className={
+                    useReferenceLikeLayout
+                      ? 'rounded-md border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm'
+                      : 'rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white'
+                  }>
                     Mode Rute: {routeMode ? 'ON' : 'OFF'}
                   </span>
-                  <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+                  <span className={
+                    useReferenceLikeLayout
+                      ? 'rounded-md border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm'
+                      : 'rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white'
+                  }>
                     Titik: {routePoints.length}
                   </span>
-                  <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+                  <span className={
+                    useReferenceLikeLayout
+                      ? 'rounded-md border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm'
+                      : 'rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white'
+                  }>
                     Jarak: {formatDistanceMetersWithUnit(routeDistanceMeters, routeDistanceUnit)}
                   </span>
                 </div>
                 <div className="pointer-events-none absolute right-3 top-3 z-[500] flex flex-wrap items-center gap-2">
-                  <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+                  <span className={
+                    useReferenceLikeLayout
+                      ? 'rounded-md border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm'
+                      : 'rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white'
+                  }>
                     Marker: {filteredMapOdpRows.length}
                   </span>
-                  <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+                  <span className={
+                    useReferenceLikeLayout
+                      ? 'rounded-md border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm'
+                      : 'rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white'
+                  }>
                     Fit: {routePoints.length >= 2 && mapFitMode === 'route' ? 'Rute' : prospectPoint ? 'Prospek' : 'Marker'}
                   </span>
                 </div>
