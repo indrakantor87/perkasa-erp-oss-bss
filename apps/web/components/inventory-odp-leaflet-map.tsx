@@ -5,6 +5,8 @@ import L from 'leaflet'
 import 'leaflet.markercluster'
 import type { DomainReviewRow } from '@/lib/types'
 
+const PRESET_PATI_BOUNDS = L.latLngBounds([-6.8350, 110.8800], [-6.6400, 111.2200])
+
 function pickMeta(meta: string[], prefix: string) {
   return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? ''
 }
@@ -25,35 +27,55 @@ function parseGeoCoordinate(value: string, kind: 'lat' | 'lng') {
   return parsed >= -180 && parsed <= 180 ? parsed : null
 }
 
-export type OdpCapacityStatus = 'AVAILABLE' | 'LIMITED' | 'FULL' | 'UNKNOWN'
+export type OdpCapacityStatus = 'EMPTY_FREE' | 'AVAILABLE_UNDER50' | 'OVER50' | 'FULL' | 'UNKNOWN'
 
 const ODP_CAPACITY_COLORS: Record<OdpCapacityStatus, string> = {
-  AVAILABLE: '#10b981',
-  LIMITED: '#f59e0b',
+  EMPTY_FREE: '#059669',
+  AVAILABLE_UNDER50: '#10b981',
+  OVER50: '#f59e0b',
   FULL: '#ef4444',
   UNKNOWN: '#64748b',
 }
 
 export function getOdpCapacityStatus(params: { totalPorts: number; usedPorts: number }): OdpCapacityStatus {
-  if (params.totalPorts <= 0) return 'UNKNOWN'
   const safeTotal = Number.isFinite(params.totalPorts) ? Math.max(0, Math.floor(params.totalPorts)) : 0
+  if (safeTotal <= 0) return 'UNKNOWN'
   const safeUsed = Number.isFinite(params.usedPorts) ? Math.max(0, Math.min(safeTotal, Math.floor(params.usedPorts))) : 0
   const available = safeTotal - safeUsed
   if (available <= 0) return 'FULL'
-  if (available <= 4) return 'LIMITED'
-  return 'AVAILABLE'
+  if (safeUsed === 0) return 'EMPTY_FREE'
+  const persenTerpakai = safeUsed / safeTotal
+  if (persenTerpakai >= 0.5) return 'OVER50'
+  return 'AVAILABLE_UNDER50'
 }
 
 export function odpCapacityStatusLabel(status: OdpCapacityStatus): string {
   switch (status) {
-    case 'AVAILABLE':
-      return 'AVAILABLE / AMAN'
-    case 'LIMITED':
-      return 'LIMITED / HAMPIR PENUH'
+    case 'EMPTY_FREE':
+      return 'MASIH KOSONG (< 50%)'
+    case 'AVAILABLE_UNDER50':
+      return 'SISA BANYAK (< 50%)'
+    case 'OVER50':
+      return 'TERPAKAI > 50%'
     case 'FULL':
-      return 'FULL / PENUH'
+      return 'PENUH'
     default:
-      return 'UNKNOWN'
+      return 'DATA KAPASITAS TIDAK LENGKAP'
+  }
+}
+
+export function odpCapacityShortLegend(status: OdpCapacityStatus): string {
+  switch (status) {
+    case 'EMPTY_FREE':
+      return '< 50%'
+    case 'AVAILABLE_UNDER50':
+      return '< 50%'
+    case 'OVER50':
+      return '> 50%'
+    case 'FULL':
+      return 'PENUH'
+    default:
+      return 'N/A'
   }
 }
 
@@ -62,14 +84,22 @@ export function getPortCapacityTone(params: { totalPorts: number; activePorts: n
   return ODP_CAPACITY_COLORS[status]
 }
 
-function buildOdpMarkerIcon(tone: string, selected = false) {
-  const size = selected ? 18 : 14
-  const border = selected ? '3px solid rgba(255,255,255,0.95)' : '2px solid rgba(15,23,42,0.9)'
+function buildOdpMarkerIcon(tone: string, selected = false, highlighted = false) {
+  const baseSize = selected ? 18 : 14
+  const size = highlighted ? baseSize + 5 : baseSize
+  const border = selected
+    ? '3px solid rgba(255,255,255,0.95)'
+    : highlighted
+      ? '3px solid rgba(37,99,235,0.98)'
+      : '2px solid rgba(15,23,42,0.9)'
+  const shadow = highlighted
+    ? '0 0 0 3px rgba(59,130,246,0.35), 0 0 18px rgba(59,130,246,0.55)'
+    : '0 0 0 2px rgba(15,23,42,0.28)'
   return L.divIcon({
     className: '',
     iconSize: [size + 4, size + 4],
     iconAnchor: [(size + 4) / 2, (size + 4) / 2],
-    html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:9999px;background:${tone};border:${border};box-shadow:0 0 0 2px rgba(15,23,42,0.28)"></span>`,
+    html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:9999px;background:${tone};border:${border};box-shadow:${shadow}"></span>`,
   })
 }
 
@@ -96,15 +126,6 @@ function buildProspectMarkerIcon() {
   })
 }
 
-function buildDeviceMarkerIcon() {
-  return L.divIcon({
-    className: '',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    html: `<span style="display:block;position:relative;width:26px;height:26px;border-radius:9999px;"><span style="position:absolute;inset:0;border-radius:9999px;border:3px solid rgba(37,99,235,0.55);background:rgba(59,130,246,0.35);box-shadow:0 0 0 4px rgba(59,130,246,0.22);"></span><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:block;width:12px;height:12px;border-radius:9999px;background:rgba(37,99,235,0.98);border:2px solid rgba(255,255,255,0.98);"></span></span>`,
-  })
-}
-
 function normalizePoint(point?: { lat: number; lng: number; label?: string } | null) {
   if (!point) return null
   return Number.isFinite(point.lat) && Number.isFinite(point.lng) ? point : null
@@ -123,7 +144,7 @@ export function InventoryOdpLeafletMap({
   prospectPoint,
   focusPoints,
   buildDetailHref,
-  devicePoint,
+  highlightRowIds,
 }: {
   rows: DomainReviewRow[]
   height?: number
@@ -137,14 +158,13 @@ export function InventoryOdpLeafletMap({
   prospectPoint?: { lat: number; lng: number; label?: string } | null
   focusPoints?: Array<{ lat: number; lng: number; label?: string }>
   buildDetailHref?: (row: DomainReviewRow) => string | undefined | null
-  devicePoint?: { lat: number; lng: number; label?: string } | null
+  highlightRowIds?: string[] | null
 }) {
   const mapId = useId()
   const mapRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
   const markerLayerRef = useRef<L.LayerGroup | L.MarkerClusterGroup | null>(null)
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
-  const deviceLayerRef = useRef<L.LayerGroup | null>(null)
   const resizeRafRef = useRef<number | null>(null)
   const lastSizeRef = useRef<{ width: number; height: number } | null>(null)
   const layoutRafRef = useRef<number | null>(null)
@@ -200,7 +220,7 @@ export function InventoryOdpLeafletMap({
   const safeRoutePoints = useMemo(() => normalizeRoutePoints(routePoints), [routePoints])
   const safeProspectPoint = useMemo(() => normalizePoint(prospectPoint), [prospectPoint])
   const safeFocusPoints = useMemo(() => normalizeRoutePoints(focusPoints), [focusPoints])
-  const safeDevicePoint = useMemo(() => normalizePoint(devicePoint), [devicePoint])
+  const safeHighlightRowIds = useMemo(() => (Array.isArray(highlightRowIds) ? highlightRowIds.filter((id) => typeof id === 'string') : []), [highlightRowIds])
   const selectedMarkerItem = useMemo(
     () => markerItems.find((item) => item.row.id === selectedRowId) ?? null,
     [markerItems, selectedRowId],
@@ -300,13 +320,11 @@ export function InventoryOdpLeafletMap({
       })
       markerLayerRef.current.addTo(mapRef.current)
       routeLayerRef.current = L.layerGroup().addTo(mapRef.current)
-      deviceLayerRef.current = L.layerGroup().addTo(mapRef.current)
     }
 
     const map = mapRef.current
     const markerLayer = markerLayerRef.current
     const routeLayer = routeLayerRef.current
-    const deviceLayer = deviceLayerRef.current
 
     const chromeFixTimer1 = window.setTimeout(() => {
       map.invalidateSize()
@@ -384,53 +402,58 @@ export function InventoryOdpLeafletMap({
 
     markerLayer.clearLayers()
     routeLayer?.clearLayers()
-    deviceLayer?.clearLayers()
 
     markerItems.forEach((item) => {
+      const isSelected = item.row.id === selectedRowId
+      const isHighlighted = safeHighlightRowIds.includes(item.row.id)
       const marker = L.marker([item.latitude, item.longitude], {
-        icon: buildOdpMarkerIcon(item.tone, item.row.id === selectedRowId),
+        icon: buildOdpMarkerIcon(item.tone, isSelected, isHighlighted),
         riseOnHover: true,
       })
       const statusTone =
-        item.status === 'AVAILABLE'
+        item.status === 'EMPTY_FREE'
           ? '#065f46'
-          : item.status === 'LIMITED'
-            ? '#b45309'
-            : item.status === 'FULL'
-              ? '#991b1b'
-              : '#334155'
+          : item.status === 'AVAILABLE_UNDER50'
+            ? '#065f46'
+            : item.status === 'OVER50'
+              ? '#b45309'
+              : item.status === 'FULL'
+                ? '#991b1b'
+                : '#334155'
+      const namaOdp = item.row.primary ? String(item.row.primary).trim() : item.row.secondary ? String(item.row.secondary).trim() : `ODP (id: ${String(item.row.id).slice(0, 8)})`
+      const popHuman = item.row.secondary ? String(item.row.secondary).trim() : namaOdp
+      const shortBadge =
+        item.status === 'FULL'
+          ? 'PENUH'
+          : item.status === 'OVER50'
+            ? '> 50%'
+            : item.status === 'UNKNOWN'
+              ? 'N/A'
+              : '< 50%'
       const popupContent = `
-        <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.55; min-width: 220px;">
-          <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${item.row.secondary || item.row.primary}</div>
-          <div style="opacity: 0.8; margin-bottom: 8px;">${item.row.primary}${item.row.detail && item.row.detail !== item.row.secondary ? ` · ${String(item.row.detail).slice(0, 60)}` : ''}</div>
-          <div style="display:inline-block; padding: 2px 8px; border-radius: 9999px; background:${item.tone}; color:#ffffff; font-weight:700; margin-bottom:10px; font-size:11px; letter-spacing: 0.02em;">
-            Status: ${item.status}
+        <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.55; min-width: 230px;">
+          <div style="font-weight: 700; font-size: 15px; margin-bottom: 2px;">${namaOdp}</div>
+          <div style="opacity: 0.78; margin-bottom: 8px;">${popHuman}${item.row.detail && String(item.row.detail) !== popHuman ? ` · ${String(item.row.detail).slice(0, 60)}` : ''}</div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <span style="display:inline-block; padding: 2px 10px; border-radius: 9999px; background:${item.tone}; color:#ffffff; font-weight:700; font-size:11px; letter-spacing: 0.02em;">
+              Terpakai: ${item.activePorts}/${item.totalPorts}
+            </span>
+            <span style="display:inline-block; padding: 2px 10px; border-radius: 9999px; background:rgba(15,23,42,0.9); color:#ffffff; font-weight:600; font-size:11px;">
+              ${shortBadge}
+            </span>
           </div>
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-bottom: 10px;">
-            <div>
-              <div style="opacity: 0.7;">Port Tersedia:</div>
-              <div style="font-weight:700; color:${statusTone};">${item.availablePorts}</div>
-            </div>
-            <div>
-              <div style="opacity: 0.7;">Total Port:</div>
-              <div style="font-weight:700;">${item.totalPorts}</div>
-            </div>
-            <div>
-              <div style="opacity: 0.7;">Terpakai:</div>
-              <div style="font-weight:700;">${item.activePorts}</div>
-            </div>
-            <div>
-              <div style="opacity: 0.7;">${item.statusLabel.split(' / ')[0]}:</div>
-              <div style="font-weight:700; color:${statusTone};">${item.availablePorts} / ${item.totalPorts}</div>
-            </div>
-          </div>
-          <div style="opacity:0.7; margin-bottom: 10px; border-top: 1px solid rgba(15,23,42,0.08); padding-top: 8px;">
-            Koordinat: ${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}
+          <div style="opacity:0.78; border-top: 1px solid rgba(15,23,42,0.08); padding-top: 8px;">
+            ${Number.isFinite(item.latitude) && Number.isFinite(item.longitude) ? `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}` : 'Koordinat tidak terbaca'}
           </div>
           ${
+            item.totalPorts <= 0
+              ? '<div style="margin-top:8px; padding:6px 8px; border-radius:8px; background:rgba(100,116,139,0.12); color:#475569; font-size:11px;">Data kapasitas ODP ini belum terbaca lengkap.</div>'
+              : ''
+          }
+          ${
             item.detailHref
-              ? `<a href="${item.detailHref.replace(/"/g, '&quot;')}" style="display:inline-block; text-decoration:none; padding:6px 10px; border-radius:6px; background:#0f172a; color:#ffffff; font-weight:600; font-size:11px;">Lihat Detail ODP</a>`
-              : '<div style="opacity:0.6; font-size:11px;">Belum ada tautan detail ODP.</div>'
+              ? `<a href="${item.detailHref.replace(/"/g, '&quot;')}" style="display:inline-block; margin-top:10px; text-decoration:none; padding:6px 10px; border-radius:6px; background:#0f172a; color:#ffffff; font-weight:600; font-size:11px;">Lihat Detail ODP</a>`
+              : '<div style="margin-top:8px; opacity:0.6; font-size:11px;">Klik marker ini untuk pilih ODP di panel samping.</div>'
           }
         </div>
       `
@@ -506,23 +529,6 @@ export function InventoryOdpLeafletMap({
       }
     }
 
-    if (deviceLayer && safeDevicePoint) {
-      const deviceMarker = L.marker([safeDevicePoint.lat, safeDevicePoint.lng], {
-        icon: buildDeviceMarkerIcon(),
-        riseOnHover: true,
-      })
-      deviceMarker.bindPopup(
-        `
-          <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.4;">
-            <div style="font-weight: 700; margin-bottom: 4px;">${safeDevicePoint.label || 'Lokasi Saya'}</div>
-            <div style="opacity: 0.85;">${safeDevicePoint.lat.toFixed(6)}, ${safeDevicePoint.lng.toFixed(6)}</div>
-          </div>
-        `,
-        { closeButton: true, autoPan: true },
-      )
-      deviceMarker.addTo(deviceLayer)
-    }
-
     let finalBounds = L.latLngBounds([])
     let hasFinalBounds = false
     if (markerBounds.isValid()) {
@@ -530,14 +536,13 @@ export function InventoryOdpLeafletMap({
       finalBounds.extend(markerBounds.getNorthEast())
       hasFinalBounds = true
     }
-    if (safeDevicePoint) {
-      finalBounds.extend([safeDevicePoint.lat, safeDevicePoint.lng])
-      hasFinalBounds = true
-    }
     if (safeProspectPoint) {
       finalBounds.extend([safeProspectPoint.lat, safeProspectPoint.lng])
       hasFinalBounds = true
     }
+
+    const isFirstLoadPresetOnly =
+      fitMode === 'markers' && !safeProspectPoint && !hasFinalBounds ? false : fitMode === 'markers' && !safeProspectPoint
 
     if (fitMode === 'route' && routeBounds && safeRoutePoints.length >= 2) {
       map.fitBounds(routeBounds.pad(0.2))
@@ -549,14 +554,14 @@ export function InventoryOdpLeafletMap({
       } else {
         map.fitBounds(selectionBounds.pad(0.2))
       }
+    } else if (isFirstLoadPresetOnly) {
+      map.fitBounds(PRESET_PATI_BOUNDS.pad(0.02), { maxZoom: 15 })
     } else if (hasFinalBounds && finalBounds.isValid()) {
       map.fitBounds(finalBounds.pad(0.3))
     } else if (markerItems.length && markerBounds.isValid()) {
-      map.fitBounds(markerBounds.pad(0.2))
-    } else if (safeDevicePoint) {
-      map.setView([safeDevicePoint.lat, safeDevicePoint.lng], 16)
+      map.fitBounds(markerBounds.pad(0.25))
     } else {
-      map.setView([-6.7450, 111.0375], 13)
+      map.fitBounds(PRESET_PATI_BOUNDS.pad(0.02), { maxZoom: 15 })
     }
 
     map.invalidateSize()
@@ -607,7 +612,7 @@ export function InventoryOdpLeafletMap({
         return () => window.clearTimeout(longRepaintT2)
       }, 180)
     }
-  }, [mapId, markerItems, onSelectRow, mapKey, routeMode, safeRoutePoints, fitMode, selectedRowId, safeProspectPoint, safeFocusPoints, onPickRoutePoint, selectedMarkerItem, safeDevicePoint])
+  }, [mapId, markerItems, onSelectRow, mapKey, routeMode, safeRoutePoints, fitMode, selectedRowId, safeProspectPoint, safeFocusPoints, onPickRoutePoint, selectedMarkerItem, safeHighlightRowIds])
 
   useEffect(() => {
     return () => {
@@ -617,7 +622,6 @@ export function InventoryOdpLeafletMap({
         tileLayerRef.current = null
         markerLayerRef.current = null
         routeLayerRef.current = null
-        deviceLayerRef.current = null
       }
       if (layoutRafRef.current) {
         cancelAnimationFrame(layoutRafRef.current)

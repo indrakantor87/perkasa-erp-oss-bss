@@ -213,7 +213,14 @@ function formatDistanceMetersWithUnit(value: number, unit: 'auto' | 'm' | 'km') 
 }
 
 function parseCoordinatePair(value: string) {
-  const match = value.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/)
+  const normalized = String(value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[\/|_;:]/g, ',')
+    .replace(/,+/g, ',')
+    .replace(/^,|,$/g, '')
+    .replace(/^\s*(-?\d+(?:\.\d+)?)\s*[:：]\s*(-?\d+(?:\.\d+)?)\s*$/, '$1,$2')
+  const match = normalized.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/)
   if (!match) return null
   const lat = Number(match[1])
   const lng = Number(match[2])
@@ -232,6 +239,20 @@ function parseGoogleMapsLocation(rawValue: string) {
       ...directPair,
       label: 'Lokasi Prospek',
       sourceLabel: 'Koordinat manual',
+    }
+  }
+
+  const spacePair = value.match(/(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/)
+  if (spacePair) {
+    const lat = Number(spacePair[1])
+    const lng = Number(spacePair[2])
+    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return {
+        lat,
+        lng,
+        label: 'Lokasi Prospek',
+        sourceLabel: 'Koordinat manual',
+      }
     }
   }
 
@@ -469,11 +490,6 @@ export function InventoryNetworkOpsPanel({
   const [mapRefreshKey, setMapRefreshKey] = useState(0)
   const [mapFitKey, setMapFitKey] = useState(0)
   const [mapFullscreenActive, setMapFullscreenActive] = useState(false)
-  const [devicePoint, setDevicePoint] = useState<{ lat: number; lng: number; label: string } | null>(null)
-  const [capturingDeviceLocation, setCapturingDeviceLocation] = useState(false)
-  const [deviceLocationMessage, setDeviceLocationMessage] = useState<string | null>(null)
-  const mapAutoLocationRequestedRef = useRef(false)
-  const lastAutoLocationOpenCycleRef = useRef(0)
   const [routeMode, setRouteMode] = useState(false)
   const [routePoints, setRoutePoints] = useState<Array<{ lat: number; lng: number; label: string }>>([])
   const [routeDistanceUnit, setRouteDistanceUnit] = useState<'auto' | 'm' | 'km'>('auto')
@@ -556,6 +572,21 @@ export function InventoryNetworkOpsPanel({
     return fallback
   }, [hasInventoryNetworkData, reviewDiagnostics])
 
+  const totalPorts = useMemo(
+    () =>
+      odpRows.reduce((total, row) => total + (Number.parseInt(pickMeta(row.meta, 'Total Ports: ') || '0', 10) || 0), 0),
+    [odpRows],
+  )
+  const totalActivePorts = useMemo(
+    () =>
+      odpRows.reduce((total, row) => total + (Number.parseInt(pickMeta(row.meta, 'Active Ports: ') || '0', 10) || 0), 0),
+    [odpRows],
+  )
+  const pendingAssignments = useMemo(
+    () => assignmentRows.filter((row) => isAttentionStatus(row.status)).length,
+    [assignmentRows],
+  )
+
   useEffect(() => {
     if (!mapFullscreenActive) return
     const previousBodyOverflow = document.body.style.overflow
@@ -568,7 +599,17 @@ export function InventoryNetworkOpsPanel({
     }
   }, [mapFullscreenActive])
 
-  const normalizedSearch = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery])
+  const normalizedSearch = useMemo(() => {
+    const base = searchQuery.trim().toLowerCase()
+    return base.replace(/[\-\/\s_\\|,.]+/g, '')
+  }, [searchQuery])
+  function matchesNormalized(haystackRaw: unknown) {
+    if (!normalizedSearch) return true
+    const haystack = String(haystackRaw ?? '').trim().toLowerCase()
+    if (!haystack) return false
+    const normalizedHay = haystack.replace(/[\-\/\s_\\|,.]+/g, '')
+    return haystack.includes(searchQuery.trim().toLowerCase()) || normalizedHay.includes(normalizedSearch)
+  }
   const filteredPreviewOdpRows = useMemo(
     () =>
       odpRows.filter((row) => {
@@ -576,9 +617,7 @@ export function InventoryNetworkOpsPanel({
         const latitude = pickMeta(row.meta, 'Latitude: ')
         const longitude = pickMeta(row.meta, 'Longitude: ')
         return [row.primary, row.secondary, row.detail, latitude, longitude].some((value) =>
-          String(value ?? '')
-            .toLowerCase()
-            .includes(normalizedSearch),
+          matchesNormalized(value),
         )
       }),
     [normalizedSearch, odpRows],
@@ -590,9 +629,7 @@ export function InventoryNetworkOpsPanel({
         const latitude = pickMeta(row.meta, 'Latitude: ')
         const longitude = pickMeta(row.meta, 'Longitude: ')
         return [row.primary, row.secondary, row.detail, latitude, longitude].some((value) =>
-          String(value ?? '')
-            .toLowerCase()
-            .includes(normalizedSearch),
+          matchesNormalized(value),
         )
       }),
     [normalizedSearch, odpMapDataset],
@@ -625,6 +662,14 @@ export function InventoryNetworkOpsPanel({
       }>,
     [odpMapDataset],
   )
+  const odpMissingCoords = useMemo(() => {
+    let missing = 0
+    odpMapDataset.forEach((row) => {
+      const point = extractOdpPoint(row)
+      if (!point) missing += 1
+    })
+    return missing
+  }, [odpMapDataset])
   const selectedOdpData = useMemo(
     () => allOdpPoints.find((item) => item.row.id === selectedOdpId) ?? allOdpPoints[0] ?? null,
     [allOdpPoints, selectedOdpId],
@@ -650,6 +695,37 @@ export function InventoryNetworkOpsPanel({
       return closest
     }, null)
   }, [allOdpPoints, prospectPoint])
+  const nearest5ProspectOdp = useMemo(() => {
+    if (!prospectPoint || !allOdpPoints.length) return []
+    const MAX_CABLE_METERS_DEFAULT = 200
+    return allOdpPoints
+      .map((item) => {
+        const distanceMeters = buildRouteDistanceMeters([
+          { lat: prospectPoint.lat, lng: prospectPoint.lng },
+          { lat: item.point.lat, lng: item.point.lng },
+        ])
+        return {
+          ...item,
+          distanceMeters,
+          withinSop: distanceMeters <= MAX_CABLE_METERS_DEFAULT,
+          sopMaxMeters: MAX_CABLE_METERS_DEFAULT,
+        }
+      })
+      .sort((a, b) => a.distanceMeters - b.distanceMeters)
+      .slice(0, 5)
+  }, [allOdpPoints, prospectPoint])
+  const nearestHighlightRowIds = useMemo(() => nearest5ProspectOdp.map((item) => item.row.id), [nearest5ProspectOdp])
+  const odpCapacityStats = useMemo(() => {
+    let unknown = 0
+    odpMapDataset.forEach((row) => {
+      const totalPorts = Number.parseInt(pickMeta(row.meta, 'Total Ports: ') || '0', 10) || 0
+      if (totalPorts <= 0) unknown += 1
+    })
+    return {
+      total: odpMapDataset.length,
+      withoutCapacity: unknown,
+    }
+  }, [odpMapDataset])
   const selectedToProspectDistanceMeters = useMemo(() => {
     if (!prospectPoint || !selectedOdpPoint) return 0
     return buildRouteDistanceMeters([
@@ -664,118 +740,6 @@ export function InventoryNetworkOpsPanel({
         ...(prospectPoint ? [prospectPoint] : []),
       ].filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng)),
     [prospectPoint, selectedOdpPoint],
-  )
-
-  useEffect(() => {
-    if (!showMap) {
-      mapAutoLocationRequestedRef.current = false
-      return
-    }
-    if (mapAutoLocationRequestedRef.current) return
-    if (capturingDeviceLocation) return
-    if (devicePoint) return
-
-    const currentCycle = lastAutoLocationOpenCycleRef.current + 1
-    lastAutoLocationOpenCycleRef.current = currentCycle
-    mapAutoLocationRequestedRef.current = true
-
-    if (typeof window === 'undefined' || !globalThis.navigator?.geolocation) {
-      setDeviceLocationMessage('Browser ini belum mendukung geolocation. Peta tetap dapat digunakan secara manual.')
-      return
-    }
-
-    let permissionState: PermissionState | null = null
-    let cancelled = false
-
-    async function run() {
-      try {
-        if (globalThis.navigator?.permissions?.query) {
-          try {
-            const status = await globalThis.navigator.permissions.query({ name: 'geolocation' as PermissionName })
-            permissionState = status.state
-            if (status.state === 'denied') {
-              setDeviceLocationMessage('Akses lokasi ditolak. Anda bisa memakai tombol Lokasi Saya nanti atau memetakan ODP secara manual.')
-              return
-            }
-          } catch {
-            permissionState = null
-          }
-        }
-
-        setCapturingDeviceLocation(true)
-        setDeviceLocationMessage(null)
-
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          const timeoutId = window.setTimeout(() => reject(new Error('timeout')), 10_000)
-          try {
-            globalThis.navigator.geolocation.getCurrentPosition(
-              (value) => {
-                window.clearTimeout(timeoutId)
-                resolve(value)
-              },
-              (error) => {
-                window.clearTimeout(timeoutId)
-                reject(error)
-              },
-              {
-                enableHighAccuracy: true,
-                timeout: 10_000,
-                maximumAge: permissionState === 'granted' ? 60_000 : 0,
-              },
-            )
-          } catch (error) {
-            window.clearTimeout(timeoutId)
-            reject(error)
-          }
-        })
-
-        if (cancelled) return
-        if (lastAutoLocationOpenCycleRef.current !== currentCycle) return
-
-        const lat = Number(position.coords.latitude)
-        const lng = Number(position.coords.longitude)
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-          setDeviceLocationMessage('Koordinat lokasi perangkat tidak valid. Peta tetap berjalan normal.')
-          return
-        }
-        setDevicePoint({ lat, lng, label: 'Lokasi Saya' })
-        setMapFitKey((current) => current + 1)
-        setDeviceLocationMessage('Lokasi perangkat berhasil dideteksi otomatis saat peta dibuka.')
-      } catch (error) {
-        if (cancelled) return
-        if (lastAutoLocationOpenCycleRef.current !== currentCycle) return
-        const message =
-          error instanceof Error && error.message === 'timeout'
-            ? 'Pembacaan lokasi perangkat timeout. Anda bisa tekan tombol Lokasi Saya untuk coba ulang.'
-            : 'Lokasi perangkat tidak dapat diambil otomatis. Peta tetap berjalan normal.'
-        setDevicePoint(null)
-        setDeviceLocationMessage(message)
-      } finally {
-        if (!cancelled && lastAutoLocationOpenCycleRef.current === currentCycle) {
-          setCapturingDeviceLocation(false)
-        }
-      }
-    }
-
-    run()
-
-    return () => {
-      cancelled = true
-    }
-  }, [showMap, capturingDeviceLocation, devicePoint])
-  const totalPorts = useMemo(
-    () =>
-      odpRows.reduce((total, row) => total + (Number.parseInt(pickMeta(row.meta, 'Total Ports: ') || '0', 10) || 0), 0),
-    [odpRows],
-  )
-  const totalActivePorts = useMemo(
-    () =>
-      odpRows.reduce((total, row) => total + (Number.parseInt(pickMeta(row.meta, 'Active Ports: ') || '0', 10) || 0), 0),
-    [odpRows],
-  )
-  const pendingAssignments = useMemo(
-    () => assignmentRows.filter((row) => isAttentionStatus(row.status)).length,
-    [assignmentRows],
   )
   const pendingReturns = useMemo(
     () => returnRows.filter((row) => isAttentionStatus(row.status)).length,
@@ -1115,47 +1079,6 @@ export function InventoryNetworkOpsPanel({
                   </button>
                   <button
                     type="button"
-                    disabled={capturingDeviceLocation}
-                    onClick={async () => {
-                      if (capturingDeviceLocation) return
-                      if (!globalThis.navigator?.geolocation) {
-                        setDeviceLocationMessage('Browser ini belum mendukung geolocation.')
-                        return
-                      }
-                      setCapturingDeviceLocation(true)
-                      setDeviceLocationMessage(null)
-                      try {
-                        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                          globalThis.navigator.geolocation.getCurrentPosition(resolve, reject, {
-                            enableHighAccuracy: true,
-                            timeout: 10_000,
-                            maximumAge: 0,
-                          })
-                        })
-                        const lat = Number(position.coords.latitude)
-                        const lng = Number(position.coords.longitude)
-                        setDevicePoint({ lat, lng, label: 'Lokasi Saya' })
-                        setMapFitKey((current) => current + 1)
-                        setDeviceLocationMessage('Lokasi perangkat berhasil ditampilkan di peta.')
-                      } catch {
-                        setDevicePoint(null)
-                        setDeviceLocationMessage('Lokasi perangkat tidak dapat diambil. Peta tetap berjalan normal.')
-                      } finally {
-                        setCapturingDeviceLocation(false)
-                      }
-                    }}
-                    className={
-                      capturingDeviceLocation
-                        ? 'rounded-md border border-slate-700 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-                        : useReferenceLikeLayout
-                        ? 'rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50'
-                        : 'rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700'
-                    }
-                  >
-                    {capturingDeviceLocation ? 'Mengambil Lokasi...' : 'Lokasi Saya'}
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setMapFullscreenActive((current) => !current)}
                     className="rounded-md border border-slate-600 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
                   >
@@ -1166,17 +1089,6 @@ export function InventoryNetworkOpsPanel({
                   {useReferenceLikeLayout ? `Marker: ${filteredMapOdpRows.length}` : `${filteredMapOdpRows.length} marker`}
                 </span>
               </div>
-              {deviceLocationMessage ? (
-                <div
-                  className={
-                    useReferenceLikeLayout
-                      ? 'border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600'
-                      : 'border-b border-slate-700 bg-slate-950/30 px-3 py-2 text-xs text-slate-200'
-                  }
-                >
-                  {deviceLocationMessage}
-                </div>
-              ) : null}
               {routeMode ? (
                 <div className="border-b border-slate-700 bg-slate-950/30 px-3 py-2 text-xs text-slate-200">
                   Mode Rute aktif. Klik marker untuk menambahkan titik rute. Gunakan Undo/Reset Rute untuk koreksi urutan.
@@ -1214,6 +1126,51 @@ export function InventoryNetworkOpsPanel({
                     Titik: {routePoints.length}
                   </span>
                 </div>
+                <div className="absolute left-3 top-[48px] z-[500] flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRouteMode((current) => !current)}
+                    className={
+                      routeMode
+                        ? 'rounded-md border border-sky-500 bg-sky-600/90 px-3 py-1.5 text-xs font-semibold text-white shadow-[0_8px_20px_rgba(2,6,23,0.35)] transition hover:bg-sky-500'
+                        : 'rounded-md border border-slate-600 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-slate-100 shadow-[0_8px_20px_rgba(2,6,23,0.35)] transition hover:bg-slate-800'
+                    }
+                  >
+                    Mode Rute: {routeMode ? 'ON' : 'OFF'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={routePoints.length === 0}
+                    onClick={() =>
+                      setRoutePoints((current) => {
+                        if (current.length === 0) return current
+                        return current.slice(0, -1)
+                      })
+                    }
+                    className={
+                      routePoints.length === 0
+                        ? 'rounded-md border border-slate-700 bg-slate-950/40 px-3 py-1.5 text-xs font-semibold text-slate-500'
+                        : 'rounded-md border border-slate-600 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-slate-100 shadow-[0_8px_20px_rgba(2,6,23,0.35)] transition hover:bg-slate-800'
+                    }
+                  >
+                    Undo
+                  </button>
+                  <button
+                    type="button"
+                    disabled={routePoints.length === 0}
+                    onClick={() => setRoutePoints([])}
+                    className={
+                      routePoints.length === 0
+                        ? 'rounded-md border border-slate-700 bg-slate-950/40 px-3 py-1.5 text-xs font-semibold text-slate-500'
+                        : 'rounded-md border border-slate-600 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-slate-100 shadow-[0_8px_20px_rgba(2,6,23,0.35)] transition hover:bg-slate-800'
+                    }
+                  >
+                    Reset
+                  </button>
+                  <span className="rounded-md border border-slate-600 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-slate-100 shadow-[0_8px_20px_rgba(2,6,23,0.35)]">
+                    Jarak: {formatDistanceMetersWithUnit(routeDistanceMeters, routeDistanceUnit)}
+                  </span>
+                </div>
                 <div className="pointer-events-none absolute right-3 top-3 z-[500] flex flex-wrap items-center gap-2">
                   <span className="rounded-md border border-slate-600 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white">
                     Marker: {filteredMapOdpRows.length}
@@ -1232,7 +1189,7 @@ export function InventoryNetworkOpsPanel({
                   selectedRowId={selectedOdpData?.row.id ?? null}
                   prospectPoint={prospectPoint}
                   focusPoints={mapSelectionPoints}
-                  devicePoint={devicePoint}
+                  highlightRowIds={nearestHighlightRowIds}
                   onSelectRow={(row) => {
                     setSelectedOdpId(row.id)
                     setShowMap(true)
@@ -1503,6 +1460,27 @@ export function InventoryNetworkOpsPanel({
       ) : null}
 
       {!isInventoryOdpFocus ? (
+      <>
+      <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-900/30 px-4 py-3 text-slate-100">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs leading-5">
+          <span className="font-semibold uppercase tracking-[0.08em] text-slate-300">Kapasitas ODP</span>
+          <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-slate-950/40" style={{ background: '#ef4444' }}></span> Merah · Penuh (0 tersisa)</span>
+          <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-slate-950/40" style={{ background: '#f59e0b' }}></span> Kuning · Terpakai &gt; 50%</span>
+          <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-slate-950/40" style={{ background: '#10b981' }}></span> Hijau · Terpakai &lt; 50%</span>
+          <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-slate-950/40" style={{ background: '#059669' }}></span> Hijau Tua · Masih 100% kosong</span>
+          <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-slate-950/40" style={{ background: '#64748b' }}></span> Abu · Data kapasitas belum terbaca</span>
+        </div>
+        {odpCapacityStats.withoutCapacity > 0 || odpMissingCoords > 0 ? (
+          <div className="mt-2 flex flex-col gap-1 text-xs">
+            {odpCapacityStats.withoutCapacity > 0 ? (
+              <p className="text-amber-200">⚠️ Terdeteksi {odpCapacityStats.withoutCapacity} dari {odpCapacityStats.total} ODP dengan data kapasitas port belum terbaca lengkap.</p>
+            ) : null}
+            {odpMissingCoords > 0 ? (
+              <p className="text-sky-200">ℹ️ {odpMissingCoords} ODP tidak mempunyai koordinat valid sehingga tidak ditampilkan di peta.</p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
         <article className="rounded-2xl border border-slate-700 bg-slate-900/25 p-4 text-slate-100">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1656,12 +1634,93 @@ export function InventoryNetworkOpsPanel({
               </p>
             </div>
           </div>
+          {prospectPoint && nearest5ProspectOdp.length ? (
+            <div className="mt-4 rounded-2xl border border-slate-700 bg-slate-950/35 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">5 ODP Terdekat · SOP Maksimal {nearest5ProspectOdp[0]?.sopMaxMeters ?? 200}m</p>
+                <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">{nearest5ProspectOdp.length} kandidat</span>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {nearest5ProspectOdp.map((item) => {
+                  const pillTone =
+                    item.withinSop
+                      ? 'border-emerald-600/60 bg-emerald-500/15 text-emerald-100'
+                      : 'border-rose-600/60 bg-rose-500/15 text-rose-100'
+                  const capacityPillBg =
+                    item.totalPorts <= 0
+                      ? '#64748b'
+                      : item.remainingPorts <= 0
+                        ? '#ef4444'
+                        : item.activePorts / item.totalPorts >= 0.5
+                          ? '#f59e0b'
+                          : item.activePorts === 0
+                            ? '#059669'
+                            : '#10b981'
+                  return (
+                    <div key={item.row.id} className="flex flex-col gap-2 rounded-xl border border-slate-700 bg-slate-900/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-white">{item.row.primary}</p>
+                          <span className="badge border-slate-600 bg-slate-800/70 text-slate-100">Sisa {item.remainingPorts}/{item.totalPorts || '?'}</span>
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ background: capacityPillBg }}>
+                            {item.totalPorts <= 0 ? 'N/A' : item.remainingPorts <= 0 ? 'PENUH' : item.activePorts / item.totalPorts >= 0.5 ? '> 50%' : '< 50%'}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-slate-300">{item.row.detail || item.row.secondary || 'Lokasi belum tercatat'}</p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-slate-200">Jarak: {formatDistanceMeters(item.distanceMeters)}</span>
+                          <span className={`badge ${pillTone}`}>
+                            {item.withinSop ? '✅ Memenuhi SOP' : '❌ Melebihi aturan'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOdpId(item.row.id)
+                            setShowMap(true)
+                            setMapFitKey((current) => current + 1)
+                          }}
+                          className="rounded-md border border-white/70 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
+                        >
+                          Pilih ODP Ini
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
         </article>
       </div>
+      </>
       ) : null}
 
       {isInventoryOdpFocus ? (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="mt-4 space-y-3">
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs leading-5">
+              <span className="font-semibold uppercase tracking-[0.08em] text-slate-500">Kapasitas ODP</span>
+              <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-slate-950/20" style={{ background: '#ef4444' }}></span> Merah · Penuh (0 tersisa)</span>
+              <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-slate-950/20" style={{ background: '#f59e0b' }}></span> Kuning · Terpakai &gt; 50%</span>
+              <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-slate-950/20" style={{ background: '#10b981' }}></span> Hijau · Terpakai &lt; 50%</span>
+              <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-slate-950/20" style={{ background: '#059669' }}></span> Hijau Tua · Masih 100% kosong</span>
+              <span className="inline-flex items-center gap-2"><span className="inline-block h-3 w-3 rounded-full border border-slate-950/20" style={{ background: '#64748b' }}></span> Abu · Data kapasitas belum terbaca</span>
+            </div>
+            {odpCapacityStats.withoutCapacity > 0 || odpMissingCoords > 0 ? (
+              <div className="mt-2 flex flex-col gap-1 text-xs">
+                {odpCapacityStats.withoutCapacity > 0 ? (
+                  <p className="text-amber-700">⚠️ Terdeteksi {odpCapacityStats.withoutCapacity} dari {odpCapacityStats.total} ODP dengan data kapasitas port belum terbaca lengkap.</p>
+                ) : null}
+                {odpMissingCoords > 0 ? (
+                  <p className="text-sky-700">ℹ️ {odpMissingCoords} ODP tidak mempunyai koordinat valid sehingga tidak ditampilkan di peta.</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <select
@@ -1689,6 +1748,136 @@ export function InventoryNetworkOpsPanel({
               />
             </div>
           </div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Lokasi Prospek</p>
+          <h4 className="mt-2 text-lg font-semibold text-slate-900">Paste link Google Maps atau koordinat rumah calon pelanggan</h4>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Sistem akan membaca titik prospek, menaruh marker di peta, lalu menghitung jarak ke ODP terpilih dan ODP terdekat.
+          </p>
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-col gap-3">
+              <input
+                value={prospectQuery}
+                onChange={(event) => setProspectQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return
+                  event.preventDefault()
+                  applyProspectLocation(prospectQuery)
+                }}
+                onPaste={(event) => {
+                  const pastedValue = event.clipboardData.getData('text')
+                  if (!pastedValue) return
+                  setTimeout(() => applyProspectLocation(pastedValue), 0)
+                }}
+                placeholder="Paste link Google Maps atau tulis koordinat: -6.676640, 111.0879242"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => applyProspectLocation(prospectQuery)}
+                  className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white"
+                >
+                  Gunakan Lokasi Prospek
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProspectPoint(null)
+                    setProspectQuery('')
+                    setProspectMessage('')
+                    setMapFitKey((current) => current + 1)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Reset Lokasi
+                </button>
+              </div>
+            </div>
+            {prospectMessage ? (
+              <p className="mt-3 text-sm text-slate-700">{prospectMessage}</p>
+            ) : (
+              <p className="mt-3 text-xs text-slate-500">Bisa dari link `maps.google.com`, `google.com/maps`, atau koordinat manual `lat,lng`.</p>
+            )}
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Titik Prospek</p>
+              <p className="mt-2 text-sm leading-6 text-slate-900">
+                {prospectPoint ? `${prospectPoint.lat.toFixed(6)}, ${prospectPoint.lng.toFixed(6)}` : 'Belum ada titik prospek'}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">{prospectPoint?.sourceLabel || 'Paste link Google Maps untuk auto-zoom ke lokasi prospek.'}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">ODP Terdekat</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">{nearestProspectOdp?.row.primary || '-'}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{nearestProspectOdp?.row.detail || 'Belum ada pembacaan karena titik prospek belum diisi.'}</p>
+              <p className="mt-2 text-sm text-slate-800">
+                {nearestProspectOdp ? `Jarak ${formatDistanceMeters(nearestProspectOdp.distanceMeters)} · Sisa port ${nearestProspectOdp.remainingPorts}` : '-'}
+              </p>
+            </div>
+          </div>
+          {prospectPoint && nearest5ProspectOdp.length ? (
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">5 ODP Terdekat · SOP Maksimal {nearest5ProspectOdp[0]?.sopMaxMeters ?? 200}m</p>
+                <span className="text-xs text-slate-500">{nearest5ProspectOdp.length} kandidat</span>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {nearest5ProspectOdp.map((item) => {
+                  const pillTone =
+                    item.withinSop
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                      : 'border-rose-300 bg-rose-50 text-rose-800'
+                  const capacityPillBg =
+                    item.totalPorts <= 0
+                      ? '#64748b'
+                      : item.remainingPorts <= 0
+                        ? '#ef4444'
+                        : item.activePorts / item.totalPorts >= 0.5
+                          ? '#f59e0b'
+                          : item.activePorts === 0
+                            ? '#059669'
+                            : '#10b981'
+                  return (
+                    <div key={item.row.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-slate-900">{item.row.primary}</p>
+                          <span className="text-xs text-slate-700">Sisa {item.remainingPorts}/{item.totalPorts || '?'}</span>
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ background: capacityPillBg }}>
+                            {item.totalPorts <= 0 ? 'N/A' : item.remainingPorts <= 0 ? 'PENUH' : item.activePorts / item.totalPorts >= 0.5 ? '> 50%' : '< 50%'}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-slate-600">{item.row.detail || item.row.secondary || 'Lokasi belum tercatat'}</p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-slate-700">Jarak: {formatDistanceMeters(item.distanceMeters)}</span>
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${pillTone}`}>
+                            {item.withinSop ? '✅ Memenuhi SOP' : '❌ Melebihi aturan'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOdpId(item.row.id)
+                            setShowMap(true)
+                            setMapFitKey((current) => current + 1)
+                          }}
+                          className="rounded-md border border-slate-950 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800"
+                        >
+                          Pilih ODP Ini
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
         </div>
       ) : null}
 
