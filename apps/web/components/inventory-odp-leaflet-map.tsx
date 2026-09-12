@@ -83,33 +83,33 @@ export function getPortCapacityTone(params: { totalPorts: number; activePorts: n
   return ODP_CAPACITY_COLORS[status]
 }
 
-const ODP_ICON_CACHE = new Map<string, L.DivIcon>()
+const ODP_CIRCLE_STYLE_CACHE = new Map<string, L.CircleMarkerOptions>()
 
-function buildOdpMarkerIcon(tone: string, selected = false, highlighted = false) {
+function buildOdpCircleStyle(tone: string, selected = false, highlighted = false): L.CircleMarkerOptions {
   const cacheKey = `${tone}:${selected ? 'S' : 'X'}:${highlighted ? 'H' : 'X'}`
-  const cached = ODP_ICON_CACHE.get(cacheKey)
+  const cached = ODP_CIRCLE_STYLE_CACHE.get(cacheKey)
   if (cached) return cached
-  const baseSize = selected ? 14 : 11
-  const size = highlighted ? baseSize + 2 : baseSize
-  const iconBox = size + 3
-  const border = selected
-    ? '2px solid rgba(255,255,255,0.95)'
+  const baseRadius = selected ? 7 : 5
+  const radius = highlighted ? baseRadius + 1.5 : baseRadius
+  const strokeColor = selected
+    ? '#ffffff'
     : highlighted
-      ? '2px solid rgba(37,99,235,0.95)'
-      : '1.5px solid rgba(15,23,42,0.78)'
-  const shadow = highlighted
-    ? '0 0 0 2px rgba(59,130,246,0.35), 0 0 12px rgba(59,130,246,0.45), 0 1px 2px rgba(15,23,42,0.18)'
-    : selected
-      ? '0 0 0 2px rgba(37,99,235,0.35), 0 2px 6px rgba(15,23,42,0.3)'
-      : '0 1px 2px rgba(15,23,42,0.2), 0 0 0 1px rgba(255,255,255,0.45)'
-  const icon = L.divIcon({
-    className: '',
-    iconSize: [iconBox, iconBox],
-    iconAnchor: [iconBox / 2, iconBox / 2],
-    html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:9999px;background:${tone};border:${border};box-shadow:${shadow};opacity:${selected ? '1' : highlighted ? '1' : '0.9'};backdrop-filter:blur(0.2px)"></span>`,
-  })
-  ODP_ICON_CACHE.set(cacheKey, icon)
-  return icon
+      ? '#2563eb'
+      : 'rgba(15,23,42,0.72)'
+  const strokeWeight = selected ? 2.5 : highlighted ? 2.5 : 1.2
+  const fillOpacity = selected ? 1 : highlighted ? 1 : 0.92
+  const style: L.CircleMarkerOptions = {
+    radius,
+    fillColor: tone,
+    fillOpacity,
+    color: strokeColor,
+    weight: strokeWeight,
+    opacity: 1,
+    lineCap: 'round',
+    lineJoin: 'round',
+  }
+  ODP_CIRCLE_STYLE_CACHE.set(cacheKey, style)
+  return style
 }
 
 function normalizeRoutePoints(points?: Array<{ lat: number; lng: number }>) {
@@ -182,7 +182,7 @@ export function InventoryOdpLeafletMap({
   const firstPresetAppliedRef = useRef<boolean>(false)
   const repaintTimersRef = useRef<number[]>([])
   const lastMapKeyRef = useRef<string | null>(null)
-  const markerInstanceMapRef = useRef<Map<string, L.Marker>>(new Map())
+  const markerInstanceMapRef = useRef<Map<string, L.CircleMarker>>(new Map())
   const lastMarkerItemsSignatureRef = useRef<string>('')
   const chromeTimersRef = useRef<number[]>([])
   const lastSelectedRef = useRef<string | null>(null)
@@ -426,76 +426,68 @@ export function InventoryOdpLeafletMap({
     if (selectedChanged) lastSelectedRef.current = selectedRowId ?? null
     if (highlightChanged) lastHighlightSigRef.current = highlightSig
 
+    const buildPopupForItem = (item: typeof markerItems[number]) => {
+      const namaOdp = item.row.primary ? String(item.row.primary).trim() : item.row.secondary ? String(item.row.secondary).trim() : `ODP (id: ${String(item.row.id).slice(0, 8)})`
+      const popHuman = item.row.secondary ? String(item.row.secondary).trim() : namaOdp
+      const shortBadge =
+        item.status === 'FULL'
+          ? 'PENUH'
+          : item.status === 'OVER50'
+            ? '> 50%'
+            : item.status === 'UNKNOWN'
+              ? 'N/A'
+              : '< 50%'
+      return `
+        <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.55; min-width: 230px;">
+          <div style="font-weight: 700; font-size: 15px; margin-bottom: 2px;">${namaOdp}</div>
+          <div style="opacity: 0.78; margin-bottom: 8px;">${popHuman}${item.row.detail && String(item.row.detail) !== popHuman ? ` · ${String(item.row.detail).slice(0, 60)}` : ''}</div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <span style="display:inline-block; padding: 2px 10px; border-radius: 9999px; background:${item.tone}; color:#ffffff; font-weight:700; font-size:11px; letter-spacing: 0.02em;">
+              Terpakai: ${item.activePorts}/${item.totalPorts}
+            </span>
+            <span style="display:inline-block; padding: 2px 10px; border-radius: 9999px; background:rgba(15,23,42,0.9); color:#ffffff; font-weight:600; font-size:11px;">
+              ${shortBadge}
+            </span>
+          </div>
+          <div style="opacity:0.78; border-top: 1px solid rgba(15,23,42,0.08); padding-top: 8px;">
+            ${Number.isFinite(item.latitude) && Number.isFinite(item.longitude) ? `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}` : 'Koordinat tidak terbaca'}
+          </div>
+          ${
+            item.totalPorts <= 0
+              ? '<div style="margin-top:8px; padding:6px 8px; border-radius:8px; background:rgba(100,116,139,0.12); color:#475569; font-size:11px;">Data kapasitas ODP ini belum terbaca lengkap.</div>'
+              : ''
+          }
+          ${
+            item.detailHref
+              ? `<a href="${item.detailHref.replace(/"/g, '&quot;')}" style="display:inline-block; margin-top:10px; text-decoration:none; padding:6px 10px; border-radius:6px; background:#0f172a; color:#ffffff; font-weight:600; font-size:11px;">Lihat Detail ODP</a>`
+              : '<div style="margin-top:8px; opacity:0.6; font-size:11px;">Klik marker ini untuk pilih ODP di panel samping.</div>'
+          }
+        </div>
+      `
+    }
+
     markerItems.forEach((item) => {
       const isSelected = item.row.id === selectedRowId
       const isHighlighted = highlightSet.has(item.row.id)
-      let marker: L.Marker | undefined
+      let marker: L.CircleMarker | undefined
       if (!fullRebuild) {
         marker = markerInstanceMapRef.current.get(item.row.id)
         if (marker && (selectedChanged || highlightChanged)) {
-          marker.setIcon(buildOdpMarkerIcon(item.tone, isSelected, isHighlighted))
+          marker.setStyle(buildOdpCircleStyle(item.tone, isSelected, isHighlighted))
         }
       }
       if (!marker) {
-        marker = L.marker([item.latitude, item.longitude], {
-          icon: buildOdpMarkerIcon(item.tone, isSelected, isHighlighted),
-          riseOnHover: true,
-        })
+        marker = L.circleMarker([item.latitude, item.longitude], buildOdpCircleStyle(item.tone, isSelected, isHighlighted))
         markerInstanceMapRef.current.set(item.row.id, marker)
-        const statusTone =
-          item.status === 'EMPTY_FREE'
-            ? '#065f46'
-            : item.status === 'AVAILABLE_UNDER50'
-              ? '#065f46'
-              : item.status === 'OVER50'
-                ? '#b45309'
-                : item.status === 'FULL'
-                  ? '#991b1b'
-                  : '#334155'
-        const namaOdp = item.row.primary ? String(item.row.primary).trim() : item.row.secondary ? String(item.row.secondary).trim() : `ODP (id: ${String(item.row.id).slice(0, 8)})`
-        const popHuman = item.row.secondary ? String(item.row.secondary).trim() : namaOdp
-        const shortBadge =
-          item.status === 'FULL'
-            ? 'PENUH'
-            : item.status === 'OVER50'
-              ? '> 50%'
-              : item.status === 'UNKNOWN'
-                ? 'N/A'
-                : '< 50%'
-        const popupContent = `
-          <div style="font-family: ui-sans-serif, system-ui; font-size: 12px; line-height: 1.55; min-width: 230px;">
-            <div style="font-weight: 700; font-size: 15px; margin-bottom: 2px;">${namaOdp}</div>
-            <div style="opacity: 0.78; margin-bottom: 8px;">${popHuman}${item.row.detail && String(item.row.detail) !== popHuman ? ` · ${String(item.row.detail).slice(0, 60)}` : ''}</div>
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-              <span style="display:inline-block; padding: 2px 10px; border-radius: 9999px; background:${item.tone}; color:#ffffff; font-weight:700; font-size:11px; letter-spacing: 0.02em;">
-                Terpakai: ${item.activePorts}/${item.totalPorts}
-              </span>
-              <span style="display:inline-block; padding: 2px 10px; border-radius: 9999px; background:rgba(15,23,42,0.9); color:#ffffff; font-weight:600; font-size:11px;">
-                ${shortBadge}
-              </span>
-            </div>
-            <div style="opacity:0.78; border-top: 1px solid rgba(15,23,42,0.08); padding-top: 8px;">
-              ${Number.isFinite(item.latitude) && Number.isFinite(item.longitude) ? `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}` : 'Koordinat tidak terbaca'}
-            </div>
-            ${
-              item.totalPorts <= 0
-                ? '<div style="margin-top:8px; padding:6px 8px; border-radius:8px; background:rgba(100,116,139,0.12); color:#475569; font-size:11px;">Data kapasitas ODP ini belum terbaca lengkap.</div>'
-                : ''
-            }
-            ${
-              item.detailHref
-                ? `<a href="${item.detailHref.replace(/"/g, '&quot;')}" style="display:inline-block; margin-top:10px; text-decoration:none; padding:6px 10px; border-radius:6px; background:#0f172a; color:#ffffff; font-weight:600; font-size:11px;">Lihat Detail ODP</a>`
-                : '<div style="margin-top:8px; opacity:0.6; font-size:11px;">Klik marker ini untuk pilih ODP di panel samping.</div>'
-            }
-          </div>
-        `
-        marker.bindPopup(popupContent, { closeButton: true, autoPan: true, maxWidth: 320 })
         marker.on('click', () => {
           onSelectRow?.(item.row)
-          if (!routeMode) {
-            return
+          if (!marker?.isPopupOpen()) {
+            marker?.bindPopup(buildPopupForItem(item), { closeButton: true, autoPan: true, maxWidth: 320 })
+            marker?.openPopup()
           }
-          onPickRoutePoint?.({ row: item.row, lat: item.latitude, lng: item.longitude })
+          if (routeMode) {
+            onPickRoutePoint?.({ row: item.row, lat: item.latitude, lng: item.longitude })
+          }
         })
         marker.addTo(markerLayer)
       }
