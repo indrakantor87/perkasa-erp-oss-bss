@@ -141,6 +141,7 @@ export function InventoryOdpLeafletMap({
 }) {
   const mapId = useId()
   const mapRef = useRef<L.Map | null>(null)
+  const tileLayerRef = useRef<L.TileLayer | null>(null)
   const markerLayerRef = useRef<L.LayerGroup | L.MarkerClusterGroup | null>(null)
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
   const deviceLayerRef = useRef<L.LayerGroup | null>(null)
@@ -286,10 +287,12 @@ export function InventoryOdpLeafletMap({
         attributionControl: true,
       })
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors',
-      }).addTo(mapRef.current)
+      })
+      tileLayer.addTo(mapRef.current)
+      tileLayerRef.current = tileLayer
 
       markerLayerRef.current = L.markerClusterGroup({
         chunkedLoading: true,
@@ -313,15 +316,35 @@ export function InventoryOdpLeafletMap({
           map.invalidateSize()
           const chromeFixTimer4 = window.setTimeout(() => {
             map.invalidateSize()
+            const chromeFixTimer5 = window.setTimeout(() => {
+              map.invalidateSize()
+              const chromeRaf1 = window.requestAnimationFrame(() => {
+                map.invalidateSize()
+                const chromeFixTimer6 = window.setTimeout(() => {
+                  map.invalidateSize()
+                }, 360)
+              })
+            }, 220)
+            return () => window.clearTimeout(chromeFixTimer4)
           }, 160)
-          return () => window.clearTimeout(chromeFixTimer4)
+          return () => window.clearTimeout(chromeFixTimer3)
         }, 100)
-        return () => window.clearTimeout(chromeFixTimer3)
+        return () => window.clearTimeout(chromeFixTimer2)
       }, 60)
-      return () => window.clearTimeout(chromeFixTimer2)
+      return () => window.clearTimeout(chromeFixTimer1)
     }, 30)
 
     if (!map || !markerLayer) return
+
+    const tileLayer = tileLayerRef.current
+    if (tileLayer && tileLayer.on) {
+      tileLayer.on('load', () => {
+        window.setTimeout(() => {
+          map.invalidateSize()
+          window.requestAnimationFrame(() => map.invalidateSize())
+        }, 0)
+      })
+    }
 
     markerLayer.clearLayers()
     routeLayer?.clearLayers()
@@ -498,7 +521,7 @@ export function InventoryOdpLeafletMap({
     } else if (safeDevicePoint) {
       map.setView([safeDevicePoint.lat, safeDevicePoint.lng], 16)
     } else {
-      map.setView([-6.9, 110.4], 10)
+      map.setView([-6.7450, 111.0375], 13)
     }
 
     map.invalidateSize()
@@ -509,6 +532,7 @@ export function InventoryOdpLeafletMap({
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null
+        tileLayerRef.current = null
         markerLayerRef.current = null
         routeLayerRef.current = null
         deviceLayerRef.current = null

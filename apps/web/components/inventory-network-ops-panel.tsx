@@ -885,6 +885,9 @@ export function InventoryNetworkOpsPanel({
                 if (next) {
                   setMapRefreshKey((k) => k + 1)
                   setMapFitKey((k) => k + 1)
+                  window.setTimeout(() => {
+                    setMapRefreshKey((k) => k + 1)
+                  }, 0)
                 }
                 return next
               })
