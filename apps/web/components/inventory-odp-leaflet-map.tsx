@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useMemo, useRef } from 'react'
 import L from 'leaflet'
-import 'leaflet.markercluster'
 import type { DomainReviewRow } from '@/lib/types'
 
 const PRESET_PATI_BOUNDS = L.latLngBounds([-6.8350, 110.8800], [-6.6400, 111.2200])
@@ -163,7 +162,7 @@ export function InventoryOdpLeafletMap({
   const mapId = useId()
   const mapRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
-  const markerLayerRef = useRef<L.LayerGroup | L.MarkerClusterGroup | null>(null)
+  const markerLayerRef = useRef<L.LayerGroup | null>(null)
   const routeLayerRef = useRef<L.LayerGroup | null>(null)
   const resizeRafRef = useRef<number | null>(null)
   const lastSizeRef = useRef<{ width: number; height: number } | null>(null)
@@ -314,10 +313,7 @@ export function InventoryOdpLeafletMap({
       tileLayer.addTo(mapRef.current)
       tileLayerRef.current = tileLayer
 
-      markerLayerRef.current = L.markerClusterGroup({
-        chunkedLoading: true,
-        showCoverageOnHover: false,
-      })
+      markerLayerRef.current = L.layerGroup()
       markerLayerRef.current.addTo(mapRef.current)
       routeLayerRef.current = L.layerGroup().addTo(mapRef.current)
     }
