@@ -48,6 +48,7 @@ export default async function CsAdminOdpPortPage({
 
   const reviewSections = payload.content.reviewSections ?? []
   const reviewDiagnostics = payload.content.reviewDiagnostics ?? []
+  const odpMapRows = payload.content.odpMapRows ?? []
   const canCreate = payload.capabilities.some((item) => item.action === 'create' && item.enabled)
   const canUpdate = payload.capabilities.some((item) => item.action === 'update' && item.enabled)
   const reviewDbReady = payload.source.effectiveMode === 'review-db' && !payload.source.isFallback
@@ -104,6 +105,7 @@ export default async function CsAdminOdpPortPage({
       <InventoryNetworkOpsPanel
         sections={reviewSections}
         reviewDiagnostics={reviewDiagnostics}
+        odpMapRows={odpMapRows ?? []}
         canCreate={canCreate}
         canUpdate={canUpdate}
         reviewDbReady={reviewDbReady}
