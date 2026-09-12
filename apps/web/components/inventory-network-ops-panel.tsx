@@ -455,7 +455,7 @@ export function InventoryNetworkOpsPanel({
     [assignmentSection],
   )
   const odpRows = odpSection?.rows ?? []
-  const odpMapDataset = odpMapRows && odpMapRows.length > 0 ? odpMapRows : odpRows
+  const odpMapDataset = odpMapRows ?? []
   const usedPortRows = usedPortSection?.rows ?? []
   const issuePortRows = issuePortSection?.rows ?? []
   const assignmentRows = assignmentSection?.rows ?? []
@@ -1154,6 +1154,11 @@ export function InventoryNetworkOpsPanel({
               {routeMode ? (
                 <div className="border-b border-slate-700 bg-slate-950/30 px-3 py-2 text-xs text-slate-200">
                   Mode Rute aktif. Klik marker untuk menambahkan titik rute. Gunakan Undo/Reset Rute untuk koreksi urutan.
+                </div>
+              ) : null}
+              {showMap && odpMapDataset.length === 0 && odpRows.length > 0 ? (
+                <div className="border-b border-amber-700 bg-amber-950/40 px-3 py-2 text-xs text-amber-100">
+                  Data peta ODP lengkap sedang dimuat ulang. Menunggu sinkronisasi cache review DB — tekan Refresh Peta atau buka ulang halaman setelah 15 detik.
                 </div>
               ) : null}
               <div
