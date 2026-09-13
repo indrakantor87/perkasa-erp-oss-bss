@@ -25,6 +25,12 @@ function buildWorklistHref(params: {
   return query ? `/dashboard/worklist?${query}` : '/dashboard/worklist'
 }
 
+export type OrganizationWorkspaceVerticalTab = {
+  key: string
+  shortLabel: string
+  label: string
+}
+
 export type OrganizationWorkspaceDefinition = {
   eyebrow: string
   title: string
@@ -33,6 +39,7 @@ export type OrganizationWorkspaceDefinition = {
   secondaryAction?: OrganizationWorkspaceLink
   steps: OrganizationWorkspaceStep[]
   sections: OrganizationWorkspaceSection[]
+  verticalTabs?: OrganizationWorkspaceVerticalTab[]
 }
 
 export const salesWorkspace: OrganizationWorkspaceDefinition = {
@@ -438,6 +445,11 @@ export const kantorWorkspace: OrganizationWorkspaceDefinition = {
     href: '/dashboard/daily-activity',
     description: 'Masuk ke plan dan closing aktivitas harian kantor.',
   },
+  verticalTabs: [
+    { key: 'RITME', shortLabel: 'RITME', label: 'Ritme Kantor' },
+    { key: 'KENDARAAN', shortLabel: 'POOL', label: 'Kendaraan Opr' },
+    { key: 'KASBON', shortLabel: 'KAS', label: 'Kasbon & Util' },
+  ],
   steps: [
     {
       title: 'Kontrol Stok',
