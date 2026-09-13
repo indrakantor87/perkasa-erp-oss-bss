@@ -5,6 +5,7 @@ import {
   Search,
   Users,
 } from 'lucide-react'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import type { AppRole } from '@/lib/types'
 import type {
   MarketingActivityRecord,
@@ -724,7 +725,7 @@ export function MarketingActivityManager({
             <table className="w-full min-w-[760px] divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="w-14 px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500" />
+                  <ExpandableHeaderLeftCells />
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Marketing</th>
                   <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Ada Aktivitas</th>
                   <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Tidak Ada</th>
@@ -734,104 +735,238 @@ export function MarketingActivityManager({
               <tbody className="divide-y divide-slate-200 bg-white">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
+                    <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
                       Memuat aktivitas marketing...
                     </td>
                   </tr>
                 ) : sortedMarketingNames.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
+                    <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
                       Belum ada aktivitas marketing pada periode terpilih.
                     </td>
                   </tr>
                 ) : (
-                  sortedMarketingNames.map((name) => {
+                  sortedMarketingNames.map((name, idx) => {
                     const group = groupedActivities[name]
-                    const isExpanded = expandedMarketing === name
                     return (
-                      <Fragment key={name}>
-                        <tr
-                          className="cursor-pointer transition hover:bg-slate-50"
-                          onClick={() => setExpandedMarketing(isExpanded ? null : name)}
-                        >
-                          <td className="px-6 py-4 text-slate-500">
-                            <span className="text-xs font-semibold">{isExpanded ? '▼' : '▶'}</span>
-                          </td>
-                          <td className="px-6 py-4 text-sm font-semibold text-slate-950">{name}</td>
-                          <td className="px-6 py-4 text-center text-sm text-slate-700">{group.activeDays}</td>
-                          <td className="px-6 py-4 text-center text-sm text-slate-700">{group.emptyDays}</td>
-                          <td className="px-6 py-4 text-center text-sm text-slate-700">{group.items.length}</td>
-                        </tr>
-                        {isExpanded ? (
-                          <tr>
-                            <td colSpan={5} className="px-4 py-4 bg-slate-50">
-                              <div className="overflow-hidden rounded-2xl border border-line bg-white">
+                      <ExpandableRow
+                        key={name}
+                        id={`marketing-${name}`}
+                        num={idx + 1}
+                        totalCols={6}
+                        compactRow={
+                          <>
+                            <td className="px-6 py-4 text-sm font-semibold text-slate-950">{name}</td>
+                            <td className="px-6 py-4 text-center text-sm text-slate-700">{group.activeDays}</td>
+                            <td className="px-6 py-4 text-center text-sm text-slate-700">{group.emptyDays}</td>
+                            <td className="px-6 py-4 text-center text-sm text-slate-700">{group.items.length}</td>
+                          </>
+                        }
+                        detail={
+                          <div className="space-y-5">
+                            <section className="space-y-2">
+                              <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                                Detil Data
+                              </h4>
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">
+                                  {group.activeDays} hari aktif
+                                </span>
+                                <span className="badge border-rose-200 bg-rose-50 text-rose-700">
+                                  {group.emptyDays} hari kosong
+                                </span>
+                                <span className="badge border-slate-200 bg-white text-slate-600">
+                                  {group.items.length} total entri
+                                </span>
+                              </div>
+                              <div className="overflow-x-auto rounded-2xl border border-line bg-white">
                                 <table className="min-w-full divide-y divide-slate-200">
                                   <thead className="bg-slate-50">
                                     <tr>
+                                      <ExpandableHeaderLeftCells />
                                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tanggal</th>
                                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Area</th>
                                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Aktivitas</th>
                                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Keterangan</th>
-                                      <th className="w-28 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-slate-200">
-                                    {group.items.map((item) => (
-                                      <tr key={item.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 text-xs text-slate-600">{formatDateLabel(item.date)}</td>
-                                        <td className="px-4 py-3 text-xs text-slate-700">
-                                          {[item.area?.name, item.area2?.name, item.area3?.name, item.area4?.name]
-                                            .filter(Boolean)
-                                            .join(', ') || '-'}
-                                        </td>
-                                        <td className="px-4 py-3 text-xs text-slate-950">
-                                          {item.activity.trim() === '-' ? (
-                                            <span className="font-medium italic text-rose-600">Tidak ada aktivitas</span>
-                                          ) : (
-                                            item.activity
-                                          )}
-                                        </td>
-                                        <td className="px-4 py-3 text-xs italic text-slate-500">{item.notes || '-'}</td>
-                                        <td className="px-4 py-3">
-                                          <div className="flex items-center justify-center gap-1">
-                                            {canMutate ? (
-                                              <button
-                                                type="button"
-                                                onClick={(event) => {
-                                                  event.stopPropagation()
-                                                  openEditModal(item)
-                                                }}
-                                                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
-                                                title="Edit aktivitas"
-                                              >
-                                                <span className="text-xs font-semibold">Edit</span>
-                                              </button>
-                                            ) : null}
-                                            {canMutate ? (
-                                              <button
-                                                type="button"
-                                                onClick={(event) => {
-                                                  event.stopPropagation()
-                                                  void handleDelete(item.id)
-                                                }}
-                                                className="rounded-lg p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700"
-                                                title="Hapus aktivitas"
-                                              >
-                                                <span className="text-xs font-semibold">Hapus</span>
-                                              </button>
-                                            ) : null}
+                                    {group.items.map((item, itemIdx) => (
+                                      <ExpandableRow
+                                        key={item.id}
+                                        id={`activity-${item.id}`}
+                                        num={itemIdx + 1}
+                                        totalCols={6}
+                                        tone={item.activity.trim() === '-' ? 'muted' : undefined}
+                                        compactRow={
+                                          <>
+                                            <td className="px-4 py-3 text-xs text-slate-600">{formatDateLabel(item.date)}</td>
+                                            <td className="px-4 py-3 text-xs text-slate-700">
+                                              {[item.area?.name, item.area2?.name, item.area3?.name, item.area4?.name]
+                                                .filter(Boolean)
+                                                .join(', ') || '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-slate-950">
+                                              {item.activity.trim() === '-' ? (
+                                                <span className="font-medium italic text-rose-600">Tidak ada aktivitas</span>
+                                              ) : (
+                                                item.activity
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs italic text-slate-500">{item.notes || '-'}</td>
+                                          </>
+                                        }
+                                        detail={
+                                          <div className="space-y-5">
+                                            <section className="space-y-2">
+                                              <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                                                Detil Data
+                                              </h4>
+                                              <div className="grid gap-3 sm:grid-cols-2">
+                                                <div className="rounded-2xl border border-line bg-slate-50 px-4 py-3">
+                                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Tanggal</p>
+                                                  <p className="mt-1 text-sm font-medium text-slate-950">{formatDateLabel(item.date)}</p>
+                                                </div>
+                                                <div className="rounded-2xl border border-line bg-slate-50 px-4 py-3">
+                                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Marketing</p>
+                                                  <p className="mt-1 text-sm font-medium text-slate-950">{name}</p>
+                                                </div>
+                                                <div className="rounded-2xl border border-line bg-slate-50 px-4 py-3 sm:col-span-2">
+                                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Area Coverage</p>
+                                                  <div className="mt-2 flex flex-wrap gap-2">
+                                                    {[item.area?.name, item.area2?.name, item.area3?.name, item.area4?.name]
+                                                      .filter(Boolean)
+                                                      .map((area) => (
+                                                        <span key={area} className="badge border-sky-200 bg-sky-50 text-sky-700">
+                                                          {area}
+                                                        </span>
+                                                      )) || <span className="text-sm italic text-slate-500">-</span>}
+                                                  </div>
+                                                </div>
+                                                <div className="rounded-2xl border border-line bg-slate-50 px-4 py-3 sm:col-span-2">
+                                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Aktivitas</p>
+                                                  <p className="mt-1 text-sm text-slate-950">
+                                                    {item.activity.trim() === '-' ? (
+                                                      <span className="font-medium italic text-rose-600">Tidak ada aktivitas</span>
+                                                    ) : (
+                                                      item.activity
+                                                    )}
+                                                  </p>
+                                                </div>
+                                                {item.notes ? (
+                                                  <div className="rounded-2xl border border-line bg-slate-50 px-4 py-3 sm:col-span-2">
+                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Keterangan</p>
+                                                    <p className="mt-1 text-sm italic text-slate-600">{item.notes}</p>
+                                                  </div>
+                                                ) : null}
+                                              </div>
+                                            </section>
+
+                                            <section className="space-y-2">
+                                              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">ID</span>
+                                                  <span className="tabular-nums text-slate-900">{item.id}</span>
+                                                  <span className="text-mute" aria-hidden>•</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Marketing</span>
+                                                  <span className="tabular-nums text-slate-900">{name}</span>
+                                                  <span className="text-mute" aria-hidden>•</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Tanggal</span>
+                                                  <span className="tabular-nums text-slate-900">{item.date}</span>
+                                                </div>
+                                              </div>
+                                            </section>
+
+                                            <section className="space-y-2 pt-3 border-t border-line">
+                                              <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+                                                Aksi
+                                              </h5>
+                                              <div className="flex flex-wrap items-center gap-3">
+                                                {canMutate ? (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => openEditModal(item)}
+                                                    className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-lineStrong hover:bg-surface"
+                                                  >
+                                                    Edit Aktivitas
+                                                  </button>
+                                                ) : null}
+                                                {canMutate ? (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => void handleDelete(item.id)}
+                                                    className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:border-rose-400 hover:bg-rose-100"
+                                                  >
+                                                    Hapus Aktivitas
+                                                  </button>
+                                                ) : null}
+                                              </div>
+                                            </section>
                                           </div>
-                                        </td>
-                                      </tr>
+                                        }
+                                      />
                                     ))}
                                   </tbody>
                                 </table>
                               </div>
-                            </td>
-                          </tr>
-                        ) : null}
-                      </Fragment>
+                            </section>
+
+                            <section className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Marketing</span>
+                                  <span className="tabular-nums text-slate-900">{name}</span>
+                                  <span className="text-mute" aria-hidden>•</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Periode</span>
+                                  <span className="tabular-nums text-slate-900">{months[month - 1]} {year}</span>
+                                  <span className="text-mute" aria-hidden>•</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Aktif</span>
+                                  <span className="tabular-nums text-slate-900">{group.activeDays} Hari</span>
+                                  <span className="text-mute" aria-hidden>•</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Kosong</span>
+                                  <span className="tabular-nums text-slate-900">{group.emptyDays} Hari</span>
+                                  <span className="text-mute" aria-hidden>•</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Entri</span>
+                                  <span className="tabular-nums text-slate-900">{group.items.length}</span>
+                                </div>
+                              </div>
+                            </section>
+
+                            <section className="space-y-2 pt-3 border-t border-line">
+                              <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+                                Aksi
+                              </h5>
+                              <div className="flex flex-wrap items-center gap-3">
+                                {canMutate ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setFormData((prev) => ({ ...prev, marketingName: name }))
+                                      setEditingItem(null)
+                                      setIsModalOpen(true)
+                                    }}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-950 bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 hover:border-slate-800"
+                                  >
+                                    + Tambah Aktivitas {name}
+                                  </button>
+                                ) : null}
+                              </div>
+                            </section>
+                          </div>
+                        }
+                      />
                     )
                   })
                 )}
