@@ -4,6 +4,12 @@ import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
 import { SimpleBarChart, type SimpleBarDatum } from '@/components/simple-bar-chart'
+import {
+  GRANULARITY_OPTIONS,
+  HistoricalBarChart,
+  type GranularityKey,
+  type HistoricalSeriesDatum,
+} from '@/components/historical-bar-chart'
 import type { AppRole, DomainReviewRow, DomainReviewSection } from '@/lib/types'
 
 function findInventorySection(sections: DomainReviewSection[] | undefined, keyword: string) {
@@ -89,6 +95,202 @@ function countByMovementPrimary(rows: DomainReviewRow[]): Array<{ label: string;
     if (bi !== -1) return 1
     return b.count - a.count
   })
+}
+
+function parseIndonesianDateTime(raw: string): Date | null {
+  const trimmed = raw.trim()
+  if (!trimmed || trimmed === '-' || trimmed.toUpperCase() === 'CURRENT_TIMESTAMP') return null
+  const normalized = trimmed.replace(',', '.').replace(/\s+/g, ' ')
+  const fromIso = new Date(normalized)
+  if (Number.isFinite(fromIso.getTime())) return fromIso
+  const slashMatch = normalized.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?$/)
+  if (slashMatch) {
+    const [, d, m, y, hh, mm] = slashMatch
+    const date = new Date(Number(y), Number(m) - 1, Number(d), Number(hh ?? 0), Number(mm ?? 0))
+    if (Number.isFinite(date.getTime())) return date
+  }
+  const idMonths = [
+    ['jan', 'januari'],
+    ['feb', 'februari', 'pebruari'],
+    ['mar', 'maret'],
+    ['apr', 'april'],
+    ['mei'],
+    ['jun', 'juni'],
+    ['jul', 'juli'],
+    ['agu', 'agustus', 'aug'],
+    ['sep', 'september', 'sept'],
+    ['okt', 'oktober'],
+    ['nov', 'november'],
+    ['des', 'desember'],
+  ]
+  const lower = normalized.toLowerCase()
+  for (let i = 0; i < idMonths.length; i++) {
+    for (const alias of idMonths[i]) {
+      if (lower.includes(alias)) {
+        const digits = lower.match(/\d+/g)?.map((v) => Number(v)) ?? []
+        const year = digits.find((v) => v >= 2000 && v <= 2100) ?? new Date().getFullYear()
+        const day = digits.find((v) => v >= 1 && v <= 31 && v !== year) ?? 1
+        const date = new Date(year, i, day)
+        if (Number.isFinite(date.getTime())) return date
+      }
+    }
+  }
+  return null
+}
+
+function pickRowDate(row: DomainReviewRow, kind: 'movement' | 'request' | 'loan'): Date | null {
+  const prefixes =
+    kind === 'movement' ? ['At: '] : kind === 'request' ? ['Requested: '] : ['Dipinjam: ', 'Dikembalikan: ']
+  for (const prefix of prefixes) {
+    const raw = pickMetaField(row.meta, prefix)
+    if (raw) {
+      const parsed = parseIndonesianDateTime(raw)
+      if (parsed) return parsed
+    }
+  }
+  if (row.filterTags?.length) {
+    for (const tag of row.filterTags) {
+      if (!tag.startsWith('PERIOD:')) continue
+      const yyyymm = tag.slice('PERIOD:'.length)
+      if (!yyyymm) continue
+      const [y, m] = yyyymm.split('-').map((v) => Number(v))
+      if (y && m) {
+        const date = new Date(y, m - 1, 1)
+        if (Number.isFinite(date.getTime())) return date
+      }
+    }
+  }
+  return null
+}
+
+function bucketKeyFor(date: Date, granularity: GranularityKey): { key: string; sort: number } {
+  const y = date.getFullYear()
+  const m = date.getMonth()
+  const d = date.getDate()
+  if (granularity === 'DAILY') {
+    const sort = y * 10000 + (m + 1) * 100 + d
+    return { key: `${String(d).padStart(2, '0')}/${String(m + 1).padStart(2, '0')}`, sort }
+  }
+  if (granularity === 'WEEKLY') {
+    const start = new Date(y, 0, 1)
+    const daysSince = Math.floor((date.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+    const week = Math.floor(daysSince / 7) + 1
+    return { key: `W${week} ${y}`, sort: y * 1000 + week }
+  }
+  if (granularity === 'MONTHLY') {
+    return { key: `${['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][m]} ${y}`, sort: y * 100 + (m + 1) }
+  }
+  if (granularity === 'QUARTERLY') {
+    const q = Math.floor(m / 3) + 1
+    return { key: `Q${q} ${y}`, sort: y * 10 + q }
+  }
+  if (granularity === 'SEMESTER') {
+    const s = m < 6 ? 1 : 2
+    return { key: `S${s} ${y}`, sort: y * 10 + s }
+  }
+  return { key: `${y}`, sort: y }
+}
+
+function buildHistoricalSeries(
+  rows: DomainReviewRow[],
+  kind: 'movement' | 'request' | 'loan',
+  granularity: GranularityKey,
+  currentPeriodLabel: string,
+  previousPeriodLabel: string,
+): {
+  series: HistoricalSeriesDatum[]
+  currentLabel: string
+  previousLabel: string
+} {
+  const dated: Array<{ date: Date; row: DomainReviewRow }> = []
+  for (const row of rows) {
+    const date = pickRowDate(row, kind)
+    if (date) dated.push({ date, row })
+  }
+  dated.sort((a, b) => a.date.getTime() - b.date.getTime())
+  if (dated.length === 0) {
+    return { series: [], currentLabel: currentPeriodLabel, previousLabel: previousPeriodLabel }
+  }
+
+  const latest = dated[dated.length - 1].date
+  const earliest = dated[0].date
+
+  const spanMonths = Math.max(
+    1,
+    (latest.getFullYear() - earliest.getFullYear()) * 12 + (latest.getMonth() - earliest.getMonth()) + 1,
+  )
+
+  function startOfGranularity(date: Date): Date {
+    const y = date.getFullYear()
+    const m = date.getMonth()
+    const d = date.getDate()
+    if (granularity === 'DAILY') return new Date(y, m, d)
+    if (granularity === 'WEEKLY') {
+      const day = (date.getDay() + 6) % 7
+      return new Date(y, m, d - day)
+    }
+    if (granularity === 'MONTHLY') return new Date(y, m, 1)
+    if (granularity === 'QUARTERLY') return new Date(y, Math.floor(m / 3) * 3, 1)
+    if (granularity === 'SEMESTER') return new Date(y, m < 6 ? 0 : 6, 1)
+    return new Date(y, 0, 1)
+  }
+
+  function addGranular(date: Date, n: number): Date {
+    const y = date.getFullYear()
+    const m = date.getMonth()
+    if (granularity === 'DAILY') return new Date(y, m, date.getDate() + n)
+    if (granularity === 'WEEKLY') return new Date(y, m, date.getDate() + 7 * n)
+    if (granularity === 'MONTHLY') return new Date(y, m + n, 1)
+    if (granularity === 'QUARTERLY') return new Date(y, m + 3 * n, 1)
+    if (granularity === 'SEMESTER') return new Date(y, m + 6 * n, 1)
+    return new Date(y + n, 0, 1)
+  }
+
+  const bucketsCount = Math.min(
+    36,
+    Math.max(4, granularity === 'DAILY' ? Math.min(21, spanMonths * 6) : granularity === 'WEEKLY' ? Math.min(12, spanMonths * 2) : granularity === 'MONTHLY' ? Math.min(12, spanMonths) : granularity === 'QUARTERLY' ? 6 : 4),
+  )
+
+  const currentStart = addGranular(startOfGranularity(latest), -(bucketsCount - 1))
+  const previousStart = addGranular(currentStart, -bucketsCount)
+  const currentEnd = addGranular(startOfGranularity(latest), 1)
+  const previousEnd = currentStart
+
+  const currentLabel = `${bucketKeyFor(new Date(currentStart.getTime() + 1), granularity).key} s/d ${bucketKeyFor(latest, granularity).key}`
+  const previousLabel = `${bucketKeyFor(new Date(previousStart.getTime() + 1), granularity).key} s/d ${bucketKeyFor(new Date(currentStart.getTime() - 1), granularity).key}`
+
+  const currentBuckets = new Map<string, number>()
+  const previousBuckets = new Map<string, number>()
+  const order: string[] = []
+  for (let i = 0; i < bucketsCount; i++) {
+    const start = addGranular(currentStart, i)
+    const b = bucketKeyFor(start, granularity)
+    if (!currentBuckets.has(b.key)) {
+      currentBuckets.set(b.key, 0)
+      order.push(b.key)
+    }
+  }
+  for (const { date, row: _row } of dated) {
+    if (date.getTime() >= currentStart.getTime() && date.getTime() < currentEnd.getTime()) {
+      const b = bucketKeyFor(date, granularity)
+      currentBuckets.set(b.key, (currentBuckets.get(b.key) ?? 0) + 1)
+    } else if (date.getTime() >= previousStart.getTime() && date.getTime() < previousEnd.getTime()) {
+      const b = bucketKeyFor(date, granularity)
+      previousBuckets.set(b.key, (previousBuckets.get(b.key) ?? 0) + 1)
+    }
+  }
+
+  const series: HistoricalSeriesDatum[] = order.map((key, idx) => ({
+    bucket: key,
+    bucketMeta: key,
+    current: currentBuckets.get(key) ?? 0,
+    previous:
+      previousBuckets.get(order[idx % order.length] ?? '') ??
+      previousBuckets.get(key) ??
+      0,
+  }))
+
+  return { series, currentLabel, previousLabel }
 }
 
 type InventoryShortcut = {
@@ -251,6 +453,7 @@ export default async function InventoryOverviewPage({
     inventoryAction?: string | string[]
     itemCode?: string | string[]
     request?: string | string[]
+    inventoryGranularity?: string | string[]
   }>
 }) {
   const session = await requireSession()
@@ -259,6 +462,11 @@ export default async function InventoryOverviewPage({
   }
 
   const resolvedSearchParams = (await searchParams) ?? {}
+  const rawGranularity = resolveSearchParam(resolvedSearchParams.inventoryGranularity)?.trim().toUpperCase()
+  const granularity: GranularityKey = GRANULARITY_OPTIONS.some((o) => o.key === rawGranularity)
+    ? (rawGranularity as GranularityKey)
+    : 'MONTHLY'
+
   const payload = await getDomainPageData('inventory', session, {
     focus: resolveSearchParam(resolvedSearchParams.focus),
     month: resolvePositiveIntegerParam(resolvedSearchParams.month),
@@ -295,6 +503,18 @@ export default async function InventoryOverviewPage({
       countByMovementPrimary(movementRows),
       toneForMovement,
     )
+
+    const historicalRequest = buildHistoricalSeries(requestRows, 'request', granularity, 'Periode saat ini', 'Periode sebelumnya')
+    const historicalMovement = buildHistoricalSeries(movementRows, 'movement', granularity, 'Periode saat ini', 'Periode sebelumnya')
+    const historicalLoan = buildHistoricalSeries(loanRows, 'loan', granularity, 'Periode saat ini', 'Periode sebelumnya')
+    const setGranularityHref = (next: GranularityKey) => {
+      const nextParams = new URLSearchParams()
+      if (resolvedSearchParams.focus) nextParams.set('focus', String(resolvedSearchParams.focus))
+      if (resolvedSearchParams.month) nextParams.set('month', String(resolvedSearchParams.month))
+      if (resolvedSearchParams.year) nextParams.set('year', String(resolvedSearchParams.year))
+      nextParams.set('inventoryGranularity', next)
+      return `/inventory${nextParams.toString() ? `?${nextParams.toString()}` : ''}`
+    }
 
     return (
       <div className="space-y-4">
@@ -430,6 +650,69 @@ export default async function InventoryOverviewPage({
                 heightPx={260}
               />
             </div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="panel p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
+              <div>
+                <p className="section-title">Pemantauan Historis Inventory</p>
+                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-inkStrong">
+                  Perbandingan kinerja periode saat ini vs periode sebelumnya
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-mute">
+                  Visualisasi historis ini menampilkan perbandingan LITERAL periode sekarang dengan periode sebelumnya, tanpa prediksi, tanpa
+                  smoothing, dan tanpa interpolasi. Warna gelap = periode saat ini; warna abu = periode sebelumnya. Gunakan toggle periodisitas
+                  di kanan atas untuk ganti granularitas seperti tampilan TradingView: harian sampai tahunan.
+                </p>
+              </div>
+              <div className="flex flex-col gap-1 text-xs leading-6 text-mute md:items-end">
+                <span className="badge border-line bg-surfaceMuted text-muteStrong self-start md:self-end">
+                  Mode: {GRANULARITY_OPTIONS.find((o) => o.key === granularity)?.label ?? 'Bulanan'}
+                </span>
+                <span>Toggle periodisitas = ubah skala agregasi bucket perbandingan historis.</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <HistoricalBarChart
+              title="Historis Request Barang (saat ini vs sebelumnya)"
+              subtitle="Jumlah request barang per bucket periode. Bandingkan dengan periode sebelumnya untuk menilai lonjakan atau penurunan beban kerja gudang."
+              granularity={granularity}
+              setGranularityHref={setGranularityHref}
+              currentPeriodLabel={historicalRequest.currentLabel}
+              previousPeriodLabel={historicalRequest.previousLabel}
+              series={historicalRequest.series}
+              unitLabel="request"
+              emptyNote="Belum ada request barang yang bisa dihistorisasi. Data muncul setelah request dengan tanggal dibuat tercatat di sistem."
+              onEmptyPreviousHint="Sistem membangun perbandingan 2 periode otomatis (periode sekarang + periode sebelumnya). Jika data hanya tersedia 1 periode, periode sebelumnya akan bernilai 0 sebagai pembanding nol."
+            />
+            <HistoricalBarChart
+              title="Historis Stock Movement (saat ini vs sebelumnya)"
+              subtitle="Jumlah transaksi barang IN, OUT, dan ADJUSTMENT per bucket periode. Pantau ratio IN/OUT dan sinyal ADJUSTMENT yang berlebih untuk temukan proses pencatatan yang perlu diperbaiki."
+              granularity={granularity}
+              setGranularityHref={setGranularityHref}
+              currentPeriodLabel={historicalMovement.currentLabel}
+              previousPeriodLabel={historicalMovement.previousLabel}
+              series={historicalMovement.series}
+              unitLabel="transaksi"
+              emptyNote="Belum ada stock movement dengan tanggal tercatat yang bisa dihistorisasi."
+              onEmptyPreviousHint="Jika bucket periode sebelumnya kosong, artinya belum ada transaksi movement tercatat pada periode pembanding."
+            />
+            <HistoricalBarChart
+              title="Historis Pinjaman Barang (saat ini vs sebelumnya)"
+              subtitle="Jumlah pinjaman per bucket periode. Membantu mengukur kapan aset fisik banyak dipinjam teknisi lapangan (puncak proyek, maintenance periodik, dll)."
+              granularity={granularity}
+              setGranularityHref={setGranularityHref}
+              currentPeriodLabel={historicalLoan.currentLabel}
+              previousPeriodLabel={historicalLoan.previousLabel}
+              series={historicalLoan.series}
+              unitLabel="pinjaman"
+              emptyNote="Belum ada pinjaman barang dengan tanggal tercatat yang bisa dihistorisasi."
+              onEmptyPreviousHint="Sistem tidak menampilkan data dummy. Periode sebelumnya kosong berarti periode tersebut memang 0 transaksi."
+            />
           </div>
         </section>
 

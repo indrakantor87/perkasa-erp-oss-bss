@@ -5425,6 +5425,14 @@ async function getReviewDbInventorySections(
   })
   const requests = requestsResult.rows
 
+  const loanValues: unknown[] = []
+  const loanWhereParts: string[] = []
+  if (period && inventorySchema.loanBorrowedAt) {
+    loanWhereParts.push(`iil.borrowed_at >= ? AND iil.borrowed_at < ?`)
+    loanValues.push(period.startDate, period.endDate)
+  }
+  const loanWhere = loanWhereParts.length ? ` WHERE ${loanWhereParts.join(' AND ')} ` : ''
+
   const loansResult = await runSafeDomainSectionQuery<ReviewDbInventoryLoanRow>({
     sectionLabel: 'inventory-loans',
     enabled:
@@ -5438,7 +5446,8 @@ async function getReviewDbInventorySections(
       inventorySchema.itemCode &&
       inventorySchema.itemName,
     query: () =>
-      runReviewDbQuery<ReviewDbInventoryLoanRow>(`
+      runReviewDbQuery<ReviewDbInventoryLoanRow>(
+        `
         SELECT
           iil.id AS loanId,
           iil.loan_code AS loanCode,
@@ -5458,9 +5467,12 @@ async function getReviewDbInventorySections(
         FROM inventory_item_loans iil
         JOIN inventory_items ii
           ON ii.id = iil.inventory_item_id
+        ${loanWhere}
         ORDER BY ${inventorySchema.loanBorrowedAt ? 'iil.borrowed_at DESC,' : ''} iil.id DESC
         LIMIT 5
-      `),
+      `,
+        loanValues,
+      ),
   })
   const loans = loansResult.rows
 
