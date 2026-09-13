@@ -1753,7 +1753,7 @@ const domainMenuLinks: Array<{
   { key: 'sales', label: 'Penjualan', href: '/sales' },
   { key: 'customers', label: 'Customer', href: '/customers' },
   { key: 'support', label: 'Support', href: '/support' },
-  { key: 'inventory', label: 'Inventory', href: '/inventory/network' },
+  { key: 'inventory', label: 'Inventory', href: '/inventory' },
   { key: 'hr', label: 'HR', href: '/hr' },
   { key: 'billing', label: 'Billing', href: '/billing' },
 ]
@@ -1778,7 +1778,7 @@ const domainOperationalBlueprints: Record<
     ],
     integrations: [
       { label: 'Customer', href: '/customers', description: 'Customer master dan alamat terbentuk setelah order tervalidasi.' },
-      { label: 'Inventory', href: '/inventory/network', description: 'ODP, port, dan perangkat mengikuti kebutuhan instalasi lapangan.' },
+      { label: 'Inventory', href: '/inventory', description: 'ODP, port, dan perangkat mengikuti kebutuhan instalasi lapangan.' },
       { label: 'Billing', href: '/billing', description: 'Subscription aktif menjadi sumber invoice recurring dan one-time.' },
     ],
   },

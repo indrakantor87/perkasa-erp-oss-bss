@@ -13,6 +13,7 @@ import { ModuleGrid } from '@/components/dashboard/module-grid'
 import { OperationalDivisionBoard } from '@/components/dashboard/operational-division-board'
 import { RoleQueueGrid } from '@/components/dashboard/role-queue-grid'
 import { WorklistBoard } from '@/components/dashboard/worklist-board'
+import { SimpleBarChart, type SimpleBarDatum } from '@/components/simple-bar-chart'
 import { canAccessPath, canPerformAction, getDefaultLandingPath } from '@/lib/access-control-server'
 import { DataSourceStatus } from '@/components/data-source-status'
 import { requireSession } from '@/lib/auth'
@@ -21,11 +22,12 @@ import { getServerUiLanguage } from '@/lib/ui-language-server'
 import { getRoleMeta } from '@/lib/role-meta'
 import { listMergedDashboardKpiDefinitions, resolveDashboardKpiManagerScope } from '@/lib/services/dashboard-kpi-service'
 import { buildDashboardNextActions, getDashboardPageData } from '@/lib/services/dashboard-service'
+import { getDomainPageData } from '@/lib/services/domain-service'
 import { buildWorklistHref } from '@/lib/services/worklist-service'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
 import { getPreferredSupportLane } from '@/lib/support-lanes'
+import type { AppRole, DomainReviewRow, DomainReviewSection } from '@/lib/types'
 import type { DashboardOperationalDivisionKey } from '@/lib/types'
-import type { AppRole } from '@/lib/types'
 import { getVisibleModuleCards } from '@/lib/ui-access'
 import { PageHeader } from '@/components/page-header'
 
@@ -109,7 +111,7 @@ function buildDashboardCommandLinks(role: AppRole) {
   }
 
   if (canAccessPath(role, '/inventory')) {
-    pushLink('Lihat Inventory', role === 'SUPER_ADMIN' ? '/inventory' : '/inventory/network', 'secondary')
+    pushLink('Lihat Inventory', '/inventory#inventory-overview-hero', 'secondary')
   }
 
   return links.slice(0, 3)
@@ -138,6 +140,91 @@ function resolveDashboardRoleProfile(role: AppRole): DashboardRoleProfile {
     default:
       return 'backoffice'
   }
+}
+
+function findInventorySection(sections: DomainReviewSection[] | undefined, keyword: string) {
+  if (!sections || sections.length === 0) return null
+  return sections.find((section) => section.title.toUpperCase().includes(keyword.toUpperCase())) ?? null
+}
+
+function pickMetaField(meta: string[], prefix: string) {
+  return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? ''
+}
+
+function countByStatus(rows: DomainReviewRow[]): Array<{ label: string; count: number }> {
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    const key = row.status.trim() || 'TANPA STATUS'
+    map.set(key, (map.get(key) ?? 0) + 1)
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, count]) => ({ label, count }))
+}
+
+function countByMetaPrefix(rows: DomainReviewRow[], prefix: string): Array<{ label: string; count: number }> {
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    const key = pickMetaField(row.meta, prefix).trim() || 'TIDAK TERDAFTAR'
+    map.set(key, (map.get(key) ?? 0) + 1)
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, count]) => ({ label, count }))
+}
+
+function countByMovementPrimary(rows: DomainReviewRow[]): Array<{ label: string; count: number }> {
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    const key = row.primary.trim().toUpperCase() || 'TANPA JENIS'
+    map.set(key, (map.get(key) ?? 0) + 1)
+  }
+  const preferredOrder = ['IN', 'OUT', 'ADJUSTMENT']
+  const entries = Array.from(map.entries()).map(([label, count]) => ({ label, count }))
+  return entries.sort((a, b) => {
+    const ai = preferredOrder.indexOf(a.label)
+    const bi = preferredOrder.indexOf(b.label)
+    if (ai !== -1 && bi !== -1) return ai - bi
+    if (ai !== -1) return -1
+    if (bi !== -1) return 1
+    return b.count - a.count
+  })
+}
+
+function statusGroupRequest(status: string): SimpleBarDatum['tone'] {
+  const s = status.trim().toUpperCase()
+  if (s.includes('SELESAI') || s.includes('DONE') || s.includes('COMPLETE')) return 'emerald'
+  if (s.includes('PENDING')) return 'amber'
+  if (s.includes('DIPROSES') || s.includes('PROSES') || s.includes('PROGRESS')) return 'sky'
+  if (s.includes('BATAL') || s.includes('CANCEL') || s.includes('REJECT')) return 'rose'
+  return 'slate'
+}
+
+function statusGroupLoan(status: string): SimpleBarDatum['tone'] {
+  const s = status.trim().toUpperCase()
+  if (s.includes('DIKEMBALIKAN') || s.includes('RETURNED') || s.includes('SELESAI')) return 'emerald'
+  if (s.includes('PARTIAL')) return 'amber'
+  if (s.includes('OVERDUE') || s.includes('TERLAMBAT')) return 'rose'
+  return 'sky'
+}
+
+function toneForMovement(primary: string): SimpleBarDatum['tone'] {
+  const s = primary.trim().toUpperCase()
+  if (s === 'IN') return 'emerald'
+  if (s === 'OUT') return 'sky'
+  if (s === 'ADJUSTMENT') return 'violet'
+  return 'slate'
+}
+
+function buildBarFromKeyValue(
+  entries: Array<{ label: string; count: number }>,
+  toneResolver?: (label: string) => SimpleBarDatum['tone'],
+): SimpleBarDatum[] {
+  return entries.map((entry) => ({
+    label: entry.label,
+    value: entry.count,
+    tone: toneResolver ? toneResolver(entry.label) : 'ink',
+  }))
 }
 
 export default async function DashboardPage({
@@ -174,6 +261,23 @@ export default async function DashboardPage({
       kpiDivisionName: kpiDivisionName || undefined,
       kpiSubdivisionName: kpiSubdivisionName || undefined,
     })
+  const hasInventoryAccess = canAccessPath(session.role, '/inventory')
+  const inventoryPayloadPromise: ReturnType<typeof getDomainPageData> | null = hasInventoryAccess
+    ? getDomainPageData('inventory', session, { month, year })
+    : null
+  const inventoryPayload = inventoryPayloadPromise ? await inventoryPayloadPromise.catch(() => null) : null
+  const inventorySections: DomainReviewSection[] = inventoryPayload?.content.reviewSections ?? []
+  const inventoryRequestRows = findInventorySection(inventorySections, 'REQUEST INVENTORY')?.rows ?? []
+  const inventoryMovementRows = findInventorySection(inventorySections, 'STOCK MOVEMENT')?.rows ?? []
+  const inventoryLoanRows = findInventorySection(inventorySections, 'PINJAMAN INVENTORY')?.rows ?? []
+  const inventoryCharts = hasInventoryAccess
+    ? {
+        statusRequest: buildBarFromKeyValue(countByStatus(inventoryRequestRows), statusGroupRequest),
+        movementKind: buildBarFromKeyValue(countByMovementPrimary(inventoryMovementRows), toneForMovement),
+        subdivRequest: buildBarFromKeyValue(countByMetaPrefix(inventoryRequestRows, 'Sub-divisi: ')),
+        statusLoan: buildBarFromKeyValue(countByStatus(inventoryLoanRows), statusGroupLoan),
+      }
+    : null
   const language = await getServerUiLanguage()
   const roleMeta = getRoleMeta(session.role, language)
   const canApproveDailyActivity = canPerformAction(session.role, 'daily_activity', 'approve')
@@ -275,6 +379,105 @@ export default async function DashboardPage({
         operationalCards={operationalCards}
         roleProfile={roleProfile}
       />
+
+      {hasInventoryAccess && inventoryCharts ? (
+        <section id="dashboard-inventory-snapshot" className="scroll-mt-24 space-y-4">
+          <div className="panel p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
+              <div>
+                <p className="section-title">Ringkasan GA Inventory</p>
+                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-inkStrong">
+                  Snapshot operasional gudang di Dasbor Operasional
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-mute">
+                  Panel ini menampilkan snapshot inventory secara langsung di Dasbor Utama agar role GA / Inventory tidak perlu pindah tab untuk
+                  membaca angka hari ini. Untuk visualisasi historis (compare periode) dan 8 grafik lengkap, buka dashboard inventory khusus.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-start gap-2 md:justify-end">
+                <span className="badge border-line bg-surfaceMuted text-muteStrong self-start">
+                  {inventoryRequestRows.length + inventoryMovementRows.length + inventoryLoanRows.length} row snapshot
+                </span>
+                <Link
+                  href="/inventory#inventory-overview-historical"
+                  className="inline-flex items-center rounded-full border border-accent bg-accent px-4 py-2 text-sm font-semibold text-accentInk transition hover:bg-accent/90 focus-visible:shadow-focus"
+                >
+                  Buka Historis Inventory →
+                </Link>
+              </div>
+            </div>
+            <div className="mt-5 grid gap-4 xl:grid-cols-3">
+              <article className="rounded-2xl border border-line bg-surface p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Total Request Aktif</p>
+                <p className="mt-3 font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums tracking-tight text-inkStrong">
+                  {inventoryRequestRows.length}
+                </p>
+                <Link
+                  href="/inventory/requests"
+                  className="mt-2 inline-flex text-xs font-semibold text-accent underline underline-offset-2"
+                >
+                  Buka queue request →
+                </Link>
+              </article>
+              <article className="rounded-2xl border border-line bg-surface p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Total Movement (IN + OUT)</p>
+                <p className="mt-3 font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums tracking-tight text-inkStrong">
+                  {inventoryMovementRows.length}
+                </p>
+                <Link
+                  href="/inventory/movements"
+                  className="mt-2 inline-flex text-xs font-semibold text-accent underline underline-offset-2"
+                >
+                  Buka movements →
+                </Link>
+              </article>
+              <article className="rounded-2xl border border-line bg-surface p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Total Pinjaman Aktif</p>
+                <p className="mt-3 font-[family-name:var(--font-heading)] text-2xl font-semibold tabular-nums tracking-tight text-inkStrong">
+                  {inventoryLoanRows.length}
+                </p>
+                <Link
+                  href="/inventory/loans"
+                  className="mt-2 inline-flex text-xs font-semibold text-accent underline underline-offset-2"
+                >
+                  Buka pinjaman →
+                </Link>
+              </article>
+            </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <SimpleBarChart
+                title="Status Request Barang (Snapshot Hari Ini)"
+                subtitle="Distribusi request per status untuk tekanan operasional gudang."
+                unitLabel="request"
+                data={inventoryCharts.statusRequest}
+                emptyNote="Belum ada request barang yang tercatat pada periode ini."
+              />
+              <SimpleBarChart
+                title="Stock Movement IN / OUT / ADJUSTMENT"
+                subtitle="Komparasi arus barang masuk vs keluar untuk memantau buffer stok."
+                unitLabel="transaksi"
+                data={inventoryCharts.movementKind}
+                emptyNote="Belum ada stock movement yang tercatat."
+              />
+              <SimpleBarChart
+                title="Top Sub-divisi Request Barang"
+                subtitle="Sub-divisi mana yang paling banyak mengajukan request barang periode ini."
+                unitLabel="request"
+                data={inventoryCharts.subdivRequest}
+                emptyNote="Belum ada request per sub-divisi yang tercatat."
+              />
+              <SimpleBarChart
+                title="Status Pinjaman Barang"
+                subtitle="Pantau pinjaman aktif, partial, dan overdue untuk akuntabilitas aset."
+                unitLabel="pinjaman"
+                data={inventoryCharts.statusLoan}
+                emptyNote="Belum ada pinjaman barang yang tercatat."
+              />
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="space-y-4">
         <WorklistBoard items={worklist} viewAllHref={worklistHref} />
         {canApproveDailyActivity && dailyActivityApprovalQueue.totalPending > 0 ? (

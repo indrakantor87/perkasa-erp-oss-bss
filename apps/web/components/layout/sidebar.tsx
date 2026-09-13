@@ -797,7 +797,7 @@ function buildInventoryMainItem(role: AppRole | null) {
     key: 'inventory-main',
     title: 'Inventory',
     description: 'Ringkasan stok, request, pinjaman, rack, dan network inventory',
-    href: role === 'SUPER_ADMIN' ? '/inventory' : '/inventory/network',
+    href: '/inventory',
     excludePrefixes: ['/inventory/legal', '/inventory/kantor', '/inventory/toko'],
     assignHrefs: ['/inventory', '/inventory/network'],
     children: buildInventorySubmenuItems(role),

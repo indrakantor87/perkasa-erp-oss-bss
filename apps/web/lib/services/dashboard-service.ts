@@ -380,7 +380,7 @@ function getDashboardOperationalCardHref(role: AppRole, card: DashboardOperation
       break
     case 'INVENTORY':
       if (canAccessDashboardHref(role, '/inventory')) {
-        return role === 'SUPER_ADMIN' ? '/inventory' : '/inventory/network'
+        return '/inventory'
       }
       break
   }
@@ -670,7 +670,7 @@ function getDashboardAlertFallback(role: AppRole, item: DashboardAlertItem) {
   }
 
   const fallbackHref =
-    ['/dashboard', '/support/tt', '/support/isolations', role === 'SUPER_ADMIN' ? '/inventory' : '/inventory/network', '/sales']
+    ['/dashboard', '/support/tt', '/support/isolations', '/inventory', '/sales']
       .find((candidate) => canAccessDashboardHref(role, candidate))
       ?? getDefaultLandingPath(role)
 
