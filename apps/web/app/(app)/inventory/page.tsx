@@ -3,7 +3,93 @@ import { notFound, redirect } from 'next/navigation'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
-import type { AppRole } from '@/lib/types'
+import { SimpleBarChart, type SimpleBarDatum } from '@/components/simple-bar-chart'
+import type { AppRole, DomainReviewRow, DomainReviewSection } from '@/lib/types'
+
+function findInventorySection(sections: DomainReviewSection[] | undefined, keyword: string) {
+  if (!sections || sections.length === 0) return null
+  return sections.find((section) => section.title.toUpperCase().includes(keyword.toUpperCase())) ?? null
+}
+
+function pickMetaField(meta: string[], prefix: string) {
+  return meta.find((item) => item.startsWith(prefix))?.slice(prefix.length).trim() ?? ''
+}
+
+function statusGroupRequest(status: string): SimpleBarDatum['tone'] {
+  const s = status.trim().toUpperCase()
+  if (s.includes('SELESAI') || s.includes('DONE') || s.includes('COMPLETE')) return 'emerald'
+  if (s.includes('PENDING')) return 'amber'
+  if (s.includes('DIPROSES') || s.includes('PROSES') || s.includes('PROGRESS')) return 'sky'
+  if (s.includes('BATAL') || s.includes('CANCEL') || s.includes('REJECT')) return 'rose'
+  return 'slate'
+}
+
+function statusGroupLoan(status: string): SimpleBarDatum['tone'] {
+  const s = status.trim().toUpperCase()
+  if (s.includes('DIKEMBALIKAN') || s.includes('RETURNED') || s.includes('SELESAI')) return 'emerald'
+  if (s.includes('PARTIAL')) return 'amber'
+  if (s.includes('OVERDUE') || s.includes('TERLAMBAT')) return 'rose'
+  return 'sky'
+}
+
+function toneForMovement(primary: string): SimpleBarDatum['tone'] {
+  const s = primary.trim().toUpperCase()
+  if (s === 'IN') return 'emerald'
+  if (s === 'OUT') return 'sky'
+  if (s === 'ADJUSTMENT') return 'violet'
+  return 'slate'
+}
+
+function buildBarFromKeyValue(
+  entries: Array<{ label: string; count: number }>,
+  toneResolver?: (label: string) => SimpleBarDatum['tone'],
+): SimpleBarDatum[] {
+  return entries.map((entry) => ({
+    label: entry.label,
+    value: entry.count,
+    tone: toneResolver ? toneResolver(entry.label) : 'ink',
+  }))
+}
+
+function countByStatus(rows: DomainReviewRow[]): Array<{ label: string; count: number }> {
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    const key = row.status.trim() || 'TANPA STATUS'
+    map.set(key, (map.get(key) ?? 0) + 1)
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, count]) => ({ label, count }))
+}
+
+function countByMetaPrefix(rows: DomainReviewRow[], prefix: string): Array<{ label: string; count: number }> {
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    const key = pickMetaField(row.meta, prefix).trim() || 'TIDAK TERDAFTAR'
+    map.set(key, (map.get(key) ?? 0) + 1)
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, count]) => ({ label, count }))
+}
+
+function countByMovementPrimary(rows: DomainReviewRow[]): Array<{ label: string; count: number }> {
+  const map = new Map<string, number>()
+  for (const row of rows) {
+    const key = row.primary.trim().toUpperCase() || 'TANPA JENIS'
+    map.set(key, (map.get(key) ?? 0) + 1)
+  }
+  const preferredOrder = ['IN', 'OUT', 'ADJUSTMENT']
+  const entries = Array.from(map.entries()).map(([label, count]) => ({ label, count }))
+  return entries.sort((a, b) => {
+    const ai = preferredOrder.indexOf(a.label)
+    const bi = preferredOrder.indexOf(b.label)
+    if (ai !== -1 && bi !== -1) return ai - bi
+    if (ai !== -1) return -1
+    if (bi !== -1) return 1
+    return b.count - a.count
+  })
+}
 
 type InventoryShortcut = {
   title: string
@@ -183,6 +269,32 @@ export default async function InventoryOverviewPage({
     const shortcuts = buildInventoryShortcuts(session.role)
     const focusCards = buildInventoryFocusCards(session.role)
     const requestHref = '/inventory/requests'
+    const reviewSections = payload.content.reviewSections ?? []
+
+    const requestSection = findInventorySection(reviewSections, 'REQUEST INVENTORY')
+    const requestRows = requestSection?.rows ?? []
+    const loanSection = findInventorySection(reviewSections, 'PINJAMAN INVENTORY')
+    const loanRows = loanSection?.rows ?? []
+    const movementSection = findInventorySection(reviewSections, 'STOCK MOVEMENT')
+    const movementRows = movementSection?.rows ?? []
+
+    const chartStatusRequest: SimpleBarDatum[] = buildBarFromKeyValue(
+      countByStatus(requestRows),
+      statusGroupRequest,
+    )
+    const chartSubdivRequest: SimpleBarDatum[] = buildBarFromKeyValue(
+      countByMetaPrefix(requestRows, 'Sub-divisi: '),
+      () => 'accent',
+    )
+    const chartStatusLoan: SimpleBarDatum[] = buildBarFromKeyValue(countByStatus(loanRows), statusGroupLoan)
+    const chartSubdivLoan: SimpleBarDatum[] = buildBarFromKeyValue(
+      countByMetaPrefix(loanRows, 'Sub-divisi: '),
+      () => 'violet',
+    )
+    const chartMovementKind: SimpleBarDatum[] = buildBarFromKeyValue(
+      countByMovementPrimary(movementRows),
+      toneForMovement,
+    )
 
     return (
       <div className="space-y-4">
@@ -260,6 +372,66 @@ export default async function InventoryOverviewPage({
             </div>
           </section>
         ) : null}
+
+        <section className="space-y-4">
+          <div className="panel p-4">
+            <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
+              <div>
+                <p className="section-title">Pemantauan Kinerja Inventory</p>
+                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-inkStrong">
+                  Ringkasan visual proses operasional gudang
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-mute">
+                  Visualisasi ini menampilkan angka hitung mentah (tidak ada prediksi, asumsi, atau smoothing). Data diambil langsung dari
+                  transaksi request, stock movement, dan pinjaman barang terbaru, sehingga bisa dipakai sebagai acuan dasar pengambilan
+                  keputusan.
+                </p>
+              </div>
+              <span className="badge border-line bg-surfaceMuted text-muteStrong self-start">5 diagram batang</span>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <SimpleBarChart
+              title="Status Request Barang"
+              subtitle="Distribusi request per status. Cek jika menumpuk pada PENDING / DIPROSES untuk mengatur prioritas."
+              unitLabel="request"
+              data={chartStatusRequest}
+              emptyNote="Belum ada transaksi request. Tabel akan terisi setelah request pertama dibuat."
+            />
+            <SimpleBarChart
+              title="Stock Movement (Masuk / Keluar / Penyesuaian)"
+              subtitle="Perbandingan barang masuk (IN), barang keluar (OUT), dan penyesuaian stok (ADJUSTMENT)."
+              unitLabel="transaksi"
+              data={chartMovementKind}
+              emptyNote="Belum ada transaksi stock movement (receipt, pemakaian, atau penyesuaian stok)."
+            />
+            <SimpleBarChart
+              title="Request per Sub-divisi"
+              subtitle="Melihat beban request per tim. Sub-divisi dengan request tinggi bisa dicek stok buffer-nya."
+              unitLabel="request"
+              data={chartSubdivRequest}
+              emptyNote="Belum ada request per sub-divisi yang tercatat."
+            />
+            <SimpleBarChart
+              title="Status Pinjaman Barang"
+              subtitle="Distribusi pinjaman: Aktif / Dikembalikan / Partial / Overdue. Fokus ke overdue dan partial untuk akuntabilitas."
+              unitLabel="pinjaman"
+              data={chartStatusLoan}
+              emptyNote="Belum ada transaksi pinjaman barang yang tercatat."
+            />
+            <div className="lg:col-span-2">
+              <SimpleBarChart
+                title="Pinjaman Barang per Sub-divisi"
+                subtitle="Memantau tim mana yang paling banyak meminjam aset gudang untuk audit dan pengawasan penggunaan."
+                unitLabel="pinjaman"
+                data={chartSubdivLoan}
+                emptyNote="Belum ada pinjaman per sub-divisi yang tercatat."
+                heightPx={260}
+              />
+            </div>
+          </div>
+        </section>
 
         {shortcuts.length > 0 ? (
           <section className="panel p-4">
