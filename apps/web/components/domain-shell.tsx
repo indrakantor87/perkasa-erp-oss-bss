@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Fragment, Suspense, type ReactNode } from 'react'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import { CaseActionOutcomeSummaryCard } from '@/components/case-action-outcome-summary'
 import { CaseDecisionTrailPanel } from '@/components/case-decision-trail'
 import { CaseEvidencePanelCard } from '@/components/case-evidence-panel'
@@ -3128,16 +3129,16 @@ export function DomainShell({
                   <table className="min-w-[1080px] w-full divide-y divide-line">
                     <thead className="bg-[var(--color-card-subtle)]">
                       <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-mute">
+                        <ExpandableHeaderLeftCells />
                         <th className="px-4 py-3">Item</th>
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3">Ringkasan</th>
                         <th className="px-4 py-3">Metadata</th>
-                        <th className="px-4 py-3">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line bg-surface">
                       {section.rows.length ? (
-                        section.rows.map((row) => {
+                        section.rows.map((row, rowIdx) => {
                           const rowAction = getDomainReviewRowAction({
                             domainKey: content.key,
                             sectionTitle: section.title,
@@ -3161,7 +3162,6 @@ export function DomainShell({
                           const billingActionOutcomeSummary =
                             content.key === 'billing' ? buildBillingActionOutcomeSummary(row, section.title) : null
                           const metaHighlights = getReviewRowMetaHighlights(row.meta)
-                          const hiddenMetaCount = Math.max(row.meta.length - metaHighlights.length, 0)
                           const hasBillingContext =
                             Boolean(billingCorrelationSummary) ||
                             Boolean(billingDecisionTrail) ||
@@ -3169,106 +3169,178 @@ export function DomainShell({
                             Boolean(billingHealthSignal) ||
                             Boolean(billingRecommendedActions) ||
                             Boolean(billingActionOutcomeSummary)
+                          const mutedStatuses = ['CLOSE', 'DONE', 'READY', 'PAID', 'CLOSED', 'COMPLETED']
+                          const tone = mutedStatuses.includes(row.status.toUpperCase()) ? 'muted' : undefined
 
                           return (
-                            <Fragment key={row.id}>
-                              <tr className="align-top">
-                                <td className="px-4 py-4">
-                                  <div className="min-w-[220px]">
-                                    <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{row.primary}</p>
-                                    <p className="mt-1 text-sm text-mute">{row.secondary}</p>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <span className={`badge ${getReviewRowStatusTone(row.status)}`}>{row.status}</span>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <p className="max-w-xl text-sm leading-6 text-mute">{row.detail}</p>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <div className="flex max-w-sm flex-wrap gap-2">
-                                    {metaHighlights.map((item) => (
-                                      <span key={`${row.id}-${item}`} className="badge border-line bg-surface text-mute">
-                                        {item}
-                                      </span>
-                                    ))}
-                                    {hiddenMetaCount > 0 ? (
-                                      <span className="badge border-dashed border-line bg-[var(--color-card-subtle)] text-mute">
-                                        +{hiddenMetaCount} meta
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                  {rowAction ? (
-                                    <div className="flex min-w-[210px] flex-col gap-2">
-                                      <Link
-                                        href={rowAction.href}
-                                        className="inline-flex items-center justify-center rounded-2xl bg-panel px-4 py-2 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
-                                      >
-                                        {rowAction.label}
-                                      </Link>
-                                      {rowAction.secondaryLabel && rowAction.secondaryHref ? (
-                                        <Link
-                                          href={rowAction.secondaryHref}
-                                          className="inline-flex items-center justify-center rounded-2xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-[var(--color-card-subtle)]"
-                                        >
-                                          {rowAction.secondaryLabel}
-                                        </Link>
-                                      ) : null}
+                            <ExpandableRow
+                              key={row.id}
+                              id={`review-${row.id}`}
+                              num={rowIdx + 1}
+                              totalCols={6}
+                              tone={tone}
+                              compactRow={
+                                <>
+                                  <td className="px-4 py-4">
+                                    <div className="min-w-[220px]">
+                                      <p className="text-sm font-semibold text-[var(--color-ink-strong)]">{row.primary}</p>
+                                      <p className="mt-1 text-sm text-mute">{row.secondary}</p>
                                     </div>
-                                  ) : (
-                                    <span className="text-sm text-mute">Tidak ada aksi langsung</span>
-                                  )}
-                                </td>
-                              </tr>
-                              {hasBillingContext ? (
-                                <tr className="bg-[var(--color-card-subtle)]">
-                                  <td colSpan={5} className="px-4 py-4">
-                                    <div className="grid gap-4 xl:grid-cols-2">
-                                      {billingHealthSignal ? (
-                                        <CaseHealthSignalCard signal={billingHealthSignal} title="Case Health Signal" />
-                                      ) : null}
-                                      {billingRecommendedActions ? (
-                                        <CaseNextActionMatrixCard
-                                          matrix={billingRecommendedActions}
-                                          title="Recommended Next Action"
-                                        />
-                                      ) : null}
-                                      {billingActionOutcomeSummary ? (
-                                        <CaseActionOutcomeSummaryCard
-                                          summary={billingActionOutcomeSummary}
-                                          title="Action Outcome Summary"
-                                        />
-                                      ) : null}
-                                      {billingCorrelationSummary ? (
-                                        <CaseCorrelationSummaryPanel
-                                          summary={billingCorrelationSummary}
-                                          title="Ringkasan Korelasi Customer / Service"
-                                        />
-                                      ) : null}
-                                      {billingDecisionTrail ? (
-                                        <CaseDecisionTrailPanel
-                                          trail={billingDecisionTrail}
-                                          title="Decision Trail Billing / Kasus"
-                                        />
-                                      ) : null}
-                                      {billingEvidencePanel ? (
-                                        <CaseEvidencePanelCard
-                                          evidence={billingEvidencePanel}
-                                          title="Evidence Billing / Kasus"
-                                        />
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <span className={`badge ${getReviewRowStatusTone(row.status)}`}>{row.status}</span>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <p className="max-w-xl text-sm leading-6 text-mute">{row.detail}</p>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <div className="flex max-w-sm flex-wrap gap-2">
+                                      {metaHighlights.map((item) => (
+                                        <span key={`${row.id}-${item}`} className="badge border-line bg-surface text-mute">
+                                          {item}
+                                        </span>
+                                      ))}
+                                      {row.meta.length - metaHighlights.length > 0 ? (
+                                        <span className="badge border-dashed border-line bg-[var(--color-card-subtle)] text-mute">
+                                          +{Math.max(row.meta.length - metaHighlights.length, 0)} meta
+                                        </span>
                                       ) : null}
                                     </div>
                                   </td>
-                                </tr>
-                              ) : null}
-                            </Fragment>
+                                </>
+                              }
+                              detail={
+                                <div className="space-y-5">
+                                  <div>
+                                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                                    <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                                      <table className="data-table">
+                                        <tbody className="divide-y divide-line text-sm">
+                                          <tr>
+                                            <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Item Primer</td>
+                                            <td className="px-4 py-2">
+                                              <p className="font-medium text-slate-950">{row.primary}</p>
+                                              {row.secondary ? <p className="mt-0.5 text-xs text-slate-500">{row.secondary}</p> : null}
+                                            </td>
+                                          </tr>
+                                          <tr>
+                                            <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Status</td>
+                                            <td className="px-4 py-2">
+                                              <div className="flex flex-wrap gap-2">
+                                                <span className={`badge ${getReviewRowStatusTone(row.status)}`}>{row.status}</span>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                          <tr>
+                                            <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Item Sekunder</td>
+                                            <td className="px-4 py-2 text-slate-700 leading-5">{row.secondary}</td>
+                                          </tr>
+                                          <tr>
+                                            <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Ringkasan</td>
+                                            <td className="px-4 py-2 text-slate-700 leading-5">{row.detail}</td>
+                                          </tr>
+                                          <tr>
+                                            <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Metadata Lengkap</td>
+                                            <td className="px-4 py-2">
+                                              <div className="flex flex-wrap gap-2">
+                                                {row.meta.map((item) => (
+                                                  <span key={`${row.id}-full-${item}`} className="badge border-line surface-soft text-mute">
+                                                    {item}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                    {hasBillingContext ? (
+                                      <div className="mt-4 rounded-2xl border border-line bg-[var(--color-card-subtle)] p-4">
+                                        <h5 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Konteks Billing / Kasus</h5>
+                                        <div className="grid gap-4 xl:grid-cols-2">
+                                          {billingHealthSignal ? (
+                                            <CaseHealthSignalCard signal={billingHealthSignal} title="Case Health Signal" />
+                                          ) : null}
+                                          {billingRecommendedActions ? (
+                                            <CaseNextActionMatrixCard
+                                              matrix={billingRecommendedActions}
+                                              title="Recommended Next Action"
+                                            />
+                                          ) : null}
+                                          {billingActionOutcomeSummary ? (
+                                            <CaseActionOutcomeSummaryCard
+                                              summary={billingActionOutcomeSummary}
+                                              title="Action Outcome Summary"
+                                            />
+                                          ) : null}
+                                          {billingCorrelationSummary ? (
+                                            <CaseCorrelationSummaryPanel
+                                              summary={billingCorrelationSummary}
+                                              title="Ringkasan Korelasi Customer / Service"
+                                            />
+                                          ) : null}
+                                          {billingDecisionTrail ? (
+                                            <CaseDecisionTrailPanel
+                                              trail={billingDecisionTrail}
+                                              title="Decision Trail Billing / Kasus"
+                                            />
+                                          ) : null}
+                                          {billingEvidencePanel ? (
+                                            <CaseEvidencePanelCard
+                                              evidence={billingEvidencePanel}
+                                              title="Evidence Billing / Kasus"
+                                            />
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">ID</span>
+                                    <span className="tabular-nums text-slate-900">{row.id}</span>
+                                    <span className="text-mute" aria-hidden>•</span>
+                                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Section</span>
+                                    <span className="tabular-nums text-slate-900">{section.title}</span>
+                                    <span className="text-mute" aria-hidden>•</span>
+                                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                                    <span className="tabular-nums text-slate-900">{row.status}</span>
+                                    <span className="text-mute" aria-hidden>•</span>
+                                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Meta Count</span>
+                                    <span className="tabular-nums text-slate-900">{row.meta.length}</span>
+                                  </div>
+                                  <div className="border-t border-line pt-3">
+                                    <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                                    <div className="flex flex-wrap gap-3 items-center">
+                                      {rowAction ? (
+                                        <>
+                                          <Link
+                                            href={rowAction.href}
+                                            className="inline-flex items-center justify-center rounded-2xl bg-panel px-4 py-2 text-sm font-semibold text-surface transition opacity-100 hover:opacity-90"
+                                          >
+                                            {rowAction.label}
+                                          </Link>
+                                          {rowAction.secondaryLabel && rowAction.secondaryHref ? (
+                                            <Link
+                                              href={rowAction.secondaryHref}
+                                              className="inline-flex items-center justify-center rounded-2xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-[var(--color-card-subtle)]"
+                                            >
+                                              {rowAction.secondaryLabel}
+                                            </Link>
+                                          ) : null}
+                                        </>
+                                      ) : (
+                                        <span className="text-sm text-mute">Tidak ada aksi langsung</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              }
+                            />
                           )
                         })
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-4 py-6 text-sm text-mute">
+                          <td colSpan={6} className="px-4 py-6 text-sm text-mute">
                             Belum ada data review pada section ini.
                           </td>
                         </tr>
@@ -3312,16 +3384,16 @@ export function DomainShell({
             <table className="min-w-[1080px] w-full divide-y divide-line">
               <thead className="bg-[var(--color-card-subtle)]">
                 <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-mute">
+                  <ExpandableHeaderLeftCells />
                   <th className="px-4 py-3">Item</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Ringkasan</th>
                   <th className="px-4 py-3">Metadata</th>
-                  <th className="px-4 py-3">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line bg-surface">
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-mute">
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-mute">
                     Tidak ada section tabel kerja untuk domain ini.
                   </td>
                 </tr>
