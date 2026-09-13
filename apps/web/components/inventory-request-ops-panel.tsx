@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { InventoryItemRequestForm } from '@/components/inventory-item-request-form'
 import { InventoryRequestStatusForm } from '@/components/inventory-request-status-form'
+import { ExpandableCardRow } from '@/components/ui-expandable-card'
 import { buildInventoryBarcodeDetailPath, extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
 import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
 
@@ -258,7 +259,7 @@ export function InventoryRequestOpsPanel({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Request Terbaru</p>
           <div className="mt-4 space-y-3">
             {requestRows.length ? (
-              requestRows.map((row) => {
+              requestRows.map((row, rIdx) => {
                 const subdivision = pickMeta(row.meta, 'Sub-divisi: ')
                 const requestedFor = pickMeta(row.meta, 'Untuk: ')
                 const requestedAt = pickMeta(row.meta, 'Requested: ')
@@ -267,100 +268,164 @@ export function InventoryRequestOpsPanel({
                 const requestBarcodeHref = getRowBarcodeHref(row)
                 const movementBarcodeHref = getRowBarcodeHref(audit?.movement)
 
-                return (
-                  <div key={row.id} className="rounded-2xl border border-line bg-white p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
-                        <p className="mt-1 text-sm text-mute">{row.secondary}</p>
+                const compactTopRow = (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[15px] font-bold text-slate-950 leading-snug">{row.primary}</p>
+                    <p className="text-sm text-slate-600">{row.secondary}</p>
+                  </div>
+                )
+
+                const compactBottomRow = <p className="text-sm leading-6 text-slate-700">{row.detail}</p>
+
+                const statusBadge = <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+
+                const actions = [
+                  requestBarcodeHref
+                    ? {
+                        key: 'barcode',
+                        label: 'Buka Barcode',
+                        tone: 'primary' as const,
+                        href: requestBarcodeHref,
+                      }
+                    : null,
+                  {
+                    key: 'status',
+                    label: 'Update Status',
+                    tone: 'primary' as const,
+                  },
+                  normalizeText(row.status) !== 'SELESAI'
+                    ? {
+                        key: 'movement',
+                        label: 'Buat Movement',
+                        tone: 'success' as const,
+                        href: `/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=REQUEST&requestId=${row.id}#inventory-action-stock-movement`,
+                      }
+                    : null,
+                  {
+                    key: 'detail',
+                    label: 'Detail Lengkap',
+                    tone: 'default' as const,
+                  },
+                ].filter(Boolean) as NonNullable<Parameters<typeof ExpandableCardRow>['0']['actions']>
+
+                const meta = [
+                  { label: 'Sub-divisi', value: subdivision || '-' },
+                  { label: 'Untuk', value: requestedFor || '-' },
+                  { label: 'Requested', value: requestedAt || '-' },
+                ]
+
+                const subSections: NonNullable<Parameters<typeof ExpandableCardRow>['0']['subSections']> = []
+
+                const badges: { key: string; tone: string; text: string; href?: string }[] = []
+                if (audit?.movement) {
+                  badges.push({
+                    key: 'mv',
+                    tone: 'border-sky-200 bg-sky-50 text-sky-700',
+                    text: `Movement: ${audit.movement.primary} · ${audit.movement.status || 'NO-REF'}`,
+                  })
+                }
+                if (!audit?.movement && normalizeText(row.status) === 'SELESAI') {
+                  badges.push({
+                    key: 'mv-out-pending',
+                    tone: 'border-amber-200 bg-amber-50 text-amber-700',
+                    text: 'Movement OUT belum terbaca',
+                  })
+                  badges.push({
+                    key: 'mv-create',
+                    tone: 'border-slate-900 bg-slate-950 text-white',
+                    text: 'Buat Movement dari Request',
+                    href: `/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=REQUEST&requestId=${row.id}#inventory-action-stock-movement`,
+                  })
+                }
+                if (!audit?.movement && normalizeText(row.status) !== 'SELESAI' && row.status.trim().toUpperCase() !== 'DRAFT') {
+                  badges.push({
+                    key: 'mv-shortcut',
+                    tone: 'border-slate-300 bg-white text-slate-700',
+                    text: 'Shortcut Movement',
+                    href: `/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=REQUEST&requestId=${row.id}#inventory-action-stock-movement`,
+                  })
+                }
+                if (handover?.handoverFrom && handover?.handoverTo) {
+                  badges.push({
+                    key: 'ho',
+                    tone: 'border-violet-200 bg-violet-50 text-violet-700',
+                    text: `Handover: ${handover.handoverFrom} -> ${handover.handoverTo}`,
+                  })
+                }
+                if (handover?.proofRef) {
+                  badges.push({
+                    key: 'proof',
+                    tone: 'border-violet-200 bg-violet-50 text-violet-700',
+                    text: `Bukti: ${handover.proofType || '-'} / ${handover.proofRef}`,
+                  })
+                }
+
+                if (badges.length) {
+                  subSections.push({
+                    key: 'badges',
+                    title: 'Info & Shortcut',
+                    content: (
+                      <div className="flex flex-wrap gap-2">
+                        {badges.map((b) =>
+                          b.href ? (
+                            <Link
+                              key={b.key}
+                              href={b.href}
+                              className={`badge ${b.tone} transition hover:opacity-90`}
+                            >
+                              {b.text}
+                            </Link>
+                          ) : (
+                            <span key={b.key} className={`badge ${b.tone}`}>
+                              {b.text}
+                            </span>
+                          ),
+                        )}
                       </div>
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        {requestBarcodeHref ? (
-                          <Link
-                            href={requestBarcodeHref}
-                            className="badge border-slate-300 bg-slate-950 text-white transition hover:bg-slate-800"
-                          >
-                            Buka Barcode
-                          </Link>
-                        ) : null}
-                        <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
-                      </div>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-slate-700">{row.detail}</p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="badge border-slate-200 bg-white text-slate-600">
-                        Sub-divisi: {subdivision || '-'}
-                      </span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">
-                        Untuk: {requestedFor || '-'}
-                      </span>
-                      <span className="badge border-slate-200 bg-white text-slate-600">
-                        Requested: {requestedAt || '-'}
-                      </span>
-                      {audit?.movement ? (
-                        <span className="badge border-sky-200 bg-sky-50 text-sky-700">
-                          Movement: {audit.movement.primary} · {audit.movement.status || 'NO-REF'}
-                        </span>
-                      ) : normalizeText(row.status) === 'SELESAI' ? (
-                        <>
-                          <span className="badge border-amber-200 bg-amber-50 text-amber-700">
-                            Movement OUT belum terbaca
-                          </span>
-                          <Link
-                            href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=REQUEST&requestId=${row.id}#inventory-action-stock-movement`}
-                            className="badge border-slate-900 bg-slate-950 text-white transition hover:bg-slate-800"
-                            aria-label="Buat stock movement keluar untuk request inventory ini"
-                          >
-                            Buat Movement dari Request
-                          </Link>
-                        </>
-                      ) : null}
-                      {!audit?.movement && normalizeText(row.status) !== 'SELESAI' && row.status.trim().toUpperCase() !== 'DRAFT' ? (
-                        <Link
-                          href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=REQUEST&requestId=${row.id}#inventory-action-stock-movement`}
-                          className="badge border-slate-300 bg-white text-slate-700 transition hover:border-slate-400"
-                          aria-label="Buat stock movement keluar untuk request inventory ini"
-                        >
-                          Shortcut Movement
-                        </Link>
-                      ) : null}
-                      {handover?.handoverFrom && handover?.handoverTo ? (
-                        <span className="badge border-violet-200 bg-violet-50 text-violet-700">
-                          Handover: {handover.handoverFrom} -&gt; {handover.handoverTo}
-                        </span>
-                      ) : null}
-                      {handover?.proofRef ? (
-                        <span className="badge border-violet-200 bg-violet-50 text-violet-700">
-                          Bukti: {handover.proofType || '-'} / {handover.proofRef}
-                        </span>
-                      ) : null}
-                    </div>
-                    {audit?.movement ? (
-                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                          <p className="font-semibold text-slate-950">Audit Movement</p>
-                          {movementBarcodeHref ? (
+                    ),
+                  })
+                }
+
+                if (audit?.movement) {
+                  subSections.push({
+                    key: 'audit-mv',
+                    title: 'Audit Movement Terkait',
+                    columns: ['Movement ID', 'Status', 'Detail'],
+                    rows: [
+                      [
+                        movementBarcodeHref ? (
+                          <>
+                            <span className="tabular-nums font-semibold">{audit.movement.primary}</span>
+                            <span className="ml-2">·</span>
                             <Link
                               href={movementBarcodeHref}
-                              className="badge border-slate-300 bg-white text-slate-700 transition hover:border-slate-400"
+                              className="ml-2 inline-flex rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
                             >
-                              Barcode Movement
+                              Barcode
                             </Link>
-                          ) : null}
-                        </div>
-                        <p className="mt-1 leading-6">{audit.movement.detail}</p>
-                        {audit.movement.meta.length ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {audit.movement.meta.map((item) => (
-                              <span key={`${audit.movement?.id}-${item}`} className="badge border-slate-200 bg-white text-slate-600">
-                                {item}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
+                          </>
+                        ) : (
+                          <span className="font-semibold text-slate-900">{audit.movement.primary}</span>
+                        ),
+                        <span>{audit.movement.status || '-'}</span>,
+                        <span className="leading-6">{audit.movement.detail}</span>,
+                      ],
+                    ],
+                  })
+                }
+
+                return (
+                  <ExpandableCardRow
+                    key={row.id}
+                    id={row.id}
+                    num={rIdx + 1}
+                    compactTopRow={compactTopRow}
+                    compactBottomRow={compactBottomRow}
+                    statusBadge={statusBadge}
+                    actions={actions}
+                    meta={meta}
+                    subSections={subSections}
+                  />
                 )
               })
             ) : (
