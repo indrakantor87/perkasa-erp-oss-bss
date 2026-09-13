@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import type { ImportBatch } from '@/lib/types'
 
 const statusTone: Record<ImportBatch['status'], string> = {
@@ -113,19 +114,19 @@ export function ImportBatchTable({
         <table className="min-w-full divide-y divide-line text-left text-sm">
           <thead className="bg-slate-50 text-mute">
             <tr>
+              <ExpandableHeaderLeftCells />
               <th className="px-6 py-4 font-semibold">Batch</th>
               <th className="px-6 py-4 font-semibold">Sumber</th>
               <th className="px-6 py-4 font-semibold">Status</th>
               <th className="px-6 py-4 font-semibold">Baris</th>
               <th className="px-6 py-4 font-semibold">Ringkasan</th>
-              <th className="px-6 py-4 font-semibold">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line bg-white">
             {items.length === 0 ? (
               <tr>
                 <td
-                  colSpan={canCleanup ? 6 : 6}
+                  colSpan={7}
                   className="px-6 py-10 text-center text-sm text-mute"
                 >
                   {reviewDbReady
@@ -134,61 +135,122 @@ export function ImportBatchTable({
                 </td>
               </tr>
             ) : null}
-            {items.map((item) => {
+            {items.map((item, idx) => {
               const summary = buildBatchSummary(item)
               const eligibleCleanup = canCleanup && item.status !== 'IMPORTED'
               const busy = busyBatchId === item.id
+              const totalCols = 7
+
+              const compactRow = (
+                <>
+                  <td className="px-6 py-5">
+                    <p className="font-semibold text-slate-950">{item.batchCode}</p>
+                    <p className="mt-1 text-xs text-mute">{item.scope}</p>
+                    <p className="mt-1 text-xs text-mute">
+                      File: {item.sourceFileName || '-'}
+                    </p>
+                  </td>
+                  <td className="px-6 py-5 font-medium text-slate-700">{item.sourceSystem}</td>
+                  <td className="px-6 py-5">
+                    <span className={`badge border-transparent ${statusTone[item.status]}`}>
+                      {item.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-5 text-slate-700">{item.totalRows.toLocaleString('id-ID')}</td>
+                  <td className="px-6 py-5 text-slate-700">
+                    <div className="space-y-1">
+                      <p>{summary.headline}</p>
+                      <p className="text-xs text-mute">{summary.detail}</p>
+                    </div>
+                  </td>
+                </>
+              )
+
+              const detail = (
+                <div className="space-y-5">
+                  <div>
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                    <div className="rounded-2xl border border-line bg-white overflow-x-auto">
+                      <table className="data-table min-w-full text-sm">
+                        <thead>
+                          <tr className="text-xs uppercase tracking-[0.14em] text-muteStrong">
+                            <th className="px-4 py-3 font-semibold">Batch Code</th>
+                            <th className="px-4 py-3 font-semibold">Scope</th>
+                            <th className="px-4 py-3 font-semibold">Source System</th>
+                            <th className="px-4 py-3 font-semibold">File Name</th>
+                            <th className="px-4 py-3 font-semibold">Catatan Batch</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td className="px-4 py-3 font-semibold text-slate-950">{item.batchCode}</td>
+                            <td className="px-4 py-3">{item.scope}</td>
+                            <td className="px-4 py-3">{item.sourceSystem}</td>
+                            <td className="px-4 py-3">{item.sourceFileName || '-'}</td>
+                            <td className="px-4 py-3 text-mute">{item.note || '-'}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">ID Batch</span>
+                    <span className="font-mono text-ink tabular-nums">{item.id}</span>
+                    <span aria-hidden className="text-mute">•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                    <span className="font-semibold text-inkStrong">{item.status}</span>
+                    <span aria-hidden className="text-mute">•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Total Rows</span>
+                    <span className="font-mono text-ink tabular-nums">{item.totalRows.toLocaleString('id-ID')}</span>
+                    <span aria-hidden className="text-mute">•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Valid Rows</span>
+                    <span className="font-mono text-emerald-700 tabular-nums">{item.validRows.toLocaleString('id-ID')}</span>
+                    <span aria-hidden className="text-mute">•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Invalid Rows</span>
+                    <span className="font-mono text-rose-700 tabular-nums">{item.invalidRows.toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="border-t border-line pt-3">
+                    <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                    <div className="flex flex-wrap gap-3 items-center">
+                      <Link href={`/import/${item.id}`} className="rounded-full bg-blue-700 px-4 py-2 text-sm font-semibold text-white">
+                        Buka batch
+                      </Link>
+                      {canCleanup ? (
+                        item.status === 'IMPORTED' ? (
+                          <span
+                            className="badge border-transparent bg-slate-100 text-slate-600"
+                            title="Batch berhasil diimport tidak dapat dihapus langsung (butuh approval bisnis terpisah)."
+                          >
+                            Terkunci
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleCleanup(item)}
+                            disabled={busy}
+                            className="rounded-full bg-rose-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300"
+                          >
+                            {busy ? 'Proses…' : 'Bersihkan'}
+                          </button>
+                        )
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              )
 
               return (
-              <tr key={item.id}>
-                <td className="px-6 py-5">
-                  <p className="font-semibold text-slate-950">{item.batchCode}</p>
-                  <p className="mt-1 text-xs text-mute">{item.scope}</p>
-                  <p className="mt-1 text-xs text-mute">
-                    File: {item.sourceFileName || '-'}
-                  </p>
-                </td>
-                <td className="px-6 py-5 font-medium text-slate-700">{item.sourceSystem}</td>
-                <td className="px-6 py-5">
-                  <span className={`badge border-transparent ${statusTone[item.status]}`}>
-                    {item.status}
-                  </span>
-                </td>
-                <td className="px-6 py-5 text-slate-700">{item.totalRows.toLocaleString('id-ID')}</td>
-                <td className="px-6 py-5 text-slate-700">
-                  <div className="space-y-1">
-                    <p>{summary.headline}</p>
-                    <p className="text-xs text-mute">{summary.detail}</p>
-                  </div>
-                </td>
-                <td className="px-6 py-5">
-                  <div className="flex items-center gap-2">
-                    <Link href={`/import/${item.id}`} className="text-sm font-semibold text-blue-700">
-                      Buka batch
-                    </Link>
-                    {canCleanup ? (
-                      item.status === 'IMPORTED' ? (
-                        <span
-                          className="badge border-transparent bg-slate-100 text-slate-600"
-                          title="Batch berhasil diimport tidak dapat dihapus langsung (butuh approval bisnis terpisah)."
-                        >
-                          Terkunci
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleCleanup(item)}
-                          disabled={busy}
-                          className="rounded-full bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white disabled:bg-slate-300"
-                        >
-                          {busy ? 'Proses…' : 'Bersihkan'}
-                        </button>
-                      )
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            )})}
+                <ExpandableRow
+                  key={item.id}
+                  id={String(item.id)}
+                  num={idx + 1}
+                  totalCols={totalCols}
+                  compactRow={compactRow}
+                  detail={detail}
+                  tone={item.status === 'IMPORTED' || item.status === 'FAILED' ? 'muted' : 'default'}
+                />
+              )
+            })}
           </tbody>
         </table>
       </div>

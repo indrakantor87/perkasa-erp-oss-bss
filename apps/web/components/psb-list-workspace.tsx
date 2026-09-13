@@ -5,6 +5,10 @@ import Link from 'next/link'
 import type { ChangeEvent } from 'react'
 import { memo, Suspense, useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { PsbControlTower } from '@/components/psb-control-tower'
+import {
+  ExpandableHeaderLeftCells,
+  ExpandableRow,
+} from '@/components/ui-expandable-table'
 import type { PsbActivationStatus, PsbListItem, PsbListPagePayload, PsbListStatus } from '@/lib/psb-list-shared'
 import { resolvePsbListAvailableActions } from '@/lib/psb-list-shared'
 
@@ -537,10 +541,11 @@ type PsbTableRowsProps = {
 }
 
 const PsbTableRows = memo(function PsbTableRows({ items, selectedId, state, isLoading, errorMessage }: PsbTableRowsProps) {
+  const totalCols = 8
   if (isLoading) {
     return (
       <tr aria-busy="true">
-        <td colSpan={7} className="px-4 py-12">
+        <td colSpan={totalCols} className="px-4 py-12">
           <div className="flex items-center justify-center gap-3 text-sm text-slate-500">
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" aria-hidden="true" />
             Memuat daftar Data PSB...
@@ -552,7 +557,7 @@ const PsbTableRows = memo(function PsbTableRows({ items, selectedId, state, isLo
   if (errorMessage) {
     return (
       <tr role="alert">
-        <td colSpan={7} className="px-4 py-10">
+        <td colSpan={totalCols} className="px-4 py-10">
           <div className="mx-auto flex max-w-xl flex-col items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">
               <span className="inline-block h-2 w-2 rounded-full bg-rose-500" aria-hidden="true" />
@@ -574,7 +579,7 @@ const PsbTableRows = memo(function PsbTableRows({ items, selectedId, state, isLo
   if (!items.length) {
     return (
       <tr>
-        <td colSpan={7} className="px-4 py-12">
+        <td colSpan={totalCols} className="px-4 py-12">
           <div className="flex flex-col items-center gap-2 text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
               Belum ada data
@@ -587,11 +592,12 @@ const PsbTableRows = memo(function PsbTableRows({ items, selectedId, state, isLo
     )
   }
   return (
-    <>
-      {items.map((item) => {
+    <tbody className="divide-y divide-slate-200">
+      {items.map((item, idx) => {
         const active = selectedId === item.id
-        return (
-          <tr key={item.id} className={active ? 'bg-sky-50/70' : 'bg-white'}>
+
+        const compactRow = (
+          <>
             <td className="px-4 py-4 align-top">
               <p className="text-sm font-semibold text-slate-950">{item.psbListCode}</p>
               <p className="mt-1 text-sm text-slate-700">{item.customerName}</p>
@@ -621,18 +627,92 @@ const PsbTableRows = memo(function PsbTableRows({ items, selectedId, state, isLo
                 {item.csPicName ? `PIC CS: ${item.csPicName}` : 'Belum ada PIC CS'}
               </p>
             </td>
-            <td className="px-4 py-4 text-right align-top">
-              <Link
-                href={buildHref(state, { selected: String(item.id) })}
-                className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Buka Detail
-              </Link>
-            </td>
-          </tr>
+          </>
+        )
+
+        const detail = (
+          <div className="space-y-5">
+            <section className="space-y-2">
+              <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                Detil Data
+              </h4>
+              <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Kode PSB</th>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Customer</th>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">No HP</th>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Paket</th>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">ODP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.psbListCode}</td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.customerName}</td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.customerPhone || '-'}</td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.packageLabel || '-'}</td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.odpCode || '-'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="space-y-2">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Marketing</span>
+                  <span className="tabular-nums text-slate-900">{item.salesOwnerName || '-'}</span>
+                  <span className="text-mute" aria-hidden>•</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Tgl Target</span>
+                  <span className="tabular-nums text-slate-900">{formatDateTime(item.requestedInstallDate)}</span>
+                  <span className="text-mute" aria-hidden>•</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">PIC CS</span>
+                  <span className="tabular-nums text-slate-900">{item.csPicName || '-'}</span>
+                  <span className="text-mute" aria-hidden>•</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                  <span className="tabular-nums text-slate-900">{getStatusLabel(item.status)}</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-2 pt-3 border-t border-line">
+              <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+                Aksi
+              </h5>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href={buildHref(state, { selected: String(item.id) })}
+                  className="inline-flex items-center justify-center rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
+                >
+                  Buka Detail
+                </Link>
+              </div>
+            </section>
+          </div>
+        )
+
+        return (
+          <ExpandableRow
+            key={item.id}
+            id={String(item.id)}
+            num={idx + 1}
+            totalCols={totalCols}
+            compactRow={compactRow}
+            detail={detail}
+            tone={active ? 'muted' : 'default'}
+          />
         )
       })}
-    </>
+    </tbody>
   )
 })
 
@@ -1099,24 +1179,22 @@ export function PsbListWorkspace({
             <table className="min-w-[980px] w-full border-collapse">
               <thead className="bg-slate-50">
                 <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <ExpandableHeaderLeftCells />
                   <th className="px-4 py-3">Kode / Customer</th>
                   <th className="px-4 py-3">Alamat / Area</th>
                   <th className="px-4 py-3">Paket / ODP</th>
                   <th className="px-4 py-3">Marketing / Target</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Tindak Lanjut</th>
-                  <th className="px-4 py-3 text-right">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
-                <PsbTableRows
-                  items={displayItems}
-                  selectedId={deferredSelectedId}
-                  state={state}
-                  isLoading={false}
-                  errorMessage={null}
-                />
-              </tbody>
+              <PsbTableRows
+                items={displayItems}
+                selectedId={deferredSelectedId}
+                state={state}
+                isLoading={false}
+                errorMessage={null}
+              />
             </table>
           </div>
 

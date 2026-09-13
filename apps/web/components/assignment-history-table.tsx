@@ -2,6 +2,7 @@ import { AssignmentAcceptButton } from '@/components/assignment-accept-button'
 import { ReleaseAssignmentButton } from '@/components/release-assignment-button'
 import { ReassignAssignmentModal, type TechnicianOption } from '@/components/reassign-assignment-modal'
 import { StatusBadge, type StatusTone } from '@/components/ui-status-badge'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import type { AssignmentHistoryItem } from '@/lib/services/tracking-service'
 
 type AssignmentHistoryTableProps = {
@@ -94,6 +95,7 @@ export function AssignmentHistoryTable({
         <table className="min-w-full border-separate border-spacing-0 text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-[0.16em] text-muteStrong">
+              <ExpandableHeaderLeftCells />
               <th className="border-b border-line px-3 py-3 font-semibold">Teknisi</th>
               <th className="border-b border-line px-3 py-3 font-semibold">Peran</th>
               <th className="border-b border-line px-3 py-3 font-semibold">Status</th>
@@ -102,11 +104,10 @@ export function AssignmentHistoryTable({
               <th className="border-b border-line px-3 py-3 font-semibold">Acceptance</th>
               <th className="border-b border-line px-3 py-3 font-semibold">Released</th>
               <th className="border-b border-line px-3 py-3 font-semibold">Alasan / Catatan</th>
-              <th className="border-b border-line px-3 py-3 text-right font-semibold">Aksi</th>
             </tr>
           </thead>
           <tbody>
-            {assignments.map((row) => {
+            {assignments.map((row, idx) => {
               const status = resolveAssignmentTone(row.status)
               const isReleased = row.status === 'RELEASED'
               const isSelf = sessionUserId != null && Number(row.technician.userId) === Number(sessionUserId)
@@ -116,9 +117,10 @@ export function AssignmentHistoryTable({
               const assignedByLabel = actorLabel(row.assignedBy)
               const acceptedByLabel = actorLabel(row.acceptedBy)
               const releasedByLabel = actorLabel(row.releasedBy)
+              const totalCols = 10
 
-              return (
-                <tr key={row.assignmentId} className="align-top group">
+              const compactRow = (
+                <>
                   <td className="border-b border-line px-3 py-3">
                     <div className="text-sm font-semibold text-inkStrong">{techLabel(row.technician)}</div>
                     <div className="mt-0.5 text-xs text-mute">User #{row.technician.userId}</div>
@@ -172,8 +174,54 @@ export function AssignmentHistoryTable({
                       <span className="text-xs text-muteStrong">-</span>
                     )}
                   </td>
-                  <td className="border-b border-line px-3 py-3">
-                    <div className="flex flex-col items-end gap-2 whitespace-nowrap">
+                </>
+              )
+
+              const detail = (
+                <div className="space-y-5">
+                  <div>
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                    <div className="rounded-2xl border border-line bg-white overflow-x-auto">
+                      <table className="data-table min-w-full text-sm">
+                        <thead>
+                          <tr className="text-xs uppercase tracking-[0.14em] text-muteStrong">
+                            <th className="px-4 py-3 font-semibold">Teknisi</th>
+                            <th className="px-4 py-3 font-semibold">Peran</th>
+                            <th className="px-4 py-3 font-semibold">Ditugaskan Oleh</th>
+                            <th className="px-4 py-3 font-semibold">Diterima Oleh</th>
+                            <th className="px-4 py-3 font-semibold">Dilepas Oleh</th>
+                            <th className="px-4 py-3 font-semibold">Alasan Release</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td className="px-4 py-3">{techLabel(row.technician)}</td>
+                            <td className="px-4 py-3">{row.role || '-'}</td>
+                            <td className="px-4 py-3">{assignedByLabel}</td>
+                            <td className="px-4 py-3">{acceptedByLabel}</td>
+                            <td className="px-4 py-3">{releasedByLabel}</td>
+                            <td className="px-4 py-3">{row.releasedReason || row.notes || '-'}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">ID Penugasan</span>
+                    <span className="font-mono text-ink tabular-nums">#{row.assignmentId}</span>
+                    <span aria-hidden className="text-mute">•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                    <span className="font-semibold text-inkStrong">{status.label}</span>
+                    <span aria-hidden className="text-mute">•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Primary</span>
+                    <span className="font-semibold text-inkStrong">{row.isPrimary ? 'Ya (UTAMA)' : 'Tidak (Support)'}</span>
+                    <span aria-hidden className="text-mute">•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Ditugaskan</span>
+                    <span className="font-mono text-ink tabular-nums">{formatDate(row.assignedAt)}</span>
+                  </div>
+                  <div className="border-t border-line pt-3">
+                    <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                    <div className="flex flex-wrap gap-3">
                       <AssignmentAcceptButton
                         assignmentId={row.assignmentId}
                         canAccept={canAccept}
@@ -195,8 +243,20 @@ export function AssignmentHistoryTable({
                         endpointBasePath={endpointBasePath}
                       />
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                </div>
+              )
+
+              return (
+                <ExpandableRow
+                  key={row.assignmentId}
+                  id={String(row.assignmentId)}
+                  num={idx + 1}
+                  totalCols={totalCols}
+                  compactRow={compactRow}
+                  detail={detail}
+                  tone={isReleased ? 'muted' : 'default'}
+                />
               )
             })}
           </tbody>

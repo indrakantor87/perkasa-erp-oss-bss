@@ -3,6 +3,7 @@
 import type { FormEvent, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AppRole } from '@/lib/types'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import type {
   DigitalAnalyticsEntry,
   DigitalAnalyticsSummary,
@@ -415,73 +416,132 @@ export function CampaignManager({ role }: { role: AppRole }) {
           <table className="min-w-[900px] w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
+                <ExpandableHeaderLeftCells />
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Campaign</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Periode</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Platform</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Objective</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Budget</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">
                     Memuat campaign...
                   </td>
                 </tr>
               ) : filteredCampaigns.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">
                     Belum ada campaign digital.
                   </td>
                 </tr>
               ) : (
-                filteredCampaigns.map((item) => (
-                  <tr key={item.id} className="align-top hover:bg-slate-50">
-                    <td className="px-4 py-4">
-                      <p className="text-sm font-semibold text-slate-950">{item.name}</p>
-                      <p className="mt-1 text-xs text-slate-500">{item.description || '-'}</p>
-                      <p className="mt-2 text-xs text-slate-400">
-                        Dibuat {item.createdBy.name} pada {formatDateTime(item.createdAt)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 text-xs text-slate-600">
-                      {formatDate(item.startDate)}
-                      <br />
-                      s/d {formatDate(item.endDate)}
-                    </td>
-                    <td className="px-4 py-4 text-xs text-slate-700">{item.platforms.join(', ') || '-'}</td>
-                    <td className="px-4 py-4 text-xs text-slate-700">{item.objectives.join('; ') || '-'}</td>
-                    <td className="px-4 py-4 text-xs font-semibold text-slate-700">{item.status}</td>
-                    <td className="px-4 py-4 text-right text-xs text-slate-700">
-                      Rp {Number(item.budget ?? 0).toLocaleString('id-ID')}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      {canMutate ? (
-                        <div className="flex justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(item)}
-                            className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDelete(item.id)}
-                            className="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600"
-                          >
-                            Hapus
-                          </button>
+                filteredCampaigns.map((item, idx) => {
+                  const totalCols = 8
+
+                  const compactRow = (
+                    <>
+                      <td className="px-4 py-4">
+                        <p className="text-sm font-semibold text-slate-950">{item.name}</p>
+                        <p className="mt-1 text-xs text-slate-500">{item.description || '-'}</p>
+                      </td>
+                      <td className="px-4 py-4 text-xs text-slate-600">
+                        {formatDate(item.startDate)}
+                        <br />
+                        s/d {formatDate(item.endDate)}
+                      </td>
+                      <td className="px-4 py-4 text-xs text-slate-700">{item.platforms.join(', ') || '-'}</td>
+                      <td className="px-4 py-4 text-xs text-slate-700">{item.objectives.join('; ') || '-'}</td>
+                      <td className="px-4 py-4 text-xs font-semibold text-slate-700">{item.status}</td>
+                      <td className="px-4 py-4 text-right text-xs text-slate-700">
+                        Rp {Number(item.budget ?? 0).toLocaleString('id-ID')}
+                      </td>
+                    </>
+                  )
+
+                  const detail = (
+                    <div className="space-y-5">
+                      <div>
+                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                        <div className="rounded-2xl border border-line bg-white overflow-x-auto">
+                          <table className="data-table min-w-full text-sm">
+                            <thead>
+                              <tr className="text-xs uppercase tracking-[0.14em] text-muteStrong">
+                                <th className="px-4 py-3 font-semibold">Campaign</th>
+                                <th className="px-4 py-3 font-semibold">Deskripsi</th>
+                                <th className="px-4 py-3 font-semibold">Dibuat Oleh</th>
+                                <th className="px-4 py-3 font-semibold">Dibuat Pada</th>
+                                <th className="px-4 py-3 font-semibold">Periode</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td className="px-4 py-3 font-semibold text-slate-950">{item.name}</td>
+                                <td className="px-4 py-3">{item.description || '-'}</td>
+                                <td className="px-4 py-3">{item.createdBy.name}</td>
+                                <td className="px-4 py-3">{formatDateTime(item.createdAt)}</td>
+                                <td className="px-4 py-3">{formatDate(item.startDate)} s/d {formatDate(item.endDate)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">read only</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">ID Campaign</span>
+                        <span className="font-mono text-ink tabular-nums">#{item.id}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                        <span className="font-semibold text-inkStrong">{item.status}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Budget</span>
+                        <span className="font-mono text-ink tabular-nums">Rp {Number(item.budget ?? 0).toLocaleString('id-ID')}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Platform</span>
+                        <span className="font-semibold text-inkStrong">{item.platforms.join(', ') || '-'}</span>
+                      </div>
+                      <div className="border-t border-line pt-3">
+                        <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                        <div className="flex flex-wrap gap-3">
+                          {canMutate ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(item)}
+                                className="rounded-full border border-line bg-white px-4 py-2 text-xs font-semibold text-slate-700"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDelete(item.id)}
+                                className="rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-600"
+                              >
+                                Hapus
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-slate-400">read only — role tidak dapat memutasi campaign</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+
+                  return (
+                    <ExpandableRow
+                      key={item.id}
+                      id={String(item.id)}
+                      num={idx + 1}
+                      totalCols={totalCols}
+                      compactRow={compactRow}
+                      detail={detail}
+                      tone={item.status === 'ACTIVE' ? 'default' : 'muted'}
+                    />
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -1273,64 +1333,126 @@ export function ContentCalendarManager({ role }: { role: AppRole }) {
           <table className="min-w-[940px] w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
+                <ExpandableHeaderLeftCells />
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Judul</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tipe</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Platform</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Publish</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tags</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">
                     Memuat content calendar...
                   </td>
                 </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">
                     Belum ada konten digital.
                   </td>
                 </tr>
               ) : (
-                filteredItems.map((item) => (
-                  <tr key={item.id} className="align-top hover:bg-slate-50">
-                    <td className="px-4 py-4">
-                      <p className="text-sm font-semibold text-slate-950">{item.title}</p>
-                      <p className="mt-1 text-xs text-slate-500 line-clamp-2">{item.content || '-'}</p>
-                    </td>
-                    <td className="px-4 py-4 text-xs text-slate-700">{item.contentType}</td>
-                    <td className="px-4 py-4 text-xs text-slate-700">{item.platform}</td>
-                    <td className="px-4 py-4 text-xs font-semibold text-slate-700">{item.status}</td>
-                    <td className="px-4 py-4 text-xs text-slate-700">{formatDateTime(item.publishDate)}</td>
-                    <td className="px-4 py-4 text-xs text-slate-700">{item.tags.join(', ') || '-'}</td>
-                    <td className="px-4 py-4 text-center">
-                      {canMutate ? (
-                        <div className="flex justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(item)}
-                            className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDelete(item.id)}
-                            className="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600"
-                          >
-                            Hapus
-                          </button>
+                filteredItems.map((item, idx) => {
+                  const totalCols = 8
+
+                  const compactRow = (
+                    <>
+                      <td className="px-4 py-4">
+                        <p className="text-sm font-semibold text-slate-950">{item.title}</p>
+                        <p className="mt-1 text-xs text-slate-500 line-clamp-2">{item.content || '-'}</p>
+                      </td>
+                      <td className="px-4 py-4 text-xs text-slate-700">{item.contentType}</td>
+                      <td className="px-4 py-4 text-xs text-slate-700">{item.platform}</td>
+                      <td className="px-4 py-4 text-xs font-semibold text-slate-700">{item.status}</td>
+                      <td className="px-4 py-4 text-xs text-slate-700">{formatDateTime(item.publishDate)}</td>
+                      <td className="px-4 py-4 text-xs text-slate-700">{item.tags.join(', ') || '-'}</td>
+                    </>
+                  )
+
+                  const detail = (
+                    <div className="space-y-5">
+                      <div>
+                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                        <div className="rounded-2xl border border-line bg-white overflow-x-auto">
+                          <table className="data-table min-w-full text-sm">
+                            <thead>
+                              <tr className="text-xs uppercase tracking-[0.14em] text-muteStrong">
+                                <th className="px-4 py-3 font-semibold">Judul</th>
+                                <th className="px-4 py-3 font-semibold">Isi Konten</th>
+                                <th className="px-4 py-3 font-semibold">Tipe</th>
+                                <th className="px-4 py-3 font-semibold">Platform</th>
+                                <th className="px-4 py-3 font-semibold">Catatan</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td className="px-4 py-3 font-semibold text-slate-950">{item.title}</td>
+                                <td className="px-4 py-3 max-w-sm">{item.content || '-'}</td>
+                                <td className="px-4 py-3">{item.contentType}</td>
+                                <td className="px-4 py-3">{item.platform}</td>
+                                <td className="px-4 py-3 text-mute">{item.notes || '-'}</td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">read only</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">ID Konten</span>
+                        <span className="font-mono text-ink tabular-nums">#{item.id}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                        <span className="font-semibold text-inkStrong">{item.status}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Publish</span>
+                        <span className="font-mono text-ink tabular-nums">{formatDateTime(item.publishDate)}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Tags</span>
+                        <span className="font-semibold text-inkStrong">{item.tags.join(', ') || '-'}</span>
+                      </div>
+                      <div className="border-t border-line pt-3">
+                        <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                        <div className="flex flex-wrap gap-3">
+                          {canMutate ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(item)}
+                                className="rounded-full border border-line bg-white px-4 py-2 text-xs font-semibold text-slate-700"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDelete(item.id)}
+                                className="rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-600"
+                              >
+                                Hapus
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-slate-400">read only — role tidak dapat memutasi konten</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+
+                  return (
+                    <ExpandableRow
+                      key={item.id}
+                      id={String(item.id)}
+                      num={idx + 1}
+                      totalCols={totalCols}
+                      compactRow={compactRow}
+                      detail={detail}
+                      tone={item.status === 'PUBLISHED' ? 'default' : 'muted'}
+                    />
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -1696,6 +1818,7 @@ export function ContentAnalyticsManager({
           <table className="min-w-[1100px] w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
+                <ExpandableHeaderLeftCells />
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Tanggal</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Platform</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Konten / Campaign</th>
@@ -1705,62 +1828,138 @@ export function ContentAnalyticsManager({
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Comments</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Shares</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Clicks</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-500">
                     Memuat analytics...
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-500">
                     Belum ada data analytics digital.
                   </td>
                 </tr>
               ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-4 text-xs text-slate-700">{formatDate(item.date)}</td>
-                    <td className="px-4 py-4 text-xs text-slate-700">{item.platform}</td>
-                    <td className="px-4 py-4 text-xs text-slate-700">
-                      {item.content?.title || '-'}
-                      <br />
-                      <span className="text-slate-500">{item.campaign?.name || '-'}</span>
-                    </td>
-                    <td className="px-4 py-4 text-right text-xs text-slate-700">{item.reach.toLocaleString('id-ID')}</td>
-                    <td className="px-4 py-4 text-right text-xs text-slate-700">{item.impressions.toLocaleString('id-ID')}</td>
-                    <td className="px-4 py-4 text-right text-xs text-slate-700">{item.likes.toLocaleString('id-ID')}</td>
-                    <td className="px-4 py-4 text-right text-xs text-slate-700">{item.comments.toLocaleString('id-ID')}</td>
-                    <td className="px-4 py-4 text-right text-xs text-slate-700">{item.shares.toLocaleString('id-ID')}</td>
-                    <td className="px-4 py-4 text-right text-xs text-slate-700">{item.clicks.toLocaleString('id-ID')}</td>
-                    <td className="px-4 py-4 text-center">
-                      {canMutate ? (
-                        <div className="flex justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(item)}
-                            className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDelete(item.id)}
-                            className="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600"
-                          >
-                            Hapus
-                          </button>
+                items.map((item, idx) => {
+                  const totalCols = 11
+
+                  const compactRow = (
+                    <>
+                      <td className="px-4 py-4 text-xs text-slate-700">{formatDate(item.date)}</td>
+                      <td className="px-4 py-4 text-xs text-slate-700">{item.platform}</td>
+                      <td className="px-4 py-4 text-xs text-slate-700">
+                        {item.content?.title || '-'}
+                        <br />
+                        <span className="text-slate-500">{item.campaign?.name || '-'}</span>
+                      </td>
+                      <td className="px-4 py-4 text-right text-xs text-slate-700">{item.reach.toLocaleString('id-ID')}</td>
+                      <td className="px-4 py-4 text-right text-xs text-slate-700">{item.impressions.toLocaleString('id-ID')}</td>
+                      <td className="px-4 py-4 text-right text-xs text-slate-700">{item.likes.toLocaleString('id-ID')}</td>
+                      <td className="px-4 py-4 text-right text-xs text-slate-700">{item.comments.toLocaleString('id-ID')}</td>
+                      <td className="px-4 py-4 text-right text-xs text-slate-700">{item.shares.toLocaleString('id-ID')}</td>
+                      <td className="px-4 py-4 text-right text-xs text-slate-700">{item.clicks.toLocaleString('id-ID')}</td>
+                    </>
+                  )
+
+                  const detail = (
+                    <div className="space-y-5">
+                      <div>
+                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                        <div className="rounded-2xl border border-line bg-white overflow-x-auto">
+                          <table className="data-table min-w-full text-sm">
+                            <thead>
+                              <tr className="text-xs uppercase tracking-[0.14em] text-muteStrong">
+                                <th className="px-4 py-3 font-semibold">Tanggal</th>
+                                <th className="px-4 py-3 font-semibold">Platform</th>
+                                <th className="px-4 py-3 font-semibold">Konten</th>
+                                <th className="px-4 py-3 font-semibold">Campaign</th>
+                                <th className="px-4 py-3 font-semibold text-right">Reach</th>
+                                <th className="px-4 py-3 font-semibold text-right">Impressions</th>
+                                <th className="px-4 py-3 font-semibold text-right">Engagement</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td className="px-4 py-3">{formatDate(item.date)}</td>
+                                <td className="px-4 py-3 font-semibold">{item.platform}</td>
+                                <td className="px-4 py-3">{item.content?.title || '-'}</td>
+                                <td className="px-4 py-3">{item.campaign?.name || '-'}</td>
+                                <td className="px-4 py-3 text-right font-mono tabular-nums">{item.reach.toLocaleString('id-ID')}</td>
+                                <td className="px-4 py-3 text-right font-mono tabular-nums">{item.impressions.toLocaleString('id-ID')}</td>
+                                <td className="px-4 py-3 text-right font-mono tabular-nums">
+                                  {(item.likes + item.comments + item.shares + item.saves).toLocaleString('id-ID')}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">read only</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">ID Analytics</span>
+                        <span className="font-mono text-ink tabular-nums">#{item.id}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Reach</span>
+                        <span className="font-mono text-ink tabular-nums">{item.reach.toLocaleString('id-ID')}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Likes</span>
+                        <span className="font-mono text-emerald-700 tabular-nums">{item.likes.toLocaleString('id-ID')}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Comments</span>
+                        <span className="font-mono text-emerald-700 tabular-nums">{item.comments.toLocaleString('id-ID')}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Shares</span>
+                        <span className="font-mono text-emerald-700 tabular-nums">{item.shares.toLocaleString('id-ID')}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Saves</span>
+                        <span className="font-mono text-emerald-700 tabular-nums">{item.saves.toLocaleString('id-ID')}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Follower Gain</span>
+                        <span className="font-mono text-sky-700 tabular-nums">{item.followersGain.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="border-t border-line pt-3">
+                        <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                        <div className="flex flex-wrap gap-3">
+                          {canMutate ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(item)}
+                                className="rounded-full border border-line bg-white px-4 py-2 text-xs font-semibold text-slate-700"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDelete(item.id)}
+                                className="rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-600"
+                              >
+                                Hapus
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-slate-400">read only — role tidak dapat memutasi analytics</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+
+                  return (
+                    <ExpandableRow
+                      key={item.id}
+                      id={String(item.id)}
+                      num={idx + 1}
+                      totalCols={totalCols}
+                      compactRow={compactRow}
+                      detail={detail}
+                      tone="default"
+                    />
+                  )
+                })
               )}
             </tbody>
           </table>

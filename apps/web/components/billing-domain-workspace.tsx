@@ -4,6 +4,10 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Suspense, useState } from 'react'
 import { DataSourceStatus } from '@/components/data-source-status'
+import {
+  ExpandableHeaderLeftCells,
+  ExpandableRow,
+} from '@/components/ui-expandable-table'
 import type {
   AppRole,
   DataSourceSnapshot,
@@ -609,16 +613,17 @@ export function BillingDomainWorkspace({
               <table className="min-w-[1120px] w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <ExpandableHeaderLeftCells />
                     <th className="px-4 py-3">Invoice / Service</th>
                     <th className="px-4 py-3">Customer</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Keterangan</th>
                     <th className="px-4 py-3">Tagihan / Follow Up</th>
-                    <th className="px-4 py-3">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
-                  {section.rows.map((row) => {
+                  {section.rows.map((row, idx) => {
+                    const totalCols = 7
                     const action = getRowAction({
                       sectionTitle: section.title,
                       row,
@@ -632,9 +637,12 @@ export function BillingDomainWorkspace({
                     const invoiceDue = pickMeta(row.meta, 'Invoice Due: ')
                     const followUp = pickMeta(row.meta, 'Follow Up: ')
                     const collectionStatus = pickMeta(row.meta, 'Collection Status: ')
+                    const total = pickMeta(row.meta, 'Total: ')
+                    const paid = pickMeta(row.meta, 'Paid: ')
+                    const updated = pickMeta(row.meta, 'Updated: ')
 
-                    return (
-                      <tr key={row.id} className="align-top">
+                    const compactRow = (
+                      <>
                         <td className="px-4 py-4">
                           <div className="space-y-1">
                             <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
@@ -661,30 +669,139 @@ export function BillingDomainWorkspace({
                             ) : null}
                           </div>
                         </td>
-                        <td className="px-4 py-4">
-                          {action ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setQuickActionItem(
-                                  buildBillingQuickActionPayload({
-                                    sectionTitle: section.title,
-                                    row,
-                                    canCreate,
-                                    canUpdate,
-                                    basePath,
-                                  }),
-                                )
-                              }
-                              className="inline-flex items-center justify-center rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800"
-                            >
-                              Aksi cepat
-                            </button>
-                          ) : (
-                            <span className="text-sm text-slate-400">Monitor</span>
-                          )}
-                        </td>
-                      </tr>
+                      </>
+                    )
+
+                    const detail = (
+                      <div className="space-y-5">
+                        <section className="space-y-2">
+                          <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                            Detil Data
+                          </h4>
+                          <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Invoice</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Service</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Customer</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Status</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Keterangan</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{row.primary}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{service || '-'}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{row.secondary}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{row.status}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800 leading-6">{row.detail || '-'}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+
+                        <section className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">Section</span>
+                              <span className="tabular-nums text-slate-900">{section.title}</span>
+                              <span className="text-mute" aria-hidden>•</span>
+                            </div>
+                            {invoiceType ? (
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold uppercase tracking-[0.14em] text-mute">Invoice Type</span>
+                                <span className="tabular-nums text-slate-900">{invoiceType}</span>
+                                <span className="text-mute" aria-hidden>•</span>
+                              </div>
+                            ) : null}
+                            {total ? (
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold uppercase tracking-[0.14em] text-mute">Total</span>
+                                <span className="tabular-nums text-slate-900">{total}</span>
+                                <span className="text-mute" aria-hidden>•</span>
+                              </div>
+                            ) : null}
+                            {paid ? (
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold uppercase tracking-[0.14em] text-mute">Paid</span>
+                                <span className="tabular-nums text-slate-900">{paid}</span>
+                                <span className="text-mute" aria-hidden>•</span>
+                              </div>
+                            ) : null}
+                            {remaining ? (
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold uppercase tracking-[0.14em] text-mute">Remaining</span>
+                                <span className="tabular-nums text-slate-900">{remaining}</span>
+                                <span className="text-mute" aria-hidden>•</span>
+                              </div>
+                            ) : null}
+                            {invoiceDue ? (
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold uppercase tracking-[0.14em] text-mute">Invoice Due</span>
+                                <span className="tabular-nums text-slate-900">{invoiceDue}</span>
+                                <span className="text-mute" aria-hidden>•</span>
+                              </div>
+                            ) : null}
+                            {updated ? (
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold uppercase tracking-[0.14em] text-mute">Diperbarui</span>
+                                <span className="tabular-nums text-slate-900">{updated}</span>
+                              </div>
+                            ) : null}
+                          </div>
+                        </section>
+
+                        <section className="space-y-2 pt-3 border-t border-line">
+                          <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+                            Aksi
+                          </h5>
+                          <div className="flex flex-wrap items-center gap-3">
+                            {action ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setQuickActionItem(
+                                      buildBillingQuickActionPayload({
+                                        sectionTitle: section.title,
+                                        row,
+                                        canCreate,
+                                        canUpdate,
+                                        basePath,
+                                      }),
+                                    )
+                                  }
+                                  className="inline-flex items-center justify-center rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-800"
+                                >
+                                  Aksi cepat
+                                </button>
+                                <Link
+                                  href={action.href}
+                                  className="inline-flex items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
+                                >
+                                  {action.label}
+                                </Link>
+                              </>
+                            ) : (
+                              <span className="text-sm text-slate-400">Monitor (tidak ada aksi tersedia untuk baris ini)</span>
+                            )}
+                          </div>
+                        </section>
+                      </div>
+                    )
+
+                    return (
+                      <ExpandableRow
+                        key={row.id}
+                        id={row.id}
+                        num={idx + 1}
+                        totalCols={totalCols}
+                        compactRow={compactRow}
+                        detail={detail}
+                        tone="default"
+                      />
                     )
                   })}
                 </tbody>

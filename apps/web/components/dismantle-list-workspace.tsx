@@ -5,6 +5,10 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import type { DismantleListItem, DismantleListPagePayload, DismantleListStatus } from '@/lib/dismantle-list-shared'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
+import {
+  ExpandableHeaderLeftCells,
+  ExpandableRow,
+} from '@/components/ui-expandable-table'
 
 function FormModalSkeleton() {
   return (
@@ -325,21 +329,23 @@ export function DismantleListWorkspace({
             <table className="min-w-[980px] w-full border-collapse">
               <thead className="bg-slate-50">
                 <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <ExpandableHeaderLeftCells />
                   <th className="px-4 py-3">Kode / Customer</th>
                   <th className="px-4 py-3">Ref Isolir / Layanan</th>
                   <th className="px-4 py-3">Alamat / Area</th>
                   <th className="px-4 py-3">Eligible / ODP</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Tindak Lanjut</th>
-                  <th className="px-4 py-3 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {items.length ? (
-                  items.map((item) => {
+                  items.map((item, idx) => {
                     const active = selectedItem?.id === item.id
-                    return (
-                      <tr key={item.id} className={active ? 'bg-rose-50/70' : 'bg-white'}>
+                    const totalCols = 8
+
+                    const compactRow = (
+                      <>
                         <td className="px-4 py-4 align-top">
                           <p className="text-sm font-semibold text-slate-950">{item.dismantleListCode}</p>
                           <p className="mt-1 text-sm text-slate-700">{item.customerName}</p>
@@ -371,20 +377,99 @@ export function DismantleListWorkspace({
                             {item.csPicName ? `PIC CS: ${item.csPicName}` : 'Belum ada PIC CS'}
                           </p>
                         </td>
-                        <td className="px-4 py-4 text-right align-top">
-                          <Link
-                            href={buildHref(state, { selected: String(item.id) })}
-                            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            Buka Detail
-                          </Link>
-                        </td>
-                      </tr>
+                      </>
+                    )
+
+                    const detail = (
+                      <div className="space-y-5">
+                        <section className="space-y-2">
+                          <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                            Detil Data
+                          </h4>
+                          <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Kode Dismantle</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Customer</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">No HP</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Ref Isolir</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Layanan</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{item.dismantleListCode}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{item.customerName}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{item.customerPhone || '-'}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{item.sourceIsolationRef || '-'}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{item.serviceRef || '-'}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+
+                        <section className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">Area</span>
+                              <span className="tabular-nums text-slate-900">{item.areaLabel || '-'}</span>
+                              <span className="text-mute" aria-hidden>•</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">Eligible</span>
+                              <span className="tabular-nums text-slate-900">{formatDateTime(item.eligibleAt)}</span>
+                              <span className="text-mute" aria-hidden>•</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">ODP</span>
+                              <span className="tabular-nums text-slate-900">{item.odpCode || '-'}</span>
+                              <span className="text-mute" aria-hidden>•</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">PIC CS</span>
+                              <span className="tabular-nums text-slate-900">{item.csPicName || '-'}</span>
+                              <span className="text-mute" aria-hidden>•</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                              <span className="tabular-nums text-slate-900">{getStatusLabel(item.status)}</span>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="space-y-2 pt-3 border-t border-line">
+                          <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+                            Aksi
+                          </h5>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <Link
+                              href={buildHref(state, { selected: String(item.id) })}
+                              className="inline-flex items-center justify-center rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
+                            >
+                              Buka Detail
+                            </Link>
+                          </div>
+                        </section>
+                      </div>
+                    )
+
+                    return (
+                      <ExpandableRow
+                        key={item.id}
+                        id={String(item.id)}
+                        num={idx + 1}
+                        totalCols={totalCols}
+                        compactRow={compactRow}
+                        detail={detail}
+                        tone={active ? 'muted' : 'default'}
+                      />
                     )
                   })
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">
+                    <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-500">
                       Tidak ada item yang cocok dengan filter saat ini.
                     </td>
                   </tr>

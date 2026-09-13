@@ -4,6 +4,10 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { canAccessPath } from '@/lib/access-control'
 import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
+import {
+  ExpandableHeaderLeftCells,
+  ExpandableRow,
+} from '@/components/ui-expandable-table'
 import { buildSupportActionHref } from '@/lib/support-action-links'
 import { canAccessSupportLane, getSupportLaneSections } from '@/lib/support-lanes'
 import type { AppRole, DomainReviewSection, DomainReviewRow, SupportActionLink } from '@/lib/types'
@@ -714,6 +718,7 @@ export function SupportTroubleTicketQueuePanel({
               <table className="min-w-[1260px] w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-100/90">
                   <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <ExpandableHeaderLeftCells />
                     <th className="px-3 py-3">ID Ticket</th>
                     <th className="px-3 py-3">Pelanggan</th>
                     <th className="px-3 py-3">User / Kontak</th>
@@ -721,7 +726,6 @@ export function SupportTroubleTicketQueuePanel({
                     <th className="px-3 py-3">Tindakan / PIC</th>
                     <th className="px-3 py-3">Target / SLA</th>
                     <th className="px-3 py-3">Waktu Ticket</th>
-                    <th className="px-3 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -762,24 +766,21 @@ export function SupportTroubleTicketQueuePanel({
                       rowLinkedWoCodesRaw && rowLinkedWoCodesRaw !== '-' && rowLinkedWoCodesRaw.trim()
                         ? rowLinkedWoCodesRaw.split('|||').map((s) => s.trim()).filter(Boolean)
                         : []
+                    const totalCols = 9
+                    const code = row.primary
+                    const numericMatch = code.match(/(\d+)/)
+                    const trackingId = numericMatch ? numericMatch[1] : encodeURIComponent(code)
 
-                    return (
-                      <tr key={row.id} className={`align-top ${getQueueRowClass(queueReason, queuePriority, slaState)}`}>
+                    const compactRow = (
+                      <>
                         <td className="px-3 py-3.5">
                           <div className="space-y-2">
-                            {(() => {
-                              const code = row.primary
-                              const numericMatch = code.match(/(\d+)/)
-                              const trackingId = numericMatch ? numericMatch[1] : encodeURIComponent(code)
-                              return (
-                                <Link
-                                  href={`/dashboard/tracking/trouble-tickets/${trackingId}`}
-                                  className="transition hover:underline"
-                                >
-                                  <p className="font-mono text-[13px] font-semibold leading-5 text-slate-950">{code}</p>
-                                </Link>
-                              )
-                            })()}
+                            <Link
+                              href={`/dashboard/tracking/trouble-tickets/${trackingId}`}
+                              className="transition hover:underline"
+                            >
+                              <p className="font-mono text-[13px] font-semibold leading-5 text-slate-950">{code}</p>
+                            </Link>
                             <div className="flex flex-wrap gap-1.5">
                               <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
                               <span className="badge border-slate-200 bg-white text-slate-600">{getQueueReasonLabel(queueReason)}</span>
@@ -789,51 +790,18 @@ export function SupportTroubleTicketQueuePanel({
                                 </span>
                               ) : null}
                             </div>
-                            {rowLinkedWoIds.length ? (
-                              <div className="flex flex-wrap gap-1">
-                                {rowLinkedWoIds.slice(0, 3).map((woId, idx) => {
-                                  const woCode = rowLinkedWoCodes[idx]
-                                  const woNumericMatch = (woCode || String(woId)).match(/(\d+)/)
-                                  const woTrackingId = woNumericMatch ? woNumericMatch[1] : encodeURIComponent(woCode || String(woId))
-                                  return (
-                                    <Link
-                                      key={`tt-row-${row.id}-wo-${woId}`}
-                                      href={`/dashboard/tracking/work-orders/${woTrackingId}`}
-                                      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-700 transition"
-                                    >
-                                      {woCode || `WO#${woId}`}
-                                    </Link>
-                                  )
-                                })}
-                                {rowLinkedWoIds.length > 3 ? (
-                                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                                    +{rowLinkedWoIds.length - 3}
-                                  </span>
-                                ) : null}
-                              </div>
-                            ) : null}
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
                           <div className="space-y-1.5">
                             <p className="font-medium leading-5 text-slate-900">{row.secondary}</p>
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Kode customer</p>
-                              <p className="mt-0.5 text-xs text-slate-500">{normalizeCellValue(customerCode)}</p>
-                            </div>
+                            <p className="text-xs text-slate-500">{normalizeCellValue(customerCode)}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="space-y-2">
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">User</p>
-                              <p className="mt-0.5 break-all text-sm leading-5 text-slate-700">{normalizeCellValue(customerUser)}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Kontak / Layanan</p>
-                              <p className="mt-0.5 font-mono text-xs text-slate-500">{normalizeCellValue(phone)}</p>
-                              <p className="mt-1 font-mono text-xs text-slate-500">{normalizeCellValue(serviceNo)}</p>
-                            </div>
+                          <div className="space-y-1">
+                            <p className="break-all text-sm leading-5 text-slate-700">{normalizeCellValue(customerUser)}</p>
+                            <p className="font-mono text-xs text-slate-500">{normalizeCellValue(phone)}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
@@ -842,62 +810,112 @@ export function SupportTroubleTicketQueuePanel({
                               <span className={`badge ${getTypeTone(type)}`}>{type}</span>
                               {isRecurring ? (
                                 <span className="badge border-violet-200 bg-violet-50 text-violet-700">
-                                  Gangguan berulang x{recurringCount}
+                                  x{recurringCount}
                                 </span>
                               ) : null}
                             </div>
-                            <p className="max-w-[260px] text-sm leading-5 text-slate-700">{row.detail}</p>
+                            <p className="max-w-[260px] text-sm leading-5 text-slate-700 line-clamp-2">{row.detail}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="space-y-2">
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Aksi berikutnya</p>
-                              <p className="mt-0.5 max-w-[240px] text-sm font-medium leading-5 text-slate-900">
-                                {latestProgress !== '-' ? latestProgress : getQueueReasonActionCopy(queueReason)}
-                              </p>
-                            </div>
-                            <div className="space-y-1 text-xs text-slate-500">
-                              <p>PIC: {normalizeCellValue(owner)}</p>
-                              <p>Follow-up: {formatCompactDateTime(followUp)}</p>
-                            </div>
+                          <div className="space-y-1">
+                            <p className="max-w-[240px] text-sm font-medium leading-5 text-slate-900">
+                              {latestProgress !== '-' ? latestProgress : getQueueReasonActionCopy(queueReason)}
+                            </p>
+                            <p className="text-xs text-slate-500">PIC: {normalizeCellValue(owner)}</p>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap gap-1.5">
-                              <span className={`badge ${getPriorityTone(queuePriority)}`}>{queuePriority}</span>
-                              <span className={`badge ${getSlaTone(slaState)}`}>{slaState}</span>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Target SLA</p>
-                              <p className="mt-0.5 text-xs text-slate-500">{formatCompactDateTime(slaDue)}</p>
-                            </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className={`badge ${getPriorityTone(queuePriority)}`}>{queuePriority}</span>
+                            <span className={`badge ${getSlaTone(slaState)}`}>{slaState}</span>
                           </div>
                         </td>
                         <td className="px-3 py-3.5">
-                          <div className="space-y-2">
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Dibuka</p>
-                              <p className="mt-0.5 text-sm text-slate-700">{formatCompactDateTime(opened)}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Update terakhir</p>
-                              <p className="mt-0.5 text-xs text-slate-500">{formatCompactDateTime(progressUpdated)}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Durasi / Close</p>
-                              <p className="mt-0.5 text-sm font-medium text-slate-900">{aging}</p>
-                              <p className="mt-1 text-xs text-slate-500">{closeLabel}</p>
-                            </div>
+                          <div className="space-y-1">
+                            <p className="text-sm text-slate-700">{formatCompactDateTime(opened)}</p>
+                            <p className="text-xs text-slate-500">{aging}</p>
                           </div>
                         </td>
-                        <td className="px-3 py-3.5">
-                          {(canUpdate || canApprove) && rowActions.length ? (
-                            <div className="flex flex-col items-end gap-2">
-                              <p className="max-w-[140px] text-right text-[11px] font-medium leading-4 text-slate-500">
-                                {getQueueReasonActionCopy(queueReason)}
-                              </p>
+                      </>
+                    )
+
+                    const detail = (
+                      <div className="space-y-5">
+                        <section className="space-y-2">
+                          <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                            Detil Data
+                          </h4>
+                          <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Ticket</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Pelanggan</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Type</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Kontak</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Layanan</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{row.primary}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{row.secondary}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{type || '-'}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{normalizeCellValue(phone)}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{normalizeCellValue(serviceNo)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+
+                        <section className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">User</span>
+                              <span className="tabular-nums text-slate-900">{normalizeCellValue(customerUser)}</span>
+                              <span className="text-mute" aria-hidden>•</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">Cust Code</span>
+                              <span className="tabular-nums text-slate-900">{normalizeCellValue(customerCode)}</span>
+                              <span className="text-mute" aria-hidden>•</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">PIC</span>
+                              <span className="tabular-nums text-slate-900">{normalizeCellValue(owner)}</span>
+                              <span className="text-mute" aria-hidden>•</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">Follow-up</span>
+                              <span className="tabular-nums text-slate-900">{formatCompactDateTime(followUp)}</span>
+                              <span className="text-mute" aria-hidden>•</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">SLA Due</span>
+                              <span className="tabular-nums text-slate-900">{formatCompactDateTime(slaDue)}</span>
+                              <span className="text-mute" aria-hidden>•</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">Progress</span>
+                              <span className="tabular-nums text-slate-900">{formatCompactDateTime(progressUpdated)}</span>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="space-y-2 pt-3 border-t border-line">
+                          <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+                            Aksi
+                          </h5>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <Link
+                              href={`/dashboard/tracking/trouble-tickets/${trackingId}`}
+                              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                            >
+                              Lihat Detail
+                            </Link>
+                            {(canUpdate || canApprove) && rowActions.length ? (
                               <button
                                 type="button"
                                 onClick={() =>
@@ -913,14 +931,36 @@ export function SupportTroubleTicketQueuePanel({
                               >
                                 Aksi cepat
                               </button>
-                            </div>
-                          ) : (
-                            <span className="badge border-slate-200 bg-white text-slate-600">
-                              {getQueueReasonActionCopy(queueReason)}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
+                            ) : null}
+                            {rowLinkedWoIds.length ? rowLinkedWoIds.slice(0, 3).map((woId, widx) => {
+                              const woCode = rowLinkedWoCodes[widx]
+                              const woNumericMatch = (woCode || String(woId)).match(/(\d+)/)
+                              const woTrackingId = woNumericMatch ? woNumericMatch[1] : encodeURIComponent(woCode || String(woId))
+                              return (
+                                <Link
+                                  key={`tt-row-${row.id}-wo-${woId}`}
+                                  href={`/dashboard/tracking/work-orders/${woTrackingId}`}
+                                  className="inline-flex items-center rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:border-indigo-300 transition"
+                                >
+                                  {woCode || `WO#${woId}`}
+                                </Link>
+                              )
+                            }) : null}
+                          </div>
+                        </section>
+                      </div>
+                    )
+
+                    return (
+                      <ExpandableRow
+                        key={row.id}
+                        id={String(row.id)}
+                        num={(allRows.indexOf(row)) + 1}
+                        totalCols={totalCols}
+                        compactRow={compactRow}
+                        detail={detail}
+                        tone="default"
+                      />
                     )
                   })}
                 </tbody>

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import type { DashboardDailyActivityApprovalQueue } from '@/lib/types'
 
 type DailyActivityApprovalQueueProps = {
@@ -194,18 +195,21 @@ export function DailyActivityApprovalQueue({ queue }: DailyActivityApprovalQueue
             <table className="min-w-full divide-y divide-line">
               <thead className="bg-slate-50">
                 <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  <th className="w-16 px-4 py-3">Pilih</th>
+                  <ExpandableHeaderLeftCells />
+                  <th className="px-4 py-3">Pilih</th>
                   <th className="px-4 py-3">Aktivitas</th>
                   <th className="px-4 py-3">Org</th>
                   <th className="px-4 py-3">Catatan</th>
-                  <th className="px-4 py-3">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line bg-white">
-                {queue.pendingItems.map((item) => {
+                {queue.pendingItems.map((item, idx) => {
                   const selected = selectedIds.includes(item.activityId)
-                  return (
-                    <tr key={item.activityId} className={selected ? 'bg-slate-50' : ''}>
+                  const totalCols = 6
+                  const activityFormId = `daily-act-form-${item.activityId}`
+
+                  const compactRow = (
+                    <>
                       <td className="px-4 py-3 align-top">
                         <input
                           type="checkbox"
@@ -237,21 +241,85 @@ export function DailyActivityApprovalQueue({ queue }: DailyActivityApprovalQueue
                         <p className="mt-1 text-sm text-mute line-clamp-1">{item.subdivisionName || '-'}</p>
                       </td>
                       <td className="px-4 py-3 align-top">
-                        <input
-                          value={rejectNotes[item.activityId] ?? ''}
-                          onChange={(event) =>
-                            setRejectNotes((prev) => ({
-                              ...prev,
-                              [item.activityId]: event.target.value,
-                            }))
-                          }
-                          className="w-full rounded-2xl border border-line bg-white px-4 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-400"
-                          placeholder="Wajib diisi jika reject"
-                          disabled={submittingBulk || submittingId === item.activityId}
-                        />
+                        {rejectNotes[item.activityId]?.trim() ? (
+                          <p className="line-clamp-2 rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            {rejectNotes[item.activityId]}
+                          </p>
+                        ) : (
+                          <p className="line-clamp-1 text-sm text-mute">
+                            Isi reject notes di panel expand
+                          </p>
+                        )}
                       </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="flex flex-wrap items-center justify-end gap-2">
+                    </>
+                  )
+
+                  const detail = (
+                    <div className="space-y-5">
+                      <div>
+                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                        <div className="rounded-2xl border border-line bg-slate-50 p-5">
+                          <form id={activityFormId}>
+                            <div className="grid gap-4 lg:grid-cols-2">
+                              <div>
+                                <label className="flex flex-col gap-2 text-sm text-slate-700">
+                                  <span className="font-semibold text-slate-950">Judul Aktivitas</span>
+                                  <p className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-slate-700">
+                                    {item.taskTitle}
+                                  </p>
+                                </label>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <label className="flex flex-col gap-2 text-sm text-slate-700">
+                                  <span className="font-semibold text-slate-950">Kode Aktivitas</span>
+                                  <p className="rounded-2xl border border-line bg-white px-4 py-3 font-mono text-sm text-slate-700 tabular-nums">
+                                    {item.activityCode}
+                                  </p>
+                                </label>
+                                <label className="flex flex-col gap-2 text-sm text-slate-700">
+                                  <span className="font-semibold text-slate-950">Tanggal</span>
+                                  <p className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-slate-700">
+                                    {formatActivityDate(item.activityDate)}
+                                  </p>
+                                </label>
+                              </div>
+                              <div className="lg:col-span-2">
+                                <label className="flex flex-col gap-2 text-sm text-slate-700">
+                                  <span className="font-semibold text-slate-950">Catatan untuk reject <span className="text-rose-600">*</span></span>
+                                  <input
+                                    value={rejectNotes[item.activityId] ?? ''}
+                                    onChange={(event) =>
+                                      setRejectNotes((prev) => ({
+                                        ...prev,
+                                        [item.activityId]: event.target.value,
+                                      }))
+                                    }
+                                    className="w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                                    placeholder="Wajib diisi jika reject"
+                                    disabled={submittingBulk || submittingId === item.activityId}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">ID Aktivitas</span>
+                        <span className="font-mono text-ink tabular-nums">#{item.activityId}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Planned By</span>
+                        <span className="font-semibold text-inkStrong">{item.plannedBy}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Divisi</span>
+                        <span className="font-semibold text-inkStrong">{item.divisionName || 'Tanpa divisi'}</span>
+                        <span aria-hidden className="text-mute">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Execution</span>
+                        <span className="font-semibold text-inkStrong">{item.executionStatus}</span>
+                      </div>
+                      <div className="border-t border-line pt-3">
+                        <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                        <div className="flex flex-wrap gap-3 items-center">
                           <button
                             type="button"
                             onClick={() => submitApproval(item.activityId, 'APPROVED')}
@@ -268,9 +336,24 @@ export function DailyActivityApprovalQueue({ queue }: DailyActivityApprovalQueue
                           >
                             Reject
                           </button>
+                          <span className="badge border-slate-200 bg-white text-slate-600">
+                            {selected ? 'Terpilih untuk bulk' : 'Belum dipilih bulk'}
+                          </span>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
+                  )
+
+                  return (
+                    <ExpandableRow
+                      key={item.activityId}
+                      id={String(item.activityId)}
+                      num={idx + 1}
+                      totalCols={totalCols}
+                      compactRow={compactRow}
+                      detail={detail}
+                      tone={selected ? 'muted' : 'default'}
+                    />
                   )
                 })}
               </tbody>

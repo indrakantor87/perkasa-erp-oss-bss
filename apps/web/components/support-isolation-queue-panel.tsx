@@ -4,6 +4,10 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { Download, Pencil, Plus, Trash2, Upload } from 'lucide-react'
+import {
+  ExpandableHeaderLeftCells,
+  ExpandableRow,
+} from '@/components/ui-expandable-table'
 import { buildSupportActionHref } from '@/lib/support-action-links'
 import { canProcessSupportDismantle } from '@/lib/support-lanes'
 import type { AppRole, DomainReviewSection, DomainReviewRow, SupportActionLink, SupportDrilldownContext } from '@/lib/types'
@@ -451,10 +455,7 @@ export function SupportIsolationQueuePanel({
           <table className="min-w-[1280px] w-full border-collapse">
             <thead className="bg-slate-50">
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                <th className="w-[44px] px-3 py-3">
-                  <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
-                </th>
-                <th className="w-[60px] px-3 py-3">No</th>
+                <ExpandableHeaderLeftCells />
                 <th className="w-[220px] px-3 py-3">Nama Pelanggan</th>
                 <th className="w-[220px] px-3 py-3">User</th>
                 <th className="w-[160px] px-3 py-3">No. HP</th>
@@ -463,11 +464,11 @@ export function SupportIsolationQueuePanel({
                 <th className="w-[110px] px-3 py-3">Suspend</th>
                 <th className="px-3 py-3">Keterangan</th>
                 <th className="w-[180px] px-3 py-3">Ticket</th>
-                <th className="w-[70px] px-3 py-3">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
-              {visibleRows.map((row, index) => {
+              {visibleRows.map((row, idx) => {
+                const totalCols = 10
                 const activeDate = pickMeta(row.meta, 'Isolasi: ')
                 const customerUser = pickMeta(row.meta, 'Customer User: ')
                 const phone = pickMeta(row.meta, 'Phone: ')
@@ -476,69 +477,128 @@ export function SupportIsolationQueuePanel({
                 const isSelected = selectedIds.has(row.id)
                 const canTransfer = dismantleTicket !== 'Sudah' && canTransferToDismantle
 
-                return (
-                  <tr key={row.id} className="align-top transition-colors hover:bg-slate-50">
-                    <td className="px-3 py-2 text-sm text-slate-700">
-                      <input type="checkbox" checked={isSelected} onChange={() => toggleRow(row.id)} />
-                    </td>
-                    <td className="px-3 py-2 text-sm text-slate-700">{index + 1}</td>
-                    <td className="px-3 py-2 text-sm text-slate-700">
+                const compactRow = (
+                  <>
+                    <td className="px-3 py-3 text-sm text-slate-700">
                       <p className="font-semibold text-slate-950">{row.primary}</p>
                       <p className="mt-1 text-xs text-mute">Aktif isolir: {activeDate || '-'}</p>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-700">{customerUser || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-sky-700">{phone || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-slate-700">{marketing || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-slate-700">{row.secondary}</td>
-                    <td className="px-3 py-2 text-sm">
+                    <td className="px-3 py-3 text-sm text-slate-700">{customerUser || '-'}</td>
+                    <td className="px-3 py-3 text-sm text-sky-700">{phone || '-'}</td>
+                    <td className="px-3 py-3 text-sm text-slate-700">{marketing || '-'}</td>
+                    <td className="px-3 py-3 text-sm text-slate-700">{row.secondary}</td>
+                    <td className="px-3 py-3 text-sm">
                       <span className={`badge ${getRowTone(row.status)}`}>{row.status}</span>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-700">
+                    <td className="px-3 py-3 text-sm text-slate-700">
                       <p className="line-clamp-2">{row.detail}</p>
                     </td>
-                    <td className="px-3 py-2 text-sm">
+                    <td className="px-3 py-3 text-sm">
                       {dismantleTicket === 'Sudah' ? (
                         <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700">Sudah</span>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="badge border-amber-200 bg-amber-50 text-amber-700">Belum</span>
-                          {canTransfer ? (
-                            <Link
-                              href={buildSupportActionHref('dismantle-approve', { isolation: buildIsolationPrefillValue(row) })}
-                              className="rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                            >
-                              Transfer
-                            </Link>
-                          ) : (
-                            <span className="text-xs text-mute">-</span>
-                          )}
-                        </div>
+                        <span className="badge border-amber-200 bg-amber-50 text-amber-700">Belum</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-sm">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setQuickActionItem(
-                            buildIsolationQuickActionPayload({
-                              row,
-                              canUpdate,
-                              canTransferToDismantle,
-                              canOpenBillingDecision: false,
-                            }),
-                          )
-                        }
-                        className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-950 p-2 text-white transition hover:bg-slate-800"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
+                  </>
+                )
+
+                const detail = (
+                  <div className="space-y-5">
+                    <section className="space-y-2">
+                      <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                        Detil Data
+                      </h4>
+                      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">Nama</th>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">User</th>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">No HP</th>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">Marketing</th>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">Radboox</th>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">Isolasi Tgl</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{row.primary}</td>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{customerUser || '-'}</td>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{phone || '-'}</td>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{marketing || '-'}</td>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{row.secondary}</td>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{activeDate || '-'}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+
+                    <section className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status Suspend</span>
+                          <span className="tabular-nums text-slate-900">{row.status}</span>
+                          <span className="text-mute" aria-hidden>•</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Ticket Dismantle</span>
+                          <span className="tabular-nums text-slate-900">{dismantleTicket}</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="space-y-2 pt-3 border-t border-line">
+                      <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+                        Aksi
+                      </h5>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQuickActionItem(
+                              buildIsolationQuickActionPayload({
+                                row,
+                                canUpdate,
+                                canTransferToDismantle,
+                                canOpenBillingDecision: false,
+                              }),
+                            )
+                          }
+                          className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-950 bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Edit
+                        </button>
+                        {canTransfer && dismantleTicket !== 'Sudah' ? (
+                          <Link
+                            href={buildSupportActionHref('dismantle-approve', { isolation: buildIsolationPrefillValue(row) })}
+                            className="inline-flex items-center justify-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:border-amber-400 hover:bg-amber-100"
+                          >
+                            Transfer ke Dismantle
+                          </Link>
+                        ) : null}
+                      </div>
+                    </section>
+                  </div>
+                )
+
+                return (
+                  <ExpandableRow
+                    key={row.id}
+                    id={String(row.id)}
+                    num={idx + 1}
+                    totalCols={totalCols}
+                    compactRow={compactRow}
+                    detail={detail}
+                    tone="default"
+                  />
                 )
               })}
               {!visibleRows.length ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-6 text-sm text-mute">
+                  <td colSpan={10} className="px-4 py-6 text-sm text-mute">
                     Tidak ada data yang cocok dengan filter.
                   </td>
                 </tr>

@@ -4,6 +4,10 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { TableQuickActionModal, type TableQuickActionPayload } from '@/components/table-quick-action-modal'
 import { Download, Pencil, Trash2, Upload } from 'lucide-react'
+import {
+  ExpandableHeaderLeftCells,
+  ExpandableRow,
+} from '@/components/ui-expandable-table'
 import { canAccessPath } from '@/lib/access-control'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import { buildSupportActionHref, buildSupportLaneHref } from '@/lib/support-action-links'
@@ -582,7 +586,7 @@ export function SupportDismantleQueuePanel({
           <table className="min-w-[1020px] w-full border-collapse">
             <thead className="bg-slate-50">
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                <th className="w-[44px] px-3 py-3"></th>
+                <ExpandableHeaderLeftCells />
                 <th className="w-[210px] px-3 py-3">Nomor Ticket</th>
                 <th className="w-[220px] px-3 py-3">Nama</th>
                 <th className="w-[240px] px-3 py-3">User / Kontak</th>
@@ -590,11 +594,11 @@ export function SupportDismantleQueuePanel({
                 <th className="w-[140px] px-3 py-3">Problem</th>
                 <th className="w-[120px] px-3 py-3">Status</th>
                 <th className="px-3 py-3">Keterangan</th>
-                <th className="w-[240px] px-3 py-3">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
-              {visibleRows.map((row) => {
+              {visibleRows.map((row, idx) => {
+                const totalCols = 9
                 const ticketNo = pickMeta(row.meta, 'Queue ID: ')
                 const user = pickMeta(row.meta, 'Customer Code: ')
                 const phone = pickMeta(row.meta, 'Phone: ')
@@ -602,31 +606,75 @@ export function SupportDismantleQueuePanel({
                 const queuePrefill = buildQueuePrefillValue(row)
                 const isSelected = selectedIds.has(row.id)
 
-                return (
-                  <tr key={row.id} className="align-top transition-colors hover:bg-slate-50">
-                    <td className="px-3 py-2 text-sm text-slate-700">
-                      <input type="checkbox" checked={isSelected} onChange={() => toggleRow(row.id)} />
-                    </td>
-                    <td className="px-3 py-2 text-sm">
+                const compactRow = (
+                  <>
+                    <td className="px-3 py-3 text-sm">
                       <span className="inline-flex rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
                         {ticketNo || row.id.replace(/^DISMANTLE-QUEUE-/, '')}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-sm font-semibold text-slate-950">{row.primary}</td>
-                    <td className="px-3 py-2 text-sm text-slate-700">
+                    <td className="px-3 py-3 text-sm font-semibold text-slate-950">{row.primary}</td>
+                    <td className="px-3 py-3 text-sm text-slate-700">
                       <p>{user || '-'}</p>
                       <p className="mt-1 font-mono text-xs text-mute">{phone || '-'}</p>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-700">{marketing || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-slate-700">{row.secondary}</td>
-                    <td className="px-3 py-2 text-sm">
+                    <td className="px-3 py-3 text-sm text-slate-700">{marketing || '-'}</td>
+                    <td className="px-3 py-3 text-sm text-slate-700">{row.secondary}</td>
+                    <td className="px-3 py-3 text-sm">
                       <span className="badge border-red-200 bg-red-50 text-red-700">OPEN</span>
                     </td>
-                    <td className="px-3 py-2 text-sm text-slate-700">
+                    <td className="px-3 py-3 text-sm text-slate-700">
                       <p className="line-clamp-2">{row.detail}</p>
                     </td>
-                    <td className="px-3 py-2 text-sm">
-                      <div className="flex flex-wrap items-center gap-2">
+                  </>
+                )
+
+                const detail = (
+                  <div className="space-y-5">
+                    <section className="space-y-2">
+                      <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                        Detil Data
+                      </h4>
+                      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">Ticket</th>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">Nama</th>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">User</th>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">Kontak</th>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">Marketing</th>
+                              <th className="text-xs font-semibold uppercase tracking-wider text-mute">Problem</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{ticketNo || '-'}</td>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{row.primary}</td>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{user || '-'}</td>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{phone || '-'}</td>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{marketing || '-'}</td>
+                              <td className="px-4 py-3 align-top text-sm text-slate-800">{row.secondary}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+
+                    <section className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                          <span className="tabular-nums text-slate-900">OPEN</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="space-y-2 pt-3 border-t border-line">
+                      <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+                        Aksi
+                      </h5>
+                      <div className="flex flex-wrap items-center gap-3">
                         <button
                           type="button"
                           onClick={() =>
@@ -639,19 +687,31 @@ export function SupportDismantleQueuePanel({
                               }),
                             )
                           }
-                          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
+                          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
                         >
                           <Pencil className="h-4 w-4" />
                           Edit Ticket
                         </button>
                         {canProcessDismantle ? (
-                          <Link href={buildSupportActionHref('dismantle-close', { dismantle: queuePrefill })} className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">
-                            Close
+                          <Link href={buildSupportActionHref('dismantle-close', { dismantle: queuePrefill })} className="rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                            Close Dismantle
                           </Link>
                         ) : null}
                       </div>
-                    </td>
-                  </tr>
+                    </section>
+                  </div>
+                )
+
+                return (
+                  <ExpandableRow
+                    key={row.id}
+                    id={String(row.id)}
+                    num={idx + 1}
+                    totalCols={totalCols}
+                    compactRow={compactRow}
+                    detail={detail}
+                    tone="default"
+                  />
                 )
               })}
               {!visibleRows.length ? (

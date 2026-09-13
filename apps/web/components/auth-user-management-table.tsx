@@ -1,9 +1,9 @@
 'use client'
 
-import { Fragment } from 'react'
 import type { FormEvent } from 'react'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import type {
   AuthUserListItem,
   AuthUserLookupOption,
@@ -226,225 +226,249 @@ export function AuthUserManagementTable({
         <table className="min-w-full divide-y divide-line text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.16em] text-mute">
             <tr>
+              <ExpandableHeaderLeftCells />
               <th className="px-6 py-4">User</th>
               <th className="px-6 py-4">Role</th>
               <th className="px-6 py-4">Divisi</th>
               <th className="px-6 py-4">Cabang</th>
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4">Sumber</th>
-              <th className="px-6 py-4">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line bg-white">
             {users.length ? (
-              users.map((user) => {
+              users.map((user, idx) => {
                 const isManageable = canManage && reviewDbReady && user.source === 'review-db'
-                const isOpen = openUserId === user.id
                 const draft = getDraft(user)
                 const message = feedback[user.id]
                 const isBusy = submittingUserId === user.id || deletingUserId === user.id
+                const totalCols = 8
+                const formId = `auth-user-form-${user.id}`
 
-                return (
-                  <Fragment key={user.id}>
-                    <tr key={user.id}>
-                      <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-950">{user.fullName}</div>
-                        <div className="mt-1 text-xs text-mute">
-                          {user.username} • {user.email}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-700">{user.roleLabel}</td>
-                      <td className="px-6 py-4 text-slate-700">{user.divisionLabel}</td>
-                      <td className="px-6 py-4 text-slate-700">{user.branchLabel}</td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`badge ${
-                            user.status === 'ACTIVE'
-                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                              : 'border-slate-200 bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {user.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="badge border-line bg-slate-50 text-slate-700">
-                          {user.source}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {isManageable ? (
-                          <button
-                            type="button"
-                            onClick={() => setOpenUserId((current) => (current === user.id ? null : user.id))}
-                            className="rounded-full border border-line bg-white px-4 py-2 text-xs font-semibold text-slate-700"
-                          >
-                            {isOpen ? 'Tutup' : 'Kelola'}
-                          </button>
-                        ) : (
-                          <span className="text-xs text-mute">
-                            {user.source === 'mock' ? 'Mock only' : 'Read only'}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
+                const compactRow = (
+                  <>
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-slate-950">{user.fullName}</div>
+                      <div className="mt-1 text-xs text-mute">
+                        {user.username} • {user.email}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-slate-700">{user.roleLabel}</td>
+                    <td className="px-6 py-4 text-slate-700">{user.divisionLabel}</td>
+                    <td className="px-6 py-4 text-slate-700">{user.branchLabel}</td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`badge ${
+                          user.status === 'ACTIVE'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-slate-200 bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {user.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="badge border-line bg-slate-50 text-slate-700">
+                        {user.source}
+                      </span>
+                    </td>
+                  </>
+                )
 
-                    {isOpen ? (
-                      <tr>
-                        <td colSpan={7} className="bg-slate-50 px-6 py-5">
-                          <form onSubmit={(event) => handleSubmit(event, user)} className="space-y-4">
-                            <div className="grid gap-4 lg:grid-cols-3">
-                              <label className="flex flex-col gap-2 text-sm text-slate-700">
-                                <span className="font-semibold text-slate-950">Nama lengkap</span>
-                                <input
-                                  value={draft.fullName}
-                                  onChange={(event) =>
-                                    updateDraft(user, { fullName: event.target.value })
-                                  }
-                                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={isBusy}
-                                />
-                              </label>
-
-                              <label className="flex flex-col gap-2 text-sm text-slate-700">
-                                <span className="font-semibold text-slate-950">Email</span>
-                                <input
-                                  value={draft.email}
-                                  onChange={(event) => updateDraft(user, { email: event.target.value })}
-                                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={isBusy}
-                                />
-                              </label>
-
-                              <label className="flex flex-col gap-2 text-sm text-slate-700">
-                                <span className="font-semibold text-slate-950">Status</span>
-                                <select
-                                  value={draft.status}
-                                  onChange={(event) => updateDraft(user, { status: event.target.value })}
-                                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={isBusy}
-                                >
-                                  <option value="ACTIVE">ACTIVE</option>
-                                  <option value="INACTIVE">INACTIVE</option>
-                                </select>
-                              </label>
-
-                              <label className="flex flex-col gap-2 text-sm text-slate-700">
-                                <span className="font-semibold text-slate-950">Role</span>
-                                <select
-                                  value={draft.roleId}
-                                  onChange={(event) => {
-                                    const nextRoleId = event.target.value
-                                    updateDraft(user, {
-                                      roleId: nextRoleId,
-                                      divisionId: getDefaultDivisionId(nextRoleId, roleOptions, divisionOptions),
-                                    })
-                                  }}
-                                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={isBusy}
-                                >
-                                  <option value="">Pilih role</option>
-                                  {roleOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-
-                              <label className="flex flex-col gap-2 text-sm text-slate-700">
-                                <span className="font-semibold text-slate-950">Divisi</span>
-                                <select
-                                  value={draft.divisionId}
-                                  onChange={(event) => updateDraft(user, { divisionId: event.target.value })}
-                                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={isBusy}
-                                >
-                                  <option value="">Semua Divisi</option>
-                                  {divisionOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-
-                              <label className="flex flex-col gap-2 text-sm text-slate-700">
-                                <span className="font-semibold text-slate-950">Cabang</span>
-                                <select
-                                  value={draft.branchId}
-                                  onChange={(event) => updateDraft(user, { branchId: event.target.value })}
-                                  className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                  disabled={isBusy}
-                                >
-                                  <option value="">Tanpa Cabang</option>
-                                  {branchOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                            </div>
-
+                const detail = (
+                  <div className="space-y-5">
+                    <div>
+                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                      <div className="rounded-2xl border border-line bg-slate-50 p-5">
+                        <form id={formId} onSubmit={(event) => handleSubmit(event, user)} className="space-y-4">
+                          <div className="grid gap-4 lg:grid-cols-3">
                             <label className="flex flex-col gap-2 text-sm text-slate-700">
-                              <span className="font-semibold text-slate-950">Reset password</span>
+                              <span className="font-semibold text-slate-950">Nama lengkap</span>
                               <input
-                                type="password"
-                                value={draft.newPassword}
+                                value={draft.fullName}
                                 onChange={(event) =>
-                                  updateDraft(user, { newPassword: event.target.value })
+                                  updateDraft(user, { fullName: event.target.value })
                                 }
-                                placeholder="Kosongkan jika tidak diubah"
                                 className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-                                disabled={isBusy}
+                                disabled={isBusy || !isManageable}
                               />
                             </label>
 
-                            <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-mute">
-                              <span className="min-w-0 flex-1">
-                                Username tetap dikunci agar identitas login tidak berubah sembarangan. Jika akun tidak dipakai lagi, hapus user langsung dari sini.
-                              </span>
-                              <div className="flex shrink-0 items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDelete(user)}
-                                  disabled={isBusy}
-                                  className="whitespace-nowrap rounded-full border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                                >
-                                  {deletingUserId === user.id ? 'Menghapus...' : 'Hapus User'}
-                                </button>
-                                <button
-                                  type="submit"
-                                  disabled={isBusy}
-                                  className="whitespace-nowrap rounded-full bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-                                >
-                                  {submittingUserId === user.id ? 'Menyimpan...' : 'Simpan Perubahan'}
-                                </button>
-                              </div>
-                            </div>
+                            <label className="flex flex-col gap-2 text-sm text-slate-700">
+                              <span className="font-semibold text-slate-950">Email</span>
+                              <input
+                                value={draft.email}
+                                onChange={(event) => updateDraft(user, { email: event.target.value })}
+                                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                                disabled={isBusy || !isManageable}
+                              />
+                            </label>
 
-                            {message ? (
-                              <div
-                                className={`rounded-2xl border px-4 py-3 text-sm ${
-                                  message.tone === 'success'
-                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                    : 'border-rose-200 bg-rose-50 text-rose-700'
-                                }`}
+                            <label className="flex flex-col gap-2 text-sm text-slate-700">
+                              <span className="font-semibold text-slate-950">Status</span>
+                              <select
+                                value={draft.status}
+                                onChange={(event) => updateDraft(user, { status: event.target.value })}
+                                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                                disabled={isBusy || !isManageable}
                               >
-                                {message.message}
-                              </div>
-                            ) : null}
-                          </form>
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
+                                <option value="ACTIVE">ACTIVE</option>
+                                <option value="INACTIVE">INACTIVE</option>
+                              </select>
+                            </label>
+
+                            <label className="flex flex-col gap-2 text-sm text-slate-700">
+                              <span className="font-semibold text-slate-950">Role</span>
+                              <select
+                                value={draft.roleId}
+                                onChange={(event) => {
+                                  const nextRoleId = event.target.value
+                                  updateDraft(user, {
+                                    roleId: nextRoleId,
+                                    divisionId: getDefaultDivisionId(nextRoleId, roleOptions, divisionOptions),
+                                  })
+                                }}
+                                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                                disabled={isBusy || !isManageable}
+                              >
+                                <option value="">Pilih role</option>
+                                {roleOptions.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="flex flex-col gap-2 text-sm text-slate-700">
+                              <span className="font-semibold text-slate-950">Divisi</span>
+                              <select
+                                value={draft.divisionId}
+                                onChange={(event) => updateDraft(user, { divisionId: event.target.value })}
+                                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                                disabled={isBusy || !isManageable}
+                              >
+                                <option value="">Semua Divisi</option>
+                                {divisionOptions.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="flex flex-col gap-2 text-sm text-slate-700">
+                              <span className="font-semibold text-slate-950">Cabang</span>
+                              <select
+                                value={draft.branchId}
+                                onChange={(event) => updateDraft(user, { branchId: event.target.value })}
+                                className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                                disabled={isBusy || !isManageable}
+                              >
+                                <option value="">Tanpa Cabang</option>
+                                {branchOptions.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+
+                          <label className="flex flex-col gap-2 text-sm text-slate-700">
+                            <span className="font-semibold text-slate-950">Reset password</span>
+                            <input
+                              type="password"
+                              value={draft.newPassword}
+                              onChange={(event) =>
+                                updateDraft(user, { newPassword: event.target.value })
+                              }
+                              placeholder="Kosongkan jika tidak diubah"
+                              className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+                              disabled={isBusy || !isManageable}
+                            />
+                          </label>
+
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-mute">
+                            <span className="min-w-0 flex-1">
+                              Username tetap dikunci agar identitas login tidak berubah sembarangan. Jika akun tidak dipakai lagi, hapus user langsung dari panel aksi di bawah.
+                            </span>
+                          </div>
+
+                          {message ? (
+                            <div
+                              className={`rounded-2xl border px-4 py-3 text-sm ${
+                                message.tone === 'success'
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                  : 'border-rose-200 bg-rose-50 text-rose-700'
+                              }`}
+                            >
+                              {message.message}
+                            </div>
+                          ) : null}
+                        </form>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                      <span className="font-semibold uppercase tracking-[0.14em] text-mute">ID User</span>
+                      <span className="font-mono text-ink tabular-nums">#{user.id}</span>
+                      <span aria-hidden className="text-mute">•</span>
+                      <span className="font-semibold uppercase tracking-[0.14em] text-mute">Username</span>
+                      <span className="font-mono text-ink tabular-nums">{user.username}</span>
+                      <span aria-hidden className="text-mute">•</span>
+                      <span className="font-semibold uppercase tracking-[0.14em] text-mute">Sumber</span>
+                      <span className="font-semibold text-inkStrong">{user.source}</span>
+                      <span aria-hidden className="text-mute">•</span>
+                      <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                      <span className="font-semibold text-inkStrong">{user.status}</span>
+                    </div>
+                    <div className="border-t border-line pt-3">
+                      <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                      <div className="flex flex-wrap gap-3 items-center">
+                        {isManageable ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(user)}
+                              disabled={isBusy}
+                              className="whitespace-nowrap rounded-full border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                            >
+                              {deletingUserId === user.id ? 'Menghapus...' : 'Hapus User'}
+                            </button>
+                            <button
+                              type="submit"
+                              form={formId}
+                              disabled={isBusy}
+                              className="whitespace-nowrap rounded-full bg-slate-950 px-4 py-2.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                              {submittingUserId === user.id ? 'Menyimpan...' : 'Simpan Perubahan'}
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-mute">
+                            {user.source === 'mock' ? 'Mock only — tidak dapat dimutasi' : 'Read only — role tidak dapat mengelola user'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+
+                return (
+                  <ExpandableRow
+                    key={user.id}
+                    id={String(user.id)}
+                    num={idx + 1}
+                    totalCols={totalCols}
+                    compactRow={compactRow}
+                    detail={detail}
+                    tone={user.status === 'ACTIVE' ? 'default' : 'muted'}
+                  />
                 )
               })
             ) : (
               <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-sm text-mute">
+                <td colSpan={8} className="px-6 py-8 text-center text-sm text-mute">
                   Belum ada user review di `auth_users`. Jalankan seed auth internal untuk mulai
                   menguji login review DB.
                 </td>
