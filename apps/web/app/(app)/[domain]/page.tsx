@@ -7,7 +7,7 @@ import { requireSession } from '@/lib/auth'
 import { salesWorkspace } from '@/lib/organization-workspaces'
 import { getDomainPageData } from '@/lib/services/domain-service'
 import { normalizeSupportLane } from '@/lib/support-lanes'
-import type { DomainFormPrefill, DomainKey, SupportDrilldownContext, SupportLaneKey } from '@/lib/types'
+import type { AppRole, DomainFormPrefill, DomainKey, SupportDrilldownContext, SupportLaneKey } from '@/lib/types'
 
 const SalesDomainWorkspace = dynamic(
   () => import('@/components/sales-domain-workspace').then((mod) => mod.SalesDomainWorkspace),
@@ -18,6 +18,24 @@ const BillingDomainWorkspace = dynamic(
 )
 
 const enabledDomains: DomainKey[] = ['sales', 'customers', 'support', 'inventory', 'hr', 'billing']
+
+type OrgLink = { label: string; href: string; description: string; badge?: string }
+type OrgSection = { title: string; description: string; links: OrgLink[] }
+
+function resolveOrgVisibleLink(role: AppRole, link: OrgLink): OrgLink | null {
+  return canAccessPath(role, link.href.split('?')[0] ?? link.href) ? link : null
+}
+
+function resolveOrgVisibleSections(role: AppRole, sections: OrgSection[]): OrgSection[] {
+  return sections
+    .map((section) => ({
+      ...section,
+      links: section.links
+        .map((link) => resolveOrgVisibleLink(role, link))
+        .filter((l): l is OrgLink => Boolean(l)),
+    }))
+    .filter((section) => section.links.length > 0)
+}
 
 function resolveSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
@@ -387,6 +405,11 @@ export default async function DomainPage({
     }
 
     if (!salesFocus && !salesLead && !salesOrder) {
+      const visPrimary = resolveOrgVisibleLink(session.role, salesWorkspace.primaryAction)
+      const visSecondary = salesWorkspace.secondaryAction
+        ? resolveOrgVisibleLink(session.role, salesWorkspace.secondaryAction)
+        : null
+      const visSections = resolveOrgVisibleSections(session.role, salesWorkspace.sections)
       return (
         <OrganizationWorkspacePage
           role={session.role}
@@ -397,6 +420,9 @@ export default async function DomainPage({
           secondaryAction={salesWorkspace.secondaryAction}
           steps={salesWorkspace.steps}
           sections={salesWorkspace.sections}
+          visiblePrimaryAction={visPrimary}
+          visibleSecondaryAction={visSecondary}
+          visibleSections={visSections}
         />
       )
     }

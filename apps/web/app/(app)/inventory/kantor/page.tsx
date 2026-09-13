@@ -1,9 +1,51 @@
 import { redirect } from 'next/navigation'
 import { requireSession } from '@/lib/auth'
 import { canAccessOrganizationWorkspace } from '@/lib/organization-workspace-access'
+import { canAccessPath } from '@/lib/access-control-server'
+import type { AppRole } from '@/lib/types'
 import { kantorWorkspace } from '@/lib/organization-workspaces'
+import type {
+  OrganizationWorkspaceLink,
+  OrganizationWorkspaceSection,
+} from '@/components/organization-workspace-page'
 import { OrganizationWorkspacePage } from '@/components/organization-workspace-page'
 import { KantorKendaraanTabContent } from '@/components/kantor-kendaraan-tab'
+
+function resolveVisibleLink(
+  role: AppRole,
+  link: OrganizationWorkspaceLink,
+): OrganizationWorkspaceLink | null {
+  return canAccessPath(role, link.href.split('?')[0] ?? link.href) ? link : null
+}
+
+function resolveVisiblePrimary(
+  role: AppRole,
+  primary: OrganizationWorkspaceLink,
+): OrganizationWorkspaceLink | null {
+  return resolveVisibleLink(role, primary)
+}
+
+function resolveVisibleSecondary(
+  role: AppRole,
+  secondary?: OrganizationWorkspaceLink,
+): OrganizationWorkspaceLink | null {
+  if (!secondary) return null
+  return resolveVisibleLink(role, secondary)
+}
+
+function resolveVisibleSections(
+  role: AppRole,
+  sections: OrganizationWorkspaceSection[],
+): OrganizationWorkspaceSection[] {
+  return sections
+    .map((section) => ({
+      ...section,
+      links: section.links
+        .map((link) => resolveVisibleLink(role, link))
+        .filter((l): l is OrganizationWorkspaceLink => Boolean(l)),
+    }))
+    .filter((section) => section.links.length > 0)
+}
 
 export default async function KantorWorkspacePage() {
   const session = await requireSession()
@@ -37,6 +79,9 @@ export default async function KantorWorkspacePage() {
       secondaryAction={kantorWorkspace.secondaryAction}
       steps={kantorWorkspace.steps}
       sections={kantorWorkspace.sections}
+      visiblePrimaryAction={resolveVisiblePrimary(session.role, kantorWorkspace.primaryAction)}
+      visibleSecondaryAction={resolveVisibleSecondary(session.role, kantorWorkspace.secondaryAction)}
+      visibleSections={resolveVisibleSections(session.role, kantorWorkspace.sections)}
       verticalTabs={kantorWorkspace.verticalTabs}
       verticalTabContents={verticalTabContents}
     />

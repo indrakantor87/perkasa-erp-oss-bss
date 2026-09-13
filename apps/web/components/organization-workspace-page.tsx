@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { canAccessPath } from '@/lib/access-control-server'
 import { getRoleMeta } from '@/lib/role-meta'
 import type { AppRole } from '@/lib/types'
 
@@ -42,6 +41,9 @@ export function OrganizationWorkspacePage({
   sections,
   verticalTabs,
   verticalTabContents,
+  visiblePrimaryAction,
+  visibleSecondaryAction,
+  visibleSections,
 }: {
   role: AppRole
   eyebrow: string
@@ -53,22 +55,22 @@ export function OrganizationWorkspacePage({
   sections: OrganizationWorkspaceSection[]
   verticalTabs?: OrganizationWorkspaceVerticalTab[]
   verticalTabContents?: Record<string, ReactNode>
+  visiblePrimaryAction?: OrganizationWorkspaceLink | null
+  visibleSecondaryAction?: OrganizationWorkspaceLink | null
+  visibleSections?: OrganizationWorkspaceSection[]
 }) {
   const roleMeta = getRoleMeta(role)
-  const visiblePrimaryAction = canAccessPath(role, primaryAction.href.split('?')[0] ?? primaryAction.href)
-    ? primaryAction
-    : null
-  const visibleSecondaryAction =
-    secondaryAction && canAccessPath(role, secondaryAction.href.split('?')[0] ?? secondaryAction.href)
-      ? secondaryAction
-      : null
-  const visibleSections = sections
-    .map((section) => ({
-      ...section,
-      links: section.links.filter((link) => canAccessPath(role, link.href.split('?')[0] ?? link.href)),
-    }))
-    .filter((section) => section.links.length > 0)
-  const totalLinks = visibleSections.reduce((count, section) => count + section.links.length, 0)
+  const resolvedPrimary =
+    typeof visiblePrimaryAction !== 'undefined' ? visiblePrimaryAction : primaryAction
+  const resolvedSecondary =
+    typeof visibleSecondaryAction !== 'undefined' ? visibleSecondaryAction : secondaryAction
+  const resolvedSections = Array.isArray(visibleSections)
+    ? visibleSections.filter((s) => s.links.length > 0)
+    : sections.map((section) => ({
+        ...section,
+        links: section.links.slice(),
+      }))
+  const totalLinks = resolvedSections.reduce((count, section) => count + section.links.length, 0)
 
   const defaultTabKey = verticalTabs?.[0]?.key ?? 'DEFAULT'
   const [activeTabKey, setActiveTabKey] = useState<string>(defaultTabKey)
@@ -96,9 +98,9 @@ export function OrganizationWorkspacePage({
           </div>
         </section>
 
-        {visibleSections.length ? (
+        {resolvedSections.length ? (
           <section className="grid gap-4 xl:grid-cols-2">
-            {visibleSections.map((section) => (
+            {resolvedSections.map((section) => (
               <div key={section.title} className="rounded-xl border border-line bg-white">
                 <div className="border-b border-slate-200 px-4 py-3">
                   <p className="section-title">{section.title}</p>
@@ -159,22 +161,22 @@ export function OrganizationWorkspacePage({
           </div>
         </div>
 
-        {visiblePrimaryAction || visibleSecondaryAction ? (
+        {resolvedPrimary || resolvedSecondary ? (
           <div className="mt-3 flex flex-wrap gap-2">
-            {visiblePrimaryAction ? (
+            {resolvedPrimary ? (
               <Link
-                href={visiblePrimaryAction.href}
+                href={resolvedPrimary.href}
                 className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-white"
               >
-                {visiblePrimaryAction.label}
+                {resolvedPrimary.label}
               </Link>
             ) : null}
-            {visibleSecondaryAction ? (
+            {resolvedSecondary ? (
               <Link
-                href={visibleSecondaryAction.href}
+                href={resolvedSecondary.href}
                 className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
               >
-                {visibleSecondaryAction.label}
+                {resolvedSecondary.label}
               </Link>
             ) : null}
           </div>
