@@ -518,7 +518,7 @@ export default async function InventoryOverviewPage({
 
     return (
       <div className="space-y-4">
-        <section className="panel p-4">
+        <section id="inventory-overview-hero" className="scroll-mt-24 panel p-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="section-title">{payload.content.eyebrow}</p>
@@ -542,9 +542,62 @@ export default async function InventoryOverviewPage({
               </Link>
             </div>
           </div>
+          <div className="mt-5 rounded-2xl border border-line bg-surfaceMuted/60 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-mute">
+              Lompat Cepat Dashboard Inventory
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <a
+                href="#inventory-overview-summary"
+                className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-muteStrong transition hover:bg-surfaceElevated hover:text-slate-950 focus-visible:shadow-focus"
+              >
+                1. Ringkasan
+              </a>
+              <a
+                href="#inventory-overview-focus"
+                className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-muteStrong transition hover:bg-surfaceElevated hover:text-slate-950 focus-visible:shadow-focus"
+              >
+                2. Fokus Kerja
+              </a>
+              <a
+                href="#inventory-overview-historical"
+                className="rounded-full border border-accent bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent transition hover:bg-accent/20 hover:text-slate-950 focus-visible:shadow-focus"
+              >
+                3. Historis ⭐ (Bandigkan Periode)
+              </a>
+              <a
+                href="#inventory-overview-kpi"
+                className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-muteStrong transition hover:bg-surfaceElevated hover:text-slate-950 focus-visible:shadow-focus"
+              >
+                4. Kinerja Saat Ini
+              </a>
+              <a
+                href="#inventory-overview-shortcuts"
+                className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-muteStrong transition hover:bg-surfaceElevated hover:text-slate-950 focus-visible:shadow-focus"
+              >
+                5. Shortcut Menu
+              </a>
+            </div>
+            <p className="mt-2 text-[11px] leading-5 text-mute">
+              Tip: Data Review DB default menampilkan 5 transaksi terbaru per kategori. Untuk visualisasi historis yang lebih banyak periode,
+              gunakan halaman masing-masing sub menu ({' '}
+              <Link className="text-accent underline underline-offset-2" href="/inventory/requests">
+                requests
+              </Link>
+              ,{' '}
+              <Link className="text-accent underline underline-offset-2" href="/inventory/movements">
+                movements
+              </Link>
+              ,{' '}
+              <Link className="text-accent underline underline-offset-2" href="/inventory/loans">
+                loans
+              </Link>
+              ) yang memuat data lebih panjang.
+            </p>
+          </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
+        <section id="inventory-overview-summary" className="scroll-mt-24 grid gap-4 md:grid-cols-3">
           {payload.content.summaries.map((item) => (
             <article key={item.label} className="panel p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">{item.label}</p>
@@ -556,7 +609,7 @@ export default async function InventoryOverviewPage({
         </section>
 
         {focusCards.length > 0 ? (
-          <section className="panel p-4">
+          <section id="inventory-overview-focus" className="scroll-mt-24 panel p-4">
             <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
               <div>
                 <p className="section-title">Fokus Inventory</p>
@@ -593,11 +646,77 @@ export default async function InventoryOverviewPage({
           </section>
         ) : null}
 
-        <section className="space-y-4">
+        <section id="inventory-overview-historical" className="scroll-mt-24 space-y-4">
+          <div className="panel p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
+              <div>
+                <p className="section-title">Pemantauan Historis Inventory</p>
+                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-inkStrong">
+                  Perbandingan kinerja periode saat ini vs periode sebelumnya
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-mute">
+                  Visualisasi historis ini menampilkan perbandingan LITERAL periode sekarang dengan periode sebelumnya, tanpa prediksi, tanpa
+                  smoothing, dan tanpa interpolasi. Warna gelap = periode saat ini; warna abu = periode sebelumnya. Gunakan toggle periodisitas
+                  di kanan atas untuk ganti granularitas seperti tampilan TradingView: harian sampai tahunan.
+                </p>
+              </div>
+              <div className="flex flex-col gap-1 text-xs leading-6 text-mute md:items-end">
+                <span className="badge border-accent bg-accent/10 text-accent self-start md:self-end">
+                  MODE: {GRANULARITY_OPTIONS.find((o) => o.key === granularity)?.label ?? 'Bulanan'}
+                </span>
+                <span>Toggle periodisitas = ubah skala agregasi bucket perbandingan historis.</span>
+                <span>
+                  Cakupan data default: 5 rows terbaru per kategori. Untuk historis panjang, buka sub menu requests, movements, atau loans.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <HistoricalBarChart
+              title="Historis Request Barang (saat ini vs sebelumnya)"
+              subtitle="Jumlah request barang per bucket periode. Bandingkan dengan periode sebelumnya untuk menilai lonjakan atau penurunan beban kerja gudang."
+              granularity={granularity}
+              setGranularityHref={setGranularityHref}
+              currentPeriodLabel={historicalRequest.currentLabel}
+              previousPeriodLabel={historicalRequest.previousLabel}
+              series={historicalRequest.series}
+              unitLabel="request"
+              emptyNote="Belum ada request barang yang bisa dihistorisasi. Data muncul setelah request dengan tanggal dibuat tercatat di sistem."
+              onEmptyPreviousHint="Sistem membangun perbandingan 2 periode otomatis. Review DB default menampilkan 5 rows terbaru request; agar terbentuk bucket historis lebih banyak, buat transaksi pada beberapa tanggal yang berbeda atau buka halaman /inventory/requests untuk data yang lebih luas."
+            />
+            <HistoricalBarChart
+              title="Historis Stock Movement (saat ini vs sebelumnya)"
+              subtitle="Jumlah transaksi barang IN, OUT, dan ADJUSTMENT per bucket periode. Pantau ratio IN/OUT dan sinyal ADJUSTMENT yang berlebih untuk temukan proses pencatatan yang perlu diperbaiki."
+              granularity={granularity}
+              setGranularityHref={setGranularityHref}
+              currentPeriodLabel={historicalMovement.currentLabel}
+              previousPeriodLabel={historicalMovement.previousLabel}
+              series={historicalMovement.series}
+              unitLabel="transaksi"
+              emptyNote="Belum ada stock movement dengan tanggal tercatat yang bisa dihistorisasi."
+              onEmptyPreviousHint="Review DB default menampilkan 5 rows movement terbaru. Gunakan halaman /inventory/movements jika butuh jangka waktu perbandingan yang lebih panjang."
+            />
+            <HistoricalBarChart
+              title="Historis Pinjaman Barang (saat ini vs sebelumnya)"
+              subtitle="Jumlah pinjaman per bucket periode. Membantu mengukur kapan aset fisik banyak dipinjam teknisi lapangan (puncak proyek, maintenance periodik, dll)."
+              granularity={granularity}
+              setGranularityHref={setGranularityHref}
+              currentPeriodLabel={historicalLoan.currentLabel}
+              previousPeriodLabel={historicalLoan.previousLabel}
+              series={historicalLoan.series}
+              unitLabel="pinjaman"
+              emptyNote="Belum ada pinjaman barang dengan tanggal tercatat yang bisa dihistorisasi."
+              onEmptyPreviousHint="Review DB default menampilkan 5 rows loan terbaru. Untuk analisa historis penuh lintas beberapa bulan, buka halaman /inventory/loans."
+            />
+          </div>
+        </section>
+
+        <section id="inventory-overview-kpi" className="scroll-mt-24 space-y-4">
           <div className="panel p-4">
             <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
               <div>
-                <p className="section-title">Pemantauan Kinerja Inventory</p>
+                <p className="section-title">Pemantauan Kinerja Inventory (Snapshot Saat Ini)</p>
                 <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-inkStrong">
                   Ringkasan visual proses operasional gudang
                 </h2>
@@ -607,7 +726,9 @@ export default async function InventoryOverviewPage({
                   keputusan.
                 </p>
               </div>
-              <span className="badge border-line bg-surfaceMuted text-muteStrong self-start">5 diagram batang</span>
+              <span className="badge border-line bg-surfaceMuted text-muteStrong self-start">
+                8 visualisasi (5 snapshot + 3 historis)
+              </span>
             </div>
           </div>
 
@@ -653,71 +774,8 @@ export default async function InventoryOverviewPage({
           </div>
         </section>
 
-        <section className="space-y-4">
-          <div className="panel p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
-              <div>
-                <p className="section-title">Pemantauan Historis Inventory</p>
-                <h2 className="mt-1 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-inkStrong">
-                  Perbandingan kinerja periode saat ini vs periode sebelumnya
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-mute">
-                  Visualisasi historis ini menampilkan perbandingan LITERAL periode sekarang dengan periode sebelumnya, tanpa prediksi, tanpa
-                  smoothing, dan tanpa interpolasi. Warna gelap = periode saat ini; warna abu = periode sebelumnya. Gunakan toggle periodisitas
-                  di kanan atas untuk ganti granularitas seperti tampilan TradingView: harian sampai tahunan.
-                </p>
-              </div>
-              <div className="flex flex-col gap-1 text-xs leading-6 text-mute md:items-end">
-                <span className="badge border-line bg-surfaceMuted text-muteStrong self-start md:self-end">
-                  Mode: {GRANULARITY_OPTIONS.find((o) => o.key === granularity)?.label ?? 'Bulanan'}
-                </span>
-                <span>Toggle periodisitas = ubah skala agregasi bucket perbandingan historis.</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <HistoricalBarChart
-              title="Historis Request Barang (saat ini vs sebelumnya)"
-              subtitle="Jumlah request barang per bucket periode. Bandingkan dengan periode sebelumnya untuk menilai lonjakan atau penurunan beban kerja gudang."
-              granularity={granularity}
-              setGranularityHref={setGranularityHref}
-              currentPeriodLabel={historicalRequest.currentLabel}
-              previousPeriodLabel={historicalRequest.previousLabel}
-              series={historicalRequest.series}
-              unitLabel="request"
-              emptyNote="Belum ada request barang yang bisa dihistorisasi. Data muncul setelah request dengan tanggal dibuat tercatat di sistem."
-              onEmptyPreviousHint="Sistem membangun perbandingan 2 periode otomatis (periode sekarang + periode sebelumnya). Jika data hanya tersedia 1 periode, periode sebelumnya akan bernilai 0 sebagai pembanding nol."
-            />
-            <HistoricalBarChart
-              title="Historis Stock Movement (saat ini vs sebelumnya)"
-              subtitle="Jumlah transaksi barang IN, OUT, dan ADJUSTMENT per bucket periode. Pantau ratio IN/OUT dan sinyal ADJUSTMENT yang berlebih untuk temukan proses pencatatan yang perlu diperbaiki."
-              granularity={granularity}
-              setGranularityHref={setGranularityHref}
-              currentPeriodLabel={historicalMovement.currentLabel}
-              previousPeriodLabel={historicalMovement.previousLabel}
-              series={historicalMovement.series}
-              unitLabel="transaksi"
-              emptyNote="Belum ada stock movement dengan tanggal tercatat yang bisa dihistorisasi."
-              onEmptyPreviousHint="Jika bucket periode sebelumnya kosong, artinya belum ada transaksi movement tercatat pada periode pembanding."
-            />
-            <HistoricalBarChart
-              title="Historis Pinjaman Barang (saat ini vs sebelumnya)"
-              subtitle="Jumlah pinjaman per bucket periode. Membantu mengukur kapan aset fisik banyak dipinjam teknisi lapangan (puncak proyek, maintenance periodik, dll)."
-              granularity={granularity}
-              setGranularityHref={setGranularityHref}
-              currentPeriodLabel={historicalLoan.currentLabel}
-              previousPeriodLabel={historicalLoan.previousLabel}
-              series={historicalLoan.series}
-              unitLabel="pinjaman"
-              emptyNote="Belum ada pinjaman barang dengan tanggal tercatat yang bisa dihistorisasi."
-              onEmptyPreviousHint="Sistem tidak menampilkan data dummy. Periode sebelumnya kosong berarti periode tersebut memang 0 transaksi."
-            />
-          </div>
-        </section>
-
         {shortcuts.length > 0 ? (
-          <section className="panel p-4">
+          <section id="inventory-overview-shortcuts" className="scroll-mt-24 panel p-4">
             <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between md:gap-4">
               <div>
                 <p className="section-title">Shortcut Inventory</p>
