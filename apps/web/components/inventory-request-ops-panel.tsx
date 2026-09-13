@@ -275,14 +275,6 @@ export function InventoryRequestOpsPanel({
                       <p className="text-sm text-slate-600">{row.secondary}</p>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
-                      {requestBarcodeHref ? (
-                        <Link
-                          href={requestBarcodeHref}
-                          className="badge border-slate-300 bg-slate-950 text-white transition hover:bg-slate-800"
-                        >
-                          Buka Barcode
-                        </Link>
-                      ) : null}
                       <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
                     </div>
                   </div>

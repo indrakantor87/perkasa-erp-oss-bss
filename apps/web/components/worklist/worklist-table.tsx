@@ -57,7 +57,7 @@ const WorklistTableRows = memo(function WorklistTableRows({
   state: WorklistQueryState
   setQuickActionItem: (item: WorklistItem) => void
 }) {
-  const totalCols = 10
+  const totalCols = 9
   return (
     <tbody>
       {items.map((item, idx) => {
@@ -103,32 +103,6 @@ const WorklistTableRows = memo(function WorklistTableRows({
             </td>
             <td className="px-3 py-3 align-top">
               <div className="text-xs text-muteStrong">{item.dueLabel || item.owner || '-'}</div>
-            </td>
-            <td className="px-3 py-3 align-top">
-              <div className="flex flex-col items-stretch gap-1.5 lg:flex-row lg:flex-wrap lg:items-center">
-                <Link
-                  href={item.href}
-                  aria-label={`${item.actionLabel}: ${item.title}`}
-                  className="btn-base btn-primary focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control px-3 text-xs font-semibold transition hover:opacity-90"
-                >
-                  {item.actionLabel}
-                </Link>
-                <Link
-                  href={selectHref}
-                  aria-label={`Lihat detail worklist item ${item.title}`}
-                  className="btn-base btn-secondary focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control px-3 text-xs font-medium transition hover:border-lineStrong"
-                >
-                  Lihat detail
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setQuickActionItem(item)}
-                  aria-label={`Buka aksi cepat untuk ${item.title}`}
-                  className="btn-base btn-ghost focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control border border-line bg-surfaceSoft px-3 text-xs font-medium text-ink transition hover:border-lineStrong hover:text-inkStrong"
-                >
-                  Aksi cepat
-                </button>
-              </div>
             </td>
           </>
         )
@@ -404,7 +378,6 @@ export function WorklistTable({ items, selectedItemId, state }: WorklistTablePro
               <th className="w-[9rem]">Status</th>
               <th>Next Action</th>
               <th className="w-[10rem]">Target / PIC</th>
-              <th className="w-[18rem]">Aksi</th>
             </tr>
           </thead>
           <WorklistTableRows
