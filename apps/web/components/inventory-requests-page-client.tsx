@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
+import { InventoryRequestTrackingFilters } from '@/components/inventory-request-tracking-filters'
 
 type InventoryRequestItem = {
   id: string | number
@@ -33,11 +34,10 @@ type InventoryRequestsPageClientProps = {
   items: InventoryRequestItem[]
   referenceActive: boolean
   error: string | null
-  InventoryRequestTrackingFilters: React.ComponentType<{ defaultValues: InventoryRequestFilterDefaults }>
 }
 
 export default function InventoryRequestsPageClient(props: InventoryRequestsPageClientProps) {
-  const { defaultValues, items, referenceActive, error, InventoryRequestTrackingFilters } = props
+  const { defaultValues, items, referenceActive, error } = props
   const totalCols = 10
 
   return (

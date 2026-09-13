@@ -40,8 +40,41 @@ type NocQueuePageClientProps = {
   otherItems: NocQueueItem[]
   itemSuggestions: SuggestionItem[]
   error: string | null
-  buildFilterHref: (patch: Partial<{ ticketType: string; queueStatus: string; slaState: string; mine: string }>) => string
   workspaceLabel: string
+}
+
+function resolveSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function buildNocQueueFilterHref(params: {
+  q?: string
+  ticketType?: string
+  queueStatus?: string
+  slaState?: string
+  mine?: boolean
+  patch: Partial<{
+    ticketType: string
+    queueStatus: string
+    slaState: string
+    mine: string
+  }>
+}) {
+  const search = new URLSearchParams()
+  const q = String(params.q ?? '').trim()
+  const ticketType = String(params.patch.ticketType ?? params.ticketType ?? '').trim()
+  const queueStatus = String(params.patch.queueStatus ?? params.queueStatus ?? '').trim()
+  const slaState = String(params.patch.slaState ?? params.slaState ?? '').trim()
+  const mine = String(params.patch.mine ?? (params.mine ? '1' : '')).trim()
+
+  if (q) search.set('q', q)
+  if (ticketType) search.set('ticketType', ticketType)
+  if (queueStatus) search.set('queueStatus', queueStatus)
+  if (slaState) search.set('slaState', slaState)
+  if (mine) search.set('mine', mine)
+
+  const query = search.toString()
+  return query ? `/dashboard/tracking/noc-queue?${query}` : '/dashboard/tracking/noc-queue'
 }
 
 function getTicketTypeIcon(ticketType: NocTicketType) {
@@ -143,8 +176,11 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
     q, ticketType, queueStatus, slaState, mine,
     canCreateDeviceLifecycle, canUpdateSupport, canUpdateWorkOrder,
     reviewDbReady, totalTickets, activeTickets, riskTickets, mineTickets,
-    typeCounts, items, otherItems, itemSuggestions, error, buildFilterHref, workspaceLabel,
+    typeCounts, items, otherItems, itemSuggestions, error, workspaceLabel,
   } = props
+
+  const buildFilterHref = (patch: Partial<{ ticketType: string; queueStatus: string; slaState: string; mine: string }>) =>
+    buildNocQueueFilterHref({ q, ticketType, queueStatus, slaState, mine, patch })
 
   const mainTotalCols = 9
   const otherTotalCols = 6

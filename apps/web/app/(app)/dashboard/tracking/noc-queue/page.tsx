@@ -128,7 +128,6 @@ export default async function NocQueuePage({
         otherItems={payload.otherItems}
         itemSuggestions={itemSuggestions as any}
         error={payload.error ?? null}
-        buildFilterHref={buildFilterHref}
         workspaceLabel={workspaceLabel}
       />
     </div>

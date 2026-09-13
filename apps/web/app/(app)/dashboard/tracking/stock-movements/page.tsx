@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { DataSourceStatus } from '@/components/data-source-status'
-import { StockMovementTrackingFilters } from '@/components/stock-movement-tracking-filters'
 import StockMovementsPageClient from '@/components/stock-movements-page-client'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
@@ -52,7 +51,6 @@ export default async function StockMovementTrackingListPage({
         items={payload.items as any[]}
         referenceActive={referenceActive}
         error={payload.error ?? null}
-        StockMovementTrackingFilters={StockMovementTrackingFilters as any}
       />
     </div>
   )

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
+import { StockMovementTrackingFilters } from '@/components/stock-movement-tracking-filters'
 
 type StockMovementItem = {
   id: string | number
@@ -37,11 +38,10 @@ type StockMovementsPageClientProps = {
   items: StockMovementItem[]
   referenceActive: boolean
   error: string | null
-  StockMovementTrackingFilters: React.ComponentType<{ defaultValues: StockMovementFilterDefaults }>
 }
 
 export default function StockMovementsPageClient(props: StockMovementsPageClientProps) {
-  const { defaultValues, items, referenceActive, error, StockMovementTrackingFilters } = props
+  const { defaultValues, items, referenceActive, error } = props
   const totalCols = 9
 
   return (

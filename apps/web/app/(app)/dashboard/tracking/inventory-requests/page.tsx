@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { DataSourceStatus } from '@/components/data-source-status'
-import { InventoryRequestTrackingFilters } from '@/components/inventory-request-tracking-filters'
 import InventoryRequestsPageClient from '@/components/inventory-requests-page-client'
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
@@ -49,7 +48,6 @@ export default async function InventoryRequestTrackingListPage({
         items={payload.items as any[]}
         referenceActive={referenceActive}
         error={payload.error ?? null}
-        InventoryRequestTrackingFilters={InventoryRequestTrackingFilters as any}
       />
     </div>
   )
