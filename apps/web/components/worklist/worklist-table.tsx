@@ -108,35 +108,34 @@ const WorklistTableRows = memo(function WorklistTableRows({
         )
 
         const detail = (
-          <div className="space-y-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                <Link
-                  href={selectHref}
-                  className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
-                >
-                  Detail
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setQuickActionItem(item)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
-                >
-                  Aksi Cepat
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-lineStrong hover:bg-surface"
-                >
-                  Assign
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:border-amber-400 hover:bg-amber-100"
-                >
-                  Hold
-                </button>
+          <div className="space-y-5">
+            <section className="space-y-2">
+              <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                Detil Data
+              </h4>
+              <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Judul</th>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Prioritas</th>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Status</th>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Next Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.title}</td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{priorityLabel}</td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.status}</td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800 leading-6">{item.nextAction ?? '-'}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
+            </section>
+
+            <section className="space-y-2">
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold uppercase tracking-[0.14em] text-mute">Dibuat</span>
@@ -158,31 +157,38 @@ const WorklistTableRows = memo(function WorklistTableRows({
                   <span className="tabular-nums text-slate-900">{item.status}</span>
                 </div>
               </div>
-            </div>
+            </section>
 
-            <section className="space-y-2">
-              <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
-                Detil Pekerjaan
-              </h4>
-              <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Judul</th>
-                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Prioritas</th>
-                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Status</th>
-                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Next Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.title}</td>
-                      <td className="px-4 py-3 align-top text-sm text-slate-800">{priorityLabel}</td>
-                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.status}</td>
-                      <td className="px-4 py-3 align-top text-sm text-slate-800 leading-6">{item.nextAction ?? '-'}</td>
-                    </tr>
-                  </tbody>
-                </table>
+            <section className="space-y-2 pt-3 border-t border-line">
+              <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+                Aksi
+              </h5>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href={selectHref}
+                  className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
+                >
+                  Detail Data
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setQuickActionItem(item)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
+                >
+                  Aksi Cepat
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-lineStrong hover:bg-surface"
+                >
+                  Assign
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:border-amber-400 hover:bg-amber-100"
+                >
+                  Hold
+                </button>
               </div>
             </section>
           </div>

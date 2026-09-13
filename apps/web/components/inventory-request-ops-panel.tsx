@@ -327,9 +327,100 @@ export function InventoryRequestOpsPanel({
                 }
 
                 const detail = (
-                  <div className="space-y-4">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-5">
+                    <section className="space-y-2">
+                      <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                        Detil Data
+                      </h4>
+
+                      {badges.length ? (
+                        <div className="space-y-2">
+                          <h5 className="text-xs font-semibold uppercase tracking-[0.16em] text-mute">Info & Shortcut</h5>
+                          <div className="flex flex-wrap gap-2">
+                            {badges.map((b) =>
+                              b.href ? (
+                                <Link
+                                  key={b.key}
+                                  href={b.href}
+                                  className={`badge ${b.tone} transition hover:opacity-90`}
+                                >
+                                  {b.text}
+                                </Link>
+                              ) : (
+                                <span key={b.key} className={`badge ${b.tone}`}>
+                                  {b.text}
+                                </span>
+                              ),
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {audit?.movement ? (
+                        <div className="space-y-2">
+                          <h5 className="text-xs font-semibold uppercase tracking-[0.16em] text-mute">Audit Movement Terkait</h5>
+                          <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Movement ID</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Status</th>
+                                  <th className="text-xs font-semibold uppercase tracking-wider text-mute">Detail</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">
+                                    <span className="tabular-nums font-semibold">{audit.movement.primary}</span>
+                                    {movementBarcodeHref ? (
+                                      <Link
+                                        href={movementBarcodeHref}
+                                        className="ml-3 inline-flex rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
+                                      >
+                                        Barcode
+                                      </Link>
+                                    ) : null}
+                                  </td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800">{audit.movement.status || '-'}</td>
+                                  <td className="px-4 py-3 align-top text-sm text-slate-800 leading-6">{audit.movement.detail}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : null}
+                    </section>
+
+                    <section className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Sub-divisi</span>
+                          <span className="tabular-nums text-slate-900">{subdivision || '-'}</span>
+                          <span className="text-mute" aria-hidden>•</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Untuk</span>
+                          <span className="tabular-nums text-slate-900">{requestedFor || '-'}</span>
+                          <span className="text-mute" aria-hidden>•</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Requested</span>
+                          <span className="tabular-nums text-slate-900">{requestedAt || '-'}</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="space-y-2 pt-3 border-t border-line">
+                      <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">
+                        Aksi
+                      </h5>
                       <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-lineStrong hover:bg-surface"
+                        >
+                          Detil Data
+                        </button>
                         {requestBarcodeHref ? (
                           <Link
                             href={requestBarcodeHref}
@@ -352,91 +443,8 @@ export function InventoryRequestOpsPanel({
                             Buat Movement
                           </Link>
                         ) : null}
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-lineStrong hover:bg-surface"
-                        >
-                          Detail Lengkap
-                        </button>
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Sub-divisi</span>
-                          <span className="tabular-nums text-slate-900">{subdivision || '-'}</span>
-                          <span className="text-mute" aria-hidden>•</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Untuk</span>
-                          <span className="tabular-nums text-slate-900">{requestedFor || '-'}</span>
-                          <span className="text-mute" aria-hidden>•</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Requested</span>
-                          <span className="tabular-nums text-slate-900">{requestedAt || '-'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {badges.length ? (
-                      <section className="space-y-2">
-                        <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
-                          Info & Shortcut
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {badges.map((b) =>
-                            b.href ? (
-                              <Link
-                                key={b.key}
-                                href={b.href}
-                                className={`badge ${b.tone} transition hover:opacity-90`}
-                              >
-                                {b.text}
-                              </Link>
-                            ) : (
-                              <span key={b.key} className={`badge ${b.tone}`}>
-                                {b.text}
-                              </span>
-                            ),
-                          )}
-                        </div>
-                      </section>
-                    ) : null}
-
-                    {audit?.movement ? (
-                      <section className="space-y-2">
-                        <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
-                          Audit Movement Terkait
-                        </h4>
-                        <div className="overflow-x-auto rounded-2xl border border-line bg-white">
-                          <table className="data-table">
-                            <thead>
-                              <tr>
-                                <th className="text-xs font-semibold uppercase tracking-wider text-mute">Movement ID</th>
-                                <th className="text-xs font-semibold uppercase tracking-wider text-mute">Status</th>
-                                <th className="text-xs font-semibold uppercase tracking-wider text-mute">Detail</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr>
-                                <td className="px-4 py-3 align-top text-sm text-slate-800">
-                                  <span className="tabular-nums font-semibold">{audit.movement.primary}</span>
-                                  {movementBarcodeHref ? (
-                                    <Link
-                                      href={movementBarcodeHref}
-                                      className="ml-3 inline-flex rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
-                                    >
-                                      Barcode
-                                    </Link>
-                                  ) : null}
-                                </td>
-                                <td className="px-4 py-3 align-top text-sm text-slate-800">{audit.movement.status || '-'}</td>
-                                <td className="px-4 py-3 align-top text-sm text-slate-800 leading-6">{audit.movement.detail}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </section>
-                    ) : null}
+                    </section>
                   </div>
                 )
 
