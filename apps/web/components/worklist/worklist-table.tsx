@@ -6,11 +6,7 @@ import { memo, useDeferredValue, useState } from 'react'
 import { StatusBadge, type StatusTone } from '@/components/ui-status-badge'
 import {
   ExpandableHeaderLeftCells,
-  ExpandableIconChevron,
   ExpandableRow,
-  type ExpandableRowActionItem,
-  type ExpandableRowMetaItem,
-  type ExpandableRowSubSection,
 } from '@/components/ui-expandable-table'
 import type { WorklistItem } from '@/lib/types'
 import { buildWorklistQueryHref, type WorklistQueryState } from '@/components/worklist/worklist-query'
@@ -74,98 +70,149 @@ const WorklistTableRows = memo(function WorklistTableRows({
         const priorityTone = resolvePriorityTone(item.priority)
         const statusTone = resolveStatusTone(item.status)
 
-        const compactCells: React.ReactNode[] = [
-          <StatusBadge
-            key={`priority-${item.id}`}
-            tone={priorityTone}
-            label={priorityLabel}
-            size="sm"
-            uppercase
-            ariaLabel={`Prioritas item ${item.id}: ${priorityLabel}`}
-          />,
-          <span key={`domain-${item.id}`} className="inline-flex rounded-full bg-surfaceSoft px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">
-            {item.domain}
-          </span>,
-          <span key={`queue-${item.id}`} className="inline-flex rounded-full bg-surfaceSoft px-2.5 py-1 text-xs font-semibold text-inkStrong">
-            {item.queue}
-          </span>,
-          <div key={`title-${item.id}`} className="flex flex-col gap-1">
-            <Link href={selectHref} className="text-sm font-semibold text-inkStrong">
-              {item.title}
-            </Link>
-            <span className="text-xs text-mute">{item.owner || item.subtitle || '-'}</span>
-          </div>,
-          <StatusBadge
-            key={`status-${item.id}`}
-            tone={statusTone}
-            label={item.status}
-            size="sm"
-            ariaLabel={`Status item ${item.id}: ${item.status}`}
-          />,
-          <p key={`next-${item.id}`} className="text-sm text-inkStrong line-clamp-2">
-            {item.nextAction}
-          </p>,
-          <div key={`target-${item.id}`} className="flex flex-col gap-1 text-xs">
-            <span className="text-mute">{item.dueLabel || item.owner || '-'}</span>
-            <span className="font-semibold text-inkStrong">{item.owner || '-'}</span>
-          </div>,
-          <div key={`actions-${item.id}`} className="flex flex-wrap gap-2">
-            <Link
-              href={selectHref}
-              className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-inkStrong hover:border-lineStrong hover:bg-surface"
-            >
-              Buka
-            </Link>
-            <button
-              type="button"
-              onClick={() => setQuickActionItem(item)}
-              className="rounded-full border border-slate-950 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
-            >
-              Aksi Cepat
-            </button>
-          </div>,
-        ]
+        const compactRow = (
+          <>
+            <td className="px-3 py-3 align-top">
+              <StatusBadge
+                tone={priorityTone}
+                label={priorityLabel}
+                size="sm"
+                uppercase
+                ariaLabel={`Prioritas item ${item.id}: ${priorityLabel}`}
+              />
+            </td>
+            <td className="px-3 py-3 align-top text-xs font-medium text-muteStrong">{item.domain}</td>
+            <td className="px-3 py-3 align-top text-xs text-mute">{item.queue}</td>
+            <td className="px-3 py-3 align-top">
+              <Link href={selectHref} className="block space-y-0.5 focus-visible:shadow-focus rounded-control px-0.5 -mx-0.5 py-0.5 hover:opacity-90" aria-label={`Pilih item ${item.title}`}>
+                <p className="text-sm font-semibold text-inkStrong">{item.title}</p>
+                <p className="text-xs text-mute">{item.subtitle || item.owner || '-'}</p>
+              </Link>
+            </td>
+            <td className="px-3 py-3 align-top">
+              <StatusBadge
+                tone={statusTone}
+                label={item.status}
+                size="sm"
+                uppercase
+                ariaLabel={`Status item ${item.id}: ${item.status}`}
+              />
+            </td>
+            <td className="px-3 py-3 align-top max-w-[22rem]">
+              <p className="text-xs leading-5 text-mute line-clamp-2">{item.nextAction || item.detail}</p>
+            </td>
+            <td className="px-3 py-3 align-top">
+              <div className="text-xs text-muteStrong">{item.dueLabel || item.owner || '-'}</div>
+            </td>
+            <td className="px-3 py-3 align-top">
+              <div className="flex flex-col items-stretch gap-1.5 lg:flex-row lg:flex-wrap lg:items-center">
+                <Link
+                  href={item.href}
+                  aria-label={`${item.actionLabel}: ${item.title}`}
+                  className="btn-base btn-primary focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control px-3 text-xs font-semibold transition hover:opacity-90"
+                >
+                  {item.actionLabel}
+                </Link>
+                <Link
+                  href={selectHref}
+                  aria-label={`Lihat detail worklist item ${item.title}`}
+                  className="btn-base btn-secondary focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control px-3 text-xs font-medium transition hover:border-lineStrong"
+                >
+                  Lihat detail
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setQuickActionItem(item)}
+                  aria-label={`Buka aksi cepat untuk ${item.title}`}
+                  className="btn-base btn-ghost focus-visible:shadow-focus tap-44 inline-flex min-h-[2.75rem] items-center justify-center rounded-control border border-line bg-surfaceSoft px-3 text-xs font-medium text-ink transition hover:border-lineStrong hover:text-inkStrong"
+                >
+                  Aksi cepat
+                </button>
+              </div>
+            </td>
+          </>
+        )
 
-        const actions: ExpandableRowActionItem[] = [
-          {
-            key: 'detail',
-            label: 'Detail',
-            tone: 'primary',
-            href: selectHref,
-          },
-          {
-            key: 'quick',
-            label: 'Aksi Cepat',
-            tone: 'primary',
-            onClick: () => setQuickActionItem(item),
-          },
-          {
-            key: 'assign',
-            label: 'Assign',
-            tone: 'default',
-          },
-          {
-            key: 'hold',
-            label: 'Hold',
-            tone: 'warning',
-          },
-        ]
+        const detail = (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href={selectHref}
+                  className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
+                >
+                  Detail
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setQuickActionItem(item)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
+                >
+                  Aksi Cepat
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-lineStrong hover:bg-surface"
+                >
+                  Assign
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:border-amber-400 hover:bg-amber-100"
+                >
+                  Hold
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Dibuat</span>
+                  <span className="tabular-nums text-slate-900">{item.dueLabel ?? '-'}</span>
+                  <span className="text-mute" aria-hidden>•</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Domain</span>
+                  <span className="tabular-nums text-slate-900">{item.domain}</span>
+                  <span className="text-mute" aria-hidden>•</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">PIC</span>
+                  <span className="tabular-nums text-slate-900">{item.owner ?? '-'}</span>
+                  <span className="text-mute" aria-hidden>•</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                  <span className="tabular-nums text-slate-900">{item.status}</span>
+                </div>
+              </div>
+            </div>
 
-        const meta: ExpandableRowMetaItem[] = [
-          { label: 'Dibuat', value: item.dueLabel ?? '-' },
-          { label: 'Domain', value: item.domain },
-          { label: 'PIC', value: item.owner ?? '-' },
-          { label: 'Status', value: item.status },
-        ]
-
-        const subSections: ExpandableRowSubSection[] = [
-          {
-            key: 'detail',
-            title: 'Detil Pekerjaan',
-            columns: ['Judul', 'Prioritas', 'Status', 'Next Action'],
-            rows: [[item.title, priorityLabel, item.status, item.nextAction ?? '-']],
-          },
-        ]
+            <section className="space-y-2">
+              <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                Detil Pekerjaan
+              </h4>
+              <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Judul</th>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Prioritas</th>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Status</th>
+                      <th className="text-xs font-semibold uppercase tracking-wider text-mute">Next Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.title}</td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{priorityLabel}</td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800">{item.status}</td>
+                      <td className="px-4 py-3 align-top text-sm text-slate-800 leading-6">{item.nextAction ?? '-'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        )
 
         return (
           <ExpandableRow
@@ -173,11 +220,9 @@ const WorklistTableRows = memo(function WorklistTableRows({
             id={item.id}
             num={idx + 1}
             totalCols={totalCols}
-            compactCells={compactCells}
+            compactRow={compactRow}
+            detail={detail}
             tone={active ? 'muted' : 'default'}
-            actions={actions}
-            meta={meta}
-            subSections={subSections}
           />
         )
       })}
@@ -351,7 +396,7 @@ export function WorklistTable({ items, selectedItemId, state }: WorklistTablePro
         <table className="data-table min-w-[1120px]">
           <thead>
             <tr>
-              <ExpandableHeaderLeftCells colSpanNumber={2} />
+              <ExpandableHeaderLeftCells />
               <th className="w-[8rem]">Prioritas</th>
               <th className="w-[8rem]">Domain</th>
               <th className="w-[10rem]">Antrean</th>

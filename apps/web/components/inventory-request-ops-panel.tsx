@@ -268,53 +268,27 @@ export function InventoryRequestOpsPanel({
                 const requestBarcodeHref = getRowBarcodeHref(row)
                 const movementBarcodeHref = getRowBarcodeHref(audit?.movement)
 
-                const compactTopRow = (
-                  <div className="flex flex-col gap-1">
-                    <p className="text-[15px] font-bold text-slate-950 leading-snug">{row.primary}</p>
-                    <p className="text-sm text-slate-600">{row.secondary}</p>
+                const compactTop = (
+                  <div className="flex flex-col gap-1 lg:flex-row lg:items-start lg:justify-between w-full">
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[15px] font-bold text-slate-950 leading-snug">{row.primary}</p>
+                      <p className="text-sm text-slate-600">{row.secondary}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {requestBarcodeHref ? (
+                        <Link
+                          href={requestBarcodeHref}
+                          className="badge border-slate-300 bg-slate-950 text-white transition hover:bg-slate-800"
+                        >
+                          Buka Barcode
+                        </Link>
+                      ) : null}
+                      <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                    </div>
                   </div>
                 )
 
-                const compactBottomRow = <p className="text-sm leading-6 text-slate-700">{row.detail}</p>
-
-                const statusBadge = <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
-
-                const actions = [
-                  requestBarcodeHref
-                    ? {
-                        key: 'barcode',
-                        label: 'Buka Barcode',
-                        tone: 'primary' as const,
-                        href: requestBarcodeHref,
-                      }
-                    : null,
-                  {
-                    key: 'status',
-                    label: 'Update Status',
-                    tone: 'primary' as const,
-                  },
-                  normalizeText(row.status) !== 'SELESAI'
-                    ? {
-                        key: 'movement',
-                        label: 'Buat Movement',
-                        tone: 'success' as const,
-                        href: `/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=REQUEST&requestId=${row.id}#inventory-action-stock-movement`,
-                      }
-                    : null,
-                  {
-                    key: 'detail',
-                    label: 'Detail Lengkap',
-                    tone: 'default' as const,
-                  },
-                ].filter(Boolean) as NonNullable<Parameters<typeof ExpandableCardRow>['0']['actions']>
-
-                const meta = [
-                  { label: 'Sub-divisi', value: subdivision || '-' },
-                  { label: 'Untuk', value: requestedFor || '-' },
-                  { label: 'Requested', value: requestedAt || '-' },
-                ]
-
-                const subSections: NonNullable<Parameters<typeof ExpandableCardRow>['0']['subSections']> = []
+                const compactBottom = <p className="text-sm leading-6 text-slate-700">{row.detail}</p>
 
                 const badges: { key: string; tone: string; text: string; href?: string }[] = []
                 if (audit?.movement) {
@@ -360,71 +334,128 @@ export function InventoryRequestOpsPanel({
                   })
                 }
 
-                if (badges.length) {
-                  subSections.push({
-                    key: 'badges',
-                    title: 'Info & Shortcut',
-                    content: (
-                      <div className="flex flex-wrap gap-2">
-                        {badges.map((b) =>
-                          b.href ? (
-                            <Link
-                              key={b.key}
-                              href={b.href}
-                              className={`badge ${b.tone} transition hover:opacity-90`}
-                            >
-                              {b.text}
-                            </Link>
-                          ) : (
-                            <span key={b.key} className={`badge ${b.tone}`}>
-                              {b.text}
-                            </span>
-                          ),
-                        )}
+                const detail = (
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="flex flex-wrap items-center gap-3">
+                        {requestBarcodeHref ? (
+                          <Link
+                            href={requestBarcodeHref}
+                            className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
+                          >
+                            Buka Barcode
+                          </Link>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-100"
+                        >
+                          Update Status
+                        </button>
+                        {normalizeText(row.status) !== 'SELESAI' ? (
+                          <Link
+                            href={`/inventory/movements?inventoryAction=stock-movement&movementType=OUT&referenceType=REQUEST&requestId=${row.id}#inventory-action-stock-movement`}
+                            className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100"
+                          >
+                            Buat Movement
+                          </Link>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-lineStrong hover:bg-surface"
+                        >
+                          Detail Lengkap
+                        </button>
                       </div>
-                    ),
-                  })
-                }
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Sub-divisi</span>
+                          <span className="tabular-nums text-slate-900">{subdivision || '-'}</span>
+                          <span className="text-mute" aria-hidden>•</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Untuk</span>
+                          <span className="tabular-nums text-slate-900">{requestedFor || '-'}</span>
+                          <span className="text-mute" aria-hidden>•</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold uppercase tracking-[0.14em] text-mute">Requested</span>
+                          <span className="tabular-nums text-slate-900">{requestedAt || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
 
-                if (audit?.movement) {
-                  subSections.push({
-                    key: 'audit-mv',
-                    title: 'Audit Movement Terkait',
-                    columns: ['Movement ID', 'Status', 'Detail'],
-                    rows: [
-                      [
-                        movementBarcodeHref ? (
-                          <>
-                            <span className="tabular-nums font-semibold">{audit.movement.primary}</span>
-                            <span className="ml-2">·</span>
-                            <Link
-                              href={movementBarcodeHref}
-                              className="ml-2 inline-flex rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
-                            >
-                              Barcode
-                            </Link>
-                          </>
-                        ) : (
-                          <span className="font-semibold text-slate-900">{audit.movement.primary}</span>
-                        ),
-                        <span>{audit.movement.status || '-'}</span>,
-                        <span className="leading-6">{audit.movement.detail}</span>,
-                      ],
-                    ],
-                  })
-                }
+                    {badges.length ? (
+                      <section className="space-y-2">
+                        <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                          Info & Shortcut
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {badges.map((b) =>
+                            b.href ? (
+                              <Link
+                                key={b.key}
+                                href={b.href}
+                                className={`badge ${b.tone} transition hover:opacity-90`}
+                              >
+                                {b.text}
+                              </Link>
+                            ) : (
+                              <span key={b.key} className={`badge ${b.tone}`}>
+                                {b.text}
+                              </span>
+                            ),
+                          )}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    {audit?.movement ? (
+                      <section className="space-y-2">
+                        <h4 className="font-[family-name:var(--font-heading)] text-base font-semibold tracking-tight text-slate-950">
+                          Audit Movement Terkait
+                        </h4>
+                        <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th className="text-xs font-semibold uppercase tracking-wider text-mute">Movement ID</th>
+                                <th className="text-xs font-semibold uppercase tracking-wider text-mute">Status</th>
+                                <th className="text-xs font-semibold uppercase tracking-wider text-mute">Detail</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td className="px-4 py-3 align-top text-sm text-slate-800">
+                                  <span className="tabular-nums font-semibold">{audit.movement.primary}</span>
+                                  {movementBarcodeHref ? (
+                                    <Link
+                                      href={movementBarcodeHref}
+                                      className="ml-3 inline-flex rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
+                                    >
+                                      Barcode
+                                    </Link>
+                                  ) : null}
+                                </td>
+                                <td className="px-4 py-3 align-top text-sm text-slate-800">{audit.movement.status || '-'}</td>
+                                <td className="px-4 py-3 align-top text-sm text-slate-800 leading-6">{audit.movement.detail}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </section>
+                    ) : null}
+                  </div>
+                )
 
                 return (
                   <ExpandableCardRow
                     key={row.id}
                     id={row.id}
                     num={rIdx + 1}
-                    compactTopRow={compactTopRow}
-                    compactBottomRow={compactBottomRow}
-                    statusBadge={statusBadge}
-                    actions={actions}
-                    meta={meta}
-                    subSections={subSections}
+                    compactTop={compactTop}
+                    compactBottom={compactBottom}
+                    detail={detail}
                   />
                 )
               })
