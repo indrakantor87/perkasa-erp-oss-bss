@@ -4,6 +4,8 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useState } from 'react'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
+import { ExpandableCardRow } from '@/components/ui-expandable-card'
 import { WorklistDetailPanel } from '@/components/worklist/worklist-detail-panel'
 import { getRoleMeta } from '@/lib/role-meta'
 import { buildSupportLaneHref } from '@/lib/support-action-links'
@@ -466,84 +468,195 @@ export function CsAdminWorkspaceDashboard({
               <div className="mt-6 hidden overflow-hidden rounded-3xl border border-slate-200 xl:block">
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
-                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      <ExpandableHeaderLeftCells />
                       <th className="px-4 py-3">Item</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Ringkasan</th>
                       <th className="px-4 py-3">Metadata</th>
                       <th className="px-4 py-3">Arah</th>
-                      <th className="px-4 py-3">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
-                    {activeBucket.items.map((item) => {
+                    {activeBucket.items.map((item, idx) => {
                       const active = item.id === selectedItem?.id
                       const selectHref = buildWorkspaceHref({ queue: activeBucket.queue, selected: item.id })
                       const metaItems = buildAdminMetaItems(item)
+                      const totalCols = 7
+                      const rowTone: 'default' | 'muted' =
+                        ['CLOSE', 'DONE', 'READY'].includes(item.status.trim().toUpperCase()) ? 'muted' : 'default'
+
+                      const actionButtons = (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setQuickActionItem(item)}
+                            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                          >
+                            Aksi cepat
+                          </button>
+                          <Link
+                            href={item.href}
+                            className="inline-flex items-center justify-center rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                          >
+                            {item.actionLabel}
+                          </Link>
+                        </>
+                      )
+
+                      const detail = (
+                        <div className="space-y-5">
+                          <div>
+                            <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                            <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                              <table className="data-table">
+                                <tbody className="divide-y divide-line text-sm">
+                                  <tr>
+                                    <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Domain</td>
+                                    <td className="px-4 py-2">
+                                      <span className={`badge ${getDomainTone(item.domain)}`}>{item.domain}</span>
+                                      <span className={`ml-2 badge ${priorityTone[item.priority]}`}>{item.priority}</span>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Item</td>
+                                    <td className="px-4 py-2">
+                                      <Link href={selectHref} className="block space-y-1 hover:opacity-90">
+                                        <p className="text-sm font-semibold text-slate-950">{item.title}</p>
+                                        <p className="text-sm text-slate-600">{item.subtitle}</p>
+                                      </Link>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Status</td>
+                                    <td className="px-4 py-2">
+                                      <div className="space-y-1">
+                                        <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
+                                        <p className="text-xs leading-5 text-slate-500">{item.dueLabel || 'Belum ada target eksplisit'}</p>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Ringkasan</td>
+                                    <td className="px-4 py-2">
+                                      <div className="space-y-2">
+                                        <p className="text-sm leading-6 text-slate-700">{item.detail}</p>
+                                        <p className="text-xs leading-5 text-slate-500">
+                                          {item.nextAction || item.reason || 'Supervisor membaca konteks lalu memutuskan tindak lanjut berikutnya.'}
+                                        </p>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Metadata</td>
+                                    <td className="px-4 py-2">
+                                      <div className="flex flex-wrap gap-2">
+                                        {metaItems.length ? (
+                                          metaItems.map((meta) => (
+                                            <span key={`${item.id}-${meta}`} className="badge border-slate-200 bg-slate-50 text-slate-600">
+                                              {meta}
+                                            </span>
+                                          ))
+                                        ) : (
+                                          <span className="text-xs leading-5 text-slate-500">Belum ada metadata admin tambahan.</span>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Arah</td>
+                                    <td className="px-4 py-2">
+                                      <div className="space-y-1">
+                                        <p className="text-sm font-semibold text-slate-950">{item.actionLabel}</p>
+                                        <p className="text-xs leading-5 text-slate-500">{item.reason || 'Buka detail untuk melihat alasan lengkap item masuk ke antrean supervisor.'}</p>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">Domain</span>
+                            <span className="tabular-nums text-slate-900">{item.domain}</span>
+                            <span className="text-mute" aria-hidden>•</span>
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">Priority</span>
+                            <span className="tabular-nums text-slate-900">{item.priority}</span>
+                            <span className="text-mute" aria-hidden>•</span>
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                            <span className="tabular-nums text-slate-900">{item.status}</span>
+                            <span className="text-mute" aria-hidden>•</span>
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">Item ID</span>
+                            <span className="tabular-nums font-mono text-xs text-slate-900">{item.id}</span>
+                            <span className="text-mute" aria-hidden>•</span>
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">PIC Count</span>
+                            <span className="tabular-nums text-slate-900">{String(item.handoffLinks?.length ?? 0)}</span>
+                          </div>
+                          <div className="border-t border-line pt-3">
+                            <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                            <div className="flex flex-wrap gap-3 items-center">
+                              {actionButtons}
+                            </div>
+                          </div>
+                        </div>
+                      )
 
                       return (
-                        <tr key={item.id} className={active ? 'bg-slate-50' : ''}>
-                          <td className="px-4 py-3 align-top">
-                            <Link href={selectHref} className="block space-y-1 hover:opacity-90">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className={`badge ${getDomainTone(item.domain)}`}>{item.domain}</span>
-                                <span className={`badge ${priorityTone[item.priority]}`}>{item.priority}</span>
-                              </div>
-                              <p className="pt-1 text-sm font-semibold text-slate-950">{item.title}</p>
-                              <p className="text-sm text-slate-600">{item.subtitle}</p>
-                            </Link>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <div className="space-y-2">
-                              <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
-                              <p className="text-xs leading-5 text-slate-500">{item.dueLabel || 'Belum ada target eksplisit'}</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <div className="space-y-2">
-                              <p className="text-sm leading-6 text-slate-700 line-clamp-2">{item.detail}</p>
-                              <p className="text-xs leading-5 text-slate-500 line-clamp-2">
-                                {item.nextAction || item.reason || 'Supervisor membaca konteks lalu memutuskan tindak lanjut berikutnya.'}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <div className="flex flex-wrap gap-2">
-                              {metaItems.length ? (
-                                metaItems.map((meta) => (
-                                  <span key={`${item.id}-${meta}`} className="badge border-slate-200 bg-slate-50 text-slate-600">
-                                    {meta}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-xs leading-5 text-slate-500">Belum ada metadata admin tambahan.</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <div className="space-y-1">
-                              <p className="text-sm font-semibold text-slate-950">{item.actionLabel}</p>
-                              <p className="text-xs leading-5 text-slate-500">{item.reason || 'Buka detail untuk melihat alasan lengkap item masuk ke antrean supervisor.'}</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setQuickActionItem(item)}
-                                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-                              >
-                                Aksi cepat
-                              </button>
-                              <Link
-                                href={item.href}
-                                className="inline-flex items-center justify-center rounded-full bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                              >
-                                {item.actionLabel}
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
+                        <ExpandableRow
+                          key={item.id}
+                          id={item.id}
+                          num={idx + 1}
+                          totalCols={totalCols}
+                          tone={rowTone}
+                          compactRow={
+                            <>
+                              <td className="px-4 py-3 align-top">
+                                <Link href={selectHref} className="block space-y-1 hover:opacity-90">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className={`badge ${getDomainTone(item.domain)}`}>{item.domain}</span>
+                                    <span className={`badge ${priorityTone[item.priority]}`}>{item.priority}</span>
+                                  </div>
+                                  <p className="pt-1 text-sm font-semibold text-slate-950">{item.title}</p>
+                                  <p className="text-sm text-slate-600">{item.subtitle}</p>
+                                </Link>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <div className="space-y-2">
+                                  <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
+                                  <p className="text-xs leading-5 text-slate-500">{item.dueLabel || 'Belum ada target eksplisit'}</p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <div className="space-y-2">
+                                  <p className="text-sm leading-6 text-slate-700 line-clamp-2">{item.detail}</p>
+                                  <p className="text-xs leading-5 text-slate-500 line-clamp-2">
+                                    {item.nextAction || item.reason || 'Supervisor membaca konteks lalu memutuskan tindak lanjut berikutnya.'}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <div className="flex flex-wrap gap-2">
+                                  {metaItems.length ? (
+                                    metaItems.map((meta) => (
+                                      <span key={`${item.id}-${meta}`} className="badge border-slate-200 bg-slate-50 text-slate-600">
+                                        {meta}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-xs leading-5 text-slate-500">Belum ada metadata admin tambahan.</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <div className="space-y-1">
+                                  <p className="text-sm font-semibold text-slate-950">{item.actionLabel}</p>
+                                  <p className="text-xs leading-5 text-slate-500">{item.reason || 'Buka detail untuk melihat alasan lengkap item masuk ke antrean supervisor.'}</p>
+                                </div>
+                              </td>
+                            </>
+                          }
+                          detail={detail}
+                        />
                       )
                     })}
                   </tbody>
@@ -551,51 +664,119 @@ export function CsAdminWorkspaceDashboard({
               </div>
 
               <div className="mt-6 grid gap-4 xl:hidden">
-                {activeBucket.items.map((item) => {
+                {activeBucket.items.map((item, idx) => {
                   const active = item.id === selectedItem?.id
                   const selectHref = buildWorkspaceHref({ queue: activeBucket.queue, selected: item.id })
+                  const metaItems = buildAdminMetaItems(item)
+
+                  const actionButtons = (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setQuickActionItem(item)}
+                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                      >
+                        Aksi cepat
+                      </button>
+                      <Link
+                        href={item.href}
+                        className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                      >
+                        {item.actionLabel}
+                      </Link>
+                    </>
+                  )
+
+                  const detail = (
+                    <div className="space-y-5">
+                      <div>
+                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                        <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                          <table className="data-table">
+                            <tbody className="divide-y divide-line text-sm">
+                              <tr>
+                                <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Status</td>
+                                <td className="px-4 py-2">
+                                  <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
+                                  <p className="mt-1 text-xs leading-5 text-slate-500">{item.dueLabel || 'Belum ada target eksplisit'}</p>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Ringkasan</td>
+                                <td className="px-4 py-2">
+                                  <div className="space-y-2">
+                                    <p className="text-sm leading-6 text-slate-700">{item.detail}</p>
+                                    <p className="text-xs leading-5 text-slate-500">
+                                      {item.nextAction || item.reason || 'Baca detail item lalu tentukan approval, koreksi, transfer, atau handoff berikutnya.'}
+                                    </p>
+                                  </div>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Arah</td>
+                                <td className="px-4 py-2">
+                                  <div className="space-y-1">
+                                    <p className="text-sm font-semibold text-slate-950">{item.actionLabel}</p>
+                                    <p className="text-xs leading-5 text-slate-500">{item.reason || 'Buka detail untuk melihat alasan lengkap.'}</p>
+                                  </div>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Metadata</td>
+                                <td className="px-4 py-2">
+                                  <div className="flex flex-wrap gap-2">
+                                    {metaItems.map((meta) => (
+                                      <span key={`mobile-meta-${item.id}-${meta}`} className="badge border-slate-200 bg-slate-50 text-slate-600">
+                                        {meta}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Domain</span>
+                        <span className="tabular-nums text-slate-900">{item.domain}</span>
+                        <span className="text-mute" aria-hidden>•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Priority</span>
+                        <span className="tabular-nums text-slate-900">{item.priority}</span>
+                        <span className="text-mute" aria-hidden>•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                        <span className="tabular-nums text-slate-900">{item.status}</span>
+                      </div>
+                      <div className="border-t border-line pt-3">
+                        <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                        <div className="flex flex-wrap gap-3 items-center">
+                          {actionButtons}
+                        </div>
+                      </div>
+                    </div>
+                  )
 
                   return (
-                    <article
+                    <ExpandableCardRow
                       key={item.id}
-                      className={`rounded-3xl border p-4 ${active ? 'border-slate-950 bg-slate-50' : 'border-slate-200 bg-white'}`}
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`badge ${getDomainTone(item.domain)}`}>{item.domain}</span>
-                        <span className={`badge ${priorityTone[item.priority]}`}>{item.priority}</span>
-                        <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
-                      </div>
-                      <Link href={selectHref} className="mt-4 block text-base font-semibold text-slate-950 hover:opacity-90">
-                        {item.title}
-                      </Link>
-                      <p className="mt-1 text-sm font-medium text-slate-700">{item.subtitle}</p>
-                      <p className="mt-2 text-sm leading-6 text-mute line-clamp-3">{item.detail}</p>
-                      <p className="mt-2 text-xs leading-5 text-slate-500 line-clamp-2">
-                        {item.nextAction || item.reason || 'Baca detail item lalu tentukan approval, koreksi, transfer, atau handoff berikutnya.'}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {buildAdminMetaItems(item).map((meta) => (
-                          <span key={`${item.id}-${meta}`} className="badge border-slate-200 bg-slate-50 text-slate-600">
-                            {meta}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setQuickActionItem(item)}
-                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-                        >
-                          Aksi cepat
-                        </button>
-                        <Link
-                          href={item.href}
-                          className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                        >
-                          {item.actionLabel}
-                        </Link>
-                      </div>
-                    </article>
+                      id={item.id}
+                      num={idx + 1}
+                      compactTop={
+                        <div className={`min-w-0 ${active ? '' : ''}`}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`badge ${getDomainTone(item.domain)}`}>{item.domain}</span>
+                            <span className={`badge ${priorityTone[item.priority]}`}>{item.priority}</span>
+                            <span className={`badge ${getStatusTone(item.status)}`}>{item.status}</span>
+                          </div>
+                          <Link href={selectHref} className="mt-3 block text-base font-semibold text-slate-950 hover:opacity-90">
+                            {item.title}
+                          </Link>
+                          <p className="mt-1 text-sm font-medium text-slate-700">{item.subtitle}</p>
+                          <p className="mt-2 text-sm leading-6 text-mute line-clamp-2">{item.detail}</p>
+                        </div>
+                      }
+                      detail={detail}
+                    />
                   )
                 })}
               </div>

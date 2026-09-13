@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
+import { ExpandableCardRow } from '@/components/ui-expandable-card'
 import { SalesCorporateAcceptanceCreateForm } from '@/components/sales-corporate-acceptance-create-form'
 import { SalesCorporateContractCreateForm } from '@/components/sales-corporate-contract-create-form'
 import { SalesCorporateDeliveryCreateForm } from '@/components/sales-corporate-delivery-create-form'
@@ -935,7 +937,8 @@ export function SalesDomainWorkspace({
         <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white shadow-sm lg:block hidden">
           <table className="min-w-[1280px] w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
-              <tr className="text-left text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              <tr className="text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                <ExpandableHeaderLeftCells />
                 <th className="w-[120px] px-3 py-3">Tahap</th>
                 <th className="w-[170px] px-3 py-3">Referensi</th>
                 <th className="w-[220px] px-3 py-3">Nama Pelanggan / Area</th>
@@ -946,125 +949,14 @@ export function SalesDomainWorkspace({
                 <th className="w-[110px] px-3 py-3">Status</th>
                 <th className="px-3 py-3">Keterangan</th>
                 <th className="w-[240px] px-3 py-3">PIC / Konteks</th>
-                <th className="w-[110px] px-3 py-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
-              {visibleRows.map(({ sectionTitle, row, action, primaryMeta, marketingName, bucket, phone, referenceValue, dateLabel, dateValue, stageLabel }) => (
-                <tr key={`${sectionTitle}-${row.id}`} className={`align-top transition-colors hover:bg-slate-50 ${getSalesBucketTone(bucket)}`}>
-                  <td className="px-3 py-2 text-xs text-slate-600">
-                    <p className="font-medium text-slate-950">{stageLabel}</p>
-                    <p className="mt-1 text-slate-500">{sectionTitle}</p>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-slate-600">
-                    <p className="font-semibold text-slate-950">{row.primary}</p>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      <span className={`badge ${getSalesBucketPillTone(bucket)}`}>{getSalesBucketLabel(bucket)}</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-slate-700">
-                    <p className="leading-5">{row.secondary}</p>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-sky-700">{marketingName || '-'}</td>
-                  <td className="px-3 py-2 text-xs text-slate-700">{phone || '-'}</td>
-                  <td className="px-3 py-2 text-xs text-slate-700">
-                    <p className="text-slate-500">{dateLabel}</p>
-                    <p className="mt-1">{dateValue || '-'}</p>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-slate-700">{referenceValue || '-'}</td>
-                  <td className="px-3 py-2 text-xs">
-                    <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-slate-700">
-                    <p className="line-clamp-2 leading-5">{row.detail}</p>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-slate-600">
-                    <div className="flex max-w-sm flex-wrap gap-2">
-                      {primaryMeta.map((item) => (
-                        <span key={`${row.id}-${item}`} className="badge border-line surface-soft text-mute">
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-right text-xs">
-                    {action ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setQuickActionItem(
-                            buildSalesQuickActionPayload({
-                              sectionTitle,
-                              row,
-                              permission: actionPermission,
-                            }),
-                          )
-                        }
-                        className="inline-flex items-center justify-center rounded-md border border-line bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50"
-                      >
-                        Aksi cepat
-                      </button>
-                    ) : (
-                      <span className="text-slate-400">Monitor</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              {visibleRows.map(({ sectionTitle, row, action, primaryMeta, marketingName, bucket, phone, referenceValue, dateLabel, dateValue, stageLabel }, idx) => {
+                const totalCols = 12
+                const rowTone: 'default' | 'muted' = bucket === 'CLOSE' ? 'muted' : 'default'
 
-        <div className="mt-4 space-y-3 lg:hidden">
-          {visibleRows.map(({ sectionTitle, row, action, primaryMeta, marketingName, bucket, phone, referenceValue, dateLabel, dateValue, stageLabel }) => (
-            <article
-              key={`mobile-${sectionTitle}-${row.id}`}
-              className={`rounded-2xl border p-3 shadow-sm bg-white ${getSalesBucketTone(bucket)}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-950">{row.primary}</p>
-                  <p className="mt-1 text-sm text-slate-700">{row.secondary}</p>
-                </div>
-                <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="badge border-line surface-soft text-mute">{stageLabel}</span>
-                <span className={`badge ${getSalesBucketPillTone(bucket)}`}>{getSalesBucketLabel(bucket)}</span>
-                {marketingName ? <span className="badge border-line surface-soft text-mute">{marketingName}</span> : null}
-              </div>
-
-              <p className="mt-3 text-sm leading-5 text-slate-700">{row.detail}</p>
-
-              <div className="mt-3 space-y-2">
-                <div className="grid grid-cols-2 gap-3 text-xs text-slate-700">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">No WA</p>
-                    <p className="mt-1">{phone || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">{dateLabel}</p>
-                    <p className="mt-1">{dateValue || '-'}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">Ref Lanjutan</p>
-                    <p className="mt-1">{referenceValue || '-'}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">PIC / Konteks</p>
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    {primaryMeta.map((item) => (
-                      <span key={`mobile-meta-${row.id}-${item}`} className="badge border-line surface-soft text-mute">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-end">
-                {action ? (
+                const actionButton = action ? (
                   <button
                     type="button"
                     onClick={() =>
@@ -1081,11 +973,250 @@ export function SalesDomainWorkspace({
                     Aksi cepat
                   </button>
                 ) : (
-                  <span className="text-sm text-slate-400">Monitor</span>
-                )}
+                  <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-500">
+                    Monitor
+                  </span>
+                )
+
+                const detail = (
+                  <div className="space-y-5">
+                    <div>
+                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                        <table className="data-table">
+                          <tbody className="divide-y divide-line text-sm">
+                            <tr>
+                              <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Tahap</td>
+                              <td className="px-4 py-2">
+                                <p className="font-medium text-slate-950">{stageLabel}</p>
+                                <p className="mt-0.5 text-xs text-slate-500">{sectionTitle}</p>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Referensi</td>
+                              <td className="px-4 py-2">
+                                <p className="font-semibold text-slate-900">{row.primary}</p>
+                                <div className="mt-1 flex flex-wrap gap-2">
+                                  <span className={`badge ${getSalesBucketPillTone(bucket)}`}>{getSalesBucketLabel(bucket)}</span>
+                                </div>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Nama Pelanggan / Area</td>
+                              <td className="px-4 py-2 text-slate-700 leading-5">{row.secondary}</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Keterangan</td>
+                              <td className="px-4 py-2 text-slate-700 leading-5">{row.detail}</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">PIC / Konteks</td>
+                              <td className="px-4 py-2">
+                                <div className="flex flex-wrap gap-2">
+                                  {primaryMeta.map((item) => (
+                                    <span key={`${row.id}-${item}`} className="badge border-line surface-soft text-mute">
+                                      {item}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                      <span className="font-semibold uppercase tracking-[0.14em] text-mute">Bucket</span>
+                      <span className="tabular-nums text-slate-900">{getSalesBucketLabel(bucket)}</span>
+                      <span className="text-mute" aria-hidden>•</span>
+                      <span className="font-semibold uppercase tracking-[0.14em] text-mute">Marketing</span>
+                      <span className="tabular-nums text-slate-900">{marketingName || '-'}</span>
+                      <span className="text-mute" aria-hidden>•</span>
+                      <span className="font-semibold uppercase tracking-[0.14em] text-mute">No WA</span>
+                      <span className="tabular-nums text-slate-900">{phone || '-'}</span>
+                      <span className="text-mute" aria-hidden>•</span>
+                      <span className="font-semibold uppercase tracking-[0.14em] text-mute">{dateLabel}</span>
+                      <span className="tabular-nums text-slate-900">{dateValue || '-'}</span>
+                      <span className="text-mute" aria-hidden>•</span>
+                      <span className="font-semibold uppercase tracking-[0.14em] text-mute">Ref Lanjutan</span>
+                      <span className="tabular-nums text-slate-900">{referenceValue || '-'}</span>
+                      <span className="text-mute" aria-hidden>•</span>
+                      <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                      <span className="tabular-nums text-slate-900">{row.status}</span>
+                    </div>
+                    <div className="border-t border-line pt-3">
+                      <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                      <div className="flex flex-wrap gap-3 items-center">
+                        {actionButton}
+                      </div>
+                    </div>
+                  </div>
+                )
+
+                return (
+                  <ExpandableRow
+                    key={`${sectionTitle}-${row.id}`}
+                    id={`${sectionTitle}-${row.id}`}
+                    num={idx + 1}
+                    totalCols={totalCols}
+                    tone={rowTone}
+                    compactRow={
+                      <>
+                        <td className="px-3 py-2 text-xs text-slate-600">
+                          <p className="font-medium text-slate-950">{stageLabel}</p>
+                          <p className="mt-1 text-slate-500">{sectionTitle}</p>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-slate-600">
+                          <p className="font-semibold text-slate-950">{row.primary}</p>
+                          <div className="mt-1 flex flex-wrap gap-2">
+                            <span className={`badge ${getSalesBucketPillTone(bucket)}`}>{getSalesBucketLabel(bucket)}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-slate-700">
+                          <p className="leading-5">{row.secondary}</p>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-sky-700">{marketingName || '-'}</td>
+                        <td className="px-3 py-2 text-xs text-slate-700">{phone || '-'}</td>
+                        <td className="px-3 py-2 text-xs text-slate-700">
+                          <p className="text-slate-500">{dateLabel}</p>
+                          <p className="mt-1">{dateValue || '-'}</p>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-slate-700">{referenceValue || '-'}</td>
+                        <td className="px-3 py-2 text-xs">
+                          <span className={`badge ${getStatusTone(row.status)}`}>{row.status}</span>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-slate-700">
+                          <p className="line-clamp-2 leading-5">{row.detail}</p>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-slate-600">
+                          <div className="flex max-w-sm flex-wrap gap-2">
+                            {primaryMeta.map((item) => (
+                              <span key={`${row.id}-${item}`} className="badge border-line surface-soft text-mute">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </>
+                    }
+                    detail={detail}
+                  />
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 space-y-3 lg:hidden">
+          {visibleRows.map(({ sectionTitle, row, action, primaryMeta, marketingName, bucket, phone, referenceValue, dateLabel, dateValue, stageLabel }, idx) => {
+            const actionButton = action ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setQuickActionItem(
+                    buildSalesQuickActionPayload({
+                      sectionTitle,
+                      row,
+                      permission: actionPermission,
+                    }),
+                  )
+                }
+                className="inline-flex items-center justify-center rounded-md border border-line bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-50"
+              >
+                Aksi cepat
+              </button>
+            ) : (
+              <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-500">
+                Monitor
+              </span>
+            )
+
+            const detail = (
+              <div className="space-y-5">
+                <div>
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                  <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                    <table className="data-table">
+                      <tbody className="divide-y divide-line text-sm">
+                        <tr>
+                          <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Tahap</td>
+                          <td className="px-4 py-2 text-slate-900">{stageLabel}</td>
+                        </tr>
+                        <tr>
+                          <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">{dateLabel}</td>
+                          <td className="px-4 py-2 text-slate-700">{dateValue || '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Ref Lanjutan</td>
+                          <td className="px-4 py-2 text-slate-700">{referenceValue || '-'}</td>
+                        </tr>
+                        <tr>
+                          <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Keterangan</td>
+                          <td className="px-4 py-2 text-slate-700 leading-5">{row.detail}</td>
+                        </tr>
+                        <tr>
+                          <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">PIC / Konteks</td>
+                          <td className="px-4 py-2">
+                            <div className="flex flex-wrap gap-2">
+                              {primaryMeta.map((item) => (
+                                <span key={`mobile-${row.id}-${item}`} className="badge border-line surface-soft text-mute">
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Bucket</span>
+                  <span className="tabular-nums text-slate-900">{getSalesBucketLabel(bucket)}</span>
+                  <span className="text-mute" aria-hidden>•</span>
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Marketing</span>
+                  <span className="tabular-nums text-slate-900">{marketingName || '-'}</span>
+                  <span className="text-mute" aria-hidden>•</span>
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">No WA</span>
+                  <span className="tabular-nums text-slate-900">{phone || '-'}</span>
+                  <span className="text-mute" aria-hidden>•</span>
+                  <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                  <span className="tabular-nums text-slate-900">{row.status}</span>
+                </div>
+                <div className="border-t border-line pt-3">
+                  <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                  <div className="flex flex-wrap gap-3 items-center">
+                    {actionButton}
+                  </div>
+                </div>
               </div>
-            </article>
-          ))}
+            )
+
+            return (
+              <ExpandableCardRow
+                key={`mobile-${sectionTitle}-${row.id}`}
+                id={`mobile-${sectionTitle}-${row.id}`}
+                num={idx + 1}
+                compactTop={
+                  <div className="min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-950 truncate">{row.primary}</p>
+                        <p className="mt-1 text-sm text-slate-700 line-clamp-2">{row.secondary}</p>
+                      </div>
+                      <span className={`badge ${getStatusTone(row.status)} shrink-0`}>{row.status}</span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="badge border-line surface-soft text-mute">{stageLabel}</span>
+                      <span className={`badge ${getSalesBucketPillTone(bucket)}`}>{getSalesBucketLabel(bucket)}</span>
+                      {marketingName ? <span className="badge border-line surface-soft text-mute">{marketingName}</span> : null}
+                    </div>
+                  </div>
+                }
+                detail={detail}
+              />
+            )
+          })}
         </div>
           </section>
         </>

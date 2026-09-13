@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import type { AppRole } from '@/lib/types'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 
 type SalesEntityKey =
   | 'leads'
@@ -532,118 +533,214 @@ export function SalesDomainListPage(props: SalesDomainListPageProps) {
         </div>
       )
     }
+    const totalCols = 7
     return (
       <div className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-inset ${tone.ring}`}>
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50">
-            <tr>
+            <tr className="text-[11px] font-bold uppercase tracking-[0.18em] text-mute">
+              <ExpandableHeaderLeftCells />
               <th scope="col" className="px-4 py-3 text-left font-semibold text-slate-600">ID</th>
               <th scope="col" className="px-4 py-3 text-left font-semibold text-slate-600">Primary</th>
               <th scope="col" className="px-4 py-3 text-left font-semibold text-slate-600">Keterangan</th>
               <th scope="col" className="px-4 py-3 text-left font-semibold text-slate-600">Status</th>
               <th scope="col" className="px-4 py-3 text-left font-semibold text-slate-600">Diperbarui</th>
-              <th scope="col" className="px-4 py-3 text-left font-semibold text-slate-600">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
-            {rows.map((row) => {
+            {rows.map((row, idx) => {
               const nextStages = buildRowNextStageLinks(entityKey, row)
               const hasNext = nextStages.length > 0
               const allowTransition = !isStatusClosed(row.status) && (canCreate || canUpdate || canApprove)
               const showApproval = entityKey === 'quotations' && canApprove && isQuotationApprovable(row.status)
-              return (
-                <tr key={row.id} className="hover:bg-slate-50/60 align-top">
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500">{row.id}</td>
-                  <td className="px-4 py-3 font-semibold text-slate-800">{row.primary}</td>
-                  <td className="px-4 py-3 text-slate-600">{row.secondary}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${tone.badge}`}>
-                      {row.status || '—'}
-                    </span>
-                    {hasNext && allowTransition ? (
-                      <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700">
-                        Next action tersedia
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{row.updatedAt || '—'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {nextStages.map((stage) => {
-                        const stageTone = getToneClasses(stage.accentTone)
-                        const enabled = allowTransition && (canCreate || canUpdate || canApprove)
-                        return (
-                          <Link
-                            key={stage.label}
-                            href={enabled ? stage.href : '#'}
-                            aria-disabled={!enabled}
-                            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold shadow-sm ring-1 ring-inset transition ${
-                              enabled
-                                ? `${stageTone.accent}`
-                                : 'pointer-events-none cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400'
-                            }`}
-                            title={
-                              !enabled
-                                ? 'Aksi tidak tersedia: status sudah tutup atau role belum izin create/update/approve.'
-                                : `Lanjutkan ${config.breadcrumb} ke ${stage.label} — prefill dari row ${row.id}.`
-                            }
-                          >
-                            → {stage.label}
-                          </Link>
-                        )
-                      })}
-                      {showApproval ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowCreate(true)
-                            setTimeout(() => {
-                              const el = document.getElementById(
-                                'sales-page-action-corporate-quotation-approval',
-                              )
-                              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                            }, 50)
-                          }}
-                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold shadow-sm ring-1 ring-inset transition ${getToneClasses('amber').accent}`}
-                          title={`Buka panel approval untuk quotation ${row.id}.`}
-                        >
-                          ✓ Proses Approval
-                        </button>
-                      ) : null}
-                      {canUpdate ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowCreate(true)
-                            setTimeout(() => {
-                              const anchor = document.getElementById(
-                                config.workspaceAnchor?.replace(/^sales-action-/, 'sales-page-action-') ??
-                                  'sales-page-form',
-                              )
-                              if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                            }, 50)
-                          }}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                          title="Buka formulir pada halaman ini untuk entri / revisi lanjutan (prefill secara manual dari row ID)."
-                        >
-                          ⇅ Buka Formulir Halaman
-                        </button>
-                      ) : null}
+              const rowTone: 'default' | 'muted' = isStatusClosed(row.status) ? 'muted' : 'default'
+
+              const actionButtons = (
+                <>
+                  {nextStages.map((stage) => {
+                    const stageTone = getToneClasses(stage.accentTone)
+                    const enabled = allowTransition && (canCreate || canUpdate || canApprove)
+                    return (
                       <Link
-                        href={workspaceHref}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                        title="Lihat konteks kerja lengkap dan seluruh alur pipeline di Workspace Penjualan."
+                        key={stage.label}
+                        href={enabled ? stage.href : '#'}
+                        aria-disabled={!enabled}
+                        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold shadow-sm ring-1 ring-inset transition ${
+                          enabled
+                            ? `${stageTone.accent}`
+                            : 'pointer-events-none cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400'
+                        }`}
+                        title={
+                          !enabled
+                            ? 'Aksi tidak tersedia: status sudah tutup atau role belum izin create/update/approve.'
+                            : `Lanjutkan ${config.breadcrumb} ke ${stage.label} — prefill dari row ${row.id}.`
+                        }
                       >
-                        ↗ Workspace
+                        → {stage.label}
                       </Link>
-                      {!allowTransition && nextStages.length === 0 && !showApproval && !canUpdate ? (
-                        <span className="inline-flex rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-500">
-                          Read-only / Final
-                        </span>
-                      ) : null}
+                    )
+                  })}
+                  {showApproval ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreate(true)
+                        setTimeout(() => {
+                          const el = document.getElementById(
+                            'sales-page-action-corporate-quotation-approval',
+                          )
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }, 50)
+                      }}
+                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold shadow-sm ring-1 ring-inset transition ${getToneClasses('amber').accent}`}
+                      title={`Buka panel approval untuk quotation ${row.id}.`}
+                    >
+                      ✓ Proses Approval
+                    </button>
+                  ) : null}
+                  {canUpdate ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreate(true)
+                        setTimeout(() => {
+                          const anchor = document.getElementById(
+                            config.workspaceAnchor?.replace(/^sales-action-/, 'sales-page-action-') ??
+                              'sales-page-form',
+                          )
+                          if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }, 50)
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                      title="Buka formulir pada halaman ini untuk entri / revisi lanjutan (prefill secara manual dari row ID)."
+                    >
+                      ⇅ Buka Formulir Halaman
+                    </button>
+                  ) : null}
+                  <Link
+                    href={workspaceHref}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                    title="Lihat konteks kerja lengkap dan seluruh alur pipeline di Workspace Penjualan."
+                  >
+                    ↗ Workspace
+                  </Link>
+                  {!allowTransition && nextStages.length === 0 && !showApproval && !canUpdate ? (
+                    <span className="inline-flex rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-500">
+                      Read-only / Final
+                    </span>
+                  ) : null}
+                </>
+              )
+
+              const detail = (
+                <div className="space-y-5">
+                  <div>
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Detil Data</h4>
+                    <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+                      <table className="data-table">
+                        <tbody className="divide-y divide-line text-sm">
+                          <tr>
+                            <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">ID</td>
+                            <td className="px-4 py-2 font-mono text-xs text-slate-600">{row.id}</td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Primary</td>
+                            <td className="px-4 py-2 font-semibold text-slate-900">{row.primary}</td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Keterangan</td>
+                            <td className="px-4 py-2 text-slate-700">{row.secondary || '—'}</td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Status</td>
+                            <td className="px-4 py-2">
+                              <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${tone.badge}`}>
+                                {row.status || '—'}
+                              </span>
+                              {hasNext && allowTransition ? (
+                                <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+                                  Next action tersedia
+                                </span>
+                              ) : null}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Terakhir Diperbarui</td>
+                            <td className="px-4 py-2 tabular-nums text-slate-700">{row.updatedAt || '—'}</td>
+                          </tr>
+                          {nextStages.length > 0 ? (
+                            <tr>
+                              <td className="px-4 py-2 font-semibold uppercase tracking-[0.14em] text-mute">Next Stages ({nextStages.length})</td>
+                              <td className="px-4 py-2">
+                                <ul className="space-y-1">
+                                  {nextStages.map((stage) => (
+                                    <li key={stage.label} className="flex items-center gap-2 text-sm">
+                                      <span className={`badge border-transparent ${getToneClasses(stage.accentTone).badge}`}>{stage.label}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </tbody>
+                      </table>
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muteStrong">
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Entity</span>
+                    <span className="tabular-nums text-slate-900">{config.breadcrumb}</span>
+                    <span className="text-mute" aria-hidden>•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Row ID</span>
+                    <span className="tabular-nums font-mono text-xs text-slate-900">{row.id}</span>
+                    <span className="text-mute" aria-hidden>•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                    <span className="tabular-nums text-slate-900">{row.status || '—'}</span>
+                    <span className="text-mute" aria-hidden>•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Next Stages</span>
+                    <span className="tabular-nums text-slate-900">{nextStages.length} available</span>
+                    <span className="text-mute" aria-hidden>•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Allow Transitions</span>
+                    <span className="tabular-nums text-slate-900">{String(allowTransition)}</span>
+                    <span className="text-mute" aria-hidden>•</span>
+                    <span className="font-semibold uppercase tracking-[0.14em] text-mute">Approval Quota</span>
+                    <span className="tabular-nums text-slate-900">{String(showApproval)}</span>
+                  </div>
+                  <div className="border-t border-line pt-3">
+                    <h5 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-mute">Aksi</h5>
+                    <div className="flex flex-wrap gap-3 items-center">
+                      {actionButtons}
+                    </div>
+                  </div>
+                </div>
+              )
+
+              return (
+                <ExpandableRow
+                  key={row.id}
+                  id={row.id}
+                  num={idx + 1}
+                  totalCols={totalCols}
+                  tone={rowTone}
+                  compactRow={
+                    <>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">{row.id}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-800">{row.primary}</td>
+                      <td className="px-4 py-3 text-slate-600">{row.secondary}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${tone.badge}`}>
+                          {row.status || '—'}
+                        </span>
+                        {hasNext && allowTransition ? (
+                          <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+                            Next action tersedia
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-500">{row.updatedAt || '—'}</td>
+                    </>
+                  }
+                  detail={detail}
+                />
               )
             })}
           </tbody>
