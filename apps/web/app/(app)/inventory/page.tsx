@@ -37,6 +37,11 @@ function buildInventoryShortcuts(role: AppRole): InventoryShortcut[] {
   if (canUpdate) {
     shortcuts.push(
       {
+        title: 'Pinjaman Barang',
+        description: 'Pinjamkan barang dan proses pengembalian dalam satu workspace.',
+        href: '/inventory/loans',
+      },
+      {
         title: 'Request Barang',
         description: 'Antrean request teknisi dan proses pengambilan barang.',
         href: '/inventory/requests',
@@ -50,11 +55,6 @@ function buildInventoryShortcuts(role: AppRole): InventoryShortcut[] {
         title: 'Penataan Rak',
         description: 'Kelola rak, barcode rak, dan struktur lokasi barang.',
         href: '/inventory/racks',
-      },
-      {
-        title: 'Pinjaman Barang',
-        description: 'Pinjamkan barang dan proses pengembalian dalam satu workspace.',
-        href: '/inventory/loans',
       },
       {
         title: 'Port ODP',
@@ -91,14 +91,23 @@ function buildInventoryFocusCards(role: AppRole): InventoryFocusCard[] {
   const canCreate = ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'GA', 'CS_ADMIN'].includes(role)
   const canUpdate = ['OWNER', 'SUPER_ADMIN', 'ADMIN', 'GA', 'CS_ADMIN', 'CS_OPERATOR', 'NOC_OPERATOR', 'FIELD_TECHNICIAN'].includes(role)
 
-  const cards: InventoryFocusCard[] = [
-    {
-      title: 'ODP dan Port',
-      description: 'Pantau kapasitas ODP, status port, dan kondisi titik jaringan yang berdampak ke order dan ticket.',
-      href: '/inventory/network',
-      badge: 'utama',
-    },
-  ]
+  const cards: InventoryFocusCard[] = []
+
+  if (canUpdate) {
+    cards.push({
+      title: 'Pinjaman Barang',
+      description: 'Kelola pinjaman aktif, proses pengembalian, dan pantau status overdue barang wajib kembali ke gudang.',
+      href: '/inventory/loans',
+      badge: 'pinjaman',
+    })
+  }
+
+  cards.push({
+    title: 'ODP dan Port',
+    description: 'Pantau kapasitas ODP, status port, dan kondisi titik jaringan yang berdampak ke order dan ticket.',
+    href: '/inventory/network',
+    badge: 'utama',
+  })
 
   if (canUpdate) {
     cards.push(

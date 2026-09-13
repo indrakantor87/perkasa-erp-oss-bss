@@ -203,14 +203,11 @@ export function InventoryLoanOpsPanel({
   initialLoanValue?: string
 }) {
   const loanSection = findSection(sections, 'PINJAMAN INVENTORY')
-  if (!loanSection) {
-    return null
-  }
-
-  const overdueRows = loanSection.rows.filter((row) => row.status.toUpperCase().includes('OVERDUE'))
-  const partialRows = loanSection.rows.filter((row) => row.status.toUpperCase().includes('PARTIAL'))
-  const statusItems = buildCountMap(loanSection.rows)
-  const tableRows = buildLoanTableRows(loanSection.rows)
+  const overdueRows = loanSection ? loanSection.rows.filter((row) => row.status.toUpperCase().includes('OVERDUE')) : []
+  const partialRows = loanSection ? loanSection.rows.filter((row) => row.status.toUpperCase().includes('PARTIAL')) : []
+  const statusItems = loanSection ? buildCountMap(loanSection.rows) : []
+  const tableRows = loanSection ? buildLoanTableRows(loanSection.rows) : []
+  const totalCount = loanSection ? loanSection.rows.length : 0
 
   return (
     <section className="panel p-6">
@@ -227,7 +224,7 @@ export function InventoryLoanOpsPanel({
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="badge border-transparent bg-slate-950 text-white">
-            {loanSection.rows.length} pinjaman
+            {totalCount} pinjaman
           </span>
           {partialRows.length ? (
             <span className="badge border-amber-200 bg-amber-50 text-amber-700">
@@ -239,13 +236,15 @@ export function InventoryLoanOpsPanel({
               {overdueRows.length} overdue
             </span>
           ) : null}
-          <button
-            type="button"
-            onClick={() => exportLoanTable(tableRows)}
-            className="rounded-full border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
-          >
-            Export Excel
-          </button>
+          {tableRows.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => exportLoanTable(tableRows)}
+              className="rounded-full border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+            >
+              Export Excel
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -279,18 +278,30 @@ export function InventoryLoanOpsPanel({
         <article className="rounded-2xl border border-line bg-slate-50 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Ringkasan Status</p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {statusItems.map((item) => (
-              <span key={item.label} className={`badge ${getStatusTone(item.label)}`}>
-                {item.label}: {item.count}
+            {statusItems.length === 0 ? (
+              <span className="badge border-slate-200 bg-white text-slate-600">
+                Belum ada data pinjaman
               </span>
-            ))}
+            ) : (
+              statusItems.map((item) => (
+                <span key={item.label} className={`badge ${getStatusTone(item.label)}`}>
+                  {item.label}: {item.count}
+                </span>
+              ))
+            )}
           </div>
         </article>
 
         <article className="rounded-2xl border border-line bg-slate-50 p-5 xl:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Daftar Pinjaman Inventory</p>
-            <p className="text-xs text-mute">Catatan: daftar menampilkan {tableRows.length} pinjaman terbaru sesuai urutan dibuat.</p>
+            <p className="text-xs text-mute">
+              {loanSection
+                ? `Catatan: daftar menampilkan ${tableRows.length} pinjaman terbaru sesuai urutan dibuat.`
+                : reviewDbReady
+                ? 'Bagian pinjaman belum tersedia di review DB. Silakan refresh setelah data pinjaman disiapkan.'
+                : 'Review DB belum aktif — data pinjaman akan muncul setelah mode review DB tersedia.'}
+            </p>
           </div>
           <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
             <table className="w-full min-w-[1500px] text-left text-sm">
@@ -315,8 +326,12 @@ export function InventoryLoanOpsPanel({
               <tbody>
                 {tableRows.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="sticky left-0 z-0 px-3 py-8 text-center text-sm text-mute">
-                      Belum ada pinjaman inventory tercatat di review DB.
+                    <td colSpan={14} className="sticky left-0 z-0 px-3 py-12 text-center text-sm text-mute">
+                      {loanSection
+                        ? 'Belum ada pinjaman inventory tercatat di review DB.'
+                        : reviewDbReady
+                        ? 'Tidak ada data pinjaman. Setelah transaksi dibuat via form di atas, tabel akan terisi otomatis.'
+                        : 'Review DB belum aktif — tabel pinjaman akan muncul setelah data terhubung.'}
                     </td>
                   </tr>
                 ) : (
