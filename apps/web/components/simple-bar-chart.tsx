@@ -65,59 +65,123 @@ export function SimpleBarChart({
           <p className="text-sm text-mute">{emptyNote}</p>
         </div>
       ) : (
-        <div className="mt-6">
+        <div className="mt-6 overflow-x-auto">
           <svg
             role="img"
             aria-label={`Diagram batang: ${title}`}
-            viewBox={`0 0 100 ${heightPx}`}
-            preserveAspectRatio="none"
-            className="w-full"
+            viewBox={`0 0 600 ${heightPx}`}
+            preserveAspectRatio="xMidYMid meet"
+            className="mx-auto w-full min-w-[360px]"
             style={{ height: `${heightPx}px` }}
           >
-            {data.map((d, idx) => {
-              const width = data.length <= 6 ? 12 : data.length <= 10 ? 8.5 : 6.5
-              const gap = (100 - width * data.length) / (data.length + 1)
-              const x = gap + idx * (width + gap)
-              const barH = (d.value / max) * (heightPx - 36)
-              const y = heightPx - 18 - barH
-              const tone: NonNullable<SimpleBarDatum['tone']> = d.tone ?? 'ink'
+            {(() => {
+              const padTop = 32
+              const padBottom = 44
+              const padLeft = 14
+              const padRight = 14
+              const chartHeight = Math.max(40, heightPx - padTop - padBottom)
+              const chartWidth = 600 - padLeft - padRight
+              const n = data.length
+              const maxBarWidth = chartWidth <= 480 ? 40 : 56
+              const minGapBetweenBars = 14
+              const maxTotalBarsWidth = chartWidth - minGapBetweenBars * (n + 1)
+              const barWidth = Math.max(14, Math.min(maxBarWidth, maxTotalBarsWidth / n))
+              const totalBarsWidth = barWidth * n
+              const gapBetween = (chartWidth - totalBarsWidth) / (n + 1)
 
-              return (
-                <g key={d.label}>
-                  <rect
-                    x={x}
-                    y={y}
-                    width={width}
-                    height={barH}
-                    rx={3.5}
-                    fill={TONE_FILL[tone]}
-                    opacity={barH > 0 ? 0.92 : 0.12}
-                  />
-                  {showValueOnTop && barH > 12 ? (
-                    <text
-                      x={x + width / 2}
-                      y={y - 4}
-                      textAnchor="middle"
-                      fontSize="7.5"
-                      fontWeight="700"
-                      fill="#0f172a"
-                    >
-                      {d.value}
-                    </text>
-                  ) : null}
-                  <text
-                    x={x + width / 2}
-                    y={heightPx - 4}
-                    textAnchor="middle"
-                    fontSize={width > 8 ? 6 : 5}
-                    fontWeight="600"
-                    fill="#475569"
-                  >
-                    {d.label.length > (width > 8 ? 14 : 9) ? `${d.label.slice(0, width > 8 ? 12 : 7)}…` : d.label}
-                  </text>
-                </g>
-              )
-            })}
+              return data.map((d, idx) => {
+                const x = padLeft + gapBetween + idx * (barWidth + gapBetween)
+                const barH = (d.value / max) * chartHeight
+                const y = padTop + chartHeight - barH
+                const baselineY = padTop + chartHeight
+                const tone: NonNullable<SimpleBarDatum['tone']> = d.tone ?? 'ink'
+                const rawLabel = d.label
+                const hasSpace = /\s/.test(rawLabel)
+                const labelTop = hasSpace ? rawLabel.slice(0, rawLabel.lastIndexOf(' ')) : rawLabel
+                const labelBottom = hasSpace ? rawLabel.slice(rawLabel.lastIndexOf(' ') + 1) : ''
+                const twoLineLabel = hasSpace && labelTop.length <= 10 && labelBottom.length <= 8
+
+                return (
+                  <g key={d.label}>
+                    <line
+                      x1={x - barWidth * 0.2}
+                      x2={x + barWidth * 1.2}
+                      y1={baselineY}
+                      y2={baselineY}
+                      stroke="#cbd5e1"
+                      strokeWidth={0.8}
+                    />
+                    <rect
+                      x={x}
+                      y={y}
+                      width={barWidth}
+                      height={barH}
+                      rx={4}
+                      fill={TONE_FILL[tone]}
+                      opacity={barH > 0 ? 0.92 : 0.12}
+                    />
+                    {showValueOnTop && barH > 20 ? (
+                      <text
+                        x={x + barWidth / 2}
+                        y={y - 8}
+                        textAnchor="middle"
+                        fontSize="13"
+                        fontWeight="800"
+                        fill="#0f172a"
+                      >
+                        {d.value}
+                      </text>
+                    ) : showValueOnTop && barH > 0 ? (
+                      <text
+                        x={x + barWidth / 2}
+                        y={y - 4}
+                        textAnchor="middle"
+                        fontSize="12"
+                        fontWeight="700"
+                        fill="#0f172a"
+                      >
+                        {d.value}
+                      </text>
+                    ) : null}
+                    {twoLineLabel ? (
+                      <>
+                        <text
+                          x={x + barWidth / 2}
+                          y={baselineY + 16}
+                          textAnchor="middle"
+                          fontSize="12"
+                          fontWeight="700"
+                          fill="#334155"
+                        >
+                          {labelTop.length > 11 ? `${labelTop.slice(0, 9)}…` : labelTop}
+                        </text>
+                        <text
+                          x={x + barWidth / 2}
+                          y={baselineY + 30}
+                          textAnchor="middle"
+                          fontSize="11"
+                          fontWeight="600"
+                          fill="#64748b"
+                        >
+                          {labelBottom.length > 9 ? `${labelBottom.slice(0, 7)}…` : labelBottom}
+                        </text>
+                      </>
+                    ) : (
+                      <text
+                        x={x + barWidth / 2}
+                        y={baselineY + 24}
+                        textAnchor="middle"
+                        fontSize={rawLabel.length > 12 ? 11 : 12}
+                        fontWeight="700"
+                        fill="#334155"
+                      >
+                        {rawLabel.length > 16 ? `${rawLabel.slice(0, 14)}…` : rawLabel}
+                      </text>
+                    )}
+                  </g>
+                )
+              })
+            })()}
           </svg>
 
           {data.length <= 8 ? (
@@ -129,8 +193,8 @@ export function SimpleBarChart({
                     key={d.label}
                     className={`flex items-center justify-between rounded-xl border border-line px-3 py-2 ${TONE_BG[tone]}`}
                   >
-                    <span className="text-sm font-semibold text-slate-950">{d.label}</span>
-                    <span className="tabular-nums text-sm font-semibold text-muteStrong">
+                    <span className="truncate text-sm font-semibold text-slate-950">{d.label}</span>
+                    <span className="shrink-0 tabular-nums text-sm font-semibold text-muteStrong">
                       {d.value} {unitLabel}
                     </span>
                   </li>

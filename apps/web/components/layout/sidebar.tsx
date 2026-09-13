@@ -1052,6 +1052,9 @@ function dedupeSidebarItems(items: SidebarNavItem[]) {
 }
 
 function getPrimaryNavHrefs(role: AppRole | null) {
+  if (role === 'GA') {
+    return ['/dashboard/daily-activity', '/dashboard/tracking']
+  }
   const base = ['/dashboard', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity']
   if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
     return [...base, '/import']
@@ -1186,7 +1189,9 @@ function buildSidebarSections(params: {
     .filter((item) => primaryHrefs.has(item.href))
     .map(mapNavigationItemToSidebarNavItem)
 
-  const utamaOrder = ['/dashboard', '/dashboard/daily-activity', '/dashboard/worklist', '/dashboard/tracking', '/import']
+  const utamaDefault = ['/dashboard', '/dashboard/daily-activity', '/dashboard/worklist', '/dashboard/tracking', '/import']
+  const utamaInventoryOnly = ['/dashboard/daily-activity', '/dashboard/tracking']
+  const utamaOrder = params.role === 'GA' ? utamaInventoryOnly : utamaDefault
   const primaryItems =
     params.role === 'SUPER_ADMIN'
       ? rawPrimaryItems

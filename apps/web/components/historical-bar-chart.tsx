@@ -154,55 +154,110 @@ export function HistoricalBarChart({
           ) : null}
         </div>
       ) : (
-        <div className="mt-6">
+        <div className="mt-6 overflow-x-auto">
           <svg
             role="img"
             aria-label={`Diagram batang historis: ${title}. Perbandingan ${currentPeriodLabel} vs ${previousPeriodLabel}`}
-            viewBox={`0 0 100 ${heightPx}`}
-            preserveAspectRatio="none"
-            className="w-full"
+            viewBox={`0 0 720 ${heightPx}`}
+            preserveAspectRatio="xMidYMid meet"
+            className="mx-auto w-full min-w-[460px]"
             style={{ height: `${heightPx}px` }}
           >
             {(() => {
+              const padTop = 36
+              const padBottom = 52
+              const chartHeight = Math.max(40, heightPx - padTop - padBottom)
               const maxPerBucket = series.map((d) => Math.max(d.current, d.previous, 1))
               const globalMax = Math.max(1, ...maxPerBucket)
-              const bucketSlot = 100 / series.length
-              const pairWidth = bucketSlot * 0.72
-              const barWidth = pairWidth / 2.2
+              const padLeft = 16
+              const padRight = 16
+              const chartWidth = 720 - padLeft - padRight
+              const bucketSlot = chartWidth / series.length
+              const pairWidth = bucketSlot * 0.64
+              const barWidth = Math.max(10, Math.min(38, pairWidth / 2.15))
 
               return series.map((d, idx) => {
-                const slotStart = idx * bucketSlot + bucketSlot * 0.14
-                const currH = (d.current / globalMax) * (heightPx - 34)
-                const prevH = (d.previous / globalMax) * (heightPx - 34)
-                const currX = slotStart
-                const prevX = slotStart + barWidth * 1.1
-                const currY = heightPx - 16 - currH
-                const prevY = heightPx - 16 - prevH
+                const slotCenterX = padLeft + idx * bucketSlot + bucketSlot / 2
+                const pairStartX = slotCenterX - pairWidth / 2
+                const currH = (d.current / globalMax) * chartHeight
+                const prevH = (d.previous / globalMax) * chartHeight
+                const currX = pairStartX
+                const prevX = pairStartX + barWidth + Math.max(4, pairWidth * 0.1)
+                const currY = padTop + chartHeight - currH
+                const prevY = padTop + chartHeight - prevH
+                const baselineY = padTop + chartHeight
+
+                const rawLabel = d.bucket
+                const hasSpace = /\s/.test(rawLabel)
+                const labelTop = hasSpace ? rawLabel.slice(0, rawLabel.lastIndexOf(' ')) : rawLabel
+                const labelBottom = hasSpace ? rawLabel.slice(rawLabel.lastIndexOf(' ') + 1) : ''
+                const twoLineLabel = hasSpace && labelTop.length <= 12 && labelBottom.length <= 8
 
                 return (
                   <g key={d.bucket}>
-                    <rect x={currX} y={currY} width={barWidth} height={currH} rx={2.8} fill="#0f172a" opacity={currH > 0 ? 0.94 : 0.12} />
-                    <rect x={prevX} y={prevY} width={barWidth} height={prevH} rx={2.8} fill="#94a3b8" opacity={prevH > 0 ? 0.62 : 0.1} />
-                    {currH > 12 ? (
-                      <text x={currX + barWidth / 2} y={currY - 3} textAnchor="middle" fontSize="6.8" fontWeight="800" fill="#0f172a">
+                    <line
+                      x1={pairStartX - bucketSlot * 0.15}
+                      x2={pairStartX + pairWidth + bucketSlot * 0.15}
+                      y1={baselineY}
+                      y2={baselineY}
+                      stroke="#cbd5e1"
+                      strokeWidth={0.8}
+                    />
+                    <rect x={currX} y={currY} width={barWidth} height={currH} rx={3.2} fill="#0f172a" opacity={currH > 0 ? 0.94 : 0.12} />
+                    <rect x={prevX} y={prevY} width={barWidth} height={prevH} rx={3.2} fill="#94a3b8" opacity={prevH > 0 ? 0.7 : 0.1} />
+                    {currH > 18 ? (
+                      <text x={currX + barWidth / 2} y={currY - 8} textAnchor="middle" fontSize="12" fontWeight="800" fill="#0f172a">
+                        {d.current}
+                      </text>
+                    ) : currH > 0 ? (
+                      <text x={currX + barWidth / 2} y={currY - 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f172a">
                         {d.current}
                       </text>
                     ) : null}
-                    {prevH > 12 ? (
-                      <text x={prevX + barWidth / 2} y={prevY - 3} textAnchor="middle" fontSize="6.8" fontWeight="700" fill="#475569">
+                    {prevH > 18 ? (
+                      <text x={prevX + barWidth / 2} y={prevY - 8} textAnchor="middle" fontSize="12" fontWeight="700" fill="#475569">
+                        {d.previous}
+                      </text>
+                    ) : prevH > 0 ? (
+                      <text x={prevX + barWidth / 2} y={prevY - 4} textAnchor="middle" fontSize="11" fontWeight="600" fill="#475569">
                         {d.previous}
                       </text>
                     ) : null}
-                    <text
-                      x={slotStart + pairWidth / 2}
-                      y={heightPx - 3}
-                      textAnchor="middle"
-                      fontSize={series.length <= 8 ? 6 : 5.2}
-                      fontWeight="600"
-                      fill="#475569"
-                    >
-                      {d.bucket.length > 9 ? `${d.bucket.slice(0, 8)}…` : d.bucket}
-                    </text>
+                    {twoLineLabel ? (
+                      <>
+                        <text
+                          x={slotCenterX}
+                          y={baselineY + 18}
+                          textAnchor="middle"
+                          fontSize="12"
+                          fontWeight="700"
+                          fill="#334155"
+                        >
+                          {labelTop}
+                        </text>
+                        <text
+                          x={slotCenterX}
+                          y={baselineY + 34}
+                          textAnchor="middle"
+                          fontSize="11"
+                          fontWeight="600"
+                          fill="#64748b"
+                        >
+                          {labelBottom}
+                        </text>
+                      </>
+                    ) : (
+                      <text
+                        x={slotCenterX}
+                        y={baselineY + 24}
+                        textAnchor="middle"
+                        fontSize={rawLabel.length > 10 ? 11 : 12}
+                        fontWeight="700"
+                        fill="#334155"
+                      >
+                        {rawLabel.length > 16 ? `${rawLabel.slice(0, 14)}…` : rawLabel}
+                      </text>
+                    )}
                   </g>
                 )
               })
@@ -211,14 +266,14 @@ export function HistoricalBarChart({
 
           <div className="mt-4 flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-surface/80 p-3">
             <div className="flex items-center gap-2">
-              <span className="inline-block h-3.5 w-3.5 rounded-sm bg-slate-950" aria-hidden />
-              <span className="text-xs font-semibold text-slate-950">{currentPeriodLabel}</span>
+              <span className="inline-block h-4 w-4 rounded-sm bg-slate-950" aria-hidden />
+              <span className="text-xs font-semibold text-slate-950">Periode sekarang: {currentPeriodLabel}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="inline-block h-3.5 w-3.5 rounded-sm bg-slate-400" aria-hidden />
-              <span className="text-xs font-semibold text-muteStrong">{previousPeriodLabel}</span>
+              <span className="inline-block h-4 w-4 rounded-sm bg-slate-400" aria-hidden />
+              <span className="text-xs font-semibold text-muteStrong">Periode sebelumnya: {previousPeriodLabel}</span>
             </div>
-            <p className="text-xs text-mute">
+            <p className="w-full text-xs text-mute sm:w-auto sm:flex-1 sm:text-right">
               Visualisasi hanya menampilkan angka hitung absolut. Tinggi batang sebanding literal dengan jumlah {unitLabel}, tanpa smoothing atau interpolasi.
             </p>
           </div>
