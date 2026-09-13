@@ -47,12 +47,11 @@ export default async function TokoWorkspacePage() {
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Ringkasan</th>
                 <th className="px-4 py-3">Metadata</th>
-                <th className="px-4 py-3">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
                   Belum ada tabel kerja untuk Toko.
                 </td>
               </tr>
