@@ -47,22 +47,19 @@ export function InventoryStockReceiptPanel({
 }) {
   const movementSection =
     sections.find((section) => section.title.toUpperCase().includes('STOCK MOVEMENT')) ?? null
+  const movementRows = movementSection?.rows ?? []
 
-  if (!movementSection) {
-    return null
-  }
-
-  const inboundRows = movementSection.rows.filter((row) => normalizeText(row.primary) === 'IN')
-  const outboundRows = movementSection.rows.filter((row) => normalizeText(row.primary) === 'OUT')
-  const handoverRows = movementSection.rows.filter((row) => hasHandoverProof(row.detail))
-  const adjustmentRows = movementSection.rows.filter((row) => normalizeText(row.primary) === 'ADJUSTMENT')
+  const inboundRows = movementRows.filter((row) => normalizeText(row.primary) === 'IN')
+  const outboundRows = movementRows.filter((row) => normalizeText(row.primary) === 'OUT')
+  const handoverRows = movementRows.filter((row) => hasHandoverProof(row.detail))
+  const adjustmentRows = movementRows.filter((row) => normalizeText(row.primary) === 'ADJUSTMENT')
   const isReceiptFocus = focusAction === 'stock-receipt'
   const isMovementFocus = focusAction === 'stock-movement'
   const visibleRows = isReceiptFocus
     ? inboundRows
     : isMovementFocus
-      ? movementSection.rows.filter((row) => normalizeText(row.primary) !== 'IN')
-      : movementSection.rows
+      ? movementRows.filter((row) => normalizeText(row.primary) !== 'IN')
+      : movementRows
 
   const totalQty = inboundRows.reduce((sum, row) => {
     const qty = Number.parseInt(pickMeta(row.meta, 'Qty: '), 10)

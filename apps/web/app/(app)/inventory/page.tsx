@@ -173,18 +173,13 @@ export default async function InventoryOverviewPage({
   }
 
   const resolvedSearchParams = (await searchParams) ?? {}
+  const payload = await getDomainPageData('inventory', session, {
+    focus: resolveSearchParam(resolvedSearchParams.focus),
+    month: resolvePositiveIntegerParam(resolvedSearchParams.month),
+    year: resolvePositiveIntegerParam(resolvedSearchParams.year),
+  })
 
-  if (session.role === 'SUPER_ADMIN') {
-    const payload = await getDomainPageData('inventory', session, {
-      focus: resolveSearchParam(resolvedSearchParams.focus),
-      month: resolvePositiveIntegerParam(resolvedSearchParams.month),
-      year: resolvePositiveIntegerParam(resolvedSearchParams.year),
-    })
-
-    if (!payload) {
-      notFound()
-    }
-
+  if (payload) {
     const shortcuts = buildInventoryShortcuts(session.role)
     const focusCards = buildInventoryFocusCards(session.role)
     const requestHref = '/inventory/requests'
@@ -237,7 +232,7 @@ export default async function InventoryOverviewPage({
                   Jalur kerja prioritas untuk inventory operasional
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-mute">
-                  Fokus ini memadatkan alur yang paling dekat dengan pekerjaan lapangan: ODP dan port, assignment device,
+                  Fokus ini memadatkan alur yang paling dekat dengan pekerjaan lapangan: Pinjaman barang, ODP dan port, assignment device,
                   request barang, stock movement, dan penataan lokasi fisik.
                 </p>
               </div>

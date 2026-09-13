@@ -91,16 +91,13 @@ export function InventoryRequestOpsPanel({
   initialRequestValue?: string
 }) {
   const requestSection = findSection(sections, 'REQUEST INVENTORY')
+  const requestRows = requestSection?.rows ?? []
 
-  if (!requestSection) {
-    return null
-  }
-
-  const bySubdivision = buildCountMap(requestSection.rows, 'Sub-divisi: ')
-  const byStatus = buildCountMap(requestSection.rows)
-  const pendingRows = requestSection.rows.filter((row) => row.status.trim().toUpperCase().includes('PENDING'))
+  const bySubdivision = requestSection ? buildCountMap(requestRows, 'Sub-divisi: ') : []
+  const byStatus = requestSection ? buildCountMap(requestRows) : []
+  const pendingRows = requestRows.filter((row) => row.status.trim().toUpperCase().includes('PENDING'))
   const movementOutRows = movementRows.filter((row) => normalizeText(row.primary) === 'OUT')
-  const requestAuditRows = requestSection.rows.map((row) => {
+  const requestAuditRows = requestRows.map((row) => {
     const requestCode = row.primary.trim()
     const matchedMovement =
       movementOutRows.find((item) => normalizeText(item.status) === normalizeText(requestCode)) ??
@@ -131,18 +128,29 @@ export function InventoryRequestOpsPanel({
           </h3>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-mute">
             Panel ini membantu tim inventory membaca antrean request berdasarkan status proses dan asal
-            sub-divisi teknisi, sehingga pemenuhan barang harian tidak tercampur antara PSB, Jalur &
+            sub-divisi teknisi, sehingga pemenuhan barang harian tidak tercampur antara PSB, Jalur &amp;
             Expan, dan Jointer.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="badge border-transparent bg-slate-950 text-white">
-            {requestSection.rows.length} request
+            {requestRows.length} request
           </span>
           {pendingRows.length ? (
             <span className="badge border-amber-200 bg-amber-50 text-amber-700">
               {pendingRows.length} pending
             </span>
+          ) : null}
+          {!requestSection ? (
+            reviewDbReady ? (
+              <span className="badge border-slate-200 bg-white text-slate-600">
+                Data request belum tersedia
+              </span>
+            ) : (
+              <span className="badge border-slate-200 bg-white text-slate-600">
+                Review DB belum aktif
+              </span>
+            )
           ) : null}
         </div>
       </div>
@@ -249,8 +257,8 @@ export function InventoryRequestOpsPanel({
         <article className="rounded-2xl border border-line bg-slate-50 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Request Terbaru</p>
           <div className="mt-4 space-y-3">
-            {requestSection.rows.length ? (
-              requestSection.rows.map((row) => {
+            {requestRows.length ? (
+              requestRows.map((row) => {
                 const subdivision = pickMeta(row.meta, 'Sub-divisi: ')
                 const requestedFor = pickMeta(row.meta, 'Untuk: ')
                 const requestedAt = pickMeta(row.meta, 'Requested: ')
