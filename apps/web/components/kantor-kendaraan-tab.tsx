@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 
 type KendaraanRow = {
   id: string
@@ -377,6 +378,7 @@ export function KantorKendaraanTabContent() {
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="sticky top-0 bg-white">
               <tr className="text-left text-xs uppercase tracking-[0.18em] text-mute">
+                <ExpandableHeaderLeftCells />
                 <th className="px-3 py-2 font-semibold">Plat No</th>
                 <th className="px-3 py-2 font-semibold">Jenis</th>
                 <th className="px-3 py-2 font-semibold">Merk / Tipe</th>
@@ -387,21 +389,21 @@ export function KantorKendaraanTabContent() {
                 <th className="px-3 py-2 font-semibold">Km Akhir</th>
                 <th className="px-3 py-2 font-semibold">Jarak</th>
                 <th className="px-3 py-2 font-semibold">Nominal BBM</th>
-                <th className="px-3 py-2 font-semibold">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-3 py-6 text-center text-sm text-mute">
+                  <td colSpan={12} className="px-3 py-6 text-center text-sm text-mute">
                     Belum ada catatan penggunaan kendaraan.
                   </td>
                 </tr>
               ) : (
-                displayRows.map((r) => {
+                displayRows.map((r, idx) => {
                   const jarak = Math.max(0, Number(r.kmAkhir ?? 0) - Number(r.kmAwal ?? 0))
-                  return (
-                    <tr key={r.id}>
+                  const jarakTone = jarak >= 100 ? 'text-emerald-700' : jarak >= 30 ? 'text-sky-700' : 'text-slate-700'
+                  const compactRow = (
+                    <>
                       <td className="px-3 py-2 font-semibold text-slate-950">{r.platNo}</td>
                       <td className="px-3 py-2">
                         <span
@@ -420,18 +422,98 @@ export function KantorKendaraanTabContent() {
                       <td className="px-3 py-2 tabular-nums text-slate-700">{normalizeDateDisplay(r.tanggalPakai)}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-slate-700">{formatNumber(r.kmAwal)}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-slate-700">{formatNumber(r.kmAkhir)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-900">{formatNumber(jarak)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums font-semibold ${jarakTone}`}>{formatNumber(jarak)}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-900">{formatCurrency(r.nominalBbm)}</td>
-                      <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          onClick={() => handleHapus(r.id)}
-                          className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-                        >
-                          Hapus
-                        </button>
-                      </td>
-                    </tr>
+                    </>
+                  )
+                  const detail = (
+                    <div className="space-y-5">
+                      <section>
+                        <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                        <div className="grid gap-4 md:grid-cols-4">
+                          <div className="rounded-xl border border-line bg-white p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Kendaraan</p>
+                            <p className="mt-2 font-semibold text-slate-950">{r.platNo}</p>
+                            <p className="mt-1 text-sm text-mute">{r.merkTipe} ({r.tahun})</p>
+                            <p className="mt-2">
+                              <span
+                                className={
+                                  r.jenisKendaraan === 'MOTOR'
+                                    ? 'badge border-sky-200 bg-sky-50 text-sky-700'
+                                    : 'badge border-violet-200 bg-violet-50 text-violet-700'
+                                }
+                              >
+                                {r.jenisKendaraan}
+                              </span>
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-line bg-white p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Driver & Tanggal</p>
+                            <p className="mt-2 font-semibold text-slate-950">{r.namaDriver}</p>
+                            <p className="mt-1 text-sm text-mute">{normalizeDateDisplay(r.tanggalPakai)}</p>
+                          </div>
+                          <div className="rounded-xl border border-line bg-white p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Odometer</p>
+                            <div className="mt-2 space-y-1 text-sm">
+                              <div className="flex items-center justify-between">
+                                <span className="text-mute">Km Awal</span>
+                                <span className="font-semibold text-slate-700">{formatNumber(r.kmAwal)}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-mute">Km Akhir</span>
+                                <span className="font-semibold text-slate-700">{formatNumber(r.kmAkhir)}</span>
+                              </div>
+                              <div className="flex items-center justify-between border-t border-line pt-1 mt-1">
+                                <span className="text-mute font-semibold">Jarak</span>
+                                <span className={`font-bold ${jarakTone}`}>{formatNumber(jarak)} Km</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-line bg-white p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Biaya BBM & Catatan</p>
+                            <p className="mt-2 text-2xl font-bold text-slate-950">{formatCurrency(r.nominalBbm)}</p>
+                            <p className="mt-1 text-xs text-mute">
+                              {r.catatan ? r.catatan : 'Tidak ada catatan tambahan'}
+                            </p>
+                          </div>
+                        </div>
+                      </section>
+                      <section className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-600">
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Plat</span>
+                        <span>{r.platNo}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Driver</span>
+                        <span>{r.namaDriver}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Tanggal</span>
+                        <span>{normalizeDateDisplay(r.tanggalPakai)}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="font-semibold uppercase tracking-[0.14em] text-mute">Jarak</span>
+                        <span>{formatNumber(jarak)} Km</span>
+                      </section>
+                      <section className="pt-3 border-t border-line">
+                        <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleHapus(r.id)}
+                            className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                          >
+                            Hapus Catatan
+                          </button>
+                        </div>
+                      </section>
+                    </div>
+                  )
+                  return (
+                    <ExpandableRow
+                      key={r.id}
+                      id={`kdr-${r.id}`}
+                      num={idx + 1}
+                      totalCols={12}
+                      compactRow={compactRow}
+                      detail={detail}
+                    />
                   )
                 })
               )}
@@ -439,11 +521,11 @@ export function KantorKendaraanTabContent() {
             {displayRows.length > 0 ? (
               <tfoot>
                 <tr className="bg-slate-950 text-white">
-                  <td colSpan={9} className="px-3 py-2 text-sm font-bold uppercase tracking-[0.16em] text-slate-200">
+                  <td colSpan={2}></td>
+                  <td colSpan={8} className="px-3 py-2 text-sm font-bold uppercase tracking-[0.16em] text-slate-200">
                     Total Nominal BBM
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums font-bold text-white">{formatCurrency(totals.total)}</td>
-                  <td></td>
                 </tr>
               </tfoot>
             ) : null}

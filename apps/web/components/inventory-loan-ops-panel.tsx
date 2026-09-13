@@ -3,6 +3,7 @@
 import * as XLSX from 'xlsx'
 import { InventoryItemLoanForm } from '@/components/inventory-item-loan-form'
 import { InventoryLoanReturnForm } from '@/components/inventory-loan-return-form'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import type { DomainReviewRow, DomainReviewSection } from '@/lib/types'
 
 function findSection(sections: DomainReviewSection[], keyword: string) {
@@ -307,8 +308,8 @@ export function InventoryLoanOpsPanel({
             <table className="w-full min-w-[1500px] text-left text-sm">
               <thead className="sticky top-0 z-10 bg-slate-100 text-slate-800">
                 <tr>
-                  <th className="sticky left-0 z-20 w-12 bg-slate-100 px-3 py-3 text-xs font-semibold uppercase tracking-wider">No</th>
-                  <th className="sticky left-[52px] z-20 bg-slate-100 px-3 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Kode Pinjam</th>
+                  <ExpandableHeaderLeftCells />
+                  <th className="px-3 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Kode Pinjam</th>
                   <th className="px-3 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Kode Barang</th>
                   <th className="px-3 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Nama Barang</th>
                   <th className="px-3 py-3 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">Peminjam</th>
@@ -326,7 +327,7 @@ export function InventoryLoanOpsPanel({
               <tbody>
                 {tableRows.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="sticky left-0 z-0 px-3 py-12 text-center text-sm text-mute">
+                    <td colSpan={15} className="sticky left-0 z-0 px-3 py-12 text-center text-sm text-mute">
                       {loanSection
                         ? 'Belum ada pinjaman inventory tercatat di review DB.'
                         : reviewDbReady
@@ -335,32 +336,110 @@ export function InventoryLoanOpsPanel({
                     </td>
                   </tr>
                 ) : (
-                  tableRows.map((r) => (
-                    <tr key={r.loanCode} className="border-t border-slate-200 align-top hover:bg-slate-50">
-                      <td className="sticky left-0 z-0 bg-white px-3 py-3 font-mono text-sm text-slate-500">{r.no}</td>
-                      <td className="sticky left-[52px] z-0 bg-white px-3 py-3 font-mono text-slate-900">{r.loanCode}</td>
-                      <td className="px-3 py-3 font-mono text-slate-900">{r.itemCode || '-'}</td>
-                      <td className="px-3 py-3 text-slate-900">{r.itemName || '-'}</td>
-                      <td className="px-3 py-3 text-slate-900">{r.borrower || '-'}</td>
-                      <td className="px-3 py-3 text-slate-700">{r.division || '-'}</td>
-                      <td className="px-3 py-3 text-slate-700">{r.subdivision || '-'}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-slate-900">{r.qty || '0'}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-slate-900">{r.returned || '0'}</td>
-                      <td className="px-3 py-3 text-right tabular-nums font-semibold text-slate-900">{r.remaining || '0'}</td>
-                      <td className="px-3 py-3 tabular-nums text-slate-700 whitespace-nowrap">{r.borrowedAt || '-'}</td>
-                      <td className="px-3 py-3 tabular-nums text-slate-700 whitespace-nowrap">{r.dueAt || '-'}</td>
-                      <td className="px-3 py-3 tabular-nums text-slate-700 whitespace-nowrap">{r.returnedAt || '-'}</td>
-                      <td className="px-3 py-3">
-                        <span className={`badge ${getStatusTone(r.status)}`}>{r.status || '-'}</span>
-                      </td>
-                    </tr>
-                  ))
+                  tableRows.map((r) => {
+                    const compactRow = (
+                      <>
+                        <td className="px-3 py-3 font-mono text-slate-900">{r.loanCode}</td>
+                        <td className="px-3 py-3 font-mono text-slate-900">{r.itemCode || '-'}</td>
+                        <td className="px-3 py-3 text-slate-900">{r.itemName || '-'}</td>
+                        <td className="px-3 py-3 text-slate-900">{r.borrower || '-'}</td>
+                        <td className="px-3 py-3 text-slate-700">{r.division || '-'}</td>
+                        <td className="px-3 py-3 text-slate-700">{r.subdivision || '-'}</td>
+                        <td className="px-3 py-3 text-right tabular-nums text-slate-900">{r.qty || '0'}</td>
+                        <td className="px-3 py-3 text-right tabular-nums text-slate-900">{r.returned || '0'}</td>
+                        <td className="px-3 py-3 text-right tabular-nums font-semibold text-slate-900">{r.remaining || '0'}</td>
+                        <td className="px-3 py-3 tabular-nums text-slate-700 whitespace-nowrap">{r.borrowedAt || '-'}</td>
+                        <td className="px-3 py-3 tabular-nums text-slate-700 whitespace-nowrap">{r.dueAt || '-'}</td>
+                        <td className="px-3 py-3 tabular-nums text-slate-700 whitespace-nowrap">{r.returnedAt || '-'}</td>
+                        <td className="px-3 py-3">
+                          <span className={`badge ${getStatusTone(r.status)}`}>{r.status || '-'}</span>
+                        </td>
+                      </>
+                    )
+                    const detail = (
+                      <div className="space-y-5">
+                        <section>
+                          <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                          <div className="grid gap-3 lg:grid-cols-2">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                              <div className="flex flex-wrap gap-2">
+                                <span className="badge border-slate-200 bg-white text-slate-700">Kode: {r.loanCode}</span>
+                                <span className={`badge ${getStatusTone(r.status)}`}>{r.status || '-'}</span>
+                              </div>
+                              <div className="text-sm">
+                                <p className="text-mute text-xs uppercase tracking-wider mb-1">Barang</p>
+                                <p className="font-semibold text-slate-900">{r.itemName || '-'}</p>
+                                <p className="text-mute font-mono text-xs">{r.itemCode || '-'}</p>
+                              </div>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                              <div className="grid grid-cols-3 gap-2 text-sm">
+                                <div>
+                                  <p className="text-mute text-xs uppercase tracking-wider">Qty Pinjam</p>
+                                  <p className="font-semibold tabular-nums text-slate-900">{r.qty || '0'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-mute text-xs uppercase tracking-wider">Kembali</p>
+                                  <p className="font-semibold tabular-nums text-slate-900">{r.returned || '0'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-mute text-xs uppercase tracking-wider">Sisa</p>
+                                  <p className="font-semibold tabular-nums text-emerald-800">{r.remaining || '0'}</p>
+                                </div>
+                              </div>
+                              {r.notes ? (
+                                <div className="text-sm">
+                                  <p className="text-mute text-xs uppercase tracking-wider mb-1">Catatan</p>
+                                  <p className="text-slate-700">{r.notes}</p>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </section>
+                        <section>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">Peminjam</span>
+                            <span className="text-slate-900 font-medium">{r.borrower || '-'}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">Divisi</span>
+                            <span className="text-slate-700">{r.division || '-'} / {r.subdivision || '-'}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">Tgl Pinjam</span>
+                            <span className="tabular-nums text-slate-700">{r.borrowedAt || '-'}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">Jatuh Tempo</span>
+                            <span className="tabular-nums text-slate-700">{r.dueAt || '-'}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">Tgl Kembali</span>
+                            <span className="tabular-nums text-slate-700">{r.returnedAt || '-'}</span>
+                          </div>
+                        </section>
+                        <section className="pt-3 border-t border-line">
+                          <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className="text-xs text-mute italic">* Aksi pinjaman tersedia melalui form Pengembalian di panel atas.</span>
+                          </div>
+                        </section>
+                      </div>
+                    )
+                    return (
+                      <ExpandableRow
+                        key={r.loanCode}
+                        id={r.loanCode}
+                        num={r.no}
+                        totalCols={15}
+                        compactRow={compactRow}
+                        detail={detail}
+                        tone="muted"
+                      />
+                    )
+                  })
                 )}
               </tbody>
               {tableRows.length > 0 ? (
                 <tfoot className="bg-emerald-50 text-slate-900">
                   <tr className="border-t border-emerald-200">
-                    <td colSpan={7} className="sticky left-0 bg-emerald-50 px-3 py-3 text-sm font-semibold">
+                    <td colSpan={8} className="sticky left-0 bg-emerald-50 px-3 py-3 text-sm font-semibold">
                       TOTAL
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums font-semibold">

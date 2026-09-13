@@ -6,6 +6,7 @@ import { DataSourceStatus } from '@/components/data-source-status'
 import { InventoryItemBarcodePanel } from '@/components/inventory-item-barcode-panel'
 import { InventoryItemCreateForm } from '@/components/inventory-item-create-form'
 import { InventoryItemEditForm, type InventoryEditableItem } from '@/components/inventory-item-edit-form'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import { buildInventoryBarcodeDetailPath } from '@/lib/inventory-barcode-utils'
 import type { DeviceLifecycleLogRow } from '@/lib/services/device-lifecycle-service'
 import type { DataSourceSnapshot, DomainReviewSection } from '@/lib/types'
@@ -919,6 +920,7 @@ export function InventoryItemsWorkspacePage({
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-[0.18em] text-mute">
+                <ExpandableHeaderLeftCells />
                 <th className="px-4 py-3 font-semibold">Item</th>
                 <th className="px-4 py-3 font-semibold">Kategori</th>
                 <th className="px-4 py-3 font-semibold">Satuan</th>
@@ -926,62 +928,147 @@ export function InventoryItemsWorkspacePage({
                 <th className="px-4 py-3 font-semibold">Stok</th>
                 <th className="px-4 py-3 font-semibold">Harga</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {items.length > 0 ? (
-                items.map((item) => (
-                  <tr key={item.itemCode}>
-                    <td className="px-4 py-4 align-top">
-                      <p className="font-semibold text-slate-950">{item.itemCode}</p>
-                      <p className="mt-1 text-sm text-mute">{item.itemName}</p>
-                      <p className="mt-1 text-xs text-slate-500">Barcode: {item.barcode || '-'}</p>
-                    </td>
-                    <td className="px-4 py-4 align-top text-slate-700">{item.categoryCode || '-'}</td>
-                    <td className="px-4 py-4 align-top text-slate-700">{item.unitCode || '-'}</td>
-                    <td className="px-4 py-4 align-top text-slate-700">
-                      <p>{item.rackCode || '-'}</p>
-                      <p className="mt-1 text-xs text-slate-500">{item.rackBarcode || '-'}</p>
-                    </td>
-                    <td className="px-4 py-4 align-top text-slate-700">
-                      <p>{formatNumber(item.currentStock)}</p>
-                      <p className="mt-1 text-xs text-slate-500">Min: {formatNumber(item.minimumStock)}</p>
-                    </td>
-                    <td className="px-4 py-4 align-top text-slate-700">{formatCurrency(item.defaultPrice)}</td>
-                    <td className="px-4 py-4 align-top">
-                      <span className="badge border-slate-200 bg-white text-slate-600">{item.status}</span>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedItemCode(item.itemCode)}
-                          className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDeactivate(item)}
-                          disabled={!canUpdate || !reviewDbReady || item.status.toUpperCase() === 'INACTIVE'}
-                          className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                        >
-                          Deactivate
-                        </button>
-                        <Link
-                          href={buildInventoryBarcodeDetailPath(item.itemCode)}
-                          className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                        >
-                          Buka detail
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                items.map((item, index) => {
+                  const compactRow = (
+                    <>
+                      <td className="px-4 py-4 align-top">
+                        <p className="font-semibold text-slate-950">{item.itemCode}</p>
+                        <p className="mt-1 text-sm text-mute">{item.itemName}</p>
+                        <p className="mt-1 text-xs text-slate-500">Barcode: {item.barcode || '-'}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top text-slate-700">{item.categoryCode || '-'}</td>
+                      <td className="px-4 py-4 align-top text-slate-700">{item.unitCode || '-'}</td>
+                      <td className="px-4 py-4 align-top text-slate-700">
+                        <p>{item.rackCode || '-'}</p>
+                        <p className="mt-1 text-xs text-slate-500">{item.rackBarcode || '-'}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top text-slate-700">
+                        <p>{formatNumber(item.currentStock)}</p>
+                        <p className="mt-1 text-xs text-slate-500">Min: {formatNumber(item.minimumStock)}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top text-slate-700 tabular-nums">{formatCurrency(item.defaultPrice)}</td>
+                      <td className="px-4 py-4 align-top">
+                        <span className="badge border-slate-200 bg-white text-slate-600">{item.status}</span>
+                      </td>
+                    </>
+                  )
+                  const detail = (
+                    <div className="space-y-5">
+                      <section>
+                        <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                        <div className="grid gap-3 lg:grid-cols-3">
+                          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                            <div className="flex flex-wrap gap-2 mb-1">
+                              <span className="badge border-indigo-100 bg-indigo-50 text-indigo-700 font-mono text-xs">{item.itemCode}</span>
+                              <span className="badge border-slate-200 bg-white text-slate-700 text-xs">{item.status}</span>
+                            </div>
+                            <p className="text-sm">
+                              <span className="text-mute text-xs uppercase tracking-wider mr-2">Nama:</span>
+                              <span className="text-slate-900 font-semibold">{item.itemName}</span>
+                            </p>
+                            <p className="text-xs text-slate-500">Barcode: {item.barcode || '-'}</p>
+                            <p className="text-xs text-slate-500">Diperbarui: {item.updatedAt || '-'}</p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Kategori</p>
+                                <p className="text-slate-800 font-medium">{item.categoryCode || '-'}</p>
+                              </div>
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Satuan</p>
+                                <p className="text-slate-800 font-medium">{item.unitCode || '-'}</p>
+                              </div>
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Rak</p>
+                                <p className="text-slate-800 font-medium">{item.rackCode || '-'}</p>
+                              </div>
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Rak Barcode</p>
+                                <p className="text-slate-800 font-mono text-xs">{item.rackBarcode || '-'}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 space-y-2">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Stok Saat Ini</p>
+                                <p className="text-slate-900 font-bold text-lg tabular-nums">{formatNumber(item.currentStock)}</p>
+                              </div>
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Minimum Stok</p>
+                                <p className="text-slate-700 font-medium tabular-nums">{formatNumber(item.minimumStock)}</p>
+                              </div>
+                              <div className="col-span-2">
+                                <p className="text-mute text-xs uppercase tracking-wider">Harga Default</p>
+                                <p className="text-emerald-800 font-bold tabular-nums">{formatCurrency(item.defaultPrice)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                      <section>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                          <span className="uppercase tracking-[0.14em] text-mute font-semibold">Kode</span>
+                          <span className="text-slate-900 font-mono font-semibold">{item.itemCode}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="uppercase tracking-[0.14em] text-mute font-semibold">Kategori</span>
+                          <span className="text-slate-700">{item.categoryCode || '-'}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="uppercase tracking-[0.14em] text-mute font-semibold">Status</span>
+                          <span className="text-slate-700 font-medium">{item.status}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="uppercase tracking-[0.14em] text-mute font-semibold">Stok</span>
+                          <span className={`tabular-nums font-semibold ${Number(item.currentStock) <= Number(item.minimumStock) ? 'text-rose-700' : 'text-slate-800'}`}>{formatNumber(item.currentStock)}</span>
+                        </div>
+                      </section>
+                      <section className="pt-3 border-t border-line">
+                        <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedItemCode(item.itemCode)}
+                            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeactivate(item)}
+                            disabled={!canUpdate || !reviewDbReady || item.status.toUpperCase() === 'INACTIVE'}
+                            className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            Deactivate
+                          </button>
+                          <Link
+                            href={buildInventoryBarcodeDetailPath(item.itemCode)}
+                            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+                          >
+                            Buka detail
+                          </Link>
+                        </div>
+                      </section>
+                    </div>
+                  )
+                  return (
+                    <ExpandableRow
+                      key={item.itemCode}
+                      id={`itm-${item.itemCode}`}
+                      num={index + 1}
+                      totalCols={9}
+                      compactRow={compactRow}
+                      detail={detail}
+                      tone="muted"
+                    />
+                  )
+                })
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-mute">
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-mute">
                     {loading ? 'Memuat data barang inventory...' : 'Belum ada item yang cocok dengan filter ini.'}
                   </td>
                 </tr>

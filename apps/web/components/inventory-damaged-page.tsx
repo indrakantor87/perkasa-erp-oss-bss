@@ -1,6 +1,7 @@
 'use client'
 
 import { DataSourceStatus } from '@/components/data-source-status'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import { useEffect, useMemo, useState } from 'react'
 import type { DataSourceSnapshot } from '@/lib/types'
 
@@ -270,7 +271,7 @@ export function InventoryDamagedPage({ source, canCreate, reviewDbReady }: Inven
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-[0.18em] text-mute">
-                <th className="px-4 py-3 font-semibold">No</th>
+                <ExpandableHeaderLeftCells />
                 <th className="px-4 py-3 font-semibold">Tanggal</th>
                 <th className="px-4 py-3 font-semibold">Item Barang</th>
                 <th className="px-4 py-3 font-semibold">Jumlah</th>
@@ -282,30 +283,101 @@ export function InventoryDamagedPage({ source, canCreate, reviewDbReady }: Inven
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-sm text-mute">
+                  <td colSpan={8} className="px-4 py-6 text-center text-sm text-mute">
                     Memuat...
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-sm text-mute">
+                  <td colSpan={8} className="px-4 py-6 text-center text-sm text-mute">
                     Belum ada data barang rusak.
                   </td>
                 </tr>
               ) : (
-                items.map((row, index) => (
-                  <tr key={row.id}>
-                    <td className="px-4 py-4 align-top text-slate-700">{index + 1}</td>
-                    <td className="px-4 py-4 align-top text-slate-700">{row.damagedDate}</td>
-                    <td className="px-4 py-4 align-top">
-                      <p className="font-semibold text-slate-950">{row.itemName}</p>
-                    </td>
-                    <td className="px-4 py-4 align-top text-slate-700">{formatNumber(row.qty)}</td>
-                    <td className="px-4 py-4 align-top text-slate-700">{formatCurrency(row.purchasePrice)}</td>
-                    <td className="px-4 py-4 align-top text-slate-700">{formatCurrency(row.sellingPrice)}</td>
-                    <td className="px-4 py-4 align-top text-slate-700">{row.notes || '-'}</td>
-                  </tr>
-                ))
+                items.map((row, index) => {
+                  const compactRow = (
+                    <>
+                      <td className="px-4 py-4 align-top text-slate-700">{row.damagedDate}</td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="font-semibold text-slate-950">{row.itemName}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top text-slate-700">{formatNumber(row.qty)}</td>
+                      <td className="px-4 py-4 align-top text-slate-700">{formatCurrency(row.purchasePrice)}</td>
+                      <td className="px-4 py-4 align-top text-slate-700">{formatCurrency(row.sellingPrice)}</td>
+                      <td className="px-4 py-4 align-top text-slate-700">{row.notes || '-'}</td>
+                    </>
+                  )
+                  const totalBeli = Number(row.purchasePrice ?? 0) * Number(row.qty ?? 0)
+                  const totalJual = Number(row.sellingPrice ?? 0) * Number(row.qty ?? 0)
+                  const detail = (
+                    <div className="space-y-5">
+                      <section>
+                        <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                        <div className="grid gap-3 lg:grid-cols-2">
+                          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                            <p className="text-sm">
+                              <span className="text-mute text-xs uppercase tracking-wider mr-2">Tanggal:</span>
+                              <span className="tabular-nums text-slate-900 font-medium">{row.damagedDate}</span>
+                            </p>
+                            <p className="text-sm">
+                              <span className="text-mute text-xs uppercase tracking-wider mr-2">Item:</span>
+                              <span className="text-slate-900 font-semibold">{row.itemName}</span>
+                            </p>
+                            <p className="text-sm">
+                              <span className="text-mute text-xs uppercase tracking-wider mr-2">Jumlah:</span>
+                              <span className="tabular-nums text-slate-900 font-semibold">{formatNumber(row.qty)} unit</span>
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-4 space-y-2">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Total Nilai Beli</p>
+                                <p className="tabular-nums text-slate-900 font-semibold">{formatCurrency(totalBeli)}</p>
+                              </div>
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Total Nilai Jual</p>
+                                <p className="tabular-nums text-emerald-800 font-semibold">{formatCurrency(totalJual)}</p>
+                              </div>
+                              <div className="col-span-2">
+                                <p className="text-mute text-xs uppercase tracking-wider">Selisih (Kerugian)</p>
+                                <p className="tabular-nums text-rose-700 font-bold">{formatCurrency(totalBeli - totalJual)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                      <section>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                          <span className="uppercase tracking-[0.14em] text-mute font-semibold">ID Record</span>
+                          <span className="text-slate-900 font-mono">{row.id}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="uppercase tracking-[0.14em] text-mute font-semibold">Tanggal</span>
+                          <span className="tabular-nums text-slate-700">{row.damagedDate}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="uppercase tracking-[0.14em] text-mute font-semibold">Qty</span>
+                          <span className="tabular-nums text-slate-700 font-medium">{formatNumber(row.qty)}</span>
+                        </div>
+                      </section>
+                      <section className="pt-3 border-t border-line">
+                        <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-xs text-mute italic">* Aksi input data barang rusak hanya melalui form Input di panel atas.</span>
+                        </div>
+                      </section>
+                    </div>
+                  )
+                  return (
+                    <ExpandableRow
+                      key={row.id}
+                      id={`dmg-${row.id}`}
+                      num={index + 1}
+                      totalCols={8}
+                      compactRow={compactRow}
+                      detail={detail}
+                      tone="default"
+                    />
+                  )
+                })
               )}
             </tbody>
           </table>

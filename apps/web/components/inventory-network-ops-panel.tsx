@@ -9,6 +9,7 @@ import { InventoryOdpPortAssignForm } from '@/components/inventory-odp-port-assi
 import { InventoryOdpPortStatusForm } from '@/components/inventory-odp-port-status-form'
 import { InventoryOdpPortMap } from '@/components/inventory-odp-port-map'
 import type { TableQuickActionPayload } from '@/components/table-quick-action-modal'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import { buildInventoryBarcodeDetailPath, extractInventoryItemCodeFromScan } from '@/lib/inventory-barcode-utils'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -1953,8 +1954,7 @@ export function InventoryNetworkOpsPanel({
           <table className="min-w-[1180px] w-full border-collapse">
             <thead className={useReferenceLikeLayout ? 'bg-[#dbeafe]' : 'bg-slate-50'}>
               <tr className={`text-left text-[11px] font-bold uppercase tracking-[0.14em] ${useReferenceLikeLayout ? 'text-slate-500' : 'text-slate-500'}`}>
-                {!isFocusedOdpMode ? <th className="w-[44px] px-3 py-3"></th> : null}
-                <th className="w-[60px] px-3 py-3">#</th>
+                <ExpandableHeaderLeftCells />
                 <th className="w-[200px] px-3 py-3">Nama ODP</th>
                 <th className="w-[140px] px-3 py-3">POP</th>
                 <th className="px-3 py-3">Lokasi</th>
@@ -1963,7 +1963,6 @@ export function InventoryNetworkOpsPanel({
                 <th className="w-[120px] px-3 py-3">Sisa</th>
                 <th className="w-[120px] px-3 py-3">Status</th>
                 <th className="w-[140px] px-3 py-3">Status Tiang</th>
-                <th className="w-[90px] px-3 py-3">Aksi</th>
               </tr>
             </thead>
             <tbody className={useReferenceLikeLayout ? 'divide-y divide-slate-200 bg-white' : 'divide-y divide-slate-200 bg-white'}>
@@ -1974,89 +1973,157 @@ export function InventoryNetworkOpsPanel({
                 const mapHref = buildOdpMapHref(row)
                 const statusTone = getPortCapacityTone({ totalPorts, activePorts })
                 const isSelected = selectedOdpData?.row.id === row.id
+                const textBase = useReferenceLikeLayout ? 'text-slate-800' : 'text-slate-700'
+                const textTitle = useReferenceLikeLayout ? 'text-slate-950' : 'text-slate-900'
+                const kapQty = activePorts >= totalPorts && totalPorts > 0 ? 'text-rose-600' : textBase
+                const sisQty = remaining === 0 && totalPorts > 0 ? 'text-rose-600' : textBase
 
-                return (
-                  <tr
-                    key={row.id}
-                    className={
-                      useReferenceLikeLayout
-                        ? isSelected
-                          ? 'align-top bg-slate-50 transition-colors'
-                          : 'align-top transition-colors hover:bg-slate-50'
-                        : isSelected
-                          ? 'align-top bg-[#24395c] transition-colors'
-                          : 'align-top transition-colors hover:bg-[#24395c]'
-                    }
-                  >
-                    {!isFocusedOdpMode ? <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-700' : 'text-slate-100'}`}></td> : null}
-                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-500' : 'text-slate-100'}`}>{index + 1}</td>
-                    <td className={`px-3 py-2 text-sm font-semibold ${useReferenceLikeLayout ? 'text-slate-950' : 'text-white'}`}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedOdpId(row.id)
-                          setShowMap(true)
-                          setMapFitKey((current) => current + 1)
-                        }}
-                        className={`text-left transition ${useReferenceLikeLayout ? 'text-slate-950 hover:text-slate-700' : 'text-white hover:text-sky-200'}`}
-                      >
-                        {row.primary}
-                      </button>
+                const compactRow = (
+                  <>
+                    <td className={`px-3 py-2 text-sm font-semibold ${textTitle}`}>
+                      {row.primary}
+                      {isSelected ? <span className="ml-2 badge border-sky-200 bg-sky-50 text-sky-700 text-[10px]">SELECTED</span> : null}
                     </td>
-                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-800' : 'text-slate-100'}`}>{row.secondary}</td>
-                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-800' : 'text-slate-100'}`}>
+                    <td className={`px-3 py-2 text-sm ${textBase}`}>{row.secondary}</td>
+                    <td className={`px-3 py-2 text-sm ${textBase}`}>
                       <p className="line-clamp-2">{row.detail}</p>
                     </td>
-                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-800' : 'text-slate-100'}`}>{totalPorts || '-'}</td>
-                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? activePorts >= totalPorts && totalPorts > 0 ? 'text-rose-500' : 'text-slate-800' : 'text-slate-100'}`}>{activePorts || '-'}</td>
-                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? remaining === 0 && totalPorts > 0 ? 'text-rose-500' : 'text-slate-800' : 'text-slate-100'}`}>{remaining || '-'}</td>
+                    <td className={`px-3 py-2 text-sm tabular-nums ${textBase}`}>{totalPorts || '-'}</td>
+                    <td className={`px-3 py-2 text-sm tabular-nums font-medium ${kapQty}`}>{activePorts || '-'}</td>
+                    <td className={`px-3 py-2 text-sm tabular-nums font-medium ${sisQty}`}>{remaining || '-'}</td>
                     <td className="px-3 py-2 text-sm">
                       <span className={`badge ${statusTone}`}>{getPortCapacityLabel({ totalPorts, activePorts })}</span>
                     </td>
-                    <td className={`px-3 py-2 text-sm ${useReferenceLikeLayout ? 'text-slate-800' : 'text-slate-100'}`}>n/a</td>
-                    <td className="px-3 py-2 text-sm">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedOdpId(row.id)
-                          setShowMap(true)
-                          setMapFitKey((current) => current + 1)
-                        }}
-                        className="mr-2 inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
-                      >
-                        Detail
-                      </button>
-                      {mapHref ? (
-                        <Link
-                          href={mapHref}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700 ${
-                            isFocusedOdpMode ? '' : 'sr-only'
-                          }`}
-                        >
-                          {isFocusedOdpMode ? 'Maps' : 'Buka Maps'}
-                        </Link>
-                      ) : null}
-                      {!isFocusedOdpMode ? (
+                    <td className={`px-3 py-2 text-sm ${textBase}`}>n/a</td>
+                  </>
+                )
+                const lat = parseOdpGeoCoordinate(pickMeta(row.meta, 'Latitude: '), 'lat')
+                const lng = parseOdpGeoCoordinate(pickMeta(row.meta, 'Longitude: '), 'lng')
+                const detail = (
+                  <div className="space-y-5">
+                    <section>
+                      <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                      <div className="grid gap-3 lg:grid-cols-3">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                          <div className="flex flex-wrap gap-2 mb-1">
+                            <span className="badge border-indigo-100 bg-indigo-50 text-indigo-700 font-mono text-xs">{row.primary}</span>
+                            <span className={`badge ${statusTone} text-xs`}>{getPortCapacityLabel({ totalPorts, activePorts })}</span>
+                            {isSelected ? <span className="badge border-sky-200 bg-sky-50 text-sky-700 text-[10px]">Terpilih</span> : null}
+                          </div>
+                          <p className="text-sm">
+                            <span className="text-mute text-xs uppercase tracking-wider mr-2">POP:</span>
+                            <span className={`font-medium ${textTitle}`}>{row.secondary || '-'}</span>
+                          </p>
+                          <div className="text-sm">
+                            <span className="text-mute text-xs uppercase tracking-wider block mb-1">Lokasi</span>
+                            <p className={textBase}>{row.detail || '-'}</p>
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                          <div className="grid grid-cols-3 gap-2 text-sm">
+                            <div>
+                              <p className="text-mute text-xs uppercase tracking-wider">Kapasitas</p>
+                              <p className={`font-bold tabular-nums ${textTitle}`}>{totalPorts || '0'}</p>
+                            </div>
+                            <div>
+                              <p className="text-mute text-xs uppercase tracking-wider">Terpakai</p>
+                              <p className={`font-bold tabular-nums ${kapQty}`}>{activePorts || '0'}</p>
+                            </div>
+                            <div>
+                              <p className="text-mute text-xs uppercase tracking-wider">Sisa</p>
+                              <p className={`font-bold tabular-nums ${sisQty}`}>{remaining || '0'}</p>
+                            </div>
+                          </div>
+                          {lat != null && lng != null ? (
+                            <div className="mt-2">
+                              <p className="text-mute text-xs uppercase tracking-wider mb-1">Koordinat</p>
+                              <p className={`font-mono text-xs ${textBase}`}>
+                                {lat?.toFixed(6)}, {lng?.toFixed(6)}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                          <p className="text-sm">
+                            <span className="text-mute text-xs uppercase tracking-wider mr-2">ID Record:</span>
+                            <span className="font-mono text-xs">{row.id}</span>
+                          </p>
+                          <div className="space-y-1 text-xs">
+                            <p className={textBase}>Status: <span className={`badge ${statusTone} ml-1`}>{getPortCapacityLabel({ totalPorts, activePorts })}</span></p>
+                            <p className={textBase}>Status Tiang: n/a</p>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+                    <section>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                        <span className="uppercase tracking-[0.14em] text-mute font-semibold">Nama ODP</span>
+                        <span className={`font-mono font-semibold ${textTitle}`}>{row.primary}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="uppercase tracking-[0.14em] text-mute font-semibold">POP</span>
+                        <span className={textBase}>{row.secondary || '-'}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="uppercase tracking-[0.14em] text-mute font-semibold">Kapasitas</span>
+                        <span className="tabular-nums font-medium">{activePorts || 0} / {totalPorts || 0}</span>
+                      </div>
+                    </section>
+                    <section className="pt-3 border-t border-line">
+                      <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                      <div className="flex flex-wrap items-center gap-3">
                         <button
                           type="button"
                           onClick={() => {
                             setSelectedOdpId(row.id)
-                            setQuickActionItem(buildInventoryQuickActionPayload(row))
+                            setShowMap(true)
+                            setMapFitKey((current) => current + 1)
                           }}
-                          className="inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/80 p-2 text-white transition hover:bg-slate-700"
+                          className="inline-flex items-center justify-center rounded-md border border-slate-600 bg-slate-800/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-slate-700"
                         >
-                          <Pencil className="h-4 w-4" />
+                          Detail & Peta
                         </button>
-                      ) : null}
-                    </td>
-                  </tr>
+                        {mapHref ? (
+                          <Link
+                            href={mapHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 justify-center rounded-md border border-emerald-700 bg-emerald-600 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-emerald-700"
+                          >
+                            <Map className="h-3.5 w-3.5" />
+                            OpenStreetMap
+                          </Link>
+                        ) : null}
+                        {!isFocusedOdpMode ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOdpId(row.id)
+                              setQuickActionItem(buildInventoryQuickActionPayload(row))
+                            }}
+                            className="inline-flex items-center gap-1 justify-center rounded-md border border-orange-500 bg-orange-500 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-orange-600"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Quick Action
+                          </button>
+                        ) : null}
+                      </div>
+                    </section>
+                  </div>
+                )
+                return (
+                  <ExpandableRow
+                    key={row.id}
+                    id={`odp-${row.id}`}
+                    num={index + 1}
+                    totalCols={10}
+                    compactRow={compactRow}
+                    detail={detail}
+                    tone={useReferenceLikeLayout ? 'default' : 'muted'}
+                  />
                 )
               })}
               {!visibleOdpRows.length ? (
                 <tr>
-                  <td colSpan={isFocusedOdpMode ? 10 : 11} className="px-4 py-6 text-sm text-slate-300">
+                  <td colSpan={10} className="px-4 py-6 text-sm text-slate-500 text-center">
                     Belum ada ODP yang bisa direview.
                   </td>
                 </tr>

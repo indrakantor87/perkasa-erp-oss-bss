@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import type { InventoryMasterSummaryItem } from '@/lib/services/inventory-master-service'
 import type { DataSourceSnapshot } from '@/lib/types'
 
@@ -106,6 +107,7 @@ export function InventoryMasterSummaryPage({
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-[0.18em] text-mute">
+                <ExpandableHeaderLeftCells />
                 <th className="px-4 py-3 font-semibold">Kode</th>
                 <th className="px-4 py-3 font-semibold">Jumlah Item</th>
                 <th className="px-4 py-3 font-semibold">Item Aktif</th>
@@ -115,18 +117,107 @@ export function InventoryMasterSummaryPage({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {items.length > 0 ? (
-                items.map((item) => (
-                  <tr key={item.code} className="align-top">
-                    <td className="px-4 py-4 font-semibold text-slate-950">{item.code}</td>
-                    <td className="px-4 py-4 text-slate-700">{formatNumber(item.itemCount)}</td>
-                    <td className="px-4 py-4 text-slate-700">{formatNumber(item.activeItemCount)}</td>
-                    <td className="px-4 py-4 text-slate-700">{formatNumber(item.totalStock)}</td>
-                    <td className="px-4 py-4 text-slate-700">{formatNumber(item.totalMinimumStock)}</td>
-                  </tr>
-                ))
+                items.map((item, index) => {
+                  const compactRow = (
+                    <>
+                      <td className="px-4 py-4 font-semibold text-slate-950">{item.code}</td>
+                      <td className="px-4 py-4 text-slate-700 tabular-nums">{formatNumber(item.itemCount)}</td>
+                      <td className="px-4 py-4 text-slate-700 tabular-nums">{formatNumber(item.activeItemCount)}</td>
+                      <td className="px-4 py-4 text-slate-700 tabular-nums font-medium">{formatNumber(item.totalStock)}</td>
+                      <td className="px-4 py-4 text-slate-700 tabular-nums">{formatNumber(item.totalMinimumStock)}</td>
+                    </>
+                  )
+                  const stockCoverage =
+                    item.totalMinimumStock > 0
+                      ? Math.round((item.totalStock / item.totalMinimumStock) * 100)
+                      : item.totalStock > 0
+                      ? 999
+                      : 0
+                  const coverageTone =
+                    stockCoverage >= 200
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : stockCoverage >= 100
+                      ? 'border-sky-200 bg-sky-50 text-sky-700'
+                      : stockCoverage >= 50
+                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-rose-200 bg-rose-50 text-rose-700'
+                  const detail = (
+                    <div className="space-y-5">
+                      <section>
+                        <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                        <div className="grid gap-3 lg:grid-cols-2">
+                          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                            <div className="flex flex-wrap gap-2 mb-1">
+                              <span className="badge border-indigo-100 bg-indigo-50 text-indigo-700 font-mono text-xs">{item.code}</span>
+                              <span className={`badge ${coverageTone} text-xs`}>Coverage {stockCoverage}%</span>
+                            </div>
+                            <p className="text-sm">
+                              <span className="text-mute text-xs uppercase tracking-wider mr-2">Kode:</span>
+                              <span className="text-slate-900 font-semibold">{item.code}</span>
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Jumlah Item</p>
+                                <p className="text-slate-800 font-bold tabular-nums">{formatNumber(item.itemCount)}</p>
+                              </div>
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Item Aktif</p>
+                                <p className="text-slate-800 font-bold tabular-nums">{formatNumber(item.activeItemCount)}</p>
+                              </div>
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Total Stok</p>
+                                <p className="text-emerald-800 font-bold tabular-nums">{formatNumber(item.totalStock)}</p>
+                              </div>
+                              <div>
+                                <p className="text-mute text-xs uppercase tracking-wider">Min. Stok</p>
+                                <p className="text-slate-800 font-bold tabular-nums">{formatNumber(item.totalMinimumStock)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                      <section>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                          <span className="uppercase tracking-[0.14em] text-mute font-semibold">Kode</span>
+                          <span className="text-slate-900 font-mono font-semibold">{item.code}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="uppercase tracking-[0.14em] text-mute font-semibold">Item Aktif/Total</span>
+                          <span className="tabular-nums font-medium">{formatNumber(item.activeItemCount)} / {formatNumber(item.itemCount)}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="uppercase tracking-[0.14em] text-mute font-semibold">Coverage</span>
+                          <span className={`font-semibold ${stockCoverage < 100 ? 'text-rose-700' : 'text-emerald-700'}`}>{stockCoverage}%</span>
+                        </div>
+                      </section>
+                      <section className="pt-3 border-t border-line">
+                        <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Link
+                            href="/inventory/items"
+                            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+                          >
+                            Buka Daftar Barang
+                          </Link>
+                        </div>
+                      </section>
+                    </div>
+                  )
+                  return (
+                    <ExpandableRow
+                      key={item.code}
+                      id={`sum-${item.code}`}
+                      num={index + 1}
+                      totalCols={7}
+                      compactRow={compactRow}
+                      detail={detail}
+                      tone="default"
+                    />
+                  )
+                })
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-mute">
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-mute">
                     Belum ada data yang bisa ditampilkan untuk master ini.
                   </td>
                 </tr>

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { DataSourceStatus } from '@/components/data-source-status'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import type { InventoryMovementReportItem, InventoryStockReportItem } from '@/lib/services/inventory-report-service'
 import type { DataSourceSnapshot } from '@/lib/types'
 
@@ -461,8 +462,9 @@ export function InventoryReportPage(props: InventoryReportPageProps) {
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="sticky top-0 z-10 bg-white">
                   <tr className="text-left text-xs uppercase tracking-[0.18em] text-mute">
-                    <th className="sticky left-0 z-20 bg-white px-4 py-3 font-semibold">Kode</th>
-                    <th className="sticky left-[88px] z-20 bg-white px-4 py-3 font-semibold">Nama Barang</th>
+                    <ExpandableHeaderLeftCells />
+                    <th className="sticky left-[136px] z-20 bg-white px-4 py-3 font-semibold">Kode</th>
+                    <th className="sticky left-[224px] z-20 bg-white px-4 py-3 font-semibold">Nama Barang</th>
                     <th className="px-4 py-3 font-semibold">Satuan</th>
                     {dateHeaders.map((d) => (
                       <th
@@ -478,7 +480,7 @@ export function InventoryReportPage(props: InventoryReportPageProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {Array.from(categoryGroups.entries()).flatMap(([cat, catItems]) => {
+                  {Array.from(categoryGroups.entries()).flatMap(([cat, catItems], catIdx) => {
                     let subMasuk = 0
                     let subKeluar = 0
                     let subAkhir = 0
@@ -487,45 +489,111 @@ export function InventoryReportPage(props: InventoryReportPageProps) {
                       subKeluar += it.totalKeluar
                       subAkhir += it.stokAkhir
                     }
+                    const totalColsMatrix = 2 + 3 + dateHeaders.length + 3
                     return [
                       <tr key={`cat-${cat}`} className="bg-slate-50">
-                        <td colSpan={3 + dateHeaders.length + 3} className="sticky left-0 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-700">
+                        <td colSpan={totalColsMatrix} className="sticky left-0 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-700">
                           Kategori: {cat}
                         </td>
                       </tr>,
-                      ...catItems.map((it) => (
-                        <tr key={`it-${it.itemCode}`}>
-                          <td className="sticky left-0 bg-white px-4 py-3 align-top font-semibold text-slate-950">{it.itemCode}</td>
-                          <td className="sticky left-[88px] bg-white px-4 py-3 align-top text-slate-800">{it.itemName}</td>
-                          <td className="px-4 py-3 align-top text-slate-700">{it.unitCode}</td>
-                          {dateHeaders.map((d) => {
-                            const key = String(d)
-                            const bucket = it.dailyByDate[key]
-                            const masuk = bucket?.masuk ?? 0
-                            const keluar = bucket?.keluar ?? 0
-                            return (
-                              <td
-                                key={d}
-                                className={`px-2 py-3 align-top text-center tabular-nums ${isMinggu(d) ? 'bg-amber-50/60' : ''}`}
-                              >
-                                {masuk || keluar ? (
-                                  <div className="flex flex-col gap-1">
-                                    {masuk ? <span className="text-emerald-700 font-semibold">+{formatNumber(masuk)}</span> : null}
-                                    {keluar ? <span className="text-rose-700 font-semibold">-{formatNumber(keluar)}</span> : null}
+                      ...catItems.map((it, idx) => {
+                        const compactRow = (
+                          <>
+                            <td className="sticky left-[136px] bg-white px-4 py-3 align-top font-semibold text-slate-950">{it.itemCode}</td>
+                            <td className="sticky left-[224px] bg-white px-4 py-3 align-top text-slate-800">{it.itemName}</td>
+                            <td className="px-4 py-3 align-top text-slate-700">{it.unitCode}</td>
+                            {dateHeaders.map((d) => {
+                              const key = String(d)
+                              const bucket = it.dailyByDate[key]
+                              const masuk = bucket?.masuk ?? 0
+                              const keluar = bucket?.keluar ?? 0
+                              return (
+                                <td
+                                  key={d}
+                                  className={`px-2 py-3 align-top text-center tabular-nums ${isMinggu(d) ? 'bg-amber-50/60' : ''}`}
+                                >
+                                  {masuk || keluar ? (
+                                    <div className="flex flex-col gap-1">
+                                      {masuk ? <span className="text-emerald-700 font-semibold">+{formatNumber(masuk)}</span> : null}
+                                      {keluar ? <span className="text-rose-700 font-semibold">-{formatNumber(keluar)}</span> : null}
+                                    </div>
+                                  ) : (
+                                    <span className="text-mute">-</span>
+                                  )}
+                                </td>
+                              )
+                            })}
+                            <td className="px-4 py-3 align-top text-right tabular-nums font-semibold text-emerald-700">{formatNumber(it.totalMasuk)}</td>
+                            <td className="px-4 py-3 align-top text-right tabular-nums font-semibold text-rose-700">{formatNumber(it.totalKeluar)}</td>
+                            <td className="px-4 py-3 align-top text-right tabular-nums font-bold text-slate-950">{formatNumber(it.stokAkhir)}</td>
+                          </>
+                        )
+                        const detail = (
+                          <div className="space-y-5">
+                            <section>
+                              <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                              <div className="grid gap-4 md:grid-cols-3">
+                                <div className="rounded-xl border border-line bg-white p-4">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Kode Item</p>
+                                  <p className="mt-2 font-semibold text-slate-950">{it.itemCode}</p>
+                                  <p className="mt-1 text-sm text-mute">{it.itemName}</p>
+                                </div>
+                                <div className="rounded-xl border border-line bg-white p-4">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Kategori & Satuan</p>
+                                  <p className="mt-2 font-semibold text-slate-950">{cat}</p>
+                                  <p className="mt-1 text-sm text-mute">Satuan: {it.unitCode}</p>
+                                </div>
+                                <div className="rounded-xl border border-line bg-white p-4">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Ringkasan Bulan Ini</p>
+                                  <div className="mt-2 space-y-1 text-sm">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-mute">Total Masuk</span>
+                                      <span className="font-semibold text-emerald-700">+{formatNumber(it.totalMasuk)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-mute">Total Keluar</span>
+                                      <span className="font-semibold text-rose-700">-{formatNumber(it.totalKeluar)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between border-t border-line pt-1 mt-1">
+                                      <span className="text-mute font-semibold">Stok Akhir</span>
+                                      <span className="font-bold text-slate-950">{formatNumber(it.stokAkhir)}</span>
+                                    </div>
                                   </div>
-                                ) : (
-                                  <span className="text-mute">-</span>
-                                )}
-                              </td>
-                            )
-                          })}
-                          <td className="px-4 py-3 align-top text-right tabular-nums font-semibold text-emerald-700">{formatNumber(it.totalMasuk)}</td>
-                          <td className="px-4 py-3 align-top text-right tabular-nums font-semibold text-rose-700">{formatNumber(it.totalKeluar)}</td>
-                          <td className="px-4 py-3 align-top text-right tabular-nums font-bold text-slate-950">{formatNumber(it.stokAkhir)}</td>
-                        </tr>
-                      )),
+                                </div>
+                              </div>
+                            </section>
+                            <section className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-600">
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">Kode</span>
+                              <span>{it.itemCode}</span>
+                              <span className="text-slate-300">•</span>
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">Kategori</span>
+                              <span>{cat}</span>
+                              <span className="text-slate-300">•</span>
+                              <span className="font-semibold uppercase tracking-[0.14em] text-mute">Satuan</span>
+                              <span>{it.unitCode}</span>
+                            </section>
+                            <section className="pt-3 border-t border-line">
+                              <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                              <div className="flex flex-wrap items-center gap-3">
+                                <span className="text-xs text-mute italic">* Lihat Kartu Stok lengkap pada Daftar Item Inventory</span>
+                              </div>
+                            </section>
+                          </div>
+                        )
+                        return (
+                          <ExpandableRow
+                            key={`it-${it.itemCode}`}
+                            id={`matrix-${catIdx}-${it.itemCode}`}
+                            num={idx + 1}
+                            totalCols={totalColsMatrix}
+                            compactRow={compactRow}
+                            detail={detail}
+                          />
+                        )
+                      }),
                       <tr key={`sub-${cat}`} className="bg-slate-50/70">
-                        <td colSpan={2} className="sticky left-0 px-4 py-2 text-sm font-bold text-slate-800">
+                        <td colSpan={2}></td>
+                        <td colSpan={2} className="sticky left-[136px] px-4 py-2 text-sm font-bold text-slate-800">
                           Subtotal {cat}
                         </td>
                         <td></td>
@@ -549,12 +617,13 @@ export function InventoryReportPage(props: InventoryReportPageProps) {
                     }
                     return (
                       <tr key="grand" className="bg-slate-950 text-white">
-                        <td colSpan={2} className="sticky left-0 bg-slate-950 px-4 py-3 text-sm font-bold">
+                        <td colSpan={2}></td>
+                        <td colSpan={2} className="sticky left-[136px] bg-slate-950 px-4 py-3 text-sm font-bold">
                           TOTAL KESELURUHAN
                         </td>
-                        <td></td>
+                        <td className="bg-slate-950"></td>
                         {dateHeaders.map((d) => (
-                          <td key={d}></td>
+                          <td key={d} className="bg-slate-950"></td>
                         ))}
                         <td className="px-4 py-3 text-right tabular-nums font-bold text-emerald-300">{formatNumber(grandMasuk)}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-bold text-rose-300">{formatNumber(grandKeluar)}</td>
@@ -572,6 +641,7 @@ export function InventoryReportPage(props: InventoryReportPageProps) {
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-[0.18em] text-mute">
+                    <ExpandableHeaderLeftCells />
                     <th className="px-4 py-3 font-semibold">Item</th>
                     <th className="px-4 py-3 font-semibold">Kategori</th>
                     <th className="px-4 py-3 font-semibold">Satuan</th>
@@ -582,24 +652,102 @@ export function InventoryReportPage(props: InventoryReportPageProps) {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {props.items.length > 0 ? (
-                    props.items.map((item) => (
-                      <tr key={`${item.itemCode}-${item.itemName}`}>
-                        <td className="px-4 py-4">
-                          <p className="font-semibold text-slate-950">{item.itemCode}</p>
-                          <p className="mt-1 text-sm text-mute">{item.itemName}</p>
-                        </td>
-                        <td className="px-4 py-4 text-slate-700">{item.categoryCode}</td>
-                        <td className="px-4 py-4 text-slate-700">{item.unitCode}</td>
-                        <td className="px-4 py-4 text-slate-700">{formatNumber(item.currentStock)}</td>
-                        <td className="px-4 py-4 text-slate-700">{formatNumber(item.minimumStock)}</td>
-                        <td className="px-4 py-4">
-                          <span className="badge border-slate-200 bg-white text-slate-600">{item.itemStatus}</span>
-                        </td>
-                      </tr>
-                    ))
+                    props.items.map((item, idx) => {
+                      const compactRow = (
+                        <>
+                          <td className="px-4 py-4">
+                            <p className="font-semibold text-slate-950">{item.itemCode}</p>
+                            <p className="mt-1 text-sm text-mute">{item.itemName}</p>
+                          </td>
+                          <td className="px-4 py-4 text-slate-700">{item.categoryCode}</td>
+                          <td className="px-4 py-4 text-slate-700">{item.unitCode}</td>
+                          <td className="px-4 py-4 text-slate-700">{formatNumber(item.currentStock)}</td>
+                          <td className="px-4 py-4 text-slate-700">{formatNumber(item.minimumStock)}</td>
+                          <td className="px-4 py-4">
+                            <span className="badge border-slate-200 bg-white text-slate-600">{item.itemStatus}</span>
+                          </td>
+                        </>
+                      )
+                      const stockCoverage = item.minimumStock > 0 ? Math.round((item.currentStock / item.minimumStock) * 100) : 100
+                      const coverageTone =
+                        stockCoverage >= 200
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : stockCoverage >= 120
+                            ? 'border-sky-200 bg-sky-50 text-sky-700'
+                            : stockCoverage >= 100
+                              ? 'border-amber-200 bg-amber-50 text-amber-700'
+                              : 'border-rose-200 bg-rose-50 text-rose-700'
+                      const detail = (
+                        <div className="space-y-5">
+                          <section>
+                            <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                            <div className="grid gap-4 md:grid-cols-4">
+                              <div className="rounded-xl border border-line bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Item</p>
+                                <p className="mt-2 font-semibold text-slate-950">{item.itemCode}</p>
+                                <p className="mt-1 text-sm text-mute">{item.itemName}</p>
+                              </div>
+                              <div className="rounded-xl border border-line bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Klasifikasi</p>
+                                <p className="mt-2 font-semibold text-slate-950">{item.categoryCode}</p>
+                                <p className="mt-1 text-sm text-mute">Satuan: {item.unitCode}</p>
+                              </div>
+                              <div className="rounded-xl border border-line bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Posisi Stok</p>
+                                <div className="mt-2 space-y-1 text-sm">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-mute">Stok Aktual</span>
+                                    <span className="font-semibold text-slate-900">{formatNumber(item.currentStock)}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-mute">Minimum Safety</span>
+                                    <span className="font-semibold text-slate-700">{formatNumber(item.minimumStock)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="rounded-xl border border-line bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Coverage Ratio</p>
+                                <p className={`mt-2 inline-block rounded-md border px-3 py-1 text-sm font-bold ${coverageTone}`}>
+                                  {stockCoverage}%
+                                </p>
+                                <p className="mt-1 text-xs text-mute">
+                                  {stockCoverage >= 100 ? 'Aman di atas minimum' : '⚠ Di bawah batas minimum'}
+                                </p>
+                              </div>
+                            </div>
+                          </section>
+                          <section className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-600">
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">Kode</span>
+                            <span>{item.itemCode}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">Kategori</span>
+                            <span>{item.categoryCode}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">Status</span>
+                            <span>{item.itemStatus}</span>
+                          </section>
+                          <section className="pt-3 border-t border-line">
+                            <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <span className="text-xs text-mute italic">* Lihat Kartu Stok dan detil item lengkap pada menu Daftar Item Inventory</span>
+                            </div>
+                          </section>
+                        </div>
+                      )
+                      return (
+                        <ExpandableRow
+                          key={`${item.itemCode}-${item.itemName}`}
+                          id={`stock-${item.itemCode}`}
+                          num={idx + 1}
+                          totalCols={8}
+                          compactRow={compactRow}
+                          detail={detail}
+                        />
+                      )
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-mute">
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-mute">
                         Belum ada data stok yang bisa ditampilkan.
                       </td>
                     </tr>
@@ -610,6 +758,7 @@ export function InventoryReportPage(props: InventoryReportPageProps) {
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-[0.18em] text-mute">
+                    <ExpandableHeaderLeftCells />
                     <th className="px-4 py-3 font-semibold">Item</th>
                     <th className="px-4 py-3 font-semibold">Tipe</th>
                     <th className="px-4 py-3 font-semibold">Qty</th>
@@ -620,24 +769,92 @@ export function InventoryReportPage(props: InventoryReportPageProps) {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {props.items.length > 0 ? (
-                    props.items.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-4 py-4">
-                          <p className="font-semibold text-slate-950">{item.itemCode}</p>
-                          <p className="mt-1 text-sm text-mute">{item.itemName}</p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className="badge border-slate-200 bg-white text-slate-600">{item.movementType}</span>
-                        </td>
-                        <td className="px-4 py-4 text-slate-700">{formatNumber(item.qty)}</td>
-                        <td className="px-4 py-4 text-slate-700">{item.referenceNo}</td>
-                        <td className="px-4 py-4 text-slate-700">{formatDateDisplay(item.movementAt)}</td>
-                        <td className="px-4 py-4 text-slate-700">{item.notes}</td>
-                      </tr>
-                    ))
+                    props.items.map((item, idx) => {
+                      const compactRow = (
+                        <>
+                          <td className="px-4 py-4">
+                            <p className="font-semibold text-slate-950">{item.itemCode}</p>
+                            <p className="mt-1 text-sm text-mute">{item.itemName}</p>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="badge border-slate-200 bg-white text-slate-600">{item.movementType}</span>
+                          </td>
+                          <td className="px-4 py-4 text-slate-700">{formatNumber(item.qty)}</td>
+                          <td className="px-4 py-4 text-slate-700">{item.referenceNo}</td>
+                          <td className="px-4 py-4 text-slate-700">{formatDateDisplay(item.movementAt)}</td>
+                          <td className="px-4 py-4 text-slate-700">{item.notes}</td>
+                        </>
+                      )
+                      const qtyTone =
+                        item.movementType === 'MASUK' || item.movementType === 'PENERIMAAN'
+                          ? 'text-emerald-700'
+                          : item.movementType === 'KELUAR' || item.movementType === 'PENGELUARAN'
+                            ? 'text-rose-700'
+                            : 'text-slate-700'
+                      const detail = (
+                        <div className="space-y-5">
+                          <section>
+                            <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                            <div className="grid gap-4 md:grid-cols-4">
+                              <div className="rounded-xl border border-line bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Item Barang</p>
+                                <p className="mt-2 font-semibold text-slate-950">{item.itemCode}</p>
+                                <p className="mt-1 text-sm text-mute">{item.itemName}</p>
+                              </div>
+                              <div className="rounded-xl border border-line bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Tipe Movement</p>
+                                <p className="mt-2">
+                                  <span className="badge border-slate-200 bg-white text-slate-600">{item.movementType}</span>
+                                </p>
+                                <p className={`mt-2 text-2xl font-bold ${qtyTone}`}>
+                                  {item.movementType === 'MASUK' || item.movementType === 'PENERIMAAN' ? '+' : item.movementType === 'KELUAR' || item.movementType === 'PENGELUARAN' ? '-' : ''}
+                                  {formatNumber(item.qty)}
+                                </p>
+                              </div>
+                              <div className="rounded-xl border border-line bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Referensi Transaksi</p>
+                                <p className="mt-2 font-semibold text-slate-950">{item.referenceNo || '-'}</p>
+                                <p className="mt-1 text-sm text-mute">Dokumen terkait</p>
+                              </div>
+                              <div className="rounded-xl border border-line bg-white p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Waktu & Catatan</p>
+                                <p className="mt-2 font-semibold text-slate-950">{formatDateDisplay(item.movementAt)}</p>
+                                <p className="mt-1 text-sm text-mute">{item.notes || 'Tidak ada catatan'}</p>
+                              </div>
+                            </div>
+                          </section>
+                          <section className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-600">
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">Tipe</span>
+                            <span>{item.movementType}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">Referensi</span>
+                            <span>{item.referenceNo || '-'}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="font-semibold uppercase tracking-[0.14em] text-mute">Waktu</span>
+                            <span>{formatDateDisplay(item.movementAt)}</span>
+                          </section>
+                          <section className="pt-3 border-t border-line">
+                            <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <span className="text-xs text-mute italic">* Aksi detil transaksi tersedia pada menu worklist inventory terkait</span>
+                            </div>
+                          </section>
+                        </div>
+                      )
+                      return (
+                        <ExpandableRow
+                          key={item.id}
+                          id={`mov-${item.id}`}
+                          num={idx + 1}
+                          totalCols={8}
+                          compactRow={compactRow}
+                          detail={detail}
+                        />
+                      )
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-mute">
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-mute">
                         Belum ada data movement yang bisa ditampilkan.
                       </td>
                     </tr>

@@ -1,5 +1,6 @@
 'use client'
 
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import { useEffect, useMemo, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 
@@ -368,6 +369,7 @@ export function InventoryReceiptsPage({ canCreate, canUpdate, canExport, reviewD
         <table className="min-w-full text-sm">
           <thead className="bg-white">
             <tr className="text-left text-xs font-semibold text-slate-500">
+              <ExpandableHeaderLeftCells />
               <th className="px-4 py-3">ID Transaksi</th>
               <th className="px-4 py-3">Tanggal</th>
               <th className="px-4 py-3">Kode</th>
@@ -376,57 +378,118 @@ export function InventoryReceiptsPage({ canCreate, canUpdate, canExport, reviewD
               <th className="px-4 py-3">Satuan</th>
               <th className="px-4 py-3">Jumlah</th>
               <th className="px-4 py-3">Keterangan</th>
-              <th className="px-4 py-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {loading ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-sm text-mute">
+                <td colSpan={10} className="px-4 py-8 text-center text-sm text-mute">
                   Memuat...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-sm text-mute">
+                <td colSpan={10} className="px-4 py-8 text-center text-sm text-mute">
                   Belum ada data.
                 </td>
               </tr>
             ) : (
-              items.map((row) => (
-                <tr key={row.id}>
-                  <td className="px-4 py-3 text-slate-700">{row.transactionId}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.date}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.itemCode}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.itemName}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.storeName || '.'}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.unitCode || ''}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.qty}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.notes || '.'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        aria-label="Edit barang masuk"
-                        onClick={() => openEditModal(row)}
-                        disabled={!canWriteUpdate}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Hapus barang masuk"
-                        onClick={() => void handleDelete(row)}
-                        disabled={!canWriteUpdate}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-600 text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              items.map((row, index) => {
+                const compactRow = (
+                  <>
+                    <td className="px-4 py-3 text-slate-700">{row.transactionId}</td>
+                    <td className="px-4 py-3 text-slate-700">{row.date}</td>
+                    <td className="px-4 py-3 text-slate-700 font-mono">{row.itemCode}</td>
+                    <td className="px-4 py-3 text-slate-900 font-medium">{row.itemName}</td>
+                    <td className="px-4 py-3 text-slate-700">{row.storeName || '.'}</td>
+                    <td className="px-4 py-3 text-slate-700">{row.unitCode || ''}</td>
+                    <td className="px-4 py-3 text-slate-700 tabular-nums font-semibold">{row.qty}</td>
+                    <td className="px-4 py-3 text-slate-700">{row.notes || '.'}</td>
+                  </>
+                )
+                const detail = (
+                  <div className="space-y-5">
+                    <section>
+                      <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                      <div className="grid gap-3 lg:grid-cols-2">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            <span className="badge border-indigo-100 bg-indigo-50 text-indigo-700 font-mono">{row.transactionId}</span>
+                            <span className="badge border-slate-200 bg-white text-slate-700">Qty: {row.qty} {row.unitCode || ''}</span>
+                          </div>
+                          <p className="text-sm">
+                            <span className="text-mute text-xs uppercase tracking-wider mr-2">Barang:</span>
+                            <span className="text-slate-900 font-semibold">{row.itemName}</span>
+                            <span className="text-mute font-mono text-xs ml-2">({row.itemCode})</span>
+                          </p>
+                          <p className="text-sm">
+                            <span className="text-mute text-xs uppercase tracking-wider mr-2">Tanggal:</span>
+                            <span className="tabular-nums text-slate-700">{row.date}</span>
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                          <p className="text-sm">
+                            <span className="text-mute text-xs uppercase tracking-wider mr-2">Nama Toko:</span>
+                            <span className="text-slate-800 font-medium">{row.storeName || '-'}</span>
+                          </p>
+                          {row.notes ? (
+                            <div className="text-sm mt-2">
+                              <p className="text-mute text-xs uppercase tracking-wider mb-1">Keterangan</p>
+                              <p className="text-slate-700">{row.notes}</p>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </section>
+                    <section>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                        <span className="uppercase tracking-[0.14em] text-mute font-semibold">ID Transaksi</span>
+                        <span className="text-slate-900 font-mono font-semibold">{row.transactionId}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="uppercase tracking-[0.14em] text-mute font-semibold">Tanggal</span>
+                        <span className="tabular-nums text-slate-700">{row.date}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="uppercase tracking-[0.14em] text-mute font-semibold">Qty</span>
+                        <span className="tabular-nums text-slate-700 font-medium">{row.qty} {row.unitCode || ''}</span>
+                      </div>
+                    </section>
+                    <section className="pt-3 border-t border-line">
+                      <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(row)}
+                          disabled={!canWriteUpdate}
+                          className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(row)}
+                          disabled={!canWriteUpdate}
+                          className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Hapus
+                        </button>
+                      </div>
+                    </section>
+                  </div>
+                )
+                return (
+                  <ExpandableRow
+                    key={row.id}
+                    id={`rcpt-${row.id}`}
+                    num={index + 1 + offset}
+                    totalCols={10}
+                    compactRow={compactRow}
+                    detail={detail}
+                    tone="default"
+                  />
+                )
+              })
             )}
           </tbody>
         </table>

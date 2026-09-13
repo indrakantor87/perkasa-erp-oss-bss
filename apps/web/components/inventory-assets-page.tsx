@@ -1,6 +1,7 @@
 'use client'
 
 import { DataSourceStatus } from '@/components/data-source-status'
+import { ExpandableHeaderLeftCells, ExpandableRow } from '@/components/ui-expandable-table'
 import { useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import type { DataSourceSnapshot } from '@/lib/types'
@@ -555,7 +556,7 @@ export function InventoryAssetsPage({ source, canCreate, reviewDbReady }: Invent
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-[0.18em] text-mute">
-                  <th className="px-4 py-3 font-semibold">No</th>
+                  <ExpandableHeaderLeftCells />
                   <th className="px-4 py-3 font-semibold">Jenis</th>
                   <th className="px-4 py-3 font-semibold">Nama Asset</th>
                   <th className="px-4 py-3 font-semibold">Qty</th>
@@ -567,32 +568,104 @@ export function InventoryAssetsPage({ source, canCreate, reviewDbReady }: Invent
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6 text-center text-sm text-mute">
+                    <td colSpan={8} className="px-4 py-6 text-center text-sm text-mute">
                       Memuat...
                     </td>
                   </tr>
                 ) : items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6 text-center text-sm text-mute">
+                    <td colSpan={8} className="px-4 py-6 text-center text-sm text-mute">
                       Belum ada data asset.
                     </td>
                   </tr>
                 ) : (
-                  items.map((row, index) => (
-                    <tr key={row.id}>
-                      <td className="px-4 py-4 align-top text-slate-700">{index + 1}</td>
-                      <td className="px-4 py-4 align-top text-slate-700">{row.assetType}</td>
-                      <td className="px-4 py-4 align-top">
-                        <p className="font-semibold text-slate-950">{row.assetName}</p>
-                      </td>
-                      <td className="px-4 py-4 align-top text-slate-700">{formatNumber(row.qty)}</td>
-                      <td className="px-4 py-4 align-top text-slate-700">{formatCurrency(row.purchasePrice)}</td>
-                      <td className="px-4 py-4 align-top text-slate-700">
-                        {formatCurrency(Number(row.purchasePrice ?? 0) * Number(row.qty ?? 0))}
-                      </td>
-                      <td className="px-4 py-4 align-top text-slate-700">{row.notes || '-'}</td>
-                    </tr>
-                  ))
+                  items.map((row, index) => {
+                    const compactRow = (
+                      <>
+                        <td className="px-4 py-4 align-top text-slate-700">{row.assetType}</td>
+                        <td className="px-4 py-4 align-top">
+                          <p className="font-semibold text-slate-950">{row.assetName}</p>
+                        </td>
+                        <td className="px-4 py-4 align-top text-slate-700">{formatNumber(row.qty)}</td>
+                        <td className="px-4 py-4 align-top text-slate-700">{formatCurrency(row.purchasePrice)}</td>
+                        <td className="px-4 py-4 align-top text-slate-700">
+                          {formatCurrency(Number(row.purchasePrice ?? 0) * Number(row.qty ?? 0))}
+                        </td>
+                        <td className="px-4 py-4 align-top text-slate-700">{row.notes || '-'}</td>
+                      </>
+                    )
+                    const meta = parseAssetNotes(row.notes)
+                    const detail = (
+                      <div className="space-y-5">
+                        <section>
+                          <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                          <div className="grid gap-3 lg:grid-cols-2">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                              <p className="text-sm">
+                                <span className="text-mute text-xs uppercase tracking-wider mr-2">Jenis:</span>
+                                <span className="text-slate-900 font-medium">{row.assetType}</span>
+                              </p>
+                              <p className="text-sm">
+                                <span className="text-mute text-xs uppercase tracking-wider mr-2">Nama:</span>
+                                <span className="text-slate-900 font-semibold">{row.assetName}</span>
+                              </p>
+                              <p className="text-sm">
+                                <span className="text-mute text-xs uppercase tracking-wider mr-2">Qty:</span>
+                                <span className="text-slate-900 tabular-nums">{formatNumber(row.qty)}</span>
+                              </p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                              <p className="text-sm">
+                                <span className="text-mute text-xs uppercase tracking-wider mr-2">Harga Beli:</span>
+                                <span className="text-slate-900 tabular-nums">{formatCurrency(row.purchasePrice)}</span>
+                              </p>
+                              <p className="text-sm">
+                                <span className="text-mute text-xs uppercase tracking-wider mr-2">Total Nilai:</span>
+                                <span className="text-emerald-800 font-semibold tabular-nums">{formatCurrency(Number(row.purchasePrice ?? 0) * Number(row.qty ?? 0))}</span>
+                              </p>
+                              {Object.keys(meta).length > 0 ? (
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {meta.kodeBarang ? <span className="badge border-slate-200 bg-white text-slate-700 font-mono text-xs">{meta.kodeBarang}</span> : null}
+                                  {meta.satuan ? <span className="badge border-slate-200 bg-white text-slate-700 text-xs">Satuan: {meta.satuan}</span> : null}
+                                  {meta.tanggalBeli ? <span className="badge border-slate-200 bg-white text-slate-700 text-xs">Beli: {normalizeDateToNotesDisplay(meta.tanggalBeli)}</span> : null}
+                                  {meta.tanggalKeluar ? <span className="badge border-slate-200 bg-white text-slate-700 text-xs">Keluar: {normalizeDateToNotesDisplay(meta.tanggalKeluar)}</span> : null}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </section>
+                        <section>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">ID Record</span>
+                            <span className="text-slate-900 font-mono">{row.id}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">Jenis</span>
+                            <span className="text-slate-700">{row.assetType}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">Nilai Total</span>
+                            <span className="tabular-nums text-emerald-800 font-semibold">{formatCurrency(Number(row.purchasePrice ?? 0) * Number(row.qty ?? 0))}</span>
+                          </div>
+                        </section>
+                        <section className="pt-3 border-t border-line">
+                          <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className="text-xs text-mute italic">* Aksi edit asset tersedia melalui form Input di panel atas dengan asset ID yang sama.</span>
+                          </div>
+                        </section>
+                      </div>
+                    )
+                    return (
+                      <ExpandableRow
+                        key={row.id}
+                        id={`asset-${row.id}`}
+                        num={index + 1}
+                        totalCols={8}
+                        compactRow={compactRow}
+                        detail={detail}
+                        tone="default"
+                      />
+                    )
+                  })
                 )}
               </tbody>
             </table>
@@ -614,6 +687,7 @@ export function InventoryAssetsPage({ source, canCreate, reviewDbReady }: Invent
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="sticky top-0 bg-white">
                 <tr className="text-left text-xs uppercase tracking-[0.18em] text-mute">
+                  <ExpandableHeaderLeftCells />
                   <th className="px-4 py-3 font-semibold">Kode Barang</th>
                   <th className="px-4 py-3 font-semibold">Nama Asset</th>
                   <th className="px-4 py-3 font-semibold">Kategori</th>
@@ -629,58 +703,145 @@ export function InventoryAssetsPage({ source, canCreate, reviewDbReady }: Invent
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-6 text-center text-sm text-mute">
+                    <td colSpan={12} className="px-4 py-6 text-center text-sm text-mute">
                       Memuat...
                     </td>
                   </tr>
                 ) : registerRows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-6 text-center text-sm text-mute">
+                    <td colSpan={12} className="px-4 py-6 text-center text-sm text-mute">
                       Belum ada data asset register untuk tahun ini.
                     </td>
                   </tr>
                 ) : (
-                  registerRows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="px-4 py-3 align-top font-semibold text-slate-950">
-                        {row.meta.kodeBarang || <span className="text-mute">-</span>}
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <p className="font-semibold text-slate-900">{row.assetName}</p>
-                      </td>
-                      <td className="px-4 py-3 align-top text-slate-700">{row.assetType}</td>
-                      <td className="px-4 py-3 align-top tabular-nums text-slate-700">{formatNumber(row.qty)}</td>
-                      <td className="px-4 py-3 align-top text-slate-700">{row.meta.satuan ?? 'unit'}</td>
-                      <td className="px-4 py-3 align-top text-slate-700 tabular-nums">
-                        {normalizeDateToNotesDisplay(row.meta.tanggalBeli)}
-                      </td>
-                      <td className="px-4 py-3 align-top text-slate-700 tabular-nums">
-                        {normalizeDateToNotesDisplay(row.meta.tanggalKeluar)}
-                      </td>
-                      <td className="px-4 py-3 align-top text-right tabular-nums text-slate-700">
-                        {formatCurrency(row.purchasePrice)}
-                      </td>
-                      <td className="px-4 py-3 align-top text-right tabular-nums text-slate-800 font-semibold">
-                        {formatCurrency(Number(row.purchasePrice ?? 0) * Number(row.qty ?? 0))}
-                      </td>
-                      <td className="px-4 py-3 align-top text-slate-700">
-                        {row.meta.pic || row.meta.lokasi ? (
-                          <div className="flex flex-col gap-1">
-                            {row.meta.pic ? <p className="text-sm">{row.meta.pic}</p> : null}
-                            {row.meta.lokasi ? <p className="text-xs text-mute">{row.meta.lokasi}</p> : null}
+                  registerRows.map((row, index) => {
+                    const compactRow = (
+                      <>
+                        <td className="px-4 py-3 align-top font-semibold text-slate-950">
+                          {row.meta.kodeBarang || <span className="text-mute">-</span>}
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <p className="font-semibold text-slate-900">{row.assetName}</p>
+                        </td>
+                        <td className="px-4 py-3 align-top text-slate-700">{row.assetType}</td>
+                        <td className="px-4 py-3 align-top tabular-nums text-slate-700">{formatNumber(row.qty)}</td>
+                        <td className="px-4 py-3 align-top text-slate-700">{row.meta.satuan ?? 'unit'}</td>
+                        <td className="px-4 py-3 align-top text-slate-700 tabular-nums">
+                          {normalizeDateToNotesDisplay(row.meta.tanggalBeli)}
+                        </td>
+                        <td className="px-4 py-3 align-top text-slate-700 tabular-nums">
+                          {normalizeDateToNotesDisplay(row.meta.tanggalKeluar)}
+                        </td>
+                        <td className="px-4 py-3 align-top text-right tabular-nums text-slate-700">
+                          {formatCurrency(row.purchasePrice)}
+                        </td>
+                        <td className="px-4 py-3 align-top text-right tabular-nums text-slate-800 font-semibold">
+                          {formatCurrency(Number(row.purchasePrice ?? 0) * Number(row.qty ?? 0))}
+                        </td>
+                        <td className="px-4 py-3 align-top text-slate-700">
+                          {row.meta.pic || row.meta.lokasi ? (
+                            <div className="flex flex-col gap-1">
+                              {row.meta.pic ? <p className="text-sm">{row.meta.pic}</p> : null}
+                              {row.meta.lokasi ? <p className="text-xs text-mute">{row.meta.lokasi}</p> : null}
+                            </div>
+                          ) : (
+                            <span className="text-mute">-</span>
+                          )}
+                        </td>
+                      </>
+                    )
+                    const detail = (
+                      <div className="space-y-5">
+                        <section>
+                          <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Detil Data</h4>
+                          <div className="grid gap-3 lg:grid-cols-3">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                              <p className="text-sm">
+                                <span className="text-mute text-xs uppercase tracking-wider mr-2">Kode:</span>
+                                <span className="font-mono text-slate-900 font-semibold">{row.meta.kodeBarang || '-'}</span>
+                              </p>
+                              <p className="text-sm">
+                                <span className="text-mute text-xs uppercase tracking-wider mr-2">Nama:</span>
+                                <span className="text-slate-900 font-semibold">{row.assetName}</span>
+                              </p>
+                              <p className="text-sm">
+                                <span className="text-mute text-xs uppercase tracking-wider mr-2">Kategori:</span>
+                                <span className="text-slate-700">{row.assetType}</span>
+                              </p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div>
+                                  <p className="text-mute text-xs uppercase tracking-wider">Qty</p>
+                                  <p className="tabular-nums text-slate-900 font-semibold">{formatNumber(row.qty)} {row.meta.satuan ?? 'unit'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-mute text-xs uppercase tracking-wider">Tgl Beli</p>
+                                  <p className="tabular-nums text-slate-700">{normalizeDateToNotesDisplay(row.meta.tanggalBeli)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-mute text-xs uppercase tracking-wider">Harga Satuan</p>
+                                  <p className="tabular-nums text-slate-900">{formatCurrency(row.purchasePrice)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-mute text-xs uppercase tracking-wider">Tgl Keluar</p>
+                                  <p className="tabular-nums text-slate-700">{normalizeDateToNotesDisplay(row.meta.tanggalKeluar)}</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 space-y-2">
+                              <p className="text-sm">
+                                <span className="text-mute text-xs uppercase tracking-wider mr-2">Total Nilai:</span>
+                                <span className="text-emerald-800 font-bold text-lg tabular-nums">{formatCurrency(Number(row.purchasePrice ?? 0) * Number(row.qty ?? 0))}</span>
+                              </p>
+                              <div className="text-sm space-y-1">
+                                <p><span className="text-mute text-xs uppercase tracking-wider mr-2">PIC:</span><span className="text-slate-800">{row.meta.pic || '-'}</span></p>
+                                <p><span className="text-mute text-xs uppercase tracking-wider mr-2">Lokasi:</span><span className="text-slate-800">{row.meta.lokasi || '-'}</span></p>
+                              </div>
+                            </div>
                           </div>
-                        ) : (
-                          <span className="text-mute">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                        </section>
+                        <section>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">ID</span>
+                            <span className="text-slate-900 font-mono">{row.id}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">Kategori</span>
+                            <span className="text-slate-700">{row.assetType}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">Perolehan</span>
+                            <span className="tabular-nums text-slate-700">{normalizeDateToNotesDisplay(row.meta.tanggalBeli)}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="uppercase tracking-[0.14em] text-mute font-semibold">Nilai</span>
+                            <span className="tabular-nums text-emerald-800 font-semibold">{formatCurrency(Number(row.purchasePrice ?? 0) * Number(row.qty ?? 0))}</span>
+                          </div>
+                        </section>
+                        <section className="pt-3 border-t border-line">
+                          <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-mute mb-3">Aksi</h5>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className="text-xs text-mute italic">* Aksi asset register dilakukan melalui form Input panel atas. Gunakan filter Tahun Perolehan untuk menemukan data spesifik.</span>
+                          </div>
+                        </section>
+                      </div>
+                    )
+                    return (
+                      <ExpandableRow
+                        key={row.id}
+                        id={`reg-${row.id}`}
+                        num={index + 1}
+                        totalCols={12}
+                        compactRow={compactRow}
+                        detail={detail}
+                        tone="muted"
+                      />
+                    )
+                  })
                 )}
               </tbody>
               {!loading && registerRows.length > 0 ? (
                 <tfoot>
                   <tr className="bg-emerald-50 border-t-2 border-emerald-200">
-                    <td colSpan={8} className="px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] text-emerald-800">
+                    <td colSpan={10} className="px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] text-emerald-800">
                       Total Nilai Asset ({registerRows.length} item)
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-bold text-emerald-800">
