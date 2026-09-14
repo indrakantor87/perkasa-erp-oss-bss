@@ -173,34 +173,37 @@ export default function WorkOrdersPageClient(props: WorkOrdersPageClientProps) {
               {items.map((row, idx) => {
                 const compactRow = (
                   <>
-                    <td className="px-4 py-4 align-top">
+                    <td className="px-4 py-3 align-middle max-w-[14ch]">
                       <Link
                         href={`/dashboard/tracking/work-orders/${row.id}`}
-                        className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90"
+                        className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90 whitespace-nowrap overflow-hidden text-ellipsis block max-w-[14ch]"
+                        title={row.workOrderNo ?? `#${row.id}`}
                       >
                         {row.workOrderNo ?? `#${row.id}`}
                       </Link>
-                      <p className="mt-1 text-xs uppercase tracking-[0.2em] text-mute">{row.workType ?? '-'}</p>
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.jobCategory ?? '-'}</td>
-                    <td className="px-4 py-4 align-top">
-                      <span className="badge border-transparent" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[14ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.jobCategory ?? '-'}>
+                      {row.jobCategory ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 align-middle max-w-[12ch]">
+                      <span className="badge border-transparent whitespace-nowrap max-w-[12ch] overflow-hidden text-ellipsis inline-block" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }} title={row.status ?? '-'}>
                         {row.status ?? '-'}
                       </span>
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.priority ?? '-'}</td>
-                    <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
-                      {row.picFullName || row.picUsername ? (
-                        <>
-                          <p className="font-semibold text-[var(--color-ink-strong)]">{row.picFullName ?? row.picUsername}</p>
-                          <p className="text-xs uppercase tracking-[0.2em] text-mute">{row.picUsername ? `@${row.picUsername}` : ''}</p>
-                        </>
-                      ) : (
-                        '-'
-                      )}
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[10ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.priority ?? '-'}>
+                      {row.priority ?? '-'}
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.technicianName ?? '-'}</td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.scheduledAt ?? '-'}</td>
+                    <td className="px-4 py-3 align-middle text-sm leading-6 text-mute max-w-[16ch]">
+                      <p className="font-semibold text-[var(--color-ink-strong)] whitespace-nowrap overflow-hidden text-ellipsis max-w-[16ch]" title={row.picFullName ?? row.picUsername ?? '-'}>
+                        {row.picFullName ?? row.picUsername ?? '-'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[16ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.technicianName ?? '-'}>
+                      {row.technicianName ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[18ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.scheduledAt ?? '-'}>
+                      {row.scheduledAt ?? '-'}
+                    </td>
                   </>
                 )
 
@@ -231,6 +234,7 @@ export default function WorkOrdersPageClient(props: WorkOrdersPageClientProps) {
                               </td>
                               <td className="px-4 py-3 align-top text-sm text-slate-800">
                                 <p>PIC: {row.picFullName ?? row.picUsername ?? '-'}</p>
+                                {row.picUsername ? <p className="text-xs uppercase tracking-[0.2em] text-mute">@{row.picUsername}</p> : null}
                                 <p className="text-xs text-mute">Teknisi: {row.technicianName ?? '-'}</p>
                                 <p className="text-xs text-mute">Jadwal: {row.scheduledAt ?? '-'}</p>
                               </td>

@@ -130,26 +130,31 @@ export default function TroubleTicketsPageClient(props: TroubleTicketsPageClient
               {items.map((row, idx) => {
                 const compactRow = (
                   <>
-                    <td className="px-4 py-4 align-top">
+                    <td className="px-4 py-3 align-middle max-w-[14ch]">
                       <Link
                         href={`/dashboard/tracking/trouble-tickets/${row.id}`}
-                        className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90"
+                        className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90 whitespace-nowrap overflow-hidden text-ellipsis block max-w-[14ch]"
+                        title={row.ticketCode ?? `#${row.id}`}
                       >
                         {row.ticketCode ?? `#${row.id}`}
                       </Link>
-                      <p className="mt-1 text-xs uppercase tracking-[0.2em] text-mute">{row.category ?? '-'}</p>
                     </td>
-                    <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
-                      <p className="font-semibold text-[var(--color-ink-strong)]">{row.customerName ?? '-'}</p>
-                      <p className="text-xs uppercase tracking-[0.2em] text-mute">{row.customerUser ?? ''}</p>
+                    <td className="px-4 py-3 align-middle text-sm leading-6 text-mute max-w-[16ch]">
+                      <p className="font-semibold text-[var(--color-ink-strong)] whitespace-nowrap overflow-hidden text-ellipsis max-w-[16ch]" title={row.customerName ?? '-'}>
+                        {row.customerName ?? '-'}
+                      </p>
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.type ?? '-'}</td>
-                    <td className="px-4 py-4 align-top">
-                      <span className="badge border-transparent" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[12ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.type ?? '-'}>
+                      {row.type ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 align-middle max-w-[12ch]">
+                      <span className="badge border-transparent whitespace-nowrap max-w-[12ch] overflow-hidden text-ellipsis inline-block" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }} title={row.status ?? '-'}>
                         {row.status ?? '-'}
                       </span>
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.openedAt ?? '-'}</td>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[18ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.openedAt ?? '-'}>
+                      {row.openedAt ?? '-'}
+                    </td>
                   </>
                 )
 

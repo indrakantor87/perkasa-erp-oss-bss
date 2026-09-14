@@ -98,30 +98,32 @@ export default function StockMovementsPageClient(props: StockMovementsPageClient
               {items.map((row, idx) => {
                 const compactRow = (
                   <>
-                    <td className="px-4 py-4 align-top">
+                    <td className="px-4 py-3 align-middle max-w-[14ch]">
                       <Link
                         href={`/dashboard/tracking/stock-movements/${row.id}`}
-                        className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90"
+                        className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90 whitespace-nowrap overflow-hidden text-ellipsis block max-w-[14ch]"
+                        title={row.itemCode ?? `Item #${row.itemId}`}
                       >
                         {row.itemCode ?? `Item #${row.itemId}`}
                       </Link>
-                      <p className="mt-1 text-sm text-mute">{row.itemName ?? ''}</p>
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[20ch] whitespace-nowrap overflow-hidden text-ellipsis" title={`${row.movementType ?? '-'}${row.referenceType ? ` • ${row.referenceType}` : ''}`}>
                       {row.movementType ?? '-'}
                       {row.referenceType ? ` • ${row.referenceType}` : ''}
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.qty ?? '-'}</td>
-                    <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
-                      <p>
-                        {row.fromLocationCode ? `${row.fromLocationCode} → ` : ''}
-                        {row.toLocationCode ? row.toLocationCode : '-'}
-                      </p>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[8ch] whitespace-nowrap overflow-hidden text-ellipsis" title={String(row.qty ?? '-')}>
+                      {row.qty ?? '-'}
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">
+                    <td className="px-4 py-3 align-middle text-sm leading-6 text-mute max-w-[18ch] whitespace-nowrap overflow-hidden text-ellipsis" title={`${row.fromLocationCode ? `${row.fromLocationCode} → ` : ''}${row.toLocationCode ?? '-'}`}>
+                      {row.fromLocationCode ? `${row.fromLocationCode} → ` : ''}
+                      {row.toLocationCode ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[16ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.technicianFullName ?? row.technicianUsername ?? (row.technicianUserId ? `User #${row.technicianUserId}` : '-')}>
                       {row.technicianFullName ?? row.technicianUsername ?? (row.technicianUserId ? `User #${row.technicianUserId}` : '-')}
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.movementAt ?? '-'}</td>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[18ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.movementAt ?? '-'}>
+                      {row.movementAt ?? '-'}
+                    </td>
                   </>
                 )
 

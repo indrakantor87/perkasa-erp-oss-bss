@@ -396,84 +396,59 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
 
                 const compactRow = (
                   <>
-                    <td className="px-4 py-4 align-top">
+                    <td className="px-4 py-3 align-middle max-w-[14ch]">
                       <Link
                         href={item.href}
-                        className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90"
+                        className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90 whitespace-nowrap overflow-hidden text-ellipsis block max-w-[14ch]"
+                        title={item.ticketNo ?? `#${item.sourceId}`}
                       >
                         {item.ticketNo ?? `#${item.sourceId}`}
                       </Link>
-                      {renderTicketMeta(item)}
                     </td>
-                    <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
-                      <p className="font-semibold text-[var(--color-ink-strong)]">{item.customerName ?? '-'}</p>
-                      <p className="text-xs uppercase tracking-[0.2em] text-mute">{item.customerUser ?? 'CUSTOMER / SITE BELUM TERHUBUNG'}</p>
+                    <td className="px-4 py-3 align-middle text-sm leading-5 text-mute max-w-[16ch]">
+                      <p className="font-semibold text-[var(--color-ink-strong)] whitespace-nowrap overflow-hidden text-ellipsis max-w-[16ch]" title={item.customerName ?? '-'}>
+                        {item.customerName ?? '-'}
+                      </p>
                     </td>
-                    <td className="px-4 py-4 align-top">
-                      <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getTypeBadgeClass(item.ticketType)}`}>
+                    <td className="px-4 py-3 align-middle max-w-[10ch]">
+                      <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap max-w-[10ch] overflow-hidden text-ellipsis ${getTypeBadgeClass(item.ticketType)}`}>
                         {(() => {
                           const Icon = getTicketTypeIcon(item.ticketType)
-                          return <Icon className="h-3.5 w-3.5" />
+                          return <Icon className="h-3.5 w-3.5 flex-shrink-0" />
                         })()}
-                        {item.ticketType}
+                        <span className="overflow-hidden text-ellipsis whitespace-nowrap">{item.ticketType}</span>
                       </span>
-                      {item.priority ? <p className="mt-2 text-xs uppercase tracking-[0.2em] text-mute">Priority {item.priority}</p> : null}
-                      <p className="mt-2 text-xs uppercase tracking-[0.2em] text-mute">{item.supportLaneLabel}</p>
                     </td>
-                    <td className="px-4 py-4 align-top">
-                      <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(item.queueStatus)}`}>
-                        {(() => {
-                          const Icon = getQueueStatusIcon(item.queueStatus)
-                          return <Icon className="h-3.5 w-3.5" />
-                        })()}
-                        {item.queueStatus}
+                    <td className="px-4 py-3 align-middle">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap ${getStatusBadgeClass(item.queueStatus)}`}>
+                          {(() => {
+                            const Icon = getQueueStatusIcon(item.queueStatus)
+                            return <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                          })()}
+                          <span className="overflow-hidden text-ellipsis whitespace-nowrap">{item.queueStatus}</span>
+                        </span>
+                        {item.slaLabel ? (
+                          <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold whitespace-nowrap ${getSlaBadgeClass(item.slaState)}`}>
+                            SLA {item.slaLabel}
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-middle text-sm leading-5 text-mute max-w-[12ch]">
+                      <p className="font-semibold text-[var(--color-ink-strong)] whitespace-nowrap overflow-hidden text-ellipsis max-w-[12ch]" title={item.technicianName ?? '-'}>
+                        {item.technicianName ?? '-'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 align-middle text-sm leading-5 text-mute max-w-[14ch]">
+                      <p className="font-semibold text-[var(--color-ink-strong)] whitespace-nowrap overflow-hidden text-ellipsis max-w-[14ch]" title={item.requestCode ?? item.deviceState ?? '-'}>
+                        {item.requestCode ?? item.deviceState ?? '-'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 align-middle text-sm leading-5 text-mute max-w-[14ch] whitespace-nowrap overflow-hidden text-ellipsis" title={`${item.lastUpdateAt ?? '-'}${item.ageLabel ? ' • Umur: ' + item.ageLabel : ''}`}>
+                      <span className="whitespace-nowrap overflow-hidden text-ellipsis block max-w-[14ch]">
+                        {item.lastUpdateAt ?? '-'}
                       </span>
-                      {item.rawStatus ? <p className="mt-2 text-xs uppercase tracking-[0.2em] text-mute">Raw: {item.rawStatus}</p> : null}
-                      {item.slaLabel ? (
-                        <p className={`mt-2 inline-flex rounded-full px-3 py-1 text-[11px] font-semibold ${getSlaBadgeClass(item.slaState)}`}>
-                          SLA {item.slaLabel}
-                        </p>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
-                      <p className="font-semibold text-[var(--color-ink-strong)]">{item.technicianName ?? '-'}</p>
-                      <p>{item.picName ? `PIC: ${item.picName}` : item.supportLaneLabel}</p>
-                      {item.picUsername ? <p className="text-xs uppercase tracking-[0.18em] text-mute">@{item.picUsername}</p> : null}
-                    </td>
-                    <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
-                      <p className="font-semibold text-[var(--color-ink-strong)]">{item.requestCode ?? item.deviceState ?? '-'}</p>
-                      <p>{item.requestStatus ?? item.supportLaneLabel}</p>
-                      <p>{item.requestRequestedFor ?? item.deviceLocationLabel ?? ''}</p>
-                      {item.operationalBadges.length ? (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {item.operationalBadges.map((badge) => (
-                            <span
-                              key={`${item.queueKey}-request-${badge}`}
-                              className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getOperationalBadgeClass(badge)}`}
-                            >
-                              {badge}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                      {item.deviceLifecycleStatus ? (
-                        <p className="mt-2">
-                          <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getLifecycleBadgeClass(item.deviceLifecycleStatus)}`}>
-                            {item.deviceLifecycleStatus}
-                          </span>
-                        </p>
-                      ) : null}
-                      {item.deviceValidationStatus && item.deviceValidationStatus !== 'NOT_REQUIRED' ? (
-                        <p className="mt-2">
-                          <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getValidationBadgeClass(item.deviceValidationStatus)}`}>
-                            {item.deviceValidationStatus}
-                          </span>
-                        </p>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
-                      <p>{item.lastUpdateAt ?? '-'}</p>
-                      {item.ageLabel ? <p>Umur: {item.ageLabel}</p> : null}
                     </td>
                   </>
                 )
@@ -496,12 +471,16 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
                             <tr>
                               <td className="px-4 py-3 align-top text-sm text-slate-800">
                                 <p className="font-semibold">{item.ticketNo ?? `#${item.sourceId}`}</p>
-                                <p className="text-xs text-mute">{item.sourceType}</p>
+                                {renderTicketMeta(item)}
+                                <p className="mt-1 text-xs text-mute">{item.sourceType}</p>
                                 <p className="mt-1 text-xs text-mute">Status Lane: {item.supportLaneLabel}</p>
+                                {item.priority ? <p className="mt-1 text-xs uppercase tracking-[0.2em] text-mute">Priority {item.priority}</p> : null}
                               </td>
                               <td className="px-4 py-3 align-top text-sm text-slate-800">
                                 <p className="font-semibold">{item.customerName ?? '-'}</p>
                                 <p className="text-xs text-mute">{item.customerUser ?? '-'}</p>
+                                <p className="text-xs text-mute">{item.picName ? `PIC: ${item.picName}` : item.supportLaneLabel}</p>
+                                {item.picUsername ? <p className="text-xs uppercase tracking-[0.18em] text-mute">@{item.picUsername}</p> : null}
                               </td>
                               <td className="px-4 py-3 align-top text-sm text-slate-800">
                                 <p>{item.deviceState ?? '-'}</p>
@@ -516,6 +495,20 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
                                 {item.deviceHandoverProofRef ? <p className="text-xs text-mute">Ref Proof: {item.deviceHandoverProofRef}</p> : null}
                                 {item.deviceTicketRef ? <p className="text-xs text-mute">Ref: {item.deviceTicketRef}</p> : null}
                                 {item.deviceLastActor ? <p className="text-xs text-mute">Actor: {item.deviceLastActor}</p> : null}
+                                {item.deviceLifecycleStatus ? (
+                                  <p className="mt-2">
+                                    <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getLifecycleBadgeClass(item.deviceLifecycleStatus)}`}>
+                                      {item.deviceLifecycleStatus}
+                                    </span>
+                                  </p>
+                                ) : null}
+                                {item.deviceValidationStatus && item.deviceValidationStatus !== 'NOT_REQUIRED' ? (
+                                  <p className="mt-2">
+                                    <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getValidationBadgeClass(item.deviceValidationStatus)}`}>
+                                      {item.deviceValidationStatus}
+                                    </span>
+                                  </p>
+                                ) : null}
                               </td>
                               <td className="px-4 py-3 align-top text-sm text-slate-800">
                                 <p>Request: {item.requestCode ?? '-'}</p>
@@ -523,6 +516,21 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
                                 <p className="mt-1 text-xs text-mute">Untuk: {item.requestRequestedFor ?? '-'}</p>
                                 <p className="mt-1 text-xs text-mute">TT: {item.troubleTicketId ?? '-'}</p>
                                 <p className="text-xs text-mute">WO: {item.workOrderId ?? '-'}</p>
+                                <p className="mt-1 text-xs text-mute">Last Update: {item.lastUpdateAt ?? '-'}</p>
+                                {item.ageLabel ? <p className="text-xs text-mute">Umur: {item.ageLabel}</p> : null}
+                                {item.rawStatus ? <p className="mt-1 text-xs uppercase tracking-[0.2em] text-mute">Raw: {item.rawStatus}</p> : null}
+                                {item.operationalBadges.length ? (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {item.operationalBadges.map((badge) => (
+                                      <span
+                                        key={`${item.queueKey}-request-${badge}`}
+                                        className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getOperationalBadgeClass(badge)}`}
+                                      >
+                                        {badge}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null}
                               </td>
                             </tr>
                           </tbody>

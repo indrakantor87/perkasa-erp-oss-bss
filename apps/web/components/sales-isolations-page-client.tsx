@@ -147,21 +147,33 @@ export default function SalesIsolationsPageClient(props: SalesIsolationsPageClie
 
                   const compactRow = (
                     <>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <p className="font-semibold text-inkStrong">{row.primary}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">{pickMeta(row, 'Customer Code: ') || '-'}</p>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[18ch]">
+                        <p className="font-semibold text-inkStrong whitespace-nowrap overflow-hidden text-ellipsis max-w-[18ch]" title={row.primary}>
+                          {row.primary}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">{pickMeta(row, 'Service No: ') || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">{pickMeta(row, 'Phone: ') || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">{pickMeta(row, 'Marketing: ') || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">{row.secondary || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">{pickMeta(row, 'Isolasi: ') || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <p className="max-w-[320px] leading-6">{row.detail || '-'}</p>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[14ch] whitespace-nowrap overflow-hidden text-ellipsis" title={pickMeta(row, 'Service No: ') || '-'}>
+                        {pickMeta(row, 'Service No: ') || '-'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[14ch] whitespace-nowrap overflow-hidden text-ellipsis" title={pickMeta(row, 'Phone: ') || '-'}>
+                        {pickMeta(row, 'Phone: ') || '-'}
+                      </td>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[16ch] whitespace-nowrap overflow-hidden text-ellipsis" title={pickMeta(row, 'Marketing: ') || '-'}>
+                        {pickMeta(row, 'Marketing: ') || '-'}
+                      </td>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[14ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.secondary || '-'}>
+                        {row.secondary || '-'}
+                      </td>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[14ch] whitespace-nowrap overflow-hidden text-ellipsis" title={pickMeta(row, 'Isolasi: ') || '-'}>
+                        {pickMeta(row, 'Isolasi: ') || '-'}
+                      </td>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[30ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.detail || '-'}>
+                        {row.detail || '-'}
+                      </td>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[12ch]">
                         <span
-                          className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${ticketTone}`}
+                          className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] whitespace-nowrap max-w-[12ch] overflow-hidden text-ellipsis ${ticketTone}`}
+                          title={ticketStatus}
                         >
                           {ticketStatus}
                         </span>

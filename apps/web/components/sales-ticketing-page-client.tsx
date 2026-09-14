@@ -189,64 +189,53 @@ export default function SalesTicketingPageClient(props: SalesTicketingPageClient
                 {items.map((item, idx) => {
                   const compactRow = (
                     <>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <p className="font-semibold text-inkStrong">{item.ticketNo ?? `#${item.sourceId}`}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">{item.supportLaneLabel}</p>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[14ch]">
+                        <p className="font-semibold text-inkStrong whitespace-nowrap overflow-hidden text-ellipsis max-w-[14ch]" title={item.ticketNo ?? `#${item.sourceId}`}>
+                          {item.ticketNo ?? `#${item.sourceId}`}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <p className="font-semibold text-inkStrong">{item.customerName ?? '-'}</p>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[16ch]">
+                        <p className="font-semibold text-inkStrong whitespace-nowrap overflow-hidden text-ellipsis max-w-[16ch]" title={item.customerName ?? '-'}>
+                          {item.customerName ?? '-'}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <p>{item.customerUser ?? 'Customer / site belum terhubung'}</p>
-                        {item.workOrderId ? <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">WO #{item.workOrderId}</p> : null}
-                        {item.troubleTicketId ? <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">TT #{item.troubleTicketId}</p> : null}
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[18ch] whitespace-nowrap overflow-hidden text-ellipsis" title={item.customerUser ?? 'Customer / site belum terhubung'}>
+                        {item.customerUser ?? 'Customer / site belum terhubung'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
+                      <td className="px-4 py-3 align-middle max-w-[12ch]">
                         <span
-                          className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getTypeBadgeClass(item.ticketType)}`}
+                          className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] whitespace-nowrap max-w-[12ch] overflow-hidden text-ellipsis ${getTypeBadgeClass(item.ticketType)}`}
+                          title={item.ticketType}
                         >
                           {item.ticketType}
                         </span>
-                        {item.priority ? <p className="mt-2 text-xs uppercase tracking-[0.16em] text-mute">Priority {item.priority}</p> : null}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getStatusBadgeClass(item.queueStatus)}`}
-                        >
-                          {item.queueStatus}
-                        </span>
-                        {item.slaLabel ? (
-                          <p className="mt-2">
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] whitespace-nowrap ${getStatusBadgeClass(item.queueStatus)}`}
+                          >
+                            {item.queueStatus}
+                          </span>
+                          {item.slaLabel ? (
                             <span
-                              className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getSlaBadgeClass(item.slaState)}`}
+                              className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] whitespace-nowrap ${getSlaBadgeClass(item.slaState)}`}
                             >
                               SLA {item.slaLabel}
                             </span>
-                          </p>
-                        ) : null}
+                          ) : null}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <p className="font-semibold text-inkStrong">{item.technicianName ?? '-'}</p>
-                        <p className="mt-1 text-mute">{item.picName ? `PIC: ${item.picName}` : item.supportLaneLabel}</p>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[16ch]">
+                        <p className="font-semibold text-inkStrong whitespace-nowrap overflow-hidden text-ellipsis max-w-[16ch]" title={item.technicianName ?? '-'}>
+                          {item.technicianName ?? '-'}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <p>{formatTicketTimestamp(item.queueStartedAt)}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-mute">{item.ageLabel ?? '-'}</p>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[18ch] whitespace-nowrap overflow-hidden text-ellipsis" title={formatTicketTimestamp(item.queueStartedAt)}>
+                        {formatTicketTimestamp(item.queueStartedAt)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <p>{formatTicketTimestamp(item.lastUpdateAt ?? item.queueStartedAt)}</p>
-                        {item.operationalBadges.length ? (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {item.operationalBadges.slice(0, 2).map((badge) => (
-                              <span
-                                key={`${item.queueKey}-${badge}`}
-                                className="inline-flex rounded-full bg-surfaceMuted px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-muteStrong"
-                              >
-                                {badge}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[18ch] whitespace-nowrap overflow-hidden text-ellipsis" title={formatTicketTimestamp(item.lastUpdateAt ?? item.queueStartedAt)}>
+                        {formatTicketTimestamp(item.lastUpdateAt ?? item.queueStartedAt)}
                       </td>
                     </>
                   )

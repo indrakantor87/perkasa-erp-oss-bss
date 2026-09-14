@@ -232,43 +232,40 @@ export default function CsAdminPageClient(props: CsAdminPageClientProps) {
 
                   const compactRow = (
                     <>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <p className="font-semibold text-inkStrong">{item.bucketQueue}</p>
-                        <p className="mt-1 text-xs text-mute">{item.queue}</p>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[14ch]">
+                        <p className="font-semibold text-inkStrong whitespace-nowrap overflow-hidden text-ellipsis max-w-[14ch]" title={item.bucketQueue}>
+                          {item.bucketQueue}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[24ch]">
                         {customerLink ? (
-                          <>
-                            <p className="font-semibold text-inkStrong">
-                              <Link
-                                href={customerLink}
-                                className="transition hover:underline hover:text-inkStrong"
-                              >
-                                {item.title}
-                              </Link>
-                            </p>
-                            <p className="mt-1">{item.subtitle}</p>
-                          </>
+                          <Link
+                            href={customerLink}
+                            className="font-semibold text-inkStrong transition hover:underline hover:text-inkStrong whitespace-nowrap overflow-hidden text-ellipsis block max-w-[24ch]"
+                            title={item.title}
+                          >
+                            {item.title}
+                          </Link>
                         ) : (
-                          <>
-                            <p className="font-semibold text-inkStrong">{item.title}</p>
-                            <p className="mt-1">{item.subtitle}</p>
-                          </>
+                          <p className="font-semibold text-inkStrong whitespace-nowrap overflow-hidden text-ellipsis max-w-[24ch]" title={item.title}>
+                            {item.title}
+                          </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getDomainBadgeTone(item.domain)}`}>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[12ch]">
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] whitespace-nowrap max-w-[12ch] overflow-hidden text-ellipsis ${getDomainBadgeTone(item.domain)}`} title={item.domain}>
                           {item.domain}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] ${getStatusBadgeTone(item.status)}`}>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[12ch]">
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] whitespace-nowrap max-w-[12ch] overflow-hidden text-ellipsis ${getStatusBadgeTone(item.status)}`} title={item.status}>
                           {item.status}
                         </span>
-                        {item.dueLabel ? <p className="mt-2 text-xs text-mute">Target: {item.dueLabel}</p> : null}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muteStrong">
-                        <p className="font-semibold text-inkStrong">{item.owner || '-'}</p>
+                      <td className="px-4 py-3 align-middle text-sm text-muteStrong max-w-[16ch]">
+                        <p className="font-semibold text-inkStrong whitespace-nowrap overflow-hidden text-ellipsis max-w-[16ch]" title={item.owner || '-'}>
+                          {item.owner || '-'}
+                        </p>
                       </td>
                     </>
                   )

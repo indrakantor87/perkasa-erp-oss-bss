@@ -95,28 +95,37 @@ export default function InventoryRequestsPageClient(props: InventoryRequestsPage
               {items.map((row, idx) => {
                 const compactRow = (
                   <>
-                    <td className="px-4 py-4 align-top">
+                    <td className="px-4 py-3 align-middle max-w-[14ch]">
                       <Link
                         href={`/dashboard/tracking/inventory-requests/${row.id}`}
-                        className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90"
+                        className="text-sm font-semibold text-[var(--color-ink-strong)] hover:opacity-90 whitespace-nowrap overflow-hidden text-ellipsis block max-w-[14ch]"
+                        title={row.requestCode ?? `#${row.id}`}
                       >
                         {row.requestCode ?? `#${row.id}`}
                       </Link>
-                      <p className="mt-1 text-xs uppercase tracking-[0.2em] text-mute">{row.requestType ?? '-'}</p>
                     </td>
-                    <td className="px-4 py-4 align-top text-sm leading-6 text-mute">
-                      <p className="font-semibold text-[var(--color-ink-strong)]">{row.itemCode ?? `Item #${row.inventoryItemId}`}</p>
-                      <p className="text-xs uppercase tracking-[0.2em] text-mute">{row.itemName ?? ''}</p>
+                    <td className="px-4 py-3 align-middle text-sm leading-6 text-mute max-w-[16ch]">
+                      <p className="font-semibold text-[var(--color-ink-strong)] whitespace-nowrap overflow-hidden text-ellipsis max-w-[16ch]" title={row.itemCode ?? `Item #${row.inventoryItemId}`}>
+                        {row.itemCode ?? `Item #${row.inventoryItemId}`}
+                      </p>
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.requestQty ?? '-'}</td>
-                    <td className="px-4 py-4 align-top">
-                      <span className="badge border-transparent" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[8ch] whitespace-nowrap overflow-hidden text-ellipsis" title={String(row.requestQty ?? '-')}>
+                      {row.requestQty ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 align-middle max-w-[12ch]">
+                      <span className="badge border-transparent whitespace-nowrap max-w-[12ch] overflow-hidden text-ellipsis inline-block" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }} title={row.requestStatus ?? '-'}>
                         {row.requestStatus ?? '-'}
                       </span>
                     </td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.requestedSubdivision ?? '-'}</td>
-                    <td className="px-4 py-4 align-top text-sm leading-6 text-mute">{row.requestedBy ?? '-'}</td>
-                    <td className="px-4 py-4 align-top text-sm text-[var(--color-mute-strong)]">{row.requestedAt ?? '-'}</td>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[16ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.requestedSubdivision ?? '-'}>
+                      {row.requestedSubdivision ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 align-middle text-sm leading-6 text-mute max-w-[16ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.requestedBy ?? '-'}>
+                      {row.requestedBy ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 align-middle text-sm text-[var(--color-mute-strong)] max-w-[18ch] whitespace-nowrap overflow-hidden text-ellipsis" title={row.requestedAt ?? '-'}>
+                      {row.requestedAt ?? '-'}
+                    </td>
                   </>
                 )
 
