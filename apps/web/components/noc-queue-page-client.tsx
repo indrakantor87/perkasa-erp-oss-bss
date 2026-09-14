@@ -246,11 +246,22 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
               defaultValue={ticketType}
               className="rounded-2xl border border-line bg-surface px-4 py-3 text-ink outline-none transition focus:shadow-focus"
             >
-              <option value="">Semua</option>
+              <option value="">Semua ({totalTickets})</option>
               {ticketTypeOptions.map((item) => (
-                <option key={item} value={item}>{item}</option>
+                <option key={item} value={item}>{item} ({typeCounts[item] ?? 0})</option>
               ))}
             </select>
+            <div className="flex flex-wrap gap-1.5">
+              {ticketTypeOptions.map((item) => (
+                <Link
+                  key={item}
+                  href={buildFilterHref({ ticketType: item })}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${ticketType === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
+                >
+                  {item} {typeCounts[item]}
+                </Link>
+              ))}
+            </div>
           </label>
 
           <label className="flex flex-col gap-2 text-sm text-muteStrong">
@@ -265,6 +276,17 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
+            <div className="flex flex-wrap gap-1.5">
+              {queueStatusOptions.map((item) => (
+                <Link
+                  key={item}
+                  href={buildFilterHref({ queueStatus: item })}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${queueStatus === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
+                >
+                  {item}
+                </Link>
+              ))}
+            </div>
           </label>
 
           <label className="flex flex-col gap-2 text-sm text-muteStrong">
@@ -279,6 +301,17 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
+            <div className="flex flex-wrap gap-1.5">
+              {slaStateOptions.map((item) => (
+                <Link
+                  key={item}
+                  href={buildFilterHref({ slaState: item })}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${slaState === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
+                >
+                  SLA {item}
+                </Link>
+              ))}
+            </div>
           </label>
 
           <div className="flex flex-col gap-2 text-sm text-muteStrong">
@@ -317,57 +350,6 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
             ) : null}
           </div>
         </form>
-
-        <div className="mt-4 rounded-2xl border border-line bg-surfaceSoft p-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">
-              <span className="rounded-full border border-line bg-surface px-3 py-1.5">Jenis Cepat</span>
-              <Link
-                href={buildFilterHref({ ticketType: '' })}
-                className={`rounded-full px-3 py-1.5 ${ticketType ? 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated' : 'bg-accent text-accentInk'}`}
-              >
-                Semua
-              </Link>
-              {ticketTypeOptions.map((item) => (
-                <Link
-                  key={item}
-                  href={buildFilterHref({ ticketType: item })}
-                  className={`rounded-full px-3 py-1.5 ${ticketType === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
-                >
-                  {item} {typeCounts[item]}
-                </Link>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">
-              <span className="rounded-full border border-line bg-surface px-3 py-1.5">Status Cepat</span>
-              <Link
-                href={buildFilterHref({ queueStatus: '' })}
-                className={`rounded-full px-3 py-1.5 ${queueStatus ? 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated' : 'bg-accent text-accentInk'}`}
-              >
-                Semua
-              </Link>
-              {queueStatusOptions.map((item) => (
-                <Link
-                  key={item}
-                  href={buildFilterHref({ queueStatus: item })}
-                  className={`rounded-full px-3 py-1.5 ${queueStatus === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
-                >
-                  {item}
-                </Link>
-              ))}
-              {slaStateOptions.map((item) => (
-                <Link
-                  key={item}
-                  href={buildFilterHref({ slaState: item })}
-                  className={`rounded-full px-3 py-1.5 ${slaState === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
-                >
-                  SLA {item}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
 
         {error ? (
           <div className="mt-6 rounded-3xl border border-warning/40 bg-warning/10 px-5 py-4 text-warning">
