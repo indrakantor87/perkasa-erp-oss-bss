@@ -107,18 +107,18 @@ export function SupportActionFormModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-      <button type="button" aria-label="Tutup form aksi support" className="absolute inset-0" onClick={handleClose} />
+    <div className="fixed inset-0 z-[100] grid place-items-center overflow-auto bg-slate-950/70 p-2 backdrop-blur-sm sm:p-4 lg:p-6">
+      <button type="button" aria-label="Tutup form aksi support" className="fixed inset-0 z-0" onClick={handleClose} />
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-10 w-full self-center max-w-[min(72rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] md:max-w-[calc(100vw-4rem)] xl:max-w-[min(72rem,calc(100vw-21rem))] overflow-x-hidden overflow-y-auto rounded-3xl border border-line bg-white shadow-2xl"
+        className="relative z-10 my-auto mx-auto w-full min-w-0 max-w-full sm:max-w-[calc(100vw-2rem)] md:max-w-[calc(100vw-4rem)] lg:max-w-[calc(100vw-8rem)] xl:max-w-[min(68rem,calc(100vw-20rem-1rem))] max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)] md:max-h-[calc(100vh-3rem)] xl:max-h-[calc(100vh-3rem)] overflow-x-hidden overflow-y-auto rounded-3xl border border-line bg-white shadow-2xl xl:mr-[19rem]"
       >
-        <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-6 py-5 backdrop-blur">
+        <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 py-4 backdrop-blur sm:px-6 sm:py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="section-title">{heading}</p>
-              <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
+              <h3 className="mt-2 font-[family-name:var(--font-heading)] text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
                 {activeItem.title}
               </h3>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-mute">{activeItem.description}</p>
@@ -127,13 +127,13 @@ export function SupportActionFormModal({
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+              className="shrink-0 rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
             >
               Tutup
             </button>
           </div>
         </div>
-        <div className="px-6 py-6">{activeItem.element}</div>
+        <div className="px-4 py-4 sm:px-6 sm:py-6">{activeItem.element}</div>
       </div>
     </div>
   )
