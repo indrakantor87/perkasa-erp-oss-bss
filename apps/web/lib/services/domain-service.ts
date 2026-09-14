@@ -1800,6 +1800,38 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
     { label: 'Rasio Overdue', value: formatPercentage(slaOverdueTickets.length, slaOpenTickets.length) },
   ]
 
+  const TT_V2_SECTION_MARKER = '[TT V2 FIELDS]'
+  const TT_V2_FIELD_SEP = ' | '
+  type TroubleTicketV2Meta = Partial<{
+    'NO WA': string
+    'LINK MAPS': string
+    PAKET: string
+    ONT: string
+    'JENIS GANGGUAN': string
+    CATEGORY: string
+    SOURCE: string
+    'CREATED BY': string
+  }>
+  function extractTroubleTicketV2Meta(notes: string | null | undefined): TroubleTicketV2Meta & { rawNotesClean: string } {
+    const raw = String(notes ?? '')
+    const markerIndex = raw.indexOf(TT_V2_SECTION_MARKER)
+    const rawNotesClean = (markerIndex >= 0 ? raw.slice(0, markerIndex) : raw).replace(/\s{2,}/g, ' ').trim()
+    const inlineBlock = markerIndex >= 0 ? raw.slice(markerIndex + TT_V2_SECTION_MARKER.length).trim() : ''
+    const meta: TroubleTicketV2Meta = {}
+    if (inlineBlock) {
+      for (const chunk of inlineBlock.split(TT_V2_FIELD_SEP)) {
+        const trimmed = chunk.trim()
+        if (!trimmed) continue
+        const firstColon = trimmed.indexOf(':')
+        if (firstColon < 0) continue
+        const key = trimmed.slice(0, firstColon).trim() as keyof TroubleTicketV2Meta
+        const value = trimmed.slice(firstColon + 1).trim()
+        meta[key] = value
+      }
+    }
+    return { ...meta, rawNotesClean }
+  }
+
   const buildSupportTicketRow = (
     item: ReviewDbSupportTicketRow,
     options: {
@@ -1813,19 +1845,27 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
     const slaState = getSlaState(item.slaDueAt)
     const queueReason = getSupportTicketQueueReason(item)
     const queuePriority = getSupportQueuePriorityLabel(queueReason)
+    const v2Meta = extractTroubleTicketV2Meta(item.notes)
+    const rawNotesClean = v2Meta.rawNotesClean
+    const v2MetaEntries: string[] = []
+    for (const key of ['NO WA', 'LINK MAPS', 'PAKET', 'ONT', 'JENIS GANGGUAN', 'SOURCE', 'CREATED BY'] as const) {
+      const value = v2Meta[key]
+      if (value) v2MetaEntries.push(`${key}: ${value}`)
+    }
 
     return {
       id: options.idSuffix ? `${item.ticketCode}-${options.idSuffix}` : item.ticketCode,
       primary: item.ticketCode,
       secondary: item.customerName,
       status: options.status,
-      detail: item.progressNotes?.trim() || item.notes?.trim() || options.defaultDetail,
+      detail: item.progressNotes?.trim() || rawNotesClean || options.defaultDetail,
       meta: [
         `Type: ${item.ticketType || '-'}`,
         `Customer User: ${item.customerUser || '-'}`,
         `Service No: ${item.serviceNo || '-'}`,
         `Customer Code: ${item.customerCode || '-'}`,
         `Phone: ${item.customerPhone || '-'}`,
+        ...v2MetaEntries,
         `Opened: ${formatDateTime(item.openedAt)}`,
         `Closed: ${formatDateTime(item.closedAt)}`,
         `SLA Days: ${item.slaDurationDays ?? '-'}`,
@@ -1845,7 +1885,7 @@ async function getReviewDbSupportSections(session: AppSession, params?: {
         `Queue Priority: ${queuePriority}`,
         `Queue Reason: ${queueReason}`,
         `Close Candidate: ${options.closeCandidate}`,
-        `Ticket Notes: ${item.notes?.trim() || '-'}`,
+        `Ticket Notes: ${rawNotesClean || '-'}`,
         `Linked Work Order IDs: ${item.linkedWorkOrderIds || '-'}`,
         `Linked Work Order Codes: ${item.linkedWorkOrderCodes || '-'}`,
       ],

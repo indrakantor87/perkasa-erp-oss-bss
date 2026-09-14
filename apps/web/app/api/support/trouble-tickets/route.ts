@@ -16,6 +16,59 @@ const allowedPriorities = new Set(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
 const allowedFieldStatuses = new Set(['OPEN', 'SCHEDULED', 'ON_PROGRESS'])
 const allowedFieldWorkTypes = new Set(['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'])
 const allowedJobCategories = new Set(['TROUBLE', 'JOINTER', 'JALUR', 'EXPAN'])
+const allowedParentTicketTypes = new Set([
+  'KONEKSI',
+  'LATENCY',
+  'PREVENTIVE',
+  'HARDWARE',
+  'BILLING',
+  'DISMANTLE',
+  'JALUR',
+  'PSB',
+  'LAINNYA',
+])
+
+const TT_V2_SECTION_MARKER = '[TT V2 FIELDS]'
+const TT_V2_FIELD_SEP = ' | '
+type TroubleTicketV2Meta = Partial<{
+  'NO WA': string
+  'LINK MAPS': string
+  PAKET: string
+  ONT: string
+  'JENIS GANGGUAN': string
+  CATEGORY: string
+  SOURCE: string
+  'CREATED BY': string
+}>
+
+function buildTroubleTicketV2MetaBlock(meta: TroubleTicketV2Meta) {
+  const entries = Object.entries(meta).filter(([, value]) => value != null && String(value).trim() !== '')
+  if (!entries.length) return ''
+  const inline = entries
+    .map(([key, value]) => `${key}: ${String(value).replace(/\s+/g, ' ').trim()}`)
+    .join(TT_V2_FIELD_SEP)
+  return `${TT_V2_SECTION_MARKER} ${inline}`
+}
+
+function extractTroubleTicketV2Meta(notes: string | null | undefined): TroubleTicketV2Meta & { rawNotesClean: string } {
+  const raw = String(notes ?? '')
+  const markerIndex = raw.indexOf(TT_V2_SECTION_MARKER)
+  const rawNotesClean = (markerIndex >= 0 ? raw.slice(0, markerIndex) : raw).replace(/\s{2,}/g, ' ').trim()
+  const inlineBlock = markerIndex >= 0 ? raw.slice(markerIndex + TT_V2_SECTION_MARKER.length).trim() : ''
+  const meta: TroubleTicketV2Meta = {}
+  if (inlineBlock) {
+    for (const chunk of inlineBlock.split(TT_V2_FIELD_SEP)) {
+      const trimmed = chunk.trim()
+      if (!trimmed) continue
+      const firstColon = trimmed.indexOf(':')
+      if (firstColon < 0) continue
+      const key = trimmed.slice(0, firstColon).trim() as keyof TroubleTicketV2Meta
+      const value = trimmed.slice(firstColon + 1).trim()
+      meta[key] = value
+    }
+  }
+  return { ...meta, rawNotesClean }
+}
 
 type WorkOrderPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
 
@@ -137,8 +190,18 @@ export async function POST(request: Request) {
       customerUser?: unknown
       category?: unknown
       type?: unknown
+      typeParent?: unknown
       status?: unknown
       problemCategory?: unknown
+      jenisGangguan?: unknown
+      customerWhatsapp?: unknown
+      noWa?: unknown
+      linkMaps?: unknown
+      packagePlan?: unknown
+      paket?: unknown
+      ontSerial?: unknown
+      ont?: unknown
+      ticketSource?: unknown
       createFieldWorkOrder?: unknown
       workOrderStatus?: unknown
       fieldWorkType?: unknown
@@ -154,9 +217,20 @@ export async function POST(request: Request) {
     const customerName = String(payload.customerName ?? '').trim()
     const customerUser = String(payload.customerUser ?? '').trim()
     const category = String(payload.category ?? '').trim().toUpperCase()
-    const type = String(payload.type ?? '').trim().toUpperCase()
+    const typeRaw = String(payload.type ?? '').trim().toUpperCase()
+    const typeParentRaw = String(payload.typeParent ?? payload.type ?? '').trim().toUpperCase()
+    const parentTicketType = allowedParentTicketTypes.has(typeParentRaw) ? typeParentRaw : typeRaw
+    const legacyType = allowedParentTicketTypes.has(typeRaw) ? typeRaw : 'KONEKSI'
+    const type = typeRaw || legacyType
     const status = String(payload.status ?? '').trim().toUpperCase()
-    const problemCategory = String(payload.problemCategory ?? '').trim()
+    const problemCategoryOld = String(payload.problemCategory ?? '').trim()
+    const jenisGangguan = String(payload.jenisGangguan ?? '').trim()
+    const customerWhatsapp = String(payload.customerWhatsapp ?? payload.noWa ?? '').trim()
+    const linkMaps = String(payload.linkMaps ?? '').trim()
+    const packagePlan = String(payload.packagePlan ?? payload.paket ?? '').trim()
+    const ontSerial = String(payload.ontSerial ?? payload.ont ?? '').trim()
+    const ticketSource = String(payload.ticketSource ?? '').trim() || 'NOC_OPERATOR_MANUAL'
+    const resolvedProblemCategory = jenisGangguan || problemCategoryOld || null
     const createFieldWorkOrder = ['1', 'true', 'yes', 'on'].includes(
       String(payload.createFieldWorkOrder ?? '')
         .trim()
@@ -194,6 +268,12 @@ export async function POST(request: Request) {
     if (String(payload.scheduledAt ?? '').trim() && !scheduledAt) {
       return Response.json({ message: 'Jadwal work order lapangan tidak valid.' }, { status: 400 })
     }
+    if (linkMaps && !/^https?:\/\//i.test(linkMaps)) {
+      return Response.json({ message: 'Link Maps harus diawali http:// atau https://.' }, { status: 400 })
+    }
+    if (customerWhatsapp && !/^[0-9+\-\s()]{6,}$/.test(customerWhatsapp)) {
+      return Response.json({ message: 'No WA harus berupa nomor telepon yang valid (min 6 digit angka).' }, { status: 400 })
+    }
 
     const linkedSubscription = await resolveLinkedSubscription(serviceReference)
     if (!linkedSubscription) {
@@ -223,12 +303,22 @@ export async function POST(request: Request) {
     }
 
     const ticketCode = await generateTicketCode(category)
-    const notes = `[Review Ticket] ${session.displayName} (${session.username})${
-      notesRaw ? ` - ${notesRaw}` : ''
-    }`
+    const actorUserId = await resolveReviewAuthUserIdByUsername(session.username)
+    const metaV2: TroubleTicketV2Meta = {
+      'NO WA': customerWhatsapp || undefined,
+      'LINK MAPS': linkMaps || undefined,
+      PAKET: packagePlan || undefined,
+      ONT: ontSerial || undefined,
+      'JENIS GANGGUAN': jenisGangguan || undefined,
+      CATEGORY: category || undefined,
+      SOURCE: ticketSource || undefined,
+      'CREATED BY': `${session.role ?? 'UNKNOWN'} | ${session.displayName ?? ''} (${session.username ?? ''})` || undefined,
+    }
+    const metaBlockV2 = buildTroubleTicketV2MetaBlock(metaV2)
+    const humanReviewPrefix = `[Review Ticket] ${session.displayName} (${session.username})${notesRaw ? ` - ${notesRaw}` : ''}`
+    const notes = [humanReviewPrefix, metaBlockV2].filter(Boolean).join('  ')
     const resolvedCustomerName = customerName || linkedSubscription.customerName
     const resolvedCustomerUser = customerUser || linkedSubscription.serviceNo || linkedSubscription.customerCode || null
-    const actorUserId = await resolveReviewAuthUserIdByUsername(session.username)
 
     const ticketInsertResult = await runReviewDbExecute<ExecuteResult>(
       `
@@ -253,7 +343,7 @@ export async function POST(request: Request) {
         category,
         type,
         status,
-        problemCategory || null,
+        resolvedProblemCategory,
         notes,
       ],
     )

@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TechnicianUserPicker } from '@/components/technician-user-picker'
 import { SupportFormContextNote } from '@/components/support-form-context-note'
@@ -20,6 +20,30 @@ const fieldWorkOrderStatusOptions = ['OPEN', 'SCHEDULED', 'ON_PROGRESS'] as cons
 const fieldJobCategoryOptions = ['TROUBLE', 'JOINTER', 'JALUR', 'EXPAN'] as const
 const priorityOptions = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
 
+const parentTicketTypeOptions = [
+  'KONEKSI',
+  'LATENCY',
+  'PREVENTIVE',
+  'HARDWARE',
+  'BILLING',
+  'DISMANTLE',
+  'JALUR',
+  'PSB',
+  'LAINNYA',
+] as const
+
+const jenisGangguanMap: Record<(typeof parentTicketTypeOptions)[number] | string, string[]> = {
+  KONEKSI: ['TOTAL DOWN', 'INTERMITTENT', 'PACKET LOSS', 'SLOW SPEED', 'NO SYNC', 'SPLICE / KABEL', 'LAINNYA'],
+  LATENCY: ['HIGH LATENCY', 'JITTER', 'LATENCY SPIKE', 'LAINNYA'],
+  PREVENTIVE: ['PEMERIKSAAN RUTIN', 'CLEANING ODP', 'REKABET KABEL', 'LAINNYA'],
+  HARDWARE: ['ONT MATI', 'ONT RUSAK', 'PORT ODP RUSAK', 'SFP RUSAK', 'ROUTER CPE', 'LAINNYA'],
+  BILLING: ['TAGIHAN BELUM LUNAS', 'SUSPEND BILLING', 'KOMPLAIN TAGIHAN', 'LAINNYA'],
+  DISMANTLE: ['PEMUTUSAN LAYANAN', 'PEMBONGKARAN ONT', 'PENGEMBALIAN PERANGKAT', 'LAINNYA'],
+  JALUR: ['KABEL PUTUS', 'SPLICE RUSAK', 'ODP PENUH', 'REKABET JALUR', 'LAINNYA'],
+  PSB: ['INSTALASI BARU', 'AKTIVASI LAYANAN', 'UJI COBA KUALITAS', 'LAINNYA'],
+  LAINNYA: ['KOMPLAIN UMUM', 'REQUEST INFORMASI', 'LAINNYA'],
+}
+
 export function SupportTicketCreateForm({
   canCreate,
   reviewDbReady,
@@ -31,9 +55,15 @@ export function SupportTicketCreateForm({
   const [customerName, setCustomerName] = useState('')
   const [customerUser, setCustomerUser] = useState('')
   const [category, setCategory] = useState<(typeof categoryOptions)[number]>('TT')
-  const [ticketType, setTicketType] = useState(typeSuggestions[0] ?? 'KONEKSI')
   const [status, setStatus] = useState<(typeof statusOptions)[number]>('OPEN')
-  const [problemCategory, setProblemCategory] = useState('')
+
+  const [noWa, setNoWa] = useState('')
+  const [linkMaps, setLinkMaps] = useState('')
+  const [typeParent, setTypeParent] = useState<(typeof parentTicketTypeOptions)[number] | ''>('')
+  const [paket, setPaket] = useState('')
+  const [ont, setOnt] = useState('')
+  const [jenisGangguan, setJenisGangguan] = useState('')
+
   const [createFieldWorkOrder, setCreateFieldWorkOrder] = useState(false)
   const [fieldWorkType, setFieldWorkType] = useState<(typeof fieldWorkTypeOptions)[number]>('REPAIR')
   const [workOrderStatus, setWorkOrderStatus] = useState<(typeof fieldWorkOrderStatusOptions)[number]>('OPEN')
@@ -43,11 +73,26 @@ export function SupportTicketCreateForm({
   const [currentPicUserId, setCurrentPicUserId] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
   const [address, setAddress] = useState('')
-  const [notes, setNotes] = useState('')
+  const [keterangan, setKeterangan] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
   const isDisabled = !canCreate || !reviewDbReady || submitting
+
+  const availableJenisGangguan = useMemo(() => {
+    if (!typeParent) return [] as string[]
+    return jenisGangguanMap[typeParent] ?? jenisGangguanMap.LAINNYA
+  }, [typeParent])
+
+  const ticketPreviewId = useMemo(() => {
+    const seq = Math.floor(10 + Math.random() * 89)
+    return `TT/PKN/${seq}`
+  }, [])
+
+  function handleTypeParentChange(next: string) {
+    setTypeParent(next as (typeof parentTicketTypeOptions)[number] | '')
+    setJenisGangguan('')
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -57,15 +102,22 @@ export function SupportTicketCreateForm({
     setFeedback(null)
 
     try {
+      const resolvedType = typeParent || typeSuggestions[0] || 'KONEKSI'
       const submitPayload: Record<string, unknown> = {
         serviceReference,
         customerName,
         customerUser,
         category,
-        type: ticketType,
+        type: resolvedType,
         status,
-        problemCategory,
-        notes,
+        customerWhatsapp: noWa,
+        linkMaps,
+        packagePlan: paket,
+        ontSerial: ont,
+        typeParent,
+        jenisGangguan,
+        ticketSource: 'NOC_OPERATOR_MANUAL',
+        notes: keterangan,
       }
 
       if (createFieldWorkOrder) {
@@ -104,9 +156,13 @@ export function SupportTicketCreateForm({
       setCustomerName('')
       setCustomerUser('')
       setCategory('TT')
-      setTicketType(typeSuggestions[0] ?? 'KONEKSI')
       setStatus('OPEN')
-      setProblemCategory('')
+      setNoWa('')
+      setLinkMaps('')
+      setTypeParent('')
+      setPaket('')
+      setOnt('')
+      setJenisGangguan('')
       setCreateFieldWorkOrder(false)
       setFieldWorkType('REPAIR')
       setWorkOrderStatus('OPEN')
@@ -116,7 +172,7 @@ export function SupportTicketCreateForm({
       setCurrentPicUserId('')
       setScheduledAt('')
       setAddress('')
-      setNotes('')
+      setKeterangan('')
       router.refresh()
     } finally {
       setSubmitting(false)
@@ -127,24 +183,25 @@ export function SupportTicketCreateForm({
     <section className="panel p-6">
       <p className="section-title">Form Action Support</p>
       <h3 className="mt-2 font-[family-name:var(--font-heading)] text-2xl font-semibold tracking-tight text-slate-950">
-        Tambah trouble ticket review
+        Buat Trouble Ticket
       </h3>
       <p className="mt-3 text-sm leading-6 text-mute">
+        Isi data gangguan atau preventive secara singkat dan jelas.
         {!canCreate
-          ? 'Role aktif belum memiliki izin create pada domain Support.'
+          ? ' Role aktif belum memiliki izin create pada domain Support.'
           : !reviewDbReady
-            ? 'Mode review database belum aktif, jadi write action support dinonaktifkan agar tidak menulis ke mock.'
-            : 'Form ini menambah trouble ticket open awal ke review DB agar antrean support bisa diuji dari sisi input hingga tindak lanjut.'}
+            ? ' Mode review database belum aktif, jadi write action support dinonaktifkan agar tidak menulis ke mock.'
+            : ''}
       </p>
       <SupportFormContextNote
         items={[
           {
             label: 'Tujuan',
-            value: 'Mencatat ticket baru agar masuk ke lane TT sebagai titik awal penanganan.',
+            value: 'Mencatat ticket baru agar masuk ke lane TT sebagai titik awal penanganan operasional NOC.',
           },
           {
             label: 'Sumber',
-            value: 'Anchor layanan memakai Service No atau Customer Code dari antrean support yang sedang tampil.',
+            value: 'Anchor layanan memakai Service No atau Customer Code, data pelanggan dilengkapi No WA / Link Maps lokasi.',
           },
           {
             label: 'Hasil',
@@ -154,6 +211,10 @@ export function SupportTicketCreateForm({
       />
 
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div className="lg:col-span-2 rounded-2xl border-2 border-slate-700 bg-slate-50 px-4 py-3 font-mono font-bold text-slate-800">
+          ID Ticket otomatis: {ticketPreviewId}
+        </div>
+
         <label className="flex flex-col gap-2 text-sm text-slate-700">
           <span className="font-semibold text-slate-950">Service No / Customer Code</span>
           <input
@@ -173,7 +234,20 @@ export function SupportTicketCreateForm({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Nama Customer</span>
+          <span className="font-semibold text-slate-950">KATEGORI</span>
+          <select
+            value={category}
+            onChange={(event) => setCategory(event.target.value as (typeof categoryOptions)[number])}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            disabled={isDisabled}
+          >
+            <option value="TT">Trouble Ticket (TT)</option>
+            <option value="PV">Preventive Visit (PV)</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">NAMA PELANGGAN</span>
           <input
             value={customerName}
             onChange={(event) => setCustomerName(event.target.value)}
@@ -185,7 +259,7 @@ export function SupportTicketCreateForm({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Customer User</span>
+          <span className="font-semibold text-slate-950">USER</span>
           <input
             value={customerUser}
             onChange={(event) => setCustomerUser(event.target.value)}
@@ -196,48 +270,39 @@ export function SupportTicketCreateForm({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Kategori</span>
-          <select
-            value={category}
-            onChange={(event) => setCategory(event.target.value as (typeof categoryOptions)[number])}
-            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            disabled={isDisabled}
-          >
-            {categoryOptions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Tipe Ticket</span>
+          <span className="font-semibold text-slate-950">NO WA</span>
           <input
-            list="support-type-suggestions"
-            value={ticketType}
-            onChange={(event) => setTicketType(event.target.value)}
+            type="tel"
+            value={noWa}
+            onChange={(event) => setNoWa(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            placeholder="KONEKSI / LATENCY / PREVENTIVE"
-            required
+            placeholder="+62 812-3456-7890"
             disabled={isDisabled}
           />
-          <datalist id="support-type-suggestions">
-            {typeSuggestions.map((item) => (
-              <option key={item} value={item} />
-            ))}
-          </datalist>
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Status Awal</span>
+          <span className="font-semibold text-slate-950">LINK MAPS</span>
+          <input
+            type="url"
+            value={linkMaps}
+            onChange={(event) => setLinkMaps(event.target.value)}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="https://maps.google.com/..."
+            disabled={isDisabled}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">TYPE</span>
           <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value as (typeof statusOptions)[number])}
+            value={typeParent}
+            onChange={(event) => handleTypeParentChange(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
             disabled={isDisabled}
           >
-            {statusOptions.map((item) => (
+            <option value="">Pilih type...</option>
+            {parentTicketTypeOptions.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -246,12 +311,52 @@ export function SupportTicketCreateForm({
         </label>
 
         <label className="flex flex-col gap-2 text-sm text-slate-700">
-          <span className="font-semibold text-slate-950">Problem Category</span>
+          <span className="font-semibold text-slate-950">PAKET</span>
           <input
-            value={problemCategory}
-            onChange={(event) => setProblemCategory(event.target.value)}
+            value={paket}
+            onChange={(event) => setPaket(event.target.value)}
             className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            placeholder="FTTH / Backbone / WiFi / ONU"
+            placeholder="Contoh: HOME LITE / HOME MINI / GAMING"
+            disabled={isDisabled}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">ONT</span>
+          <input
+            value={ont}
+            onChange={(event) => setOnt(event.target.value)}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="Pilih ONT / Serial Number ONT"
+            disabled={isDisabled}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700">
+          <span className="font-semibold text-slate-950">JENIS GANGGUAN</span>
+          <select
+            value={jenisGangguan}
+            onChange={(event) => setJenisGangguan(event.target.value)}
+            className="rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+            disabled={isDisabled || !typeParent}
+          >
+            <option value="">{typeParent ? 'Pilih...' : 'Pilih type terlebih dahulu'}</option>
+            {availableJenisGangguan.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
+          <span className="font-semibold text-slate-950">KETERANGAN</span>
+          <textarea
+            rows={6}
+            value={keterangan}
+            onChange={(event) => setKeterangan(event.target.value)}
+            className="min-h-[160px] rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
+            placeholder="Deskripsikan gangguan secara singkat dan jelas: kronologi, gejala, waktu terjadi, tindakan sementara yang dilakukan..."
             disabled={isDisabled}
           />
         </label>
@@ -372,27 +477,16 @@ export function SupportTicketCreateForm({
           </>
         ) : null}
 
-        <label className="flex flex-col gap-2 text-sm text-slate-700 lg:col-span-2">
-          <span className="font-semibold text-slate-950">Catatan</span>
-          <textarea
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            className="min-h-28 rounded-2xl border border-line bg-white px-4 py-3 outline-none transition focus:border-slate-400"
-            placeholder="Ringkasan keluhan pelanggan atau konteks ticket"
-            disabled={isDisabled}
-          />
-        </label>
-
         <div className="lg:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-mute">
-            Anchor layanan wajib memakai `Service No` atau `Customer Code`, sedangkan saran type ticket diambil dari queue support yang sedang tampil.
+            Anchor wajib memakai `Service No` / `Customer Code` untuk link subscription. Field V2 (No WA, Link Maps, Paket, ONT, Jenis Gangguan) disimpan aman ke notes dengan prefix `[TT V2 FIELDS]`.
           </div>
           <button
             type="submit"
             disabled={isDisabled}
             className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            {submitting ? 'Menyimpan...' : 'Simpan Trouble Ticket'}
+            {submitting ? 'Menyimpan...' : 'Simpan'}
           </button>
         </div>
       </form>
