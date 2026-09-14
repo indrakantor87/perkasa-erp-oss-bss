@@ -1731,7 +1731,7 @@ function buildMockOperationalCards(summary: DashboardSummary, filters: Dashboard
       title: 'NOC',
       description: 'Fokus pada penanganan trouble ticket, SLA, dan stabilitas operasi jaringan.',
       badge: 'NOC',
-      href: '/support/tt',
+      href: '/support',
       tone: 'border-emerald-200 bg-emerald-50 text-emerald-900',
       metrics: [
         { label: 'Trouble Ticket', value: formatNumber(summary.troubleTickets) },
@@ -2656,7 +2656,7 @@ async function getReviewDbOperationalCards(
       title: 'NOC',
       description: 'Fokus pada penanganan trouble ticket, SLA, dan stabilitas operasi jaringan.',
       badge: 'NOC',
-      href: '/support/tt',
+      href: '/support',
       tone: 'border-emerald-200 bg-emerald-50 text-emerald-900',
       metrics: [
         { label: 'Trouble Ticket', value: formatNumber(Number(noc.openTickets ?? 0)) },

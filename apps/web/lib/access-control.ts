@@ -55,11 +55,11 @@ const baselineRoleLandingPaths: Record<AppRole, string> = {
   SALES_MARKETING: '/dashboard/worklist',
   CS_OPERATOR: '/dashboard/worklist',
   CS_ADMIN: '/customers/cs-admin',
-  NOC_OPERATOR: '/support/tt',
+  NOC_OPERATOR: '/support',
   FIELD_TECHNICIAN: '/support/teknisi-psb',
-  TT_OPERATOR: '/support/tt',
+  TT_OPERATOR: '/support',
   DIGITAL_CREATOR: '/dashboard/worklist',
-  DISMANTLE_OPERATOR: '/support/dismantle',
+  DISMANTLE_OPERATOR: '/support',
 }
 
 const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
