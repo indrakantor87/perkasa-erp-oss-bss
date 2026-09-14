@@ -710,6 +710,19 @@ function buildCompactTicketingItem() {
   })
 }
 
+function buildCompactTtLaneItem() {
+  return buildSidebarNavItem('/support', {
+    key: 'support-tt-lane-compact',
+    title: 'Lane Trouble Ticket',
+    description: 'Workspace intake TT: tambah ticket baru, dispatch progress, eskalasi, dan kontrol SLA.',
+    href: '/support/tt',
+    requiredPath: '/support',
+    assignHrefs: ['/support', '/support/tt'],
+    matchPrefixes: ['/support/tt'],
+    excludePrefixes: ['/support/teknisi-psb', '/support/teknisi-troubleshoots', '/support/teknisi-dismantle'],
+  })
+}
+
 function buildCompactIsolirItem() {
   return buildSidebarNavItem('/support', {
     key: 'support-isolir-compact',
@@ -1154,6 +1167,7 @@ function getWorkspaceCustomItems(role: AppRole | null) {
     case 'NOC_OPERATOR':
       return [
         buildCompactNocDashboardItem(),
+        buildCompactTtLaneItem(),
         buildCompactTicketingItem(),
         buildCompactSlaItem(),
         buildCompactIsolirItem(),
@@ -1162,7 +1176,7 @@ function getWorkspaceCustomItems(role: AppRole | null) {
     case 'FIELD_TECHNICIAN':
       return [buildCompactNocDashboardItem(), buildTeknisiLapanganItem()]
     case 'TT_OPERATOR':
-      return [buildCompactNocDashboardItem(), buildTroubleTicketItem()]
+      return [buildCompactNocDashboardItem(), buildCompactTtLaneItem(), buildTroubleTicketItem()]
     case 'DIGITAL_CREATOR':
       return [buildDigitalCreatorItem()]
     case 'DISMANTLE_OPERATOR':

@@ -715,8 +715,23 @@ function buildNocHeroShortcuts(sections: DomainReviewSection[], role: AppRole): 
   const slaOverdue = findSupportSection(sections, 'SLA Overdue')?.rows.length ?? 0
   const isolations = findSupportSection(sections, 'Isolir Aktif')?.rows.length ?? 0
   const dismantle = findSupportSection(sections, 'Antrean Dismantle Open')?.rows.length ?? 0
+  const canCreateTt =
+    role === 'SUPER_ADMIN' ||
+    role === 'ADMIN' ||
+    role === 'OWNER' ||
+    role === 'NOC_OPERATOR' ||
+    role === 'TT_OPERATOR'
 
-  const shortcuts: NocShortcutCard[] = [
+  const shortcuts: NocShortcutCard[] = []
+  if (canCreateTt) {
+    shortcuts.push({
+      title: 'Buat Trouble Ticket Baru',
+      description: 'Intake ticket teknis baru: jenis gangguan, SLA target, PIC, dan assign langsung ke teknisi.',
+      href: '/support/tt#ticket-create',
+      badge: 'Buat Baru',
+    })
+  }
+  shortcuts.push(
     {
       title: 'Lane TT (Trouble Ticket)',
       description: 'Masuk ke workspace penanganan ticket open, ready close, critical, dan waiting progress.',
@@ -757,7 +772,7 @@ function buildNocHeroShortcuts(sections: DomainReviewSection[], role: AppRole): 
       href: '/customers/cs-admin',
       badge: 'Customer',
     },
-  ]
+  )
 
   if (role === 'SUPER_ADMIN' || role === 'OWNER' || role === 'ADMIN') {
     shortcuts.splice(
@@ -776,7 +791,22 @@ function buildNocHeroShortcuts(sections: DomainReviewSection[], role: AppRole): 
 }
 
 function buildNocShortcutCards(role: AppRole): NocShortcutCard[] {
-  const cards: NocShortcutCard[] = [
+  const canCreateTt =
+    role === 'SUPER_ADMIN' ||
+    role === 'ADMIN' ||
+    role === 'OWNER' ||
+    role === 'NOC_OPERATOR' ||
+    role === 'TT_OPERATOR'
+  const cards: NocShortcutCard[] = []
+  if (canCreateTt) {
+    cards.push({
+      title: 'Buat Trouble Ticket Baru',
+      description: 'Form intake ticket teknis NOC: jenis gangguan, SLA target, PIC, dan assign teknisi.',
+      href: '/support/tt#ticket-create',
+      badge: 'Buat Baru',
+    })
+  }
+  cards.push(
     {
       title: 'Lane TT (Trouble Ticket)',
       description: 'Workspace utama penanganan ticket: create, progress, escalate, assign, close.',
@@ -825,7 +855,7 @@ function buildNocShortcutCards(role: AppRole): NocShortcutCard[] {
       href: '/customers/cs-admin',
       badge: 'Referensi',
     },
-  ]
+  )
 
   if (role === 'SUPER_ADMIN' || role === 'OWNER' || role === 'ADMIN') {
     cards.push({
