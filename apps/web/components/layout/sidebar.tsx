@@ -28,11 +28,11 @@ const rolePreferredOrder: Partial<Record<AppRole, string[]>> = {
   CS_OPERATOR: ['/dashboard/worklist', '/dashboard/tracking', '/list-psb', '/list-dismantle', '/support', '/customers', '/inventory', '/dashboard/daily-activity', '/dashboard', '/billing'],
   CS_ADMIN: ['/customers/cs-admin', '/dashboard/worklist', '/dashboard/tracking', '/list-psb', '/list-dismantle', '/support', '/customers', '/dashboard/daily-activity', '/dashboard', '/billing'],
   FINANCE: ['/billing', '/list-dismantle', '/support', '/customers', '/dashboard/worklist', '/dashboard/daily-activity', '/dashboard'],
-  NOC_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/inventory', '/dashboard/daily-activity', '/dashboard'],
-  TT_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard'],
+  NOC_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/inventory', '/dashboard/daily-activity'],
+  TT_OPERATOR: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity'],
   DIGITAL_CREATOR: ['/dashboard/worklist', '/dashboard/tracking', '/sales', '/customers', '/dashboard/daily-activity', '/dashboard'],
-  FIELD_TECHNICIAN: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/inventory', '/dashboard/daily-activity', '/dashboard'],
-  DISMANTLE_OPERATOR: ['/list-dismantle', '/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard'],
+  FIELD_TECHNICIAN: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/inventory', '/dashboard/daily-activity'],
+  DISMANTLE_OPERATOR: ['/list-dismantle', '/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity'],
 }
 
 const controlCenterOrder = ['/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard', '/import']
@@ -1055,6 +1055,14 @@ function getPrimaryNavHrefs(role: AppRole | null) {
   if (role === 'GA') {
     return ['/dashboard/daily-activity', '/dashboard/tracking']
   }
+  if (
+    role === 'NOC_OPERATOR' ||
+    role === 'TT_OPERATOR' ||
+    role === 'DISMANTLE_OPERATOR' ||
+    role === 'FIELD_TECHNICIAN'
+  ) {
+    return ['/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity']
+  }
   const base = ['/dashboard', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity']
   if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
     return [...base, '/import']
@@ -1191,7 +1199,14 @@ function buildSidebarSections(params: {
 
   const utamaDefault = ['/dashboard', '/dashboard/daily-activity', '/dashboard/worklist', '/dashboard/tracking', '/import']
   const utamaInventoryOnly = ['/dashboard/daily-activity', '/dashboard/tracking']
-  const utamaOrder = params.role === 'GA' ? utamaInventoryOnly : utamaDefault
+  const utamaNocFamily = ['/dashboard/daily-activity', '/dashboard/worklist', '/dashboard/tracking']
+  const isNocFamily =
+    params.role === 'NOC_OPERATOR' ||
+    params.role === 'TT_OPERATOR' ||
+    params.role === 'DISMANTLE_OPERATOR' ||
+    params.role === 'FIELD_TECHNICIAN'
+  const utamaOrder =
+    params.role === 'GA' ? utamaInventoryOnly : isNocFamily ? utamaNocFamily : utamaDefault
   const primaryItems =
     params.role === 'SUPER_ADMIN'
       ? rawPrimaryItems
