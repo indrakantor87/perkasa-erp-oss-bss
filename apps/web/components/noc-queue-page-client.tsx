@@ -251,17 +251,6 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
                 <option key={item} value={item}>{item} ({typeCounts[item] ?? 0})</option>
               ))}
             </select>
-            <div className="flex flex-wrap gap-1.5">
-              {ticketTypeOptions.map((item) => (
-                <Link
-                  key={item}
-                  href={buildFilterHref({ ticketType: item })}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${ticketType === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
-                >
-                  {item} {typeCounts[item]}
-                </Link>
-              ))}
-            </div>
           </label>
 
           <label className="flex flex-col gap-2 text-sm text-muteStrong">
@@ -276,17 +265,6 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
-            <div className="flex flex-wrap gap-1.5">
-              {queueStatusOptions.map((item) => (
-                <Link
-                  key={item}
-                  href={buildFilterHref({ queueStatus: item })}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${queueStatus === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
-                >
-                  {item}
-                </Link>
-              ))}
-            </div>
           </label>
 
           <label className="flex flex-col gap-2 text-sm text-muteStrong">
@@ -301,17 +279,6 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
-            <div className="flex flex-wrap gap-1.5">
-              {slaStateOptions.map((item) => (
-                <Link
-                  key={item}
-                  href={buildFilterHref({ slaState: item })}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${slaState === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
-                >
-                  SLA {item}
-                </Link>
-              ))}
-            </div>
           </label>
 
           <div className="flex flex-col gap-2 text-sm text-muteStrong">
@@ -348,6 +315,35 @@ export default function NocQueuePageClient(props: NocQueuePageClientProps) {
                 Filter aktif
               </span>
             ) : null}
+            <div className="ml-auto w-full md:w-auto flex flex-wrap gap-1.5 md:justify-end mt-2 md:mt-0">
+              {ticketTypeOptions.map((item) => (
+                <Link
+                  key={`inline-ticket-${item}`}
+                  href={buildFilterHref({ ticketType: item })}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${ticketType === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
+                >
+                  {item} {typeCounts[item]}
+                </Link>
+              ))}
+              {queueStatusOptions.map((item) => (
+                <Link
+                  key={`inline-status-${item}`}
+                  href={buildFilterHref({ queueStatus: item })}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${queueStatus === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
+                >
+                  {item}
+                </Link>
+              ))}
+              {slaStateOptions.map((item) => (
+                <Link
+                  key={`inline-sla-${item}`}
+                  href={buildFilterHref({ slaState: item })}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${slaState === item ? 'bg-accent text-accentInk' : 'border border-line bg-surface text-muteStrong hover:bg-surfaceElevated hover:text-inkStrong'}`}
+                >
+                  SLA {item}
+                </Link>
+              ))}
+            </div>
           </div>
         </form>
 
