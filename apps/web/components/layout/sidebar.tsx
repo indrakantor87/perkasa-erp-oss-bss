@@ -675,6 +675,29 @@ function buildHrSubmenuItems() {
   ]
 }
 
+function buildCompactNocDashboardItem() {
+  return buildSidebarNavItem('/support', {
+    key: 'support-noc-dashboard-plain',
+    title: 'Dashboard NOC',
+    description: 'Rangkuman kinerja divisi NOC: historis throughput, SLA overdue, monitoring isolir dismantle, dan shortcut lane kerja cepat.',
+    href: '/support',
+    requiredPath: '/support',
+    assignHrefs: ['/support'],
+    matchPrefixes: ['/support'],
+    excludePrefixes: [
+      '/support/tt',
+      '/support/sla',
+      '/support/isolations',
+      '/support/dismantle',
+      '/support/teknisi-psb',
+      '/support/teknisi-troubleshoots',
+      '/support/teknisi-dismantle',
+      '/support/teknisi-expan',
+      '/support/teknisi-jointer',
+    ],
+  })
+}
+
 function buildCompactTicketingItem() {
   return buildSidebarNavItem('/dashboard/tracking', {
     key: 'tracking-ticketing-compact',
@@ -1129,15 +1152,21 @@ function getWorkspaceCustomItems(role: AppRole | null) {
         buildCompactOdpPortItem(),
       ]
     case 'NOC_OPERATOR':
-      return [buildCompactTicketingItem(), buildCompactSlaItem(), buildCompactIsolirItem(), buildCompactOdpPortItem()]
+      return [
+        buildCompactNocDashboardItem(),
+        buildCompactTicketingItem(),
+        buildCompactSlaItem(),
+        buildCompactIsolirItem(),
+        buildCompactOdpPortItem(),
+      ]
     case 'FIELD_TECHNICIAN':
-      return [buildTeknisiLapanganItem()]
+      return [buildCompactNocDashboardItem(), buildTeknisiLapanganItem()]
     case 'TT_OPERATOR':
-      return [buildTroubleTicketItem()]
+      return [buildCompactNocDashboardItem(), buildTroubleTicketItem()]
     case 'DIGITAL_CREATOR':
       return [buildDigitalCreatorItem()]
     case 'DISMANTLE_OPERATOR':
-      return [buildDismantleItem()]
+      return [buildCompactNocDashboardItem(), buildDismantleItem()]
     default:
       return []
   }
