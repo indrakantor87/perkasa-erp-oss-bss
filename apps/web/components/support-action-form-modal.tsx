@@ -109,7 +109,11 @@ export function SupportActionFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
       <button type="button" aria-label="Tutup form aksi support" className="absolute inset-0" onClick={handleClose} />
-      <div className="relative z-10 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-3xl border border-line bg-white shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative z-10 w-full self-center max-w-[min(72rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] md:max-w-[calc(100vw-4rem)] xl:max-w-[min(72rem,calc(100vw-21rem))] overflow-x-hidden overflow-y-auto rounded-3xl border border-line bg-white shadow-2xl"
+      >
         <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-6 py-5 backdrop-blur">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
