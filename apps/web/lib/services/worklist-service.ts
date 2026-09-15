@@ -731,7 +731,7 @@ async function getWorklistBaseData(session: AppSession) {
       const approvalItems = buildDailyActivityApprovalWorklistItems(session.role, dashboardData.dailyActivityApprovalQueue)
       let items = upgradeDashboardItems(session.role, [...dashboardData.worklist, ...approvalItems])
 
-      const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+      const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
       if (ownerAliases.length) {
         const aliasSet = new Set(ownerAliases.map((v) => String(v ?? '').trim().toUpperCase()))
         const matchOwned = (value: unknown): boolean => {

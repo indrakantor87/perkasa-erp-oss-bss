@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     const filters: string[] = ['1 = 1']
     const values: unknown[] = []
 
-    const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+    const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
     if (ownerAliases.length) {
       const placeholders = ownerAliases.map(() => '?').join(', ')
       filters.push(`LOWER(COALESCE(psb.sales_owner_name, '')) IN (${placeholders})`)

@@ -1002,26 +1002,20 @@ async function getOwnerOptionsFromReviewDb() {
     .filter(Boolean)
 }
 
-export function resolveOwnedPsbListOwnerAliases(session?: AppSession) {
-  if (!session || (session.role !== 'PENJUALAN' && session.role !== 'SALES_MARKETING')) {
+import { resolveSalesOwnerAliasesIncludingSpvTeam } from '@/lib/services/sales-team-membership-service'
+
+export async function resolveOwnedPsbListOwnerAliases(session?: AppSession) {
+  if (!session) {
     return []
   }
-
-  return Array.from(
-    new Set(
-      [
-        session.displayName,
-        session.username,
-        `${session.displayName} (${session.username})`,
-      ]
-        .map((item) => normalizeText(item))
-        .filter(Boolean),
-    ),
-  )
+  if (session.role === 'PENJUALAN' || session.role === 'SALES_MARKETING' || session.role === 'SPV_SALES') {
+    return resolveSalesOwnerAliasesIncludingSpvTeam(session, normalizeText)
+  }
+  return []
 }
 
 function filterVisiblePsbListOwnerOptions(items: PsbListItem[], ownerOptions: string[], session?: AppSession) {
-  if (session?.role !== 'PENJUALAN' && session?.role !== 'SALES_MARKETING') {
+  if (session?.role !== 'PENJUALAN' && session?.role !== 'SALES_MARKETING' && session?.role !== 'SPV_SALES') {
     return ownerOptions
   }
 
@@ -1046,7 +1040,7 @@ async function getReviewDbPsbListPageData(
 
   const where: string[] = []
   const values: unknown[] = []
-  const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+  const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
   if (state.status) {
     where.push('status = ?')
     values.push(state.status)
@@ -1237,7 +1231,7 @@ async function getPsbListPageDataWithMock(
   }
 
   const searchNeedle = normalizeText(state.q)
-  const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+  const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
   const filteredItems = mockPsbListItems
     .filter((item) => !state.status || item.status === state.status)
     .filter((item) => {

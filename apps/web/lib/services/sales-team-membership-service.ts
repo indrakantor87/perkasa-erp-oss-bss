@@ -630,6 +630,175 @@ export async function resolveManagedSalesUserIdsSpvOnly(spvUserId: number): Prom
   }
 }
 
+type _AliasTextNormalizeFn = (value: string | null | undefined) => string
+
+function _buildAliasesFromNameParts(
+  displayName: string | null | undefined,
+  username: string | null | undefined,
+  normalize: _AliasTextNormalizeFn,
+): string[] {
+  const dn = normalize(displayName)
+  const un = normalize(username)
+  const parts: string[] = []
+  if (dn) parts.push(dn)
+  if (un) parts.push(un)
+  if (dn || un) {
+    const combo = normalize(`${String(displayName ?? '').trim()} (${String(username ?? '').trim()})`)
+    if (combo) parts.push(combo)
+  }
+  return Array.from(new Set(parts))
+}
+
+type AliasPureUserRef = {
+  userId: number
+  roleCode: string
+  displayName?: string | null
+  username?: string | null
+  status?: string | null
+}
+
+export function resolveSalesOwnerAliasesIncludingSpvTeamPure(
+  sessionRole: string | null | undefined,
+  sessionUserId: number | null | undefined,
+  sessionDisplayName: string | null | undefined,
+  sessionUsername: string | null | undefined,
+  activeMemberships: Pick<SalesTeamMembership, 'spvUserId' | 'memberUserId' | 'active'>[] | null | undefined,
+  userRefs: AliasPureUserRef[] | null | undefined,
+  normalize: _AliasTextNormalizeFn,
+): string[] {
+  try {
+    const role = String(sessionRole ?? '').trim().toUpperCase()
+    const userIdNum = Number(sessionUserId ?? 0)
+    const userIdValid = Number.isFinite(userIdNum) && userIdNum > 0
+
+    const refByUserId = new Map<number, AliasPureUserRef>()
+    if (Array.isArray(userRefs)) {
+      for (const r of userRefs) {
+        if (!r) continue
+        const id = Number(r.userId)
+        if (Number.isFinite(id) && id > 0) refByUserId.set(id, r)
+      }
+    }
+
+    const isSalesRole = role === 'PENJUALAN' || role === 'SALES_MARKETING'
+
+    if (isSalesRole) {
+      return _buildAliasesFromNameParts(sessionDisplayName, sessionUsername, normalize)
+    }
+
+    if (role === 'SPV_SALES') {
+      const seen = new Set<string>()
+      const pushAlias = (s: string) => { if (s) seen.add(s) }
+      for (const a of _buildAliasesFromNameParts(sessionDisplayName, sessionUsername, normalize)) {
+        pushAlias(a)
+      }
+      if (userIdValid && Array.isArray(activeMemberships)) {
+        const selfRef = refByUserId.get(userIdNum)
+        if (selfRef) {
+          for (const a of _buildAliasesFromNameParts(selfRef.displayName, selfRef.username, normalize)) {
+            pushAlias(a)
+          }
+        }
+        const validMembershipIds = new Set<number>()
+        for (const m of activeMemberships) {
+          if (!m) continue
+          if (Number(m.spvUserId) !== userIdNum) continue
+          if (Number(m.active) !== 1) continue
+          const mid = Number(m.memberUserId)
+          if (Number.isFinite(mid) && mid > 0) validMembershipIds.add(mid)
+        }
+        for (const mid of validMembershipIds) {
+          const ref = refByUserId.get(mid)
+          if (!ref) continue
+          const memberRole = String(ref.roleCode ?? '').trim().toUpperCase()
+          const memberStatus = String(ref.status ?? 'ACTIVE').trim().toUpperCase()
+          if (memberRole !== 'PENJUALAN' && memberRole !== 'SALES_MARKETING') continue
+          if (memberStatus !== 'ACTIVE') continue
+          for (const a of _buildAliasesFromNameParts(ref.displayName, ref.username, normalize)) {
+            pushAlias(a)
+          }
+        }
+      }
+      return Array.from(seen)
+    }
+
+    return []
+  } catch {
+    return []
+  }
+}
+
+export async function resolveSalesOwnerAliasesIncludingSpvTeam(
+  session: AppSession | null | undefined,
+  normalizeFn?: _AliasTextNormalizeFn,
+): Promise<string[]> {
+  const normalize: _AliasTextNormalizeFn =
+    typeof normalizeFn === 'function'
+      ? normalizeFn
+      : (value) => String(value ?? '').trim().toUpperCase()
+
+  const role = session?.role ? String(session.role).trim().toUpperCase() : ''
+  const displayName = session?.displayName ?? null
+  const username = session?.username ?? null
+  const userIdNum = Number(session?.userId ?? 0)
+  const userIdValid = Number.isFinite(userIdNum) && userIdNum > 0
+
+  if (role === 'PENJUALAN' || role === 'SALES_MARKETING') {
+    return _buildAliasesFromNameParts(displayName, username, normalize)
+  }
+  if (role !== 'SPV_SALES') {
+    return []
+  }
+
+  let memberships: Pick<SalesTeamMembership, 'spvUserId' | 'memberUserId' | 'active'>[] = []
+  let refs: AliasPureUserRef[] = []
+  try {
+    if (userIdValid && isReviewDbConfigured()) {
+      memberships = await listActiveMembersForSpv(userIdNum)
+      const memberIds = new Set<number>([userIdNum])
+      for (const m of memberships) {
+        const mid = Number(m.memberUserId)
+        if (Number.isFinite(mid) && mid > 0) memberIds.add(mid)
+      }
+      for (const id of memberIds) {
+        try {
+          const r = await fetchAuthUserRefLite(id)
+          if (r) refs.push({ userId: r.userId, roleCode: r.roleCode, status: r.status })
+        } catch {
+          // skip failed lookup
+        }
+      }
+    }
+  } catch {
+    memberships = []
+    refs = []
+  }
+
+  const pureSessionDisplayNameDisplay = displayName
+  const pureSessionUsernameDisplay = username
+
+  let pureRefs: AliasPureUserRef[] = refs
+  if (userIdValid) {
+    const selfHasRef = refs.some((r) => Number(r.userId) === userIdNum)
+    if (!selfHasRef) {
+      pureRefs = [
+        { userId: userIdNum, roleCode: 'SPV_SALES', displayName: pureSessionDisplayNameDisplay, username: pureSessionUsernameDisplay, status: 'ACTIVE' },
+        ...refs,
+      ]
+    }
+  }
+
+  return resolveSalesOwnerAliasesIncludingSpvTeamPure(
+    role,
+    userIdValid ? userIdNum : null,
+    pureSessionDisplayNameDisplay,
+    pureSessionUsernameDisplay,
+    memberships,
+    pureRefs,
+    normalize,
+  )
+}
+
 export const SALES_TEAM_MEMBERSHIP_PROVISION_META = {
   target: SALES_TEAM_MEMBERSHIP_TABLE_CANONICAL_NAME,
   engine: 'InnoDB',

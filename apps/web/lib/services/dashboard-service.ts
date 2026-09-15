@@ -1861,7 +1861,7 @@ async function getReviewDbOperationalCards(
   const digitalSourceConditions = digitalSources.map(() => '?').join(', ')
   await ensureDashboardSupportReadTables()
 
-  const salesOwnerAliases = resolveOwnedPsbListOwnerAliases(session)
+  const salesOwnerAliases = await resolveOwnedPsbListOwnerAliases(session)
   const salesOwnerClause = salesOwnerAliases.length
     ? `LOWER(COALESCE(marketing_name, '')) IN (${salesOwnerAliases.map(() => '?').join(', ')})`
     : null
@@ -3071,12 +3071,13 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
       }))
     }
     case 'PENJUALAN':
-    case 'SALES_MARKETING': {
+    case 'SALES_MARKETING':
+    case 'SPV_SALES': {
       const [customerCompletenessQueryParts, salesOrderQueryParts] = await Promise.all([
         getDashboardCustomerCompletenessQueryParts(),
         getDashboardSalesOrderQueryParts(),
       ])
-      const worklistOwnerAliases = resolveOwnedPsbListOwnerAliases(session)
+      const worklistOwnerAliases = await resolveOwnedPsbListOwnerAliases(session)
       const worklistOwnerClause = worklistOwnerAliases.length
         ? `LOWER(COALESCE(marketing_name, '')) IN (${worklistOwnerAliases.map(() => '?').join(', ')})`
         : null
