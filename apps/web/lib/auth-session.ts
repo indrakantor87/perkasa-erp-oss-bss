@@ -193,6 +193,7 @@ function mapReviewRoleToAppRole(roleCode: string): AppRole {
   if (normalized === 'GA') return 'GA'
   if (normalized === 'PENJUALAN') return 'PENJUALAN'
   if (normalized === 'MARKETING' || normalized === 'SALES') return 'PENJUALAN'
+  if (normalized === 'SPV_SALES' || normalized === 'SUPERVISOR_PENJUALAN' || normalized === 'SPV_PENJUALAN') return 'SPV_SALES'
   if (normalized === 'CS') return 'CS_OPERATOR'
   if (normalized === 'ADMIN_CS') return 'CS_ADMIN'
   if (normalized === 'NOC') return 'NOC_OPERATOR'
