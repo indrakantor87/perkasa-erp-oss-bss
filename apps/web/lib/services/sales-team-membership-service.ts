@@ -586,6 +586,34 @@ export async function hardDeleteSalesTeamMembership(
   return { success: true, deleted }
 }
 
+export async function listScopedSpvMemberships(spvUserId: number): Promise<SalesTeamMembership[]> {
+  const id = Number(spvUserId)
+  if (!Number.isFinite(id) || id <= 0) return []
+  if (!isReviewDbConfigured()) return []
+  const rows = await runReviewDbQuery<SalesTeamMembership>(
+    `
+      SELECT
+        id,
+        spv_user_id AS spvUserId,
+        member_user_id AS memberUserId,
+        active,
+        created_at AS createdAt,
+        updated_at AS updatedAt,
+        created_by_user_id AS createdByUserId,
+        deactivated_by_user_id AS deactivatedByUserId,
+        deactivated_at AS deactivatedAt,
+        deactivation_reason AS deactivationReason,
+        reactivated_by_user_id AS reactivatedByUserId,
+        reactivated_at AS reactivatedAt
+      FROM ${SALES_TEAM_MEMBERSHIP_TABLE_CANONICAL_NAME}
+      WHERE spv_user_id = ?
+      ORDER BY id DESC
+    `,
+    [id],
+  )
+  return rows
+}
+
 
 export async function resolveManagedOwnerAliases(session: AppSession): Promise<number[]> {
   return resolveManagedSalesUsers(session)
