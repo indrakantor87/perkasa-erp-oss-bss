@@ -524,6 +524,69 @@ export async function resolveManagedSalesUsers(session: AppSession): Promise<num
   return [userId]
 }
 
+export async function listAllSalesTeamMemberships(): Promise<SalesTeamMembership[]> {
+  if (!isReviewDbConfigured()) return []
+  const rows = await runReviewDbQuery<SalesTeamMembership>(
+    `
+      SELECT
+        id,
+        spv_user_id AS spvUserId,
+        member_user_id AS memberUserId,
+        active,
+        created_at AS createdAt,
+        updated_at AS updatedAt,
+        created_by_user_id AS createdByUserId,
+        deactivated_by_user_id AS deactivatedByUserId,
+        deactivated_at AS deactivatedAt,
+        deactivation_reason AS deactivationReason,
+        reactivated_by_user_id AS reactivatedByUserId,
+        reactivated_at AS reactivatedAt
+      FROM ${SALES_TEAM_MEMBERSHIP_TABLE_CANONICAL_NAME}
+      ORDER BY id DESC
+    `,
+    [],
+  )
+  return rows
+}
+
+export type HardDeleteMembershipParams = {
+  spvUserId: number
+  memberUserId: number
+}
+
+export type HardDeleteMembershipResult =
+  | { success: true; deleted: boolean }
+  | { success: false; error: MembershipValidationError; detail?: string }
+
+export async function hardDeleteSalesTeamMembership(
+  params: HardDeleteMembershipParams,
+): Promise<HardDeleteMembershipResult> {
+  const spvUserId = Number(params.spvUserId)
+  const memberUserId = Number(params.memberUserId)
+  if (!Number.isFinite(spvUserId) || !Number.isFinite(memberUserId)) {
+    return { success: false, error: 'MEMBERSHIP_NOT_FOUND', detail: 'User id tidak valid' }
+  }
+
+  const historical = await findHistoricalMembership(spvUserId, memberUserId)
+  if (!historical) {
+    return { success: false, error: 'MEMBERSHIP_NOT_FOUND', detail: 'Membership tidak ditemukan untuk pasangan ini' }
+  }
+
+  const execRes = await runReviewDbExecute<{ affectedRows: number }>(
+    `
+      DELETE FROM ${SALES_TEAM_MEMBERSHIP_TABLE_CANONICAL_NAME}
+      WHERE spv_user_id = ?
+        AND member_user_id = ?
+    `,
+    [spvUserId, memberUserId],
+  )
+
+  invalidateReviewDbTableCache(SALES_TEAM_MEMBERSHIP_TABLE_CANONICAL_NAME)
+  const deleted = Number(execRes?.affectedRows ?? 0) > 0
+  return { success: true, deleted }
+}
+
+
 export async function resolveManagedOwnerAliases(session: AppSession): Promise<number[]> {
   return resolveManagedSalesUsers(session)
 }
