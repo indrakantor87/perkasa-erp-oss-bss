@@ -28,6 +28,172 @@ type ReviewAuthUserRow = {
   id: number
 }
 
+export const TECHNICIAN_ROLE_WHITELIST_CANONICAL: readonly string[] = [
+  'TEKNISI',
+  'TEKNISI_PSB',
+  'FIELD_TECHNICIAN',
+] as const
+
+export type TechnicianRoleWhitelist = (typeof TECHNICIAN_ROLE_WHITELIST_CANONICAL)[number]
+
+export type ValidateTargetUserResult = {
+  userId: number
+  userRoleCode: string
+  userBranchId: number | null
+  displayName: string
+  username: string
+}
+
+export type ValidateBranchScopeSession = {
+  role: AppRole
+  branchId: number | null
+  branchIds: number[]
+}
+
+export async function validateTargetTechnicianUser(params: {
+  targetUserId: number
+  allowedRoles?: readonly string[]
+  connection?: ReviewDbConnection
+  forUpdate?: boolean
+}): Promise<ValidateTargetUserResult | null> {
+  const targetNum = Number(params.targetUserId ?? 0)
+  if (!Number.isInteger(targetNum) || targetNum <= 0) {
+    return null
+  }
+  const rolesUp = params.allowedRoles?.length
+    ? [...params.allowedRoles].map((r) => String(r).trim().toUpperCase()).filter(Boolean)
+    : [...TECHNICIAN_ROLE_WHITELIST_CANONICAL].map((r) => r.toUpperCase())
+  if (rolesUp.length < 1) {
+    return null
+  }
+  const placeholders = rolesUp.map(() => '?').join(', ')
+  const forUpdateClause = params.forUpdate ? ' FOR UPDATE' : ''
+  const sql = `
+    SELECT au.id AS id,
+           au.status AS status,
+           ar.code AS role_code,
+           COALESCE(NULLIF(au.display_name,''), au.username, CONCAT('user:', au.id)) AS display_name,
+           au.username AS username,
+           au.branch_id AS branch_id
+    FROM auth_users au
+    JOIN auth_roles ar ON ar.id = au.role_id
+    WHERE au.id = ?
+    LIMIT 1${forUpdateClause}
+  `
+  const values: unknown[] = [targetNum]
+  let rows: Array<Record<string, unknown>> = []
+  if (params.connection) {
+    const [res] = await params.connection.query(sql, values)
+    rows = (res as Array<Record<string, unknown>>) || []
+  } else {
+    rows = await runReviewDbQuery<Record<string, unknown>>(sql, values)
+  }
+  const row = rows[0]
+  if (!row) {
+    return null
+  }
+  const statusUp = String(row.status ?? '').trim().toUpperCase()
+  if (statusUp !== 'ACTIVE') {
+    return null
+  }
+  const roleUp = String(row.role_code ?? '').trim().toUpperCase()
+  if (!rolesUp.includes(roleUp)) {
+    return null
+  }
+  const branchIdRaw = row.branch_id
+  const branchIdNum = Number(branchIdRaw ?? 0)
+  const branchId = Number.isInteger(branchIdNum) && branchIdNum > 0 ? branchIdNum : null
+  return {
+    userId: targetNum,
+    userRoleCode: roleUp,
+    userBranchId: branchId,
+    displayName: String(row.display_name ?? `user:${targetNum}`).trim() || `user:${targetNum}`,
+    username: String(row.username ?? '').trim(),
+  }
+}
+
+export function isBranchIdInScope(session: ValidateBranchScopeSession, candidateBranchId: number | null): boolean {
+  if (!session) {
+    return false
+  }
+  const roleUp = (session.role ?? '').toString().trim().toUpperCase() as AppRole
+  if (roleUp === 'OWNER' || roleUp === 'SUPER_ADMIN') {
+    return true
+  }
+  if (candidateBranchId == null || !Number.isInteger(candidateBranchId) || candidateBranchId <= 0) {
+    return false
+  }
+  const idsArr = Array.isArray(session.branchIds) ? session.branchIds.filter((n) => Number.isInteger(n) && n > 0) : []
+  if (roleUp === 'ADMIN') {
+    return idsArr.includes(candidateBranchId)
+  }
+  const sessionBranchNum = Number(session.branchId ?? 0)
+  const sessionBranchId = Number.isInteger(sessionBranchNum) && sessionBranchNum > 0 ? sessionBranchNum : null
+  if (sessionBranchId != null) {
+    return sessionBranchId === candidateBranchId
+  }
+  return idsArr.includes(candidateBranchId)
+}
+
+export type WorkOrderBranchLockRow = {
+  id: number
+  branchId: number | null
+  status: string
+  closedAt: Date | string | null
+  completedAt: Date | string | null
+  cancelledAt: Date | string | null
+}
+
+export async function lockAndResolveWorkOrderBranch(params: {
+  workOrderId: number
+  connection: ReviewDbConnection
+}): Promise<WorkOrderBranchLockRow | null> {
+  const idNum = Number(params.workOrderId ?? 0)
+  if (!Number.isInteger(idNum) || idNum <= 0) {
+    return null
+  }
+  const [rows] = await params.connection.query(
+    `
+      SELECT id, branch_id AS branchId, status,
+             closed_at AS closedAt, completed_at AS completedAt, cancelled_at AS cancelledAt
+      FROM service_work_orders
+      WHERE id = ?
+      LIMIT 1
+      FOR UPDATE
+    `,
+    [idNum],
+  )
+  const arr = (rows as WorkOrderBranchLockRow[]) || []
+  const row = arr[0] ?? null
+  if (!row) {
+    return null
+  }
+  const branchRaw = (row as unknown as Record<string, unknown>).branchId
+  const branchNum = Number(branchRaw ?? 0)
+  const branchId = Number.isInteger(branchNum) && branchNum > 0 ? branchNum : null
+  return {
+    id: Number(row.id ?? 0) || idNum,
+    branchId,
+    status: String(row.status ?? '').trim(),
+    closedAt: row.closedAt ?? null,
+    completedAt: row.completedAt ?? null,
+    cancelledAt: row.cancelledAt ?? null,
+  }
+}
+
+export function isWorkOrderTerminal(row: {
+  status?: string
+  closedAt?: Date | string | null
+  completedAt?: Date | string | null
+  cancelledAt?: Date | string | null
+}): boolean {
+  if (!row) return true
+  if (row.closedAt != null || row.completedAt != null || row.cancelledAt != null) return true
+  const s = String(row.status ?? '').trim().toUpperCase()
+  if (!s) return false
+  return new Set(['COMPLETED', 'CLOSED', 'CLOSE', 'CANCELLED', 'CANCELED', 'DONE', 'FINAL_CLOSED']).has(s)
+}
+
 export type ServiceWorkOrderInsertParams = {
   salesOrderId?: number | null
   subscriptionId?: number | null
@@ -51,6 +217,15 @@ export type ServiceWorkOrderInsertParams = {
   address?: string | null
   latitude?: number | null
   longitude?: number | null
+}
+
+function buildActiveWhereParts(prefix: string) {
+  const activePlaceholders = Q3_ASSIGNMENT_ACTIVE_STATUSES.map(() => '?').join(', ')
+  const statuses = [...Q3_ASSIGNMENT_ACTIVE_STATUSES]
+  return {
+    sql: `${prefix}assignment_role = ? AND ${prefix}assignment_status IN (${activePlaceholders}) AND ${prefix}released_at IS NULL`,
+    values: [Q3_ASSIGNMENT_ROLE_CANONICAL, ...statuses],
+  }
 }
 
 function padSequence(value: number) {
@@ -471,10 +646,41 @@ export async function insertServiceWorkOrderAssignment(params: {
   isPrimary?: boolean
   notes?: string | null
   connection?: ReviewDbConnection
+  skipTargetValidation?: boolean
+  bypassTargetValidation?: boolean
 }) {
+  if (!params.skipTargetValidation && !params.bypassTargetValidation) {
+    const validated = await validateTargetTechnicianUser({
+      targetUserId: params.assignedUserId,
+      allowedRoles: TECHNICIAN_ROLE_WHITELIST_CANONICAL,
+      connection: params.connection,
+      forUpdate: !!params.connection,
+    })
+    if (!validated) {
+      throw new Error('Target teknisi assignment tidak valid (tidak ditemukan / tidak aktif / role bukan teknisi / diluar scope).')
+    }
+  }
   await ensureServiceWorkOrderAssignmentTable()
+  const woIdNum = Number(params.workOrderId ?? 0)
+  if (!Number.isInteger(woIdNum) || woIdNum <= 0) {
+    throw new Error('Work order ID assignment tidak valid.')
+  }
+  const activeWhere = buildActiveWhereParts('d')
+  const dupSql = `SELECT COUNT(*) AS total FROM service_work_order_assignments d WHERE d.work_order_id = ? AND d.assigned_user_id = ? AND ${activeWhere.sql}`
+  const dupValues: unknown[] = [woIdNum, params.assignedUserId, ...activeWhere.values]
+  let dupRows: Array<Record<string, unknown>> = []
+  if (params.connection) {
+    const [res] = await params.connection.query(dupSql, dupValues)
+    dupRows = (res as Array<Record<string, unknown>>) || []
+  } else {
+    dupRows = await runReviewDbQuery<Record<string, unknown>>(dupSql, dupValues)
+  }
+  const dupTotal = Number(dupRows[0]?.total ?? 0)
+  if (dupTotal > 0) {
+    throw new Error('Teknisi target sudah memiliki assignment aktif pada work order ini (duplicate assignment ditolak).')
+  }
   const values = [
-    params.workOrderId,
+    woIdNum,
     params.assignedUserId,
     params.assignmentRole ?? 'FIELD_TECHNICIAN',
     params.assignmentStatus ?? 'ASSIGNED',
@@ -1619,15 +1825,6 @@ function resolveReassignAuthorizationScope(
   return 'DENY'
 }
 
-function buildActiveWhereParts(prefix: string) {
-  const activePlaceholders = Q3_ASSIGNMENT_ACTIVE_STATUSES.map(() => '?').join(', ')
-  const statuses = [...Q3_ASSIGNMENT_ACTIVE_STATUSES]
-  return {
-    sql: `${prefix}assignment_role = ? AND ${prefix}assignment_status IN (${activePlaceholders}) AND ${prefix}released_at IS NULL`,
-    values: [Q3_ASSIGNMENT_ROLE_CANONICAL, ...statuses],
-  }
-}
-
 export async function reassignServiceWorkOrderAssignment(params: {
   assignmentAId: number
   targetTechBId: number
@@ -1730,7 +1927,7 @@ export async function reassignServiceWorkOrderAssignment(params: {
       return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
     }
     const roleUp = String(techB.role_code ?? '').trim().toUpperCase()
-    if (roleUp !== 'TEKNISI' && roleUp !== 'TEKNISI_PSB') {
+    if (roleUp !== 'TEKNISI' && roleUp !== 'TEKNISI_PSB' && roleUp !== 'FIELD_TECHNICIAN') {
       return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
     }
 
