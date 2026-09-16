@@ -33,6 +33,7 @@ const WORKLIST_QUEUE_MAP: Record<AppRole, string[]> = {
   GA: ['ODP dan Port', 'Inventory Request', 'Movement Bulanan', 'Lainnya'],
   PENJUALAN: ['Lead Follow Up', 'Customer Belum Lengkap', 'Coverage dan Survey', 'Order Siap Aktivasi', 'Monitoring Support/ODP', 'Lainnya'],
   SALES_MARKETING: ['Lead Follow Up', 'Customer Belum Lengkap', 'Coverage dan Survey', 'Order Siap Aktivasi', 'Monitoring Support/ODP', 'Lainnya'],
+  SPV_SALES: ['Lead Follow Up', 'Customer Belum Lengkap', 'Coverage dan Survey', 'Order Siap Aktivasi', 'Monitoring Support/ODP', 'Lainnya'],
   CS_OPERATOR: ['Input dan Follow Up', 'Order dan Aktivasi', 'Isolir dan Dismantle', 'TT Dasar', 'ODP dan Port', 'Lainnya'],
   CS_ADMIN: ['Queue CS Tim', 'Perlu Approval', 'Perlu Koreksi', 'Transfer atau Restore', 'Queue Risiko Tinggi', 'Lainnya'],
   NOC_OPERATOR: ['TT Teknis', 'SLA Kritis', 'ODP dan Port', 'Monitoring Isolir', 'Lainnya'],
@@ -51,6 +52,7 @@ const ROLE_QUEUE_DEFAULT: Record<AppRole, string> = {
   GA: 'ODP dan Port',
   PENJUALAN: 'Lead Follow Up',
   SALES_MARKETING: 'Lead Follow Up',
+  SPV_SALES: 'Lead Follow Up',
   CS_OPERATOR: 'Input dan Follow Up',
   CS_ADMIN: 'Queue CS Tim',
   NOC_OPERATOR: 'TT Teknis',
@@ -729,7 +731,7 @@ async function getWorklistBaseData(session: AppSession) {
       const approvalItems = buildDailyActivityApprovalWorklistItems(session.role, dashboardData.dailyActivityApprovalQueue)
       let items = upgradeDashboardItems(session.role, [...dashboardData.worklist, ...approvalItems])
 
-      const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+      const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
       if (ownerAliases.length) {
         const aliasSet = new Set(ownerAliases.map((v) => String(v ?? '').trim().toUpperCase()))
         const matchOwned = (value: unknown): boolean => {

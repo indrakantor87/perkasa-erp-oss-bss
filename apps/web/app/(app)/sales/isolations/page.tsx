@@ -5,11 +5,19 @@ import SalesIsolationsPageClient from '@/components/sales-isolations-page-client
 import { canAccessPath } from '@/lib/access-control-server'
 import { requireSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
-import type { DomainReviewRow, SupportLaneKey } from '@/lib/types'
+import { resolveSalesOwnerAliasesIncludingSpvTeam } from '@/lib/services/sales-team-membership-service'
+import type { AppRole, DomainReviewRow, SupportLaneKey } from '@/lib/types'
 
 function resolveSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
+
+const BYPASS_MARKETING_OWNER_FILTER_ROLES: ReadonlySet<AppRole> = new Set([
+  'OWNER',
+  'SUPER_ADMIN',
+  'ADMIN',
+  'CS_ADMIN',
+])
 
 function filterRowsByMarketingOwner(rows: DomainReviewRow[], ownerCandidates: string[]) {
   const normalizedCandidates = ownerCandidates
@@ -30,6 +38,25 @@ function filterRowsByMarketingOwner(rows: DomainReviewRow[], ownerCandidates: st
 
     return marketingName ? normalizedCandidates.includes(marketingName) : false
   })
+}
+
+async function resolveIsolationOwnerCandidates(session: {
+  role: AppRole | null
+  displayName?: string | null
+  username?: string | null
+  userId?: number | null
+}): Promise<string[] | null> {
+  const role = (session.role ?? '').trim().toUpperCase() as AppRole
+  if (BYPASS_MARKETING_OWNER_FILTER_ROLES.has(role)) {
+    return null
+  }
+  if (role === 'SPV_SALES') {
+    return resolveSalesOwnerAliasesIncludingSpvTeam(session as any)
+  }
+  if (role === 'PENJUALAN' || role === 'SALES_MARKETING') {
+    return [session.displayName ?? '', session.username ?? '']
+  }
+  return [session.displayName ?? '', session.username ?? '']
 }
 
 function pickMeta(row: DomainReviewRow, prefix: string) {
@@ -66,7 +93,10 @@ export default async function SalesIsolationsPage({
 
   const reviewSections = payload.content.reviewSections ?? []
   const isolationSection = reviewSections.find((section) => section.title.trim().toUpperCase().includes('ISOLIR AKTIF'))
-  const scopedRows = filterRowsByMarketingOwner(isolationSection?.rows ?? [], [session.displayName, session.username])
+  const ownerCandidates = await resolveIsolationOwnerCandidates(session)
+  const scopedRows = ownerCandidates === null
+    ? (isolationSection?.rows ?? [])
+    : filterRowsByMarketingOwner(isolationSection?.rows ?? [], ownerCandidates)
   const q = String(resolveSearchParam(resolvedSearchParams.q) ?? '').trim().toUpperCase()
   const radboox = String(resolveSearchParam(resolvedSearchParams.radboox) ?? '').trim().toUpperCase()
 

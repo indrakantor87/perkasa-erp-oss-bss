@@ -1,8 +1,10 @@
+import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail } from '@/lib/review-db'
-import { releaseServiceWorkOrderAssignment } from '@/lib/services/field-ops-service'
+import { hasFullFieldOpsReassignAccess, releaseServiceWorkOrderAssignment } from '@/lib/services/field-ops-service'
 import { releaseServiceWorkOrderAssignmentMock } from '@/lib/services/tracking-service'
+import type { AppRole } from '@/lib/types'
 
 export async function POST(
   request: Request,
@@ -25,24 +27,15 @@ export async function POST(
     const source = getDataSourceSnapshot()
     const actorUserId = session.userId
 
-    const normalizedRole = (session.role ?? '').trim().toUpperCase() as
-      | 'FIELD_TECHNICIAN'
-      | 'OWNER'
-      | 'SUPER_ADMIN'
-      | 'ADMIN'
-      | 'NOC_OPERATOR'
-      | 'TT_OPERATOR'
-      | string
+    const sessionRole = (session.role ?? 'PUBLIC') as AppRole
 
     let resolvedScope: 'SELF_ONLY' | 'FULL_ACCESS' | 'DENY' = 'DENY'
-    if (normalizedRole === 'FIELD_TECHNICIAN') {
+    if (sessionRole === 'FIELD_TECHNICIAN') {
       resolvedScope = 'SELF_ONLY'
     } else if (
-      normalizedRole === 'OWNER' ||
-      normalizedRole === 'SUPER_ADMIN' ||
-      normalizedRole === 'ADMIN' ||
-      normalizedRole === 'NOC_OPERATOR' ||
-      normalizedRole === 'TT_OPERATOR'
+      hasFullFieldOpsReassignAccess(sessionRole) ||
+      canPerformAction(sessionRole, 'support', 'update') ||
+      canPerformAction(sessionRole, 'sales', 'update')
     ) {
       resolvedScope = 'FULL_ACCESS'
     } else {

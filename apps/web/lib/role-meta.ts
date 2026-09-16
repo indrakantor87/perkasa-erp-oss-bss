@@ -75,6 +75,14 @@ const roleMetaMap: Record<AppRole, RoleMeta> = {
     division: 'Pemasaran dan Pelayanan',
     subdivision: 'Penjualan',
   },
+  SPV_SALES: {
+    label: 'Supervisor Penjualan',
+    shortLabel: 'SPV Sales',
+    tone: 'bg-sky-600 text-white',
+    scope: 'Supervisi team penjualan, monitoring progress team, dan koordinasi operasional penjualan sesuai cabang.',
+    division: 'Pemasaran dan Pelayanan',
+    subdivision: 'Penjualan',
+  },
   CS_OPERATOR: {
     label: 'CS Operator',
     shortLabel: 'CS',

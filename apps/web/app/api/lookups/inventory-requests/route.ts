@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
+import { canPerformAction } from '@/lib/access-control-server'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbQuery } from '@/lib/review-db'
 
 type InventoryRequestRow = {
   id: number
@@ -9,10 +10,32 @@ type InventoryRequestRow = {
   requestStatus: string | null
 }
 
+function resolveBranchScope(session: {
+  role?: unknown
+  branchId?: unknown
+  branchIds?: unknown[]
+}) {
+  const roleUp = (session.role ?? '').toString().trim().toUpperCase()
+  if (roleUp === 'OWNER' || roleUp === 'SUPER_ADMIN') {
+    return { global: true, branchIds: [] as number[] }
+  }
+  const fromArray = Array.isArray(session.branchIds)
+    ? session.branchIds.filter((n) => Number.isInteger(n) && (n as number) > 0).map((n) => Number(n))
+    : []
+  const fromSingle = Number.isInteger(session.branchId as number) && (session.branchId as number) > 0
+    ? [session.branchId as number]
+    : []
+  const merged = Array.from(new Set([...fromArray, ...fromSingle]))
+  return { global: false, branchIds: merged }
+}
+
 export async function GET() {
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
+  }
+  if (!canPerformAction(session.role, 'inventory', 'view')) {
+    return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
 
   const source = getDataSourceSnapshot()
@@ -21,6 +44,20 @@ export async function GET() {
   }
 
   try {
+    const hasRequestBranchId = await hasReviewDbColumn('inventory_item_requests', 'branch_id')
+    const scope = resolveBranchScope(session)
+    const values: unknown[] = []
+    const whereClauses: string[] = []
+    if (hasRequestBranchId && !scope.global) {
+      if (scope.branchIds.length === 0) {
+        whereClauses.push('1 = 0')
+      } else {
+        const placeholders = scope.branchIds.map(() => '?').join(', ')
+        whereClauses.push(`branch_id IN (${placeholders})`)
+        values.push(...scope.branchIds)
+      }
+    }
+    const whereClause = whereClauses.length > 0 ? ` WHERE ${whereClauses.join(' AND ')}` : ''
     const rows = await runReviewDbQuery<InventoryRequestRow>(
       `
         SELECT
@@ -28,10 +65,11 @@ export async function GET() {
           request_code AS requestCode,
           request_type AS requestType,
           request_status AS requestStatus
-        FROM inventory_item_requests
+        FROM inventory_item_requests${whereClause}
         ORDER BY id DESC
         LIMIT 200
       `,
+      values,
     )
 
     return Response.json({

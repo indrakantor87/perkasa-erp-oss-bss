@@ -1002,26 +1002,20 @@ async function getOwnerOptionsFromReviewDb() {
     .filter(Boolean)
 }
 
-export function resolveOwnedPsbListOwnerAliases(session?: AppSession) {
-  if (!session || (session.role !== 'PENJUALAN' && session.role !== 'SALES_MARKETING')) {
+import { resolveSalesOwnerAliasesIncludingSpvTeam } from '@/lib/services/sales-team-membership-service'
+
+export async function resolveOwnedPsbListOwnerAliases(session?: AppSession) {
+  if (!session) {
     return []
   }
-
-  return Array.from(
-    new Set(
-      [
-        session.displayName,
-        session.username,
-        `${session.displayName} (${session.username})`,
-      ]
-        .map((item) => normalizeText(item))
-        .filter(Boolean),
-    ),
-  )
+  if (session.role === 'PENJUALAN' || session.role === 'SALES_MARKETING' || session.role === 'SPV_SALES') {
+    return resolveSalesOwnerAliasesIncludingSpvTeam(session, normalizeText)
+  }
+  return []
 }
 
 function filterVisiblePsbListOwnerOptions(items: PsbListItem[], ownerOptions: string[], session?: AppSession) {
-  if (session?.role !== 'PENJUALAN' && session?.role !== 'SALES_MARKETING') {
+  if (session?.role !== 'PENJUALAN' && session?.role !== 'SALES_MARKETING' && session?.role !== 'SPV_SALES') {
     return ownerOptions
   }
 
@@ -1046,7 +1040,7 @@ async function getReviewDbPsbListPageData(
 
   const where: string[] = []
   const values: unknown[] = []
-  const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+  const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
   if (state.status) {
     where.push('status = ?')
     values.push(state.status)
@@ -1237,7 +1231,7 @@ async function getPsbListPageDataWithMock(
   }
 
   const searchNeedle = normalizeText(state.q)
-  const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+  const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
   const filteredItems = mockPsbListItems
     .filter((item) => !state.status || item.status === state.status)
     .filter((item) => {
@@ -1297,7 +1291,7 @@ async function getPsbListPageDataWithMock(
 }
 
 export function canUpdatePsbList(role: AppRole) {
-  return ['SUPER_ADMIN', 'ADMIN', 'CS_OPERATOR', 'CS_ADMIN', 'PENJUALAN', 'SALES_MARKETING'].includes(role)
+  return ['SUPER_ADMIN', 'ADMIN', 'CS_OPERATOR', 'CS_ADMIN'].includes(role)
 }
 
 export function canApprovePsbList(role: AppRole) {
@@ -1345,11 +1339,16 @@ export async function createPsbListItem(params: {
   const googleMapsLink = normalizeNullableText(params.googleMapsLink)
   const escortNotes = normalizeNullableText(params.escortNotes)
   const activityNotes = normalizeNullableText(params.activityNotes)
-  const nextActionLabel = buildNextActionLabel('BARU')
-  const auditNotes =
-    activityNotes ??
-    escortNotes ??
-    `Input PSB baru dari penjualan. Menunggu dipilih CS untuk review dan penjadwalan.`
+  const isSalesActor = params.actorRole === 'PENJUALAN' || params.actorRole === 'SALES_MARKETING'
+  const resolvedStatus: PsbListStatus = isSalesActor ? 'REVIEW_CS' : 'BARU'
+  const nextActionLabel = buildNextActionLabel(resolvedStatus)
+  const auditNotes = isSalesActor
+    ? activityNotes ??
+      escortNotes ??
+      `Input PSB baru dari penjualan. Auto submit review ke CS (status: REVIEW_CS). Jika perlu koreksi data, CS akan kembalikan status PERLU_KOREKSI kembali ke penjualan untuk perbaikan sebelum re-submit.`
+    : activityNotes ??
+      escortNotes ??
+      `Input PSB baru dari penjualan. Menunggu dipilih CS untuk review dan penjadwalan.`
 
   const insertResult = await runReviewDbExecute<ExecuteResult>(
     `
@@ -1369,7 +1368,7 @@ export async function createPsbListItem(params: {
         activity_notes,
         next_action_label
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'BARU', ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       psbListCode,
@@ -1380,6 +1379,7 @@ export async function createPsbListItem(params: {
       packageLabel,
       salesOwnerName,
       requestedInstallDate,
+      resolvedStatus,
       areaLabel,
       googleMapsLink,
       escortNotes,
@@ -1404,9 +1404,9 @@ export async function createPsbListItem(params: {
         actor_role,
         notes
       )
-      VALUES (?, 'CREATE', NULL, 'BARU', ?, ?, ?)
+      VALUES (?, 'CREATE', NULL, ?, ?, ?, ?)
     `,
-    [psbListId, params.actorName, params.actorRole, auditNotes],
+    [psbListId, resolvedStatus, params.actorName, params.actorRole, auditNotes],
   )
 
   return {

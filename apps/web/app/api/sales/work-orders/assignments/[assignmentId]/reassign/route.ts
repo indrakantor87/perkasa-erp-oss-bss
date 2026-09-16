@@ -5,7 +5,7 @@ import { getReviewDbErrorDetail } from '@/lib/review-db'
 import {
   reassignServiceWorkOrderAssignment,
   type ReassignFieldTechSession,
-  REASSIGN_FULL_ACCESS_ROLES_SET,
+  hasFullFieldOpsReassignAccess,
 } from '@/lib/services/field-ops-service'
 import { reassignServiceWorkOrderAssignmentMock } from '@/lib/services/tracking-service'
 import type { AppRole } from '@/lib/types'
@@ -35,7 +35,7 @@ export async function POST(
   }
 
   const sessionRole = (session.role ?? 'PUBLIC') as AppRole
-  const hasFullAccess = REASSIGN_FULL_ACCESS_ROLES_SET.has(sessionRole)
+  const hasFullAccess = hasFullFieldOpsReassignAccess(sessionRole)
   const hasSupportUpdate = canPerformAction(sessionRole, 'support', 'update')
   if (!(hasFullAccess || hasSupportUpdate)) {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
@@ -61,6 +61,8 @@ export async function POST(
     const reassignSession: ReassignFieldTechSession = {
       userId: session.userId,
       role: sessionRole,
+      branchId: session.branchId ?? null,
+      branchIds: Array.isArray(session.branchIds) ? session.branchIds.filter((n) => Number.isInteger(n) && n > 0) : [],
     }
 
     let affectedRows = 0

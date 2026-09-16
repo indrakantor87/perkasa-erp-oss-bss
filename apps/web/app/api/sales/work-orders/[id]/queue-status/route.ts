@@ -4,7 +4,8 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { hasReviewDbColumn, getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import {
   insertServiceWorkOrderStatusLog,
-  REASSIGN_FULL_ACCESS_ROLES_SET,
+  isBranchIdInScope,
+  hasFullFieldOpsReassignAccess,
   resolveReviewAuthUserIdByUsername,
 } from '@/lib/services/field-ops-service'
 import type { AppRole } from '@/lib/types'
@@ -14,6 +15,7 @@ type WorkOrderRow = {
   workOrderNo: string
   status: string
   notes: string | null
+  branchId: number | null
 }
 
 type QueueShortcutStatus = 'OPEN' | 'ON_PROGRESS' | 'TEMPORARY' | 'CLOSE' | 'FINAL_CLOSE'
@@ -58,7 +60,8 @@ async function getWorkOrderById(id: number) {
         id,
         work_order_no AS workOrderNo,
         status,
-        notes
+        notes,
+        branch_id AS branchId
       FROM service_work_orders
       WHERE id = ?
       LIMIT 1
@@ -104,7 +107,7 @@ export async function POST(
       const canCreateInventory = canPerformAction(sessionRole, 'inventory', 'create')
       const canManageInventory = canPerformAction(sessionRole, 'inventory', 'manage')
       const canUpdateSupport = canPerformAction(sessionRole, 'support', 'update')
-      const hasFullAccess = REASSIGN_FULL_ACCESS_ROLES_SET.has(sessionRole)
+      const hasFullAccess = hasFullFieldOpsReassignAccess(sessionRole)
       if (queueStatus === 'CLOSE' && !(canCreateInventory || canManageInventory || hasFullAccess)) {
         return Response.json(
           { message: 'Forbidden: shortcut CLOSE memerlukan izin inventory create/manage atau operator akses penuh.' },
@@ -130,6 +133,12 @@ export async function POST(
     const workOrder = await getWorkOrderById(workOrderId)
     if (!workOrder) {
       return Response.json({ message: 'Work order tidak ditemukan.' }, { status: 404 })
+    }
+    if (!isBranchIdInScope(session, workOrder.branchId)) {
+      return Response.json(
+        { message: 'Work order berada di luar scope cabang user (cross-branch mutation ditolak).' },
+        { status: 403 },
+      )
     }
 
     const targetStatus = mapQueueShortcutToWorkOrderStatus(queueStatus)
@@ -187,15 +196,24 @@ export async function POST(
       setClauses.push('updated_at = CURRENT_TIMESTAMP')
     }
 
-    values.push(workOrder.id)
+    const branchAllowedIds: number[] = []
+    if (workOrder.branchId != null && Number.isInteger(workOrder.branchId) && workOrder.branchId > 0) {
+      branchAllowedIds.push(workOrder.branchId)
+    }
+    const woBranchPlaceholders = branchAllowedIds.length ? branchAllowedIds.map(() => '?').join(', ') : null
+    const bindTail: unknown[] = []
+    if (woBranchPlaceholders) {
+      for (const bId of branchAllowedIds) bindTail.push(bId)
+    }
+    bindTail.push(workOrder.id)
 
     await runReviewDbExecute(
       `
         UPDATE service_work_orders
         SET ${setClauses.join(',\n          ')}
-        WHERE id = ?
+        WHERE id = ?${woBranchPlaceholders ? ` AND branch_id IN (${woBranchPlaceholders})` : ''}
       `,
-      values,
+      woBranchPlaceholders ? [...values.slice(0, -1), ...branchAllowedIds, workOrder.id] : values,
     )
 
     await insertServiceWorkOrderStatusLog({

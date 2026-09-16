@@ -399,7 +399,7 @@ async function main() {
       displayName: 'BUDI',
       branchIds: [],
     } as AppSession
-    const smAliases = resolveOwnedPsbListOwnerAliases(smSession)
+    const smAliases = await resolveOwnedPsbListOwnerAliases(smSession)
     assert.ok(
       Array.isArray(smAliases) && smAliases.length >= 1,
       'SALES_MARKETING harus menghasilkan aliases non-empty. Prior gap: SALES_MARKETING return empty karena PENJUALAN only condition.',
@@ -414,7 +414,7 @@ async function main() {
       displayName: 'BUDI',
       branchIds: [],
     } as AppSession
-    const pnAliases = resolveOwnedPsbListOwnerAliases(pnSession)
+    const pnAliases = await resolveOwnedPsbListOwnerAliases(pnSession)
     assert.equal(
       pnAliases.length,
       smAliases.length,
@@ -434,7 +434,7 @@ async function main() {
       branchIds: [],
     } as AppSession
     assert.deepEqual(
-      resolveOwnedPsbListOwnerAliases(otherSession),
+      await resolveOwnedPsbListOwnerAliases(otherSession),
       [],
       'Role NON-isolated (ADMIN/CS/OWNER/SUPER_ADMIN) harus return empty aliases — existing behavior preserved.',
     )
@@ -454,14 +454,14 @@ async function main() {
       authenticated: { username: string; displayName: string }
       clientOwnerRaw?: string | null
     }
-    const buildWhereMirror = (params: BuildWhereParams): { where: string[]; values: unknown[] } => {
+    const buildWhereMirror = async (params: BuildWhereParams): Promise<{ where: string[]; values: unknown[] }> => {
       const session: AppSession = {
         role: params.role,
         username: params.authenticated.username,
         displayName: params.authenticated.displayName,
         branchIds: [],
       } as AppSession
-      const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+      const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
       const where: string[] = []
       const values: unknown[] = []
       if (ownerAliases.length) {
@@ -476,7 +476,7 @@ async function main() {
 
     const rolesIsolated: Array<AppRole> = ['PENJUALAN', 'SALES_MARKETING']
     for (const role of rolesIsolated) {
-      const out = buildWhereMirror({
+      const out = await buildWhereMirror({
         role,
         authenticated: { username: 'budi', displayName: 'BUDI' },
         clientOwnerRaw: 'ANDI',
@@ -496,7 +496,7 @@ async function main() {
       )
     }
 
-    const adminOut = buildWhereMirror({
+    const adminOut = await buildWhereMirror({
       role: 'ADMIN',
       authenticated: { username: 'admin', displayName: 'ADMIN' },
       clientOwnerRaw: 'ANDI',
@@ -522,7 +522,7 @@ async function main() {
   // ===========================================================================
   {
     type BuildExportParams = { role: AppRole; username: string; displayName: string; clientOwnerParam?: string }
-    const buildExportFilters = (p: BuildExportParams) => {
+    const buildExportFilters = async (p: BuildExportParams) => {
       const session: AppSession = {
         role: p.role,
         username: p.username,
@@ -531,7 +531,7 @@ async function main() {
       } as AppSession
       const filters: string[] = ['1 = 1']
       const values: unknown[] = []
-      const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+      const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
       if (ownerAliases.length) {
         const placeholders = ownerAliases.map(() => '?').join(', ')
         filters.push(`LOWER(COALESCE(psb.sales_owner_name, '')) IN (${placeholders})`)
@@ -545,7 +545,7 @@ async function main() {
       return { filters, values, whereJoined: filters.join(' AND ') }
     }
 
-    const pExp = buildExportFilters({
+    const pExp = await buildExportFilters({
       role: 'PENJUALAN',
       username: 'budi',
       displayName: 'BUDI',
@@ -574,7 +574,7 @@ async function main() {
       `Security scope BUDI wajib ada. Found unique set: ${[...uniqueAliasElements].join(', ')}`,
     )
 
-    const smExp = buildExportFilters({
+    const smExp = await buildExportFilters({
       role: 'SALES_MARKETING',
       username: 'siti',
       displayName: 'SITI AYU',
@@ -586,7 +586,7 @@ async function main() {
       'SALES_MARKETING export values wajib contain authenticated SITI scope.',
     )
 
-    const csExp = buildExportFilters({
+    const csExp = await buildExportFilters({
       role: 'CS_ADMIN',
       username: 'cs01',
       displayName: 'CS OPERATOR',
@@ -612,14 +612,14 @@ async function main() {
   //          Verify ADMIN → TANPA owner scope (global aggregate).
   // ===========================================================================
   {
-    const buildActiveLeadWhere = (p: { role: AppRole; username: string; displayName: string }) => {
+    const buildActiveLeadWhere = async (p: { role: AppRole; username: string; displayName: string }) => {
       const session: AppSession = {
         role: p.role,
         username: p.username,
         displayName: p.displayName,
         branchIds: [],
       } as AppSession
-      const salesOwnerAliases = resolveOwnedPsbListOwnerAliases(session)
+      const salesOwnerAliases = await resolveOwnedPsbListOwnerAliases(session)
       const salesOwnerClause = salesOwnerAliases.length
         ? `LOWER(COALESCE(marketing_name, '')) IN (${salesOwnerAliases.map(() => '?').join(', ')})`
         : null
@@ -628,7 +628,7 @@ async function main() {
       return { where: whereParts.join(' AND '), ownerArgs: salesOwnerAliases }
     }
 
-    const pnDash = buildActiveLeadWhere({ role: 'PENJUALAN', username: 'budi', displayName: 'BUDI' })
+    const pnDash = await buildActiveLeadWhere({ role: 'PENJUALAN', username: 'budi', displayName: 'BUDI' })
     assert.ok(
       /marketing_name/.test(pnDash.where),
       'PENJUALAN dashboard activeLeads WHERE wajib memuat marketing_name restriction.',
@@ -641,11 +641,11 @@ async function main() {
       `PENJUALAN dashboard owner args set wajib contain BUDI. Found: ${[...pnDashArgsSet].join(', ')}`,
     )
 
-    const smDash = buildActiveLeadWhere({ role: 'SALES_MARKETING', username: 'rudi', displayName: 'RUDI' })
+    const smDash = await buildActiveLeadWhere({ role: 'SALES_MARKETING', username: 'rudi', displayName: 'RUDI' })
     assert.ok(/marketing_name/.test(smDash.where), 'SALES_MARKETING dashboard: scope marketing_name wajib ada.')
     assert.ok(smDash.ownerArgs.length >= 1, 'SALES_MARKETING dashboard: owner args non-empty.')
 
-    const adminDash = buildActiveLeadWhere({ role: 'ADMIN', username: 'admin', displayName: 'ADMIN' })
+    const adminDash = await buildActiveLeadWhere({ role: 'ADMIN', username: 'admin', displayName: 'ADMIN' })
     assert.equal(
       /marketing_name/.test(adminDash.where),
       false,
@@ -664,7 +664,7 @@ async function main() {
   // ===========================================================================
   {
     type TestWorklistItem = { id: string; owner?: string | null; subtitle?: string | null; queue?: string }
-    const applyWorklistOwnershipGuard = (
+    const applyWorklistOwnershipGuard = async (
       items: TestWorklistItem[],
       p: { role: AppRole; username: string; displayName: string },
     ) => {
@@ -674,7 +674,7 @@ async function main() {
         displayName: p.displayName,
         branchIds: [],
       } as AppSession
-      const ownerAliases = resolveOwnedPsbListOwnerAliases(session)
+      const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
       if (!ownerAliases.length) return [...items]
       const aliasSet = new Set(ownerAliases.map((v) => String(v ?? '').trim().toUpperCase()))
       const matchOwned = (value: unknown): boolean => {
@@ -697,7 +697,7 @@ async function main() {
       { id: 'tt-1', owner: 'CS TEAM', subtitle: null, queue: 'TT Teknis' },
     ]
 
-    const pMineFalse = applyWorklistOwnershipGuard(sampleItems, {
+    const pMineFalse = await applyWorklistOwnershipGuard(sampleItems, {
       role: 'PENJUALAN',
       username: 'budi',
       displayName: 'BUDI',
@@ -710,7 +710,7 @@ async function main() {
     assert.equal(pIds.includes('tt-1'), false, 'PENJUALAN mine=false: TT Teknis CS team DIBLOKIR, bukan milik BUDI.')
     assert.equal(pMineFalse.length, 2, `PENJUALAN: exact 2 item BUDI retained. Jumlah: ${pMineFalse.length}`)
 
-    const smQueueAll = applyWorklistOwnershipGuard(sampleItems, {
+    const smQueueAll = await applyWorklistOwnershipGuard(sampleItems, {
       role: 'SALES_MARKETING',
       username: 'budi',
       displayName: 'BUDI',
@@ -721,7 +721,7 @@ async function main() {
       `SALES_MARKETING queue=All: defence-in-depth harus tetap 2 item BUDI. Result ids: ${smQueueAll.map((i) => i.id).join(', ')}`,
     )
 
-    const adminAll = applyWorklistOwnershipGuard(sampleItems, {
+    const adminAll = await applyWorklistOwnershipGuard(sampleItems, {
       role: 'ADMIN',
       username: 'admin',
       displayName: 'ADMIN',

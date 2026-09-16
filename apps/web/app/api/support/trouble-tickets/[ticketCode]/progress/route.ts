@@ -1,40 +1,24 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  getReviewDbErrorDetail,
+  hasReviewDbColumn,
+  runReviewDbTransaction,
+  type ReviewDbConnection,
+} from '@/lib/review-db'
 import { ensureSupportTroubleTicketProgressTable } from '@/lib/services/support-ticket-progress-service'
+import {
+  isBranchIdInScope,
+  lockAndResolveTroubleTicketBranch,
+  type ValidateBranchScopeSession,
+  type TroubleTicketBranchLockRow,
+} from '@/lib/services/field-ops-service'
 
 const allowedStatuses = new Set(['OPEN', 'ON_PROGRESS', 'FOLLOW_UP'])
 
-type TroubleTicketRow = {
-  id: number
-  ticketCode: string
-  customerName: string
-  status: string
-  closedAt: string | Date | null
-}
-
 function normalizeRequiredText(value: unknown) {
   return String(value ?? '').trim()
-}
-
-async function getTroubleTicketByCode(ticketCode: string) {
-  const [row] = await runReviewDbQuery<TroubleTicketRow>(
-    `
-      SELECT
-        id,
-        ticket_code AS ticketCode,
-        customer_name AS customerName,
-        status,
-        closed_at AS closedAt
-      FROM support_trouble_tickets
-      WHERE UPPER(ticket_code) = ?
-      LIMIT 1
-    `,
-    [ticketCode],
-  )
-
-  return row ?? null
 }
 
 async function buildProgressLogInsertPayload(params: {
@@ -44,7 +28,9 @@ async function buildProgressLogInsertPayload(params: {
   progressNotes: string
   followUpAt: Date | null
   actorLabel: string
+  connection: ReviewDbConnection
 }) {
+  void params.connection
   const [
     hasTroubleTicketId,
     hasProgressStatus,
@@ -112,12 +98,14 @@ export async function POST(
     )
   }
 
+  let resolvedTicketCode = ''
   try {
     const resolvedParams = await params
     const ticketCode = decodeURIComponent(resolvedParams.ticketCode ?? '').trim().toUpperCase()
     if (!ticketCode) {
       return Response.json({ message: 'Kode ticket wajib diisi.' }, { status: 400 })
     }
+    resolvedTicketCode = ticketCode
 
     const payload = (await request.json()) as {
       progressStatus?: unknown
@@ -149,59 +137,90 @@ export async function POST(
       }
     }
 
-    const ticket = await getTroubleTicketByCode(ticketCode)
-    if (!ticket) {
-      return Response.json({ message: 'Trouble ticket tidak ditemukan.' }, { status: 404 })
-    }
-    if (ticket.closedAt || ['CLOSE', 'CLOSED'].includes(ticket.status.trim().toUpperCase())) {
-      return Response.json({ message: `Trouble ticket ${ticket.ticketCode} sudah berstatus closed.` }, { status: 409 })
-    }
-
     await ensureSupportTroubleTicketProgressTable()
 
-    const actorLabel = `${session.displayName} (${session.username})`
-    const noteText = `[Progress via web] ${actorLabel} - ${progressNotes}`
+    const sessionSafe = session as unknown as ValidateBranchScopeSession
+    const result = await runReviewDbTransaction(async (conn) => {
+      const lockedTicket = await lockAndResolveTroubleTicketBranch({
+        ticketCode,
+        connection: conn,
+      })
+      if (!lockedTicket) {
+        return { status: 404, message: 'Trouble ticket tidak ditemukan.' } as const
+      }
+      if (
+        lockedTicket.closedAt ||
+        ['CLOSE', 'CLOSED'].includes(lockedTicket.status.trim().toUpperCase())
+      ) {
+        return {
+          status: 409,
+          message: `Trouble ticket ${lockedTicket.ticketCode ?? ticketCode} sudah berstatus closed.`,
+        } as const
+      }
+      if (!isBranchIdInScope(sessionSafe, lockedTicket.branchId)) {
+        return {
+          status: 403,
+          message: 'Akses lintas cabang tidak diizinkan untuk update progress trouble ticket.',
+        } as const
+      }
+      void 0 satisfies TroubleTicketBranchLockRow | unknown
 
-    await runReviewDbExecute(
-      `
-        UPDATE support_trouble_tickets
-        SET
-          status = ?,
-          notes = CASE
-            WHEN notes IS NULL OR notes = '' THEN ?
-            ELSE CONCAT(notes, '\n', ?)
-          END,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `,
-      [progressStatus, noteText, noteText, ticket.id],
-    )
+      const actorLabel = `${session.displayName} (${session.username})`
+      const noteText = `[Progress via web] ${actorLabel} - ${progressNotes}`
 
-    const progressLogPayload = await buildProgressLogInsertPayload({
-      ticketId: ticket.id,
-      progressStatus,
-      ownerName,
-      progressNotes,
-      followUpAt,
-      actorLabel,
-    })
-
-    if (progressLogPayload) {
-      await runReviewDbExecute(
+      await conn.query(
         `
-          INSERT INTO support_trouble_ticket_progress_logs (
-            ${progressLogPayload.columns.join(',\n            ')}
-          )
-          VALUES (${progressLogPayload.placeholders.join(', ')})
+          UPDATE support_trouble_tickets
+          SET
+            status = ?,
+            notes = CASE
+              WHEN notes IS NULL OR notes = '' THEN ?
+              ELSE CONCAT(notes, '\n', ?)
+            END,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
         `,
-        progressLogPayload.values,
+        [progressStatus, noteText, noteText, lockedTicket.id],
       )
-    }
 
-    return Response.json({
-      message: `Progress trouble ticket ${ticket.ticketCode} untuk ${ticket.customerName} berhasil diperbarui.`,
+      const progressLogPayload = await buildProgressLogInsertPayload({
+        ticketId: lockedTicket.id,
+        progressStatus,
+        ownerName,
+        progressNotes,
+        followUpAt,
+        actorLabel,
+        connection: conn,
+      })
+
+      if (progressLogPayload) {
+        await conn.query(
+          `
+            INSERT INTO support_trouble_ticket_progress_logs (
+              ${progressLogPayload.columns.join(',\n            ')}
+            )
+            VALUES (${progressLogPayload.placeholders.join(', ')})
+          `,
+          progressLogPayload.values,
+        )
+      }
+
+      return {
+        status: 200 as const,
+        message: `Progress trouble ticket ${lockedTicket.ticketCode ?? ticketCode} untuk ${lockedTicket.customerName ?? 'customer'} berhasil diperbarui.`,
+      }
     })
+
+    return Response.json({ message: result.message }, { status: result.status })
   } catch (error) {
-    return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
+    return Response.json(
+      {
+        message: getReviewDbErrorDetail(error),
+        ticketCode: resolvedTicketCode || undefined,
+      },
+      { status: 500 },
+    )
   }
 }
+
+declare const _ttAnchorType: never

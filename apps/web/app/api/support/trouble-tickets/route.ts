@@ -7,7 +7,9 @@ import {
   generateServiceWorkOrderNo,
   insertServiceWorkOrderAssignment,
   insertServiceWorkOrderStatusLog,
+  isBranchIdInScope,
   resolveReviewAuthUserIdByUsername,
+  validateTargetTechnicianUser,
 } from '@/lib/services/field-ops-service'
 
 const allowedCategories = new Set(['TT', 'PV'])
@@ -385,6 +387,27 @@ export async function POST(request: Request) {
       const workOrderId = Number(workOrderInsertResult.insertId ?? 0)
       if (Number.isInteger(workOrderId) && workOrderId > 0) {
         if (currentPicUserId) {
+          const validatedPic = await validateTargetTechnicianUser({ targetUserId: currentPicUserId })
+          if (!validatedPic) {
+            return Response.json(
+              { message: 'currentPicUserId (PIC awal WO) tidak valid: user tidak ditemukan / tidak aktif / bukan teknisi.' },
+              { status: 403 },
+            )
+          }
+          const woBranch = linkedSubscription.branchId
+          const targetBranch = validatedPic.userBranchId ?? woBranch
+          if (woBranch != null && targetBranch != null && !isBranchIdInScope(session, targetBranch)) {
+            return Response.json(
+              { message: 'Target teknisi currentPicUserId untuk WO linked berada di luar scope cabang user.' },
+              { status: 403 },
+            )
+          }
+          if (woBranch != null && targetBranch != null && targetBranch !== woBranch) {
+            return Response.json(
+              { message: 'Target teknisi currentPicUserId untuk WO linked harus berasal dari cabang yang sama dengan WO (subscription branch).' },
+              { status: 403 },
+            )
+          }
           await insertServiceWorkOrderAssignment({
             workOrderId,
             assignedUserId: currentPicUserId,

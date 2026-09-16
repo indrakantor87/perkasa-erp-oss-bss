@@ -7,7 +7,9 @@ import {
   generateServiceWorkOrderNo,
   insertServiceWorkOrderAssignment,
   insertServiceWorkOrderStatusLog,
+  isBranchIdInScope,
   resolveReviewAuthUserIdByUsername,
+  validateTargetTechnicianUser,
 } from '@/lib/services/field-ops-service'
 
 const allowedWorkTypes = new Set(['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'])
@@ -178,8 +180,37 @@ export async function POST(request: Request) {
     const technicianName = String(payload.technicianName ?? '').trim()
     const jobCategoryRaw = String(payload.jobCategory ?? '').trim().toUpperCase()
     const priorityRaw = String(payload.priority ?? '').trim().toUpperCase()
-    const branchId = resolveOptionalPositiveInt(payload.branchId) ?? session.branchId
+    const rawBranchCandidate = resolveOptionalPositiveInt(payload.branchId)
+    if (rawBranchCandidate != null && !isBranchIdInScope(session, rawBranchCandidate)) {
+      return Response.json(
+        { message: 'branchId dari request berada di luar scope cabang user (cross-branch assignment ditolak).' },
+        { status: 403 },
+      )
+    }
+    const branchId = rawBranchCandidate ?? session.branchId
     const currentPicUserId = resolveOptionalPositiveInt(payload.currentPicUserId)
+    if (currentPicUserId != null) {
+      const validatedPic = await validateTargetTechnicianUser({ targetUserId: currentPicUserId })
+      if (!validatedPic) {
+        return Response.json(
+          { message: 'currentPicUserId (PIC awal) tidak valid: user tidak ditemukan / tidak aktif / bukan teknisi.' },
+          { status: 403 },
+        )
+      }
+      const targetBranch = validatedPic.userBranchId ?? branchId
+      if (branchId != null && targetBranch != null && !isBranchIdInScope(session, targetBranch)) {
+        return Response.json(
+          { message: 'Target teknisi currentPicUserId berada di luar scope cabang user (cross-branch assignment ditolak).' },
+          { status: 403 },
+        )
+      }
+      if (branchId != null && targetBranch != null && targetBranch !== branchId) {
+        return Response.json(
+          { message: 'Target teknisi currentPicUserId harus berada pada cabang yang sama dengan work order (branchId).' },
+          { status: 403 },
+        )
+      }
+    }
     const address = String(payload.address ?? '').trim()
     const latitude = resolveOptionalCoordinate(payload.latitude)
     const longitude = resolveOptionalCoordinate(payload.longitude)

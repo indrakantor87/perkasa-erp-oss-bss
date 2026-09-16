@@ -2,6 +2,11 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  isBranchIdInScope,
+  TECHNICIAN_ROLE_WHITELIST_CANONICAL,
+  validateTargetTechnicianUser,
+} from '@/lib/services/field-ops-service'
 
 const allowedMovementTypes = new Set(['IN', 'OUT', 'ADJUSTMENT'])
 const allowedReferenceTypes = new Set(['WORK_ORDER', 'TROUBLE_TICKET', 'REQUEST', 'MANUAL', 'PURCHASE_RECEIPT'])
@@ -259,6 +264,26 @@ export async function POST(request: Request) {
     }
     if (movementType === 'ADJUSTMENT' && qty < 0) {
       return Response.json({ message: 'Qty adjustment tidak valid.' }, { status: 400 })
+    }
+
+    if (technicianUserId != null) {
+      const validatedTech = await validateTargetTechnicianUser({
+        targetUserId: technicianUserId,
+        allowedRoles: TECHNICIAN_ROLE_WHITELIST_CANONICAL,
+      })
+      if (!validatedTech) {
+        return Response.json(
+          { message: 'technicianUserId (penerima teknisi) tidak valid: user tidak ditemukan / tidak aktif / bukan teknisi.' },
+          { status: 403 },
+        )
+      }
+      const targetBranch = validatedTech.userBranchId
+      if (targetBranch != null && !isBranchIdInScope(session, targetBranch)) {
+        return Response.json(
+          { message: 'Teknisi penerima stock (technicianUserId) berada di luar scope cabang user (cross-branch assignment ditolak).' },
+          { status: 403 },
+        )
+      }
     }
 
     const handoverAuditNote = buildHandoverAuditNote({

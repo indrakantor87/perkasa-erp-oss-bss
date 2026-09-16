@@ -246,7 +246,7 @@ function buildSalesSubmenuItems(role: AppRole | null) {
     }),
   )
 
-  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING'].includes(role)) {
+  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING', 'SPV_SALES'].includes(role)) {
     items.push(
       buildSidebarNavItem('/sales', {
         key: 'sales-sub-input-psb',
@@ -258,7 +258,7 @@ function buildSalesSubmenuItems(role: AppRole | null) {
     )
   }
 
-  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING'].includes(role)) {
+  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING', 'SPV_SALES'].includes(role)) {
     items.push(
       buildSidebarNavItem('/list-psb', {
         key: 'sales-sub-list-psb',
@@ -277,7 +277,7 @@ function buildSalesSubmenuItems(role: AppRole | null) {
     )
   }
 
-  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING', 'CS_OPERATOR', 'CS_ADMIN'].includes(role)) {
+  if (['SUPER_ADMIN', 'ADMIN', 'OWNER', 'PENJUALAN', 'SALES_MARKETING', 'SPV_SALES', 'CS_OPERATOR', 'CS_ADMIN'].includes(role)) {
     items.push(
       buildSidebarNavItem('/sales', {
         key: 'sales-sub-leads',
@@ -1145,6 +1145,7 @@ function getWorkspaceCustomItems(role: AppRole | null) {
       return [buildInventoryMainItem(role)]
     case 'PENJUALAN':
     case 'SALES_MARKETING':
+    case 'SPV_SALES':
       return [buildSalesMainItem(role)]
     case 'CS_OPERATOR':
       return [
@@ -1212,6 +1213,7 @@ function getSupportingCustomItems(role: AppRole | null) {
       return []
     case 'PENJUALAN':
     case 'SALES_MARKETING':
+    case 'SPV_SALES':
       return [buildCustomersMainItem(role)]
     case 'NOC_OPERATOR':
       return []

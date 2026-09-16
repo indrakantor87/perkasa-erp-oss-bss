@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail } from '@/lib/review-db'
 import {
-  REASSIGN_FULL_ACCESS_ROLES_SET,
+  hasFullFieldOpsReassignAccess,
   releaseServiceTroubleTicketAssignment,
   TT_ASSIGNMENT_ERROR_CODES,
 } from '@/lib/services/field-ops-service'
@@ -39,7 +39,7 @@ export async function POST(
   if (sessionRole === 'FIELD_TECHNICIAN') {
     resolvedScope = 'SELF_ONLY'
   } else if (
-    REASSIGN_FULL_ACCESS_ROLES_SET.has(sessionRole) ||
+    hasFullFieldOpsReassignAccess(sessionRole) ||
     canPerformAction(sessionRole, 'support', 'update')
   ) {
     resolvedScope = 'FULL_ACCESS'
