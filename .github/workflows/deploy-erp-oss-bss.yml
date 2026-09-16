@@ -74,7 +74,7 @@ jobs:
           echo "short_sha=$S" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
 
-          FULL_IMG="${IMAGE_REPOSITORY}$(printf '%c' ':')main-${S}"
+          FULL_IMG="${IMAGE_REPOSITORY}$(printf '%c' ':')${S}"
           echo "deploy_image=$FULL_IMG" >> "$GITHUB_OUTPUT"
           echo "DEPLOY_IMAGE=$FULL_IMG"
 
@@ -85,9 +85,11 @@ jobs:
               ;;
           esac
 
-          REQUIRED_PREFIX="${IMAGE_REPOSITORY}$(printf '%c' ':')main-"
-          if [[ "$FULL_IMG" != "$REQUIRED_PREFIX"* ]]; then
-            echo "FATAL: Deploy image format INVALID. Expected ${REQUIRED_PREFIX}<7hex>"
+          REQUIRED_PREFIX="${IMAGE_REPOSITORY}$(printf '%c' ':')"
+          EXPECTED_PATTERN="^${REQUIRED_PREFIX}[0-9a-fA-F]{7}\$"
+          if ! [[ "$FULL_IMG" =~ $EXPECTED_PATTERN ]]; then
+            echo "FATAL: Deploy image format INVALID. Expected ${REQUIRED_PREFIX}<7-hex-chars>"
+            echo "Pattern regex: $EXPECTED_PATTERN"
             echo "Got: [$FULL_IMG]"
             exit 12
           fi
@@ -386,13 +388,14 @@ jobs:
 
           case "$DEPLOY_IMG_PLACEHOLDER" in
             *"$ABORT_COLON")
-              abort "REMOTE: Mutable tag BAN violated. Deploy identity must be immutable main-<7hex>" 11
+              abort "REMOTE: Mutable tag BAN violated. Deploy identity must be immutable <7-hex-sha> only" 11
               ;;
           esac
 
-          REQUIRED_IMG_PREFIX="ghcr.io/indrakantor87/perkasa-erp-oss-bss$(printf '%c' ':')main-"
-          if [[ "$DEPLOY_IMG_PLACEHOLDER" != "$REQUIRED_IMG_PREFIX"* ]]; then
-            abort "REMOTE: Image format INVALID. Expected prefix=$REQUIRED_IMG_PREFIX" 12
+          REQUIRED_IMG_PREFIX="ghcr.io/indrakantor87/perkasa-erp-oss-bss$(printf '%c' ':')"
+          EXPECTED_IMG_PATTERN="^${REQUIRED_IMG_PREFIX}[0-9a-fA-F]{7}$"
+          if ! [[ "$DEPLOY_IMG_PLACEHOLDER" =~ $EXPECTED_IMG_PATTERN ]]; then
+            abort "REMOTE: Image format INVALID. Expected pattern=$EXPECTED_IMG_PATTERN (prefix=$REQUIRED_IMG_PREFIX + 7 hex chars)" 12
           fi
 
           if ! docker network inspect "$ERP_NETWORK_PLACEHOLDER" >/dev/null 2>&1; then
