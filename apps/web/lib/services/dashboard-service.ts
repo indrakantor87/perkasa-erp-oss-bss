@@ -316,9 +316,11 @@ function canAccessDashboardHref(role: AppRole, href: string) {
   return true
 }
 
-function getLockedOperationalDivision(role: AppRole): DashboardOperationalDivisionKey {
+export function getLockedOperationalDivision(role: AppRole): DashboardOperationalDivisionKey {
   switch (role) {
     case 'SALES_MARKETING':
+    case 'PENJUALAN':
+    case 'SPV_SALES':
       return 'SALES'
     case 'CS_OPERATOR':
     case 'CS_ADMIN':
@@ -1866,6 +1868,9 @@ async function getReviewDbOperationalCards(
     ? `LOWER(COALESCE(marketing_name, '')) IN (${salesOwnerAliases.map(() => '?').join(', ')})`
     : null
   const salesOwnerArgs = salesOwnerClause ? [...salesOwnerAliases] : []
+  const subscriptionOwnerClause = salesOwnerAliases.length
+    ? `LOWER(COALESCE(so.marketing_name, '')) IN (${salesOwnerAliases.map(() => '?').join(', ')})`
+    : null
   const marketingNameExpression = (tableAlias?: string) => {
     const prefix = tableAlias ? `${tableAlias}.` : ''
     return salesOwnerClause
@@ -2034,7 +2039,16 @@ async function getReviewDbOperationalCards(
             WHERE 1 = 0`
   const salesMonthlyOrderArgs = hasSalesOrderRequestDate ? [startText, endText] : []
   const salesMonthlyActivationFilter = hasSalesSubscriptionActivatedAt
-    ? `
+    ? subscriptionOwnerClause
+      ? `
+            FROM service_subscriptions ss
+            JOIN sales_orders so
+              ON so.id = ss.order_id
+            WHERE ss.activated_at IS NOT NULL
+              AND ss.activated_at >= ?
+              AND ss.activated_at < ?
+              AND ${subscriptionOwnerClause}`
+      : `
             FROM service_subscriptions
             WHERE activated_at IS NOT NULL
               AND activated_at >= ?
@@ -2042,7 +2056,11 @@ async function getReviewDbOperationalCards(
     : `
             FROM (SELECT NULL AS activated_at) service_subscriptions
             WHERE 1 = 0`
-  const salesMonthlyActivationArgs = hasSalesSubscriptionActivatedAt ? [startText, endText] : []
+  const salesMonthlyActivationArgs = hasSalesSubscriptionActivatedAt
+    ? subscriptionOwnerClause
+      ? [startText, endText, ...salesOwnerArgs]
+      : [startText, endText]
+    : []
 
   const digitalLeadFilter = hasSalesLeadSource
     ? `
@@ -4326,30 +4344,83 @@ async function getReviewDbWorklist(session: AppSession): Promise<DashboardWorkIt
   }
 }
 
-async function getReviewDbDashboardSummary(_session?: AppSession) {
-  const [hasIsolationStatus, hasIsolationIsArchived] = await Promise.all([
+async function getReviewDbDashboardSummary(session?: AppSession) {
+  const [
+    hasIsolationStatus,
+    hasIsolationIsArchived,
+    hasCustomerBranchId,
+    hasSalesOrderBranchId,
+    hasTicketBranchId,
+    hasIsolationBranchId,
+    hasInventoryBranchId,
+    hasEmployeeBranchId,
+    hasInvoiceBranchId,
+  ] = await Promise.all([
     hasReviewDbColumn('support_isolations', 'status'),
     hasReviewDbColumn('support_isolations', 'is_archived'),
+    hasReviewDbColumn('crm_customers', 'branch_id'),
+    hasReviewDbColumn('sales_orders', 'branch_id'),
+    hasReviewDbColumn('support_trouble_tickets', 'branch_id'),
+    hasReviewDbColumn('support_isolations', 'branch_id'),
+    hasReviewDbColumn('inventory_items', 'branch_id'),
+    hasReviewDbColumn('hr_employees', 'branch_id'),
+    hasReviewDbColumn('billing_invoices', 'branch_id'),
   ])
+
+  const safeSession = session ?? null
+  const roleUp = (safeSession?.role ?? '').toString().trim().toUpperCase()
+  const isGlobalRole = roleUp === 'OWNER' || roleUp === 'SUPER_ADMIN'
+  const sessionBranchIds: number[] = isGlobalRole
+    ? []
+    : Array.isArray(safeSession?.branchIds)
+      ? safeSession!.branchIds.filter((n) => Number.isInteger(n) && n > 0)
+      : Number.isInteger(safeSession?.branchId as number) && (safeSession?.branchId as number) > 0
+        ? [safeSession!.branchId as number]
+        : []
+  const branchInScopeClause = (col: string): { clause: string; values: number[] } => {
+    if (isGlobalRole) return { clause: '', values: [] }
+    if (sessionBranchIds.length === 0) return { clause: ` AND 1 = 0`, values: [] }
+    const placeholders = sessionBranchIds.map(() => '?').join(', ')
+    return { clause: ` AND ${col} IN (${placeholders})`, values: [...sessionBranchIds] }
+  }
+
+  const customersBranch = hasCustomerBranchId ? branchInScopeClause('branch_id') : { clause: '', values: [] as number[] }
+  const ordersBranch = hasSalesOrderBranchId ? branchInScopeClause('branch_id') : { clause: '', values: [] as number[] }
+  const ticketsBranch = hasTicketBranchId ? branchInScopeClause('branch_id') : { clause: '', values: [] as number[] }
+  const isolationsBranch = hasIsolationBranchId ? branchInScopeClause('branch_id') : { clause: '', values: [] as number[] }
+  const inventoryBranch = hasInventoryBranchId ? branchInScopeClause('branch_id') : { clause: '', values: [] as number[] }
+  const employeesBranch = hasEmployeeBranchId ? branchInScopeClause('branch_id') : { clause: '', values: [] as number[] }
+  const invoicesBranch = hasInvoiceBranchId ? branchInScopeClause('branch_id') : { clause: '', values: [] as number[] }
+
   const dashboardIsolationCountFilter = hasIsolationStatus
     ? `
         SELECT COUNT(*)
         FROM support_isolations
         WHERE status = 'OPEN'${hasIsolationIsArchived ? `
-          AND is_archived = 0` : ''}`
+          AND is_archived = 0` : ''}${isolationsBranch.clause}`
     : `
         SELECT COUNT(*)
         FROM (SELECT 0 AS id) support_isolations
         WHERE 1 = 0`
+
+  const queryValues: unknown[] = [
+    ...customersBranch.values,
+    ...ordersBranch.values,
+    ...ticketsBranch.values,
+    ...inventoryBranch.values,
+    ...employeesBranch.values,
+    ...invoicesBranch.values,
+  ]
+
   const [row] = await runReviewDbQuery<DashboardSummaryRow>(`
     SELECT
-      (SELECT COUNT(*) FROM crm_customers) AS customers,
-      (SELECT COUNT(*) FROM sales_orders) AS orders,
+      (SELECT COUNT(*) FROM crm_customers WHERE 1 = 1${customersBranch.clause}) AS customers,
+      (SELECT COUNT(*) FROM sales_orders WHERE 1 = 1${ordersBranch.clause}) AS orders,
       (
         SELECT COUNT(*)
         FROM support_trouble_tickets
         WHERE closed_at IS NULL
-          AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')
+          AND COALESCE(UPPER(TRIM(status)), 'OPEN') NOT IN ('CLOSE', 'CLOSED')${ticketsBranch.clause}
       ) AS troubleTickets,
       (
         ${dashboardIsolationCountFilter}
@@ -4357,20 +4428,22 @@ async function getReviewDbDashboardSummary(_session?: AppSession) {
       (
         SELECT COUNT(*)
         FROM inventory_items
-        WHERE status = 'ACTIVE'
+        WHERE status = 'ACTIVE'${inventoryBranch.clause}
       ) AS inventoryItems,
-      (SELECT COUNT(*) FROM hr_employees) AS employees,
+      (SELECT COUNT(*) FROM hr_employees WHERE 1 = 1${employeesBranch.clause}) AS employees,
       (
         SELECT COUNT(*)
         FROM billing_invoices
-        WHERE invoice_status = 'OVERDUE'
+        WHERE (
+          invoice_status = 'OVERDUE'
           OR (
             due_date < CURRENT_DATE
             AND COALESCE(paid_amount, 0) < COALESCE(total_amount, 0)
             AND invoice_status NOT IN ('PAID', 'CANCELLED')
           )
+        )${invoicesBranch.clause}
       ) AS overdueInvoices
-  `)
+  `, queryValues)
 
   return row ?? EMPTY_DASHBOARD_SUMMARY
 }

@@ -5,7 +5,7 @@ import {
   TT_CLOSE_ERROR_CODES,
   TroubleTicketCloseError,
   closeTroubleTicketWithMaterials,
-  REASSIGN_FULL_ACCESS_ROLES_SET,
+  hasFullFieldOpsReassignAccess,
   type TtCloseErrorCode,
 } from '@/lib/services/field-ops-service'
 import type { AppRole } from '@/lib/types'
@@ -89,7 +89,7 @@ export async function POST(
   const canUpdateSupport = canPerformAction(sessionRole, 'support', 'update')
   const canCreateInventory = canPerformAction(sessionRole, 'inventory', 'create')
   const canManageInventory = canPerformAction(sessionRole, 'inventory', 'manage')
-  const hasFullAccess = REASSIGN_FULL_ACCESS_ROLES_SET.has(sessionRole)
+  const hasFullAccess = hasFullFieldOpsReassignAccess(sessionRole)
   if (!(canUpdateSupport && (canCreateInventory || canManageInventory || hasFullAccess))) {
     return Response.json(
       {

@@ -1,7 +1,24 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  getReviewDbErrorDetail,
+  hasReviewDbColumn,
+  ReviewDbConnection,
+  runReviewDbExecute,
+  runReviewDbQuery,
+  runReviewDbTransaction,
+} from '@/lib/review-db'
+import { isBranchIdInScope, lockAndResolveWorkOrderBranch } from '@/lib/services/field-ops-service'
+
+class DeviceAssignmentHttpError extends Error {
+  readonly statusCode: number
+  constructor(message: string, statusCode: number) {
+    super(message)
+    this.statusCode = statusCode
+    this.name = 'DeviceAssignmentHttpError'
+  }
+}
 
 const allowedStatuses = new Set(['ASSIGNED', 'RETURNED', 'DAMAGED', 'LOST'])
 
@@ -16,6 +33,7 @@ type SubscriptionRow = {
   id: number
   serviceNo: string
   customerId: number
+  branchId: number | null
 }
 
 type WorkOrderRow = {
@@ -26,11 +44,36 @@ type WorkOrderRow = {
 type CustomerRow = {
   id: number
   customerCode: string
+  branchId: number | null
 }
 
 type InsertResult = {
   insertId?: number
   affectedRows?: number
+}
+
+type ResolvedReference = {
+  subscriptionId: number | null
+  workOrderId: number | null
+  customerId: number | null
+  subscriptionBranchId: number | null
+  workOrderBranchId: number | null
+  customerBranchId: number | null
+}
+
+async function txQuery<T>(conn: ReviewDbConnection, sql: string, values: unknown[] = []): Promise<T[]> {
+  const [rows] = await conn.query(sql, values)
+  return (rows as T[]) || []
+}
+
+async function txExecute<T>(conn: ReviewDbConnection, sql: string, values: unknown[] = []): Promise<T> {
+  const [result] = await conn.query(sql, values)
+  return result as T
+}
+
+function toPositiveIntegerOrNull(value: unknown): number | null {
+  const n = Number(value ?? 0)
+  return Number.isInteger(n) && n > 0 ? n : null
 }
 
 async function getSubscriptionQueryParts() {
@@ -247,147 +290,207 @@ export async function POST(request: Request) {
       )
     }
 
-    const [item] = await runReviewDbQuery<ItemRow>(
-      `
-        SELECT
-          id,
-          item_code AS itemCode,
-          item_name AS itemName,
-          current_stock AS currentStock
-        FROM inventory_items
-        WHERE UPPER(item_code) = UPPER(?)
-        LIMIT 1
-      `,
-      [itemCode],
-    )
-    if (!item) {
-      return Response.json({ message: 'Item inventory tidak ditemukan di review DB.' }, { status: 404 })
-    }
+    const subscriptionQueryParts = await getSubscriptionQueryParts()
 
-    let subscriptionId: number | null = null
-    let workOrderId: number | null = null
-    let resolvedCustomerId: number | null = null
-
-    if (serviceNo) {
-      const subscriptionQueryParts = await getSubscriptionQueryParts()
-      const [subscription] = await runReviewDbQuery<SubscriptionRow>(
+    const { assignmentId, itemInfo } = await runReviewDbTransaction(async (conn): Promise<{ assignmentId: number; itemInfo: ItemRow }> => {
+      const [itemRow] = await txQuery<ItemRow>(
+        conn,
         `
-          SELECT id, service_no AS serviceNo, ${subscriptionQueryParts.customerIdExpression} AS customerId
-          FROM service_subscriptions
-          WHERE UPPER(service_no) = UPPER(?)
+          SELECT
+            id,
+            item_code AS itemCode,
+            item_name AS itemName,
+            current_stock AS currentStock
+          FROM inventory_items
+          WHERE UPPER(item_code) = UPPER(?)
           LIMIT 1
+          FOR UPDATE
         `,
-        [serviceNo],
+        [itemCode],
       )
-      if (!subscription) {
-        return Response.json({ message: 'Service no tidak ditemukan di review DB.' }, { status: 404 })
+      if (!itemRow) {
+        throw new DeviceAssignmentHttpError('Item inventory tidak ditemukan di review DB.', 404)
       }
-      subscriptionId = subscription.id
-      resolvedCustomerId = subscription.customerId
-    }
 
-    if (workOrderNo) {
-      const [workOrder] = await runReviewDbQuery<WorkOrderRow>(
-        `
-          SELECT id, work_order_no AS workOrderNo
-          FROM service_work_orders
-          WHERE UPPER(work_order_no) = UPPER(?)
-          LIMIT 1
-        `,
-        [workOrderNo],
-      )
-      if (!workOrder) {
-        return Response.json({ message: 'Work order no tidak ditemukan di review DB.' }, { status: 404 })
-      }
-      workOrderId = workOrder.id
-    }
+      let subscriptionId: number | null = null
+      let workOrderId: number | null = null
+      let resolvedCustomerId: number | null = null
+      let subscriptionBranchId: number | null = null
+      let workOrderBranchId: number | null = null
+      let customerBranchId: number | null = null
 
-    if (customerCode) {
-      const [customer] = await runReviewDbQuery<CustomerRow>(
-        `
-          SELECT id, customer_code AS customerCode
-          FROM crm_customers
-          WHERE UPPER(customer_code) = UPPER(?)
-          LIMIT 1
-        `,
-        [customerCode],
-      )
-      if (!customer) {
-        return Response.json({ message: 'Customer code tidak ditemukan di review DB.' }, { status: 404 })
-      }
-      resolvedCustomerId = customer.id
-    }
-
-    if (assignmentStatus === 'ASSIGNED' && item.currentStock <= 0) {
-      return Response.json({ message: 'Stok item tidak cukup untuk assignment.' }, { status: 400 })
-    }
-
-    const noteText = `[Assign Device] ${session.displayName} (${session.username})${notesRaw ? ` - ${notesRaw}` : ''}`
-    const deviceAssignmentInsertPayload = await buildDeviceAssignmentInsertPayload({
-      subscriptionId,
-      workOrderId,
-      inventoryItemId: item.id,
-      customerId: resolvedCustomerId,
-      serialNumber: serialNumber || null,
-      macAddress: macAddress || null,
-      assignmentStatus,
-      notes: noteText,
-    })
-
-    const insert = await runReviewDbExecute<InsertResult>(
-      `
-        INSERT INTO service_device_assignments (
-          ${deviceAssignmentInsertPayload.columns.join(',\n          ')}
+      if (serviceNo) {
+        const [subscription] = await txQuery<SubscriptionRow>(
+          conn,
+          `
+            SELECT
+              id,
+              service_no AS serviceNo,
+              ${subscriptionQueryParts.customerIdExpression} AS customerId,
+              branch_id AS branchId
+            FROM service_subscriptions
+            WHERE UPPER(service_no) = UPPER(?)
+            LIMIT 1
+            FOR UPDATE
+          `,
+          [serviceNo],
         )
-        VALUES (${deviceAssignmentInsertPayload.placeholders.join(', ')})
-      `,
-      deviceAssignmentInsertPayload.values,
-    )
+        if (!subscription) {
+          throw new DeviceAssignmentHttpError('Service no tidak ditemukan di review DB.', 404)
+        }
+        subscriptionId = subscription.id
+        resolvedCustomerId = subscription.customerId
+        subscriptionBranchId = toPositiveIntegerOrNull(subscription.branchId)
+      }
 
-    const assignmentId = Number(insert.insertId ?? 0)
-    if (!assignmentId) {
-      return Response.json({ message: 'Device assignment gagal dibuat di review DB.' }, { status: 500 })
-    }
+      if (workOrderNo) {
+        const [workOrder] = await txQuery<WorkOrderRow>(
+          conn,
+          `
+            SELECT id, work_order_no AS workOrderNo
+            FROM service_work_orders
+            WHERE UPPER(work_order_no) = UPPER(?)
+            LIMIT 1
+            FOR UPDATE
+          `,
+          [workOrderNo],
+        )
+        if (!workOrder) {
+          throw new DeviceAssignmentHttpError('Work order no tidak ditemukan di review DB.', 404)
+        }
+        workOrderId = workOrder.id
+        const woLock = await lockAndResolveWorkOrderBranch({ workOrderId, connection: conn })
+        if (!woLock) {
+          throw new DeviceAssignmentHttpError('Work order branch scope tidak dapat divalidasi.', 404)
+        }
+        workOrderBranchId = toPositiveIntegerOrNull(woLock.branchId)
+      }
 
-    if (assignmentStatus === 'ASSIGNED') {
-      const inventoryStockMovementInsertPayload = await buildInventoryStockMovementInsertPayload({
-        itemId: item.id,
+      if (customerCode) {
+        const [customer] = await txQuery<CustomerRow>(
+          conn,
+          `
+            SELECT
+              id,
+              customer_code AS customerCode,
+              branch_id AS branchId
+            FROM crm_customers
+            WHERE UPPER(customer_code) = UPPER(?)
+            LIMIT 1
+            FOR UPDATE
+          `,
+          [customerCode],
+        )
+        if (!customer) {
+          throw new DeviceAssignmentHttpError('Customer code tidak ditemukan di review DB.', 404)
+        }
+        resolvedCustomerId = customer.id
+        customerBranchId = toPositiveIntegerOrNull(customer.branchId)
+      }
+
+      const providedBranches: Array<{ label: string; branchId: number | null }> = []
+      if (serviceNo) providedBranches.push({ label: 'Service No', branchId: subscriptionBranchId })
+      if (workOrderNo) providedBranches.push({ label: 'Work Order No', branchId: workOrderBranchId })
+      if (customerCode) providedBranches.push({ label: 'Customer Code', branchId: customerBranchId })
+
+      const positiveBranches = providedBranches.filter((b) => Number.isInteger(b.branchId) && (b.branchId ?? 0) > 0)
+      if (positiveBranches.length > 1) {
+        const firstBranchId = positiveBranches[0].branchId as number
+        const mismatch = positiveBranches.filter((b) => b.branchId !== firstBranchId)
+        if (mismatch.length > 0) {
+          throw new DeviceAssignmentHttpError(
+            'Reference entity berasal dari cabang berbeda. Semua reference (service no, work order, customer) harus berasal dari cabang yang sama.',
+            400,
+          )
+        }
+      }
+
+      const consolidatedBranchId: number | null =
+        positiveBranches.length > 0 ? (positiveBranches[0].branchId as number) : null
+
+      if (!isBranchIdInScope(session, consolidatedBranchId)) {
+        throw new DeviceAssignmentHttpError('Anda tidak memiliki otorisasi untuk device assignment pada cabang target.', 403)
+      }
+
+      if (assignmentStatus === 'ASSIGNED' && itemRow.currentStock <= 0) {
+        throw new DeviceAssignmentHttpError('Stok item tidak cukup untuk assignment.', 400)
+      }
+
+      const noteText = `[Assign Device] ${session.displayName} (${session.username})${notesRaw ? ` - ${notesRaw}` : ''}`
+      const deviceAssignmentInsertPayload = await buildDeviceAssignmentInsertPayload({
+        subscriptionId,
         workOrderId,
-        referenceNo: workOrderNo || serviceNo || `ASSIGN-${assignmentId}`,
-        noteText,
+        inventoryItemId: itemRow.id,
+        customerId: resolvedCustomerId,
+        serialNumber: serialNumber || null,
+        macAddress: macAddress || null,
+        assignmentStatus,
+        notes: noteText,
       })
 
-      if (inventoryStockMovementInsertPayload) {
-        await runReviewDbExecute<InsertResult>(
-          `
-            INSERT INTO inventory_stock_movements (
-              ${inventoryStockMovementInsertPayload.columns.join(',\n              ')}
-            )
-            VALUES (${inventoryStockMovementInsertPayload.placeholders.join(', ')})
-          `,
-          inventoryStockMovementInsertPayload.values,
-        )
+      const insert = await txExecute<InsertResult>(
+        conn,
+        `
+          INSERT INTO service_device_assignments (
+            ${deviceAssignmentInsertPayload.columns.join(',\n            ')}
+          )
+          VALUES (${deviceAssignmentInsertPayload.placeholders.join(', ')})
+        `,
+        deviceAssignmentInsertPayload.values,
+      )
+
+      const assignmentId = Number(insert.insertId ?? 0)
+      if (!assignmentId) {
+        throw new DeviceAssignmentHttpError('Device assignment gagal dibuat di review DB.', 500)
       }
 
-      const inventoryItemStockUpdatePayload = await buildInventoryItemStockUpdatePayload()
+      if (assignmentStatus === 'ASSIGNED') {
+        const inventoryStockMovementInsertPayload = await buildInventoryStockMovementInsertPayload({
+          itemId: itemRow.id,
+          workOrderId,
+          referenceNo: workOrderNo || serviceNo || `ASSIGN-${assignmentId}`,
+          noteText,
+        })
 
-      if (inventoryItemStockUpdatePayload) {
-        await runReviewDbExecute<InsertResult>(
-          `
-            UPDATE inventory_items
-            SET
-              ${inventoryItemStockUpdatePayload.assignments.join(',\n              ')}
-            WHERE id = ?
-          `,
-          [item.id],
-        )
+        if (inventoryStockMovementInsertPayload) {
+          await txExecute<InsertResult>(
+            conn,
+            `
+              INSERT INTO inventory_stock_movements (
+                ${inventoryStockMovementInsertPayload.columns.join(',\n                ')}
+              )
+              VALUES (${inventoryStockMovementInsertPayload.placeholders.join(', ')})
+            `,
+            inventoryStockMovementInsertPayload.values,
+          )
+        }
+
+        const inventoryItemStockUpdatePayload = await buildInventoryItemStockUpdatePayload()
+
+        if (inventoryItemStockUpdatePayload) {
+          await txExecute<InsertResult>(
+            conn,
+            `
+              UPDATE inventory_items
+              SET
+                ${inventoryItemStockUpdatePayload.assignments.join(',\n                ')}
+              WHERE id = ?
+            `,
+            [itemRow.id],
+          )
+        }
       }
-    }
+
+      return { assignmentId, itemInfo: itemRow }
+    })
 
     return Response.json({
-      message: `Device assignment ${item.itemCode} (${item.itemName}) berhasil disimpan.`,
+      message: `Device assignment ${itemInfo.itemCode} (${itemInfo.itemName}) berhasil disimpan.`,
     })
   } catch (error) {
+    if (error instanceof DeviceAssignmentHttpError) {
+      return Response.json({ message: error.message }, { status: error.statusCode })
+    }
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
   }
 }

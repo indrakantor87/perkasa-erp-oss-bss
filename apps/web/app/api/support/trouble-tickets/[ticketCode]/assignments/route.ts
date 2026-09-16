@@ -5,7 +5,7 @@ import { getReviewDbErrorDetail } from '@/lib/review-db'
 import {
   createServiceTroubleTicketAssignment,
   type CreateServiceTroubleTicketAssignmentSession,
-  REASSIGN_FULL_ACCESS_ROLES_SET,
+  hasFullFieldOpsReassignAccess,
   TT_ASSIGNMENT_ERROR_CODES,
 } from '@/lib/services/field-ops-service'
 import type { AppRole } from '@/lib/types'
@@ -45,7 +45,7 @@ export async function POST(
     )
   }
   const sessionRole = (session.role ?? 'PUBLIC') as AppRole
-  const hasFullAccess = REASSIGN_FULL_ACCESS_ROLES_SET.has(sessionRole)
+  const hasFullAccess = hasFullFieldOpsReassignAccess(sessionRole)
   const hasSupportUpdate = canPerformAction(sessionRole, 'support', 'update')
   if (!(hasFullAccess || hasSupportUpdate)) {
     return Response.json(
@@ -85,6 +85,8 @@ export async function POST(
     const createSession: CreateServiceTroubleTicketAssignmentSession = {
       userId: session.userId,
       role: sessionRole,
+      branchId: session.branchId ?? null,
+      branchIds: Array.isArray(session.branchIds) ? session.branchIds.filter((n) => Number.isInteger(n) && n > 0) : [],
     }
 
     let result

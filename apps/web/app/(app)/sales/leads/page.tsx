@@ -28,7 +28,7 @@ export default async function SalesLeadsPage() {
   let rows: Awaited<ReturnType<typeof getSalesDomainListPageData>>['rows'] | undefined
   if (reviewDbReady) {
     try {
-      const list = await getSalesDomainListPageData('leads', source, session.role)
+      const list = await getSalesDomainListPageData('leads', source, session)
       isLoading = list.isLoading
       errorMessage = list.errorMessage
       rows = list.rows

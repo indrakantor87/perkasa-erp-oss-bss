@@ -1,9 +1,20 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  getReviewDbErrorDetail,
+  hasReviewDbColumn,
+  runReviewDbTransaction,
+  type ReviewDbConnection,
+} from '@/lib/review-db'
 import { ensureSupportTroubleTicketEscalationTable } from '@/lib/services/support-ticket-escalation-service'
 import { ensureSupportTroubleTicketProgressTable } from '@/lib/services/support-ticket-progress-service'
+import {
+  isBranchIdInScope,
+  lockAndResolveTroubleTicketBranch,
+  type ValidateBranchScopeSession,
+  type TroubleTicketBranchLockRow,
+} from '@/lib/services/field-ops-service'
 
 const allowedEscalationLevels = new Set(['DUE_TODAY', 'OVERDUE', 'MANUAL'])
 
@@ -34,7 +45,18 @@ function normalizeRequiredText(value: unknown) {
   return String(value ?? '').trim()
 }
 
-async function getTroubleTicketByCode(ticketCode: string) {
+function isDateWithinToday(value: Date) {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+  return value >= start && value < end
+}
+
+async function getTroubleTicketFullDetail(params: {
+  ticket: TroubleTicketBranchLockRow
+  connection: ReviewDbConnection
+}) {
   const [hasSupportSlaDueAt, hasSupportSlaTroubleType, hasSupportSlaDurationDays] = await Promise.all([
     hasReviewDbColumn('support_trouble_tickets', 'sla_due_at'),
     hasReviewDbColumn('support_trouble_ticket_sla', 'trouble_type'),
@@ -65,7 +87,7 @@ async function getTroubleTicketByCode(ticketCode: string) {
         ELSE DATE_ADD(stt.opened_at, INTERVAL sla.duration_days DAY)
       END`
 
-  const [row] = await runReviewDbQuery<TroubleTicketRow>(
+  const [rows] = await params.connection.query(
     `
       SELECT
         stt.id AS id,
@@ -79,27 +101,20 @@ async function getTroubleTicketByCode(ticketCode: string) {
         ${supportSlaDueExpression} AS slaDueAt
       FROM support_trouble_tickets stt
       ${supportSlaJoinClause}
-      WHERE UPPER(stt.ticket_code) = ?
+      WHERE stt.id = ?
       LIMIT 1
     `,
-    [ticketCode],
+    [params.ticket.id],
   )
-
-  return row ?? null
+  const arr = (rows as TroubleTicketRow[]) || []
+  return arr[0] ?? null
 }
 
-function isDateWithinToday(value: Date) {
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-
-  const end = new Date(start)
-  end.setDate(end.getDate() + 1)
-
-  return value >= start && value < end
-}
-
-async function getLatestEscalationByTicketId(ticketId: number) {
-  const [row] = await runReviewDbQuery<TroubleTicketEscalationRow>(
+async function getLatestEscalationByTicketId(params: {
+  ticketId: number
+  connection: ReviewDbConnection
+}) {
+  const [rows] = await params.connection.query(
     `
       SELECT
         escalation_target AS escalationTarget,
@@ -111,14 +126,17 @@ async function getLatestEscalationByTicketId(ticketId: number) {
       ORDER BY id DESC
       LIMIT 1
     `,
-    [ticketId],
+    [params.ticketId],
   )
-
-  return row ?? null
+  const arr = (rows as TroubleTicketEscalationRow[]) || []
+  return arr[0] ?? null
 }
 
-async function getLatestProgressByTicketId(ticketId: number) {
-  const [row] = await runReviewDbQuery<TroubleTicketProgressRow>(
+async function getLatestProgressByTicketId(params: {
+  ticketId: number
+  connection: ReviewDbConnection
+}) {
+  const [rows] = await params.connection.query(
     `
       SELECT
         updated_at AS progressUpdatedAt
@@ -127,10 +145,10 @@ async function getLatestProgressByTicketId(ticketId: number) {
       ORDER BY id DESC
       LIMIT 1
     `,
-    [ticketId],
+    [params.ticketId],
   )
-
-  return row ?? null
+  const arr = (rows as TroubleTicketProgressRow[]) || []
+  return arr[0] ?? null
 }
 
 export async function POST(
@@ -153,12 +171,14 @@ export async function POST(
     )
   }
 
+  let resolvedTicketCode = ''
   try {
     const resolvedParams = await params
     const ticketCode = decodeURIComponent(resolvedParams.ticketCode ?? '').trim().toUpperCase()
     if (!ticketCode) {
       return Response.json({ message: 'Kode ticket wajib diisi.' }, { status: 400 })
     }
+    resolvedTicketCode = ticketCode
 
     const payload = (await request.json()) as {
       escalationTarget?: unknown
@@ -180,128 +200,160 @@ export async function POST(
       return Response.json({ message: 'Alasan eskalasi wajib diisi.' }, { status: 400 })
     }
 
-    const ticket = await getTroubleTicketByCode(ticketCode)
-    if (!ticket) {
-      return Response.json({ message: 'Trouble ticket tidak ditemukan.' }, { status: 404 })
-    }
-    if (ticket.closedAt || ['CLOSE', 'CLOSED'].includes(ticket.status.trim().toUpperCase())) {
-      return Response.json({ message: `Trouble ticket ${ticket.ticketCode} sudah berstatus closed.` }, { status: 409 })
-    }
-
-    const slaDueAt = ticket.slaDueAt ? new Date(ticket.slaDueAt) : null
-    const hasValidSlaDueAt = !!slaDueAt && Number.isFinite(slaDueAt.getTime())
-    if (escalationLevel === 'OVERDUE' && !hasValidSlaDueAt) {
-      return Response.json(
-        {
-          message: `Trouble ticket ${ticket.ticketCode} belum memiliki konteks SLA yang cukup untuk eskalasi OVERDUE. Lengkapi master SLA atau gunakan level MANUAL.`,
-        },
-        { status: 409 },
-      )
-    }
-    if (escalationLevel === 'OVERDUE' && hasValidSlaDueAt && slaDueAt >= new Date()) {
-      return Response.json(
-        {
-          message: `Trouble ticket ${ticket.ticketCode} belum OVERDUE menurut SLA. Gunakan level MANUAL bila eskalasi tetap diperlukan.`,
-        },
-        { status: 409 },
-      )
-    }
-    if (escalationLevel === 'DUE_TODAY' && !hasValidSlaDueAt) {
-      return Response.json(
-        {
-          message: `Trouble ticket ${ticket.ticketCode} belum memiliki konteks SLA yang cukup untuk eskalasi DUE_TODAY. Lengkapi master SLA atau gunakan level MANUAL.`,
-        },
-        { status: 409 },
-      )
-    }
-    if (
-      escalationLevel === 'DUE_TODAY' &&
-      hasValidSlaDueAt &&
-      (!isDateWithinToday(slaDueAt) || slaDueAt < new Date())
-    ) {
-      return Response.json(
-        {
-          message: `Trouble ticket ${ticket.ticketCode} tidak berada pada status SLA DUE_TODAY. Gunakan level yang sesuai dengan kondisi aktual.`,
-        },
-        { status: 409 },
-      )
-    }
-
     await ensureSupportTroubleTicketEscalationTable()
     await ensureSupportTroubleTicketProgressTable()
 
-    const latestEscalation = await getLatestEscalationByTicketId(ticket.id)
-    const latestProgress = await getLatestProgressByTicketId(ticket.id)
-    const normalizedIncomingTarget = escalationTarget.trim().toUpperCase()
-    const normalizedIncomingReason = escalationReason.trim().toUpperCase()
-    const normalizedLatestTarget = String(latestEscalation?.escalationTarget ?? '')
-      .trim()
-      .toUpperCase()
-    const normalizedLatestLevel = String(latestEscalation?.escalationLevel ?? '')
-      .trim()
-      .toUpperCase()
-    const normalizedLatestReason = String(latestEscalation?.escalationReason ?? '')
-      .trim()
-      .toUpperCase()
-    const latestEscalatedAt = latestEscalation?.escalatedAt ? new Date(latestEscalation.escalatedAt) : null
-    const latestProgressUpdatedAt = latestProgress?.progressUpdatedAt ? new Date(latestProgress.progressUpdatedAt) : null
-    const hasNewProgressAfterEscalation =
-      !!latestEscalatedAt &&
-      !!latestProgressUpdatedAt &&
-      Number.isFinite(latestEscalatedAt.getTime()) &&
-      Number.isFinite(latestProgressUpdatedAt.getTime()) &&
-      latestProgressUpdatedAt > latestEscalatedAt
+    const sessionSafe = session as unknown as ValidateBranchScopeSession
+    const result = await runReviewDbTransaction(async (conn) => {
+      const lockedTicket = await lockAndResolveTroubleTicketBranch({
+        ticketCode,
+        connection: conn,
+      })
+      if (!lockedTicket) {
+        return { status: 404, message: 'Trouble ticket tidak ditemukan.' } as const
+      }
+      if (
+        lockedTicket.closedAt ||
+        ['CLOSE', 'CLOSED'].includes(lockedTicket.status.trim().toUpperCase())
+      ) {
+        return {
+          status: 409,
+          message: `Trouble ticket ${lockedTicket.ticketCode ?? ticketCode} sudah berstatus closed.`,
+        } as const
+      }
+      if (!isBranchIdInScope(sessionSafe, lockedTicket.branchId)) {
+        return {
+          status: 403,
+          message: 'Akses lintas cabang tidak diizinkan untuk eskalasi trouble ticket.',
+        } as const
+      }
 
-    if (
-      latestEscalation &&
-      normalizedLatestTarget === normalizedIncomingTarget &&
-      normalizedLatestLevel === escalationLevel &&
-      normalizedLatestReason === normalizedIncomingReason &&
-      !hasNewProgressAfterEscalation
-    ) {
-      return Response.json(
-        {
+      const ticket = await getTroubleTicketFullDetail({ ticket: lockedTicket, connection: conn })
+      if (!ticket) {
+        return { status: 404, message: 'Trouble ticket tidak ditemukan.' } as const
+      }
+
+      const slaDueAt = ticket.slaDueAt ? new Date(ticket.slaDueAt) : null
+      const hasValidSlaDueAt = !!slaDueAt && Number.isFinite(slaDueAt.getTime())
+      if (escalationLevel === 'OVERDUE' && !hasValidSlaDueAt) {
+        return {
+          status: 409,
+          message: `Trouble ticket ${ticket.ticketCode} belum memiliki konteks SLA yang cukup untuk eskalasi OVERDUE. Lengkapi master SLA atau gunakan level MANUAL.`,
+        } as const
+      }
+      if (escalationLevel === 'OVERDUE' && hasValidSlaDueAt && slaDueAt >= new Date()) {
+        return {
+          status: 409,
+          message: `Trouble ticket ${ticket.ticketCode} belum OVERDUE menurut SLA. Gunakan level MANUAL bila eskalasi tetap diperlukan.`,
+        } as const
+      }
+      if (escalationLevel === 'DUE_TODAY' && !hasValidSlaDueAt) {
+        return {
+          status: 409,
+          message: `Trouble ticket ${ticket.ticketCode} belum memiliki konteks SLA yang cukup untuk eskalasi DUE_TODAY. Lengkapi master SLA atau gunakan level MANUAL.`,
+        } as const
+      }
+      if (
+        escalationLevel === 'DUE_TODAY' &&
+        hasValidSlaDueAt &&
+        (!isDateWithinToday(slaDueAt) || slaDueAt < new Date())
+      ) {
+        return {
+          status: 409,
+          message: `Trouble ticket ${ticket.ticketCode} tidak berada pada status SLA DUE_TODAY. Gunakan level yang sesuai dengan kondisi aktual.`,
+        } as const
+      }
+
+      const latestEscalation = await getLatestEscalationByTicketId({
+        ticketId: ticket.id,
+        connection: conn,
+      })
+      const latestProgress = await getLatestProgressByTicketId({
+        ticketId: ticket.id,
+        connection: conn,
+      })
+      const normalizedIncomingTarget = escalationTarget.trim().toUpperCase()
+      const normalizedIncomingReason = escalationReason.trim().toUpperCase()
+      const normalizedLatestTarget = String(latestEscalation?.escalationTarget ?? '')
+        .trim()
+        .toUpperCase()
+      const normalizedLatestLevel = String(latestEscalation?.escalationLevel ?? '')
+        .trim()
+        .toUpperCase()
+      const normalizedLatestReason = String(latestEscalation?.escalationReason ?? '')
+        .trim()
+        .toUpperCase()
+      const latestEscalatedAt = latestEscalation?.escalatedAt
+        ? new Date(latestEscalation.escalatedAt)
+        : null
+      const latestProgressUpdatedAt = latestProgress?.progressUpdatedAt
+        ? new Date(latestProgress.progressUpdatedAt)
+        : null
+      const hasNewProgressAfterEscalation =
+        !!latestEscalatedAt &&
+        !!latestProgressUpdatedAt &&
+        Number.isFinite(latestEscalatedAt.getTime()) &&
+        Number.isFinite(latestProgressUpdatedAt.getTime()) &&
+        latestProgressUpdatedAt > latestEscalatedAt
+
+      if (
+        latestEscalation &&
+        normalizedLatestTarget === normalizedIncomingTarget &&
+        normalizedLatestLevel === escalationLevel &&
+        normalizedLatestReason === normalizedIncomingReason &&
+        !hasNewProgressAfterEscalation
+      ) {
+        return {
+          status: 409,
           message: `Trouble ticket ${ticket.ticketCode} sudah memiliki eskalasi yang sama tanpa progress baru sesudah eskalasi terakhir. Tambahkan context baru atau update progress ticket terlebih dahulu sebelum eskalasi ulang.`,
-        },
-        { status: 409 },
+        } as const
+      }
+
+      const actorLabel = `${session.displayName} (${session.username})`
+      const noteText = `[Escalated via web] ${actorLabel} -> ${escalationTarget} [${escalationLevel}] - ${escalationReason}`
+
+      await conn.query(
+        `
+          UPDATE support_trouble_tickets
+          SET
+            notes = CASE
+              WHEN notes IS NULL OR notes = '' THEN ?
+              ELSE CONCAT(notes, '\n', ?)
+            END,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `,
+        [noteText, noteText, ticket.id],
       )
-    }
 
-    const actorLabel = `${session.displayName} (${session.username})`
-    const noteText = `[Escalated via web] ${actorLabel} -> ${escalationTarget} [${escalationLevel}] - ${escalationReason}`
+      await conn.query(
+        `
+          INSERT INTO support_trouble_ticket_escalation_logs (
+            trouble_ticket_id,
+            escalation_target,
+            escalation_level,
+            escalation_reason,
+            escalated_by
+          )
+          VALUES (?, ?, ?, ?, ?)
+        `,
+        [ticket.id, escalationTarget, escalationLevel, escalationReason, actorLabel],
+      )
 
-    await runReviewDbExecute(
-      `
-        UPDATE support_trouble_tickets
-        SET
-          notes = CASE
-            WHEN notes IS NULL OR notes = '' THEN ?
-            ELSE CONCAT(notes, '\n', ?)
-          END,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `,
-      [noteText, noteText, ticket.id],
-    )
-
-    await runReviewDbExecute(
-      `
-        INSERT INTO support_trouble_ticket_escalation_logs (
-          trouble_ticket_id,
-          escalation_target,
-          escalation_level,
-          escalation_reason,
-          escalated_by
-        )
-        VALUES (?, ?, ?, ?, ?)
-      `,
-      [ticket.id, escalationTarget, escalationLevel, escalationReason, actorLabel],
-    )
-
-    return Response.json({
-      message: `Trouble ticket ${ticket.ticketCode} berhasil dieskalasikan ke ${escalationTarget}.`,
+      return {
+        status: 200 as const,
+        message: `Trouble ticket ${ticket.ticketCode} berhasil dieskalasikan ke ${escalationTarget}.`,
+      }
     })
+
+    return Response.json({ message: result.message }, { status: result.status })
   } catch (error) {
-    return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
+    return Response.json(
+      {
+        message: getReviewDbErrorDetail(error),
+        ticketCode: resolvedTicketCode || undefined,
+      },
+      { status: 500 },
+    )
   }
 }

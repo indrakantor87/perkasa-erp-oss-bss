@@ -181,6 +181,52 @@ export async function lockAndResolveWorkOrderBranch(params: {
   }
 }
 
+export type TroubleTicketBranchLockRow = {
+  id: number
+  ticketCode: string | null
+  branchId: number | null
+  status: string
+  closedAt: Date | string | null
+  customerName: string | null
+}
+
+export async function lockAndResolveTroubleTicketBranch(params: {
+  ticketCode: string
+  connection: ReviewDbConnection
+}): Promise<TroubleTicketBranchLockRow | null> {
+  const code = String(params.ticketCode ?? '').trim().toUpperCase()
+  if (!code) {
+    return null
+  }
+  const [rows] = await params.connection.query(
+    `
+      SELECT id, ticket_code AS ticketCode, branch_id AS branchId, status,
+             closed_at AS closedAt, customer_name AS customerName
+      FROM support_trouble_tickets
+      WHERE UPPER(ticket_code) = ?
+      LIMIT 1
+      FOR UPDATE
+    `,
+    [code],
+  )
+  const arr = (rows as TroubleTicketBranchLockRow[]) || []
+  const row = arr[0] ?? null
+  if (!row) {
+    return null
+  }
+  const branchRaw = (row as unknown as Record<string, unknown>).branchId
+  const branchNum = Number(branchRaw ?? 0)
+  const branchId = Number.isInteger(branchNum) && branchNum > 0 ? branchNum : null
+  return {
+    id: Number(row.id ?? 0) || 0,
+    ticketCode: row.ticketCode ? String(row.ticketCode).trim() : code,
+    branchId,
+    status: String(row.status ?? '').trim(),
+    closedAt: row.closedAt ?? null,
+    customerName: row.customerName ? String(row.customerName).trim() : null,
+  }
+}
+
 export function isWorkOrderTerminal(row: {
   status?: string
   closedAt?: Date | string | null
@@ -1770,6 +1816,8 @@ export type ReassignFieldTechAuthorizationScope = 'SELF_ONLY' | 'FULL_ACCESS'
 export type ReassignFieldTechSession = {
   userId: number | undefined | null
   role: AppRole
+  branchId: number | null
+  branchIds: number[]
 }
 
 const REASSIGN_FULL_ACCESS_ROLES: readonly AppRole[] = [
@@ -1778,9 +1826,15 @@ const REASSIGN_FULL_ACCESS_ROLES: readonly AppRole[] = [
   'ADMIN',
   'NOC_OPERATOR',
   'TT_OPERATOR',
+  'CS_ADMIN',
 ] as const
 
 export const REASSIGN_FULL_ACCESS_ROLES_SET: ReadonlySet<AppRole> = new Set(REASSIGN_FULL_ACCESS_ROLES)
+
+export function hasFullFieldOpsReassignAccess(role: AppRole | null | undefined): boolean {
+  if (!role) return false
+  return REASSIGN_FULL_ACCESS_ROLES_SET.has(role)
+}
 
 export type ReassignServiceWorkOrderAssignmentResult = {
   affectedRows: number
@@ -1868,6 +1922,14 @@ export async function reassignServiceWorkOrderAssignment(params: {
       return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
     }
 
+    const woLock = await lockAndResolveWorkOrderBranch({ workOrderId, connection })
+    if (!woLock) {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId: null }
+    }
+    if (!isBranchIdInScope(params.session, woLock.branchId)) {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
+    }
+
     const lockWoActiveParts = buildActiveWhereParts('')
     const lockWoScopeSql = `
       SELECT id
@@ -1906,28 +1968,19 @@ export async function reassignServiceWorkOrderAssignment(params: {
       return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
     }
 
-    const techBValidationSql = `
-      SELECT au.id AS id,
-             au.status AS status,
-             ar.code AS role_code
-      FROM auth_users au
-      JOIN auth_roles ar
-        ON ar.id = au.role_id
-      WHERE au.id = ?
-      LIMIT 1
-      FOR UPDATE
-    `
-    const [techBRows] = await connection.query(techBValidationSql, [targetTechBNum])
-    const techB = (techBRows as TechBValidationRow[])[0]
-    if (!techB) {
+    const techBValidated = await validateTargetTechnicianUser({
+      targetUserId: targetTechBNum,
+      connection,
+      forUpdate: true,
+    })
+    if (!techBValidated) {
       return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
     }
-    const statusUp = String(techB.status ?? '').trim().toUpperCase()
-    if (statusUp !== 'ACTIVE') {
+    const targetBranch = techBValidated.userBranchId
+    if (woLock.branchId != null && targetBranch != null && !isBranchIdInScope(params.session, targetBranch)) {
       return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
     }
-    const roleUp = String(techB.role_code ?? '').trim().toUpperCase()
-    if (roleUp !== 'TEKNISI' && roleUp !== 'TEKNISI_PSB' && roleUp !== 'FIELD_TECHNICIAN') {
+    if (woLock.branchId != null && targetBranch != null && targetBranch !== woLock.branchId) {
       return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, workOrderId }
     }
 
@@ -2616,6 +2669,8 @@ export type CreateServiceTroubleTicketAssignmentResult = {
 export type CreateServiceTroubleTicketAssignmentSession = {
   userId: number | undefined | null
   role: AppRole
+  branchId: number | null
+  branchIds: number[]
 }
 
 export async function createServiceTroubleTicketAssignment(params: {
@@ -2651,16 +2706,9 @@ export async function createServiceTroubleTicketAssignment(params: {
   return runReviewDbTransaction<CreateServiceTroubleTicketAssignmentResult>(async (conn) => {
     const tableExists = await probeAssignmentTableExists(conn)
     if (!tableExists) throwAssignmentTableNotProvisioned()
-    const ttLockSql = `
-      SELECT id, ticket_code AS ticketCode, status, closed_at AS closedAt
-      FROM support_trouble_tickets
-      WHERE UPPER(TRIM(ticket_code)) = ?
-      LIMIT 1
-      FOR UPDATE
-    `
-    const [ttRows] = await conn.query(ttLockSql, [ticketCodeUp])
-    const ttRow = (ttRows as { id: number; ticketCode: string; status: string; closedAt: Date | string | null }[])[0]
-    if (!ttRow) {
+
+    const ttLock = await lockAndResolveTroubleTicketBranch({ ticketCode: ticketCodeUp, connection: conn })
+    if (!ttLock) {
       return {
         affectedRows: 0,
         newAssignmentId: null,
@@ -2669,13 +2717,24 @@ export async function createServiceTroubleTicketAssignment(params: {
         errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_NOT_FOUND,
       }
     }
-    const statusUp = String(ttRow.status ?? '').trim().toUpperCase()
-    const isClosed = statusUp === 'CLOSED' || statusUp === 'CLOSE' || ttRow.closedAt != null
+    const ttRowId = ttLock.id
+    if (!isBranchIdInScope(params.session, ttLock.branchId)) {
+      return {
+        affectedRows: 0,
+        newAssignmentId: null,
+        troubleTicketId: ttRowId,
+        alreadyDone: false,
+        errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_ASSIGNMENT_NOT_AUTHORIZED,
+        errorMessage: 'Ticket berada di luar scope cabang user (cross-branch assignment ditolak).',
+      }
+    }
+    const statusUp = String(ttLock.status ?? '').trim().toUpperCase()
+    const isClosed = statusUp === 'CLOSED' || statusUp === 'CLOSE' || ttLock.closedAt != null
     if (isClosed) {
       return {
         affectedRows: 0,
         newAssignmentId: null,
-        troubleTicketId: ttRow.id,
+        troubleTicketId: ttRowId,
         alreadyDone: false,
         errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_ALREADY_CLOSED,
       }
@@ -2685,7 +2744,7 @@ export async function createServiceTroubleTicketAssignment(params: {
       return {
         affectedRows: 0,
         newAssignmentId: null,
-        troubleTicketId: ttRow.id,
+        troubleTicketId: ttRowId,
         alreadyDone: false,
         errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_STATUS_INVALID,
       }
@@ -2694,57 +2753,52 @@ export async function createServiceTroubleTicketAssignment(params: {
     const scopeLockSql = `
       SELECT id FROM service_trouble_ticket_assignments WHERE trouble_ticket_id = ? AND ${actParts.sql} FOR UPDATE
     `
-    await conn.query(scopeLockSql, [ttRow.id, ...actParts.values])
-    const techBSql = `
-      SELECT au.id, au.status, ar.code AS role_code,
-             COALESCE(NULLIF(au.display_name,''), au.username, CONCAT('user:', au.id)) AS display_name,
-             au.username
-      FROM auth_users au
-      JOIN auth_roles ar ON ar.id = au.role_id
-      WHERE au.id = ?
-      LIMIT 1
-      FOR UPDATE
-    `
-    const [techBRows] = await conn.query(techBSql, [targetTechNum])
-    const techB = (techBRows as TTAuthUserRow[])[0]
-    if (!techB) {
+    await conn.query(scopeLockSql, [ttRowId, ...actParts.values])
+
+    const techBValidated = await validateTargetTechnicianUser({
+      targetUserId: targetTechNum,
+      connection: conn,
+      forUpdate: true,
+    })
+    if (!techBValidated) {
       return {
         affectedRows: 0,
         newAssignmentId: null,
-        troubleTicketId: ttRow.id,
+        troubleTicketId: ttRowId,
         alreadyDone: false,
         errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_TECHNICIAN_INVALID,
       }
     }
-    const statusTechB = String(techB.status ?? '').trim().toUpperCase()
-    if (statusTechB !== 'ACTIVE') {
+    const targetBranch = techBValidated.userBranchId
+    if (ttLock.branchId != null && targetBranch != null && !isBranchIdInScope(params.session, targetBranch)) {
       return {
         affectedRows: 0,
         newAssignmentId: null,
-        troubleTicketId: ttRow.id,
+        troubleTicketId: ttRowId,
         alreadyDone: false,
-        errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_TECHNICIAN_INVALID,
+        errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_ASSIGNMENT_NOT_AUTHORIZED,
+        errorMessage: 'Teknisi target berada di luar scope cabang user (cross-branch assignment ditolak).',
       }
     }
-    const roleUp = String(techB.role_code ?? '').trim().toUpperCase()
-    if (roleUp !== 'TEKNISI' && roleUp !== 'TEKNISI_PSB' && roleUp !== 'FIELD_TECHNICIAN') {
+    if (ttLock.branchId != null && targetBranch != null && targetBranch !== ttLock.branchId) {
       return {
         affectedRows: 0,
         newAssignmentId: null,
-        troubleTicketId: ttRow.id,
+        troubleTicketId: ttRowId,
         alreadyDone: false,
-        errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_TECHNICIAN_INVALID,
+        errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_ASSIGNMENT_NOT_AUTHORIZED,
+        errorMessage: 'Teknisi target harus berada pada cabang yang sama dengan trouble ticket.',
       }
     }
     const dupParts = buildActiveWhereParts('d')
     const dupCheckSql = `SELECT COUNT(*) AS total FROM service_trouble_ticket_assignments d WHERE d.trouble_ticket_id = ? AND d.assigned_user_id = ? AND ${dupParts.sql}`
-    const [dupRows] = await conn.query(dupCheckSql, [ttRow.id, targetTechNum, ...dupParts.values])
+    const [dupRows] = await conn.query(dupCheckSql, [ttRowId, targetTechNum, ...dupParts.values])
     const dupTotal = Number((dupRows as TTCountRow[])[0]?.total ?? 0)
     if (dupTotal > 0) {
       return {
         affectedRows: 0,
         newAssignmentId: null,
-        troubleTicketId: ttRow.id,
+        troubleTicketId: ttRowId,
         alreadyDone: false,
         errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_ASSIGNMENT_DUPLICATE_TECH,
       }
@@ -2753,20 +2807,20 @@ export async function createServiceTroubleTicketAssignment(params: {
     if (isPrimaryFlag) {
       const primParts = buildActiveWhereParts('q')
       const primSql = `SELECT COUNT(*) AS total FROM service_trouble_ticket_assignments q WHERE q.trouble_ticket_id = ? AND q.is_primary = 1 AND ${primParts.sql}`
-      const [primRows] = await conn.query(primSql, [ttRow.id, ...primParts.values])
+      const [primRows] = await conn.query(primSql, [ttRowId, ...primParts.values])
       const primTotal = Number((primRows as TTCountRow[])[0]?.total ?? 0)
       if (primTotal > 0) {
         return {
           affectedRows: 0,
           newAssignmentId: null,
-          troubleTicketId: ttRow.id,
+          troubleTicketId: ttRowId,
           alreadyDone: false,
           errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_ASSIGNMENT_DUPLICATE_PRIMARY,
         }
       }
     }
     await insertServiceTroubleTicketAssignment({
-      troubleTicketId: ttRow.id,
+      troubleTicketId: ttRowId,
       assignedUserId: targetTechNum,
       assignmentRole: params.assignmentRole ?? Q3_ASSIGNMENT_ROLE_CANONICAL,
       assignmentStatus: 'ASSIGNED',
@@ -2778,14 +2832,14 @@ export async function createServiceTroubleTicketAssignment(params: {
     const lastSql = 'SELECT LAST_INSERT_ID() AS insert_id'
     const [lastRows] = await conn.query(lastSql, [])
     const newAssignmentId = Number((lastRows as { insert_id: number }[])[0]?.insert_id ?? 0) || null
-    const ownerName = techB.display_name ? String(techB.display_name) : String(techB.username) || `user:${targetTechNum}`
+    const ownerName = techBValidated.displayName || techBValidated.username || `user:${targetTechNum}`
     try {
       await insertSupportTroubleTicketProgressLog(
         {
-          troubleTicketId: ttRow.id,
+          troubleTicketId: ttRowId,
           progressStatus: 'ASSIGN',
           ownerName,
-          progressNotes: `[ASSIGN] Teknisi ${ownerName} di-assign ke TT ${ttRow.ticketCode}.${params.notes ? ` Catatan: ${params.notes}` : ''}`,
+          progressNotes: `[ASSIGN] Teknisi ${ownerName} di-assign ke TT ${ttLock.ticketCode ?? ticketCodeUp}.${params.notes ? ` Catatan: ${params.notes}` : ''}`,
           followUpAt: null,
           updatedBy: ownerName,
         },
@@ -2800,7 +2854,7 @@ export async function createServiceTroubleTicketAssignment(params: {
     return {
       affectedRows: 1,
       newAssignmentId,
-      troubleTicketId: ttRow.id,
+      troubleTicketId: ttRowId,
       alreadyDone: false,
     }
   })
@@ -3117,8 +3171,28 @@ export async function reassignServiceTroubleTicketAssignment(params: {
     if (!Number.isInteger(ttId) || ttId <= 0) {
       return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, troubleTicketId: null }
     }
-    const ttLockSql = `SELECT id FROM support_trouble_tickets WHERE id = ? LIMIT 1 FOR UPDATE`
-    await conn.query(ttLockSql, [ttId])
+    const ttCodeProbeSql = `SELECT ticket_code FROM support_trouble_tickets WHERE id = ? LIMIT 1`
+    const [ttCodeRows] = await conn.query(ttCodeProbeSql, [ttId])
+    const ttCodeRaw = (ttCodeRows as Array<Record<string, unknown>>)[0]?.ticket_code
+    const ttCode = ttCodeRaw != null ? String(ttCodeRaw).trim().toUpperCase() : ''
+    if (!ttCode) {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, troubleTicketId: ttId, errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_NOT_FOUND }
+    }
+    const ttLock = await lockAndResolveTroubleTicketBranch({ ticketCode: ttCode, connection: conn })
+    if (!ttLock) {
+      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, troubleTicketId: ttId, errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_NOT_FOUND }
+    }
+    if (!isBranchIdInScope(params.session, ttLock.branchId)) {
+      return {
+        affectedRows: 0,
+        newAssignmentId: null,
+        alreadyDone: false,
+        troubleTicketId: ttId,
+        errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_ASSIGNMENT_NOT_AUTHORIZED,
+        errorMessage: 'Ticket berada di luar scope cabang user (cross-branch reassign ditolak).',
+      }
+    }
+
     const actParts = buildActiveWhereParts('')
     const scopeLockSql = `SELECT id FROM service_trouble_ticket_assignments WHERE trouble_ticket_id = ? AND ${actParts.sql} FOR UPDATE`
     await conn.query(scopeLockSql, [ttId, ...actParts.values])
@@ -3162,28 +3236,34 @@ export async function reassignServiceTroubleTicketAssignment(params: {
         errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_ASSIGNMENT_SAME_USER_NOP,
       }
     }
-    const techBSql = `
-      SELECT au.id, au.status, ar.code AS role_code,
-             COALESCE(NULLIF(au.display_name,''), au.username, CONCAT('user:', au.id)) AS display_name,
-             au.username
-      FROM auth_users au
-      JOIN auth_roles ar ON ar.id = au.role_id
-      WHERE au.id = ?
-      LIMIT 1
-      FOR UPDATE
-    `
-    const [techBRows] = await conn.query(techBSql, [targetTechBNum])
-    const techB = (techBRows as TTAuthUserRow[])[0]
-    if (!techB) {
+    const techBValidated = await validateTargetTechnicianUser({
+      targetUserId: targetTechBNum,
+      connection: conn,
+      forUpdate: true,
+    })
+    if (!techBValidated) {
       return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, troubleTicketId: ttId, errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_TECHNICIAN_INVALID }
     }
-    const statusTechBUp = String(techB.status ?? '').trim().toUpperCase()
-    if (statusTechBUp !== 'ACTIVE') {
-      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, troubleTicketId: ttId, errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_TECHNICIAN_INVALID }
+    const targetBranch = techBValidated.userBranchId
+    if (ttLock.branchId != null && targetBranch != null && !isBranchIdInScope(params.session, targetBranch)) {
+      return {
+        affectedRows: 0,
+        newAssignmentId: null,
+        alreadyDone: false,
+        troubleTicketId: ttId,
+        errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_ASSIGNMENT_NOT_AUTHORIZED,
+        errorMessage: 'Teknisi target berada di luar scope cabang user (cross-branch reassign ditolak).',
+      }
     }
-    const roleTechBUp = String(techB.role_code ?? '').trim().toUpperCase()
-    if (roleTechBUp !== 'TEKNISI' && roleTechBUp !== 'TEKNISI_PSB' && roleTechBUp !== 'FIELD_TECHNICIAN') {
-      return { affectedRows: 0, newAssignmentId: null, alreadyDone: false, troubleTicketId: ttId, errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_TECHNICIAN_INVALID }
+    if (ttLock.branchId != null && targetBranch != null && targetBranch !== ttLock.branchId) {
+      return {
+        affectedRows: 0,
+        newAssignmentId: null,
+        alreadyDone: false,
+        troubleTicketId: ttId,
+        errorCode: TT_ASSIGNMENT_ERROR_CODES.TT_ASSIGNMENT_NOT_AUTHORIZED,
+        errorMessage: 'Teknisi target harus berada pada cabang yang sama dengan trouble ticket.',
+      }
     }
     const dupParts = buildActiveWhereParts('d')
     const dupSql = `SELECT COUNT(*) AS total FROM service_trouble_ticket_assignments d WHERE d.trouble_ticket_id = ? AND d.assigned_user_id = ? AND ${dupParts.sql}`
@@ -3239,7 +3319,7 @@ export async function reassignServiceTroubleTicketAssignment(params: {
     const lastSql = 'SELECT LAST_INSERT_ID() AS insert_id'
     const [lastRows] = await conn.query(lastSql, [])
     const newAssignmentId = Number((lastRows as { insert_id: number }[])[0]?.insert_id ?? 0) || null
-    const newOwnerName = techB.display_name ? String(techB.display_name) : String(techB.username) || `user:${targetTechBNum}`
+    const newOwnerName = techBValidated.displayName || techBValidated.username || `user:${targetTechBNum}`
     try {
       await insertSupportTroubleTicketProgressLog(
         {

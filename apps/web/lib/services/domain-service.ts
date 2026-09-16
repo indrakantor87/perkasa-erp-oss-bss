@@ -47,6 +47,7 @@ import {
   getSupportLaneSections,
 } from '@/lib/support-lanes'
 import type { AppSession } from '@/lib/auth-session'
+import { resolveSalesOwnerAliasesIncludingSpvTeam } from '@/lib/services/sales-team-membership-service'
 import type {
   AccessAction,
   AppRole,
@@ -6880,11 +6881,58 @@ function joinSecondaryParts(parts: Array<string | null | undefined>): string {
 export async function getSalesDomainListPageData(
   entityKey: string,
   source: ReturnType<typeof getDataSourceSnapshot>,
-  _role: AppRole,
+  sessionOrRole: AppSession | AppRole,
 ): Promise<SalesDomainListPageData> {
   const empty: SalesDomainListPageData = { isLoading: false, errorMessage: null, rows: [] }
   if (!source) return empty
   if (source.effectiveMode !== 'review-db' || source.isFallback) return empty
+
+  let normalizedSession: AppSession | null = null
+  let role: AppRole = 'PENJUALAN'
+  if (sessionOrRole && typeof sessionOrRole === 'object' && 'role' in sessionOrRole && 'userId' in sessionOrRole) {
+    normalizedSession = sessionOrRole as AppSession
+    role = normalizedSession.role
+  } else {
+    role = sessionOrRole as AppRole
+  }
+
+  const GLOBAL_SCOPE_ROLES = new Set<AppRole>(['OWNER', 'SUPER_ADMIN', 'ADMIN'])
+  let ownerAliases: string[] | null = null
+  try {
+    if (normalizedSession && GLOBAL_SCOPE_ROLES.has(role)) {
+      ownerAliases = null
+    } else if (normalizedSession && role === 'SPV_SALES') {
+      ownerAliases = await resolveSalesOwnerAliasesIncludingSpvTeam(normalizedSession)
+      if (!ownerAliases || ownerAliases.length === 0) {
+        ownerAliases = [
+          String(normalizedSession.displayName || '').trim().toLowerCase(),
+          String(normalizedSession.username || '').trim().toLowerCase(),
+        ].filter(Boolean)
+      }
+    } else if (normalizedSession && (role === 'PENJUALAN' || role === 'SALES_MARKETING')) {
+      ownerAliases = [
+        String(normalizedSession.displayName || '').trim().toLowerCase(),
+        String(normalizedSession.username || '').trim().toLowerCase(),
+      ].filter(Boolean)
+    } else {
+      ownerAliases = normalizedSession ? [
+        String(normalizedSession.displayName || '').trim().toLowerCase(),
+        String(normalizedSession.username || '').trim().toLowerCase(),
+      ].filter(Boolean) : null
+    }
+  } catch {
+    ownerAliases = normalizedSession ? [
+      String(normalizedSession.displayName || '').trim().toLowerCase(),
+      String(normalizedSession.username || '').trim().toLowerCase(),
+    ].filter(Boolean) : null
+  }
+  const ownerValues: string[] = ownerAliases || []
+  const ownerClauseLead = ownerAliases && ownerAliases.length > 0
+    ? `LOWER(COALESCE(sl.marketing_name, '')) IN (${ownerAliases.map(() => '?').join(', ')})`
+    : null
+  const ownerClauseOrder = ownerAliases && ownerAliases.length > 0
+    ? `LOWER(COALESCE(so.marketing_name, '')) IN (${ownerAliases.map(() => '?').join(', ')})`
+    : null
 
   try {
     const salesSchema = await getSalesReadSchema()
@@ -6959,6 +7007,7 @@ export async function getSalesDomainListPageData(
           ordersCount: number
           quotationsCount: number
         }
+        const wherePart = ownerClauseLead ? `WHERE ${ownerClauseLead}` : ''
         const res = await runSafeDomainSectionQuery<Row>({
           sectionLabel: `sales-list-leads`,
           enabled: true,
@@ -6977,9 +7026,10 @@ export async function getSalesDomainListPageData(
                 (SELECT COUNT(*) FROM sales_orders so WHERE so.lead_id = sl.id) AS ordersCount,
                 (SELECT COUNT(*) FROM sales_quotations sq WHERE sq.lead_id = sl.id) AS quotationsCount
               FROM sales_leads sl
+              ${wherePart}
               ORDER BY ${hasLeadUpdatedAt ? 'sl.updated_at DESC,' : salesSchema.leadCreatedAt ? 'sl.created_at DESC,' : ''} sl.id DESC
               LIMIT ${SALES_LIST_LIMIT}
-            `),
+            `, ownerValues),
         })
         return {
           ...empty,
@@ -7016,6 +7066,7 @@ export async function getSalesDomainListPageData(
           createdAt: string | null
           updatedAt: string | null
         }
+        const wherePart = ownerClauseOrder ? `WHERE ${ownerClauseOrder}` : ''
         const res = await runSafeDomainSectionQuery<Row>({
           sectionLabel: `sales-list-orders`,
           enabled: true,
@@ -7038,9 +7089,10 @@ export async function getSalesDomainListPageData(
               FROM sales_orders so
               LEFT JOIN sales_leads sl ON sl.id = so.lead_id
               LEFT JOIN service_subscriptions ss ON ss.order_id = so.id
+              ${wherePart}
               ORDER BY ${hasOrderUpdatedAt ? 'so.updated_at DESC,' : hasOrderCreatedAt ? 'so.created_at DESC,' : ''} so.id DESC
               LIMIT ${SALES_LIST_LIMIT}
-            `),
+            `, ownerValues),
         })
         return {
           ...empty,
@@ -7077,6 +7129,7 @@ export async function getSalesDomainListPageData(
           contractId: number | null
           contractNo: string | null
         }
+        const wherePart = ownerClauseLead ? `WHERE ${ownerClauseLead}` : ''
         const res = await runSafeDomainSectionQuery<Row>({
           sectionLabel: `sales-list-quotations`,
           enabled: true,
@@ -7098,9 +7151,10 @@ export async function getSalesDomainListPageData(
               FROM sales_quotations q
               LEFT JOIN sales_leads sl ON sl.id = q.lead_id
               LEFT JOIN sales_contracts c ON c.quotation_id = q.id
+              ${wherePart}
               ORDER BY ${hasQuotationUpdatedAt ? 'q.updated_at DESC,' : salesSchema.quotationCreatedAt ? 'q.created_at DESC,' : ''} q.id DESC
               LIMIT ${SALES_LIST_LIMIT}
-            `),
+            `, ownerValues),
         })
         return {
           ...empty,
@@ -7140,6 +7194,7 @@ export async function getSalesDomainListPageData(
           acceptanceNo: string | null
           acceptanceStatus: string | null
         }
+        const wherePart = ownerClauseLead ? `WHERE ${ownerClauseLead}` : ''
         const res = await runSafeDomainSectionQuery<Row>({
           sectionLabel: `sales-list-contracts`,
           enabled: true,
@@ -7166,9 +7221,10 @@ export async function getSalesDomainListPageData(
               LEFT JOIN sales_quotations q ON q.id = c.quotation_id
               LEFT JOIN sales_leads sl ON sl.id = c.lead_id
               LEFT JOIN sales_corporate_acceptances a ON a.contract_id = c.id
+              ${wherePart}
               ORDER BY ${hasContractUpdatedAt ? 'c.updated_at DESC,' : salesSchema.contractSignedAt ? 'c.signed_at DESC,' : ''} c.id DESC
               LIMIT ${SALES_LIST_LIMIT}
-            `),
+            `, ownerValues),
         })
         return {
           ...empty,
@@ -7209,6 +7265,7 @@ export async function getSalesDomainListPageData(
           packageName: string | null
           packageSpeedLabel: string | null
         }
+        const wherePart = ownerClauseOrder ? `WHERE ${ownerClauseOrder}` : ''
         const res = await runSafeDomainSectionQuery<Row>({
           sectionLabel: `sales-list-subscriptions`,
           enabled: true,
@@ -7234,9 +7291,10 @@ export async function getSalesDomainListPageData(
               LEFT JOIN crm_customers cc ON cc.id = ss.customer_id
               LEFT JOIN sales_orders so ON so.id = ss.order_id
               LEFT JOIN sales_packages sp ON sp.id = ss.package_id
+              ${wherePart}
               ORDER BY ${hasSubsUpdatedAt ? 'ss.updated_at DESC,' : salesSchema.subscriptionActivatedAt ? 'ss.activated_at DESC,' : hasSubsCreatedAt ? 'ss.created_at DESC,' : ''} ss.id DESC
               LIMIT ${SALES_LIST_LIMIT}
-            `),
+            `, ownerValues),
         })
         return {
           ...empty,
@@ -7274,6 +7332,7 @@ export async function getSalesDomainListPageData(
           siteAddress: string | null
           technicalNotes: string | null
         }
+        const wherePart = ownerClauseLead ? `WHERE ${ownerClauseLead}` : ''
         const res = await runSafeDomainSectionQuery<Row>({
           sectionLabel: `sales-list-surveys`,
           enabled: true,
@@ -7297,9 +7356,10 @@ export async function getSalesDomainListPageData(
               FROM sales_surveys ss
               LEFT JOIN sales_leads sl ON sl.id = ss.lead_id
               LEFT JOIN sales_covered_areas ca ON ca.id = ss.covered_area_id
+              ${wherePart}
               ORDER BY ${hasSurveyUpdatedAt ? 'ss.updated_at DESC,' : salesSchema.surveyScheduledAt ? 'ss.scheduled_at DESC,' : salesSchema.surveyCreatedAt ? 'ss.created_at DESC,' : ''} ss.id DESC
               LIMIT ${SALES_LIST_LIMIT}
-            `),
+            `, ownerValues),
         })
         return {
           ...empty,

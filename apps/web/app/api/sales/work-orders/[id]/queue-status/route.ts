@@ -5,7 +5,7 @@ import { hasReviewDbColumn, getReviewDbErrorDetail, runReviewDbExecute, runRevie
 import {
   insertServiceWorkOrderStatusLog,
   isBranchIdInScope,
-  REASSIGN_FULL_ACCESS_ROLES_SET,
+  hasFullFieldOpsReassignAccess,
   resolveReviewAuthUserIdByUsername,
 } from '@/lib/services/field-ops-service'
 import type { AppRole } from '@/lib/types'
@@ -107,7 +107,7 @@ export async function POST(
       const canCreateInventory = canPerformAction(sessionRole, 'inventory', 'create')
       const canManageInventory = canPerformAction(sessionRole, 'inventory', 'manage')
       const canUpdateSupport = canPerformAction(sessionRole, 'support', 'update')
-      const hasFullAccess = REASSIGN_FULL_ACCESS_ROLES_SET.has(sessionRole)
+      const hasFullAccess = hasFullFieldOpsReassignAccess(sessionRole)
       if (queueStatus === 'CLOSE' && !(canCreateInventory || canManageInventory || hasFullAccess)) {
         return Response.json(
           { message: 'Forbidden: shortcut CLOSE memerlukan izin inventory create/manage atau operator akses penuh.' },

@@ -2,6 +2,7 @@ import type { AppRole } from '@/lib/types'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { mockAuthUsers, type AppSession } from '@/lib/auth-session'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { resolveManagedSalesUsers, resolveSalesOwnerAliasesIncludingSpvTeam } from '@/lib/services/sales-team-membership-service'
 
 type ExecuteResult = {
   insertId?: number
@@ -129,12 +130,107 @@ function buildMockMarketingUsers() {
     }))
 }
 
-function resolveReadScopeRole(role: AppRole) {
-  return role === 'PENJUALAN' || role === 'SALES_MARKETING' || role === 'SUPER_ADMIN' || role === 'CS_ADMIN' || role === 'DIGITAL_CREATOR'
+export function resolveReadScopeRole(role: AppRole) {
+  return (
+    role === 'PENJUALAN' ||
+    role === 'SALES_MARKETING' ||
+    role === 'SPV_SALES' ||
+    role === 'SUPER_ADMIN' ||
+    role === 'ADMIN' ||
+    role === 'OWNER' ||
+    role === 'CS_ADMIN' ||
+    role === 'DIGITAL_CREATOR'
+  )
 }
 
 export function canMutateMarketingActivities(role: AppRole) {
-  return role === 'SUPER_ADMIN' || role === 'SALES_MARKETING' || role === 'PENJUALAN'
+  return (
+    role === 'OWNER' ||
+    role === 'SUPER_ADMIN' ||
+    role === 'ADMIN' ||
+    role === 'SALES_MARKETING' ||
+    role === 'PENJUALAN' ||
+    role === 'SPV_SALES'
+  )
+}
+
+export const MARKETING_ACTIVITY_GLOBAL_OWNER_ROLES: ReadonlySet<AppRole> = new Set([
+  'OWNER',
+  'SUPER_ADMIN',
+  'ADMIN',
+])
+
+export type MarketingActivityOwnerScope =
+  | { mode: 'GLOBAL' }
+  | { mode: 'TEAM'; allowedUsernames: ReadonlySet<string>; ownerAliases: ReadonlySet<string> }
+  | { mode: 'SELF'; allowedUsernames: ReadonlySet<string> }
+
+async function resolveMarketingActivityOwnerScope(session: AppSession): Promise<MarketingActivityOwnerScope> {
+  const role = (session.role ?? '').trim().toUpperCase() as AppRole
+
+  if (MARKETING_ACTIVITY_GLOBAL_OWNER_ROLES.has(role)) {
+    return { mode: 'GLOBAL' }
+  }
+
+  if (role === 'SPV_SALES') {
+    const managedUserIds = await resolveManagedSalesUsers(session)
+    const spvUserId = session.userId ? Number(session.userId) : null
+    const allManagedIds = new Set<number>(managedUserIds)
+    if (spvUserId && Number.isFinite(spvUserId)) allManagedIds.add(spvUserId)
+    let allowedUsernames = new Set<string>([session.username.trim().toLowerCase()])
+    if (allManagedIds.size > 0) {
+      try {
+        const placeholders = Array.from(allManagedIds).map(() => '?').join(', ')
+        const rows = await runReviewDbQuery<{ username: string; fullName: string }>(
+          `SELECT username, full_name AS fullName FROM auth_users WHERE status = 'ACTIVE' AND id IN (${placeholders})`,
+          Array.from(allManagedIds),
+        )
+        for (const r of rows) {
+          if (r.username) allowedUsernames.add(String(r.username).trim().toLowerCase())
+        }
+      } catch {
+        // fail closed: keep only self
+      }
+    }
+    const ownerAliasesRaw = await resolveSalesOwnerAliasesIncludingSpvTeam(session as any)
+    const ownerAliases = new Set(ownerAliasesRaw.map((s) => String(s ?? '').trim().toLowerCase()).filter(Boolean))
+    return { mode: 'TEAM', allowedUsernames, ownerAliases }
+  }
+
+  if (role === 'PENJUALAN' || role === 'SALES_MARKETING') {
+    const allowedUsernames = new Set<string>([session.username.trim().toLowerCase()])
+    return { mode: 'SELF', allowedUsernames }
+  }
+
+  const allowedUsernames = new Set<string>([session.username.trim().toLowerCase()])
+  return { mode: 'SELF', allowedUsernames }
+}
+
+export async function assertMarketingOwnerInScope(
+  scope: MarketingActivityOwnerScope,
+  ownerUsername: string | null | undefined,
+  ownerFullName: string | null | undefined,
+  violationMessage: string,
+): Promise<void> {
+  if (scope.mode === 'GLOBAL') return
+
+  const username = String(ownerUsername ?? '').trim().toLowerCase()
+  const fullName = String(ownerFullName ?? '').trim().toLowerCase()
+
+  if (scope.mode === 'SELF') {
+    const matched = username && scope.allowedUsernames.has(username)
+    if (!matched) throw new Error(violationMessage)
+    return
+  }
+
+  if (scope.mode === 'TEAM') {
+    const byUsername = username && scope.allowedUsernames.has(username)
+    const byAlias = fullName && scope.ownerAliases.has(fullName)
+    if (!byUsername && !byAlias) throw new Error(violationMessage)
+    return
+  }
+
+  throw new Error(violationMessage)
 }
 
 export async function ensureMarketingActivitiesTable() {
@@ -273,10 +369,40 @@ export async function getMarketingActivities(params: {
     values.push(year, month)
   }
 
-  if (params.session.role === 'SALES_MARKETING' || params.session.role === 'PENJUALAN') {
-    filters.push('LOWER(ma.marketing_username) = ?')
-    values.push(params.session.username.trim().toLowerCase())
-  } else if (marketing) {
+  const ownerScope = await resolveMarketingActivityOwnerScope(params.session)
+
+  if (ownerScope.mode === 'SELF') {
+    const selfUsernames = Array.from(ownerScope.allowedUsernames).filter(Boolean)
+    if (selfUsernames.length === 0) {
+      return [] as MarketingActivityRecord[]
+    }
+    const placeholders = selfUsernames.map(() => '?').join(', ')
+    filters.push(`LOWER(ma.marketing_username) IN (${placeholders})`)
+    for (const u of selfUsernames) values.push(u)
+  } else if (ownerScope.mode === 'TEAM') {
+    // SPV: kombinasi allowed username team + alias name matching legacy denormalized marketing_name
+    const teamUsernames = Array.from(ownerScope.allowedUsernames).filter(Boolean)
+    const aliasMatchers = Array.from(ownerScope.ownerAliases).filter(Boolean)
+    if (teamUsernames.length === 0 && aliasMatchers.length === 0) {
+      return [] as MarketingActivityRecord[]
+    }
+    const teamConditions: string[] = []
+    if (teamUsernames.length > 0) {
+      const placeholders = teamUsernames.map(() => '?').join(', ')
+      teamConditions.push(`LOWER(ma.marketing_username) IN (${placeholders})`)
+      for (const u of teamUsernames) values.push(u)
+    }
+    if (aliasMatchers.length > 0) {
+      const placeholders = aliasMatchers.map(() => '?').join(', ')
+      teamConditions.push(`LOWER(ma.marketing_name) IN (${placeholders})`)
+      for (const a of aliasMatchers) values.push(a)
+    }
+    filters.push(`(${teamConditions.join(' OR ')})`)
+  } else if (ownerScope.mode === 'GLOBAL') {
+    // tidak menambahkan filter owner (lihat lintas owner)
+  }
+
+  if (marketing) {
     filters.push('(LOWER(ma.marketing_name) LIKE ? OR LOWER(ma.marketing_username) LIKE ?)')
     values.push(`%${marketing.toLowerCase()}%`, `%${marketing.toLowerCase()}%`)
   }
@@ -397,6 +523,8 @@ export async function createMarketingActivity(params: {
   assertCanMutate(params.session)
   await ensureMarketingActivitiesTable()
 
+  const ownerScope = await resolveMarketingActivityOwnerScope(params.session)
+
   const date = normalizeText(params.payload.date)
   if (!date) {
     throw new Error('Tanggal aktivitas wajib diisi.')
@@ -404,14 +532,24 @@ export async function createMarketingActivity(params: {
 
   let marketingUsername = params.session.username
   let marketingName = params.session.displayName
-  if (params.session.role !== 'SALES_MARKETING' && params.session.role !== 'PENJUALAN') {
-    const resolvedMarketing = await resolveMarketingIdentity(normalizeText(params.payload.marketingName))
-    if (!resolvedMarketing) {
-      throw new Error('Marketing harus dipilih dari user marketing yang valid.')
+  if (ownerScope.mode === 'GLOBAL' || ownerScope.mode === 'TEAM') {
+    const desiredMarketing = normalizeText(params.payload.marketingName)
+    if (desiredMarketing) {
+      const resolvedMarketing = await resolveMarketingIdentity(desiredMarketing)
+      if (!resolvedMarketing) {
+        throw new Error('Marketing harus dipilih dari user marketing yang valid.')
+      }
+      marketingUsername = resolvedMarketing.username
+      marketingName = resolvedMarketing.fullName
     }
-    marketingUsername = resolvedMarketing.username
-    marketingName = resolvedMarketing.fullName
   }
+
+  await assertMarketingOwnerInScope(
+    ownerScope,
+    marketingUsername,
+    marketingName,
+    'SPV hanya bisa membuat aktivitas untuk anggota tim yang valid. Owner di luar tim ditolak.',
+  )
 
   const areaIds = dedupeAreaIds([
     normalizeOptionalInt(params.payload.areaId),
@@ -468,16 +606,19 @@ export async function updateMarketingActivity(params: {
   assertCanMutate(params.session)
   await ensureMarketingActivitiesTable()
 
+  const ownerScope = await resolveMarketingActivityOwnerScope(params.session)
+
   const existing = await getMarketingActivityById(params.id)
   if (!existing) {
     throw new Error('Aktivitas marketing tidak ditemukan.')
   }
-  if (
-    (params.session.role === 'SALES_MARKETING' || params.session.role === 'PENJUALAN') &&
-    existing.marketingUsername !== params.session.username
-  ) {
-    throw new Error('Anda hanya bisa mengubah aktivitas milik sendiri.')
-  }
+
+  await assertMarketingOwnerInScope(
+    ownerScope,
+    existing.marketingUsername,
+    existing.marketingName,
+    'Anda tidak diizinkan mengubah aktivitas marketing owner di luar cakupan Anda.',
+  )
 
   const date = normalizeText(params.payload.date)
   if (!date) {
@@ -486,14 +627,24 @@ export async function updateMarketingActivity(params: {
 
   let marketingUsername = existing.marketingUsername
   let marketingName = existing.marketingName
-  if (params.session.role !== 'SALES_MARKETING' && params.session.role !== 'PENJUALAN') {
-    const resolvedMarketing = await resolveMarketingIdentity(normalizeText(params.payload.marketingName))
-    if (!resolvedMarketing) {
-      throw new Error('Marketing harus dipilih dari user marketing yang valid.')
+  if (ownerScope.mode === 'GLOBAL' || ownerScope.mode === 'TEAM') {
+    const desiredMarketing = normalizeText(params.payload.marketingName)
+    if (desiredMarketing) {
+      const resolvedMarketing = await resolveMarketingIdentity(desiredMarketing)
+      if (!resolvedMarketing) {
+        throw new Error('Marketing harus dipilih dari user marketing yang valid.')
+      }
+      marketingUsername = resolvedMarketing.username
+      marketingName = resolvedMarketing.fullName
     }
-    marketingUsername = resolvedMarketing.username
-    marketingName = resolvedMarketing.fullName
   }
+
+  await assertMarketingOwnerInScope(
+    ownerScope,
+    marketingUsername,
+    marketingName,
+    'Perpindahan owner ke luar tim Anda tidak diizinkan.',
+  )
 
   const areaIds = dedupeAreaIds([
     normalizeOptionalInt(params.payload.areaId),
@@ -545,16 +696,19 @@ export async function deleteMarketingActivity(params: { id: number; session: App
   assertCanMutate(params.session)
   await ensureMarketingActivitiesTable()
 
+  const ownerScope = await resolveMarketingActivityOwnerScope(params.session)
+
   const existing = await getMarketingActivityById(params.id)
   if (!existing) {
     throw new Error('Aktivitas marketing tidak ditemukan.')
   }
-  if (
-    (params.session.role === 'SALES_MARKETING' || params.session.role === 'PENJUALAN') &&
-    existing.marketingUsername !== params.session.username
-  ) {
-    throw new Error('Anda hanya bisa menghapus aktivitas milik sendiri.')
-  }
+
+  await assertMarketingOwnerInScope(
+    ownerScope,
+    existing.marketingUsername,
+    existing.marketingName,
+    'Anda tidak diizinkan menghapus aktivitas marketing owner di luar cakupan tim Anda.',
+  )
 
   await runReviewDbExecute<ExecuteResult>(
     `
@@ -666,7 +820,23 @@ export async function batchCreateMarketingActivities(params: {
   assertCanMutate(params.session)
   await ensureMarketingActivitiesTable()
 
-  const marketingOptions = await getMarketingUserOptions()
+  const ownerScope = await resolveMarketingActivityOwnerScope(params.session)
+
+  let marketingOptions = await getMarketingUserOptions()
+  if (ownerScope.mode === 'TEAM') {
+    // SPV: HANYA tampilkan marketing user dalam anggota tim aktif + diri sendiri
+    const allowedUsernamesLc = new Set(Array.from(ownerScope.allowedUsernames).map((s) => s.toLowerCase()))
+    const allowedAliasesLc = new Set(Array.from(ownerScope.ownerAliases).map((s) => s.toLowerCase()))
+    marketingOptions = marketingOptions.filter((opt) => {
+      const u = String(opt.username ?? '').trim().toLowerCase()
+      const n = String(opt.fullName ?? '').trim().toLowerCase()
+      return allowedUsernamesLc.has(u) || allowedAliasesLc.has(n)
+    })
+  } else if (ownerScope.mode === 'SELF') {
+    const allowedUsername = params.session.username.trim().toLowerCase()
+    marketingOptions = marketingOptions.filter((opt) => String(opt.username ?? '').trim().toLowerCase() === allowedUsername)
+  }
+
   const areaOptions = await getMarketingCoveredAreaOptions()
 
   const rowErrors: MarketingActivityImportRowError[] = []
@@ -692,7 +862,8 @@ export async function batchCreateMarketingActivities(params: {
 
   let successCount = 0
   if (validPayloads.length) {
-    const isSelfScopedRole = params.session.role === 'SALES_MARKETING' || params.session.role === 'PENJUALAN'
+    const scopeSelf = params.session.role === 'SALES_MARKETING' || params.session.role === 'PENJUALAN'
+    const isSelfScopedRole = ownerScope.mode === 'SELF' || scopeSelf
     const baseMarketingUsername = params.session.username
     const baseMarketingName = params.session.displayName
     const userMap = new Map(marketingOptions.map((item) => [item.fullName.trim().toLowerCase(), { username: item.username, fullName: item.fullName }]))

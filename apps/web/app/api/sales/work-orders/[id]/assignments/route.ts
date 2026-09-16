@@ -11,7 +11,7 @@ import {
   isWorkOrderTerminal,
   lockAndResolveWorkOrderBranch,
   resolveReviewAuthUserIdByUsername,
-  REASSIGN_FULL_ACCESS_ROLES_SET,
+  hasFullFieldOpsReassignAccess,
   validateTargetTechnicianUser,
 } from '@/lib/services/field-ops-service'
 import type { AppRole } from '@/lib/types'
@@ -43,7 +43,7 @@ export async function POST(
   }
 
   const sessionRole = (session.role ?? 'PUBLIC') as AppRole
-  const hasFullAccess = REASSIGN_FULL_ACCESS_ROLES_SET.has(sessionRole)
+  const hasFullAccess = hasFullFieldOpsReassignAccess(sessionRole)
   const hasSupportUpdate = canPerformAction(sessionRole, 'support', 'update')
   const hasSalesUpdate = canPerformAction(sessionRole, 'sales', 'update')
 

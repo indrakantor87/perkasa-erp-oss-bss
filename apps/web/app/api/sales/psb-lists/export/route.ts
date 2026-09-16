@@ -4,6 +4,74 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbQuery } from '@/lib/review-db'
 import { resolveOwnedPsbListOwnerAliases } from '@/lib/services/psb-list-service'
 
+const RESTRICTED_SALES_ROLES: ReadonlySet<string> = new Set([
+  'PENJUALAN',
+  'SALES_MARKETING',
+  'SPV_SALES',
+])
+
+export function isRestrictedSalesRole(role: unknown): boolean {
+  return RESTRICTED_SALES_ROLES.has(String(role ?? '').toUpperCase())
+}
+
+export function escapeLikeWildcards(value: string): string {
+  return String(value ?? '').replace(/([%_\\])/g, '\\$1')
+}
+
+export function normalizeOwnerAlias(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+export function isOwnerParamWithinAuthorizedScope(
+  ownerParam: string,
+  ownerAliases: string[],
+): { allowed: boolean; matchedAlias: string | null; reason: string } {
+  const ownerNorm = normalizeOwnerAlias(ownerParam)
+  if (ownerNorm.length === 0) {
+    return { allowed: true, matchedAlias: null, reason: 'OWNER_EMPTY_NOOP' }
+  }
+  if (!Array.isArray(ownerAliases) || ownerAliases.length === 0) {
+    return {
+      allowed: false,
+      matchedAlias: null,
+      reason: 'AUTHORIZED_OWNER_ALIASES_EMPTY_FAIL_CLOSED',
+    }
+  }
+  const normalizedAliases = ownerAliases
+    .map((alias) => normalizeOwnerAlias(alias))
+    .filter((alias) => alias.length > 0)
+  if (normalizedAliases.length === 0) {
+    return {
+      allowed: false,
+      matchedAlias: null,
+      reason: 'AUTHORIZED_OWNER_ALIASES_NORMALIZED_EMPTY_FAIL_CLOSED',
+    }
+  }
+  for (const alias of normalizedAliases) {
+    if (alias === ownerNorm) {
+      return {
+        allowed: true,
+        matchedAlias: alias,
+        reason: 'EXACT_ALIAS_MATCH',
+      }
+    }
+  }
+  for (const alias of normalizedAliases) {
+    if (alias.includes(ownerNorm) || ownerNorm.includes(alias)) {
+      return {
+        allowed: true,
+        matchedAlias: alias,
+        reason: 'SUBSTRING_OVERLAP_ALIAS_MATCH',
+      }
+    }
+  }
+  return {
+    allowed: false,
+    matchedAlias: null,
+    reason: 'OWNER_PARAM_OUTSIDE_AUTHORIZED_SCOPE',
+  }
+}
+
 type PsbListExportRow = {
   id: number
   psb_list_code: string | null
@@ -68,13 +136,22 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url)
     const status = String(url.searchParams.get('status') ?? '').trim()
-    const owner = String(url.searchParams.get('owner') ?? '').trim()
+    const ownerRaw = String(url.searchParams.get('owner') ?? '').trim()
     const q = String(url.searchParams.get('q') ?? '').trim()
+
+    const owner = escapeLikeWildcards(ownerRaw)
 
     const filters: string[] = ['1 = 1']
     const values: unknown[] = []
 
     const ownerAliases = await resolveOwnedPsbListOwnerAliases(session)
+    const restrictedRole = isRestrictedSalesRole(session.role)
+    if (restrictedRole && ownerAliases.length === 0) {
+      return Response.json(
+        { message: 'Akses owner scope tidak tersedia (fail-closed).' },
+        { status: 403 },
+      )
+    }
     if (ownerAliases.length) {
       const placeholders = ownerAliases.map(() => '?').join(', ')
       filters.push(`LOWER(COALESCE(psb.sales_owner_name, '')) IN (${placeholders})`)
@@ -86,11 +163,27 @@ export async function GET(request: Request) {
       values.push(status)
     }
     if (owner) {
+      if (restrictedRole) {
+        const scope = isOwnerParamWithinAuthorizedScope(ownerRaw, ownerAliases)
+        if (!scope.allowed) {
+          return Response.json(
+            {
+              message: `Parameter owner diluar cakupan otorisasi (${scope.reason}).`,
+            },
+            { status: 400 },
+          )
+        }
+      }
       const ownerLike = `%${owner}%`
-      filters.push(
-        '(UPPER(COALESCE(psb.sales_owner_name, \'\')) LIKE UPPER(?) OR UPPER(COALESCE(psb.cs_pic_name, \'\')) LIKE UPPER(?))',
-      )
-      values.push(ownerLike, ownerLike)
+      if (restrictedRole) {
+        filters.push('(UPPER(COALESCE(psb.sales_owner_name, \'\')) LIKE UPPER(?))')
+        values.push(ownerLike)
+      } else {
+        filters.push(
+          '(UPPER(COALESCE(psb.sales_owner_name, \'\')) LIKE UPPER(?) OR UPPER(COALESCE(psb.cs_pic_name, \'\')) LIKE UPPER(?))',
+        )
+        values.push(ownerLike, ownerLike)
+      }
     }
     if (q) {
       const like = `%${q}%`
