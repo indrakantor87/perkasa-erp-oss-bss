@@ -506,6 +506,19 @@ export function InventoryNetworkOpsPanel({
   const [prospectQuery, setProspectQuery] = useState('')
   const [prospectPoint, setProspectPoint] = useState<{ lat: number; lng: number; label: string; sourceLabel: string } | null>(null)
   const [prospectMessage, setProspectMessage] = useState<string>('')
+  const [selectedProspectRoadRoute, setSelectedProspectRoadRoute] = useState<{
+    status: string
+    provider: string
+    distanceKmFormatted: string
+    durationFormatted: string
+    straightLineKmFormatted: string
+    distanceMeters: number
+    durationSeconds: number | null
+    straightLineDistanceMeters: number
+    errorMessage?: string
+  } | null>(null)
+  const [selectedProspectRoadRouteLoading, setSelectedProspectRoadRouteLoading] = useState<boolean>(false)
+  const [selectedProspectRoadRouteError, setSelectedProspectRoadRouteError] = useState<string | null>(null)
   const canWrite = canCreate && reviewDbReady
   const useReferenceLikeLayout = true
   const hasInventoryNetworkData = Boolean(odpSection || usedPortSection || issuePortSection || assignmentSection || returnSection)
@@ -684,6 +697,69 @@ export function InventoryNetworkOpsPanel({
     [allOdpPoints, selectedOdpId],
   )
   const selectedOdpPoint = selectedOdpData?.point ?? null
+
+  useEffect(() => {
+    if (!prospectPoint || !selectedOdpPoint) {
+      setSelectedProspectRoadRoute(null)
+      setSelectedProspectRoadRouteLoading(false)
+      setSelectedProspectRoadRouteError(null)
+      return
+    }
+    let cancelled = false
+    const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null
+    const run = async () => {
+      setSelectedProspectRoadRouteLoading(true)
+      setSelectedProspectRoadRouteError(null)
+      try {
+        const response = await fetch('/api/routing/road-route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            origin: { lat: prospectPoint.lat, lon: prospectPoint.lng },
+            destination: { lat: selectedOdpPoint.lat, lon: selectedOdpPoint.lng },
+            profile: 'driving',
+          }),
+          signal: abortController?.signal,
+        })
+        if (!response.ok) {
+          const errorPayload = (await response.json().catch(() => null)) as { message?: string } | null
+          throw new Error(errorPayload?.message ?? `HTTP ${response.status}`)
+        }
+        const payload = (await response.json()) as {
+          status: string
+          provider: string
+          distanceKmFormatted: string
+          durationFormatted: string
+          straightLineKmFormatted: string
+          distanceMeters: number
+          durationSeconds: number | null
+          straightLineDistanceMeters: number
+          errorMessage?: string
+        }
+        if (cancelled) return
+        setSelectedProspectRoadRoute(payload)
+      } catch (error) {
+        if (cancelled) return
+        const message = error instanceof Error ? error.message : String(error)
+        const isAbort = typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError'
+        if (!isAbort) {
+          setSelectedProspectRoadRouteError(message)
+        }
+        setSelectedProspectRoadRoute(null)
+      } finally {
+        if (!cancelled) {
+          setSelectedProspectRoadRouteLoading(false)
+        }
+      }
+    }
+    const timeoutId = window.setTimeout(run, 180)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+      abortController?.abort()
+    }
+  }, [prospectPoint, selectedOdpPoint])
+
   const nearestProspectOdp = useMemo(() => {
     if (!prospectPoint || !allOdpPoints.length) return null
     return allOdpPoints.reduce<{
@@ -1592,10 +1668,53 @@ export function InventoryNetworkOpsPanel({
                 </p>
               </div>
               <div className="rounded-xl border border-slate-700 bg-slate-900/30 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Jarak ke Prospek</p>
-                <p className="mt-2 text-sm leading-6 text-white">
-                  {prospectPoint && selectedOdpData ? formatDistanceMeters(selectedToProspectDistanceMeters) : 'Belum ada lokasi prospek'}
-                </p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Jarak & Estimasi Perjalanan</p>
+                {!prospectPoint || !selectedOdpData ? (
+                  <p className="mt-2 text-sm leading-6 text-slate-400">Belum ada lokasi prospek atau ODP terpilih</p>
+                ) : selectedProspectRoadRouteLoading ? (
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-sm font-semibold text-slate-200">Menghitung rute jalan…</p>
+                    <p className="text-xs text-slate-400">Garis lurus sementara: {formatDistanceMeters(selectedToProspectDistanceMeters)}</p>
+                  </div>
+                ) : selectedProspectRoadRoute ? (
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-base font-semibold leading-6 text-white">
+                      Jarak jalan: <span className="tabular-nums">{selectedProspectRoadRoute.distanceKmFormatted}</span>
+                      {selectedProspectRoadRoute.status !== 'ROUTED' ? (
+                        <span className="ml-2 rounded-full border border-amber-400/60 bg-amber-400/15 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-200">
+                          {selectedProspectRoadRoute.status === 'FALLBACK_STRAIGHT_LINE'
+                            ? 'Fallback Garis Lurus'
+                            : selectedProspectRoadRoute.status === 'NO_ROUTE'
+                              ? 'Tidak Ada Rute'
+                              : selectedProspectRoadRoute.status}
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-sm leading-6 text-slate-200">
+                      Perkiraan waktu: <span className="tabular-nums font-medium text-white">{selectedProspectRoadRoute.durationFormatted}</span>
+                    </p>
+                    <p className="text-xs leading-5 text-slate-400">
+                      Garis lurus: <span className="tabular-nums">{selectedProspectRoadRoute.straightLineKmFormatted}</span>
+                      <span className="ml-2 opacity-75">· provider: {selectedProspectRoadRoute.provider}</span>
+                    </p>
+                    {selectedProspectRoadRouteError ? (
+                      <p className="text-xs leading-5 text-rose-300">⚠️ Routing error: {selectedProspectRoadRouteError}</p>
+                    ) : selectedProspectRoadRoute.errorMessage && selectedProspectRoadRoute.status !== 'ROUTED' ? (
+                      <p className="text-xs leading-5 text-amber-300">Catatan: {selectedProspectRoadRoute.errorMessage}</p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-sm font-semibold leading-6 text-white">
+                      Jarak garis lurus: <span className="tabular-nums">{formatDistanceMeters(selectedToProspectDistanceMeters)}</span>
+                      <span className="ml-2 rounded-full border border-slate-500/60 bg-slate-700/70 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-200">Langsung</span>
+                    </p>
+                    <p className="text-xs leading-5 text-slate-400">Rute jalan belum dihitung atau routing engine belum dikonfigurasi.</p>
+                    {selectedProspectRoadRouteError ? (
+                      <p className="text-xs leading-5 text-rose-300">⚠️ Error: {selectedProspectRoadRouteError}</p>
+                    ) : null}
+                  </div>
+                )}
               </div>
             </div>
           </div>
