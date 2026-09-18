@@ -269,6 +269,10 @@ export function InventoryOdpLeafletMap({
     })
 
     observer.observe(element)
+    const shellEl = document.getElementById('odp-leaflet-map-shell')
+    if (shellEl && shellEl !== element) {
+      observer.observe(shellEl)
+    }
 
     return () => {
       observer.disconnect()
@@ -408,7 +412,7 @@ export function InventoryOdpLeafletMap({
       const sizeCheckTimer = window.setInterval(() => {
         sizeRetries += 1
         const el = document.getElementById(mapId)
-        if ((el && el.offsetWidth > 150 && el.offsetHeight > 150) || sizeRetries >= 25) {
+        if ((el && el.offsetWidth > 150 && el.offsetHeight > 150) || sizeRetries >= 75) {
           window.clearInterval(sizeCheckTimer)
           runChromePaintChain()
         }
