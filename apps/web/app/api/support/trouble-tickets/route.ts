@@ -4,6 +4,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import {
   buildServiceWorkOrderInsertPayload,
+  ensureSupportTroubleTicketBranchColumn,
   generateServiceWorkOrderNo,
   insertServiceWorkOrderAssignment,
   insertServiceWorkOrderStatusLog,
@@ -285,6 +286,19 @@ export async function POST(request: Request) {
       )
     }
 
+    if (linkedSubscription.branchId == null) {
+      return Response.json(
+        { message: 'Cabang untuk service subscription tidak dapat ditentukan (branch_id missing). Create TT ditolak.' },
+        { status: 403 },
+      )
+    }
+    if (!isBranchIdInScope(session, linkedSubscription.branchId)) {
+      return Response.json(
+        { message: 'Target customer/service berada di luar scope cabang user (cross-branch create TT ditolak).' },
+        { status: 403 },
+      )
+    }
+
     const hasSupportSlaTroubleType = await hasReviewDbColumn('support_trouble_ticket_sla', 'trouble_type')
     if (hasSupportSlaTroubleType) {
       const knownTroubleTypes = await runReviewDbQuery<TroubleTypeRow>(
@@ -322,32 +336,43 @@ export async function POST(request: Request) {
     const resolvedCustomerName = customerName || linkedSubscription.customerName
     const resolvedCustomerUser = customerUser || linkedSubscription.serviceNo || linkedSubscription.customerCode || null
 
+    await ensureSupportTroubleTicketBranchColumn()
+    const hasTtBranchId = await hasReviewDbColumn('support_trouble_tickets', 'branch_id')
+    const ticketInsertColumns = [
+      'subscription_id',
+      'ticket_code',
+      'customer_name',
+      'customer_user',
+      'category',
+      'type',
+      'status',
+      'problem_category',
+      'notes',
+    ]
+    const ticketInsertValues: unknown[] = [
+      linkedSubscription.subscriptionId,
+      ticketCode,
+      resolvedCustomerName,
+      resolvedCustomerUser,
+      category,
+      type,
+      status,
+      resolvedProblemCategory,
+      notes,
+    ]
+    if (hasTtBranchId) {
+      ticketInsertColumns.push('branch_id')
+      ticketInsertValues.push(linkedSubscription.branchId)
+    }
+
     const ticketInsertResult = await runReviewDbExecute<ExecuteResult>(
       `
         INSERT INTO support_trouble_tickets (
-          subscription_id,
-          ticket_code,
-          customer_name,
-          customer_user,
-          category,
-          type,
-          status,
-          problem_category,
-          notes
+          ${ticketInsertColumns.join(',\n          ')}
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (${ticketInsertColumns.map(() => '?').join(', ')})
       `,
-      [
-        linkedSubscription.subscriptionId,
-        ticketCode,
-        resolvedCustomerName,
-        resolvedCustomerUser,
-        category,
-        type,
-        status,
-        resolvedProblemCategory,
-        notes,
-      ],
+      ticketInsertValues,
     )
     const troubleTicketId = Number(ticketInsertResult.insertId ?? 0)
     const ticketCodeForMessage = ticketCode

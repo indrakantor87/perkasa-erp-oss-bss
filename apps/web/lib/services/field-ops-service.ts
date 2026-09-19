@@ -188,6 +188,7 @@ export type TroubleTicketBranchLockRow = {
   status: string
   closedAt: Date | string | null
   customerName: string | null
+  subscriptionId: number | null
 }
 
 export async function lockAndResolveTroubleTicketBranch(params: {
@@ -200,23 +201,40 @@ export async function lockAndResolveTroubleTicketBranch(params: {
   }
   const [rows] = await params.connection.query(
     `
-      SELECT id, ticket_code AS ticketCode, branch_id AS branchId, status,
-             closed_at AS closedAt, customer_name AS customerName
-      FROM support_trouble_tickets
-      WHERE UPPER(ticket_code) = ?
+      SELECT
+        tt.id,
+        tt.ticket_code AS ticketCode,
+        tt.branch_id AS branchId,
+        tt.status,
+        tt.closed_at AS closedAt,
+        tt.customer_name AS customerName,
+        tt.subscription_id AS subscriptionId,
+        c.branch_id AS fallbackBranchId
+      FROM support_trouble_tickets tt
+      LEFT JOIN service_subscriptions ss ON ss.id = tt.subscription_id
+      LEFT JOIN crm_customers c ON c.id = ss.customer_id
+      WHERE UPPER(tt.ticket_code) = ?
       LIMIT 1
       FOR UPDATE
     `,
     [code],
   )
-  const arr = (rows as TroubleTicketBranchLockRow[]) || []
+  const arr = (rows as Array<TroubleTicketBranchLockRow & { fallbackBranchId?: number | null }>) || []
   const row = arr[0] ?? null
   if (!row) {
     return null
   }
   const branchRaw = (row as unknown as Record<string, unknown>).branchId
   const branchNum = Number(branchRaw ?? 0)
-  const branchId = Number.isInteger(branchNum) && branchNum > 0 ? branchNum : null
+  let branchId = Number.isInteger(branchNum) && branchNum > 0 ? branchNum : null
+  if (branchId == null) {
+    const fallbackRaw = (row as unknown as Record<string, unknown>).fallbackBranchId
+    const fallbackNum = Number(fallbackRaw ?? 0)
+    branchId = Number.isInteger(fallbackNum) && fallbackNum > 0 ? fallbackNum : null
+  }
+  const subscriptionIdRaw = (row as unknown as Record<string, unknown>).subscriptionId
+  const subscriptionNum = Number(subscriptionIdRaw ?? 0)
+  const subscriptionId = Number.isInteger(subscriptionNum) && subscriptionNum > 0 ? subscriptionNum : null
   return {
     id: Number(row.id ?? 0) || 0,
     ticketCode: row.ticketCode ? String(row.ticketCode).trim() : code,
@@ -224,7 +242,18 @@ export async function lockAndResolveTroubleTicketBranch(params: {
     status: String(row.status ?? '').trim(),
     closedAt: row.closedAt ?? null,
     customerName: row.customerName ? String(row.customerName).trim() : null,
+    subscriptionId,
   }
+}
+
+export async function ensureSupportTroubleTicketBranchColumn() {
+  if (await hasReviewDbColumn('support_trouble_tickets', 'branch_id')) {
+    return
+  }
+  await runReviewDbExecute<ExecuteResult>(
+    `ALTER TABLE support_trouble_tickets ADD COLUMN branch_id BIGINT UNSIGNED NULL AFTER subscription_id`,
+  )
+  invalidateReviewDbColumnCache('support_trouble_tickets', 'branch_id')
 }
 
 export function isWorkOrderTerminal(row: {
@@ -2294,6 +2323,7 @@ async function ensureTroubleTicketTables() {
     ensureInventoryRequestTable(),
     ensureSupportTroubleTicketProgressTable(),
     ensureInventoryStockMovementsWorkOrderColumn(),
+    ensureSupportTroubleTicketBranchColumn(),
   ])
 }
 
@@ -2320,32 +2350,32 @@ export async function closeTroubleTicketWithMaterials(params: {
   await ensureTroubleTicketTables()
 
   return runReviewDbTransaction<CloseTroubleTicketWithMaterialsResult>(async (conn) => {
-    const lockSql = `
-      SELECT
-        id,
-        ticket_code AS ticketCode,
-        status,
-        closed_at AS closedAt,
-        customer_name AS customerName,
-        subscription_id AS subscriptionId
-      FROM support_trouble_tickets
-      WHERE UPPER(TRIM(ticket_code)) = ?
-      LIMIT 1
-      FOR UPDATE
-    `
-    const [lockRows] = await conn.query(lockSql, [ticketCodeUp])
-    const ttRow = ((lockRows as TTLockRow[] | undefined)?.[0] ?? null) as TTLockRow | null
-    if (!ttRow) {
+    const ttLock = await lockAndResolveTroubleTicketBranch({ ticketCode: ticketCodeUp, connection: conn })
+    if (!ttLock) {
       throw new TroubleTicketCloseError('TT_NOT_FOUND', 'Trouble ticket tidak ditemukan.')
     }
 
-    const statusUp = String(ttRow.status ?? '').trim().toUpperCase()
-    const isClosed = statusUp === 'CLOSED' || statusUp === 'CLOSE' || ttRow.closedAt != null
+    const actorSessionForScope: ValidateBranchScopeSession = {
+      role: params.actor.role,
+      branchId: params.actor.branchId,
+      branchIds: params.actor.branchId != null && Number.isInteger(params.actor.branchId) && params.actor.branchId > 0
+        ? [params.actor.branchId]
+        : [],
+    }
+    if (!isBranchIdInScope(actorSessionForScope, ttLock.branchId)) {
+      throw new TroubleTicketCloseError(
+        TT_CLOSE_ERROR_CODES.TT_NOT_AUTHORIZED,
+        'Ticket berada di luar scope cabang actor (cross-branch close ditolak).',
+      )
+    }
+
+    const statusUp = String(ttLock.status ?? '').trim().toUpperCase()
+    const isClosed = statusUp === 'CLOSED' || statusUp === 'CLOSE' || ttLock.closedAt != null
     if (isClosed) {
       return {
         idempotent: true,
-        troubleTicketId: ttRow.id,
-        troubleTicketCode: ttRow.ticketCode,
+        troubleTicketId: ttLock.id,
+        troubleTicketCode: ttLock.ticketCode ?? ticketCodeUp,
         status: 'CLOSED',
         closedBy: {
           userId: actorUserIdSafe,
@@ -2370,7 +2400,7 @@ export async function closeTroubleTicketWithMaterials(params: {
     }
 
     await releaseAllActiveTroubleTicketAssignments({
-      troubleTicketId: ttRow.id,
+      troubleTicketId: ttLock.id,
       releasedByUserId: actorUserIdSafe,
       actorLabel,
       connection: conn,
@@ -2392,7 +2422,7 @@ export async function closeTroubleTicketWithMaterials(params: {
         AND UPPER(TRIM(r.request_status)) IN ('REQUEST','PENDING','ON_PROGRESS')
       FOR UPDATE OF i, r
     `
-    const [reqRowsRaw] = await conn.query(reqSql, [ttRow.id])
+    const [reqRowsRaw] = await conn.query(reqSql, [ttLock.id])
     const requestRows = ((reqRowsRaw as TTRequestRow[] | undefined) ?? []) as TTRequestRow[]
 
     const materials: TroubleTicketCloseMaterialResult[] = []
@@ -2409,7 +2439,7 @@ export async function closeTroubleTicketWithMaterials(params: {
         )
       }
 
-      const movementNote = `[TT CLOSE] ${ttRow.ticketCode} | ${actorLabel} | ${row.requestCode ?? ''}`
+      const movementNote = `[TT CLOSE] ${ttLock.ticketCode ?? ticketCodeUp} | ${actorLabel} | ${row.requestCode ?? ''}`
       const movementInsertSql = `
         INSERT INTO inventory_stock_movements (
           item_id, movement_type, qty, movement_note, movement_at,
@@ -2420,8 +2450,8 @@ export async function closeTroubleTicketWithMaterials(params: {
         row.inventoryItemId,
         qty,
         movementNote,
-        ttRow.ticketCode,
-        ttRow.id,
+        ttLock.ticketCode ?? ticketCodeUp,
+        ttLock.id,
         actorUserIdSafe,
         actorLabel,
       ])
@@ -2487,7 +2517,7 @@ export async function closeTroubleTicketWithMaterials(params: {
       updateParts.push('closed_by_user_id = ?')
       updateValues.push(actorUserIdSafe)
     }
-    updateValues.push(ttRow.id)
+    updateValues.push(ttLock.id)
     const ttUpdateSql = `UPDATE support_trouble_tickets SET ${updateParts.join(', ')} WHERE id = ? LIMIT 1`
     const [ttUpRaw] = await conn.query(ttUpdateSql, updateValues)
     const ttAffected = Number((ttUpRaw as unknown as ExecuteResult | undefined)?.affectedRows ?? 0)
@@ -2498,7 +2528,7 @@ export async function closeTroubleTicketWithMaterials(params: {
     try {
       await insertSupportTroubleTicketProgressLog(
         {
-          troubleTicketId: ttRow.id,
+          troubleTicketId: ttLock.id,
           progressStatus: 'CLOSED',
           ownerName: actorLabel,
           progressNotes: closeNoteText,
@@ -2513,8 +2543,8 @@ export async function closeTroubleTicketWithMaterials(params: {
 
     return {
       idempotent: false,
-      troubleTicketId: ttRow.id,
-      troubleTicketCode: ttRow.ticketCode,
+      troubleTicketId: ttLock.id,
+      troubleTicketCode: ttLock.ticketCode ?? ticketCodeUp,
       status: 'CLOSED',
       closedBy: {
         userId: actorUserIdSafe,

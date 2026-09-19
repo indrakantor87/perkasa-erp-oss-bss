@@ -21,6 +21,7 @@ import {
 import {
   buildServiceWorkOrderInsertPayload,
   ensureServiceWorkOrderStatusLogTable,
+  ensureSupportTroubleTicketBranchColumn,
   generateServiceWorkOrderNo,
   insertServiceWorkOrder,
   resolveReviewAuthUserIdByUsername,
@@ -1730,6 +1731,8 @@ export async function transferPsbListToTicket(params: {
       const hasTtOpenedAt = await hasReviewDbColumn('support_trouble_tickets', 'opened_at')
       const hasTtClosedAt = await hasReviewDbColumn('support_trouble_tickets', 'closed_at')
       const hasTtSlaDueAt = await hasReviewDbColumn('support_trouble_tickets', 'sla_due_at')
+      await ensureSupportTroubleTicketBranchColumn()
+      const hasTtBranchId = await hasReviewDbColumn('support_trouble_tickets', 'branch_id')
       const ttColumns: string[] = ['ticket_code', 'customer_name', 'category', 'type', 'status', 'problem_category', 'notes']
       const ttValues: unknown[] = [
         ticketCode,
@@ -1748,6 +1751,10 @@ export async function transferPsbListToTicket(params: {
       if (hasTtSubscriptionId) {
         ttColumns.push('subscription_id')
         ttValues.push(null)
+      }
+      if (hasTtBranchId) {
+        ttColumns.push('branch_id')
+        ttValues.push(params.branchId ?? null)
       }
       if (hasTtOpenedAt) {
         ttColumns.push('opened_at')
