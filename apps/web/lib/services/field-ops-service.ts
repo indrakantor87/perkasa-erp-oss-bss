@@ -1167,16 +1167,53 @@ async function ensureInventoryStockMovementsWorkOrderColumn() {
   void invalidateReviewDbColumnCache
 }
 
+async function ensureServiceWorkOrdersClosedByUserIdColumn() {
+  if (await hasReviewDbColumn('service_work_orders', 'closed_by_user_id')) return
+  try {
+    await runReviewDbExecute(`
+      ALTER TABLE service_work_orders
+      ADD COLUMN closed_by_user_id BIGINT UNSIGNED NULL AFTER completed_at
+    `)
+  } catch {
+  }
+  invalidateReviewDbColumnCache('service_work_orders', 'closed_by_user_id')
+}
+
+async function ensureServiceWorkOrdersTroubleTicketIdColumn() {
+  if (await hasReviewDbColumn('service_work_orders', 'trouble_ticket_id')) return
+  try {
+    await runReviewDbExecute(`
+      ALTER TABLE service_work_orders
+      ADD COLUMN trouble_ticket_id BIGINT UNSIGNED NULL AFTER subscription_id,
+      ADD KEY idx_swo_tt (trouble_ticket_id)
+    `)
+  } catch {
+  }
+  invalidateReviewDbColumnCache('service_work_orders', 'trouble_ticket_id')
+}
+
+export type TTCompleteActor = {
+  userId: number | null
+  username: string
+  displayName: string
+  role: AppRole
+  branchId: number | null
+  branchIds: number[]
+}
+
 export async function completeWorkOrderWithMaterials(params: {
   workOrderId: number
   actorUserId: number | null
   actorUsername: string | null
   reasonNotes?: string | null
+  actor?: TTCompleteActor | null
   opts?: {
     connection?: ReviewDbConnection
   }
 }): Promise<CompleteWorkOrderResult> {
   await ensureInventoryStockMovementsWorkOrderColumn()
+  await ensureServiceWorkOrdersClosedByUserIdColumn()
+  await ensureServiceWorkOrdersTroubleTicketIdColumn()
   const actorUserIdNum = Number(params.actorUserId ?? 0) || null
   const actorLabel = params.actorUsername ? `user:${params.actorUsername}` : 'system'
 
@@ -1457,17 +1494,29 @@ export async function completeWorkOrderWithMaterials(params: {
           if (openSiblingCount <= 0 && ttCode) {
             ttCascadeClose.attempted = true
             try {
+              const cascadeActor: TTCloseActor = params.actor
+                ? {
+                    userId: params.actor.userId ?? actorUserIdNum,
+                    username: params.actor.username || params.actorUsername || 'system',
+                    displayName: params.actor.displayName || params.actor.username || params.actorUsername || 'System User',
+                    role: params.actor.role,
+                    branchId: params.actor.branchId ?? null,
+                    branchIds: Array.isArray(params.actor.branchIds) ? params.actor.branchIds.slice() : [],
+                  }
+                : {
+                    userId: actorUserIdNum,
+                    username: params.actorUsername || 'system',
+                    displayName: actorLabel,
+                    role: 'TT_OPERATOR',
+                    branchId: null,
+                    branchIds: [],
+                  }
               const closeRes = await closeTroubleTicketWithMaterials({
                 ticketCode: ttCode,
                 resolutionAction: 'RESOLVED_BY_WO',
                 closeNotes: reasonNotesFinal,
-                actor: {
-                  userId: actorUserIdNum,
-                  username: params.actorUsername ?? 'system',
-                  displayName: actorLabel,
-                  role: 'TT_OPERATOR',
-                  branchId: null,
-                },
+                actor: cascadeActor,
+                opts: { connection: conn },
               })
               ttCascadeClose.success = true
               ttCascadeClose.idempotent = Boolean(closeRes?.idempotent ?? false)
@@ -2270,6 +2319,7 @@ type TTCloseActor = {
   displayName: string
   role: AppRole
   branchId: number | null
+  branchIds?: number[] | null
 }
 
 export type TroubleTicketCloseMaterialResult = {
@@ -2324,6 +2374,18 @@ async function ensureTroubleTicketTables() {
     ensureSupportTroubleTicketProgressTable(),
     ensureInventoryStockMovementsWorkOrderColumn(),
     ensureSupportTroubleTicketBranchColumn(),
+    ensureServiceWorkOrdersClosedByUserIdColumn(),
+    ensureServiceWorkOrdersTroubleTicketIdColumn(),
+    (async () => {
+      if (await hasReviewDbColumn('support_trouble_tickets', 'closed_by_user_id')) return
+      try {
+        await runReviewDbExecute(`
+          ALTER TABLE support_trouble_tickets
+          ADD COLUMN closed_by_user_id BIGINT UNSIGNED NULL AFTER closed_at
+        `)
+      } catch {}
+      invalidateReviewDbColumnCache('support_trouble_tickets', 'closed_by_user_id')
+    })(),
   ])
 }
 
@@ -2332,6 +2394,9 @@ export async function closeTroubleTicketWithMaterials(params: {
   resolutionAction: string
   closeNotes: string
   actor: TTCloseActor
+  opts?: {
+    connection?: ReviewDbConnection
+  }
 }): Promise<CloseTroubleTicketWithMaterialsResult> {
   if (!params?.ticketCode || !params?.resolutionAction || !params?.closeNotes) {
     throw new TroubleTicketCloseError('TT_MATERIAL_INVALID', 'Parameter close ticket tidak lengkap.')
@@ -2349,7 +2414,8 @@ export async function closeTroubleTicketWithMaterials(params: {
 
   await ensureTroubleTicketTables()
 
-  return runReviewDbTransaction<CloseTroubleTicketWithMaterialsResult>(async (conn) => {
+  const txConn = params.opts?.connection
+  const doClose = async (conn: ReviewDbConnection) => {
     const ttLock = await lockAndResolveTroubleTicketBranch({ ticketCode: ticketCodeUp, connection: conn })
     if (!ttLock) {
       throw new TroubleTicketCloseError('TT_NOT_FOUND', 'Trouble ticket tidak ditemukan.')
@@ -2358,9 +2424,11 @@ export async function closeTroubleTicketWithMaterials(params: {
     const actorSessionForScope: ValidateBranchScopeSession = {
       role: params.actor.role,
       branchId: params.actor.branchId,
-      branchIds: params.actor.branchId != null && Number.isInteger(params.actor.branchId) && params.actor.branchId > 0
-        ? [params.actor.branchId]
-        : [],
+      branchIds: (Array.isArray(params.actor.branchIds) && params.actor.branchIds.length > 0)
+        ? params.actor.branchIds.filter((n) => Number.isInteger(n) && n > 0).slice()
+        : (params.actor.branchId != null && Number.isInteger(params.actor.branchId) && params.actor.branchId > 0
+            ? [params.actor.branchId]
+            : []),
     }
     if (!isBranchIdInScope(actorSessionForScope, ttLock.branchId)) {
       throw new TroubleTicketCloseError(
@@ -2420,7 +2488,7 @@ export async function closeTroubleTicketWithMaterials(params: {
       LEFT JOIN inventory_items i ON i.id = r.inventory_item_id
       WHERE r.trouble_ticket_id = ?
         AND UPPER(TRIM(r.request_status)) IN ('REQUEST','PENDING','ON_PROGRESS')
-      FOR UPDATE OF i, r
+      FOR UPDATE
     `
     const [reqRowsRaw] = await conn.query(reqSql, [ttLock.id])
     const requestRows = ((reqRowsRaw as TTRequestRow[] | undefined) ?? []) as TTRequestRow[]
@@ -2558,7 +2626,11 @@ export async function closeTroubleTicketWithMaterials(params: {
       movementIds,
       progressLogInserted: true,
     }
-  })
+  }
+  if (txConn) {
+    return doClose(txConn)
+  }
+  return runReviewDbTransaction<CloseTroubleTicketWithMaterialsResult>(doClose)
 }
 
 async function ensureServiceTroubleTicketAssignmentColumn(
