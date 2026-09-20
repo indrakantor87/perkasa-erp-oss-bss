@@ -1214,13 +1214,18 @@ export async function completeWorkOrderWithMaterials(params: {
   await ensureInventoryStockMovementsWorkOrderColumn()
   await ensureServiceWorkOrdersClosedByUserIdColumn()
   await ensureServiceWorkOrdersTroubleTicketIdColumn()
+  const hasWoClosedByUserId = await hasReviewDbColumn('service_work_orders', 'closed_by_user_id')
+  const hasWoTroubleTicketId = await hasReviewDbColumn('service_work_orders', 'trouble_ticket_id')
   const actorUserIdNum = Number(params.actorUserId ?? 0) || null
   const actorLabel = params.actorUsername ? `user:${params.actorUsername}` : 'system'
 
   const doComplete = async (conn: ReviewDbConnection): Promise<CompleteWorkOrderResult> => {
+    const initialWoCols = ['id', 'work_order_no', 'status', 'completed_at']
+    if (hasWoClosedByUserId) initialWoCols.push('closed_by_user_id')
+    if (hasWoTroubleTicketId) initialWoCols.push('trouble_ticket_id')
     const [woRowsRaw] = await conn.query(
       `
-        SELECT id, work_order_no, status, completed_at, closed_by_user_id, trouble_ticket_id
+        SELECT ${initialWoCols.join(', ')}
         FROM service_work_orders
         WHERE id = ?
         LIMIT 1
@@ -1240,13 +1245,16 @@ export async function completeWorkOrderWithMaterials(params: {
     const fromStatus = String(wo.status ?? 'OPEN').trim().toUpperCase()
 
     if (fromStatus === 'COMPLETED') {
+      const woClosedByRaw = (wo as unknown as Record<string, unknown>).closed_by_user_id
+      const woClosedByNum = Number(woClosedByRaw ?? 0)
+      const woClosedBy = Number.isInteger(woClosedByNum) && woClosedByNum > 0 ? woClosedByNum : null
       return {
         success: true,
         idempotent: true,
         workOrderId: wo.id,
         workOrderNo: wo.work_order_no,
         status: 'COMPLETED',
-        closedByUserId: wo.closed_by_user_id,
+        closedByUserId: woClosedBy,
         closedAt: wo.completed_at ? String(wo.completed_at) : null,
         materials: [],
         movementIds: [],
@@ -1402,16 +1410,24 @@ export async function completeWorkOrderWithMaterials(params: {
       })
     }
 
+    const woUpdateParts = [
+      `status = ?`,
+      `completed_at = CURRENT_TIMESTAMP`,
+      `updated_at = CURRENT_TIMESTAMP`,
+    ]
+    const woUpdateValues: unknown[] = ['COMPLETED']
+    if (hasWoClosedByUserId) {
+      woUpdateParts.push(`closed_by_user_id = ?`)
+      woUpdateValues.push(actorUserIdNum)
+    }
+    woUpdateValues.push(wo.id)
     const [woUpdRaw] = await conn.query(
       `
         UPDATE service_work_orders
-        SET status = 'COMPLETED',
-            completed_at = CURRENT_TIMESTAMP,
-            closed_by_user_id = ?,
-            updated_at = CURRENT_TIMESTAMP
+        SET ${woUpdateParts.join(',\n            ')}
         WHERE id = ? AND status <> 'COMPLETED' AND status <> 'CANCELLED'
       `,
-      [actorUserIdNum, wo.id],
+      woUpdateValues,
     )
     const woUpd = woUpdRaw as unknown as ExecuteResult
     const woAffected = Number(woUpd?.affectedRows ?? 0)
@@ -1448,8 +1464,13 @@ export async function completeWorkOrderWithMaterials(params: {
       warning: null,
     }
 
-    const linkedTtId = Number(wo.trouble_ticket_id ?? 0)
-    if (Number.isInteger(linkedTtId) && linkedTtId > 0) {
+    let linkedTtId = 0
+    if (hasWoTroubleTicketId) {
+      const linkedRaw = (wo as unknown as Record<string, unknown>).trouble_ticket_id
+      const linkedNum = Number(linkedRaw ?? 0)
+      linkedTtId = Number.isInteger(linkedNum) && linkedNum > 0 ? linkedNum : 0
+    }
+    if (linkedTtId > 0) {
       try {
         const [ttRowsRaw] = await conn.query(
           `SELECT id, ticket_code, status FROM support_trouble_tickets WHERE id = ? LIMIT 1`,
@@ -1485,13 +1506,16 @@ export async function completeWorkOrderWithMaterials(params: {
         }
 
         try {
-          const [woSiblingRaw] = await conn.query(
-            `SELECT COUNT(id) AS n FROM service_work_orders WHERE trouble_ticket_id = ? AND UPPER(TRIM(COALESCE(status,''))) NOT IN ('COMPLETED','CANCELLED','CLOSED')`,
-            [linkedTtId],
-          )
-          const siblingRow = (woSiblingRaw as Array<Record<string, unknown>> | undefined)?.[0]
-          const openSiblingCount = Number(siblingRow?.n ?? 0)
-          if (openSiblingCount <= 0 && ttCode) {
+          let openSiblingCount = 1
+          if (hasWoTroubleTicketId) {
+            const [woSiblingRaw] = await conn.query(
+              `SELECT COUNT(id) AS n FROM service_work_orders WHERE trouble_ticket_id = ? AND UPPER(TRIM(COALESCE(status,''))) NOT IN ('COMPLETED','CANCELLED','CLOSED')`,
+              [linkedTtId],
+            )
+            const siblingRow = (woSiblingRaw as Array<Record<string, unknown>> | undefined)?.[0]
+            openSiblingCount = Number(siblingRow?.n ?? 0)
+          }
+          if (openSiblingCount <= 0 && ttCascadeClose.troubleTicketCode) {
             ttCascadeClose.attempted = true
             try {
               const cascadeActor: TTCloseActor = params.actor
@@ -1602,10 +1626,14 @@ export async function cancelWorkOrder(params: {
   const actorUserIdNum = Number(params.actorUserId ?? 0) || null
   const actorLabel = params.actorUsername ? `user:${params.actorUsername}` : 'system'
 
+  const hasWoCancelClosedBy = await hasReviewDbColumn('service_work_orders', 'closed_by_user_id')
+
   const doCancel = async (conn: ReviewDbConnection): Promise<CancelWorkOrderResult> => {
+    const cancelWoCols = ['id', 'work_order_no', 'status', 'completed_at']
+    if (hasWoCancelClosedBy) cancelWoCols.push('closed_by_user_id')
     const [woRowsRaw] = await conn.query(
       `
-        SELECT id, work_order_no, status, completed_at, closed_by_user_id
+        SELECT ${cancelWoCols.join(', ')}
         FROM service_work_orders
         WHERE id = ?
         LIMIT 1
@@ -1622,13 +1650,16 @@ export async function cancelWorkOrder(params: {
     }
     const fromStatus = String(wo.status ?? 'OPEN').trim().toUpperCase()
     if (fromStatus === 'CANCELLED') {
+      const wcRaw = (wo as unknown as Record<string, unknown>).closed_by_user_id
+      const wcNum = Number(wcRaw ?? 0)
+      const wcId = Number.isInteger(wcNum) && wcNum > 0 ? wcNum : null
       return {
         success: true,
         idempotent: true,
         workOrderId: wo.id,
         workOrderNo: wo.work_order_no,
         status: 'CANCELLED',
-        cancelledByUserId: wo.closed_by_user_id,
+        cancelledByUserId: wcId,
         cancelledAt: wo.completed_at ? String(wo.completed_at) : null,
       }
     }
@@ -1647,16 +1678,24 @@ export async function cancelWorkOrder(params: {
       )
     }
 
+    const woCancelUpdParts = [
+      `status = ?`,
+      `completed_at = CURRENT_TIMESTAMP`,
+      `updated_at = CURRENT_TIMESTAMP`,
+    ]
+    const woCancelUpdValues: unknown[] = ['CANCELLED']
+    if (hasWoCancelClosedBy) {
+      woCancelUpdParts.push(`closed_by_user_id = ?`)
+      woCancelUpdValues.push(actorUserIdNum)
+    }
+    woCancelUpdValues.push(wo.id)
     const [woUpdRaw] = await conn.query(
       `
         UPDATE service_work_orders
-        SET status = 'CANCELLED',
-            completed_at = CURRENT_TIMESTAMP,
-            closed_by_user_id = ?,
-            updated_at = CURRENT_TIMESTAMP
+        SET ${woCancelUpdParts.join(',\n            ')}
         WHERE id = ? AND status <> 'COMPLETED' AND status <> 'CANCELLED'
       `,
-      [actorUserIdNum, wo.id],
+      woCancelUpdValues,
     )
     const woUpd = woUpdRaw as unknown as ExecuteResult
     const affected = Number(woUpd?.affectedRows ?? 0)
@@ -1761,11 +1800,14 @@ export async function transitionWorkOrderStatus(params: {
     | 'OPEN'
     | 'SCHEDULED'
     | 'ON_PROGRESS'
+  const hasWoTransitionClosedBy = await hasReviewDbColumn('service_work_orders', 'closed_by_user_id')
 
   const doTransition = async (conn: ReviewDbConnection): Promise<WorkOrderTransitionResult> => {
+    const transitionWoCols = ['id', 'work_order_no', 'status', 'completed_at']
+    if (hasWoTransitionClosedBy) transitionWoCols.push('closed_by_user_id')
     const [woRowsRaw] = await conn.query(
       `
-        SELECT id, work_order_no, status, completed_at, closed_by_user_id
+        SELECT ${transitionWoCols.join(', ')}
         FROM service_work_orders
         WHERE id = ?
         LIMIT 1
@@ -2413,7 +2455,7 @@ export async function closeTroubleTicketWithMaterials(params: {
   const closeNoteText = `[Closed via TT lifecycle] ${actorLabel} - ${closeNotesRaw}`
 
   await ensureTroubleTicketTables()
-
+  const hasTtClosedByUserId = await hasReviewDbColumn('support_trouble_tickets', 'closed_by_user_id')
   const txConn = params.opts?.connection
   const doClose = async (conn: ReviewDbConnection) => {
     const ttLock = await lockAndResolveTroubleTicketBranch({ ticketCode: ticketCodeUp, connection: conn })
@@ -2581,7 +2623,7 @@ export async function closeTroubleTicketWithMaterials(params: {
 
     const updateParts = ['status = ?', 'resolution_action = ?', 'close_notes = ?', 'closed_at = CURRENT_TIMESTAMP']
     const updateValues: unknown[] = ['CLOSED', resolutionActionUp, closeNoteText]
-    if (actorUserIdSafe != null) {
+    if (hasTtClosedByUserId && actorUserIdSafe != null) {
       updateParts.push('closed_by_user_id = ?')
       updateValues.push(actorUserIdSafe)
     }

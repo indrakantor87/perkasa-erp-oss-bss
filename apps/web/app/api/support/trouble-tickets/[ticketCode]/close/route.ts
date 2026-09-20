@@ -167,6 +167,9 @@ export async function POST(
         displayName: String(session.displayName ?? session.username ?? 'Unknown User'),
         role: sessionRole,
         branchId: session.branchId ? Number(session.branchId) : null,
+        branchIds: Array.isArray(session.branchIds)
+          ? session.branchIds.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
+          : [],
       },
     })
 
