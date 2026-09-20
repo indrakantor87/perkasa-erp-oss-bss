@@ -2,6 +2,7 @@ import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail } from '@/lib/review-db'
+import type { AppRole } from '@/lib/types'
 import {
   WO_COMPLETION_ERROR_CODES,
   type WorkOrderCompletionErrorCode,
@@ -101,11 +102,20 @@ export async function POST(
         : session.displayName || session.username
 
     const actorUserId = await resolveReviewAuthUserIdByUsername(session.username)
+    const actorRole = (session.role ?? 'PUBLIC') as AppRole
     const result = await completeWorkOrderWithMaterials({
       workOrderId,
       actorUserId,
       actorUsername: session.username,
       reasonNotes,
+      actor: {
+        userId: actorUserId,
+        username: session.username,
+        displayName: session.displayName || session.username || 'Unknown User',
+        role: actorRole,
+        branchId: session.branchId ? Number(session.branchId) : null,
+        branchIds: Array.isArray(session.branchIds) ? session.branchIds.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0) : [],
+      },
     })
 
     const httpStatus = result.idempotent ? 200 : 200
