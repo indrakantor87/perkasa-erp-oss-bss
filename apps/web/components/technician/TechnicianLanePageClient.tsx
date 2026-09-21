@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { isValidTransition } from '@/lib/services/field-tech-transitions'
-import { resolveCanonicalSlaState, type CanonicalSlaState } from '@/lib/services/sla-resolver'
+import { isValidTransition, clientHasActiveTemporaryPeriod, clientSumTemporaryMinutes, type CanonicalSlaState, type ClientSlaTemporaryPeriod } from '@/lib/field-tech-browser'
 import { StatusBadge, resolveStatusBadgeTone } from '@/components/ui-status-badge'
 import { UiButton, IconChevronDown } from '@/components/ui-button'
 import {
@@ -89,29 +88,39 @@ function computeSlaInfo(row: {
   let effectiveMinutes = 0
   let temporaryMinutes = 0
   if (openedAt && Number.isFinite(openedAt.getTime())) {
+    temporaryMinutes = clientSumTemporaryMinutes(tempPeriods as unknown as ClientSlaTemporaryPeriod[])
     const baseMs = Math.max(0, Date.now() - openedAt.getTime())
-    let closedTempMs = 0
-    if (tempPeriods) {
-      for (const p of tempPeriods) {
-        const s = p.startedAt
-        if (!p.endedAt) continue
-        const e = p.endedAt
-        if (Number.isFinite(s.getTime()) && Number.isFinite(e.getTime()) && e.getTime() > s.getTime()) {
-          closedTempMs += e.getTime() - s.getTime()
-        }
-      }
-    }
-    temporaryMinutes = Math.max(0, Math.floor(closedTempMs / (1000 * 60)))
-    effectiveMinutes = Math.max(0, Math.floor((baseMs - closedTempMs) / (1000 * 60)))
+    effectiveMinutes = Math.max(0, Math.floor(baseMs / 60000) - temporaryMinutes)
   }
   let fallbackHours: number | null = null
   if (!slaDueAt && openedAt) fallbackHours = 24
-  const state = resolveCanonicalSlaState({
-    slaDueAt,
-    openedAt,
-    fallbackTargetHours: fallbackHours,
-    temporaryPeriods: tempPeriods,
-  })
+  const activeTemp = clientHasActiveTemporaryPeriod(tempPeriods as unknown as ClientSlaTemporaryPeriod[])
+  let state: CanonicalSlaState = 'UNSET'
+  if (activeTemp) {
+    state = 'TEMPORARY_PAUSED'
+  } else if (slaDueAt) {
+    const due = slaDueAt instanceof Date ? slaDueAt : new Date(String(slaDueAt))
+    if (Number.isFinite(due.getTime())) {
+      const now = Date.now()
+      const diffMs = due.getTime() - now
+      if (diffMs < 0) state = 'BREACHED'
+      else {
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
+        const tomorrowStart = new Date(todayStart)
+        tomorrowStart.setDate(tomorrowStart.getDate() + 1)
+        if (due.getTime() >= todayStart.getTime() && due.getTime() < tomorrowStart.getTime()) state = 'WARNING'
+        else state = 'ON_TRACK'
+      }
+    }
+  } else if (openedAt && fallbackHours != null) {
+    const ageMs = Math.max(0, Date.now() - openedAt.getTime())
+    const ageMin = Math.floor(ageMs / 60000) - temporaryMinutes
+    const targetMin = Math.max(0, Math.floor(fallbackHours * 60))
+    if (ageMin >= targetMin) state = 'BREACHED'
+    else if (ageMin >= Math.max(0, targetMin - 180)) state = 'WARNING'
+    else state = 'ON_TRACK'
+  }
   let dueLabel = formatDateShort(slaDueAt)
   if (dueLabel === '-' && openedAt && fallbackHours) {
     const due = new Date(openedAt.getTime() + fallbackHours * 3600 * 1000)

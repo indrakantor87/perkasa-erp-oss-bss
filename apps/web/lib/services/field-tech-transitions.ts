@@ -91,7 +91,7 @@ async function isWorkOrderOwnedByTech(
     uid,
   ]
 
-  const rows = await runReviewDbQuery<Record<string, unknown>>(
+  const rowsQ = await conn.query(
     `
       SELECT 1 AS matched
       FROM service_work_orders wo
@@ -120,7 +120,8 @@ async function isWorkOrderOwnedByTech(
       LIMIT 1
     `,
     bindBase,
-  ).catch(() => [])
+  ).catch(() => [[], []] as unknown as [Record<string, unknown>[], unknown[]])
+  const rows = (Array.isArray(rowsQ) && Array.isArray(rowsQ[0]) ? rowsQ[0] : (Array.isArray(rowsQ) ? rowsQ : [])) as Record<string, unknown>[]
 
   return Number(rows[0]?.matched ?? 0) === 1
 }
@@ -161,14 +162,16 @@ async function isTroubleTicketOwnedByTech(
       ))`
     : 'FALSE'
   const fallbackClause = hasAssignmentsTable
-    ? `(${directClause}
-        AND NOT EXISTS (
-          SELECT 1
-          FROM service_trouble_ticket_assignments ta_other
-          WHERE ta_other.trouble_ticket_id = tt.id
-            AND ta_other.assigned_user_id <> tt.assigned_user_id
-            AND ta_other.released_at IS NULL
-        ))`
+    ? hasAssigned
+      ? `(${directClause}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM service_trouble_ticket_assignments ta_other
+            WHERE ta_other.trouble_ticket_id = tt.id
+              AND ta_other.assigned_user_id <> tt.assigned_user_id
+              AND ta_other.released_at IS NULL
+          ))`
+      : directClause
     : directClause
 
   const bind: unknown[] = hasAssignmentsTable
@@ -181,7 +184,7 @@ async function isTroubleTicketOwnedByTech(
       ]
     : [...pkVals, uid]
 
-  const rows = await runReviewDbQuery<Record<string, unknown>>(
+  const rowsQ = await conn.query(
     `
       SELECT tt.id AS ttId, 1 AS matched
       FROM support_trouble_tickets tt
@@ -190,7 +193,8 @@ async function isTroubleTicketOwnedByTech(
       LIMIT 1
     `,
     bind,
-  ).catch(() => [])
+  ).catch(() => [[], []] as unknown as [Record<string, unknown>[], unknown[]])
+  const rows = (Array.isArray(rowsQ) && Array.isArray(rowsQ[0]) ? rowsQ[0] : (Array.isArray(rowsQ) ? rowsQ : [])) as Record<string, unknown>[]
 
   const matched = Number(rows[0]?.matched ?? 0) === 1
   const ttId = Number(rows[0]?.ttId ?? 0)
@@ -1052,14 +1056,18 @@ export async function markTroubleTicketTemporary(params: {
       }
     }
 
+    const hasTtWorkOrderId = await hasReviewDbColumn('support_trouble_tickets', 'work_order_id')
     try {
+      const periodJoinClause = hasTtWorkOrderId
+        ? `(t.trouble_ticket_id = tt.id OR t.work_order_id = tt.work_order_id)`
+        : `t.trouble_ticket_id = tt.id`
       await conn.query(
         `
           INSERT INTO tickets_temporary_periods
             (ticket_id, status, started_at, actor_user_id, reason)
           SELECT t.id, 'TEMPORARY', CURRENT_TIMESTAMP, ?, ?
           FROM tickets t
-          INNER JOIN support_trouble_tickets tt ON tt.id = ? AND (t.trouble_ticket_id = tt.id OR t.work_order_id = tt.work_order_id)
+          INNER JOIN support_trouble_tickets tt ON tt.id = ? AND ${periodJoinClause}
           LIMIT 1
         `,
         [uid, reason.slice(0, 1000), ttId],
@@ -1245,7 +1253,11 @@ export async function resumeFromTemporary(params: {
       }
     }
 
+    const hasTtWorkOrderId2 = await hasReviewDbColumn('support_trouble_tickets', 'work_order_id')
     try {
+      const resumeJoinClause = hasTtWorkOrderId2
+        ? `(t.trouble_ticket_id = tt.id OR t.work_order_id = tt.work_order_id)`
+        : `t.trouble_ticket_id = tt.id`
       await conn.query(
         `
           UPDATE tickets_temporary_periods
@@ -1256,7 +1268,7 @@ export async function resumeFromTemporary(params: {
             AND ticket_id IN (
               SELECT t.id FROM tickets t
               INNER JOIN support_trouble_tickets tt ON tt.id = ?
-                AND (t.trouble_ticket_id = tt.id OR t.work_order_id = tt.work_order_id)
+                AND ${resumeJoinClause}
             )
           ORDER BY id DESC
           LIMIT 1

@@ -147,7 +147,9 @@ export function resolveCanonicalSlaState(
     let breachedAt: Date | null = null
     let computedState: CanonicalSlaState = 'UNSET'
 
-    if (totalDurationMinutes > 0 && openedMs > 0) {
+    if (hasActiveTemporary) {
+      computedState = 'TEMPORARY_PAUSED'
+    } else if (totalDurationMinutes > 0 && openedMs > 0) {
       const extendedDueMs = (slaDueAtBase?.getTime() ?? 0) + closedTemporaryTotalMs
       finalDueAt = new Date(extendedDueMs)
       const remainingMs = extendedDueMs - nowMs
@@ -161,14 +163,6 @@ export function resolveCanonicalSlaState(
           2 * 60 * 60 * 1000,
         )
         computedState = remainingMs <= warningThresholdMs ? 'WARNING' : 'ON_TRACK'
-      }
-    }
-
-    if (hasActiveTemporary) {
-      if (computedState === 'BREACHED') {
-        computedState = 'TEMPORARY_PAUSED'
-      } else if (computedState === 'UNSET') {
-        computedState = 'ON_TRACK'
       }
     }
 
@@ -230,8 +224,7 @@ export function resolveCanonicalSlaState(
   void referenceNow
 
   if (hasActiveTemporary) {
-    if (baseState === 'BREACHED') return 'TEMPORARY_PAUSED'
-    if (baseState === 'UNSET') return 'ON_TRACK'
+    if (baseState === 'BREACHED' || baseState === 'ON_TRACK' || baseState === 'WARNING' || baseState === 'UNSET') return 'TEMPORARY_PAUSED'
   }
   return baseState
 }
