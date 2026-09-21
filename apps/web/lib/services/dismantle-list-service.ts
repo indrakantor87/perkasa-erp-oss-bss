@@ -24,7 +24,7 @@ import {
   parseStructuredSupportNote,
   SUPPORT_DISMANTLE_METADATA_PREFIXES,
 } from '@/lib/services/support-dismantle-service'
-import { createUnifiedTicketAndSyncLegacy, ensureTicketsUnifiedTable } from './unified-ticket-service'
+import { createUnifiedTicketAndSyncLegacy, ensureTicketsUnifiedTable, insertUnifiedTicketWithConnection } from './unified-ticket-service'
 import type { AppRole, DataSourceSnapshot } from '@/lib/types'
 
 type ExecuteResult = {
@@ -1348,6 +1348,9 @@ export async function transferDismantleListToTicket(params: {
   })
 
   let workOrderId = 0
+
+  await ensureTicketsUnifiedTable()
+
   await runReviewDbTransaction(async (connection) => {
     const [insertResult] = await connection.query(
       `
@@ -1426,11 +1429,8 @@ export async function transferDismantleListToTicket(params: {
         params.notes.trim() || `Transfer ke ticketing operasional dengan WO ${workOrderNo}.`,
       ],
     )
-  })
 
-  try {
-    await ensureTicketsUnifiedTable()
-    await createUnifiedTicketAndSyncLegacy({
+    await insertUnifiedTicketWithConnection(connection, {
       ticketCode: `DIS-${new Date().getFullYear()}-${workOrderId}`,
       ticketType: 'DISMANTLE',
       title: `Dismantle WO#${workOrderId}`,
@@ -1443,9 +1443,9 @@ export async function transferDismantleListToTicket(params: {
       openedAt: new Date(),
       assignedUserId: Number(actorUserId ?? 0) > 0 ? Number(actorUserId) : null,
       workOrderId: Number(workOrderId),
-      sourceLegacy: 'WORK_ORDER'
+      sourceLegacy: 'WORK_ORDER',
     } as any)
-  } catch (e) { console.error('[WRITE-THROUGH] dismantle unified sync failed (ignored):', e) }
+  })
 
   return {
     id: row.id,

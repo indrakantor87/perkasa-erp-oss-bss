@@ -412,6 +412,26 @@ async function syncLegacyTroubleTicket(
   }
 }
 
+export async function insertUnifiedTicketWithConnection(
+  conn: ReviewDbConnection,
+  params: CreateUnifiedTicketParams,
+): Promise<{ unifiedTicketId: number; ticketCode: string; ticketType: any; affectedRows: number }> {
+  const payload = await buildUnifiedTicketInsertPayload(params)
+  const insertSql = `INSERT INTO tickets (${payload.columns.join(', ')}) VALUES (${payload.columns.map(() => '?').join(', ')})`
+  const [insertRes] = await conn.query(insertSql, payload.values)
+  const result = insertRes as unknown as ExecuteResult
+  const insertId = Number(result.insertId ?? 0)
+  if (!Number.isInteger(insertId) || insertId <= 0) {
+    throw new Error('Unified ticket insert tidak menghasilkan ID yang valid.')
+  }
+  return {
+    unifiedTicketId: insertId,
+    ticketCode: params.ticketCode,
+    ticketType: params.ticketType,
+    affectedRows: Number(result.affectedRows ?? 1),
+  }
+}
+
 export async function createUnifiedTicketAndSyncLegacy(params: CreateUnifiedTicketParams) {
   await ensureTicketsUnifiedTable()
 

@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 import {
   buildServiceWorkOrderInsertPayload,
   ensureSupportTroubleTicketBranchColumn,
@@ -12,7 +12,7 @@ import {
   resolveReviewAuthUserIdByUsername,
   validateTargetTechnicianUser,
 } from '@/lib/services/field-ops-service'
-import { createUnifiedTicketAndSyncLegacy, ensureTicketsUnifiedTable } from '../../../../lib/services/unified-ticket-service'
+import { createUnifiedTicketAndSyncLegacy, ensureTicketsUnifiedTable, insertUnifiedTicketWithConnection } from '../../../../lib/services/unified-ticket-service'
 
 const allowedCategories = new Set(['TT', 'PV'])
 const allowedStatuses = new Set(['OPEN', 'ON_PROGRESS'])
@@ -366,118 +366,131 @@ export async function POST(request: Request) {
       ticketInsertValues.push(linkedSubscription.branchId)
     }
 
-    const ticketInsertResult = await runReviewDbExecute<ExecuteResult>(
-      `
-        INSERT INTO support_trouble_tickets (
-          ${ticketInsertColumns.join(',\n          ')}
-        )
-        VALUES (${ticketInsertColumns.map(() => '?').join(', ')})
-      `,
-      ticketInsertValues,
-    )
-    const troubleTicketId = Number(ticketInsertResult.insertId ?? 0)
+    await ensureTicketsUnifiedTable()
+
     const ticketCodeForMessage = ticketCode
+    const tCode = String(ticketCode ?? `TT-${Date.now()}`).slice(0, 64)
+    let unifiedType: 'TROUBLE' = 'TROUBLE'
+    const unifiedStatusRaw = String(status ?? 'OPEN').toUpperCase() as any
+    const unifiedPriorityRaw = String(priority ?? 'MEDIUM').toUpperCase() as any
 
-    if (createFieldWorkOrder) {
-      const workOrderNo = await generateServiceWorkOrderNo()
-      const workOrderNotes = `${notes} [AUTO_WO:${ticketCodeForMessage}]`
-      const workOrderInsertPayload = await buildServiceWorkOrderInsertPayload({
-        salesOrderId: null,
-        subscriptionId: linkedSubscription.subscriptionId,
-        troubleTicketId: Number.isInteger(troubleTicketId) && troubleTicketId > 0 ? troubleTicketId : null,
-        workOrderNo,
-        workType: fieldWorkType,
-        status: workOrderStatus,
-        technicianName: null,
-        scheduledAt,
-        notes: workOrderNotes,
-        branchId: linkedSubscription.branchId,
-        jobCategory,
-        priority,
-        sourceType: 'TROUBLE_TICKET',
-        currentPicUserId,
-        scheduledByUserId: actorUserId,
-        address: address || null,
-      })
-
-      const workOrderInsertResult = await runReviewDbExecute<ExecuteResult>(
-        `
-          INSERT INTO service_work_orders (
-            ${workOrderInsertPayload.columns.join(',\n            ')}
-          )
-          VALUES (${workOrderInsertPayload.placeholders.join(', ')})
-        `,
-        workOrderInsertPayload.values,
-      )
-
-      const workOrderId = Number(workOrderInsertResult.insertId ?? 0)
-      if (Number.isInteger(workOrderId) && workOrderId > 0) {
-        if (currentPicUserId) {
-          const validatedPic = await validateTargetTechnicianUser({ targetUserId: currentPicUserId })
-          if (!validatedPic) {
-            return Response.json(
-              { message: 'currentPicUserId (PIC awal WO) tidak valid: user tidak ditemukan / tidak aktif / bukan teknisi.' },
-              { status: 403 },
-            )
-          }
-          const woBranch = linkedSubscription.branchId
-          const targetBranch = validatedPic.userBranchId ?? woBranch
-          if (woBranch != null && targetBranch != null && !isBranchIdInScope(session, targetBranch)) {
-            return Response.json(
-              { message: 'Target teknisi currentPicUserId untuk WO linked berada di luar scope cabang user.' },
-              { status: 403 },
-            )
-          }
-          if (woBranch != null && targetBranch != null && targetBranch !== woBranch) {
-            return Response.json(
-              { message: 'Target teknisi currentPicUserId untuk WO linked harus berasal dari cabang yang sama dengan WO (subscription branch).' },
-              { status: 403 },
-            )
-          }
-          await insertServiceWorkOrderAssignment({
-            workOrderId,
-            assignedUserId: currentPicUserId,
-            assignedByUserId: actorUserId,
-            assignmentRole: 'FIELD_TECHNICIAN',
-            assignmentStatus: 'ASSIGNED',
-            isPrimary: true,
-            notes: `WO lapangan dibuat dari ticket ${ticketCodeForMessage}.`,
-          })
-        }
-        await insertServiceWorkOrderStatusLog({
-          workOrderId,
-          fromStatus: null,
-          toStatus: workOrderStatus,
-          changedByUserId: actorUserId,
-          reasonCode: 'AUTO_CREATED',
-          reasonNotes: `WO lapangan dibuat dari trouble ticket ${ticketCodeForMessage}.`,
-        })
+    if (createFieldWorkOrder && currentPicUserId) {
+      const validatedPic = await validateTargetTechnicianUser({ targetUserId: currentPicUserId })
+      if (!validatedPic) {
+        return Response.json(
+          { message: 'currentPicUserId (PIC awal WO) tidak valid: user tidak ditemukan / tidak aktif / bukan teknisi.' },
+          { status: 403 },
+        )
+      }
+      const woBranch = linkedSubscription.branchId
+      const targetBranch = validatedPic.userBranchId ?? woBranch
+      if (woBranch != null && targetBranch != null && !isBranchIdInScope(session, targetBranch)) {
+        return Response.json(
+          { message: 'Target teknisi currentPicUserId untuk WO linked berada di luar scope cabang user.' },
+          { status: 403 },
+        )
+      }
+      if (woBranch != null && targetBranch != null && targetBranch !== woBranch) {
+        return Response.json(
+          { message: 'Target teknisi currentPicUserId untuk WO linked harus berasal dari cabang yang sama dengan WO (subscription branch).' },
+          { status: 403 },
+        )
       }
     }
 
-    try {
-      await ensureTicketsUnifiedTable()
-      const tCode = String(ticketCode ?? `TT-${Date.now()}`).slice(0, 64)
-      let type: 'TROUBLE' = 'TROUBLE'
-      const statusRaw = String(status ?? 'OPEN').toUpperCase() as any
-      const priorityRaw = String(priority ?? 'MEDIUM').toUpperCase() as any
-      await createUnifiedTicketAndSyncLegacy({
+    let troubleTicketId = 0
+    let workOrderId = 0
+    let workOrderNo = ''
+
+    await runReviewDbTransaction(async (connection) => {
+      const [ticketInsertResult] = await connection.query(
+        `
+          INSERT INTO support_trouble_tickets (
+            ${ticketInsertColumns.join(',\n            ')}
+          )
+          VALUES (${ticketInsertColumns.map(() => '?').join(', ')})
+        `,
+        ticketInsertValues,
+      )
+      troubleTicketId = Number((ticketInsertResult as ExecuteResult).insertId ?? 0)
+
+      if (createFieldWorkOrder) {
+        workOrderNo = await generateServiceWorkOrderNo()
+        const workOrderNotes = `${notes} [AUTO_WO:${ticketCodeForMessage}]`
+        const workOrderInsertPayload = await buildServiceWorkOrderInsertPayload({
+          salesOrderId: null,
+          subscriptionId: linkedSubscription.subscriptionId,
+          troubleTicketId: Number.isInteger(troubleTicketId) && troubleTicketId > 0 ? troubleTicketId : null,
+          workOrderNo,
+          workType: fieldWorkType,
+          status: workOrderStatus,
+          technicianName: null,
+          scheduledAt,
+          notes: workOrderNotes,
+          branchId: linkedSubscription.branchId,
+          jobCategory,
+          priority,
+          sourceType: 'TROUBLE_TICKET',
+          currentPicUserId,
+          scheduledByUserId: actorUserId,
+          address: address || null,
+        })
+
+        const [workOrderInsertResult] = await connection.query(
+          `
+            INSERT INTO service_work_orders (
+              ${workOrderInsertPayload.columns.join(',\n              ')}
+            )
+            VALUES (${workOrderInsertPayload.placeholders.join(', ')})
+          `,
+          workOrderInsertPayload.values,
+        )
+
+        workOrderId = Number((workOrderInsertResult as ExecuteResult).insertId ?? 0)
+        if (Number.isInteger(workOrderId) && workOrderId > 0) {
+          if (currentPicUserId) {
+            await insertServiceWorkOrderAssignment({
+              workOrderId,
+              assignedUserId: currentPicUserId,
+              assignedByUserId: actorUserId,
+              assignmentRole: 'FIELD_TECHNICIAN',
+              assignmentStatus: 'ASSIGNED',
+              isPrimary: true,
+              notes: `WO lapangan dibuat dari ticket ${ticketCodeForMessage}.`,
+              connection,
+            })
+          }
+          await insertServiceWorkOrderStatusLog(
+            {
+              workOrderId,
+              fromStatus: null,
+              toStatus: workOrderStatus,
+              changedByUserId: actorUserId,
+              reasonCode: 'AUTO_CREATED',
+              reasonNotes: `WO lapangan dibuat dari trouble ticket ${ticketCodeForMessage}.`,
+            },
+            { connection },
+          )
+        }
+      }
+
+      await insertUnifiedTicketWithConnection(connection, {
         ticketCode: tCode,
-        ticketType: type,
+        ticketType: unifiedType,
         title: String(resolvedProblemCategory ?? `Trouble Ticket ${tCode}`).slice(0, 255),
         description: String(notes ?? '').slice(0, 4000),
         customerName: String(resolvedCustomerName ?? '').slice(0, 255) || null,
         customerId: null,
         branchId: Number(linkedSubscription.branchId ?? 0) > 0 ? Number(linkedSubscription.branchId) : null,
-        status: statusRaw,
-        priority: priorityRaw,
+        status: unifiedStatusRaw,
+        priority: unifiedPriorityRaw,
         openedAt: new Date(),
         assignedUserId: Number(currentPicUserId ?? 0) > 0 ? Number(currentPicUserId) : null,
         slaDueAt: null,
         troubleTicketId: Number(troubleTicketId),
-        sourceLegacy: 'TROUBLE_TICKET'
+        sourceLegacy: 'TROUBLE_TICKET',
       } as any)
-    } catch (err) { console.error('[WRITE-THROUGH] unified TT creation failed (ignored backward compat):', err) }
+    })
 
     return Response.json({
       message: `Trouble ticket ${ticketCode} untuk ${resolvedCustomerName} berhasil disimpan dan terhubung ke ${linkedSubscription.serviceNo || linkedSubscription.customerCode || serviceReference}${createFieldWorkOrder ? ' beserta work order lapangan.' : '.'}`,

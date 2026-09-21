@@ -1,7 +1,7 @@
 import { canPerformAction } from '@/lib/access-control'
 import { getSession } from '@/lib/auth'
 import { getDataSourceSnapshot } from '@/lib/data-source'
-import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import { getReviewDbErrorDetail, hasReviewDbColumn, runReviewDbExecute, runReviewDbQuery, runReviewDbTransaction } from '@/lib/review-db'
 import {
   buildServiceWorkOrderInsertPayload,
   generateServiceWorkOrderNo,
@@ -11,7 +11,7 @@ import {
   resolveReviewAuthUserIdByUsername,
   validateTargetTechnicianUser,
 } from '@/lib/services/field-ops-service'
-import { createUnifiedTicketAndSyncLegacy, ensureTicketsUnifiedTable } from '../../../../lib/services/unified-ticket-service'
+import { createUnifiedTicketAndSyncLegacy, ensureTicketsUnifiedTable, insertUnifiedTicketWithConnection } from '../../../../lib/services/unified-ticket-service'
 
 const allowedWorkTypes = new Set(['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'])
 const allowedStatuses = new Set(['OPEN', 'SCHEDULED', 'ON_PROGRESS'])
@@ -279,49 +279,63 @@ export async function POST(request: Request) {
       longitude,
     })
 
-    const insertResult = await runReviewDbExecute<ExecuteResult>(
-      `
-        INSERT INTO service_work_orders (
-          ${workOrderInsertPayload.columns.join(',\n          ')}
-        )
-        VALUES (${workOrderInsertPayload.placeholders.join(', ')})
-      `,
-      workOrderInsertPayload.values
-    )
-    const workOrderId = Number(insertResult.insertId ?? 0)
-    if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
-      throw new Error('Work order berhasil disimpan tetapi ID insert tidak terbaca.')
-    }
-
-    if (currentPicUserId) {
-      await insertServiceWorkOrderAssignment({
-        workOrderId,
-        assignedUserId: currentPicUserId,
-        assignedByUserId: actorUserId,
-        assignmentRole: 'FIELD_TECHNICIAN',
-        assignmentStatus: 'ASSIGNED',
-        isPrimary: true,
-        notes: technicianName || null,
-      })
-    }
-    await insertServiceWorkOrderStatusLog({
-      workOrderId,
-      fromStatus: null,
-      toStatus: status,
-      changedByUserId: actorUserId,
-      reasonCode: 'AUTO_CREATED',
-      reasonNotes: `WO dibuat dari sales order ${salesOrder.orderNo}${jobCategory ? ` (${jobCategory})` : ''}.`,
+    const salesOrderUpdatePayload = await buildSalesOrderUpdatePayload({
+      nextOrderStatus: resolveNextOrderStatus(status),
+      technicianName: technicianName || null,
+      scheduledAt,
     })
 
-    try {
-      await ensureTicketsUnifiedTable()
-      const jobCatUpperCase = String(jobCategory ?? '').toUpperCase()
-      let unifiedType: 'PSB' | 'DISMANTLE' | 'JALUR' = 'JALUR'
-      if (jobCatUpperCase.includes('PSB') || jobCatUpperCase.includes('PASANG') || jobCatUpperCase.includes('INSTALL')) unifiedType = 'PSB'
-      else if (jobCatUpperCase.includes('DISMANTLE') || jobCatUpperCase.includes('CABUT')) unifiedType = 'DISMANTLE'
-      const statusRaw = String('OPEN').toUpperCase() as any
-      const priorityRaw = String(priority ?? 'MEDIUM').toUpperCase() as any
-      await createUnifiedTicketAndSyncLegacy({
+    await ensureTicketsUnifiedTable()
+
+    const jobCatUpperCase = String(jobCategory ?? '').toUpperCase()
+    let unifiedType: 'PSB' | 'DISMANTLE' | 'JALUR' = 'JALUR'
+    if (jobCatUpperCase.includes('PSB') || jobCatUpperCase.includes('PASANG') || jobCatUpperCase.includes('INSTALL')) unifiedType = 'PSB'
+    else if (jobCatUpperCase.includes('DISMANTLE') || jobCatUpperCase.includes('CABUT')) unifiedType = 'DISMANTLE'
+    const unifiedStatusRaw = String('OPEN').toUpperCase() as any
+    const unifiedPriorityRaw = String(priority ?? 'MEDIUM').toUpperCase() as any
+
+    let workOrderId = 0
+
+    await runReviewDbTransaction(async (connection) => {
+      const [insertResult] = await connection.query(
+        `
+          INSERT INTO service_work_orders (
+            ${workOrderInsertPayload.columns.join(',\n            ')}
+          )
+          VALUES (${workOrderInsertPayload.placeholders.join(', ')})
+        `,
+        workOrderInsertPayload.values,
+      )
+      workOrderId = Number((insertResult as ExecuteResult).insertId ?? 0)
+      if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+        throw new Error('Work order berhasil disimpan tetapi ID insert tidak terbaca.')
+      }
+
+      if (currentPicUserId) {
+        await insertServiceWorkOrderAssignment({
+          workOrderId,
+          assignedUserId: currentPicUserId,
+          assignedByUserId: actorUserId,
+          assignmentRole: 'FIELD_TECHNICIAN',
+          assignmentStatus: 'ASSIGNED',
+          isPrimary: true,
+          notes: technicianName || null,
+          connection,
+        })
+      }
+      await insertServiceWorkOrderStatusLog(
+        {
+          workOrderId,
+          fromStatus: null,
+          toStatus: status,
+          changedByUserId: actorUserId,
+          reasonCode: 'AUTO_CREATED',
+          reasonNotes: `WO dibuat dari sales order ${salesOrder.orderNo}${jobCategory ? ` (${jobCategory})` : ''}.`,
+        },
+        { connection },
+      )
+
+      await insertUnifiedTicketWithConnection(connection, {
         ticketCode: `WO-${String(new Date().getFullYear())}-${workOrderId}`,
         ticketType: unifiedType,
         title: typeof notes === 'string' ? notes : `Work Order #${workOrderId}`,
@@ -329,30 +343,25 @@ export async function POST(request: Request) {
         customerName: String(salesOrder.customerName ?? 'Unknown Customer').slice(0, 255),
         customerId: null,
         branchId: typeof branchId === 'number' ? branchId : null,
-        status: statusRaw,
-        priority: priorityRaw,
+        status: unifiedStatusRaw,
+        priority: unifiedPriorityRaw,
         openedAt: new Date(),
         assignedUserId: Number(currentPicUserId ?? 0) > 0 ? Number(currentPicUserId) : null,
         slaDueAt: null,
         workOrderId: Number(workOrderId),
-        sourceLegacy: 'WORK_ORDER'
+        sourceLegacy: 'WORK_ORDER',
       } as any)
-    } catch (err) { console.error('[WRITE-THROUGH] unified ticket create failed (ignored for backward compat):', err) }
 
-    const salesOrderUpdatePayload = await buildSalesOrderUpdatePayload({
-      nextOrderStatus: resolveNextOrderStatus(status),
-      technicianName: technicianName || null,
-      scheduledAt,
+      await connection.query(
+        `
+          UPDATE sales_orders
+          SET
+            ${salesOrderUpdatePayload.assignments.join(',\n            ')}
+          WHERE id = ?
+        `,
+        [...salesOrderUpdatePayload.values, salesOrder.id],
+      )
     })
-    await runReviewDbExecute<ExecuteResult>(
-      `
-        UPDATE sales_orders
-        SET
-          ${salesOrderUpdatePayload.assignments.join(',\n          ')}
-        WHERE id = ?
-      `,
-      [...salesOrderUpdatePayload.values, salesOrder.id]
-    )
 
     return Response.json({
       message: `Work order ${workOrderNo} untuk order ${salesOrder.orderNo} (${salesOrder.customerName}) berhasil disimpan${jobCategory ? ` dengan kategori ${jobCategory}` : ''}.`,
