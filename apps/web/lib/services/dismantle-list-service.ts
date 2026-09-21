@@ -24,6 +24,7 @@ import {
   parseStructuredSupportNote,
   SUPPORT_DISMANTLE_METADATA_PREFIXES,
 } from '@/lib/services/support-dismantle-service'
+import { createUnifiedTicketAndSyncLegacy, ensureTicketsUnifiedTable } from './unified-ticket-service'
 import type { AppRole, DataSourceSnapshot } from '@/lib/types'
 
 type ExecuteResult = {
@@ -1426,6 +1427,25 @@ export async function transferDismantleListToTicket(params: {
       ],
     )
   })
+
+  try {
+    await ensureTicketsUnifiedTable()
+    await createUnifiedTicketAndSyncLegacy({
+      ticketCode: `DIS-${new Date().getFullYear()}-${workOrderId}`,
+      ticketType: 'DISMANTLE',
+      title: `Dismantle WO#${workOrderId}`,
+      description: transferNotes ?? null,
+      customerName: String(row.customerName ?? '').slice(0, 255) || null,
+      customerId: null,
+      branchId: Number(params.branchId ?? 0) > 0 ? Number(params.branchId) : null,
+      status: 'OPEN' as any,
+      priority: 'MEDIUM' as any,
+      openedAt: new Date(),
+      assignedUserId: Number(actorUserId ?? 0) > 0 ? Number(actorUserId) : null,
+      workOrderId: Number(workOrderId),
+      sourceLegacy: 'WORK_ORDER'
+    } as any)
+  } catch (e) { console.error('[WRITE-THROUGH] dismantle unified sync failed (ignored):', e) }
 
   return {
     id: row.id,

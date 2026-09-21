@@ -97,8 +97,7 @@ async function isWorkOrderOwnedByTech(
       FROM service_work_orders wo
       WHERE wo.id = ?
         AND (
-          ${picClause}
-          OR EXISTS (
+          (EXISTS (
             SELECT 1
             FROM service_work_order_assignments a
             WHERE a.work_order_id = wo.id
@@ -106,6 +105,16 @@ async function isWorkOrderOwnedByTech(
               AND a.assignment_role = ?
               AND a.assignment_status IN (${activePlaceholders})
               AND a.released_at IS NULL
+          ))
+          OR (
+            ${picClause}
+            AND NOT EXISTS (
+              SELECT 1
+              FROM service_work_order_assignments a_other
+              WHERE a_other.work_order_id = wo.id
+                AND a_other.assigned_user_id <> wo.current_pic_user_id
+                AND a_other.released_at IS NULL
+            )
           )
         )
       LIMIT 1
@@ -140,8 +149,8 @@ async function isTroubleTicketOwnedByTech(
   const pkVals = byCode.length > 0 ? byCode : byId
 
   const directClause = hasAssigned ? 'tt.assigned_user_id = ?' : 'FALSE'
-  const assignClause = hasAssignmentsTable
-    ? `EXISTS (
+  const existsClause = hasAssignmentsTable
+    ? `(EXISTS (
         SELECT 1
         FROM service_trouble_ticket_assignments ta
         WHERE ta.trouble_ticket_id = tt.id
@@ -149,23 +158,35 @@ async function isTroubleTicketOwnedByTech(
           AND ta.assignment_role = ?
           AND ta.assignment_status IN (${activePlaceholders})
           AND ta.released_at IS NULL
-      )`
+      ))`
     : 'FALSE'
+  const fallbackClause = hasAssignmentsTable
+    ? `(${directClause}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM service_trouble_ticket_assignments ta_other
+          WHERE ta_other.trouble_ticket_id = tt.id
+            AND ta_other.assigned_user_id <> tt.assigned_user_id
+            AND ta_other.released_at IS NULL
+        ))`
+    : directClause
 
-  const bind: unknown[] = [
-    ...pkVals,
-    uid,
-    uid,
-    Q3_ASSIGNMENT_ROLE_CANONICAL,
-    ...Q3_ASSIGNMENT_ACTIVE_STATUSES,
-  ]
+  const bind: unknown[] = hasAssignmentsTable
+    ? [
+        ...pkVals,
+        uid,
+        Q3_ASSIGNMENT_ROLE_CANONICAL,
+        ...Q3_ASSIGNMENT_ACTIVE_STATUSES,
+        uid,
+      ]
+    : [...pkVals, uid]
 
   const rows = await runReviewDbQuery<Record<string, unknown>>(
     `
       SELECT tt.id AS ttId, 1 AS matched
       FROM support_trouble_tickets tt
       WHERE ${wherePk}
-        AND (${directClause} OR ${assignClause})
+        AND (${existsClause} OR ${fallbackClause})
       LIMIT 1
     `,
     bind,
@@ -355,13 +376,13 @@ export async function submitWorkOrder(params: {
     const fromStatus = String(row.status ?? '').trim().toUpperCase()
     const linkedTtId = Number(row.ttId ?? 0)
 
-    if (fromStatus === 'SUBMITTED') {
+    if (fromStatus === 'COMPLETED') {
       return {
         success: true,
         idempotent: true,
         affectedRows: 1,
         fromStatus,
-        toStatus: 'SUBMITTED',
+        toStatus: 'COMPLETED',
         ticketId: null,
         workOrderId: woId,
         troubleTicketId: linkedTtId || null,
@@ -369,7 +390,7 @@ export async function submitWorkOrder(params: {
     }
 
     const sets: string[] = ['status = ?', 'updated_at = CURRENT_TIMESTAMP']
-    const bind: unknown[] = ['SUBMITTED']
+    const bind: unknown[] = ['COMPLETED']
     if (hasSubmittedAt) {
       sets.push('submitted_at = COALESCE(submitted_at, CURRENT_TIMESTAMP)')
     }
@@ -386,13 +407,13 @@ export async function submitWorkOrder(params: {
     )
     const affected = Number((updRaw as ExecuteResult | undefined)?.affectedRows ?? 0)
 
-    if (affected <= 0 && fromStatus === 'SUBMITTED') {
+    if (affected <= 0 && fromStatus === 'COMPLETED') {
       return {
         success: true,
         idempotent: true,
         affectedRows: 1,
         fromStatus,
-        toStatus: 'SUBMITTED',
+        toStatus: 'COMPLETED',
         ticketId: null,
         workOrderId: woId,
         troubleTicketId: linkedTtId || null,
@@ -415,7 +436,7 @@ export async function submitWorkOrder(params: {
       {
         workOrderId: woId,
         fromStatus,
-        toStatus: 'SUBMITTED',
+        toStatus: 'COMPLETED',
         changedByUserId: uid,
         reasonCode: 'WO_SUBMIT',
         reasonNotes: params.notes && String(params.notes).trim()
@@ -431,6 +452,7 @@ export async function submitWorkOrder(params: {
       const hasUnifiedStatus = await hasReviewDbColumn('tickets', 'status')
       const hasUnifiedSubmittedAt = await hasReviewDbColumn('tickets', 'submitted_at')
       const hasUnifiedSubmittedBy = await hasReviewDbColumn('tickets', 'submitted_by_user_id')
+      const hasUnifiedCompletedAt = await hasReviewDbColumn('tickets', 'completed_at')
       if (hasUnifiedWorkOrderId) {
         const [unifiedRows] = await conn.query(
           `SELECT id FROM tickets WHERE work_order_id = ? LIMIT 1`,
@@ -445,7 +467,7 @@ export async function submitWorkOrder(params: {
             const ubind: unknown[] = []
             if (hasUnifiedStatus) {
               usets.push('status = ?')
-              ubind.push('SUBMITTED')
+              ubind.push('COMPLETED')
             }
             if (hasUnifiedSubmittedAt) {
               usets.push('submitted_at = COALESCE(submitted_at, CURRENT_TIMESTAMP)')
@@ -453,6 +475,9 @@ export async function submitWorkOrder(params: {
             if (hasUnifiedSubmittedBy) {
               usets.push('submitted_by_user_id = COALESCE(submitted_by_user_id, ?)')
               ubind.push(uid)
+            }
+            if (hasUnifiedCompletedAt) {
+              usets.push('completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP)')
             }
             usets.push('updated_at = CURRENT_TIMESTAMP')
             ubind.push(unifiedTicketId)
@@ -477,7 +502,7 @@ export async function submitWorkOrder(params: {
       idempotent: false,
       affectedRows: affected,
       fromStatus,
-      toStatus: 'SUBMITTED',
+      toStatus: 'COMPLETED',
       ticketId: unifiedTicketId,
       workOrderId: woId,
       troubleTicketId: linkedTtId || null,
@@ -747,13 +772,13 @@ export async function submitTroubleTicket(params: {
     }
     const fromStatus = String(row.status ?? '').trim().toUpperCase()
 
-    if (fromStatus === 'SUBMITTED') {
+    if (fromStatus === 'COMPLETED') {
       return {
         success: true,
         idempotent: true,
         affectedRows: 1,
         fromStatus,
-        toStatus: 'SUBMITTED',
+        toStatus: 'COMPLETED',
         ticketId: null,
         workOrderId: null,
         troubleTicketId: ttId,
@@ -761,7 +786,7 @@ export async function submitTroubleTicket(params: {
     }
 
     const sets: string[] = ['status = ?', 'updated_at = CURRENT_TIMESTAMP']
-    const bind: unknown[] = ['SUBMITTED']
+    const bind: unknown[] = ['COMPLETED']
     if (hasTtSubmittedAt) {
       sets.push('submitted_at = COALESCE(submitted_at, CURRENT_TIMESTAMP)')
     }
@@ -783,13 +808,13 @@ export async function submitTroubleTicket(params: {
         [ttId],
       ).catch(() => [[{ status: '' }]])
       const st = String(((currentCheck as unknown as Array<Array<Record<string, unknown>>>)[0]?.[0]?.status) ?? '').trim().toUpperCase()
-      if (st === 'SUBMITTED') {
+      if (st === 'COMPLETED') {
         return {
           success: true,
           idempotent: true,
           affectedRows: 1,
           fromStatus,
-          toStatus: 'SUBMITTED',
+          toStatus: 'COMPLETED',
           ticketId: null,
           workOrderId: null,
           troubleTicketId: ttId,
@@ -817,7 +842,7 @@ export async function submitTroubleTicket(params: {
       await insertSupportTroubleTicketProgressLog(
         {
           troubleTicketId: ttId,
-          progressStatus: 'SUBMITTED',
+          progressStatus: 'COMPLETED',
           ownerName,
           progressNotes: params.notes && String(params.notes).trim()
             ? String(params.notes).trim().slice(0, 1000)
@@ -835,6 +860,7 @@ export async function submitTroubleTicket(params: {
       const hasUnifiedStatus = await hasReviewDbColumn('tickets', 'status')
       const hasUnifiedSubmittedAt = await hasReviewDbColumn('tickets', 'submitted_at')
       const hasUnifiedSubmittedBy = await hasReviewDbColumn('tickets', 'submitted_by_user_id')
+      const hasUnifiedCompletedAt = await hasReviewDbColumn('tickets', 'completed_at')
       if (hasUnifiedTtId) {
         const [unifiedRows] = await conn.query(
           `SELECT id FROM tickets WHERE trouble_ticket_id = ? LIMIT 1`,
@@ -849,7 +875,7 @@ export async function submitTroubleTicket(params: {
             const ubind: unknown[] = []
             if (hasUnifiedStatus) {
               usets.push('status = ?')
-              ubind.push('SUBMITTED')
+              ubind.push('COMPLETED')
             }
             if (hasUnifiedSubmittedAt) {
               usets.push('submitted_at = COALESCE(submitted_at, CURRENT_TIMESTAMP)')
@@ -857,6 +883,9 @@ export async function submitTroubleTicket(params: {
             if (hasUnifiedSubmittedBy) {
               usets.push('submitted_by_user_id = COALESCE(submitted_by_user_id, ?)')
               ubind.push(uid)
+            }
+            if (hasUnifiedCompletedAt) {
+              usets.push('completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP)')
             }
             usets.push('updated_at = CURRENT_TIMESTAMP')
             ubind.push(unifiedTicketId)
@@ -881,7 +910,7 @@ export async function submitTroubleTicket(params: {
       idempotent: false,
       affectedRows: affected,
       fromStatus,
-      toStatus: 'SUBMITTED',
+      toStatus: 'COMPLETED',
       ticketId: unifiedTicketId,
       workOrderId: null,
       troubleTicketId: ttId,
@@ -948,7 +977,7 @@ export async function markTroubleTicketTemporary(params: {
     }
     const fromStatus = String(row.status ?? '').trim().toUpperCase()
 
-    if (fromStatus === 'TEMPORARY' || fromStatus === 'ON_HOLD' || fromStatus === 'PENDING') {
+    if (fromStatus === 'TEMPORARY') {
       return {
         success: true,
         idempotent: true,
@@ -961,7 +990,7 @@ export async function markTroubleTicketTemporary(params: {
       }
     }
 
-    if (!NON_TERMINAL_TT_FROM.has(fromStatus)) {
+    if (fromStatus !== 'ON_PROGRESS') {
       return {
         success: false,
         idempotent: false,
@@ -999,7 +1028,7 @@ export async function markTroubleTicketTemporary(params: {
         [ttId],
       ).catch(() => [[{ status: '' }]])
       const st = String(((currentCheck as unknown as Array<Array<Record<string, unknown>>>)[0]?.[0]?.status) ?? '').trim().toUpperCase()
-      if (st === 'TEMPORARY' || st === 'ON_HOLD' || st === 'PENDING') {
+      if (st === 'TEMPORARY') {
         return {
           success: true,
           idempotent: true,
@@ -1154,7 +1183,7 @@ export async function resumeFromTemporary(params: {
       }
     }
 
-    if (fromStatus !== 'TEMPORARY' && fromStatus !== 'ON_HOLD' && fromStatus !== 'PENDING') {
+    if (fromStatus !== 'TEMPORARY') {
       return {
         success: false,
         idempotent: false,
@@ -1308,30 +1337,6 @@ export async function resolveTroubleTicketUnifiedTicketId(troubleTicketId: numbe
   }
 }
 
-export async function resolveTicketIdByWorkOrderId(workOrderId: number): Promise<number | null> {
-  return resolveWorkOrderUnifiedTicketId(workOrderId)
-}
-
-export async function resolveTicketIdByTroubleTicketCode(ticketCode: string): Promise<number | null> {
-  try {
-    const code = String(ticketCode ?? '').trim().toUpperCase()
-    if (!code) return null
-    const rows = await runReviewDbQuery<Record<string, unknown>>(
-      `
-        SELECT t.id
-        FROM tickets t
-        INNER JOIN support_trouble_tickets tt ON tt.id = t.trouble_ticket_id
-        WHERE UPPER(tt.ticket_code) = ?
-        LIMIT 1
-      `,
-      [code],
-    )
-    return Number(rows[0]?.id ?? 0) || null
-  } catch {
-    return null
-  }
-}
-
 export function isValidTransition(
   current: string,
   action: string,
@@ -1346,10 +1351,7 @@ export function isValidTransition(
     ['ASSIGNED', 'ACCEPT'],
     ['ACCEPTED', 'START'],
     ['ON_PROGRESS', 'SUBMIT'],
-    ['SUBMITTED', 'COMPLETE'],
     ['TEMPORARY', 'RESUME'],
-    ['PENDING', 'RESUME'],
-    ['ON_HOLD', 'RESUME'],
     ['ON_PROGRESS', 'TEMPORARY', 'TROUBLE'],
   ]
 
@@ -1363,6 +1365,8 @@ export function isValidTransition(
 }
 
 export { resumeFromTemporary as resumeTroubleTicketFromTemporary }
+export { resolveWorkOrderUnifiedTicketId as resolveTicketIdByWorkOrderId }
+export { resolveTroubleTicketUnifiedTicketId as resolveTicketIdByTroubleTicketCode }
 
 void getActiveTechnicianAssignmentByTicketId
 void runReviewDbExecute

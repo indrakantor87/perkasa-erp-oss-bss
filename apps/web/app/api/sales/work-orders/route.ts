@@ -11,6 +11,7 @@ import {
   resolveReviewAuthUserIdByUsername,
   validateTargetTechnicianUser,
 } from '@/lib/services/field-ops-service'
+import { createUnifiedTicketAndSyncLegacy, ensureTicketsUnifiedTable } from '../../../../lib/services/unified-ticket-service'
 
 const allowedWorkTypes = new Set(['INSTALLATION', 'REPAIR', 'DISMANTLE', 'RELOCATION'])
 const allowedStatuses = new Set(['OPEN', 'SCHEDULED', 'ON_PROGRESS'])
@@ -311,6 +312,32 @@ export async function POST(request: Request) {
       reasonCode: 'AUTO_CREATED',
       reasonNotes: `WO dibuat dari sales order ${salesOrder.orderNo}${jobCategory ? ` (${jobCategory})` : ''}.`,
     })
+
+    try {
+      await ensureTicketsUnifiedTable()
+      const jobCatUpperCase = String(jobCategory ?? '').toUpperCase()
+      let unifiedType: 'PSB' | 'DISMANTLE' | 'JALUR' = 'JALUR'
+      if (jobCatUpperCase.includes('PSB') || jobCatUpperCase.includes('PASANG') || jobCatUpperCase.includes('INSTALL')) unifiedType = 'PSB'
+      else if (jobCatUpperCase.includes('DISMANTLE') || jobCatUpperCase.includes('CABUT')) unifiedType = 'DISMANTLE'
+      const statusRaw = String('OPEN').toUpperCase() as any
+      const priorityRaw = String(priority ?? 'MEDIUM').toUpperCase() as any
+      await createUnifiedTicketAndSyncLegacy({
+        ticketCode: `WO-${String(new Date().getFullYear())}-${workOrderId}`,
+        ticketType: unifiedType,
+        title: typeof notes === 'string' ? notes : `Work Order #${workOrderId}`,
+        description: null,
+        customerName: String(salesOrder.customerName ?? 'Unknown Customer').slice(0, 255),
+        customerId: null,
+        branchId: typeof branchId === 'number' ? branchId : null,
+        status: statusRaw,
+        priority: priorityRaw,
+        openedAt: new Date(),
+        assignedUserId: Number(currentPicUserId ?? 0) > 0 ? Number(currentPicUserId) : null,
+        slaDueAt: null,
+        workOrderId: Number(workOrderId),
+        sourceLegacy: 'WORK_ORDER'
+      } as any)
+    } catch (err) { console.error('[WRITE-THROUGH] unified ticket create failed (ignored for backward compat):', err) }
 
     const salesOrderUpdatePayload = await buildSalesOrderUpdatePayload({
       nextOrderStatus: resolveNextOrderStatus(status),

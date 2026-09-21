@@ -12,6 +12,7 @@ import {
   resolveReviewAuthUserIdByUsername,
   validateTargetTechnicianUser,
 } from '@/lib/services/field-ops-service'
+import { createUnifiedTicketAndSyncLegacy, ensureTicketsUnifiedTable } from '../../../../lib/services/unified-ticket-service'
 
 const allowedCategories = new Set(['TT', 'PV'])
 const allowedStatuses = new Set(['OPEN', 'ON_PROGRESS'])
@@ -453,6 +454,30 @@ export async function POST(request: Request) {
         })
       }
     }
+
+    try {
+      await ensureTicketsUnifiedTable()
+      const tCode = String(ticketCode ?? `TT-${Date.now()}`).slice(0, 64)
+      let type: 'TROUBLE' = 'TROUBLE'
+      const statusRaw = String(status ?? 'OPEN').toUpperCase() as any
+      const priorityRaw = String(priority ?? 'MEDIUM').toUpperCase() as any
+      await createUnifiedTicketAndSyncLegacy({
+        ticketCode: tCode,
+        ticketType: type,
+        title: String(resolvedProblemCategory ?? `Trouble Ticket ${tCode}`).slice(0, 255),
+        description: String(notes ?? '').slice(0, 4000),
+        customerName: String(resolvedCustomerName ?? '').slice(0, 255) || null,
+        customerId: null,
+        branchId: Number(linkedSubscription.branchId ?? 0) > 0 ? Number(linkedSubscription.branchId) : null,
+        status: statusRaw,
+        priority: priorityRaw,
+        openedAt: new Date(),
+        assignedUserId: Number(currentPicUserId ?? 0) > 0 ? Number(currentPicUserId) : null,
+        slaDueAt: null,
+        troubleTicketId: Number(troubleTicketId),
+        sourceLegacy: 'TROUBLE_TICKET'
+      } as any)
+    } catch (err) { console.error('[WRITE-THROUGH] unified TT creation failed (ignored backward compat):', err) }
 
     return Response.json({
       message: `Trouble ticket ${ticketCode} untuk ${resolvedCustomerName} berhasil disimpan dan terhubung ke ${linkedSubscription.serviceNo || linkedSubscription.customerCode || serviceReference}${createFieldWorkOrder ? ' beserta work order lapangan.' : '.'}`,

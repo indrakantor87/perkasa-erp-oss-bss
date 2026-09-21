@@ -62,17 +62,16 @@ export function buildFieldTechTroubleTicketOwnershipWhere(
   const bindParams: unknown[] = []
 
   bindParams.push(numericUserId)
-  bindParams.push(numericUserId)
   bindParams.push(Q3_TT_ASSIGNMENT_ROLE_CANONICAL)
   for (const status of Q3_TT_ASSIGNMENT_ACTIVE_STATUSES) {
     bindParams.push(status)
   }
+  bindParams.push(numericUserId)
   const statusPlaceholders = Q3_TT_ASSIGNMENT_ACTIVE_STATUSES.map(() => '?').join(', ')
 
   const sqlFragment = [
     '(',
-    `  ${ttRef}.assigned_user_id = ?`,
-    '  OR EXISTS (',
+    '  (EXISTS (',
     '    SELECT 1',
     '    FROM service_trouble_ticket_assignments q3_tta',
     `    WHERE q3_tta.trouble_ticket_id = ${ttRef}.id`,
@@ -80,6 +79,16 @@ export function buildFieldTechTroubleTicketOwnershipWhere(
     '      AND q3_tta.assignment_role = ?',
     `      AND q3_tta.assignment_status IN (${statusPlaceholders})`,
     '      AND q3_tta.released_at IS NULL',
+    '  ))',
+    '  OR (',
+    `    ${ttRef}.assigned_user_id = ?`,
+    '    AND NOT EXISTS (',
+    '      SELECT 1',
+    '      FROM service_trouble_ticket_assignments q3_tta_other',
+    `      WHERE q3_tta_other.trouble_ticket_id = ${ttRef}.id`,
+    `        AND q3_tta_other.assigned_user_id <> ${ttRef}.assigned_user_id`,
+    '        AND q3_tta_other.released_at IS NULL',
+    '    )',
     '  )',
     ')',
   ].join('\n')

@@ -92,7 +92,7 @@ void (async function runGroupD() {
     console.error('TEST D18 Reason required empty DENY → DENY: FAIL')
   }
 
-  // SPEC D19: Temporary→Resume valid
+  // SPEC D19: Temporary→Resume valid (TEMPORARY ONLY strict)
   try {
     const fromTemporary = isValidTransition('TEMPORARY', 'RESUME', 'TROUBLE')
     const fromPending = isValidTransition('PENDING', 'RESUME', 'TROUBLE')
@@ -101,17 +101,17 @@ void (async function runGroupD() {
     const fromAssignedDenied = isValidTransition('ASSIGNED', 'RESUME', 'TROUBLE')
     const passed =
       fromTemporary === true &&
-      fromPending === true &&
-      fromOnHold === true &&
+      fromPending === false &&
+      fromOnHold === false &&
       fromOtherDenied === false &&
       fromAssignedDenied === false
     if (passed) {
-      console.log('TEST D19 Temporary→Resume valid → VALID: PASS')
+      console.log('TEST D19 Temporary→Resume valid (TEMPORARY ONLY strict) → VALID: PASS')
     } else {
-      console.error('TEST D19 Temporary→Resume valid → VALID: FAIL')
+      console.error('TEST D19 Temporary→Resume valid (TEMPORARY ONLY strict) → VALID: FAIL')
     }
   } catch {
-    console.error('TEST D19 Temporary→Resume valid → VALID: FAIL')
+    console.error('TEST D19 Temporary→Resume valid (TEMPORARY ONLY strict) → VALID: FAIL')
   }
 
   // SPEC D20: Temporary exclude SLA duration
@@ -216,24 +216,21 @@ void (async function runGroupD() {
     console.error('TEST D22 Resume SLA continue → CONTINUED: FAIL')
   }
 
-  // SPEC D23: Temporary not COMPLETED
+  // SPEC D23: Temporary TIDAK bisa COMPLETED tanpa submit valid
   try {
-    const tempToCompleted = isValidTransition('TEMPORARY', 'COMPLETE', 'TROUBLE')
-    const onHoldToCompleted = isValidTransition('ON_HOLD', 'COMPLETE', 'TROUBLE')
-    const pendingToCompleted = isValidTransition('PENDING', 'COMPLETE', 'TROUBLE')
-    const submittedToComplete = isValidTransition('SUBMITTED', 'COMPLETE', 'TROUBLE')
-    const passed =
-      tempToCompleted === false &&
-      onHoldToCompleted === false &&
-      pendingToCompleted === false &&
-      submittedToComplete === true
+    const aTempCompleteDenied = isValidTransition('TEMPORARY', 'COMPLETE', 'TROUBLE') === false
+    const bTempSubmitDenied = isValidTransition('TEMPORARY', 'SUBMIT', 'TROUBLE') === false
+    const cResumeThenSubmitValid =
+      isValidTransition('TEMPORARY', 'RESUME', 'TROUBLE') === true &&
+      isValidTransition('ON_PROGRESS', 'SUBMIT', 'TROUBLE') === true
+    const passed = aTempCompleteDenied && bTempSubmitDenied && cResumeThenSubmitValid
     if (passed) {
-      console.log('TEST D23 Temporary not COMPLETED → NOT_COMPLETED: PASS')
+      console.log('TEST D23 Temporary TIDAK bisa COMPLETED tanpa submit valid → DENY: PASS')
     } else {
-      console.error('TEST D23 Temporary not COMPLETED → NOT_COMPLETED: FAIL')
+      console.error('TEST D23 Temporary TIDAK bisa COMPLETED tanpa submit valid → DENY: FAIL')
     }
   } catch {
-    console.error('TEST D23 Temporary not COMPLETED → NOT_COMPLETED: FAIL')
+    console.error('TEST D23 Temporary TIDAK bisa COMPLETED tanpa submit valid → DENY: FAIL')
   }
 
   // SPEC D24: Other tech temp/resume DENY
