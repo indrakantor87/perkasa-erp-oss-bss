@@ -1777,8 +1777,11 @@ export type WorkOrderTransitionResult = {
 const VALID_WO_TRANSITIONS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['OPEN', new Set(['SCHEDULED', 'ON_PROGRESS', 'CANCELLED', 'COMPLETED'])],
   ['SCHEDULED', new Set(['OPEN', 'ON_PROGRESS', 'CANCELLED', 'COMPLETED'])],
+  ['ASSIGNED', new Set(['ON_PROGRESS', 'CANCELLED'])],
+  ['ACCEPTED', new Set(['ON_PROGRESS', 'CANCELLED'])],
   ['ON_PROGRESS', new Set(['SCHEDULED', 'COMPLETED', 'CANCELLED'])],
   ['PENDING', new Set(['OPEN', 'SCHEDULED', 'ON_PROGRESS', 'COMPLETED', 'CANCELLED'])],
+  ['TEMPORARY', new Set(['ON_PROGRESS'])],
 ])
 
 export async function transitionWorkOrderStatus(params: {

@@ -75,6 +75,7 @@ function getBootstrapMockPassword(user: Pick<MockAuthUser, 'username' | 'passwor
 
 export const mockAuthUsers: MockAuthUser[] = [
   {
+    userId: 90000,
     username: 'admin.perkasa',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_ADMIN_PERKASA',
     displayName: 'Super Admin Perkasa',
@@ -83,6 +84,7 @@ export const mockAuthUsers: MockAuthUser[] = [
     branchIds: [1],
   },
   {
+    userId: 90003,
     username: 'marketing.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_MARKETING_REVIEW',
     displayName: 'Marketing Review',
@@ -91,6 +93,7 @@ export const mockAuthUsers: MockAuthUser[] = [
     branchIds: [1],
   },
   {
+    userId: 90004,
     username: 'cs.operator',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_CS_OPERATOR',
     displayName: 'Operator CS Review',
@@ -99,6 +102,7 @@ export const mockAuthUsers: MockAuthUser[] = [
     branchIds: [1],
   },
   {
+    userId: 90005,
     username: 'cs.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_CS_REVIEW',
     displayName: 'Admin CS Review',
@@ -107,6 +111,7 @@ export const mockAuthUsers: MockAuthUser[] = [
     branchIds: [1],
   },
   {
+    userId: 90006,
     username: 'support.ops',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_SUPPORT_OPS',
     displayName: 'Operator NOC Support',
@@ -115,6 +120,7 @@ export const mockAuthUsers: MockAuthUser[] = [
     branchIds: [1],
   },
   {
+    userId: 90007,
     username: 'tt.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_TT_REVIEW',
     displayName: 'TT Operator Review',
@@ -123,6 +129,7 @@ export const mockAuthUsers: MockAuthUser[] = [
     branchIds: [1],
   },
   {
+    userId: 90008,
     username: 'dismantle.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_DISMANTLE_REVIEW',
     displayName: 'Dismantle Review',
@@ -131,6 +138,7 @@ export const mockAuthUsers: MockAuthUser[] = [
     branchIds: [1],
   },
   {
+    userId: 90009,
     username: 'creator.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_CREATOR_REVIEW',
     displayName: 'Creator Digital Review',
@@ -139,9 +147,19 @@ export const mockAuthUsers: MockAuthUser[] = [
     branchIds: [1],
   },
   {
+    userId: 90001,
     username: 'field.review',
     passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_FIELD_REVIEW',
     displayName: 'Field Technician Review',
+    role: 'FIELD_TECHNICIAN',
+    branchId: 1,
+    branchIds: [1],
+  },
+  {
+    userId: 90002,
+    username: 'ft.cross',
+    passwordEnvKey: 'BOOTSTRAP_MOCK_AUTH_PASSWORD_FIELD_REVIEW',
+    displayName: 'Cross Technician (Security Review)',
     role: 'FIELD_TECHNICIAN',
     branchId: 1,
     branchIds: [1],
@@ -233,6 +251,7 @@ export function authenticateMockUser(username: string, password: string): AppSes
   }
 
   return {
+    userId: candidate.userId,
     username: candidate.username,
     displayName: candidate.displayName,
     role: candidate.role,

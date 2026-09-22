@@ -1,59 +1,76 @@
 import { redirect } from 'next/navigation'
-import { requireSession } from '@/lib/auth'
-import { canAccessPath } from '@/lib/access-control-server'
-import type { AppRole } from '@/lib/types'
-import { canAccessOrganizationWorkspace } from '@/lib/organization-workspace-access'
-import { teknisiExpanWorkspace } from '@/lib/organization-workspaces'
-import type {
-  OrganizationWorkspaceLink,
-  OrganizationWorkspaceSection,
-} from '@/components/organization-workspace-page'
-import { OrganizationWorkspacePage } from '@/components/organization-workspace-page'
+import TechnicianLanePageClient from '@/components/technician/TechnicianLanePageClient'
+import { getSession, requireSession } from '@/lib/auth'
+import {
+  getTechnicianLaneTickets,
+  getTechnicianLaneTicketDetail,
+  type TechnicianLaneQuery,
+} from '@/lib/services/technician-lane-service'
 
-function resolveVisibleLink(
-  role: AppRole,
-  link: OrganizationWorkspaceLink,
-): OrganizationWorkspaceLink | null {
-  return canAccessPath(role, link.href.split('?')[0] ?? link.href) ? link : null
+const LANE_KEY = 'EXPAN'
+const LANE_TITLE = 'Lane Expan (Perluasan Jaringan)'
+const LANE_EYEBROW = 'Lapangan • Support'
+const LANE_DESCRIPTION =
+  'Daftar tiket Expan / Perluasan Jaringan yang ditugaskan kepada Anda. Koordinasikan dengan team jalur untuk penarikan kabel FO baru, update status pengerjaan, dan lampirkan evidence coverage area.'
+const TICKET_TYPE_LABEL = 'EXPAN'
+
+function resolveSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
 }
 
-function resolveVisibleSections(
-  role: AppRole,
-  sections: OrganizationWorkspaceSection[],
-): OrganizationWorkspaceSection[] {
-  return sections
-    .map((section) => ({
-      ...section,
-      links: section.links
-        .map((link) => resolveVisibleLink(role, link))
-        .filter((l): l is OrganizationWorkspaceLink => Boolean(l)),
-    }))
-    .filter((section) => section.links.length > 0)
-}
-
-export default async function TeknisiExpanWorkspacePage() {
+export default async function TeknisiExpanLanePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}) {
   const session = await requireSession()
-  if (!canAccessOrganizationWorkspace(session.role, 'teknisi-expan')) {
-    redirect('/dashboard')
+  const roleUp = String(session?.role ?? '').trim().toUpperCase()
+  const isFieldTech = roleUp === 'FIELD_TECHNICIAN'
+  const canAccess =
+    isFieldTech ||
+    roleUp === 'TT_OPERATOR' ||
+    roleUp === 'NOC_OPERATOR' ||
+    roleUp === 'SUPER_ADMIN' ||
+    roleUp === 'ADMIN'
+
+  if (!canAccess) {
+    redirect('/login?error=forbidden')
+  }
+
+  const qParam = resolveSearchParam((await searchParams)?.q) ?? ''
+  const statusParam = resolveSearchParam((await searchParams)?.status) ?? ''
+  const priorityParam = resolveSearchParam((await searchParams)?.priority) ?? ''
+  const query: TechnicianLaneQuery = {
+    q: qParam || undefined,
+    status: statusParam || undefined,
+    priority: priorityParam || undefined,
+  }
+
+  const payload = await getTechnicianLaneTickets(LANE_KEY, query, session)
+  const sessionUserId = Number(session?.userId ?? 0)
+  const detailsById: Record<number, Awaited<ReturnType<typeof getTechnicianLaneTicketDetail>>> = {}
+
+  for (const row of payload.items.slice(0, 20)) {
+    detailsById[row.id] = await getTechnicianLaneTicketDetail(row.id, session)
   }
 
   return (
-    <OrganizationWorkspacePage
-      role={session.role}
-      eyebrow={teknisiExpanWorkspace.eyebrow}
-      title={teknisiExpanWorkspace.title}
-      description={teknisiExpanWorkspace.description}
-      primaryAction={teknisiExpanWorkspace.primaryAction}
-      secondaryAction={teknisiExpanWorkspace.secondaryAction}
-      steps={teknisiExpanWorkspace.steps}
-      sections={teknisiExpanWorkspace.sections}
-      visiblePrimaryAction={resolveVisibleLink(session.role, teknisiExpanWorkspace.primaryAction)}
-      visibleSecondaryAction={
-        teknisiExpanWorkspace.secondaryAction
-          ? resolveVisibleLink(session.role, teknisiExpanWorkspace.secondaryAction)
-          : null
-      }
-      visibleSections={resolveVisibleSections(session.role, teknisiExpanWorkspace.sections)}
+    <TechnicianLanePageClient
+      laneTitle={LANE_TITLE}
+      laneKey={LANE_KEY}
+      eyebrow={LANE_EYEBROW}
+      description={LANE_DESCRIPTION}
+      ticketTypeLabel={TICKET_TYPE_LABEL}
+      sessionUserId={sessionUserId}
+      items={payload.items}
+      counters={payload.counters}
+      countersError={payload.error}
+      error={payload.error}
+      q={qParam}
+      status={statusParam}
+      priority={priorityParam}
+      detailsById={detailsById}
     />
   )
 }
+

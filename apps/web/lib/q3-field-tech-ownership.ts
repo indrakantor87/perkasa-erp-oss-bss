@@ -62,17 +62,16 @@ export function buildFieldTechWorkOrderOwnershipWhere(
   const values: unknown[] = []
 
   values.push(numericUserId)
-  values.push(numericUserId)
   values.push(Q3_ASSIGNMENT_ROLE_CANONICAL)
   for (const status of Q3_ASSIGNMENT_ACTIVE_STATUSES) {
     values.push(status)
   }
+  values.push(numericUserId)
   const statusPlaceholders = Q3_ASSIGNMENT_ACTIVE_STATUSES.map(() => '?').join(', ')
 
   const whereFragment = [
     '(',
-    `  ${woRef}.current_pic_user_id = ?`,
-    '  OR EXISTS (',
+    '  (EXISTS (',
     '    SELECT 1',
     '    FROM service_work_order_assignments q3_a',
     `    WHERE q3_a.work_order_id = ${woRef}.id`,
@@ -80,6 +79,16 @@ export function buildFieldTechWorkOrderOwnershipWhere(
     '      AND q3_a.assignment_role = ?',
     `      AND q3_a.assignment_status IN (${statusPlaceholders})`,
     '      AND q3_a.released_at IS NULL',
+    '  ))',
+    '  OR (',
+    `    ${woRef}.current_pic_user_id = ?`,
+    '    AND NOT EXISTS (',
+    '      SELECT 1',
+    '      FROM service_work_order_assignments q3_a_other',
+    `      WHERE q3_a_other.work_order_id = ${woRef}.id`,
+    `        AND q3_a_other.assigned_user_id <> ${woRef}.current_pic_user_id`,
+    '        AND q3_a_other.released_at IS NULL',
+    '    )',
     '  )',
     ')',
   ].join('\n')
