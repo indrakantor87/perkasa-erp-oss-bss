@@ -389,11 +389,47 @@ export async function PATCH(request: Request) {
           status = ?,
           overtime_hours = ?,
           locked_by_admin = ?,
+          source_type = 'SOURCE_MANUAL_CORRECTION',
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `,
       [checkInRaw || null, checkOutRaw || null, status, overtimeHours, lockByAdmin ? 1 : 0, attendance.id],
     )
+
+    const beforeSnapshot = {
+      attendance_id: attendance.id,
+      employee_code: attendance.employeeCode,
+      employee_name: attendance.fullName,
+      attendance_date: attendance.attendanceDate,
+      status: currentStatus,
+      check_in: currentCheckIn,
+      check_out: currentCheckOut,
+      overtime_hours: currentOvertime,
+      locked_by_admin: currentLock,
+    }
+
+    const afterSnapshot = {
+      attendance_id: attendance.id,
+      employee_code: attendance.employeeCode,
+      employee_name: attendance.fullName,
+      attendance_date: attendance.attendanceDate,
+      status: status,
+      check_in: checkInRaw || '',
+      check_out: checkOutRaw || '',
+      overtime_hours: overtimeHours,
+      locked_by_admin: lockByAdmin,
+    }
+
+    const detailTextSnapshot =
+      `BEFORE: ${JSON.stringify(beforeSnapshot)} | AFTER: ${JSON.stringify(afterSnapshot)}${notes ? ` | NOTES: ${notes}` : ''}`
+
+    const statusChanged = currentStatus !== status
+    const checkInChanged = currentCheckIn !== (checkInRaw || '')
+    const checkOutChanged = currentCheckOut !== (checkOutRaw || '')
+    const overtimeChanged = currentOvertime !== overtimeHours
+    const lockChanged = currentLock !== lockByAdmin
+    const isManualCorrection =
+      statusChanged || checkInChanged || checkOutChanged || overtimeChanged || lockChanged
 
     await recordHrAudit({
       actionType: 'ATTENDANCE_UPDATE',
@@ -402,8 +438,20 @@ export async function PATCH(request: Request) {
       detail: `Attendance ${attendance.employeeCode} - ${attendance.fullName} tanggal ${attendance.attendanceDate} dikoreksi dari ${currentStatus} ke ${status}${notes ? ` (${notes})` : ''}.`,
     })
 
+    if (isManualCorrection) {
+      await recordHrAudit({
+        actionType: 'EMPLOYEE_ATTENDANCE_CORRECTION',
+        actor: `${session.displayName} (${session.username})`,
+        targetRef: `${attendance.employeeCode}:ATT-${attendance.id}`,
+        detail: detailTextSnapshot,
+      })
+    }
+
     return Response.json({
       message: `Attendance ${attendance.employeeCode} - ${attendance.fullName} tanggal ${attendance.attendanceDate} berhasil diperbarui.`,
+      correction_recorded: isManualCorrection,
+      before: beforeSnapshot,
+      after: afterSnapshot,
     })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
