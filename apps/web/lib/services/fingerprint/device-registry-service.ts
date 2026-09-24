@@ -1,4 +1,4 @@
-import { createHash, createCipheriv, createDecipheriv } from 'crypto'
+import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 import { runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { MockFingerprintConnector } from './mock-connector'
@@ -22,8 +22,8 @@ import type {
 export const MASKED_AUTH_CONFIG = '••••••••••••'
 
 const ENCRYPTION_ALGO = 'aes-256-cbc'
-const DEFAULT_IV_HEX = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
-const FALLBACK_KEY_BASE64 = 'UGVya2FzYV9FUllQVE9EX0Rldl9GUF9LZXlfMzJCeXRlc0tleQ=='
+const FP_ENCRYPTION_ERROR_NOCONFIG = 'FP_ENCRYPTION_NOT_CONFIGURED'
+const LEGACY_IV_HEX = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
 
 type ExecuteResult = {
   insertId?: number
@@ -33,12 +33,21 @@ type ExecuteResult = {
 
 let tablesEnsured = false
 
-function resolveEncryptionKey() {
+function resolveEncryptionKey(): string {
   const envKey = process.env.FINGERPRINT_DEVICE_CONFIG_ENCRYPTION_KEY?.trim()
-  if (envKey && envKey.length >= 8) {
+  if (!envKey) {
+    throw new Error(FP_ENCRYPTION_ERROR_NOCONFIG)
+  }
+  const isHex64 = envKey.length === 64 && /^[0-9a-fA-F]+$/.test(envKey)
+  if (isHex64) {
     return envKey
   }
-  return Buffer.from(FALLBACK_KEY_BASE64, 'base64').toString('utf-8')
+  try {
+    normalizeEncryptionKeyTo32Bytes(envKey)
+    return envKey
+  } catch {
+    throw new Error(FP_ENCRYPTION_ERROR_NOCONFIG)
+  }
 }
 
 function normalizeEncryptionKeyTo32Bytes(key: string): Buffer {
@@ -48,42 +57,57 @@ function normalizeEncryptionKeyTo32Bytes(key: string): Buffer {
 
 export function encryptAuthConfig(authConfig: unknown): string {
   const serialized = JSON.stringify(authConfig ?? null)
+  let key: Buffer
   try {
-    const key = normalizeEncryptionKeyTo32Bytes(resolveEncryptionKey())
-    const iv = Buffer.from(DEFAULT_IV_HEX, 'hex').subarray(0, 16)
-    const cipher = createCipheriv(ENCRYPTION_ALGO, key, iv)
-    const ciphertext = Buffer.concat([cipher.update(serialized, 'utf-8'), cipher.final()])
-    return `AES:${ciphertext.toString('base64')}`
+    key = normalizeEncryptionKeyTo32Bytes(resolveEncryptionKey())
   } catch {
-    return `B64:${Buffer.from(serialized, 'utf-8').toString('base64')}`
+    throw new Error(FP_ENCRYPTION_ERROR_NOCONFIG)
   }
+  const iv = randomBytes(16)
+  const cipher = createCipheriv(ENCRYPTION_ALGO, key, iv)
+  const ciphertext = Buffer.concat([cipher.update(serialized, 'utf-8'), cipher.final()])
+  const ivHex = iv.toString('hex')
+  return `AES:${ivHex}:${ciphertext.toString('base64')}`
 }
 
 export function decryptAuthConfig(ciphertext: string): unknown {
   if (!ciphertext) {
     return null
   }
+  if (!ciphertext.startsWith('AES:')) {
+    return null
+  }
+  let key: Buffer
   try {
-    if (ciphertext.startsWith('AES:')) {
-      const payload = ciphertext.slice(4)
-      const key = normalizeEncryptionKeyTo32Bytes(resolveEncryptionKey())
-      const iv = Buffer.from(DEFAULT_IV_HEX, 'hex').subarray(0, 16)
-      const decipher = createDecipheriv(ENCRYPTION_ALGO, key, iv)
-      const raw = Buffer.concat([
-        decipher.update(Buffer.from(payload, 'base64')),
-        decipher.final(),
-      ]).toString('utf-8')
-      return JSON.parse(raw)
+    key = normalizeEncryptionKeyTo32Bytes(resolveEncryptionKey())
+  } catch {
+    throw new Error(FP_ENCRYPTION_ERROR_NOCONFIG)
+  }
+  const newFormat = ciphertext.match(/^AES:([0-9a-fA-F]{32}):(.+)$/)
+  let ivHex: string
+  let payloadB64: string
+  if (newFormat) {
+    ivHex = newFormat[1]
+    payloadB64 = newFormat[2]
+  } else {
+    const legacyPayload = ciphertext.slice(4)
+    if (legacyPayload.includes(':')) {
+      return null
     }
-    if (ciphertext.startsWith('B64:')) {
-      const payload = ciphertext.slice(4)
-      const raw = Buffer.from(payload, 'base64').toString('utf-8')
-      return JSON.parse(raw)
-    }
+    ivHex = LEGACY_IV_HEX
+    payloadB64 = legacyPayload
+  }
+  try {
+    const iv = Buffer.from(ivHex, 'hex').subarray(0, 16)
+    const decipher = createDecipheriv(ENCRYPTION_ALGO, key, iv)
+    const raw = Buffer.concat([
+      decipher.update(Buffer.from(payloadB64, 'base64')),
+      decipher.final(),
+    ]).toString('utf-8')
+    return JSON.parse(raw)
   } catch {
     return null
   }
-  return null
 }
 
 export function computeDedupHash(
@@ -102,6 +126,16 @@ export function maskMachineAuth<T extends { authConfigEncrypted: string }>(
   return {
     ...row,
     authConfigEncrypted: MASKED_AUTH_CONFIG,
+  }
+}
+
+export function validateFingerprintEncryptionConfiguredOrThrow(): void {
+  try {
+    resolveEncryptionKey()
+  } catch {
+    throw new Error(
+      'Konfigurasi enkripsi perangkat fingerprint tidak tersedia. Hubungi administrator untuk mengatur FINGERPRINT_DEVICE_CONFIG_ENCRYPTION_KEY environment variable.',
+    )
   }
 }
 
@@ -345,6 +379,7 @@ export async function createDevice(input: FpMachineCreateInput): Promise<{
   id: number
   masked: Omit<FpMachineRow, 'authConfigEncrypted'> & { authConfigEncrypted: string }
 }> {
+  validateFingerprintEncryptionConfiguredOrThrow()
   await ensureFingerprintTables()
   const ip = String(input.ip ?? '').trim()
   const model = String(input.model ?? '').trim()
@@ -384,6 +419,9 @@ export async function updateDevice(
 ): Promise<
   (Omit<FpMachineRow, 'authConfigEncrypted'> & { authConfigEncrypted: string }) | null
 > {
+  if (Object.prototype.hasOwnProperty.call(input, 'authConfig')) {
+    validateFingerprintEncryptionConfiguredOrThrow()
+  }
   await ensureFingerprintTables()
   const existing = await getDeviceRawUnmasked(id)
   if (!existing) {
@@ -472,6 +510,7 @@ export async function testDeviceConnection(machineId: number): Promise<{
   info?: FingerprintDeviceInfo
   errorMessage?: string
 }> {
+  validateFingerprintEncryptionConfiguredOrThrow()
   await ensureFingerprintTables()
   const machine = await getDeviceRawUnmasked(machineId)
   if (!machine) {
@@ -520,6 +559,7 @@ export async function syncNow(
   actorUserId: number | null,
   syncMode: SyncMode = 'MANUAL',
 ): Promise<SyncRunSummary> {
+  validateFingerprintEncryptionConfiguredOrThrow()
   await ensureFingerprintTables()
 
   const startedAt = new Date()

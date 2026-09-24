@@ -144,6 +144,9 @@ Category **A: Documents** — HR/SUPER_ADMIN only. No Finance/Employee/Manager a
 | `DELETE` | `/api/hr/documents/:id` | **Soft delete only:** set active=0. No hard delete file disk. | MARK_INACTIVE access log. Audit EMPLOYEE_DOC_INACTIVE |
 
 Category **B: Fingerprint Device/Mapping/Sync** — HR/SUPER_ADMIN only. Semua `auth_config_encrypted` response API **MASKED = `'••••••••••••'` literal**. Tidak pernah return ciphertext asli bahkan SUPER_ADMIN di network tab.
+
+**ENVIRONMENT NOTE (WAJIB FAIL-CLOSED, NO FALLBACK):**
+`FINGERPRINT_DEVICE_CONFIG_ENCRYPTION_KEY` environment variable **WAJIB** disediakan via secret manager / process.env (JANGAN hardcoded dalam source code, JANGAN commit dalam .env apa pun). Jika env tidak tersedia atau invalid maka operasi create/update/sync/test-connection device **FAIL CLOSED** dengan HTTP 503 error user-friendly "Konfigurasi enkripsi perangkat fingerprint tidak tersedia." TIDAK ADA fallback key/IV hardcoded. Backward decrypt ciphertext lawas (sebelum fix-commit) tetap didukung menggunakan IV legacy hanya untuk mode decrypt, tidak pernah digunakan untuk enkripsi baru. Format: minimal 8 karakter (SHA256 dinormalisasi ke 32 bytes AES-256) ATAU exact 64 hex chars (32 bytes raw AES-256).
 | Method | Path | Description | Guard Critical |
 |---|---|---|---|
 | `GET/POST` | `/api/hr/fingerprint/devices` | GET list devices (masked). POST Create new device. Insert AES-256 env key auth_config_encrypted. | FP_DEVICE_CREATE audit. Masking enabled. |

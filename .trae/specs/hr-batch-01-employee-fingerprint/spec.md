@@ -739,7 +739,7 @@ Semua 6 fields audit FRS wajib terpenuhi di DB level:
 | ERP Server IP bisa reach mesin Fingerprint di LAN / VPN | ⚠️ USER MUST VERIFY IT | Jika ERP deploy cloud publik tidak bisa LAN → perlu VPN / tunnel / reverse proxy. Not in scope ERP code development. |
 | Firewall (Mesin → Port Inbound Allow dari IP server ERP) | ⚠️ USER VERIFY | Sering port block meskipun IP benar. |
 | Static IP untuk setiap mesin fingerprint | ⚠️ Decision infra (DHCP reservation / Static) | Jika IP berubah setiap reboot = sync device IP list sering update. Static recommended. |
-| Encryption Key Environment Variable for device auth | ⚠️ Add 1 env var ke `.env` tanpa commit ke repo. | `FINGERPRINT_DEVICE_CONFIG_ENCRYPTION_KEY=32bytes hex` |
+| Encryption Key Environment Variable for device auth | ⚠️ Add 1 env var ke secret manager / process.env TANPA commit ke repo. **NO FALLBACK HARDCODED DEFAULT** (fail closed: create/update/sync/test-connection device akan ERROR 503 jika env tidak tersedia). Untuk decrypt legacy ciphertext yang dienkripsi sebelum fix-1, tetap bisa jika value IV lawas. **JANGAN hardcoded key.** | `FINGERPRINT_DEVICE_CONFIG_ENCRYPTION_KEY` wajib. Format: minimal 8 karakter apapun (akan di-normalisasi SHA-256 ke 32 bytes AES-256 key) ATAU hex exact 64 chars (32 bytes raw AES-256). |
 
 ---
 
