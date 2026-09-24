@@ -105,7 +105,7 @@ Central bootstrap function: `ensureHrBatch01Schema()` di hr-batch01-schema-ensur
 #### `hr_attendance` — **2 new columns:**
 | Column | Type | Notes |
 |---|---|---|
-| source_type | ENUM('SOURCE_BROWSER','SOURCE_FINGERPRINT_MACHINE','SOURCE_MANUAL_CORRECTION') NOT NULL DEFAULT 'SOURCE_BROWSER' | Badge Source UI Fingerprint/Browser/Manual |
+| source_type | ENUM('SOURCE_BROWSER','SOURCE_FINGERPRINT_MACHINE','SOURCE_MANUAL_CORRECTION') NOT NULL DEFAULT 'SOURCE_BROWSER' (metadata schema legacy, TIDAK dihapus untuk kompatibilitas). Runtime canonical HR Attendance = HANYA `SOURCE_FINGERPRINT_MACHINE`. Browser/manual/face create = ditolak di route POST attendance. Correction TIDAK mengubah source_type (tetap FP). Legacy non-FP sources otomatis di-upgrade ke canonical fingerprint saat processing engine berjalan. | Source Badge UI hanya tampilkan label Mesin Fingerprint (Dikoreksi HR adalah small note). |
 | fingerprint_device_id | BIGINT UNSIGNED NULL | FK → hr_fp_machines.id (nullable, optional traceability) |
 
 ### 4.3 ENUM Expansion (hr_audit_logs.action_type)
@@ -166,7 +166,8 @@ Category **C: Attendance Export Excel**
 |---|---|
 | `POST /api/hr/employees` | Menerima 9+ fields baru (email/team/position/supervisor/contract/exit/user). Validasi UNIQUE email, FK team/position valid, Supervisor self A→A + cycle A→B→A reject 400, INSERT history HIRED otomatis server-side, 2 audit log, Auto REVOKE FP mappings bila status exited. |
 | `PATCH /api/hr/employees/:id?` | Same validations. detectMutations() diff prev/new_value → auto insert 11 mutation events H2..H12 server-side history. Snapshot prev/new value JSON disimpan detail_json/history. |
-| `PATCH /api/hr/attendance` | Manual correction HR → set source_type=SOURCE_MANUAL_CORRECTION. Build BEFORE/AFTER snapshot JSON attendance. Record audit EMPLOYEE_ATTENDANCE_CORRECTION (#29) with BEF/AFT payload detail_text. |
+| `PATCH /api/hr/attendance` | HR ADMINISTRATIVE CORRECTION = BUKAN metode absensi. TIDAK MENGUBAH source_type (source_type SELALU dipertahankan canonical FINGERPRINT). Build BEFORE/AFTER snapshot JSON attendance. Record audit EMPLOYEE_ATTENDANCE_CORRECTION (#29) with BEF/AFT payload detail_text. Correction = mekanisme perbaikan data, BUKAN source pembuatan attendance. |
+| `POST /api/hr/attendance` | BROWSER/MANUAL/FACE/GEOFENCE CREATE REJECTED 403. Attendance hanya dapat dibuat dari hr_fp_raw_events melewati attendance processing engine. Endpoint TIDAK DIHAPUS (preserve code path route), tapi behavior: semua request non-fp create → 403 Forbidden Indonesia message jelas reject. |
 
 ---
 
@@ -178,7 +179,7 @@ Modified component: [hr-workspace-page.tsx](file:///d:/trae_projects/perkasa-erp
 | Column Baru | Isi |
 |---|---|
 | ⏱️ Worked Hours | Kalkulasi on-the-fly clock_out - clock_in (format `9j 13m`). `-` jika salah satu null. |
-| 🏷️ Source Badge | 👆 **Fingerprint** (tone=emerald) / 🖐️ **Browser** (tone=sky) / ✍️ **Manual** (tone=amber). Berdasarkan `source_type` ENUM. |
+| 🏷️ Source Badge | 👆 **Mesin Fingerprint** (tone=success default). Jika terdapat note `Dikoreksi HR` (tone=warning small text dibawah label) = menandakan data pernah di-koreksi administratif oleh HR, tapi original source data = tetap fingerprint. **TIDAK ADA badge Browser, TIDAK ADA badge Manual standalone.** Correction = catatan perbaikan, BUKAN metode absensi. Source canonical hanya satu: SOURCE_FINGERPRINT_MACHINE. |
 | Tap Count | Badge angka `5 tap` = total count raw events hari itu employee. |
 | ▶️ Action Button Baru | `[Lihat Raw Events (N)]` → Open dialog Modal |
 | Modal Baru | **RawEventsModal 5 rows preview:** Show timestamp, mode badge IN/OUT/UNDEFINED, Machine id, verifyScore 0-100 jika ada. Backdrop blur. |

@@ -71,12 +71,15 @@ function extractTimeOnly(datetimeStr: string | null): string {
   return (time || '-').split('.')[0].substring(0, 8) || '-'
 }
 
-function sourceBadgeIconAndLabel(source: SourceType): { icon: string; label: string; tone: 'success' | 'info' | 'warning' } {
+function sourceBadgeIconAndLabel(source: SourceType): { icon: string; label: string; tone: 'success' | 'info' | 'warning'; note?: string } {
   const s = String(source || '').toUpperCase()
-  if (s === 'SOURCE_FINGERPRINT_MACHINE') return { icon: '👆', label: 'Fingerprint', tone: 'success' }
-  if (s === 'SOURCE_BROWSER') return { icon: '🖐️', label: 'Browser', tone: 'info' }
-  if (s === 'SOURCE_MANUAL_CORRECTION') return { icon: '✍️', label: 'Manual', tone: 'warning' }
-  return { icon: '📌', label: String(source || '-'), tone: 'info' }
+  const isCorrection = s === 'SOURCE_MANUAL_CORRECTION'
+  return {
+    icon: '👆',
+    label: 'Mesin Fingerprint',
+    tone: isCorrection ? 'warning' : 'success',
+    note: isCorrection ? 'Dikoreksi HR' : undefined,
+  }
 }
 
 function statusLabel(status: string): string {
@@ -216,7 +219,7 @@ const hrWorkspaceTabs: HrWorkspaceTab[] = [
   {
     key: 'attendance',
     title: 'Absensi',
-    description: 'Input attendance, koreksi absensi, geofence, dan face attendance.',
+    description: 'Rekap absensi karyawan dari mesin fingerprint dan koreksi administratif.',
     href: '/hr/attendance',
   },
   {
@@ -1082,7 +1085,14 @@ function AttendanceDailyView({
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge tone={src.tone} label={`${src.icon} ${src.label}`} size="sm" uppercase={false} />
+                        <div className="flex flex-col gap-1">
+                          <StatusBadge tone={src.tone} label={`${src.icon} ${src.label}`} size="sm" uppercase={false} />
+                          {src.note ? (
+                            <span className="text-[8px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-400">
+                              {src.note}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="badge border-slate-200 bg-white text-slate-700 dark:bg-slate-800 dark:text-slate-200">

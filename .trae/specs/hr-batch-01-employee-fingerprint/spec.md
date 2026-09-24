@@ -288,8 +288,8 @@ Excel Export Section 17
 ### 7.2 Attendance Core Requirements vs Current System
 | Requirement | Current System (Audit) | Status Support |
 |---|---|---|
-| Data source = mesin fingerprint network pull | Browser Geo + Face capture upload (browser only). NO fingerprint machine connector | ❌ NOT FOUND. Implement from scratch. |
-| Daily per-employee attendance clock IN / OUT | ✅ EXISTS — hr_attendance table L667 check_in/check_out | ✅ REUSE existing table. Expand/add source_type column (SOURCE_BROWSER vs SOURCE_FINGERPRINT_MACHINE) |
+| Data source = mesin fingerprint network pull | **FINGERPRINT MACHINE ONLY — NO Browser, NO Manual, NO Face, NO GPS/Geofence.** Existing legacy Browser Geo + Face upload di-nonaktifkan/DI-TOLAK 403 oleh route attendance. | ✅ **FINGERPRINT ONLY IMPLEMENTED.** Non-fingerprint create rejected via 403. Hanya processing engine dari hr_fp_raw_events (via MockConnector / real connector HW-spec) yang dapat menciptakan hr_attendance. |
+| Daily per-employee attendance clock IN / OUT | ✅ EXISTS — hr_attendance table L667 check_in/check_out | ✅ REUSE existing table. Canonical source_type = SOURCE_FINGERPRINT_MACHINE SATU-SATUNYA. Legacy SOURCE_BROWSER (data lawas) otomatis di-upgrade normalize ke SOURCE_FINGERPRINT_MACHINE saat re-process. Correction = TIDAK MENGUBAH source_type; correction hanya audit EMPLOYEE_ATTENDANCE_CORRECTION dengan BEFORE/AFTER snapshot (NOT a source method). |
 | Status 4 ENUM PRESENT/SICK/PERMIT/ALPHA | ✅ EXISTS hr_attendance.status (LATE missing, OOS batch 01 processing rule simple) | ✅ KEEP ENUM; LAMBAT = future batch OOS |
 | Overtime hours DECIMAL field | ✅ EXISTS overtime_hours L677 | ⚠️ Keep field, tapi OT workflow request form = OOS. Jika mesin punya event IN下班后 extra clock = masuk overtime_hours (jika bisa mapping dari type event TBD). |
 | Locked by admin (manual koreksi) | ✅ EXISTS locked_by_admin TINYINT L679 | ✅ Keep. Rules: processed FROM fingerprint → default locked_by_admin=0. HR bisa klik "Lock Final" 1x setelah review → tidak berubah di sync berikutnya. |

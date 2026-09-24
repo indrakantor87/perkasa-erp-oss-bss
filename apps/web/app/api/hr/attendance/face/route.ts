@@ -19,6 +19,14 @@ export async function GET() {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
 
+  return Response.json(
+    {
+      message:
+        'Fitur ini dinonaktifkan. HR Attendance Batch-01 hanya menggunakan data absensi dari MESIN FINGERPRINT. Face recognition, selfie attendance, dan geofence/GPS bukan metode absensi yang didukung.',
+    },
+    { status: 403 },
+  )
+
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     return Response.json(
@@ -43,6 +51,14 @@ export async function PATCH(request: Request) {
   if (!canPerformAction(session.role, 'hr', 'update')) {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
+
+  return Response.json(
+    {
+      message:
+        'Fitur ini dinonaktifkan. HR Attendance Batch-01 hanya menggunakan data absensi dari MESIN FINGERPRINT. Face recognition, selfie attendance, dan geofence/GPS bukan metode absensi yang didukung.',
+    },
+    { status: 403 },
+  )
 
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
@@ -81,12 +97,12 @@ export async function PATCH(request: Request) {
       autoVerifyHighConfidence,
       autoVerifyMinScore,
       notes,
-      updatedBy: `${session.displayName} (${session.username})`,
+      updatedBy: `${(session as any).displayName} (${(session as any).username})`,
     })
 
     await recordHrAudit({
       actionType: 'ATTENDANCE_FACE_CONFIG',
-      actor: `${session.displayName} (${session.username})`,
+      actor: `${(session as any).displayName} (${(session as any).username})`,
       targetRef: verificationMode,
       detail: `Konfigurasi face attendance diperbarui ke mode ${verificationMode}${isRequired ? ' dan diwajibkan saat check-in' : ''}${autoVerifyHighConfidence ? ` dengan auto-verify aktif di skor minimum ${autoVerifyMinScore}` : ' dengan auto-verify dimatikan'}.`,
     })

@@ -238,13 +238,9 @@ export async function processRawEventsToDailyAttendance(
         result.totalSkippedLocked++
       } else {
         const currentSource = existing.source_type || ''
-        let newSourceType: string
+        let newSourceType = 'SOURCE_FINGERPRINT_MACHINE'
         if (currentSource === 'SOURCE_MANUAL_CORRECTION') {
           newSourceType = 'SOURCE_MANUAL_CORRECTION'
-        } else if (currentSource === '' || currentSource === 'SOURCE_FINGERPRINT_MACHINE' || currentSource === 'SOURCE_BROWSER' || currentSource == null) {
-          newSourceType = 'SOURCE_FINGERPRINT_MACHINE'
-        } else {
-          newSourceType = currentSource
         }
 
         const newFingerprintDeviceId = existing.fingerprint_device_id ?? minMachineId
@@ -252,7 +248,7 @@ export async function processRawEventsToDailyAttendance(
         if (
           existing.source_type == null ||
           existing.source_type === 'SOURCE_FINGERPRINT_MACHINE' ||
-          existing.source_type === 'SOURCE_BROWSER'
+          existing.source_type !== 'SOURCE_MANUAL_CORRECTION'
         ) {
           await conn.query(
             `

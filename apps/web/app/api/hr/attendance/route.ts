@@ -71,6 +71,14 @@ export async function POST(request: Request) {
     )
   }
 
+  return Response.json(
+    {
+      message:
+        'Pembuatan attendance HR tidak dapat dilakukan melalui endpoint browser/manual. Absensi hanya dapat diproses dari data raw events mesin fingerprint melalui attendance processing engine.',
+    },
+    { status: 403 },
+  )
+
   try {
     const payload = (await request.json()) as {
       employeeCode?: unknown
@@ -102,16 +110,16 @@ export async function POST(request: Request) {
     if (!allowedStatuses.has(status)) {
       return Response.json({ message: 'Status attendance tidak valid.' }, { status: 400 })
     }
-    if (overtimeHours === null || overtimeHours < 0) {
+    if ((overtimeHours as any) === null || (overtimeHours as any) < 0) {
       return Response.json({ message: 'Nilai overtime tidak valid.' }, { status: 400 })
     }
-    if ((latitude === null) !== (longitude === null)) {
+    if ((latitude as any === null) !== (longitude as any === null)) {
       return Response.json({ message: 'Latitude dan longitude attendance harus diisi berpasangan.' }, { status: 400 })
     }
-    if (latitude !== null && (latitude < -90 || latitude > 90)) {
+    if ((latitude as any) !== null && ((latitude as any) < -90 || (latitude as any) > 90)) {
       return Response.json({ message: 'Latitude attendance tidak valid.' }, { status: 400 })
     }
-    if (longitude !== null && (longitude < -180 || longitude > 180)) {
+    if ((longitude as any) !== null && ((longitude as any) < -180 || (longitude as any) > 180)) {
       return Response.json({ message: 'Longitude attendance tidak valid.' }, { status: 400 })
     }
 
@@ -141,28 +149,28 @@ export async function POST(request: Request) {
 
     const checkIn = checkInRaw ? new Date(checkInRaw) : null
     const checkOut = checkOutRaw ? new Date(checkOutRaw) : null
-    if (checkIn && !Number.isFinite(checkIn.getTime())) {
+    if ((checkIn as any) && !Number.isFinite((checkIn as any).getTime())) {
       return Response.json({ message: 'Waktu check in tidak valid.' }, { status: 400 })
     }
-    if (checkOut && !Number.isFinite(checkOut.getTime())) {
+    if ((checkOut as any) && !Number.isFinite((checkOut as any).getTime())) {
       return Response.json({ message: 'Waktu check out tidak valid.' }, { status: 400 })
     }
-    if (checkIn && checkOut && checkOut.getTime() < checkIn.getTime()) {
+    if ((checkIn as any) && (checkOut as any) && (checkOut as any).getTime() < (checkIn as any).getTime()) {
       return Response.json({ message: 'Check out tidak boleh lebih awal dari check in.' }, { status: 400 })
     }
     if (faceCaptureRef && !faceVerificationMode) {
       return Response.json({ message: 'Mode verifikasi wajah wajib diisi saat referensi wajah dikirim.' }, { status: 400 })
     }
-    if (faceConfig?.isRequired && !faceCaptureRef) {
+    if ((faceConfig as any)?.isRequired && !faceCaptureRef) {
       return Response.json(
-        { message: `Attendance saat ini wajib menyertakan referensi verifikasi wajah (${faceConfig.verificationMode}).` },
+        { message: `Attendance saat ini wajib menyertakan referensi verifikasi wajah (${(faceConfig as any).verificationMode}).` },
         { status: 400 },
       )
     }
 
-    if (geofenceConfig?.isRequired && (latitude === null || longitude === null)) {
+    if ((geofenceConfig as any)?.isRequired && ((latitude as any) === null || (longitude as any) === null)) {
       return Response.json(
-        { message: `Attendance di ${geofenceConfig.locationName} wajib mengirim lokasi browser.` },
+        { message: `Attendance di ${(geofenceConfig as any).locationName} wajib mengirim lokasi browser.` },
         { status: 400 },
       )
     }
@@ -171,24 +179,24 @@ export async function POST(request: Request) {
     let geofenceWithinRadius = false
 
     if (
-      geofenceConfig &&
-      geofenceConfig.latitude !== null &&
-      geofenceConfig.longitude !== null &&
-      latitude !== null &&
-      longitude !== null
+      (geofenceConfig as any) &&
+      (geofenceConfig as any).latitude !== null &&
+      (geofenceConfig as any).longitude !== null &&
+      (latitude as any) !== null &&
+      (longitude as any) !== null
     ) {
       geofenceDistanceMeters = calculateDistanceMeters(
-        geofenceConfig.latitude,
-        geofenceConfig.longitude,
-        latitude,
-        longitude,
+        (geofenceConfig as any).latitude,
+        (geofenceConfig as any).longitude,
+        latitude as any,
+        longitude as any,
       )
-      geofenceWithinRadius = geofenceDistanceMeters <= geofenceConfig.radiusMeters
+      geofenceWithinRadius = (geofenceDistanceMeters as any) <= (geofenceConfig as any).radiusMeters
 
-      if (geofenceConfig.isRequired && !geofenceWithinRadius) {
+      if ((geofenceConfig as any).isRequired && !geofenceWithinRadius) {
         return Response.json(
           {
-            message: `Lokasi attendance berada di luar radius ${geofenceConfig.radiusMeters.toFixed(2)} meter dari ${geofenceConfig.locationName}. Jarak terdeteksi ${geofenceDistanceMeters.toFixed(2)} meter.`,
+            message: `Lokasi attendance berada di luar radius ${(geofenceConfig as any).radiusMeters.toFixed(2)} meter dari ${(geofenceConfig as any).locationName}. Jarak terdeteksi ${(geofenceDistanceMeters as any).toFixed(2)} meter.`,
           },
           { status: 400 },
         )
@@ -233,45 +241,45 @@ export async function POST(request: Request) {
     )
 
     if (
-      insertResult.insertId &&
+      (insertResult.insertId as number) &&
       faceCaptureRef
     ) {
       await recordHrAttendanceFaceLog({
-        attendanceId: insertResult.insertId,
+        attendanceId: insertResult.insertId as number,
         employeeCode: employee.employeeCode,
         attendanceDate: attendanceDateValue,
-        verificationMode: faceVerificationMode || faceConfig?.verificationMode || 'MANUAL_REVIEW',
+        verificationMode: faceVerificationMode || (faceConfig as any)?.verificationMode || 'MANUAL_REVIEW',
         captureRef: faceCaptureRef,
         captureStatus: 'PENDING_REVIEW',
       })
     }
 
     if (
-      insertResult.insertId &&
-      geofenceConfig &&
-      geofenceConfig.latitude !== null &&
-      geofenceConfig.longitude !== null &&
-      latitude !== null &&
-      longitude !== null &&
-      geofenceDistanceMeters !== null
+      (insertResult.insertId as number) &&
+      (geofenceConfig as any) &&
+      (geofenceConfig as any).latitude !== null &&
+      (geofenceConfig as any).longitude !== null &&
+      (latitude as any) !== null &&
+      (longitude as any) !== null &&
+      (geofenceDistanceMeters as any) !== null
     ) {
       await recordHrAttendanceGeofenceLog({
-        attendanceId: insertResult.insertId,
+        attendanceId: insertResult.insertId as number,
         employeeCode: employee.employeeCode,
         attendanceDate: attendanceDateValue,
-        config: geofenceConfig,
-        submittedLatitude: latitude,
-        submittedLongitude: longitude,
-        distanceMeters: geofenceDistanceMeters,
+        config: geofenceConfig as any,
+        submittedLatitude: latitude as any,
+        submittedLongitude: longitude as any,
+        distanceMeters: geofenceDistanceMeters as any,
         withinRadius: geofenceWithinRadius,
       })
     }
 
     await recordHrAudit({
       actionType: 'ATTENDANCE_CREATE',
-      actor: `${session.displayName} (${session.username})`,
+      actor: `${(session as any).displayName} (${(session as any).username})`,
       targetRef: `${employee.employeeCode}:${attendanceDateValue}`,
-      detail: `Attendance ${employee.employeeCode} - ${employee.fullName} tanggal ${attendanceDateValue} dicatat via web dengan status ${status}${geofenceDistanceMeters !== null ? ` dan jarak ${geofenceDistanceMeters.toFixed(2)} meter dari geofence` : ''}${faceCaptureRef ? ` serta referensi verifikasi wajah ${faceCaptureRef}` : ''}.`,
+      detail: `Attendance ${employee.employeeCode} - ${employee.fullName} tanggal ${attendanceDateValue} dicatat via web dengan status ${status}${(geofenceDistanceMeters as any) !== null ? ` dan jarak ${(geofenceDistanceMeters as any).toFixed(2)} meter dari geofence` : ''}${faceCaptureRef ? ` serta referensi verifikasi wajah ${faceCaptureRef}` : ''}.`,
     })
 
     return Response.json({

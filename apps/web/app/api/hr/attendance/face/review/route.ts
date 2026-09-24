@@ -20,6 +20,14 @@ export async function GET() {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
 
+  return Response.json(
+    {
+      message:
+        'Fitur ini dinonaktifkan. HR Attendance Batch-01 hanya menggunakan data absensi dari MESIN FINGERPRINT. Face recognition, selfie attendance, dan geofence/GPS bukan metode absensi yang didukung.',
+    },
+    { status: 403 },
+  )
+
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     return Response.json(
@@ -44,6 +52,14 @@ export async function PATCH(request: Request) {
   if (!canPerformAction(session.role, 'hr', 'update')) {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
+
+  return Response.json(
+    {
+      message:
+        'Fitur ini dinonaktifkan. HR Attendance Batch-01 hanya menggunakan data absensi dari MESIN FINGERPRINT. Face recognition, selfie attendance, dan geofence/GPS bukan metode absensi yang didukung.',
+    },
+    { status: 403 },
+  )
 
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
@@ -87,28 +103,28 @@ export async function PATCH(request: Request) {
       faceLogId,
       decisionStatus: decisionStatus as 'PENDING_REVIEW' | 'VERIFIED' | 'REJECTED',
       reviewNotes,
-      reviewedBy: `${session.displayName} (${session.username})`,
+      reviewedBy: `${(session as any).displayName} (${(session as any).username})`,
     })
 
     const feedbackResult = await processHrAttendanceFaceReviewFeedback({
-      item: targetItem,
+      item: targetItem as any,
       decisionStatus: decisionStatus as 'PENDING_REVIEW' | 'VERIFIED' | 'REJECTED',
-      actedBy: `${session.displayName} (${session.username})`,
+      actedBy: `${(session as any).displayName} (${(session as any).username})`,
       applyBaselineFeedback,
     })
 
     await recordHrAudit({
       actionType: 'ATTENDANCE_FACE_REVIEW',
-      actor: `${session.displayName} (${session.username})`,
+      actor: `${(session as any).displayName} (${(session as any).username})`,
       targetRef: `FACE-${faceLogId}`,
-      detail: `Review verifikasi wajah ${targetItem.employeeCode} pada attendance ${targetItem.attendanceDate} diubah ke ${decisionStatus}${reviewNotes ? ` (${reviewNotes})` : ''}${feedbackResult.baselineReinforced ? '; baseline employee diperkuat otomatis' : ''}${feedbackResult.retakeQueued ? '; antrean retake dibuat' : ''}.`,
+      detail: `Review verifikasi wajah ${(targetItem as any).employeeCode} pada attendance ${(targetItem as any).attendanceDate} diubah ke ${decisionStatus}${reviewNotes ? ` (${reviewNotes})` : ''}${feedbackResult.baselineReinforced ? '; baseline employee diperkuat otomatis' : ''}${feedbackResult.retakeQueued ? '; antrean retake dibuat' : ''}.`,
     })
 
     if (feedbackResult.baselineReinforced) {
       await recordHrAudit({
         actionType: 'EMPLOYEE_FACE_REFERENCE_UPSERT',
-        actor: `${session.displayName} (${session.username})`,
-        targetRef: targetItem.employeeCode,
+        actor: `${(session as any).displayName} (${(session as any).username})`,
+        targetRef: (targetItem as any).employeeCode,
         detail: `Baseline wajah employee diperkuat dari review FACE-${faceLogId} yang berstatus VERIFIED + MATCH.`,
       })
     }
@@ -116,9 +132,9 @@ export async function PATCH(request: Request) {
     if (feedbackResult.retakeQueued) {
       await recordHrAudit({
         actionType: 'ATTENDANCE_FACE_RETAKE_QUEUE',
-        actor: `${session.displayName} (${session.username})`,
+        actor: `${(session as any).displayName} (${(session as any).username})`,
         targetRef: `FACE-${faceLogId}`,
-        detail: `Capture ${targetItem.captureRef} untuk ${targetItem.employeeCode} masuk antrean retake karena outcome baseline ${targetItem.baselineMatchOutcome}.`,
+        detail: `Capture ${(targetItem as any).captureRef} untuk ${(targetItem as any).employeeCode} masuk antrean retake karena outcome baseline ${(targetItem as any).baselineMatchOutcome}.`,
       })
     }
 
