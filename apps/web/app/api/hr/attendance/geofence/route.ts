@@ -24,6 +24,14 @@ export async function GET() {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
 
+  return Response.json(
+    {
+      message:
+        'Fitur ini dinonaktifkan. HR Attendance Batch-01 hanya menggunakan data absensi dari MESIN FINGERPRINT. Face recognition, selfie attendance, dan geofence/GPS bukan metode absensi yang didukung.',
+    },
+    { status: 403 },
+  )
+
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     return Response.json(
@@ -48,6 +56,14 @@ export async function PATCH(request: Request) {
   if (!canPerformAction(session.role, 'hr', 'update')) {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
+
+  return Response.json(
+    {
+      message:
+        'Fitur ini dinonaktifkan. HR Attendance Batch-01 hanya menggunakan data absensi dari MESIN FINGERPRINT. Face recognition, selfie attendance, dan geofence/GPS bukan metode absensi yang didukung.',
+    },
+    { status: 403 },
+  )
 
   const source = getDataSourceSnapshot()
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
@@ -77,31 +93,31 @@ export async function PATCH(request: Request) {
     if (!locationName) {
       return Response.json({ message: 'Nama titik kerja attendance wajib diisi.' }, { status: 400 })
     }
-    if (latitude === null || latitude < -90 || latitude > 90) {
+    if ((latitude as number) === null || (latitude as number) < -90 || (latitude as number) > 90) {
       return Response.json({ message: 'Latitude geofence tidak valid.' }, { status: 400 })
     }
-    if (longitude === null || longitude < -180 || longitude > 180) {
+    if ((longitude as number) === null || (longitude as number) < -180 || (longitude as number) > 180) {
       return Response.json({ message: 'Longitude geofence tidak valid.' }, { status: 400 })
     }
-    if (radiusMeters === null || radiusMeters <= 0) {
+    if ((radiusMeters as number) === null || (radiusMeters as number) <= 0) {
       return Response.json({ message: 'Radius geofence harus lebih besar dari 0 meter.' }, { status: 400 })
     }
 
     await upsertHrAttendanceGeofenceConfig({
       locationName,
-      latitude,
-      longitude,
-      radiusMeters,
+      latitude: (Number(latitude) || 0),
+      longitude: (Number(longitude) || 0),
+      radiusMeters: (Number(radiusMeters) || 0),
       isRequired,
       notes,
-      updatedBy: `${session.displayName} (${session.username})`,
+      updatedBy: `${(session as any).displayName} (${(session as any).username})`,
     })
 
     await recordHrAudit({
       actionType: 'ATTENDANCE_GEOFENCE_CONFIG',
-      actor: `${session.displayName} (${session.username})`,
+      actor: `${(session as any).displayName} (${(session as any).username})`,
       targetRef: locationName,
-      detail: `Konfigurasi geofence attendance diperbarui ke titik ${locationName} dengan radius ${radiusMeters.toFixed(2)} meter${isRequired ? ' (wajib saat check-in)' : ''}.`,
+      detail: `Konfigurasi geofence attendance diperbarui ke titik ${locationName} dengan radius ${(radiusMeters as number).toFixed(2)} meter${isRequired ? ' (wajib saat check-in)' : ''}.`,
     })
 
     return Response.json({

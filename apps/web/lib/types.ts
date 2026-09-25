@@ -6,6 +6,7 @@ export const APP_ROLES = [
   'HR',
   'GA',
   'PENJUALAN',
+  'KARYAWAN',
   'SALES_MARKETING',
   'SPV_SALES',
   'CS_OPERATOR',
