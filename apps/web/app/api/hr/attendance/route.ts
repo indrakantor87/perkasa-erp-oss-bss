@@ -397,7 +397,6 @@ export async function PATCH(request: Request) {
           status = ?,
           overtime_hours = ?,
           locked_by_admin = ?,
-          source_type = 'SOURCE_MANUAL_CORRECTION',
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `,

@@ -237,40 +237,72 @@ export async function processRawEventsToDailyAttendance(
       } else if (existing.locked_by_admin === 1) {
         result.totalSkippedLocked++
       } else {
-        const currentSource = existing.source_type || ''
-        let newSourceType = 'SOURCE_FINGERPRINT_MACHINE'
-        if (currentSource === 'SOURCE_MANUAL_CORRECTION') {
-          newSourceType = 'SOURCE_MANUAL_CORRECTION'
+        const currentSource = existing.source_type
+
+        // ================================================================
+        // ATTENDANCE SOURCE PROVENANCE RULE (Historical Integrity Guard)
+        // ----------------------------------------------------------------
+        // Source type adalah HISTORICAL PROVENANCE, bukan status normalisasi.
+        // Jangan pernah rewrite source type hanya karena record di-reprocess.
+        //
+        // A. NEW records (insert branch di atas): SELALU source_type =
+        //    SOURCE_FINGERPRINT_MACHINE (provenance: raw event mesin FP).
+        //
+        // B. Existing records saat UPDATE:
+        //    - Jika existing sudah memiliki source_type HISTORIS non-FP
+        //      (SOURCE_BROWSER / SOURCE_MANUAL / SOURCE_FACE / SOURCE_GPS /
+        //       SOURCE_OTHER dst):
+        //         => source_type ASLI DIPERTAHANKAN APA ADANYA. JANGAN rewrite.
+        //         => HANYA update ci/co/status/fingerprint_device_id/locked=0.
+        //    - Jika existing SOURCE_FINGERPRINT_MACHINE:
+        //         => Pertahankan source_type = SOURCE_FINGERPRINT_MACHINE.
+        //    - Jika existing SOURCE_MANUAL_CORRECTION:
+        //         => Pertahankan correction marker audit. Never overwrite.
+        // ================================================================
+        //
+        // newSourceType default = pertahankan current source existing ASLI.
+        // HANYA replace SOURCE_FINGERPRINT_MACHINE canonical IF existing
+        // source is NULL/undefined (artinya lawas belum pernah assign)
+        // dan record ini datang dari engine via raw event FP saat ini.
+        // Jadi SOURCE_FINGERPRINT_MACHINE hanya diberikan apabila source
+        // tidak ada histori (null).
+        // ----------------------------------------------------------------
+
+        let newSourceType = currentSource
+        if (currentSource == null) {
+          // Source NULL = lawas record tanpa provenance, DAN sekarang
+          // sedang di-update dari raw event FP engine. Assign canonical FP.
+          newSourceType = 'SOURCE_FINGERPRINT_MACHINE'
         }
 
         const newFingerprintDeviceId = existing.fingerprint_device_id ?? minMachineId
 
-        if (
-          existing.source_type == null ||
-          existing.source_type === 'SOURCE_FINGERPRINT_MACHINE' ||
-          existing.source_type !== 'SOURCE_MANUAL_CORRECTION'
-        ) {
-          await conn.query(
-            `
-              UPDATE hr_attendance
-              SET check_in = ?,
-                  check_out = ?,
-                  status = ?,
-                  source_type = ?,
-                  fingerprint_device_id = ?
-              WHERE id = ?
-            `,
-            [
-              clockIn,
-              clockOut,
-              status,
-              newSourceType,
-              newFingerprintDeviceId,
-              existing.id,
-            ]
-          )
-          result.totalUpdated++
-        }
+        // ================================================================
+        // Kondisi UPDATE: JALANKAN UPDATE SELALU kecuali locked.
+        // (Kita selalu update ci/co/status/fp_device_id sesuai raw events.)
+        // Tetapi: source_type diatas sesuai provenance rule.
+        // RULE: HINDARI relabel generic non-correction => FP!
+        // ================================================================
+        await conn.query(
+          `
+            UPDATE hr_attendance
+            SET check_in = ?,
+                check_out = ?,
+                status = ?,
+                source_type = ?,
+                fingerprint_device_id = ?
+            WHERE id = ?
+          `,
+          [
+            clockIn,
+            clockOut,
+            status,
+            newSourceType,
+            newFingerprintDeviceId,
+            existing.id,
+          ]
+        )
+        result.totalUpdated++
       }
 
       const eventIds = events.map((e) => e.id)
