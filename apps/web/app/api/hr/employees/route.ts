@@ -4,6 +4,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { recordHrAudit } from '@/lib/services/hr-audit-service'
 import { ensureHrBatch01Schema } from '@/lib/services/hr-batch01-schema-ensure'
+import { ensureHrBatch02aEmployeeCodeUnique } from '@/lib/services/hr-batch02a-schema-ensure'
 import {
   detectSupervisorCycle,
   insertEmployeeHistoryEvent,
@@ -306,6 +307,7 @@ export async function POST(request: Request) {
   }
 
   await ensureHrBatch01Schema()
+  await ensureHrBatch02aEmployeeCodeUnique()
 
   try {
     const payload = (await request.json()) as {
@@ -448,56 +450,75 @@ export async function POST(request: Request) {
       divisionId = division.id
     }
 
-    const employeeCode = await generateEmployeeCode()
-    const insertResult = await runReviewDbExecute<InsertResult>(
-      `
-        INSERT INTO hr_employees (
-          branch_id,
-          division_id,
-          employee_code,
-          full_name,
-          position_name,
-          employment_status,
-          join_date,
-          base_salary,
-          phone,
-          whatsapp,
-          email_corporate,
-          team_id,
-          position_id,
-          supervisor_id,
-          contract_doc_id,
-          contract_start_date,
-          contract_end_date,
-          exit_date,
-          exit_reason,
-          user_id
+    const MAX_CODE_ATTEMPTS = 3
+    let employeeCode: string = ''
+    let insertResult: InsertResult = {}
+    let codeAttempt = 0
+    while (codeAttempt < MAX_CODE_ATTEMPTS) {
+      codeAttempt++
+      employeeCode = await generateEmployeeCode()
+      try {
+        insertResult = await runReviewDbExecute<InsertResult>(
+          `
+            INSERT INTO hr_employees (
+              branch_id,
+              division_id,
+              employee_code,
+              full_name,
+              position_name,
+              employment_status,
+              join_date,
+              base_salary,
+              phone,
+              whatsapp,
+              email_corporate,
+              team_id,
+              position_id,
+              supervisor_id,
+              contract_doc_id,
+              contract_start_date,
+              contract_end_date,
+              exit_date,
+              exit_reason,
+              user_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            branchId,
+            divisionId,
+            employeeCode,
+            fullName,
+            positionName || null,
+            employmentStatus,
+            joinDateRaw || null,
+            baseSalary,
+            phone || null,
+            whatsapp || null,
+            emailCorporate,
+            teamId,
+            positionId,
+            supervisorId,
+            contractDocId,
+            contractStartDate,
+            contractEndDate,
+            exitDate,
+            exitReason,
+            userId,
+          ],
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        branchId,
-        divisionId,
-        employeeCode,
-        fullName,
-        positionName || null,
-        employmentStatus,
-        joinDateRaw || null,
-        baseSalary,
-        phone || null,
-        whatsapp || null,
-        emailCorporate,
-        teamId,
-        positionId,
-        supervisorId,
-        contractDocId,
-        contractStartDate,
-        contractEndDate,
-        exitDate,
-        exitReason,
-        userId,
-      ],
-    )
+        break
+      } catch (insertErr: unknown) {
+        const errText = String(insertErr instanceof Error ? insertErr.message : insertErr)
+        const isDuplicateCode =
+          (errText.includes('ER_DUP_ENTRY') || errText.includes('Duplicate entry')) &&
+          (errText.includes('uq_hr_employees_employee_code') || errText.includes(`'${employeeCode}'`))
+        if (isDuplicateCode && codeAttempt < MAX_CODE_ATTEMPTS) {
+          continue
+        }
+        throw insertErr
+      }
+    }
 
     const newEmployeeId = Number(insertResult.insertId ?? 0)
     const actorRef = `${session.displayName} (${session.username})`

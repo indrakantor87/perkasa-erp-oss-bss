@@ -34,6 +34,7 @@ const baselineRoleAllowedPrefixes: Record<AppRole, string[]> = {
   HR: ['/dashboard', '/hr', '/dashboard/tracking'],
   GA: ['/dashboard', '/inventory', '/support', '/dashboard/tracking'],
   PENJUALAN: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory', '/dashboard/tracking'],
+  KARYAWAN: ['/dashboard', '/me', '/dashboard/tracking'],
   SALES_MARKETING: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory', '/dashboard/tracking'],
   SPV_SALES: ['/dashboard', '/sales', '/list-psb', '/customers', '/support', '/inventory', '/dashboard/tracking'],
   CS_OPERATOR: ['/dashboard', '/sales', '/list-psb', '/list-dismantle', '/customers', '/support', '/inventory', '/dashboard/tracking'],
@@ -53,6 +54,7 @@ const baselineRoleLandingPaths: Record<AppRole, string> = {
   HR: '/hr',
   GA: '/inventory',
   PENJUALAN: '/dashboard/worklist',
+  KARYAWAN: '/me/profile',
   SALES_MARKETING: '/dashboard/worklist',
   SPV_SALES: '/dashboard/worklist',
   CS_OPERATOR: '/dashboard/worklist',
@@ -123,6 +125,10 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
     { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'create'] },
     { resource: 'support', label: 'Support', actions: ['view'] },
     { resource: 'inventory', label: 'Inventory', actions: ['view'] },
+  ],
+  KARYAWAN: [
+    { resource: 'dashboard', label: 'Dashboard Karyawan', actions: ['view'] },
+    { resource: 'daily_activity', label: 'Daily Activity', actions: ['view'] },
   ],
   SALES_MARKETING: [
     { resource: 'dashboard', label: 'Dashboard Marketing', actions: ['view'] },

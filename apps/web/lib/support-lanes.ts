@@ -76,6 +76,7 @@ const supportLaneOrder: Record<AppRole, SupportLaneKey[]> = {
   HR: ['tt', 'sla'],
   GA: ['dismantle', 'isolations', 'tt'],
   PENJUALAN: ['isolations', 'tt', 'dismantle', 'sla'],
+  KARYAWAN: [],
   SALES_MARKETING: ['isolations', 'tt', 'dismantle', 'sla'],
   SPV_SALES: ['isolations', 'tt', 'dismantle', 'sla'],
   CS_OPERATOR: ['isolations', 'tt', 'dismantle', 'sla'],

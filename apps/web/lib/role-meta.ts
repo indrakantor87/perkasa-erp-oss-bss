@@ -67,6 +67,14 @@ const roleMetaMap: Record<AppRole, RoleMeta> = {
     division: 'Pemasaran dan Pelayanan',
     subdivision: 'Penjualan',
   },
+  KARYAWAN: {
+    label: 'Karyawan',
+    shortLabel: 'Karyawan',
+    tone: 'bg-violet-600 text-white',
+    scope: 'Self-service profil, absensi, dokumen pribadi, dan slip gaji sesuai scope kepemilikan.',
+    division: 'Finance & HR',
+    subdivision: 'Employee Self-Service',
+  },
   SALES_MARKETING: {
     label: 'Sales Marketing',
     shortLabel: 'Marketing',

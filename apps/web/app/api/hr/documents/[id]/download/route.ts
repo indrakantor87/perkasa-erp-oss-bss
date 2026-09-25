@@ -4,6 +4,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { recordHrAudit } from '@/lib/services/hr-audit-service'
 import { ensureHrBatch01Schema } from '@/lib/services/hr-batch01-schema-ensure'
+import { requireEmployeeByAuthUserId } from '@/lib/services/hr/employee-identity.service'
 import { createReadStream } from 'node:fs'
 import { headers } from 'next/headers'
 import { basename, extname, resolve, join } from 'node:path'
@@ -154,6 +155,25 @@ export async function GET(_request: Request, { params }: { params: ParamsPromise
         `IDOR generic 404 response untuk document_id=${documentId}.`,
       )
       return Response.json({ message: 'Dokumen tidak ditemukan.' }, { status: 404 })
+    }
+
+    if (session.role === 'KARYAWAN') {
+      try {
+        const me = await requireEmployeeByAuthUserId(session.userId)
+        if (row.employeeId !== me.id) {
+          await insertDocumentAccessLog(
+            documentId,
+            'ACCESS_DENIED',
+            actorUserId,
+            actorIp,
+            clientUserAgent,
+            `IDOR attempt DOWNLOAD: KARYAWAN user_id=${session.userId} mencoba download dokumen employee_id=${row.employeeId} (bukan miliknya).`,
+          )
+          return Response.json({ message: 'Dokumen tidak ditemukan.' }, { status: 404 })
+        }
+      } catch {
+        return Response.json({ message: 'Dokumen tidak ditemukan.' }, { status: 404 })
+      }
     }
 
     const safePath = pathTraversalSafe(row.storageRefInternal)

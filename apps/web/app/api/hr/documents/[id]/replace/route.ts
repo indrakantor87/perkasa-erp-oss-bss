@@ -4,6 +4,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { recordHrAudit } from '@/lib/services/hr-audit-service'
 import { ensureHrBatch01Schema } from '@/lib/services/hr-batch01-schema-ensure'
+import { requireEmployeeByAuthUserId } from '@/lib/services/hr/employee-identity.service'
 import { createHash } from 'node:crypto'
 import { mkdir, stat, writeFile, access } from 'node:fs/promises'
 import { constants } from 'node:fs'
@@ -192,6 +193,25 @@ export async function POST(request: Request, { params }: { params: ParamsPromise
     const existing = existingRows[0]
     if (!existing || existing.active !== 1) {
       return Response.json({ message: 'Dokumen lama tidak ditemukan atau sudah tidak aktif.' }, { status: 404 })
+    }
+
+    if (session.role === 'KARYAWAN') {
+      try {
+        const me = await requireEmployeeByAuthUserId(session.userId)
+        if (existing.employeeId !== me.id) {
+          await insertDocumentAccessLog(
+            oldDocumentId,
+            'ACCESS_DENIED',
+            actorUserId,
+            actorIp,
+            clientUserAgent,
+            `IDOR attempt REPLACE: KARYAWAN user_id=${session.userId} mencoba replace dokumen employee_id=${existing.employeeId} (bukan miliknya).`,
+          )
+          return Response.json({ message: 'Dokumen tidak ditemukan.' }, { status: 404 })
+        }
+      } catch {
+        return Response.json({ message: 'Dokumen tidak ditemukan.' }, { status: 404 })
+      }
     }
 
     const employeeId = existing.employeeId

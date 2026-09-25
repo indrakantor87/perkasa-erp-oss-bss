@@ -4,6 +4,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { recordHrAudit } from '@/lib/services/hr-audit-service'
 import { ensureHrBatch01Schema } from '@/lib/services/hr-batch01-schema-ensure'
+import { requireEmployeeByAuthUserId } from '@/lib/services/hr/employee-identity.service'
 import { createHash } from 'node:crypto'
 import { mkdir, stat, writeFile, access } from 'node:fs/promises'
 import { constants } from 'node:fs'
@@ -165,9 +166,6 @@ export async function POST(request: Request) {
     const docCategoryRaw = formData.get('doc_category')
     const fileEntry = formData.get('file')
 
-    if (!employeeIdRaw) {
-      return Response.json({ message: 'employee_id wajib diisi.' }, { status: 400 })
-    }
     if (!docCategoryRaw) {
       return Response.json({ message: 'doc_category wajib diisi.' }, { status: 400 })
     }
@@ -175,9 +173,18 @@ export async function POST(request: Request) {
       return Response.json({ message: 'Upload file dokumen wajib dikirim.' }, { status: 400 })
     }
 
-    const employeeId = Number.parseInt(String(employeeIdRaw).trim(), 10)
-    if (!Number.isInteger(employeeId) || employeeId <= 0) {
-      return Response.json({ message: 'employee_id tidak valid.' }, { status: 400 })
+    let employeeId: number
+    if (session.role === 'KARYAWAN') {
+      const me = await requireEmployeeByAuthUserId(session.userId)
+      employeeId = me.id
+    } else {
+      if (!employeeIdRaw) {
+        return Response.json({ message: 'employee_id wajib diisi.' }, { status: 400 })
+      }
+      employeeId = Number.parseInt(String(employeeIdRaw).trim(), 10)
+      if (!Number.isInteger(employeeId) || employeeId <= 0) {
+        return Response.json({ message: 'employee_id tidak valid.' }, { status: 400 })
+      }
     }
 
     const docCategory = String(docCategoryRaw).trim().toUpperCase()
@@ -335,13 +342,18 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const employeeIdRaw = searchParams.get('employee_id')
 
-    if (!employeeIdRaw) {
-      return Response.json({ message: 'employee_id wajib dikirim sebagai query parameter.' }, { status: 400 })
-    }
-
-    const employeeId = Number.parseInt(String(employeeIdRaw).trim(), 10)
-    if (!Number.isInteger(employeeId) || employeeId <= 0) {
-      return Response.json({ message: 'employee_id tidak valid.' }, { status: 400 })
+    let employeeId: number
+    if (session.role === 'KARYAWAN') {
+      const me = await requireEmployeeByAuthUserId(session.userId)
+      employeeId = me.id
+    } else {
+      if (!employeeIdRaw) {
+        return Response.json({ message: 'employee_id wajib dikirim sebagai query parameter.' }, { status: 400 })
+      }
+      employeeId = Number.parseInt(String(employeeIdRaw).trim(), 10)
+      if (!Number.isInteger(employeeId) || employeeId <= 0) {
+        return Response.json({ message: 'employee_id tidak valid.' }, { status: 400 })
+      }
     }
 
     const [employee] = await runReviewDbQuery<EmployeeRow>(

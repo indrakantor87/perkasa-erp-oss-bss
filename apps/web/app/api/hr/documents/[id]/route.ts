@@ -4,6 +4,7 @@ import { getDataSourceSnapshot } from '@/lib/data-source'
 import { getReviewDbErrorDetail, runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
 import { recordHrAudit } from '@/lib/services/hr-audit-service'
 import { ensureHrBatch01Schema } from '@/lib/services/hr-batch01-schema-ensure'
+import { requireEmployeeByAuthUserId } from '@/lib/services/hr/employee-identity.service'
 import { headers } from 'next/headers'
 
 type InsertResult = {
@@ -125,6 +126,25 @@ export async function DELETE(_request: Request, { params }: { params: ParamsProm
     const existing = existingRows[0]
     if (!existing) {
       return Response.json({ message: 'Dokumen tidak ditemukan.' }, { status: 404 })
+    }
+
+    if (session.role === 'KARYAWAN') {
+      try {
+        const me = await requireEmployeeByAuthUserId(session.userId)
+        if (existing.employeeId !== me.id) {
+          await insertDocumentAccessLog(
+            documentId,
+            'ACCESS_DENIED',
+            actorUserId,
+            actorIp,
+            clientUserAgent,
+            `IDOR attempt MARK_INACTIVE: KARYAWAN user_id=${session.userId} mencoba nonaktifkan dokumen employee_id=${existing.employeeId} (bukan miliknya).`,
+          )
+          return Response.json({ message: 'Dokumen tidak ditemukan.' }, { status: 404 })
+        }
+      } catch {
+        return Response.json({ message: 'Dokumen tidak ditemukan.' }, { status: 404 })
+      }
     }
 
     if (existing.active !== 1) {

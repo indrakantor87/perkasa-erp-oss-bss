@@ -33,6 +33,7 @@ const rolePreferredOrder: Partial<Record<AppRole, string[]>> = {
   DIGITAL_CREATOR: ['/dashboard/worklist', '/dashboard/tracking', '/sales', '/customers', '/dashboard/daily-activity', '/dashboard'],
   FIELD_TECHNICIAN: ['/support', '/dashboard/worklist', '/dashboard/tracking', '/inventory', '/dashboard/daily-activity'],
   DISMANTLE_OPERATOR: ['/list-dismantle', '/support', '/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity'],
+  KARYAWAN: ['/me/profile', '/dashboard/daily-activity', '/dashboard/worklist', '/dashboard/tracking', '/dashboard'],
 }
 
 const controlCenterOrder = ['/dashboard/worklist', '/dashboard/tracking', '/dashboard/daily-activity', '/dashboard', '/import']
@@ -1044,6 +1045,49 @@ function buildTeknisiLapanganSubmenuItems() {
   ]
 }
 
+function buildKaryawanSelfServiceItem() {
+  return buildSidebarNavItem('/me', {
+    key: 'karyawan-self-service',
+    title: 'Self-Service',
+    description: 'Profil, absensi, dokumen, dan slip gaji pribadi',
+    excludePrefixes: ['/me/profile', '/me/attendance', '/me/documents', '/me/salary-slips'],
+    children: buildKaryawanSelfServiceSubmenuItems(),
+  })
+}
+
+function buildKaryawanSelfServiceSubmenuItems() {
+  return [
+    buildSidebarNavItem('/me', {
+      key: 'karyawan-sub-profile',
+      title: 'Profil Saya',
+      description: 'Data pribadi, jabatan, dan informasi kontak.',
+      href: '/me/profile',
+      matchPrefixes: ['/me/profile'],
+    }),
+    buildSidebarNavItem('/me', {
+      key: 'karyawan-sub-attendance',
+      title: 'Absensi Saya',
+      description: 'Riwayat kehadiran dan catatan jam kerja.',
+      href: '/me/attendance',
+      matchPrefixes: ['/me/attendance'],
+    }),
+    buildSidebarNavItem('/me', {
+      key: 'karyawan-sub-documents',
+      title: 'Dokumen Saya',
+      description: 'Arsip KTP, KK, ijazah, kontrak, dan dokumen pribadi.',
+      href: '/me/documents',
+      matchPrefixes: ['/me/documents'],
+    }),
+    buildSidebarNavItem('/me', {
+      key: 'karyawan-sub-salary-slips',
+      title: 'Slip Gaji',
+      description: 'Daftar slip gaji yang telah dirilis.',
+      href: '/me/salary-slips',
+      matchPrefixes: ['/me/salary-slips'],
+    }),
+  ]
+}
+
 function buildTroubleTicketItem() {
   return buildSidebarNavItem('/support', {
     key: 'support-tt-only',
@@ -1182,6 +1226,8 @@ function getWorkspaceCustomItems(role: AppRole | null) {
       return [buildDigitalCreatorItem()]
     case 'DISMANTLE_OPERATOR':
       return [buildCompactNocDashboardItem(), buildDismantleItem()]
+    case 'KARYAWAN':
+      return [buildKaryawanSelfServiceItem()]
     default:
       return []
   }
