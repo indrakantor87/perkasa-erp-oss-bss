@@ -75,6 +75,8 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
     { resource: 'support', label: 'Support', actions: ['view'] },
     { resource: 'inventory', label: 'Inventory', actions: ['view'] },
     { resource: 'billing', label: 'Billing', actions: ['view', 'export'] },
+    { resource: 'leave_requests', label: 'Pengajuan Cuti/Izin/Sakit', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'overtime_requests', label: 'Pengajuan Lembur', actions: ['view', 'create', 'update', 'approve', 'export'] },
   ],
   SUPER_ADMIN: [
     { resource: 'dashboard', label: 'Dashboard Global', actions: ['view', 'export', 'manage'] },
@@ -88,6 +90,8 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
     { resource: 'billing', label: 'Billing', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'access_settings', label: 'Akses & Permission', actions: ['view', 'manage'] },
     { resource: 'user_settings', label: 'Manajemen User Internal', actions: ['view', 'manage'] },
+    { resource: 'leave_requests', label: 'Pengajuan Cuti/Izin/Sakit', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'overtime_requests', label: 'Pengajuan Lembur', actions: ['view', 'create', 'update', 'approve', 'export'] },
   ],
   ADMIN: [
     { resource: 'dashboard', label: 'Dashboard Admin', actions: ['view', 'export'] },
@@ -111,6 +115,8 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
     { resource: 'dashboard', label: 'Dashboard HR', actions: ['view'] },
     { resource: 'daily_activity', label: 'Daily Activity', actions: ['view', 'create', 'update', 'approve'] },
     { resource: 'hr', label: 'HR', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'leave_requests', label: 'Pengajuan Cuti/Izin/Sakit', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'overtime_requests', label: 'Pengajuan Lembur', actions: ['view', 'create', 'update', 'approve', 'export'] },
   ],
   GA: [
     { resource: 'dashboard', label: 'Dashboard GA', actions: ['view'] },

@@ -36,6 +36,32 @@ export type AccessResource =
   | 'billing'
   | 'access_settings'
   | 'user_settings'
+  | 'leave_requests'
+  | 'overtime_requests'
+
+export type LeaveRequestStatus =
+  | 'DRAFT'
+  | 'PENDING_SUPERVISOR'
+  | 'APPROVED_SUPERVISOR'
+  | 'PENDING_HR'
+  | 'APPROVED_HR'
+  | 'COMPLETED'
+  | 'REJECTED_SUPERVISOR'
+  | 'REJECTED_HR'
+  | 'CANCELLED_EMPLOYEE'
+  | 'CANCELLED_HR_ADMIN'
+  | 'PARTIAL'
+
+export type OvertimeRequestStatus =
+  | 'DRAFT'
+  | 'PENDING_SUPERVISOR'
+  | 'APPROVED_SUPERVISOR'
+  | 'PENDING_HR'
+  | 'APPROVED_HR'
+  | 'COMPLETED'
+  | 'REJECTED_SUPERVISOR'
+  | 'REJECTED_HR'
+  | 'CANCELLED_HR_ADMIN'
 
 export type AccessAction = 'view' | 'create' | 'update' | 'approve' | 'export' | 'manage'
 

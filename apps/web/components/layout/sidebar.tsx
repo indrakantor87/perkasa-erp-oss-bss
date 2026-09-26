@@ -616,7 +616,7 @@ function buildHrMainItem() {
     key: 'hr-main',
     title: 'HR',
     description: 'Employee, attendance, payroll, dan pinjaman karyawan',
-    excludePrefixes: ['/hr/employees', '/hr/attendance', '/hr/salary', '/hr/loans', '/hr/permissions', '/hr/disciplinary'],
+    excludePrefixes: ['/hr/employees', '/hr/attendance', '/hr/salary', '/hr/loans', '/hr/permissions', '/hr/disciplinary', '/hr/leave-requests', '/hr/overtime-requests'],
     children: buildHrSubmenuItems(),
   })
 }
@@ -629,7 +629,7 @@ function buildHrSubmenuItems() {
       description: 'Ringkasan HR dan jalur masuk ke workspace utama.',
       href: '/hr',
       matchPrefixes: ['/hr'],
-      excludePrefixes: ['/hr/employees', '/hr/attendance', '/hr/salary', '/hr/loans', '/hr/permissions', '/hr/disciplinary'],
+      excludePrefixes: ['/hr/employees', '/hr/attendance', '/hr/salary', '/hr/loans', '/hr/permissions', '/hr/disciplinary', '/hr/leave-requests', '/hr/overtime-requests'],
     }),
     buildSidebarNavItem('/hr', {
       key: 'hr-sub-employees',
@@ -672,6 +672,20 @@ function buildHrSubmenuItems() {
       description: 'Kelola surat peringatan dan tindak lanjut disiplin.',
       href: '/hr/disciplinary',
       matchPrefixes: ['/hr/disciplinary'],
+    }),
+    buildSidebarNavItem('/hr', {
+      key: 'hr-sub-leave-requests',
+      title: 'Pengajuan Cuti & Izin',
+      description: 'Kelola pengajuan cuti, izin, dan sakit karyawan beserta approval.',
+      href: '/hr/leave-requests',
+      matchPrefixes: ['/hr/leave-requests'],
+    }),
+    buildSidebarNavItem('/hr', {
+      key: 'hr-sub-overtime-requests',
+      title: 'Pengajuan Lembur',
+      description: 'Kelola pengajuan lembur karyawan dan approval HR.',
+      href: '/hr/overtime-requests',
+      matchPrefixes: ['/hr/overtime-requests'],
     }),
   ]
 }
@@ -1050,7 +1064,7 @@ function buildKaryawanSelfServiceItem() {
     key: 'karyawan-self-service',
     title: 'Self-Service',
     description: 'Profil, absensi, dokumen, dan slip gaji pribadi',
-    excludePrefixes: ['/me/profile', '/me/attendance', '/me/documents', '/me/salary-slips'],
+    excludePrefixes: ['/me/profile', '/me/attendance', '/me/documents', '/me/salary-slips', '/me/leaves', '/me/overtime'],
     children: buildKaryawanSelfServiceSubmenuItems(),
   })
 }
@@ -1084,6 +1098,20 @@ function buildKaryawanSelfServiceSubmenuItems() {
       description: 'Daftar slip gaji yang telah dirilis.',
       href: '/me/salary-slips',
       matchPrefixes: ['/me/salary-slips'],
+    }),
+    buildSidebarNavItem('/me', {
+      key: 'karyawan-sub-leaves',
+      title: 'Cuti, Izin & Sakit',
+      description: 'Ajukan dan pantau status cuti, izin, dan sakit pribadi.',
+      href: '/me/leaves',
+      matchPrefixes: ['/me/leaves'],
+    }),
+    buildSidebarNavItem('/me', {
+      key: 'karyawan-sub-overtime',
+      title: 'Pengajuan Lembur',
+      description: 'Ajukan dan pantau status pengajuan lembur pribadi.',
+      href: '/me/overtime',
+      matchPrefixes: ['/me/overtime'],
     }),
   ]
 }
