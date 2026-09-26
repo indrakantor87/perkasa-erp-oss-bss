@@ -17,6 +17,8 @@ function parseId(value: string) {
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -37,6 +39,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
 

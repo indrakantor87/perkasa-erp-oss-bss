@@ -43,7 +43,8 @@ function pathTraversalSafe(storageRef: string | null): string | null {
 type ParamsPromise = Promise<{ id: string }>
 
 export async function GET(_request: Request, { params }: { params: ParamsPromise }) {
-  const session = await getSession()
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
   if (session.role !== 'KARYAWAN' && session.role !== 'HR' && session.role !== 'SUPER_ADMIN' && session.role !== 'OWNER' && session.role !== 'ADMIN') {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
@@ -59,8 +60,7 @@ export async function GET(_request: Request, { params }: { params: ParamsPromise
   const actorUserId = Number(session.userId ?? 0)
   try {
     const me = await requireEmployeeByAuthUserId(session.userId)
-    const { id } = await params
-    const documentId = Number.parseInt(String(id ?? '').trim(), 10)
+    const documentId = Number.parseInt(String(idLocal ?? '').trim(), 10)
     if (!Number.isInteger(documentId) || documentId <= 0) {
       return Response.json({ message: 'Dokumen tidak ditemukan.' }, { status: 404 })
     }

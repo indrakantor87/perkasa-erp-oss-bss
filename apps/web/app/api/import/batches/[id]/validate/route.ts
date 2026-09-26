@@ -11,6 +11,8 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -28,8 +30,7 @@ export async function POST(
   }
 
   try {
-    const { id } = await params
-    const result = await validateImportBatch(id, `${session.displayName} (${session.username})`)
+    const result = await validateImportBatch(idLocal, `${session.displayName} (${session.username})`)
 
     return NextResponse.json({
       message: `Validasi batch ${result.batchCode} selesai: ${result.validRows} valid, ${result.invalidRows} invalid, ${result.duplicateRows} duplikat.`,

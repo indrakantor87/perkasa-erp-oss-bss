@@ -76,6 +76,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -84,9 +86,7 @@ export async function POST(
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
 
-  try {
-    const resolvedParams = await params
-    const workOrderId = Number.parseInt(String(resolvedParams.id ?? '').trim(), 10)
+  try {const workOrderId = Number.parseInt(String(idLocal ?? '').trim(), 10)
     if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
       return Response.json({ message: 'ID work order tidak valid.' }, { status: 400 })
     }

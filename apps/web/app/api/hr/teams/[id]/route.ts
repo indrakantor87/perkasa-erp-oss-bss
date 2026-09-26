@@ -24,12 +24,13 @@ function parseIsActive(value: unknown): number {
   return 0
 }
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const session = await getSession()
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
   if (!canPerformAction(session.role, 'hr', 'view')) return Response.json({ message: 'Forbidden' }, { status: 403 })
   await ensureHrBatch01Schema()
-  const id = parsePositiveInt(params.id)
+  const id = parsePositiveInt(idLocal)
   if (!id) return Response.json({ message: 'id team tidak valid.' }, { status: 400 })
   const rows = await runReviewDbQuery<TeamRow & { division_name: string | null }>(
     `SELECT t.id, t.division_id, t.team_code, t.name, t.is_active, d.name AS division_name FROM org_teams t LEFT JOIN org_divisions d ON d.id = t.division_id WHERE t.id = ? LIMIT 1`,
@@ -39,8 +40,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return Response.json({ data: rows[0] })
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  const session = await getSession()
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
   if (!canPerformAction(session.role, 'hr', 'update')) return Response.json({ message: 'Forbidden' }, { status: 403 })
   const source = getDataSourceSnapshot()
@@ -48,7 +50,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     return Response.json({ message: 'Write action HR hanya aktif saat review DB tersedia.' }, { status: 503 })
   }
   await ensureHrBatch01Schema()
-  const id = parsePositiveInt(params.id)
+  const id = parsePositiveInt(idLocal)
   if (!id) return Response.json({ message: 'id team tidak valid.' }, { status: 400 })
   try {
     const payload = (await request.json()) as {
@@ -103,8 +105,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const session = await getSession()
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
   if (!canPerformAction(session.role, 'hr', 'update')) return Response.json({ message: 'Forbidden' }, { status: 403 })
   const source = getDataSourceSnapshot()
@@ -112,7 +115,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     return Response.json({ message: 'Write action HR hanya aktif saat review DB tersedia.' }, { status: 503 })
   }
   await ensureHrBatch01Schema()
-  const id = parsePositiveInt(params.id)
+  const id = parsePositiveInt(idLocal)
   if (!id) return Response.json({ message: 'id team tidak valid.' }, { status: 400 })
   const [exists] = await runReviewDbQuery<TeamRow>(`SELECT id, name, is_active FROM org_teams WHERE id = ? LIMIT 1`, [id])
   if (!exists) return Response.json({ message: 'Team tidak ditemukan.' }, { status: 404 })

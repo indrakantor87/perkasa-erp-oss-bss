@@ -29,6 +29,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ assignmentId: string }> },
 ) {
+  const { assignmentId: assignmentIdLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -41,9 +43,7 @@ export async function POST(
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
 
-  try {
-    const resolvedParams = await params
-    const assignmentIdRaw = String(resolvedParams.assignmentId ?? '').trim()
+  try {const assignmentIdRaw = String(assignmentIdLocal ?? '').trim()
     const assignmentId = Number.parseInt(assignmentIdRaw, 10)
     if (!Number.isInteger(assignmentId) || assignmentId <= 0) {
       return Response.json({ message: 'ID assignment lama tidak valid.' }, { status: 400 })

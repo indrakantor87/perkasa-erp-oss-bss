@@ -23,9 +23,10 @@ const ALLOWED_EMP_CANCEL_STATUS = new Set(['DRAFT', 'PENDING_SUPERVISOR'])
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getSession()
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
@@ -42,7 +43,7 @@ export async function POST(
 
   try {
     const me = await requireEmployeeByAuthUserId(session.userId)
-    const otId = Number.parseInt(String(params.id ?? '').trim(), 10)
+    const otId = Number.parseInt(String(idLocal ?? '').trim(), 10)
 
     if (!Number.isInteger(otId) || otId <= 0) {
       return Response.json({ message: 'ID overtime tidak valid.' }, { status: 400 })

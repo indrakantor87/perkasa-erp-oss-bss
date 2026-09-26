@@ -30,15 +30,16 @@ function parsePositiveInt(value: unknown): number | null {
 
 export async function GET(
   _request: Request,
-  { params }: { params: { requestId: string; docId: string } },
+  { params }: { params: Promise<{ requestId: string; docId: string }> },
 ) {
-  const session = await getSession()
+  const { requestId: requestIdLocal, docId: docIdLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
 
   await ensureHrBatch02b()
 
-  const requestId = parsePositiveInt(params.requestId)
-  const docId = parsePositiveInt(params.docId)
+  const requestId = parsePositiveInt(requestIdLocal)
+  const docId = parsePositiveInt(docIdLocal)
   if (!requestId || !docId) return Response.json({ message: 'Request tidak ditemukan' }, { status: 404 })
 
   const isHrOrAdmin =

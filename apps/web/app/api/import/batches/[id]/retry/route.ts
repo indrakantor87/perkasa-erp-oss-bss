@@ -13,6 +13,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -30,7 +32,6 @@ export async function POST(
   }
 
   try {
-    const { id } = await params
     const payload = (await request.json().catch(() => ({}))) as { stage?: unknown }
     let stageOverride: undefined | '01' | '02' | '03' | '04' | '05'
 
@@ -43,7 +44,7 @@ export async function POST(
     }
 
     const result = await retryImportBatch(
-      id,
+      idLocal,
       `${session.displayName} (${session.username})`,
       stageOverride
     )

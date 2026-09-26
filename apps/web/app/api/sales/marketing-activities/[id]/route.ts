@@ -26,14 +26,15 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const { id } = await params
-    const activityId = Number(id)
+    const activityId = Number(idLocal)
     if (!Number.isInteger(activityId) || activityId <= 0) {
       return Response.json({ message: 'ID aktivitas marketing tidak valid.' }, { status: 400 })
     }
@@ -58,14 +59,15 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const { id } = await params
-    const activityId = Number(id)
+    const activityId = Number(idLocal)
     if (!Number.isInteger(activityId) || activityId <= 0) {
       return Response.json({ message: 'ID aktivitas marketing tidak valid.' }, { status: 400 })
     }

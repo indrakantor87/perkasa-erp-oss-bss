@@ -36,6 +36,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ assignmentId: string }> },
 ): Promise<Response> {
+  const { assignmentId: assignmentIdLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json(
@@ -52,9 +54,7 @@ export async function POST(
       { status: 403 },
     )
   }
-  try {
-    const resolvedParams = await params
-    const assignmentIdRaw = String(resolvedParams.assignmentId ?? '').trim()
+  try {const assignmentIdRaw = String(assignmentIdLocal ?? '').trim()
     const assignmentId = Number.parseInt(assignmentIdRaw, 10)
     if (!Number.isInteger(assignmentId) || assignmentId <= 0) {
       return Response.json(

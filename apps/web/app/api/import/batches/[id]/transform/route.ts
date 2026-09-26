@@ -20,6 +20,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -37,7 +39,6 @@ export async function POST(
   }
 
   try {
-    const { id } = await params
     const payload = (await request.json()) as { stage?: unknown; odp05NonCumulative?: unknown }
     const rawStage = String(payload.stage ?? '').trim().padStart(2, '0')
     const odp05NonCumulativeRaw = payload.odp05NonCumulative === true
@@ -57,12 +58,12 @@ export async function POST(
 
     let odp05NonCumulative = false
     if (stage === '05') {
-      await preflightOdpOnlyImportBatch(id)
+      await preflightOdpOnlyImportBatch(idLocal)
       odp05NonCumulative = odp05NonCumulativeRaw
     }
 
     const result = await transformImportBatch(
-      id,
+      idLocal,
       stage,
       `${session.displayName} (${session.username})`,
       odp05NonCumulative ? { odp05NonCumulative: true } : undefined,

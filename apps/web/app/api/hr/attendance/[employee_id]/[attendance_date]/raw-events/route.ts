@@ -44,8 +44,9 @@ function formatLocalTimestamp(value: unknown): string {
 
 export async function GET(
   _request: Request,
-  { params }: { params: { employee_id: string; attendance_date: string } },
+  { params }: { params: Promise<{ employee_id: string; attendance_date: string }> },
 ) {
+  const { employee_id: employeeIdParam, attendance_date: attendanceDateParam } = await params
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -63,8 +64,8 @@ export async function GET(
   }
 
   try {
-    const employeeIdRaw = params?.employee_id
-    const attendanceDateRaw = params?.attendance_date
+    const employeeIdRaw = employeeIdParam
+    const attendanceDateRaw = attendanceDateParam
 
     if (!employeeIdRaw || !attendanceDateRaw) {
       return Response.json(

@@ -29,14 +29,15 @@ function parseTinyInt(value: unknown): number {
   return 0
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const session = await getSession()
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
   if (!canPerformAction(session.role, 'hr', 'view') && !canPerformAction(session.role, 'leave_requests', 'view')) {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
   }
   await ensureHrBatch02b()
-  const id = parsePositiveInt(params.id)
+  const id = parsePositiveInt(idLocal)
   if (!id) return Response.json({ message: 'id leave type tidak valid.' }, { status: 400 })
   const rows = await runReviewDbQuery<LeaveTypeRow>(
     `SELECT id, code, name, description, needs_docs, deduct_balance, is_active FROM hr_leave_types WHERE id = ? LIMIT 1`,
@@ -46,8 +47,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   return Response.json({ data: rows[0] })
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const session = await getSession()
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
   if (!canPerformAction(session.role, 'hr', 'update') && !canPerformAction(session.role, 'leave_requests', 'approve')) {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
@@ -57,7 +59,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return Response.json({ message: 'Write action HR hanya aktif saat review DB tersedia.' }, { status: 503 })
   }
   await ensureHrBatch02b()
-  const id = parsePositiveInt(params.id)
+  const id = parsePositiveInt(idLocal)
   if (!id) return Response.json({ message: 'id leave type tidak valid.' }, { status: 400 })
   try {
     const payload = (await request.json()) as {
@@ -110,8 +112,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  const session = await getSession()
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
   if (!canPerformAction(session.role, 'hr', 'update') && !canPerformAction(session.role, 'leave_requests', 'approve')) {
     return Response.json({ message: 'Forbidden' }, { status: 403 })
@@ -121,7 +124,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     return Response.json({ message: 'Write action HR hanya aktif saat review DB tersedia.' }, { status: 503 })
   }
   await ensureHrBatch02b()
-  const id = parsePositiveInt(params.id)
+  const id = parsePositiveInt(idLocal)
   if (!id) return Response.json({ message: 'id leave type tidak valid.' }, { status: 400 })
   const [exists] = await runReviewDbQuery<LeaveTypeRow>(
     `SELECT id, code, name FROM hr_leave_types WHERE id = ? LIMIT 1`,

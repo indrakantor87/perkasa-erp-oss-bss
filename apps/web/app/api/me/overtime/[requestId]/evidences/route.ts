@@ -19,9 +19,10 @@ type OtRequestRow = {
 
 export async function POST(
   request: Request,
-  { params }: { params: { requestId: string } },
+  { params }: { params: Promise<{ requestId: string }> },
 ) {
-  const session = await getSession()
+  const { requestId: requestIdLocal } = await params
+const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
@@ -38,7 +39,7 @@ export async function POST(
 
   try {
     const me = await requireEmployeeByAuthUserId(session.userId)
-    const otRequestId = Number.parseInt(String(params.requestId ?? '').trim(), 10)
+    const otRequestId = Number.parseInt(String(requestIdLocal ?? '').trim(), 10)
 
     if (!Number.isInteger(otRequestId) || otRequestId <= 0) {
       return Response.json({ message: 'ID permohonan overtime tidak valid.' }, { status: 400 })

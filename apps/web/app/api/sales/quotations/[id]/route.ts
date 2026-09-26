@@ -17,6 +17,8 @@ type ExecuteResult = {
 const allowedDecisions = new Set(['APPROVED', 'REJECTED'])
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id: idLocal } = await context.params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -46,10 +48,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         { message: 'Schema sales_quotations belum siap. Jalankan schema SQL terbaru terlebih dulu.' },
         { status: 503 },
       )
-    }
-
-    const params = await context.params
-    const quotationId = Number(params.id)
+    }const quotationId = Number(idLocal)
     if (!Number.isInteger(quotationId) || quotationId <= 0) {
       return Response.json({ message: 'ID quotation tidak valid.' }, { status: 400 })
     }

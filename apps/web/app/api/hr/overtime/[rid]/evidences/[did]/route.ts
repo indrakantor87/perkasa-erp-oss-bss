@@ -22,9 +22,10 @@ type EvidenceRow = {
 
 export async function GET(
   request: Request,
-  { params }: { params: { rid: string; did: string } },
+  { params }: { params: Promise<{ rid: string; did: string }> },
 ) {
-  const session = await getSession()
+  const { rid: ridLocal, did: didLocal } = await params
+const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
@@ -35,8 +36,8 @@ export async function GET(
   try {
     await ensureHrBatch02b()
 
-    const rid = Number.parseInt(String(params.rid ?? '').trim(), 10)
-    const did = Number.parseInt(String(params.did ?? '').trim(), 10)
+    const rid = Number.parseInt(String(ridLocal ?? '').trim(), 10)
+    const did = Number.parseInt(String(didLocal ?? '').trim(), 10)
 
     if (!Number.isInteger(rid) || rid <= 0) {
       return Response.json({ message: 'ID overtime tidak valid.' }, { status: 400 })

@@ -15,6 +15,8 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -22,9 +24,7 @@ export async function GET(
   if (!canAccessPath(session.role, '/import')) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   }
-
-  const { id } = await params
-  const { source, batch, detail } = await getImportBatchDetail(id)
+  const { source, batch, detail } = await getImportBatchDetail(idLocal)
 
   if (!batch || !detail) {
     return NextResponse.json({ message: 'Batch tidak ditemukan.' }, { status: 404 })
@@ -78,6 +78,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -95,8 +97,7 @@ export async function POST(
   }
 
   try {
-    const { id } = await params
-    const batch = await getBatchLookup(id)
+    const batch = await getBatchLookup(idLocal)
 
     if (!batch) {
       return NextResponse.json({ message: 'Batch tidak ditemukan.' }, { status: 404 })
@@ -230,6 +231,8 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -239,8 +242,7 @@ export async function DELETE(
   }
 
   try {
-    const { id } = await params
-    const result = await deleteImportBatch(id, `${session.displayName} (${session.username})`)
+    const result = await deleteImportBatch(idLocal, `${session.displayName} (${session.username})`)
     return NextResponse.json({ message: `Batch ${result.batchCode} berhasil dibersihkan.`, result })
   } catch (error) {
     if (error instanceof Error && error.message.trim()) {

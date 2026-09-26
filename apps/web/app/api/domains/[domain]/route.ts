@@ -24,18 +24,17 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ domain: string }> }
 ) {
+  const { domain: domainLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-  }
-
-  const { domain } = await params
-  if (!canAccessPath(session.role, `/${domain}`)) {
+  }if (!canAccessPath(session.role, `/${domainLocal}`)) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   }
 
   const url = new URL(request.url)
-  const payload = await getDomainPageData(domain as DomainKey, session, {
+  const payload = await getDomainPageData(domainLocal as DomainKey, session, {
     supportLane: normalizeSupportLane(url.searchParams.get('lane') ?? undefined),
     focus: resolveSearchParam(url.searchParams.get('focus')),
     month: resolvePositiveIntegerParam(url.searchParams.get('month')),

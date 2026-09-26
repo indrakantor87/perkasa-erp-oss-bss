@@ -27,9 +27,10 @@ const HR_FINAL_ROLES = new Set(['HR', 'SUPER_ADMIN', 'OWNER'])
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getSession()
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
@@ -53,7 +54,7 @@ export async function PATCH(
   const actorRef = `${session.displayName} (${session.username})`
 
   try {
-    const otId = Number.parseInt(String(params.id ?? '').trim(), 10)
+    const otId = Number.parseInt(String(idLocal ?? '').trim(), 10)
 
     if (!Number.isInteger(otId) || otId <= 0) {
       return Response.json({ message: 'ID overtime tidak valid.' }, { status: 400 })

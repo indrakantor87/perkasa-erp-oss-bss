@@ -56,6 +56,8 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json(
@@ -81,8 +83,7 @@ export async function POST(
   }
 
   try {
-    const resolvedParams = await params
-    const psbListId = resolvePositiveInt(String(resolvedParams.id ?? ''))
+const psbListId = resolvePositiveInt(String(idLocal ?? ''))
     if (!psbListId) {
       return Response.json(
         {

@@ -46,6 +46,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -62,9 +64,7 @@ export async function POST(
     )
   }
 
-  try {
-    const resolvedParams = await params
-    const isolationId = String(resolvedParams.id ?? '').trim()
+  try {const isolationId = String(idLocal ?? '').trim()
     if (!isolationId) {
       return Response.json({ message: 'ID isolir tidak valid.' }, { status: 400 })
     }

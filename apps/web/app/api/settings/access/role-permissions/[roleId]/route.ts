@@ -13,6 +13,8 @@ function normalizeRoleId(value: string) {
 }
 
 export async function GET(_: Request, context: { params: Promise<{ roleId: string }> }) {
+  const { roleId: roleIdLocal } = await context.params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -25,9 +27,7 @@ export async function GET(_: Request, context: { params: Promise<{ roleId: strin
   if (source.effectiveMode !== 'review-db' || source.isFallback) {
     return Response.json({ message: 'Role permission belum tersedia di mode ini.' }, { status: 503 })
   }
-
-  const { roleId } = await context.params
-  const id = normalizeRoleId(roleId)
+  const id = normalizeRoleId(roleIdLocal)
   if (!id) {
     return Response.json({ message: 'Role ID tidak valid.' }, { status: 400 })
   }
@@ -46,6 +46,8 @@ export async function GET(_: Request, context: { params: Promise<{ roleId: strin
 }
 
 export async function PUT(request: Request, context: { params: Promise<{ roleId: string }> }) {
+  const { roleId: roleIdLocal } = await context.params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -61,9 +63,7 @@ export async function PUT(request: Request, context: { params: Promise<{ roleId:
       { status: 503 }
     )
   }
-
-  const { roleId } = await context.params
-  const id = normalizeRoleId(roleId)
+  const id = normalizeRoleId(roleIdLocal)
   if (!id) {
     return Response.json({ message: 'Role ID tidak valid.' }, { status: 400 })
   }

@@ -19,8 +19,9 @@ function parsePositiveInt(value: unknown): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const session = await getSession()
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
 
   const hasHrCancel =
@@ -40,7 +41,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   await ensureHrBatch02b()
 
-  const leaveId = parsePositiveInt(params.id)
+  const leaveId = parsePositiveInt(idLocal)
   if (!leaveId) return Response.json({ message: 'Request tidak ditemukan' }, { status: 404 })
 
   try {

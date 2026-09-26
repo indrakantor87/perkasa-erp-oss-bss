@@ -31,8 +31,9 @@ function parsePositiveBigInt(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
 }
 
-export async function POST(request: Request, { params }: { params: { requestId: string } }) {
-  const session = await getSession()
+export async function POST(request: Request, { params }: { params: Promise<{ requestId: string }> }) {
+  const { requestId: requestIdLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
 
   const source = getDataSourceSnapshot()
@@ -45,7 +46,7 @@ export async function POST(request: Request, { params }: { params: { requestId: 
   const me = await requireEmployeeByAuthUserId(session.userId)
   const canonicalTrustedEmpId = me.id
 
-  const requestId = parsePositiveInt(params.requestId)
+  const requestId = parsePositiveInt(requestIdLocal)
   if (!requestId) return Response.json({ message: 'Request tidak ditemukan' }, { status: 404 })
 
   try {
@@ -125,8 +126,9 @@ export async function POST(request: Request, { params }: { params: { requestId: 
   }
 }
 
-export async function GET(_request: Request, { params }: { params: { requestId: string } }) {
-  const session = await getSession()
+export async function GET(_request: Request, { params }: { params: Promise<{ requestId: string }> }) {
+  const { requestId: requestIdLocal } = await params
+const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
 
   await ensureHrBatch02b()
@@ -134,7 +136,7 @@ export async function GET(_request: Request, { params }: { params: { requestId: 
   const me = await requireEmployeeByAuthUserId(session.userId)
   const canonicalTrustedEmpId = me.id
 
-  const requestId = parsePositiveInt(params.requestId)
+  const requestId = parsePositiveInt(requestIdLocal)
   if (!requestId) return Response.json({ message: 'Request tidak ditemukan' }, { status: 404 })
 
   const [leaveReq] = await runReviewDbQuery<LeaveRequestRow>(

@@ -82,6 +82,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ ticketCode: string }> },
 ) {
+  const { ticketCode: ticketCodeLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -99,9 +101,7 @@ export async function POST(
   }
 
   let resolvedTicketCode = ''
-  try {
-    const resolvedParams = await params
-    const ticketCode = decodeURIComponent(resolvedParams.ticketCode ?? '').trim().toUpperCase()
+  try {const ticketCode = decodeURIComponent(ticketCodeLocal ?? '').trim().toUpperCase()
     if (!ticketCode) {
       return Response.json({ message: 'Kode ticket wajib diisi.' }, { status: 400 })
     }

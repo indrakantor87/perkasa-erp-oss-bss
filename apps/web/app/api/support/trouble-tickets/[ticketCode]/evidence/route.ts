@@ -15,6 +15,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ ticketCode: string }> },
 ) {
+  const { ticketCode: ticketCodeLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -31,10 +33,7 @@ export async function POST(
   }
 
   try {
-    await ensureTechnicianSchemaFoundation().catch(() => null)
-
-    const resolvedParams = await params
-    const ticketCode = String(resolvedParams.ticketCode ?? '').trim().toUpperCase()
+    await ensureTechnicianSchemaFoundation().catch(() => null)const ticketCode = String(ticketCodeLocal ?? '').trim().toUpperCase()
     if (!ticketCode) {
       return NextResponse.json({ error: 'Kode trouble ticket tidak valid.' }, { status: 400 })
     }

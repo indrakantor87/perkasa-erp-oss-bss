@@ -241,6 +241,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -259,10 +261,7 @@ export async function POST(
 
   try {
     await ensureSupportDismantleQueueTable()
-    await ensureSupportDismantleHistoryColumns()
-
-    const resolvedParams = await params
-    const queueId = String(resolvedParams.id ?? '').trim()
+    await ensureSupportDismantleHistoryColumns()const queueId = String(idLocal ?? '').trim()
     if (!queueId) {
       return Response.json({ message: 'ID queue dismantle tidak valid.' }, { status: 400 })
     }

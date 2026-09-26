@@ -38,6 +38,8 @@ function normalizeDateToSql(value: unknown) {
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ itemCode: string }> }) {
+  const { itemCode: itemCodeLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -54,9 +56,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ item
     )
   }
 
-  try {
-    const resolvedParams = await params
-    const itemCode = decodeURIComponent(String(resolvedParams.itemCode ?? '')).trim()
+  try {const itemCode = decodeURIComponent(String(itemCodeLocal ?? '')).trim()
     if (!itemCode) {
       return Response.json({ message: 'Kode item tidak valid.' }, { status: 400 })
     }

@@ -73,6 +73,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ ticketCode: string }> },
 ): Promise<Response> {
+  const { ticketCode: ticketCodeLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return Response.json(
@@ -114,9 +116,7 @@ export async function POST(
     )
   }
 
-  try {
-    const resolvedParams = await params
-    const ticketCode = decodeURIComponent(resolvedParams.ticketCode ?? '').trim().toUpperCase()
+  try {const ticketCode = decodeURIComponent(ticketCodeLocal ?? '').trim().toUpperCase()
     if (!ticketCode) {
       return Response.json(
         {

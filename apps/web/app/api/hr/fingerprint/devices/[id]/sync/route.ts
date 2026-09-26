@@ -17,8 +17,9 @@ function parseIdParam(idSegment: string | undefined) {
 
 export async function POST(
   request: Request,
-  segment: { params?: Promise<{ id?: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id: idLocal } = await params
   const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
@@ -36,8 +37,7 @@ export async function POST(
   }
 
   try {
-    const params = await segment?.params
-    const id = parseIdParam(params?.id)
+    const id = parseIdParam(idLocal)
     if (!id) {
       return Response.json({ message: 'ID device fingerprint tidak valid.' }, { status: 400 })
     }

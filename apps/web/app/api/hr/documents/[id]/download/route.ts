@@ -94,7 +94,8 @@ async function insertDocumentAccessLog(
 type ParamsPromise = Promise<{ id: string }>
 
 export async function GET(_request: Request, { params }: { params: ParamsPromise }) {
-  const session = await getSession()
+  const { id: idLocal } = await params
+const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })
   }
@@ -119,8 +120,7 @@ export async function GET(_request: Request, { params }: { params: ParamsPromise
   const actorRef = `${session.displayName} (${session.username})`
 
   try {
-    const { id } = await params
-    const documentId = Number.parseInt(String(id ?? '').trim(), 10)
+    const documentId = Number.parseInt(String(idLocal ?? '').trim(), 10)
     if (!Number.isInteger(documentId) || documentId <= 0) {
       return Response.json({ message: 'Dokumen tidak ditemukan.' }, { status: 404 })
     }

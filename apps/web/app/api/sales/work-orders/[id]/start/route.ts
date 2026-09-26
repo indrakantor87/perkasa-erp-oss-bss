@@ -12,6 +12,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -28,10 +30,7 @@ export async function POST(
   }
 
   try {
-    await ensureTechnicianSchemaFoundation().catch(() => null)
-
-    const resolvedParams = await params
-    const idRaw = String(resolvedParams.id ?? '').trim()
+    await ensureTechnicianSchemaFoundation().catch(() => null)const idRaw = String(idLocal ?? '').trim()
     const workOrderId = Number.parseInt(idRaw, 10)
     if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
       return NextResponse.json({ error: 'ID work order tidak valid.' }, { status: 400 })

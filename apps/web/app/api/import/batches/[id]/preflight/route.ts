@@ -8,6 +8,8 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idLocal } = await params
+
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -25,7 +27,6 @@ export async function GET(
   }
 
   try {
-    const { id } = await params
     const url = new URL(request.url)
     const stage = String(url.searchParams.get('stage') ?? '')
       .trim()
@@ -35,11 +36,11 @@ export async function GET(
       return NextResponse.json({ message: 'Stage preflight tidak valid.' }, { status: 400 })
     }
 
-    const result = await preflightOdpOnlyImportBatch(id)
+    const result = await preflightOdpOnlyImportBatch(idLocal)
     return NextResponse.json(
       {
         stage,
-        batchId: id,
+        batchId: idLocal,
         ...result,
       },
       { headers: { 'Cache-Control': 'no-store' } }
