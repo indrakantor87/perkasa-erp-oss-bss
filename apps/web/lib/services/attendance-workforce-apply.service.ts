@@ -225,11 +225,10 @@ export async function applyApprovedLeaveToAttendance(
   )
 
   await recordHrAudit({
-    actionType: 'ATTENDANCE_UPDATE',
+    actionType: 'LEAVE_REQUEST_HR_ATTENDANCE_APPLIED',
     actor: actorDisplayName || 'System HR',
     targetRef: `hr_leave_requests:${leaveRequestId}`,
     detail: JSON.stringify({
-      audit_hint: 'LEAVE_REQUEST_HR_ATTENDANCE_APPLIED',
       leave_request_id: leaveRequestId,
       employee_id: leaveReq.employee_id,
       appliedCount,
@@ -361,11 +360,10 @@ export async function applyApprovedOvertimeToAttendance(
   )
 
   await recordHrAudit({
-    actionType: 'ATTENDANCE_UPDATE',
+    actionType: 'OVERTIME_HR_ATTENDANCE_APPLIED',
     actor: 'System HR Overtime Apply',
     targetRef: `hr_overtime_requests:${otRequestId}`,
     detail: JSON.stringify({
-      audit_hint: 'OVERTIME_HR_ATTENDANCE_APPLIED',
       overtime_request_id: otRequestId,
       employee_id: otReq.employee_id,
       appliedCount,

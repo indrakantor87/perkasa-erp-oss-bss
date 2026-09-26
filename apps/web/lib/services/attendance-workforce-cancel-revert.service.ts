@@ -185,10 +185,17 @@ export async function restoreLeaveRequestBalance(
 
   try {
     await recordHrAudit({
-      actionType: 'EMPLOYEE_ATTENDANCE_CORRECTION',
+      actionType: 'LEAVE_REQUEST_HR_CANCEL',
       actor: actorDisplayName?.trim() || 'HR Admin System',
       targetRef: `hr_leave_requests:${leaveIdNum}`,
-      detail: `LEAVE_BALANCE_RESTORE id=${leaveIdNum} balance_restored=${result.balanceRestored} already_restored=${result.alreadyRestored} actor=${actorDisplayName}`,
+      detail: JSON.stringify({
+        leave_request_id: leaveIdNum,
+        balance_restored: result.balanceRestored,
+        already_restored: result.alreadyRestored,
+        total_days_restored: totalDaysNum,
+        cancel_reason: finalCancelReason,
+        audit_events_persisted: result.auditEvents,
+      }),
     })
   } catch {}
 
@@ -323,16 +330,59 @@ export async function revertLeaveRequestAttendanceSnapshot(
       result.auditEvents.push(
         `LEAVE_REVERT_CONFLICT date=${dateKey} attendance_id=${attendanceIdNum} leave_request_id=${leaveIdNum} current_status=${String(currentStatusNorm ?? 'NULL')} expected_status=${String(expectedStatusNorm ?? 'NULL')} status_match=${statusMatch} notes_match=${notesMatch}.`,
       )
+      try {
+        await recordHrAudit({
+          actionType: 'LEAVE_REVERT_CONFLICT',
+          actor: actorDisplayName?.trim() || 'HR Admin System',
+          targetRef: `hr_leave_requests:${leaveIdNum}:attendance:${attendanceIdNum}`,
+          detail: JSON.stringify({
+            leave_request_id: leaveIdNum,
+            attendance_id: attendanceIdNum,
+            date: dateKey,
+            current_status: currentStatusNorm,
+            expected_after_applied_status: expectedStatusNorm,
+            current_notes: currentNotesNorm,
+            expected_after_applied_notes: expectedNotesNorm,
+            status_match: statusMatch,
+            notes_match: notesMatch,
+            reason: 'Value attendance berubah setelah leave approved oleh koreksi/workflow lain. Revert attendance SET dibatalkan otomatis untuk menghindari overwrite. Workflow leave TETAP status CANCELLED_HR_ADMIN. Finalisasi manual via PATCH attendance Correction.',
+          }),
+        })
+      } catch {}
     }
   }
 
   try {
     await recordHrAudit({
-      actionType: 'EMPLOYEE_ATTENDANCE_CORRECTION',
+      actionType: 'LEAVE_REQUEST_HR_CANCEL',
       actor: actorDisplayName?.trim() || 'HR Admin System',
       targetRef: `hr_leave_requests:${leaveIdNum}`,
-      detail: `LEAVE_REQUEST_HR_CANCEL_ATTENDANCE_REVERT id=${leaveIdNum} reverted=${result.revertedCount} conflict_skip=${result.skippedConflictCount} no_snapshot_key_skip=${result.skippedNoSnapshotKeyCount} actor=${actorDisplayName}`,
+      detail: JSON.stringify({
+        leave_request_id: leaveIdNum,
+        reverted_count: result.revertedCount,
+        conflict_skipped_count: result.skippedConflictCount,
+        no_snapshot_key_skipped_count: result.skippedNoSnapshotKeyCount,
+        warnings: result.warnings,
+        cancel_reason: cancelReason && String(cancelReason).trim() ? String(cancelReason).trim() : null,
+        audit_events: result.auditEvents,
+      }),
     })
+  } catch {}
+
+  try {
+    for (const evt of result.auditEvents) {
+      try {
+        const evtStr = String(evt ?? '')
+        if (evtStr.startsWith('LEAVE_REVERT_NO_ATTENDANCE_ROW')) {
+          await recordHrAudit({
+            actionType: 'LEAVE_REQUEST_HR_CANCEL',
+            actor: actorDisplayName?.trim() || 'HR Admin System',
+            targetRef: `hr_leave_requests:${leaveIdNum}`,
+            detail: evtStr,
+          })
+        }
+      } catch {}
+    }
   } catch {}
 
   const balanceResult = await restoreLeaveRequestBalance(leaveRequestId, actorDisplayName, cancelReason)
@@ -490,6 +540,22 @@ export async function revertOvertimeAttendanceSnapshot(
       result.auditEvents.push(
         `OVERTIME_REVERT_CONFLICT date=${dateKey} attendance_id=${attendanceIdNum} ot_request_id=${otIdNum} current_overtime_minutes=${String(currentOvertime ?? 'NULL')} expected_after_overtime=${String(expectedAfterOvertime ?? 'NULL')} match=${overtimeMatch}.`,
       )
+      try {
+        await recordHrAudit({
+          actionType: 'OVERTIME_REVERT_CONFLICT',
+          actor: actorDisplayName?.trim() || 'HR Admin System',
+          targetRef: `hr_overtime_requests:${otIdNum}:attendance:${attendanceIdNum}`,
+          detail: JSON.stringify({
+            ot_request_id: otIdNum,
+            attendance_id: attendanceIdNum,
+            date: dateKey,
+            current_overtime_minutes: currentOvertime,
+            expected_after_approved_overtime: expectedAfterOvertime,
+            match: overtimeMatch,
+            reason: 'overtime_minutes attendance tercatat berubah oleh koreksi HR atau workflow lain setelah OT APPROVED. Revert attendance SET dibatalkan otomatis agar tidak overwrite nilai terbaru. Workflow OT status TETAP CANCELLED_HR_ADMIN success commit. Finalisasi manual via PATCH attendance Correction.',
+          }),
+        })
+      } catch {}
     }
   }
 
@@ -514,10 +580,43 @@ export async function revertOvertimeAttendanceSnapshot(
 
   try {
     await recordHrAudit({
-      actionType: 'EMPLOYEE_ATTENDANCE_CORRECTION',
+      actionType: 'OVERTIME_HR_CANCEL',
       actor: actorDisplayName?.trim() || 'HR Admin System',
       targetRef: `hr_overtime_requests:${otIdNum}`,
-      detail: `OVERTIME_HR_CANCEL_ATTENDANCE_REVERT id=${otIdNum} reverted=${result.revertedCount} conflict_skip=${result.skippedConflict} no_row_skip=${result.skippedNoRow} actor=${actorDisplayName}`,
+      detail: JSON.stringify({
+        ot_request_id: otIdNum,
+        reverted_overtime_count: result.revertedCount,
+        conflict_skipped_count: result.skippedConflict,
+        no_row_skipped_count: result.skippedNoRow,
+        warnings: result.warnings,
+        cancel_reason: finalCancelReason,
+        audit_events: result.auditEvents,
+      }),
+    })
+  } catch {}
+
+  try {
+    for (const evt of result.auditEvents) {
+      try {
+        const evtStr = String(evt ?? '')
+        if (evtStr.startsWith('OVERTIME_REVERT_NO_ATTENDANCE_ROW')) {
+          await recordHrAudit({
+            actionType: 'OVERTIME_HR_CANCEL',
+            actor: actorDisplayName?.trim() || 'HR Admin System',
+            targetRef: `hr_overtime_requests:${otIdNum}`,
+            detail: evtStr,
+          })
+        }
+      } catch {}
+    }
+  } catch {}
+
+  try {
+    await recordHrAudit({
+      actionType: 'OVERTIME_HR_CANCEL',
+      actor: actorDisplayName?.trim() || 'HR Admin System',
+      targetRef: `hr_overtime_requests:${otIdNum}`,
+      detail: `OVERTIME_HR_CANCEL_ATTENDANCE_REVERT id=${otIdNum} reverted=${result.revertedCount} conflict_skip=${result.skippedConflict} no_row_skip=${result.skippedNoRow} actor=${actorDisplayName} cancel_reason=${finalCancelReason ?? 'NULL'}`,
     })
   } catch {}
 

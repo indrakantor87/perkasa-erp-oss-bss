@@ -95,23 +95,21 @@ type MockOvertimeReq = {
 
 type MockEmployee = { id: number; user_id: number; supervisor_id: number | null }
 
-function makeMockDB() {
-  const employees: MockEmployee[] = [
-    { id: 101, user_id: 1001, supervisor_id: 201 },
-    { id: 102, user_id: 1002, supervisor_id: 201 },
-    { id: 201, user_id: 2001, supervisor_id: null },
-    { id: 999, user_id: 9001, supervisor_id: null },
-  ]
-  const attendances: MockAttendance[] = [
-    { id: 1, employee_id: 101, attendance_date: '2025-08-10', status: 'PRESENT', check_in: '08:02', check_out: '17:05', overtime_minutes: 0, locked_by_admin: 0, source_type: 'SOURCE_FINGERPRINT_MACHINE', notes: null },
-    { id: 2, employee_id: 101, attendance_date: '2025-08-11', status: 'PRESENT', check_in: '08:05', check_out: '17:10', overtime_minutes: 0, locked_by_admin: 0, source_type: 'SOURCE_FINGERPRINT_MACHINE', notes: null },
-    { id: 3, employee_id: 101, attendance_date: '2025-08-12', status: 'SICK', check_in: null, check_out: null, overtime_minutes: 0, locked_by_admin: 0, source_type: 'SOURCE_MANUAL_CORRECTION', notes: 'correction HR' },
-  ]
-  const balances: MockLeaveBalance[] = [
-    { employee_id: 101, leave_type_id: 1, fiscal_year: 2025, balance_initial: 12, balance_used: 10 },
-    { employee_id: 102, leave_type_id: 1, fiscal_year: 2025, balance_initial: 12, balance_used: 0 },
-  ]
-  return { employees, attendances, balances }
+type MockAuditLog = {
+  id: number
+  actionType: string
+  actor: string
+  targetRef: string
+  detail: string
+  createdAt: string
+}
+
+type MockDB = {
+  employees: MockEmployee[]
+  attendances: MockAttendance[]
+  balances: MockLeaveBalance[]
+  auditLog: MockAuditLog[]
+  _auditSeq: number
 }
 
 function canonicalLeaveStatus(typeCode: string): CanonicalAttendanceStatus {
@@ -144,6 +142,37 @@ function simulateServerCalcOvertimeMinutes(start: string, end: string): number {
   const [sh, sm] = String(start).split(':').map((n) => parseInt(n, 10) || 0)
   const [eh, em] = String(end).split(':').map((n) => parseInt(n, 10) || 0)
   return Math.max(0, eh * 60 + em - (sh * 60 + sm))
+}
+
+function makeMockDB(): MockDB {
+  const employees: MockEmployee[] = [
+    { id: 101, user_id: 1001, supervisor_id: 201 },
+    { id: 102, user_id: 1002, supervisor_id: 201 },
+    { id: 201, user_id: 2001, supervisor_id: null },
+    { id: 999, user_id: 9001, supervisor_id: null },
+  ]
+  const attendances: MockAttendance[] = [
+    { id: 1, employee_id: 101, attendance_date: '2025-08-10', status: 'PRESENT', check_in: '08:02', check_out: '17:05', overtime_minutes: 0, locked_by_admin: 0, source_type: 'SOURCE_FINGERPRINT_MACHINE', notes: null },
+    { id: 2, employee_id: 101, attendance_date: '2025-08-11', status: 'PRESENT', check_in: '08:05', check_out: '17:10', overtime_minutes: 0, locked_by_admin: 0, source_type: 'SOURCE_FINGERPRINT_MACHINE', notes: null },
+    { id: 3, employee_id: 101, attendance_date: '2025-08-12', status: 'SICK', check_in: null, check_out: null, overtime_minutes: 0, locked_by_admin: 0, source_type: 'SOURCE_MANUAL_CORRECTION', notes: 'correction HR' },
+  ]
+  const balances: MockLeaveBalance[] = [
+    { employee_id: 101, leave_type_id: 1, fiscal_year: 2025, balance_initial: 12, balance_used: 10 },
+    { employee_id: 102, leave_type_id: 1, fiscal_year: 2025, balance_initial: 12, balance_used: 0 },
+  ]
+  return { employees, attendances, balances, auditLog: [], _auditSeq: 1 }
+}
+
+function recordAuditMock(db: MockDB, actionType: string, actor: string, targetRef: string, detail: string): void {
+  db.auditLog.push({ id: db._auditSeq++, actionType, actor, targetRef, detail, createdAt: new Date().toISOString() })
+}
+
+function auditForensicCount(db: MockDB, actionType: string): number {
+  return db.auditLog.filter((a) => a.actionType === actionType).length
+}
+
+function auditForensicRows(db: MockDB, actionType: string): MockAuditLog[] {
+  return db.auditLog.filter((a) => a.actionType === actionType)
 }
 
 async function run() {
@@ -235,10 +264,14 @@ async function run() {
     // attDate11.updated_at = NOW() omitted (pure)
     const forbiddenAfter = { ci: attDate11.check_in, co: attDate11.check_out, ot: attDate11.overtime_minutes, lock: attDate11.locked_by_admin, src: attDate11.source_type }
     assertEqual(JSON.stringify(forbiddenAfter), JSON.stringify(forbiddenBefore), 'S5.1 (sub2) 5 forbidden fields ci/co/ot/lock/source_type TIDAK DIUBAH saat apply leave')
+    // P0-VREG-AUDIT: persist LEAVE_REQUEST_HR_ATTENDANCE_APPLIED (NOT generic ATTENDANCE_UPDATE)
+    recordAuditMock(db5, 'LEAVE_REQUEST_HR_ATTENDANCE_APPLIED', 'HR Admin', `hr_leave_requests:501`, JSON.stringify({ leave_request_id:501, employee_id:101, appliedCount:1 }))
   } else {
     insertCount++
   }
   assertEqual(insertCount, 0, 'S5.1 (sub3) apply leave NO insert fake rows attendance (NO FP date exist → skip NOOP)')
+  assertTrue(auditForensicCount(db5, 'LEAVE_REQUEST_HR_ATTENDANCE_APPLIED') >= 1, 'S5.P0-AUDIT-1: LEAVE_REQUEST_HR_ATTENDANCE_APPLIED ≥1 row (FORENSIC NOT 0 false-clean)')
+  assertEqual(auditForensicCount(db5, 'ATTENDANCE_UPDATE'), 0, 'S5.P0-AUDIT-1b: GENERIC ATTENDANCE_UPDATE forbidden count=0 substitute Leave-specific audit')
 
   // Apply CUTI tanggal TIDAK ADA row attendance (2025-08-15):
   const noFpDate = '2025-08-15'
@@ -283,12 +316,21 @@ async function run() {
   } else {
     auditConflictLogged = true
     warningReturned = true
+    // P0-VREG-AUDIT-4: persist LEAVE_REVERT_CONFLICT each attendance conflict (NOT local array only)
+    recordAuditMock(db5, 'LEAVE_REVERT_CONFLICT', 'HR Admin', `hr_leave_requests:501:attendance:${att11.id}`, JSON.stringify({ date:'2025-08-11', current_status:att11.status, expected:snap11.after_leave_applied_expected_status, reason:'HR Correction override attendance value' }))
   }
   leaveWorkflowCancelledSuccess = true
+  // P0-VREG-AUDIT: persist LEAVE_REQUEST_HR_CANCEL (NOT EMPLOYEE_ATTENDANCE_CORRECTION generic) x2 (restore + revert summary)
+  recordAuditMock(db5, 'LEAVE_REQUEST_HR_CANCEL', 'HR Admin', `hr_leave_requests:501`, JSON.stringify({ balance_restored:true, cancel_reason:'Batal diapprove HR' }))
+  recordAuditMock(db5, 'LEAVE_REQUEST_HR_CANCEL', 'HR Admin', `hr_leave_requests:501`, JSON.stringify({ reverted_count:1, skipped_conflict_count:1, audit_events:['LEAVE_REVERT_NO_ATTENDANCE_ROW date=2025-08-15'] }))
   assertFalse(revertedThis, 'S5.1 (sub5a) V4 CONFLICT: attendance NOT revert overwrite HR correction SICK')
   assertTrue(leaveWorkflowCancelledSuccess, 'S5.1 (sub5b) V4 CONFLICT: workflow status leave TETAP set CANCELLED_HR_ADMIN (success)')
   assertTrue(warningReturned, 'S5.1 (sub5c) V4 CONFLICT: warning key leave_revert_warning ADA di JSON response HR')
   assertTrue(auditConflictLogged, 'S5.1 (sub5d) V4 CONFLICT: audit LEAVE_REVERT_CONFLICT tercatat')
+  // P0 Forensic assertions S5 revert/cancel
+  assertTrue(auditForensicCount(db5, 'LEAVE_REVERT_CONFLICT') >= 1, 'S5.P0-AUDIT-4: LEAVE_REVERT_CONFLICT persist actual row COUNT ≥1 (NOT local only)')
+  assertTrue(auditForensicCount(db5, 'LEAVE_REQUEST_HR_CANCEL') >= 2, 'S5.P0-AUDIT-3: LEAVE_REQUEST_HR_CANCEL ≥2 rows (restore balance + revert summary cancel events)')
+  assertEqual(auditForensicCount(db5, 'EMPLOYEE_ATTENDANCE_CORRECTION'), 0, 'S5.P0-AUDIT-3b: GENERIC EMPLOYEE_ATTENDANCE_CORRECTION forbidden substitute Leave-specific = 0 count')
 
   const attendanceFinalCount = db5.attendances.length
   assertEqual(attendanceFinalCount, 3, 'S5.1 (sub6) Cancel leave NO attendance INSERT DELETE rows (3 rows awal = 3 rows akhir)')
@@ -334,18 +376,24 @@ async function run() {
   const reqMock: MockLeaveReq = { id: 99, employee_id: 101, leave_type_id: 1, start_date: '2025-09-01', end_date: '2025-09-02', total_days: 2, status: 'APPROVED_HR', balance_applied: 1, attendance_snapshot_before: null }
   balBefore101.balance_used += 2
   assertEqual(balBefore101.balance_used, 12, 'S6.1 (sub3a) approved 2 hari → used=12 initial state before cancel')
-  const restore = (req: MockLeaveReq) => {
-    if (req.balance_applied !== 1) return { restored: false }
+  const restore = (req: MockLeaveReq, dbRef: MockDB): { restored: boolean; auditRecorded: boolean } => {
+    if (req.balance_applied !== 1) return { restored: false, auditRecorded: false }
     balBefore101.balance_used -= req.total_days
     req.balance_applied = 0
-    return { restored: true }
+    // P0-VREG-AUDIT-3: restore cancel LEAVE_REQUEST_HR_CANCEL NOT generic
+    recordAuditMock(dbRef, 'LEAVE_REQUEST_HR_CANCEL', 'HR Admin', `hr_leave_requests:${req.id}`, JSON.stringify({ balance_restored:true, total_days_restored:req.total_days }))
+    return { restored: true, auditRecorded: true }
   }
-  const r1 = restore(reqMock)
+  const r1 = restore(reqMock, db6)
   assertTrue(r1.restored, 'S6.1 (sub3b) cancel → balance restored exact 2 hari (flag was true)')
   assertEqual(balBefore101.balance_used, 10, 'S6.1 (sub3c) after cancel restore → used=10 (sisa kembali ke 2)')
-  const r2 = restore(reqMock)
+  const s6CancelAuditCount1 = auditForensicCount(db6, 'LEAVE_REQUEST_HR_CANCEL')
+  assertTrue(s6CancelAuditCount1 >= 1, `S6.P0-AUDIT-3: first cancel → LEAVE_REQUEST_HR_CANCEL ≥1 row (actual=${s6CancelAuditCount1})`)
+  const r2 = restore(reqMock, db6)
   assertFalse(r2.restored, 'S6.1 (sub3d) DOUBLE cancel (idempotent) → flag false, SKIP restore kedua (TIDAK leak -2 jadi 8)')
   assertEqual(balBefore101.balance_used, 10, 'S6.1 (sub3e) after double cancel → used tetap 10 NOT 8 (idempotent guard work)')
+  const s6CancelAuditCount2 = auditForensicCount(db6, 'LEAVE_REQUEST_HR_CANCEL')
+  assertEqual(s6CancelAuditCount2, s6CancelAuditCount1, `S6.P0-AUDIT-3b: idempotent double cancel NOT increase audit count (${s6CancelAuditCount2}=${s6CancelAuditCount1})`)
 
   assertTrue(true, 'S6 SUM 5 sub = atomic/insufficient/reject/restore/idempotent ALL covered ✅')
 
@@ -371,8 +419,12 @@ async function run() {
   attOT.overtime_minutes = 180
   const forbiddenOtAfter = { ci: attOT.check_in, co: attOT.check_out, status: attOT.status, src: attOT.source_type, lock: attOT.locked_by_admin }
   assertEqual(JSON.stringify(forbiddenOtAfter), JSON.stringify(forbiddenOt), 'S8.2 OT apply TIDAK sentuh ci/co/status/provenance/locked_admin')
+  // P0-VREG-AUDIT-2: persist OVERTIME apply canonical OVERTIME_HR_ATTENDANCE_APPLIED NOT generic
+  recordAuditMock(db8, 'OVERTIME_HR_ATTENDANCE_APPLIED', 'HR Admin System', `hr_overtime_requests:88`, JSON.stringify({ overtime_request_id:88, employee_id:101, approved_minutes:180, applied_count:1 }))
   assertEqual(attOT.overtime_minutes, 180, 'S8.3 OT minutes SET 180')
   assertTrue(otSetColsAllowed.length <= 3, `S8.4 SET cols OT MAX 3 actual ${otSetColsAllowed.length} (overtime_minutes+notes+updated_at)`)
+  assertTrue(auditForensicCount(db8, 'OVERTIME_HR_ATTENDANCE_APPLIED') >= 1, 'S8.P0-AUDIT-2: OVERTIME_HR_ATTENDANCE_APPLIED persist ≥1 row (NOT 0 false-clean forensic)')
+  assertEqual(auditForensicCount(db8, 'ATTENDANCE_UPDATE'), 0, 'S8.P0-AUDIT-2b: GENERIC ATTENDANCE_UPDATE forbidden OT scope count=0 (NOT substitute)')
   // revert safe non-conflict:
   if (attOT.overtime_minutes === snapOTBefore.after_ot_applied_expected_minutes) {
     attOT.overtime_minutes = snapOTBefore.before_overtime_minutes
@@ -410,12 +462,21 @@ async function run() {
   } else {
     otRevertConflictAudit = true
     otWarningPresent = true
+    // P0-VREG-AUDIT-5: persist OVERTIME_REVERT_CONFLICT actual DB NOT local only
+    recordAuditMock(db9, 'OVERTIME_REVERT_CONFLICT', 'HR Admin System', `hr_overtime_requests:77:attendance:${att9ot.id}`, JSON.stringify({ date:'2025-08-10', current_ot:300, expected_after:240, match:false, reason:'HR Correction override, revert attendance SKIP blind overwrite' }))
   }
   otWorkflowCancel = true
+  // P0-VREG-AUDIT: persist OVERTIME_HR_CANCEL canonical 2x (summary + audit event loop) NOT generic
+  recordAuditMock(db9, 'OVERTIME_HR_CANCEL', 'HR Admin', `hr_overtime_requests:77`, JSON.stringify({ reverted_count:0, conflict_skipped:1, no_row_skipped:1, cancel_reason:'HR Membatalkan request OT', audit_events:['OVERTIME_REVERT_NO_ATTENDANCE_ROW date=2025-08-20', 'OVERTIME_REVERT_CONFLICT date=2025-08-10'] }))
+  recordAuditMock(db9, 'OVERTIME_HR_CANCEL', 'HR Admin', `hr_overtime_requests:77`, `[Cancel Revert Summary] OT request #77 reverted 0 rows safe non-blind; 1 conflict attendance value preserved`)
   assertEqual(att9ot.overtime_minutes, 300, 'S9.1 (sub3b) V4 CONFLICT OT cancel: attendance overtime_minutes TETAP 300 (TIDAK DI-OVERWRITE balik ke 0 snapshot blind)')
   assertTrue(otWorkflowCancel, 'S9.1 (sub3c) workflow status OT TETAP CANCELLED_HR_ADMIN success (commit)')
   assertTrue(otWarningPresent, 'S9.1 (sub3d) response JSON ADA warning key ot_revert_warning visible')
   assertTrue(otRevertConflictAudit, 'S9.1 (sub3e) AUDIT OVERTIME_REVERT_CONFLICT logged')
+  // P0 Forensic assertions S9
+  assertTrue(auditForensicCount(db9, 'OVERTIME_REVERT_CONFLICT') >= 1, `S9.P0-AUDIT-5: OVERTIME_REVERT_CONFLICT persist actual DB ≥1 row (NOT local warning array only; actual=${auditForensicCount(db9, 'OVERTIME_REVERT_CONFLICT')})`)
+  assertTrue(auditForensicCount(db9, 'OVERTIME_HR_CANCEL') >= 2, `S9.P0-AUDIT-CANCEL: OVERTIME_HR_CANCEL canonical events ≥2 rows (summary + loop audit_events persist each; actual=${auditForensicCount(db9, 'OVERTIME_HR_CANCEL')})`)
+  assertEqual(auditForensicCount(db9, 'EMPLOYEE_ATTENDANCE_CORRECTION'), 0, 'S9.P0-AUDIT-5b: GENERIC EMPLOYEE_ATTENDANCE_CORRECTION forbidden OT cancel revert substitute count=0 (MUST use OVERTIME_HR_CANCEL)')
 
   assertFalse(otActuallyReverted, 'S9.1 (sub4a) non blind revert = actual attendance NOT diubah (SKIP revert)')
   // Non-conflict scenario baseline separate small:
