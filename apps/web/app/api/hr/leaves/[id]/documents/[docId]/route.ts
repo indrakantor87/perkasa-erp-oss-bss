@@ -30,9 +30,9 @@ function parsePositiveInt(value: unknown): number | null {
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ requestId: string; docId: string }> },
+  { params }: { params: Promise<{ id: string; docId: string }> },
 ) {
-  const { requestId: requestIdLocal, docId: docIdLocal } = await params
+  const { id: requestIdLocal, docId: docIdLocal } = await params
 const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
 

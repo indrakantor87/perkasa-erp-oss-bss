@@ -19,9 +19,9 @@ type OtRequestRow = {
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ requestId: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { requestId: requestIdLocal } = await params
+  const { id: requestIdLocal } = await params
 const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })

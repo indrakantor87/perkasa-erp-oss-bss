@@ -22,9 +22,9 @@ type EvidenceRow = {
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ rid: string; did: string }> },
+  { params }: { params: Promise<{ id: string; did: string }> },
 ) {
-  const { rid: ridLocal, did: didLocal } = await params
+  const { id: ridLocal, did: didLocal } = await params
 const session = await getSession()
   if (!session) {
     return Response.json({ message: 'Unauthorized' }, { status: 401 })

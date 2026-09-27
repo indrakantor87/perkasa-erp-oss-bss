@@ -31,8 +31,8 @@ function parsePositiveBigInt(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
 }
 
-export async function POST(request: Request, { params }: { params: Promise<{ requestId: string }> }) {
-  const { requestId: requestIdLocal } = await params
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: requestIdLocal } = await params
 const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
 
@@ -126,8 +126,8 @@ const session = await getSession()
   }
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ requestId: string }> }) {
-  const { requestId: requestIdLocal } = await params
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: requestIdLocal } = await params
 const session = await getSession()
   if (!session) return Response.json({ message: 'Unauthorized' }, { status: 401 })
 
