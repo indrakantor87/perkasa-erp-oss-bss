@@ -336,7 +336,14 @@ function getVisibleSections(workspace: HrWorkspaceKey, sections: DomainReviewSec
     case 'attendance':
       return sections.filter((section) => {
         const title = section.title.toUpperCase()
-        return title.includes('ATTENDANCE')
+        const blocked = [
+          'FACE ATTENDANCE',
+          'FACE PRIORITY',
+          'FACE RETAKE',
+          'REVIEW FACE',
+          'GEOFENCE',
+        ].some((token) => title.includes(token))
+        return title.includes('ATTENDANCE') && !blocked
       })
     case 'salary':
       return sections.filter((section) => {
