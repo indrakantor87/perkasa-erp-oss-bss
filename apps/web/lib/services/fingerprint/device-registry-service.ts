@@ -1,5 +1,11 @@
 import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'crypto'
-import { runReviewDbExecute, runReviewDbQuery } from '@/lib/review-db'
+import {
+  runReviewDbExecute,
+  runReviewDbQuery,
+  addColumnIfMissing,
+  invalidateReviewDbColumnCache,
+  hasReviewDbColumn,
+} from '@/lib/review-db'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { MockFingerprintConnector } from './mock-connector'
 import type {
@@ -139,6 +145,118 @@ export function validateFingerprintEncryptionConfiguredOrThrow(): void {
   }
 }
 
+async function ensureHrFpMachinesHybridAlign() {
+  const tableName = 'hr_fp_machines'
+  if (!(await hasReviewDbColumn(tableName, 'ip'))) {
+    await addColumnIfMissing(tableName, 'ip', 'ip VARCHAR(64) NOT NULL DEFAULT \'__legacy_missing__\'', 'id')
+  }
+  if (!(await hasReviewDbColumn(tableName, 'display_name'))) {
+    await addColumnIfMissing(tableName, 'display_name', 'display_name VARCHAR(120) NULL', 'machine_name')
+  }
+  if (!(await hasReviewDbColumn(tableName, 'model'))) {
+    await addColumnIfMissing(tableName, 'model', 'model VARCHAR(100) NULL DEFAULT \'__legacy_missing__\'', 'machine_model')
+  }
+  if (!(await hasReviewDbColumn(tableName, 'ip_address'))) {
+    await addColumnIfMissing(tableName, 'ip_address', 'ip_address VARCHAR(45) NOT NULL DEFAULT \'__current_missing__\'', 'display_name')
+  }
+  if (!(await hasReviewDbColumn(tableName, 'machine_name'))) {
+    await addColumnIfMissing(tableName, 'machine_name', 'machine_name VARCHAR(120) NOT NULL DEFAULT \'__current_missing__\'', 'ip')
+  }
+  if (!(await hasReviewDbColumn(tableName, 'machine_model'))) {
+    await addColumnIfMissing(tableName, 'machine_model', 'machine_model VARCHAR(100) NOT NULL DEFAULT \'__current_missing__\'', 'display_name')
+  }
+  await addColumnIfMissing(tableName, 'active', 'active TINYINT(1) NOT NULL DEFAULT 1', 'branch_id')
+  await addColumnIfMissing(tableName, 'location', 'location TEXT NULL', 'model')
+  await addColumnIfMissing(tableName, 'branch_id', 'branch_id BIGINT UNSIGNED NULL', 'location')
+  await addColumnIfMissing(tableName, 'sync_method', 'sync_method VARCHAR(60) NULL', 'last_sync_at')
+  await addColumnIfMissing(tableName, 'notes', 'notes TEXT NULL', 'auth_config_encrypted')
+  await addColumnIfMissing(tableName, 'created_by_user_id', 'created_by_user_id BIGINT UNSIGNED NULL', 'updated_at')
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE ${tableName} ADD UNIQUE INDEX IF NOT EXISTS uq_fp_machines_ip_port_current (ip, port)`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE ${tableName} ADD UNIQUE INDEX IF NOT EXISTS uq_fp_machines_ip_port (ip_address, port)`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE ${tableName} ADD INDEX IF NOT EXISTS idx_hr_fp_machines_ip (ip)`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE ${tableName} ADD INDEX IF NOT EXISTS idx_hr_fp_machines_status (last_connection_status)`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE ${tableName} MODIFY COLUMN last_connection_status ENUM('UNKNOWN','ONLINE','OFFLINE','SYNC_ERROR','AUTH_FAILED') NOT NULL DEFAULT 'OFFLINE'`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_sync_runs MODIFY COLUMN sync_mode ENUM('MANUAL','SCHEDULED','RETRY') NOT NULL DEFAULT 'MANUAL'`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_employee_mappings MODIFY COLUMN machine_user_id VARCHAR(64) NOT NULL`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_employee_mappings ADD COLUMN IF NOT EXISTS notes TEXT NULL AFTER revoked_at`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_employee_mappings ADD COLUMN IF NOT EXISTS created_by_user_id BIGINT UNSIGNED NULL AFTER notes`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_raw_events MODIFY COLUMN machine_user_id VARCHAR(64) NOT NULL`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER employee_id`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER event_timestamp_original`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED' AFTER event_type_raw`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS raw_payload_json TEXT NULL AFTER is_processed`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER raw_payload_json`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS processing_notes TEXT NULL AFTER received_at`,
+    )
+  } catch {}
+  invalidateReviewDbColumnCache(tableName)
+  invalidateReviewDbColumnCache('hr_fp_sync_runs')
+  invalidateReviewDbColumnCache('hr_fp_employee_mappings')
+  invalidateReviewDbColumnCache('hr_fp_raw_events')
+}
+
 export async function ensureFingerprintTables() {
   if (tablesEnsured) {
     return
@@ -147,21 +265,34 @@ export async function ensureFingerprintTables() {
   await runReviewDbExecute<ExecuteResult>(`
     CREATE TABLE IF NOT EXISTS hr_fp_machines (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-      ip VARCHAR(64) NOT NULL,
+      ip VARCHAR(64) NOT NULL DEFAULT '__legacy_missing__',
+      machine_name VARCHAR(120) NOT NULL DEFAULT '__current_missing__',
+      display_name VARCHAR(120) NULL,
+      ip_address VARCHAR(45) NOT NULL DEFAULT '__current_missing__',
       port INT UNSIGNED NULL,
-      model VARCHAR(80) NOT NULL,
+      machine_model VARCHAR(100) NOT NULL DEFAULT '__current_missing__',
+      model VARCHAR(80) NOT NULL DEFAULT '__legacy_missing__',
+      location TEXT NULL,
+      branch_id BIGINT UNSIGNED NULL,
+      active TINYINT(1) NOT NULL DEFAULT 1,
       device_timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Jakarta',
       auth_config_encrypted TEXT NULL,
-      display_name VARCHAR(120) NULL,
       last_sync_at DATETIME NULL,
-      last_connection_status ENUM('ONLINE','OFFLINE','AUTH_FAILED','SYNC_ERROR') NOT NULL DEFAULT 'OFFLINE',
+      sync_method VARCHAR(60) NULL,
+      last_connection_status ENUM('UNKNOWN','ONLINE','OFFLINE','SYNC_ERROR','AUTH_FAILED') NOT NULL DEFAULT 'OFFLINE',
+      notes TEXT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      created_by_user_id BIGINT UNSIGNED NULL,
       PRIMARY KEY (id),
+      UNIQUE KEY uq_fp_machines_ip_port_current (ip, port),
+      UNIQUE KEY uq_fp_machines_ip_port (ip_address, port),
       KEY idx_hr_fp_machines_ip (ip),
       KEY idx_hr_fp_machines_status (last_connection_status)
     )
   `)
+
+  await ensureHrFpMachinesHybridAlign()
 
   await runReviewDbExecute<ExecuteResult>(`
     CREATE TABLE IF NOT EXISTS hr_fp_employee_mappings (
@@ -172,12 +303,16 @@ export async function ensureFingerprintTables() {
       enrollment_status ENUM('ENROLLED','PENDING','REVOKED') NOT NULL DEFAULT 'ENROLLED',
       enrolled_at DATETIME NULL,
       revoked_at DATETIME NULL,
+      notes TEXT NULL,
+      created_by_user_id BIGINT UNSIGNED NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       PRIMARY KEY (id),
       UNIQUE KEY uk_hr_fp_mapping_machine_user (machine_id, machine_user_id),
       KEY idx_hr_fp_mapping_employee (employee_id),
-      KEY idx_hr_fp_mapping_enrollment (enrollment_status)
+      KEY idx_hr_fp_mapping_enrollment (enrollment_status),
+      CONSTRAINT fk_fp_map_machine FOREIGN KEY (machine_id) REFERENCES hr_fp_machines(id),
+      CONSTRAINT fk_fp_map_employee FOREIGN KEY (employee_id) REFERENCES hr_employees(id)
     )
   `)
 
@@ -198,30 +333,38 @@ export async function ensureFingerprintTables() {
       final_status ENUM('SUCCESS','PARTIAL','FAILED') NOT NULL DEFAULT 'SUCCESS',
       error_summary TEXT NULL,
       PRIMARY KEY (id),
+      CONSTRAINT fk_sync_run_machine FOREIGN KEY (machine_id) REFERENCES hr_fp_machines(id),
       KEY idx_hr_fp_sync_runs_machine (machine_id, started_at DESC),
-      KEY idx_hr_fp_sync_runs_status (final_status)
+      KEY idx_hr_fp_sync_runs_status (final_status),
+      KEY idx_sync_run_machine_time (machine_id, started_at DESC)
     )
   `)
 
   await runReviewDbExecute<ExecuteResult>(`
     CREATE TABLE IF NOT EXISTS hr_fp_raw_events (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      sync_run_id BIGINT UNSIGNED NULL,
       machine_id BIGINT UNSIGNED NOT NULL,
       machine_user_id VARCHAR(64) NOT NULL,
       employee_id BIGINT UNSIGNED NULL,
-      event_timestamp_local DATETIME NOT NULL,
-      event_timestamp_utc DATETIME NOT NULL,
+      event_timestamp_original DATETIME NOT NULL,
+      event_timestamp_normalized DATETIME NOT NULL,
       event_type_raw VARCHAR(64) NULL,
+      event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED',
       verify_score INT NULL,
       deduplication_hash CHAR(64) NOT NULL,
       is_unmapped TINYINT(1) NOT NULL DEFAULT 0,
       is_processed TINYINT(1) NOT NULL DEFAULT 0,
-      raw_payload JSON NULL,
-      sync_run_id BIGINT UNSIGNED NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      raw_payload_json TEXT NULL,
+      received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      processing_notes TEXT NULL,
       PRIMARY KEY (id),
       UNIQUE KEY uk_hr_fp_raw_dedup (deduplication_hash),
-      KEY idx_hr_fp_raw_machine_ts (machine_id, event_timestamp_local DESC),
+      CONSTRAINT fk_raw_machine FOREIGN KEY (machine_id) REFERENCES hr_fp_machines(id),
+      CONSTRAINT fk_raw_sync FOREIGN KEY (sync_run_id) REFERENCES hr_fp_sync_runs(id),
+      CONSTRAINT fk_raw_employee FOREIGN KEY (employee_id) REFERENCES hr_employees(id),
+      KEY idx_raw_time_norm (event_timestamp_normalized),
+      KEY idx_hr_fp_raw_machine_ts (machine_id, event_timestamp_normalized DESC),
       KEY idx_hr_fp_raw_employee (employee_id),
       KEY idx_hr_fp_raw_unmapped (is_unmapped)
     )
@@ -243,12 +386,16 @@ function toSqlDateTime(date: Date): string {
 function mapRowToMachine(row: Record<string, unknown>): FpMachineRow {
   return {
     id: Number(row.id),
-    ip: String(row.ip ?? ''),
+    ip: String(row.ip ?? row.ip_address ?? ''),
     port: row.port === null || row.port === undefined ? null : Number(row.port),
-    model: String(row.model ?? ''),
+    model: String(row.model ?? row.machine_model ?? ''),
     deviceTimezone: String(row.device_timezone ?? 'Asia/Jakarta'),
     authConfigEncrypted: String(row.auth_config_encrypted ?? ''),
-    displayName: row.display_name === null || row.display_name === undefined ? '' : String(row.display_name),
+    displayName: (
+      row.display_name !== null && row.display_name !== undefined
+        ? String(row.display_name)
+        : (row.machine_name !== null && row.machine_name !== undefined ? String(row.machine_name) : '')
+    ),
     lastSyncAt: row.last_sync_at ? String(row.last_sync_at) : null,
     lastConnectionStatus: (String(row.last_connection_status ?? 'OFFLINE') as ConnectionStatus),
     createdAt: String(row.created_at ?? ''),
@@ -392,20 +539,40 @@ export async function createDevice(input: FpMachineCreateInput): Promise<{
     throw new Error('VALIDATION_ERROR')
   }
 
+  const dupCheck = await runReviewDbQuery<Record<string, unknown>>(
+    `
+      SELECT id
+      FROM hr_fp_machines
+      WHERE (ip = ? OR ip_address = ?)
+        AND (port <=> ?)
+      LIMIT 1
+    `,
+    [ip, ip, port],
+  )
+  if (dupCheck.length > 0) {
+    const err = new Error('DEVICE_DUPLICATE_IP_PORT') as Error & { code?: string }
+    err.code = 'DEVICE_DUPLICATE_IP_PORT'
+    throw err
+  }
+
+  const legacyMachineName = displayName ?? ip
   const result = await runReviewDbExecute<ExecuteResult>(
     `
       INSERT INTO hr_fp_machines (
         ip,
+        ip_address,
         port,
         model,
+        machine_model,
+        machine_name,
         device_timezone,
         auth_config_encrypted,
         display_name,
         last_connection_status
       )
-      VALUES (?, ?, ?, ?, ?, ?, 'OFFLINE')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OFFLINE')
     `,
-    [ip, port, model, deviceTimezone, authConfigEncrypted, displayName],
+    [ip, ip, port, model, model, legacyMachineName, deviceTimezone, authConfigEncrypted, displayName],
   )
 
   const id = Number(result.insertId ?? 0)
@@ -448,15 +615,18 @@ export async function updateDevice(
       UPDATE hr_fp_machines
       SET
         ip = ?,
+        ip_address = ?,
         port = ?,
         model = ?,
+        machine_model = ?,
         device_timezone = ?,
         auth_config_encrypted = ?,
         display_name = ?,
+        machine_name = COALESCE(?, machine_name),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `,
-    [ip, port, model, deviceTimezone, authConfigEncrypted, displayName, id],
+    [ip, ip, port, model, model, deviceTimezone, authConfigEncrypted, displayName, displayName, id],
   )
 
   return getDevice(id)
@@ -735,27 +905,34 @@ export async function syncNow(
             machine_user_id,
             employee_id,
             event_timestamp_local,
+            event_timestamp_original,
             event_timestamp_utc,
+            event_timestamp_normalized,
             event_type_raw,
+            event_mode,
             verify_score,
             deduplication_hash,
             is_unmapped,
             is_processed,
             raw_payload,
+            raw_payload_json,
             sync_run_id
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'UNDEFINED', ?, ?, ?, 0, ?, ?, ?)
         `,
         [
           machineId,
           ev.machineUserId,
           employeeId,
           tsLocalSql,
+          tsLocalSql,
+          tsUtcSql,
           tsUtcSql,
           ev.eventTypeRaw ?? null,
           ev.verifyScore ?? null,
           dedupHash,
           isUnmapped,
+          rawPayloadSerialized,
           rawPayloadSerialized,
           runId,
         ],

@@ -239,32 +239,78 @@ async function ensureHrDocumentAccessLogsTable() {
   invalidateReviewDbColumnCache('hr_document_access_logs')
 }
 
+async function ensureHrFpMachinesHybridAlign() {
+  const tableName = 'hr_fp_machines'
+  await addColumnIfMissing(tableName, 'ip', 'ip VARCHAR(64) NOT NULL DEFAULT \'__legacy_missing__\'', 'id')
+  await addColumnIfMissing(tableName, 'display_name', 'display_name VARCHAR(120) NULL', 'machine_name')
+  await addColumnIfMissing(tableName, 'model', 'model VARCHAR(100) NULL DEFAULT \'__legacy_missing__\'', 'machine_model')
+  await addColumnIfMissing(tableName, 'active', 'active TINYINT(1) NOT NULL DEFAULT 1', 'branch_id')
+  await addColumnIfMissing(tableName, 'location', 'location TEXT NULL', 'model')
+  await addColumnIfMissing(tableName, 'branch_id', 'branch_id BIGINT UNSIGNED NULL', 'location')
+  await addColumnIfMissing(tableName, 'sync_method', 'sync_method VARCHAR(60) NULL', 'last_sync_at')
+  await addColumnIfMissing(tableName, 'notes', 'notes TEXT NULL', 'auth_config_encrypted')
+  await addColumnIfMissing(tableName, 'created_by_user_id', 'created_by_user_id BIGINT UNSIGNED NULL', 'updated_at')
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE ${tableName} ADD UNIQUE INDEX IF NOT EXISTS uq_fp_machines_ip_port_current (ip, port)`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE ${tableName} ADD UNIQUE INDEX IF NOT EXISTS uq_fp_machines_ip_port (ip_address, port)`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE ${tableName} ADD INDEX IF NOT EXISTS idx_hr_fp_machines_ip (ip)`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE ${tableName} ADD INDEX IF NOT EXISTS idx_hr_fp_machines_status (last_connection_status)`,
+    )
+  } catch {}
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE ${tableName} MODIFY COLUMN last_connection_status ENUM('UNKNOWN','ONLINE','OFFLINE','SYNC_ERROR','AUTH_FAILED') NOT NULL DEFAULT 'OFFLINE'`,
+    )
+  } catch {}
+  invalidateReviewDbColumnCache(tableName)
+}
+
 async function ensureHrFpMachinesTable() {
   await runReviewDbExecute<ExecuteResult>(
     `
       CREATE TABLE IF NOT EXISTS hr_fp_machines (
         id BIGINT NOT NULL AUTO_INCREMENT,
+        ip VARCHAR(64) NOT NULL DEFAULT '__legacy_missing__',
         machine_name VARCHAR(120) NOT NULL,
-        ip_address VARCHAR(45) NOT NULL,
+        display_name VARCHAR(120) NULL,
+        ip_address VARCHAR(45) NOT NULL DEFAULT '__current_missing__',
         port INTEGER UNSIGNED NULL,
         machine_model VARCHAR(100) NOT NULL,
+        model VARCHAR(100) NULL DEFAULT '__legacy_missing__',
         location TEXT NULL,
         branch_id BIGINT UNSIGNED NULL,
         active TINYINT(1) NOT NULL DEFAULT 1,
         last_sync_at DATETIME NULL,
-        last_connection_status ENUM('UNKNOWN','ONLINE','OFFLINE','SYNC_ERROR','AUTH_FAILED') NOT NULL DEFAULT 'UNKNOWN',
         sync_method VARCHAR(60) NULL,
-        device_timezone VARCHAR(40) NOT NULL DEFAULT 'Asia/Jakarta',
+        last_connection_status ENUM('UNKNOWN','ONLINE','OFFLINE','SYNC_ERROR','AUTH_FAILED') NOT NULL DEFAULT 'OFFLINE',
+        device_timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Jakarta',
         auth_config_encrypted TEXT NULL,
         notes TEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         created_by_user_id BIGINT UNSIGNED NULL,
         PRIMARY KEY (id),
-        UNIQUE KEY uq_fp_machines_ip_port (ip_address, port)
+        UNIQUE KEY uq_fp_machines_ip_port (ip_address, port),
+        UNIQUE KEY uq_fp_machines_ip_port_current (ip, port),
+        KEY idx_hr_fp_machines_ip (ip),
+        KEY idx_hr_fp_machines_status (last_connection_status)
       )
     `,
   )
+  await ensureHrFpMachinesHybridAlign()
   invalidateReviewDbColumnCache('hr_fp_machines')
 }
 
@@ -299,24 +345,30 @@ async function ensureHrFpSyncRunsTable() {
       CREATE TABLE IF NOT EXISTS hr_fp_sync_runs (
         id BIGINT NOT NULL AUTO_INCREMENT,
         machine_id BIGINT UNSIGNED NOT NULL,
+        actor_user_id BIGINT UNSIGNED NULL,
         started_at DATETIME NOT NULL,
         finished_at DATETIME NULL,
-        sync_mode ENUM('MANUAL','SCHEDULED') NOT NULL,
-        actor_user_id BIGINT UNSIGNED NULL,
+        sync_mode ENUM('MANUAL','SCHEDULED','RETRY') NOT NULL DEFAULT 'MANUAL',
+        duration_ms BIGINT UNSIGNED NULL,
         total_records_fetched INT UNSIGNED NOT NULL DEFAULT 0,
         total_new_valid INT UNSIGNED NOT NULL DEFAULT 0,
         total_duplicates_skipped INT UNSIGNED NOT NULL DEFAULT 0,
         total_unmapped INT UNSIGNED NOT NULL DEFAULT 0,
         total_failed_parse INT UNSIGNED NOT NULL DEFAULT 0,
-        final_status ENUM('SUCCESS','PARTIAL','FAILED') NULL,
+        final_status ENUM('SUCCESS','PARTIAL','FAILED') NOT NULL DEFAULT 'SUCCESS',
         error_summary TEXT NULL,
-        duration_ms BIGINT UNSIGNED NULL,
         PRIMARY KEY (id),
         CONSTRAINT fk_sync_run_machine FOREIGN KEY (machine_id) REFERENCES hr_fp_machines(id),
-        KEY idx_sync_run_machine_time (machine_id, started_at DESC)
+        KEY idx_sync_run_machine_time (machine_id, started_at DESC),
+        KEY idx_hr_fp_sync_runs_status (final_status)
       )
     `,
   )
+  try {
+    await runReviewDbExecute<ExecuteResult>(
+      `ALTER TABLE hr_fp_sync_runs MODIFY COLUMN sync_mode ENUM('MANUAL','SCHEDULED','RETRY') NOT NULL DEFAULT 'MANUAL'`,
+    )
+  } catch {}
   invalidateReviewDbColumnCache('hr_fp_sync_runs')
 }
 
