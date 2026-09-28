@@ -6,7 +6,7 @@ import { requireSession } from '@/lib/auth'
 import { getDomainPageData } from '@/lib/services/domain-service'
 import { getHrWorkspaceInsightSections } from '@/lib/services/hr-workspace-insight-service'
 
-const validHrWorkspaces: HrWorkspaceKey[] = ['overview', 'employees', 'attendance', 'salary', 'loans', 'permissions', 'disciplinary']
+const validHrWorkspaces: HrWorkspaceKey[] = ['overview', 'employees', 'attendance', 'salary', 'loans', 'permissions', 'disciplinary', 'fingerprint']
 
 function resolveSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value

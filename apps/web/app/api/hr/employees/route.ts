@@ -289,6 +289,66 @@ async function autoRevokeFpMappings(employeeId: number, actorRef: string) {
   return affected
 }
 
+export async function GET(request: Request) {
+  const session = await getSession()
+  if (!session) {
+    return Response.json({ message: 'Unauthorized' }, { status: 401 })
+  }
+  if (!canPerformAction(session.role, 'hr', 'view')) {
+    return Response.json({ message: 'Forbidden' }, { status: 403 })
+  }
+
+  try {
+    await ensureHrBatch01Schema()
+    await ensureHrBatch02aEmployeeCodeUnique()
+
+    const url = new URL(request.url)
+    const q = String(url.searchParams.get('q') ?? '').trim()
+    const includeResigned = String(url.searchParams.get('includeResigned') ?? '').trim().toLowerCase() === '1'
+    const limitRaw = Number.parseInt(String(url.searchParams.get('limit') ?? '100'), 10)
+    const safeLimit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 500) : 100
+
+    const whereClauses: string[] = []
+    const params: unknown[] = []
+
+    if (!includeResigned) {
+      whereClauses.push(`(UPPER(COALESCE(he.status,'')) <> 'ARCHIVED' AND (he.exit_date IS NULL OR UPPER(COALESCE(he.employment_status,'')) NOT IN ('RESIGNED','TERMINATED','PENSIUN')))`)
+    }
+    if (q) {
+      whereClauses.push(`(he.employee_code LIKE ? OR UPPER(he.full_name) LIKE ?)`)
+      params.push(`%${q}%`, `%${q.toUpperCase()}%`)
+    }
+
+    const where = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''
+
+    const rows = await runReviewDbQuery<{ id: number; employeeCode: string | null; fullName: string | null; employmentStatus: string | null }>(
+      `
+        SELECT
+          he.id,
+          he.employee_code AS employeeCode,
+          he.full_name AS fullName,
+          he.employment_status AS employmentStatus
+        FROM hr_employees he
+        ${where}
+        ORDER BY he.full_name ASC, he.id ASC
+        LIMIT ?
+      `,
+      [...params, safeLimit],
+    )
+
+    const data = rows.map((row) => ({
+      id: Number(row.id) || 0,
+      employeeCode: row.employeeCode ?? '',
+      fullName: row.fullName ?? '',
+      employmentStatus: row.employmentStatus ?? '',
+    }))
+
+    return Response.json({ data })
+  } catch (error) {
+    return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
+  }
+}
+
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) {

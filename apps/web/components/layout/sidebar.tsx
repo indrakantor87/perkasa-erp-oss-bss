@@ -616,7 +616,7 @@ function buildHrMainItem() {
     key: 'hr-main',
     title: 'HR',
     description: 'Employee, attendance, payroll, dan pinjaman karyawan',
-    excludePrefixes: ['/hr/employees', '/hr/attendance', '/hr/salary', '/hr/loans', '/hr/permissions', '/hr/disciplinary', '/hr/leave-requests', '/hr/overtime-requests'],
+    excludePrefixes: ['/hr/employees', '/hr/attendance', '/hr/salary', '/hr/loans', '/hr/permissions', '/hr/disciplinary', '/hr/leave-requests', '/hr/overtime-requests', '/hr/fingerprint'],
     children: buildHrSubmenuItems(),
   })
 }
@@ -686,6 +686,13 @@ function buildHrSubmenuItems() {
       description: 'Kelola pengajuan lembur karyawan dan approval HR.',
       href: '/hr/overtime-requests',
       matchPrefixes: ['/hr/overtime-requests'],
+    }),
+    buildSidebarNavItem('/hr', {
+      key: 'hr-sub-fingerprint',
+      title: 'Fingerprint Devices',
+      description: 'Kelola mesin fingerprint, koneksi, sinkronisasi, dan mapping karyawan.',
+      href: '/hr/fingerprint',
+      matchPrefixes: ['/hr/fingerprint'],
     }),
   ]
 }

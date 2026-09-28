@@ -169,8 +169,12 @@ const HrSalarySlipVoidForm = dynamic(
   () => import('@/components/hr-salary-slip-void-form').then((mod) => mod.HrSalarySlipVoidForm),
   { ssr: false, loading: FormModalSkeleton },
 )
+const HrFingerprintManagement = dynamic(
+  () => import('@/components/hr-fingerprint-management').then((mod) => mod.HrFingerprintManagement),
+  { ssr: false, loading: FormModalSkeleton },
+)
 
-export type HrWorkspaceKey = 'overview' | 'employees' | 'attendance' | 'salary' | 'loans' | 'permissions' | 'disciplinary'
+export type HrWorkspaceKey = 'overview' | 'employees' | 'attendance' | 'salary' | 'loans' | 'permissions' | 'disciplinary' | 'fingerprint'
 
 type HrWorkspacePageProps = {
   content: DomainPageContent
@@ -229,6 +233,12 @@ const hrWorkspaceTabs: HrWorkspaceTab[] = [
     title: 'Sanksi',
     description: 'Kelola SP, catatan disiplin, dan tindak lanjut pelanggaran kerja.',
     href: '/hr/disciplinary',
+  },
+  {
+    key: 'fingerprint',
+    title: 'Fingerprint Devices',
+    description: 'Kelola mesin fingerprint, koneksi, sinkronisasi, dan mapping karyawan.',
+    href: '/hr/fingerprint',
   },
 ]
 
@@ -362,6 +372,8 @@ function getVisibleSections(workspace: HrWorkspaceKey, sections: DomainReviewSec
         const title = section.title.toUpperCase()
         return title.includes('EMPLOYEE') || title.includes('KPI') || title.includes('FACE')
       })
+    case 'fingerprint':
+      return []
     case 'overview':
     default:
       return sections.filter((section) => {
@@ -524,6 +536,8 @@ function renderWorkspaceForms(params: {
     case 'permissions':
       return null
     case 'disciplinary':
+      return null
+    case 'fingerprint':
       return null
     case 'overview':
     default:
@@ -1415,6 +1429,18 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
             />
           )}
         </section>
+      ) : null}
+
+      {activeWorkspace === 'fingerprint' ? (
+        <Suspense fallback={<FormModalSkeleton />}>
+          <HrFingerprintManagement
+            canCreate={canCreate}
+            canUpdate={canUpdate}
+            canView={enabledCapabilities.some((c) => c.action === 'view')}
+            canDelete={canUpdate}
+            reviewDbReady={reviewDbReady}
+          />
+        </Suspense>
       ) : null}
 
       {renderWorkspaceForms({
