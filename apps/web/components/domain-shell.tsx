@@ -111,18 +111,6 @@ const HrAttendanceForm = dynamic(
   () => import('@/components/hr-attendance-form').then((mod) => mod.HrAttendanceForm),
   { ssr: false, loading: FormModalSkeleton },
 )
-const HrAttendanceFaceConfigForm = dynamic(
-  () => import('@/components/hr-attendance-face-config-form').then((mod) => mod.HrAttendanceFaceConfigForm),
-  { ssr: false, loading: FormModalSkeleton },
-)
-const HrAttendanceFaceReviewForm = dynamic(
-  () => import('@/components/hr-attendance-face-review-form').then((mod) => mod.HrAttendanceFaceReviewForm),
-  { ssr: false, loading: FormModalSkeleton },
-)
-const HrAttendanceGeofenceForm = dynamic(
-  () => import('@/components/hr-attendance-geofence-form').then((mod) => mod.HrAttendanceGeofenceForm),
-  { ssr: false, loading: FormModalSkeleton },
-)
 const HrAttendanceUpdateForm = dynamic(
   () => import('@/components/hr-attendance-update-form').then((mod) => mod.HrAttendanceUpdateForm),
   { ssr: false, loading: FormModalSkeleton },
@@ -137,10 +125,6 @@ const HrEmployeeCreateForm = dynamic(
 )
 const HrEmployeeKpiForm = dynamic(
   () => import('@/components/hr-employee-kpi-form').then((mod) => mod.HrEmployeeKpiForm),
-  { ssr: false, loading: FormModalSkeleton },
-)
-const HrEmployeeFaceReferenceForm = dynamic(
-  () => import('@/components/hr-employee-face-reference-form').then((mod) => mod.HrEmployeeFaceReferenceForm),
   { ssr: false, loading: FormModalSkeleton },
 )
 const HrEmployeeReactivateForm = dynamic(
@@ -578,11 +562,7 @@ type HrActionKey =
   | 'employee-archive'
   | 'employee-reactivate'
   | 'kpi-entry'
-  | 'face-reference'
   | 'attendance-create'
-  | 'face-config'
-  | 'face-review'
-  | 'geofence-config'
   | 'attendance-update'
   | 'loan-create'
   | 'salary-create'
@@ -592,12 +572,8 @@ type HrActionKey =
   | 'salary-void'
 
 const HR_ACTION_ORDER: HrActionKey[] = [
-  'face-review',
   'attendance-update',
   'attendance-create',
-  'face-reference',
-  'face-config',
-  'geofence-config',
   'employee-create',
   'employee-archive',
   'employee-reactivate',
@@ -621,27 +597,6 @@ function getHrSectionAction(params: {
 }) {
   const title = params.sectionTitle.trim().toUpperCase()
 
-  if (title.includes('FACE') && title.includes('REVIEW') && params.canUpdate) {
-    return {
-      key: 'face-review' as const,
-      label: 'Review Verifikasi Wajah',
-      description: 'Validasi capture attendance wajah yang masih menunggu keputusan HR.',
-    }
-  }
-  if (title.includes('FACE') && params.canUpdate) {
-    return {
-      key: 'face-reference' as const,
-      label: 'Kelola Referensi Wajah',
-      description: 'Perkuat baseline wajah employee untuk akurasi verifikasi attendance.',
-    }
-  }
-  if (title.includes('GEOFENCE') && params.canUpdate) {
-    return {
-      key: 'geofence-config' as const,
-      label: 'Atur Geofence',
-      description: 'Sesuaikan titik kerja dan radius attendance sesuai operasi lapangan.',
-    }
-  }
   if (title.includes('ATTENDANCE') && params.canUpdate) {
     return {
       key: 'attendance-update' as const,
@@ -1680,15 +1635,6 @@ function getDomainReviewRowAction(params: {
   }
 
   if (params.domainKey === 'hr') {
-    if (params.canUpdate && (title.includes('FACE') && title.includes('REVIEW') || rowStatus.includes('PENDING_REVIEW'))) {
-      return { label: 'Review Wajah', href: `#${getHrActionAnchorId('face-review')}` }
-    }
-    if (params.canUpdate && title.includes('FACE')) {
-      return { label: 'Kelola Referensi', href: `#${getHrActionAnchorId('face-reference')}` }
-    }
-    if (params.canUpdate && title.includes('GEOFENCE')) {
-      return { label: 'Atur Geofence', href: `#${getHrActionAnchorId('geofence-config')}` }
-    }
     if (params.canUpdate && title.includes('ATTENDANCE')) {
       return {
         label: 'Koreksi Attendance',
@@ -1831,10 +1777,9 @@ const domainOperationalBlueprints: Record<
   hr: {
     focusTitle: 'Operasional SDM, attendance, payroll, dan kontrol lapangan',
     focusDescription:
-      'Menu HR menggabungkan employee lifecycle, attendance, loan, payroll, dan fondasi geofence/wajah untuk mendukung operasi harian ERP.',
+      'Menu HR menggabungkan employee lifecycle, attendance dari mesin fingerprint, loan, dan payroll untuk mendukung operasi harian ERP.',
     flows: [
-      { title: 'Employee -> Attendance', detail: 'Hubungkan master karyawan dengan kehadiran dan kontrol lokasi.' },
-      { title: 'Face/Geo Review', detail: 'Gunakan review manual dan konfigurasi threshold sebagai fondasi verifikasi lapangan.' },
+      { title: 'Employee -> Attendance', detail: 'Hubungkan master karyawan dengan data kehadiran dari mesin fingerprint dan koreksi administratif.' },
       { title: 'Loan -> Payroll', detail: 'Jaga pinjaman dan slip gaji tetap sinkron dengan status karyawan aktif.' },
     ],
     integrations: [
@@ -2189,80 +2134,6 @@ export function DomainShell({
           .filter((row) => row.status.toUpperCase() === 'ARCHIVED')
           .map((row) => `${row.id.replace(/^EMP-/, '')} | ${row.primary} | ${row.secondary} | ${row.status}`)
       : []
-  const hrEmployeeFaceReferenceSuggestions =
-    content.key === 'hr'
-      ? (() => {
-          const referenceRows = (content.reviewSections ?? [])
-            .filter((section) => section.title.toUpperCase().includes('EMPLOYEE FACE REFERENCES'))
-            .flatMap((section) => section.rows)
-
-          const referenceMap = new Map(
-            referenceRows
-              .map((row) => {
-                const employeeId = row.meta.find((item) => item.startsWith('Employee ID: '))?.replace('Employee ID: ', '').trim() || ''
-                if (!employeeId || employeeId === '-') {
-                  return null
-                }
-
-                const referenceRef =
-                  row.meta.find((item) => item.startsWith('Reference Ref: '))?.replace('Reference Ref: ', '').trim() || '-'
-                const verificationMode = row.meta.find((item) => item.startsWith('Mode: '))?.replace('Mode: ', '').trim() || 'CAMERA_CAPTURE'
-
-                return [employeeId, { referenceRef, verificationMode }] as const
-              })
-              .filter((item): item is readonly [string, { referenceRef: string; verificationMode: string }] => Boolean(item)),
-          )
-
-          return (content.reviewSections ?? [])
-            .filter((section) => section.title.toUpperCase().includes('EMPLOYEE TERBARU'))
-            .flatMap((section) => section.rows)
-            .filter((row) => row.status.toUpperCase() !== 'ARCHIVED')
-            .map((row) => {
-              const employeeId = row.id.replace(/^EMP-/, '').trim()
-              const reference = referenceMap.get(employeeId)
-              return employeeId
-                ? `${employeeId} | ${row.primary} | ${row.secondary} | ${row.status} | ${reference?.referenceRef || '-'} | ${reference?.verificationMode || 'CAMERA_CAPTURE'}`
-                : ''
-            })
-            .filter(Boolean)
-        })()
-      : []
-  const hrEmployeeFaceReferenceTrendSuggestions =
-    content.key === 'hr'
-      ? (content.reviewSections ?? [])
-          .filter((section) => section.title.toUpperCase().includes('FACE REFERENCE TRENDS'))
-          .flatMap((section) => section.rows)
-          .map((row) => {
-            const employeeId = row.id.replace(/^FACE-TREND-/, '').trim()
-            const historyCount = row.meta.find((item) => item.startsWith('History Count: '))?.replace('History Count: ', '').trim() || '0'
-            const averageScore = row.meta.find((item) => item.startsWith('Average Score: '))?.replace('Average Score: ', '').trim() || '0.0'
-            const latestScore = row.meta.find((item) => item.startsWith('Latest Score: '))?.replace('Latest Score: ', '').trim() || '0'
-            const bestScore = row.meta.find((item) => item.startsWith('Best Score: '))?.replace('Best Score: ', '').trim() || '0'
-            const latestSource = row.meta.find((item) => item.startsWith('Latest Source: '))?.replace('Latest Source: ', '').trim() || '-'
-            const driftStatus = row.meta.find((item) => item.startsWith('Drift Status: '))?.replace('Drift Status: ', '').trim() || 'INSUFFICIENT_DATA'
-            const gapFromAverage =
-              row.meta.find((item) => item.startsWith('Gap From Average: '))?.replace('Gap From Average: ', '').trim() || '0.0'
-            const gapFromBest = row.meta.find((item) => item.startsWith('Gap From Best: '))?.replace('Gap From Best: ', '').trim() || '0'
-            return employeeId
-              ? `${employeeId} | ${historyCount} | ${averageScore} | ${latestScore} | ${bestScore} | ${latestSource} | ${driftStatus} | ${gapFromAverage} | ${gapFromBest}`
-              : ''
-          })
-          .filter(Boolean)
-      : []
-  const hrEmployeeVerifiedFaceCandidateSuggestions =
-    content.key === 'hr'
-      ? (content.reviewSections ?? [])
-          .filter((section) => section.title.toUpperCase().includes('VERIFIED FACE CANDIDATES'))
-          .flatMap((section) => section.rows)
-          .map((row) => {
-            const employeeId = row.meta.find((item) => item.startsWith('Employee ID: '))?.replace('Employee ID: ', '').trim() || ''
-            const captureRef = row.meta.find((item) => item.startsWith('Capture Ref: '))?.replace('Capture Ref: ', '').trim() || ''
-            const verificationMode = row.meta.find((item) => item.startsWith('Mode: '))?.replace('Mode: ', '').trim() || 'CAMERA_CAPTURE'
-            const reviewedAt = row.meta.find((item) => item.startsWith('Reviewed At: '))?.replace('Reviewed At: ', '').trim() || '-'
-            return employeeId && captureRef ? `${employeeId} | ${captureRef} | ${verificationMode} | ${reviewedAt}` : ''
-          })
-          .filter(Boolean)
-      : []
   const hrAttendanceSuggestions =
     content.key === 'hr'
       ? (content.reviewSections ?? [])
@@ -2277,90 +2148,6 @@ export function DomainShell({
             const lock = row.meta.find((item) => item.startsWith('Lock Raw: '))?.replace('Lock Raw: ', '').trim() || '0'
             return attendanceId
               ? `${attendanceId} | ${row.primary} | ${row.status} | ${attendanceDate} | ${checkIn} | ${checkOut} | ${overtime} | ${lock}`
-              : ''
-          })
-          .filter(Boolean)
-      : []
-  const hrAttendanceGeofenceConfig =
-    content.key === 'hr'
-      ? (() => {
-          const row = (content.reviewSections ?? [])
-            .filter((section) => section.title.toUpperCase().includes('GEOFENCE ATTENDANCE'))
-            .flatMap((section) => section.rows)[0]
-
-          if (!row || row.status.toUpperCase() === 'NOT_SET') {
-            return null
-          }
-
-          return {
-            locationName: row.primary,
-            latitude: row.meta.find((item) => item.startsWith('Latitude: '))?.replace('Latitude: ', '').trim() || '',
-            longitude: row.meta.find((item) => item.startsWith('Longitude: '))?.replace('Longitude: ', '').trim() || '',
-            radiusMeters: row.meta.find((item) => item.startsWith('Radius: '))?.replace('Radius: ', '').replace(' meter', '').trim() || '100',
-            isRequired:
-              (row.meta.find((item) => item.startsWith('Required: '))?.replace('Required: ', '').trim() || '').toUpperCase() ===
-              'YA',
-            notes: row.meta.find((item) => item.startsWith('Notes: '))?.replace('Notes: ', '').trim() || '',
-          }
-        })()
-      : null
-  const hrAttendanceFaceConfig =
-    content.key === 'hr'
-      ? (() => {
-          const row = (content.reviewSections ?? [])
-            .filter((section) => section.title.toUpperCase().includes('FACE ATTENDANCE'))
-            .flatMap((section) => section.rows)[0]
-
-          if (!row || row.status.toUpperCase() === 'NOT_SET') {
-            return null
-          }
-
-          return {
-            isRequired:
-              (row.meta.find((item) => item.startsWith('Required: '))?.replace('Required: ', '').trim() || '').toUpperCase() ===
-              'YA',
-            verificationMode: row.meta.find((item) => item.startsWith('Mode: '))?.replace('Mode: ', '').trim() || 'MANUAL_REVIEW',
-            autoVerifyHighConfidence:
-              (row.meta.find((item) => item.startsWith('Auto Verify: '))?.replace('Auto Verify: ', '').trim() || '').toUpperCase() ===
-              'YA',
-            autoVerifyMinScore: Number.parseInt(
-              row.meta.find((item) => item.startsWith('Auto Verify Min Score: '))?.replace('Auto Verify Min Score: ', '').trim() ||
-                '85',
-              10,
-            ),
-            notes: row.meta.find((item) => item.startsWith('Notes: '))?.replace('Notes: ', '').trim() || '',
-          }
-        })()
-      : null
-  const hrAttendanceFaceReviewSuggestions =
-    content.key === 'hr'
-      ? (content.reviewSections ?? [])
-          .filter((section) => section.title.toUpperCase().includes('REVIEW FACE ATTENDANCE'))
-          .flatMap((section) => section.rows)
-          .map((row) => {
-            const faceLogId = row.id.replace(/^FACE-/, '').trim()
-            const captureRef = row.meta.find((item) => item.startsWith('Capture Ref: '))?.replace('Capture Ref: ', '').trim() || '-'
-            const mode = row.meta.find((item) => item.startsWith('Mode: '))?.replace('Mode: ', '').trim() || row.secondary || '-'
-            const matchScore = row.meta.find((item) => item.startsWith('Match Score: '))?.replace('Match Score: ', '').trim() || '0'
-            const confidenceBand =
-              row.meta.find((item) => item.startsWith('Confidence Band: '))?.replace('Confidence Band: ', '').trim() || 'LOW'
-            const baselineReferenceRef =
-              row.meta.find((item) => item.startsWith('Baseline Reference Ref: '))?.replace('Baseline Reference Ref: ', '').trim() || '-'
-            const baselineMatchScore =
-              row.meta.find((item) => item.startsWith('Baseline Match Score: '))?.replace('Baseline Match Score: ', '').trim() || '0'
-            const baselineMatchBand =
-              row.meta.find((item) => item.startsWith('Baseline Match Band: '))?.replace('Baseline Match Band: ', '').trim() || 'NO_BASELINE'
-            const baselineMatchOutcome =
-              row.meta.find((item) => item.startsWith('Baseline Match Outcome: '))?.replace('Baseline Match Outcome: ', '').trim() ||
-              'NO_BASELINE'
-            const recommendation =
-              row.meta.find((item) => item.startsWith('Recommendation: '))?.replace('Recommendation: ', '').trim() || 'PENDING_REVIEW'
-            const recommendationReason =
-              row.meta.find((item) => item.startsWith('Recommendation Reason: '))?.replace('Recommendation Reason: ', '').trim() || '-'
-            const autoReviewEligible =
-              row.meta.find((item) => item.startsWith('Auto Review Eligible: '))?.replace('Auto Review Eligible: ', '').trim() || 'Tidak'
-            return faceLogId
-              ? `${faceLogId} | ${row.primary} | ${row.status} | ${captureRef} | ${mode} | ${matchScore} | ${confidenceBand} | ${recommendation} | ${autoReviewEligible} | ${baselineReferenceRef} | ${baselineMatchScore} | ${baselineMatchBand} | ${baselineMatchOutcome} | ${recommendationReason}`
               : ''
           })
           .filter(Boolean)
@@ -3952,43 +3739,11 @@ export function DomainShell({
               initialEmployeeValue={hrEmployeePrefillValue}
             />
           </div>
-          <div id={getHrActionAnchorId('face-reference')} className="scroll-mt-24">
-            <HrEmployeeFaceReferenceForm
-              canUpdate={canUpdate}
-              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-              employeeSuggestions={hrEmployeeFaceReferenceSuggestions}
-              trendSuggestions={hrEmployeeFaceReferenceTrendSuggestions}
-              verifiedCaptureSuggestions={hrEmployeeVerifiedFaceCandidateSuggestions}
-            />
-          </div>
           <div id={getHrActionAnchorId('attendance-create')} className="scroll-mt-24">
             <HrAttendanceForm
               canCreate={canCreate}
               reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
               employeeSuggestions={hrEmployeeSuggestions}
-              geofenceConfig={hrAttendanceGeofenceConfig}
-              faceConfig={hrAttendanceFaceConfig}
-            />
-          </div>
-          <div id={getHrActionAnchorId('face-config')} className="scroll-mt-24">
-            <HrAttendanceFaceConfigForm
-              canUpdate={canUpdate}
-              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-              initialConfig={hrAttendanceFaceConfig}
-            />
-          </div>
-          <div id={getHrActionAnchorId('face-review')} className="scroll-mt-24">
-            <HrAttendanceFaceReviewForm
-              canUpdate={canUpdate}
-              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-              reviewSuggestions={hrAttendanceFaceReviewSuggestions}
-            />
-          </div>
-          <div id={getHrActionAnchorId('geofence-config')} className="scroll-mt-24">
-            <HrAttendanceGeofenceForm
-              canUpdate={canUpdate}
-              reviewDbReady={source.effectiveMode === 'review-db' && !source.isFallback}
-              initialConfig={hrAttendanceGeofenceConfig}
             />
           </div>
           <div id={getHrActionAnchorId('attendance-update')} className="scroll-mt-24">

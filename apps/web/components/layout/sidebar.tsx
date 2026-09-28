@@ -634,14 +634,14 @@ function buildHrSubmenuItems() {
     buildSidebarNavItem('/hr', {
       key: 'hr-sub-employees',
       title: 'Data Karyawan',
-      description: 'Master employee, arsip, face reference, dan KPI.',
+      description: 'Master employee, arsip, reaktivasi, dan KPI.',
       href: '/hr/employees',
       matchPrefixes: ['/hr/employees'],
     }),
     buildSidebarNavItem('/hr', {
       key: 'hr-sub-attendance',
       title: 'Absensi',
-      description: 'Input attendance, koreksi, geofence, dan face review.',
+      description: 'Rekap absensi karyawan dari mesin fingerprint dan koreksi administratif.',
       href: '/hr/attendance',
       matchPrefixes: ['/hr/attendance'],
     }),

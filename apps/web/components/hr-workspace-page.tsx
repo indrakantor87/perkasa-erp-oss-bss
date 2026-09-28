@@ -125,18 +125,6 @@ const HrAttendanceForm = dynamic(
   () => import('@/components/hr-attendance-form').then((mod) => mod.HrAttendanceForm),
   { ssr: false, loading: FormModalSkeleton },
 )
-const HrAttendanceFaceConfigForm = dynamic(
-  () => import('@/components/hr-attendance-face-config-form').then((mod) => mod.HrAttendanceFaceConfigForm),
-  { ssr: false, loading: FormModalSkeleton },
-)
-const HrAttendanceFaceReviewForm = dynamic(
-  () => import('@/components/hr-attendance-face-review-form').then((mod) => mod.HrAttendanceFaceReviewForm),
-  { ssr: false, loading: FormModalSkeleton },
-)
-const HrAttendanceGeofenceForm = dynamic(
-  () => import('@/components/hr-attendance-geofence-form').then((mod) => mod.HrAttendanceGeofenceForm),
-  { ssr: false, loading: FormModalSkeleton },
-)
 const HrAttendanceUpdateForm = dynamic(
   () => import('@/components/hr-attendance-update-form').then((mod) => mod.HrAttendanceUpdateForm),
   { ssr: false, loading: FormModalSkeleton },
@@ -147,10 +135,6 @@ const HrEmployeeArchiveForm = dynamic(
 )
 const HrEmployeeCreateForm = dynamic(
   () => import('@/components/hr-employee-create-form').then((mod) => mod.HrEmployeeCreateForm),
-  { ssr: false, loading: FormModalSkeleton },
-)
-const HrEmployeeFaceReferenceForm = dynamic(
-  () => import('@/components/hr-employee-face-reference-form').then((mod) => mod.HrEmployeeFaceReferenceForm),
   { ssr: false, loading: FormModalSkeleton },
 )
 const HrEmployeeKpiForm = dynamic(
@@ -213,7 +197,7 @@ const hrWorkspaceTabs: HrWorkspaceTab[] = [
   {
     key: 'employees',
     title: 'Data Karyawan',
-    description: 'Master employee, arsip, reaktivasi, face reference, dan KPI.',
+    description: 'Master employee, arsip, reaktivasi, dan KPI.',
     href: '/hr/employees',
   },
   {
@@ -254,28 +238,6 @@ function extractMeta(row: DomainReviewRow, prefix: string) {
 
 function buildEmployeeSuggestions(sections: DomainReviewSection[]) {
   const employeeRows = sections.filter((section) => section.title.toUpperCase().includes('EMPLOYEE TERBARU')).flatMap((section) => section.rows)
-  const faceReferenceRows = sections
-    .filter((section) => section.title.toUpperCase().includes('EMPLOYEE FACE REFERENCES'))
-    .flatMap((section) => section.rows)
-
-  const faceReferenceMap = new Map(
-    faceReferenceRows
-      .map((row) => {
-        const employeeId = extractMeta(row, 'Employee ID: ')
-        if (!employeeId || employeeId === '-') {
-          return null
-        }
-
-        return [
-          employeeId,
-          {
-            referenceRef: extractMeta(row, 'Reference Ref: ') || '-',
-            verificationMode: extractMeta(row, 'Mode: ') || 'CAMERA_CAPTURE',
-          },
-        ] as const
-      })
-      .filter((item): item is readonly [string, { referenceRef: string; verificationMode: string }] => Boolean(item)),
-  )
 
   return {
     employeeSuggestions: employeeRows.map((row) => `${row.primary} | ${row.secondary}`).filter(Boolean),
@@ -287,54 +249,7 @@ function buildEmployeeSuggestions(sections: DomainReviewSection[]) {
       .filter((row) => row.status.toUpperCase() === 'ARCHIVED')
       .map((row) => `${row.id.replace(/^EMP-/, '').trim()} | ${row.primary} | ${row.secondary} | ${row.status}`)
       .filter(Boolean),
-    employeeFaceReferenceSuggestions: employeeRows
-      .filter((row) => row.status.toUpperCase() !== 'ARCHIVED')
-      .map((row) => {
-        const employeeId = row.id.replace(/^EMP-/, '').trim()
-        const reference = faceReferenceMap.get(employeeId)
-        return employeeId
-          ? `${employeeId} | ${row.primary} | ${row.secondary} | ${row.status} | ${reference?.referenceRef || '-'} | ${reference?.verificationMode || 'CAMERA_CAPTURE'}`
-          : ''
-      })
-      .filter(Boolean),
   }
-}
-
-function buildEmployeeFaceTrendSuggestions(sections: DomainReviewSection[]) {
-  return sections
-    .filter((section) => section.title.toUpperCase().includes('FACE REFERENCE TRENDS'))
-    .flatMap((section) => section.rows)
-    .map((row) => {
-      const employeeId = row.id.replace(/^FACE-TREND-/, '').trim()
-      return employeeId
-        ? [
-            employeeId,
-            extractMeta(row, 'History Count: ') || '0',
-            extractMeta(row, 'Average Score: ') || '0.0',
-            extractMeta(row, 'Latest Score: ') || '0',
-            extractMeta(row, 'Best Score: ') || '0',
-            extractMeta(row, 'Latest Source: ') || '-',
-            extractMeta(row, 'Drift Status: ') || 'INSUFFICIENT_DATA',
-            extractMeta(row, 'Gap From Average: ') || '0.0',
-            extractMeta(row, 'Gap From Best: ') || '0',
-          ].join(' | ')
-        : ''
-    })
-    .filter(Boolean)
-}
-
-function buildVerifiedFaceCandidateSuggestions(sections: DomainReviewSection[]) {
-  return sections
-    .filter((section) => section.title.toUpperCase().includes('VERIFIED FACE CANDIDATES'))
-    .flatMap((section) => section.rows)
-    .map((row) => {
-      const employeeId = extractMeta(row, 'Employee ID: ')
-      const captureRef = extractMeta(row, 'Capture Ref: ')
-      const verificationMode = extractMeta(row, 'Mode: ') || 'CAMERA_CAPTURE'
-      const reviewedAt = extractMeta(row, 'Reviewed At: ') || '-'
-      return employeeId && captureRef ? `${employeeId} | ${captureRef} | ${verificationMode} | ${reviewedAt}` : ''
-    })
-    .filter(Boolean)
 }
 
 function buildAttendanceSuggestions(sections: DomainReviewSection[]) {
@@ -358,59 +273,8 @@ function buildAttendanceSuggestions(sections: DomainReviewSection[]) {
     })
     .filter(Boolean)
 
-  const geofenceRow = sections
-    .filter((section) => section.title.toUpperCase().includes('GEOFENCE ATTENDANCE'))
-    .flatMap((section) => section.rows)[0]
-  const faceConfigRow = sections.filter((section) => section.title.toUpperCase().includes('FACE ATTENDANCE')).flatMap((section) => section.rows)[0]
-
   return {
     attendanceSuggestions,
-    geofenceConfig:
-      geofenceRow && geofenceRow.status.toUpperCase() !== 'NOT_SET'
-        ? {
-            locationName: geofenceRow.primary,
-            latitude: extractMeta(geofenceRow, 'Latitude: '),
-            longitude: extractMeta(geofenceRow, 'Longitude: '),
-            radiusMeters: extractMeta(geofenceRow, 'Radius: ').replace(' meter', '').trim() || '100',
-            isRequired: (extractMeta(geofenceRow, 'Required: ') || '').toUpperCase() === 'YA',
-            notes: extractMeta(geofenceRow, 'Notes: '),
-          }
-        : null,
-    faceConfig:
-      faceConfigRow && faceConfigRow.status.toUpperCase() !== 'NOT_SET'
-        ? {
-            isRequired: (extractMeta(faceConfigRow, 'Required: ') || '').toUpperCase() === 'YA',
-            verificationMode: extractMeta(faceConfigRow, 'Mode: ') || 'MANUAL_REVIEW',
-            autoVerifyHighConfidence: (extractMeta(faceConfigRow, 'Auto Verify: ') || '').toUpperCase() === 'YA',
-            autoVerifyMinScore: Number.parseInt(extractMeta(faceConfigRow, 'Auto Verify Min Score: ') || '85', 10),
-            notes: extractMeta(faceConfigRow, 'Notes: '),
-          }
-        : null,
-    faceReviewSuggestions: sections
-      .filter((section) => section.title.toUpperCase().includes('REVIEW FACE ATTENDANCE'))
-      .flatMap((section) => section.rows)
-      .map((row) => {
-        const faceLogId = row.id.replace(/^FACE-/, '').trim()
-        return faceLogId
-          ? [
-              faceLogId,
-              row.primary,
-              row.status,
-              extractMeta(row, 'Capture Ref: ') || '-',
-              extractMeta(row, 'Mode: ') || row.secondary || '-',
-              extractMeta(row, 'Match Score: ') || '0',
-              extractMeta(row, 'Confidence Band: ') || 'LOW',
-              extractMeta(row, 'Recommendation: ') || 'PENDING_REVIEW',
-              extractMeta(row, 'Auto Review Eligible: ') || 'Tidak',
-              extractMeta(row, 'Baseline Reference Ref: ') || '-',
-              extractMeta(row, 'Baseline Match Score: ') || '0',
-              extractMeta(row, 'Baseline Match Band: ') || 'NO_BASELINE',
-              extractMeta(row, 'Baseline Match Outcome: ') || 'NO_BASELINE',
-              extractMeta(row, 'Recommendation Reason: ') || '-',
-            ].join(' | ')
-          : ''
-      })
-      .filter(Boolean),
   }
 }
 
@@ -472,7 +336,7 @@ function getVisibleSections(workspace: HrWorkspaceKey, sections: DomainReviewSec
     case 'attendance':
       return sections.filter((section) => {
         const title = section.title.toUpperCase()
-        return title.includes('ATTENDANCE') || title.includes('GEOFENCE') || title.includes('FACE')
+        return title.includes('ATTENDANCE')
       })
     case 'salary':
       return sections.filter((section) => {
@@ -565,8 +429,6 @@ function renderWorkspaceForms(params: {
 }) {
   const { workspace, canCreate, canUpdate, reviewDbReady, sections } = params
   const employeeData = buildEmployeeSuggestions(sections)
-  const faceTrendSuggestions = buildEmployeeFaceTrendSuggestions(sections)
-  const verifiedFaceCandidateSuggestions = buildVerifiedFaceCandidateSuggestions(sections)
   const attendanceData = buildAttendanceSuggestions(sections)
   const loanData = buildLoanSuggestions(sections)
   const salaryData = buildSalarySuggestions(sections)
@@ -595,15 +457,6 @@ function renderWorkspaceForms(params: {
           <Suspense fallback={<FormModalSkeleton />}>
             <HrEmployeeKpiForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} employeeSuggestions={employeeData.employeeSuggestions} />
           </Suspense>
-          <Suspense fallback={<FormModalSkeleton />}>
-            <HrEmployeeFaceReferenceForm
-              canUpdate={canUpdate}
-              reviewDbReady={reviewDbReady}
-              employeeSuggestions={employeeData.employeeFaceReferenceSuggestions}
-              trendSuggestions={faceTrendSuggestions}
-              verifiedCaptureSuggestions={verifiedFaceCandidateSuggestions}
-            />
-          </Suspense>
         </div>
       )
     case 'attendance':
@@ -614,8 +467,6 @@ function renderWorkspaceForms(params: {
               canCreate={canCreate}
               reviewDbReady={reviewDbReady}
               employeeSuggestions={employeeData.employeeSuggestions}
-              geofenceConfig={attendanceData.geofenceConfig}
-              faceConfig={attendanceData.faceConfig}
             />
           </Suspense>
           <Suspense fallback={<FormModalSkeleton />}>
@@ -623,19 +474,6 @@ function renderWorkspaceForms(params: {
               canUpdate={canUpdate}
               reviewDbReady={reviewDbReady}
               attendanceSuggestions={attendanceData.attendanceSuggestions}
-            />
-          </Suspense>
-          <Suspense fallback={<FormModalSkeleton />}>
-            <HrAttendanceGeofenceForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} initialConfig={attendanceData.geofenceConfig} />
-          </Suspense>
-          <Suspense fallback={<FormModalSkeleton />}>
-            <HrAttendanceFaceConfigForm canUpdate={canUpdate} reviewDbReady={reviewDbReady} initialConfig={attendanceData.faceConfig} />
-          </Suspense>
-          <Suspense fallback={<FormModalSkeleton />}>
-            <HrAttendanceFaceReviewForm
-              canUpdate={canUpdate}
-              reviewDbReady={reviewDbReady}
-              reviewSuggestions={attendanceData.faceReviewSuggestions}
             />
           </Suspense>
         </div>
