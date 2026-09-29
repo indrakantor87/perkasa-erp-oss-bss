@@ -802,6 +802,7 @@ export function HrFingerprintManagement({
               onTestConnect={handleTestConnect}
               onSyncNow={handleSyncNow}
               onSyncHistory={openSyncHistory}
+              onCreate={openCreate}
               testConnectId={testConnectId}
               testConnectStatus={testConnectStatus}
               testConnectMessage={testConnectMessage}
@@ -1092,6 +1093,7 @@ function DevicesTable({
   onTestConnect,
   onSyncNow,
   onSyncHistory,
+  onCreate,
   testConnectId,
   testConnectStatus,
   testConnectMessage,
@@ -1114,6 +1116,7 @@ function DevicesTable({
   onTestConnect: (d: FpMachine) => void
   onSyncNow: (d: FpMachine) => void
   onSyncHistory: (d: FpMachine) => void
+  onCreate: () => void
   testConnectId: number | null
   testConnectStatus: LoadStatus
   testConnectMessage: string | null
@@ -1154,7 +1157,7 @@ function DevicesTable({
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           {canCreate ? (
-            <UiButton variant="primary" size="md" onClick={() => { const anyCreate = document.querySelector<HTMLButtonElement>('button[data-create-fallback]'); if (anyCreate) anyCreate.click() }}>
+            <UiButton variant="primary" size="md" onClick={onCreate}>
               Tambah Mesin Fingerprint
             </UiButton>
           ) : null}
