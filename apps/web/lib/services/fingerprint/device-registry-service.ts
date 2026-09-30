@@ -8,7 +8,7 @@ import {
 } from '@/lib/review-db'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { MockFingerprintConnector } from './mock-connector'
-import type {
+import {
   ConnectionStatus,
   EnrollmentStatus,
   FingerprintDeviceInfo,
@@ -18,12 +18,14 @@ import type {
   FpMachineUpdateInput,
   FpMappingCreateInput,
   FpMappingRow,
+  FpMappingUpdateInput,
   FpSyncRunRow,
   RawFingerprintEvent,
   SyncMode,
   SyncRunFinalStatus,
   SyncRunSummary,
 } from './types'
+import { processRawEventsToDailyAttendance } from '@/lib/services/attendance-processing-engine'
 
 export const MASKED_AUTH_CONFIG = '••••••••••••'
 
@@ -904,42 +906,70 @@ export async function syncNow(
             machine_id,
             machine_user_id,
             employee_id,
-            event_timestamp_local,
             event_timestamp_original,
-            event_timestamp_utc,
             event_timestamp_normalized,
             event_type_raw,
-            event_mode,
             verify_score,
             deduplication_hash,
             is_unmapped,
             is_processed,
-            raw_payload,
             raw_payload_json,
             sync_run_id
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'UNDEFINED', ?, ?, ?, 0, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
         `,
         [
           machineId,
           ev.machineUserId,
           employeeId,
           tsLocalSql,
-          tsLocalSql,
-          tsUtcSql,
           tsUtcSql,
           ev.eventTypeRaw ?? null,
           ev.verifyScore ?? null,
           dedupHash,
           isUnmapped,
           rawPayloadSerialized,
-          rawPayloadSerialized,
           runId,
         ],
       )
 
-      if (Number(insertRaw.affectedRows ?? 0) > 0) {
+      const rowsAffected = Number(insertRaw.affectedRows ?? 0)
+      if (rowsAffected > 0) {
         totalNewValid += 1
+      } else if (rowsAffected === 0 && checkExisting.length === 0) {
+        totalFailedParse += 1
+        const errMsg =
+          'INSERT hr_fp_raw_events affectedRows=0 not duplicate ' +
+          `[machine_user_id=${String(ev.machineUserId ?? '')}, ts_local=${tsLocalSql}, ts_utc=${tsUtcSql}]`
+        if (errorSummary === null) {
+          errorSummary = errMsg
+        } else if (errorSummary.length < 8000) {
+          errorSummary = errorSummary + ' | ' + errMsg
+        }
+      }
+    }
+
+    try {
+      const genResult = await processRawEventsToDailyAttendance({
+        employeeId: undefined,
+        startDate: undefined,
+        endDate: undefined,
+      })
+      if (genResult && typeof genResult.totalProcessed === 'number') {
+        if (genResult.totalInserted > 0 || genResult.totalUpdated > 0) {
+          // Counter propagated: raw event flagged is_processed handled inside engine itself by transaction; counters here for audit visibility only
+        }
+      }
+    } catch (genError) {
+      const msg =
+        genError instanceof Error
+          ? `ATTENDANCE_GENERATOR_ERROR: ${genError.message}`
+          : `ATTENDANCE_GENERATOR_ERROR`
+      totalFailedParse += 1
+      if (errorSummary === null) {
+        errorSummary = msg
+      } else if (errorSummary.length < 8000) {
+        errorSummary = errorSummary + ' | ' + msg
       }
     }
 
@@ -1235,4 +1265,153 @@ export async function createMapping(
   )
 
   return { mapping: mapRowToMapping(rows[0]), created: true }
+}
+
+export async function updateMapping(
+  id: number,
+  input: FpMappingUpdateInput,
+): Promise<{ mapping: FpMappingRow | null; updated: boolean; conflict?: boolean }> {
+  await ensureFingerprintTables()
+
+  const safeId = Number(id)
+  if (!safeId || safeId <= 0) {
+    throw new Error('VALIDATION_ERROR')
+  }
+
+  const currentRows = await runReviewDbQuery<Record<string, unknown>>(
+    `
+      SELECT id, machine_id, machine_user_id, employee_id, enrollment_status
+      FROM hr_fp_employee_mappings
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [safeId],
+  )
+  if (currentRows.length === 0) {
+    return { mapping: null, updated: false }
+  }
+  const current = currentRows[0]
+  const currentMachineId = Number(current.machine_id)
+
+  let nextMachineUserId = String(input.machineUserId ?? current.machine_user_id ?? '').trim()
+  let nextEmployeeId = Number.isFinite(Number(input.employeeId))
+    ? Number(input.employeeId)
+    : Number(current.employee_id)
+  const enrollmentStatusRaw = String(input.enrollmentStatus ?? current.enrollment_status ?? 'ENROLLED')
+    .trim()
+    .toUpperCase()
+  const nextEnrollmentStatus: EnrollmentStatus =
+    enrollmentStatusRaw === 'PENDING' || enrollmentStatusRaw === 'REVOKED'
+      ? enrollmentStatusRaw
+      : 'ENROLLED'
+
+  if (!nextMachineUserId || !nextEmployeeId) {
+    throw new Error('VALIDATION_ERROR')
+  }
+
+  if (
+    nextMachineUserId !== String(current.machine_user_id ?? '') ||
+    currentMachineId !== Number(current.machine_id)
+  ) {
+    const duplicateCheck = await runReviewDbQuery<Record<string, unknown>>(
+      `
+        SELECT id
+        FROM hr_fp_employee_mappings
+        WHERE machine_id = ?
+          AND machine_user_id = ?
+          AND id <> ?
+        LIMIT 1
+      `,
+      [currentMachineId, nextMachineUserId, safeId],
+    )
+    if (duplicateCheck.length > 0) {
+      return {
+        mapping: mapRowToMapping({
+          ...current,
+          machine_id: currentMachineId,
+          machine_user_id: nextMachineUserId,
+          employee_id: nextEmployeeId,
+        }),
+        updated: false,
+        conflict: true,
+      }
+    }
+  }
+
+  const revokedAtSql =
+    nextEnrollmentStatus === 'REVOKED'
+      ? 'COALESCE(revoked_at, CURRENT_TIMESTAMP)'
+      : 'NULL'
+  const enrolledAtSql =
+    nextEnrollmentStatus !== 'REVOKED'
+      ? 'COALESCE(enrolled_at, CURRENT_TIMESTAMP)'
+      : 'enrolled_at'
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      UPDATE hr_fp_employee_mappings
+      SET
+        machine_user_id = ?,
+        employee_id = ?,
+        enrollment_status = ?,
+        enrolled_at = ${enrolledAtSql},
+        revoked_at = ${revokedAtSql},
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    [nextMachineUserId, nextEmployeeId, nextEnrollmentStatus, safeId],
+  )
+
+  const rows = await runReviewDbQuery<Record<string, unknown>>(
+    `
+      SELECT
+        fm.id,
+        fm.machine_id,
+        fm.machine_user_id,
+        fm.employee_id,
+        he.employee_code,
+        he.full_name,
+        fm.enrollment_status,
+        fm.enrolled_at,
+        fm.revoked_at,
+        fm.created_at,
+        fm.updated_at
+      FROM hr_fp_employee_mappings fm
+      LEFT JOIN hr_employees he
+        ON he.id = fm.employee_id
+      WHERE fm.id = ?
+      LIMIT 1
+    `,
+    [safeId],
+  )
+  return { mapping: rows[0] ? mapRowToMapping(rows[0]) : null, updated: true }
+}
+
+export async function deleteMapping(id: number): Promise<{ deleted: boolean; softRevoked?: boolean }> {
+  await ensureFingerprintTables()
+  const safeId = Number(id)
+  if (!safeId || safeId <= 0) {
+    throw new Error('VALIDATION_ERROR')
+  }
+
+  const current = await runReviewDbQuery<Record<string, unknown>>(
+    `SELECT id, enrollment_status FROM hr_fp_employee_mappings WHERE id = ? LIMIT 1`,
+    [safeId],
+  )
+  if (current.length === 0) {
+    return { deleted: false }
+  }
+
+  await runReviewDbExecute<ExecuteResult>(
+    `
+      UPDATE hr_fp_employee_mappings
+      SET
+        enrollment_status = 'REVOKED',
+        revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    [safeId],
+  )
+  return { deleted: true, softRevoked: true }
 }

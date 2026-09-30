@@ -94,6 +94,12 @@ export interface FpMappingCreateInput {
   enrollmentStatus?: EnrollmentStatus
 }
 
+export interface FpMappingUpdateInput {
+  machineUserId?: string
+  employeeId?: number
+  enrollmentStatus?: EnrollmentStatus
+}
+
 export interface FpSyncRunRow {
   id: number
   machineId: number
