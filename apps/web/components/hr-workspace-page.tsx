@@ -10,6 +10,24 @@ import type { AppRole, DataSourceSnapshot, DomainCapability, DomainPageContent, 
 
 type SourceType = 'SOURCE_BROWSER' | 'SOURCE_FINGERPRINT_MACHINE' | 'SOURCE_MANUAL_CORRECTION' | string
 
+type ConnectionStatus = 'ONLINE' | 'OFFLINE' | 'AUTH_FAILED' | 'SYNC_ERROR' | 'UNKNOWN'
+type SyncRunFinalStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED'
+type LoadStatus = 'idle' | 'loading' | 'loaded' | 'error'
+
+type FpMachine = {
+  id: number
+  ip: string
+  port: number | null
+  model: string
+  deviceTimezone: string
+  authConfigEncrypted: string
+  displayName: string
+  lastSyncAt: string | null
+  lastConnectionStatus: ConnectionStatus
+  createdAt: string
+  updatedAt: string
+}
+
 type RawEventItem = {
   id: number
   event_timestamp: string
@@ -79,6 +97,63 @@ function sourceBadgeIconAndLabel(source: SourceType): { icon: string; label: str
     label: 'Mesin Fingerprint',
     tone: isCorrection ? 'warning' : 'success',
     note: isCorrection ? 'Dikoreksi HR' : undefined,
+  }
+}
+
+function connectionTone(status: ConnectionStatus): 'success' | 'warning' | 'danger' | 'neutral' {
+  switch (status) {
+    case 'ONLINE':
+      return 'success'
+    case 'OFFLINE':
+      return 'warning'
+    case 'AUTH_FAILED':
+    case 'SYNC_ERROR':
+      return 'danger'
+    case 'UNKNOWN':
+    default:
+      return 'neutral'
+  }
+}
+
+function connectionLabel(status: ConnectionStatus): string {
+  switch (status) {
+    case 'ONLINE':
+      return 'Online'
+    case 'OFFLINE':
+      return 'Offline'
+    case 'AUTH_FAILED':
+      return 'Gagal Otentikasi'
+    case 'SYNC_ERROR':
+      return 'Error Sinkronisasi'
+    case 'UNKNOWN':
+    default:
+      return 'Tidak Diketahui'
+  }
+}
+
+function finalStatusTone(status: SyncRunFinalStatus): 'success' | 'warning' | 'danger' | 'neutral' {
+  switch (status) {
+    case 'SUCCESS':
+      return 'success'
+    case 'PARTIAL':
+      return 'warning'
+    case 'FAILED':
+      return 'danger'
+    default:
+      return 'neutral'
+  }
+}
+
+function finalStatusLabel(status: SyncRunFinalStatus): string {
+  switch (status) {
+    case 'SUCCESS':
+      return 'Sukses'
+    case 'PARTIAL':
+      return 'Parsial'
+    case 'FAILED':
+      return 'Gagal'
+    default:
+      return '—'
   }
 }
 
@@ -1150,6 +1225,17 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
   const [attendanceSubTab, setAttendanceSubTab] = useState<AttendanceSubTab>('daily')
   const [rawModalOpen, setRawModalOpen] = useState(false)
   const [rawModalRow, setRawModalRow] = useState<AttendanceDailyRow | null>(null)
+  const [syncRefreshCounter, setSyncRefreshCounter] = useState<number>(0)
+
+  const [devicesStatus, setDevicesStatus] = useState<LoadStatus>('idle')
+  const [devicesList, setDevicesList] = useState<FpMachine[]>([])
+  const [devicesError, setDevicesError] = useState<string | null>(null)
+  const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null)
+
+  const [syncNowId, setSyncNowId] = useState<number | null>(null)
+  const [syncNowStatus, setSyncNowStatus] = useState<LoadStatus>('idle')
+  const [syncNowMessage, setSyncNowMessage] = useState<string | null>(null)
+  const [syncNowTone, setSyncNowTone] = useState<'success' | 'danger' | 'info' | 'warning'>('info')
 
   useEffect(() => {
     let cancelled = false
@@ -1174,7 +1260,7 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
     }
     void fetchDaily()
     return () => { cancelled = true }
-  }, [dailyFilterFrom, dailyFilterTo, source?.effectiveMode])
+  }, [dailyFilterFrom, dailyFilterTo, source?.effectiveMode, syncRefreshCounter])
 
   useEffect(() => {
     let cancelled = false
@@ -1199,7 +1285,7 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
     }
     void fetchMonthly()
     return () => { cancelled = true }
-  }, [monthFilter])
+  }, [monthFilter, syncRefreshCounter])
 
   useEffect(() => {
     let cancelled = false
@@ -1225,7 +1311,7 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
     }
     void fetchUnmapped()
     return () => { cancelled = true }
-  }, [attendanceSubTab])
+  }, [attendanceSubTab, syncRefreshCounter])
 
   useEffect(() => {
     let cancelled = false
@@ -1250,7 +1336,7 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
     }
     void fetchDevice()
     return () => { cancelled = true }
-  }, [attendanceSubTab])
+  }, [attendanceSubTab, syncRefreshCounter])
 
   useEffect(() => {
     let cancelled = false
@@ -1288,6 +1374,109 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
   function handleViewRawEvents(row: AttendanceDailyRow) {
     setRawModalRow(row)
     setRawModalOpen(true)
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    async function fetchDevices() {
+      if (activeWorkspace !== 'attendance') return
+      setDevicesStatus('loading')
+      setDevicesError(null)
+      try {
+        const url = '/api/hr/fingerprint/devices'
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        if (!cancelled) {
+          const list = Array.isArray(json?.data) ? json.data : []
+          const typed: FpMachine[] = (list as unknown[]).filter((x: any): x is FpMachine => x && typeof (x as any).id === 'number')
+          setDevicesList(typed)
+          if (typed.length > 0 && (selectedDeviceId === null || !typed.find(d => d.id === selectedDeviceId))) {
+            setSelectedDeviceId(typed[0].id)
+          }
+          setDevicesStatus('loaded')
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setDevicesError(err?.message || 'Gagal memuat daftar perangkat fingerprint')
+          setDevicesStatus('error')
+          setDevicesList([])
+        }
+      }
+    }
+    void fetchDevices()
+    return () => { cancelled = true }
+  }, [activeWorkspace, syncRefreshCounter])
+
+  async function handleSyncDevice() {
+    const deviceId = selectedDeviceId
+    if (!deviceId || !Number.isFinite(deviceId)) {
+      setSyncNowTone('danger')
+      setSyncNowMessage('Pilih perangkat fingerprint yang valid.')
+      setSyncNowStatus('error')
+      return
+    }
+    if (!canCreate || !reviewDbReady) {
+      setSyncNowTone('danger')
+      setSyncNowMessage(!reviewDbReady ? 'Review DB belum siap. Sync hanya aktif di mode review DB.' : 'Anda tidak memiliki izin untuk sinkronisasi (butuh capability hr.create).')
+      setSyncNowStatus('error')
+      return
+    }
+    setSyncNowId(deviceId)
+    setSyncNowStatus('loading')
+    setSyncNowTone('info')
+    setSyncNowMessage('Menarik data dari mesin fingerprint, harap tunggu...')
+    try {
+      const res = await fetch(`/api/hr/fingerprint/devices/${encodeURIComponent(String(deviceId))}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ syncMode: 'MANUAL' }),
+      })
+      if (!res.ok) {
+        let errMsg = `HTTP ${res.status}`
+        try {
+          const json = await res.json()
+          if (json?.message) errMsg = `${errMsg} — ${json.message}`
+        } catch { }
+        throw new Error(errMsg)
+      }
+      const json = await res.json()
+      const run: any = (json as any)?.run ?? null
+      if (!run) {
+        throw new Error('Response sync tidak mengandung data run counters.')
+      }
+      const fs: SyncRunFinalStatus = String(run.finalStatus ?? 'FAILED').toUpperCase() as SyncRunFinalStatus
+      const counters = {
+        totalRecordsFetched: Number(run.totalRecordsFetched ?? 0),
+        totalNewValid: Number(run.totalNewValid ?? 0),
+        totalDuplicatesSkipped: Number(run.totalDuplicatesSkipped ?? 0),
+        totalUnmapped: Number(run.totalUnmapped ?? 0),
+        totalFailedParse: Number(run.totalFailedParse ?? 0),
+        cursorAdvanced: Boolean(run.cursorAdvanced),
+        durationMs: Number(run.durationMs ?? 0),
+      }
+      const summaryLine = `${counters.totalRecordsFetched} fetched, ${counters.totalNewValid} baru, ${counters.totalDuplicatesSkipped} duplikat, ${counters.totalUnmapped} unmapped, ${counters.totalFailedParse} gagal. ${counters.cursorAdvanced ? 'Cursor MAJU.' : 'Cursor TIDAK MAJU.'}`
+      if (fs === 'SUCCESS') {
+        setSyncNowTone('success')
+        setSyncNowMessage(`Sukses Sinkron Mesin. ${summaryLine}`)
+      } else if (fs === 'PARTIAL') {
+        setSyncNowTone('warning')
+        const err = run.errorSummary ? ` Detail error: ${String(run.errorSummary).substring(0, 400)}.` : ''
+        setSyncNowMessage(`Sinkron Parsial. ${summaryLine}${err}`)
+      } else {
+        setSyncNowTone('danger')
+        const err = run.errorSummary ? ` Detail: ${String(run.errorSummary).substring(0, 400)}.` : ''
+        setSyncNowMessage(`Sinkron GAGAL. ${summaryLine}${err}`)
+      }
+      setSyncNowStatus('loaded')
+      setSyncRefreshCounter(c => c + 1)
+    } catch (err: any) {
+      setSyncNowTone('danger')
+      setSyncNowMessage(`Sinkron Mesin ERROR: ${err?.message || 'Terjadi kesalahan tidak dikenal.'}`)
+      setSyncNowStatus('error')
+    } finally {
+      setSyncNowId(null)
+    }
   }
 
   const visibleSections = [...workspaceInsightSections, ...getVisibleSections(activeWorkspace, content.reviewSections ?? [])]
@@ -1392,6 +1581,81 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
 
       {activeWorkspace === 'attendance' ? (
         <section className="space-y-4">
+          <div className="panel p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-3 lg:flex-grow">
+                <div className="flex flex-col gap-1 md:flex-grow min-w-[280px]">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Perangkat Fingerprint (Device Target Sinkron)</label>
+                  {devicesStatus === 'error' ? (
+                    <span className="text-sm text-danger">Gagal memuat daftar perangkat: {devicesError || 'Unknown'}</span>
+                  ) : devicesStatus === 'loading' ? (
+                    <span className="text-sm text-mute">Memuat daftar perangkat fingerprint...</span>
+                  ) : devicesList.length === 0 ? (
+                    <span className="text-sm text-mute">Belum ada device fingerprint tersimpan. Buat device di menu Fingerprint.</span>
+                  ) : (
+                    <select
+                      value={selectedDeviceId ?? ''}
+                      onChange={(ev) => setSelectedDeviceId(ev.target.value ? Number(ev.target.value) : null)}
+                      disabled={syncNowStatus === 'loading'}
+                      className="w-full rounded-2xl border border-line bg-white px-4 py-2 text-sm focus:border-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950/10 disabled:opacity-60"
+                    >
+                      {devicesList.map((d) => {
+                        const ipPort = d.port ? `${d.ip}:${d.port}` : d.ip
+                        const label = `${d.displayName} (${ipPort}) — ${connectionLabel(d.lastConnectionStatus)}`
+                        return (
+                          <option key={d.id} value={d.id}>
+                            {label}
+                          </option>
+                        )
+                      })}
+                    </select>
+                  )}
+                </div>
+                {selectedDeviceId && devicesStatus === 'loaded' ? (
+                  <div className="flex gap-1">
+                    {(() => {
+                    const device = devicesList.find(d => d.id === selectedDeviceId)
+                    if (!device) return null
+                    const deviceLabelParts = [
+                      device.displayName || device.model,
+                      device.port ? `${device.ip}:${device.port}` : device.ip,
+                      connectionLabel(device.lastConnectionStatus),
+                    ].filter(Boolean).join(' · ')
+                    return (
+                      <StatusBadge tone={connectionTone(device.lastConnectionStatus)} label={deviceLabelParts} />
+                    )
+                  })()}
+                  </div>
+                ) : null}
+              </div>
+              <UiButton
+                variant="secondary"
+                size="md"
+                onClick={handleSyncDevice}
+                disabled={
+                  !canCreate ||
+                  !reviewDbReady ||
+                  !selectedDeviceId ||
+                  devicesList.length === 0 ||
+                  syncNowStatus === 'loading'
+                }
+              >
+                {syncNowStatus === 'loading' ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-current"></span>
+                    Sinkronisasi...
+                  </span>
+                ) : (
+                  <>🔄 Sinkron Mesin</>
+                )}
+              </UiButton>
+            </div>
+            {syncNowMessage && (
+              <div className="mt-3">
+                <StatusBadge tone={syncNowTone as any} label={syncNowMessage} />
+              </div>
+            )}
+          </div>
           <div className="panel p-2 inline-flex flex-wrap items-center gap-2 rounded-full">
             <UiButton
               variant={attendanceSubTab === 'daily' ? 'primary' : 'ghost'}
