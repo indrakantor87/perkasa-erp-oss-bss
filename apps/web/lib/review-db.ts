@@ -139,21 +139,52 @@ export async function runReviewDbQuery<T>(sql: string, values: unknown[] = []) {
   }
 }
 
+export type SqlExecuteResult = {
+  affectedRows: number
+  insertId: number
+  changedRows: number
+  error: string | null
+  errorCode: number | null
+  errorSqlState?: string | null
+}
+
+function extractSqlErrorInfo(error: unknown): { message: string; code: number | null; sqlState: string | null } {
+  let message = 'UNKNOWN_ERROR'
+  let code: number | null = null
+  let sqlState: string | null = null
+  if (error instanceof Error) {
+    message = error.message.trim() || message
+    const anyErr = error as unknown as { code?: string | number; errno?: number; sqlState?: string }
+    if (typeof anyErr.code === 'number') {
+      code = anyErr.code
+    } else if (typeof anyErr.code === 'string') {
+      const numeric = parseInt(anyErr.code.replace(/\D/g, ''), 10)
+      code = Number.isFinite(numeric) && numeric > 0 ? numeric : anyErr.errno && Number.isFinite(anyErr.errno) ? anyErr.errno : null
+    } else if (typeof anyErr.errno === 'number') {
+      code = anyErr.errno
+    }
+    if (typeof anyErr.sqlState === 'string') {
+      sqlState = anyErr.sqlState || null
+    }
+  }
+  return { message, code, sqlState }
+}
+
 export async function runReviewDbQueryWithError<T>(
   sql: string,
   values: unknown[] = [],
-): Promise<{ rows: T[]; error: string | null; disabled: boolean }> {
+): Promise<{ rows: T[]; error: string | null; errorCode: number | null; errorSqlState?: string | null; disabled: boolean }> {
   const pool = await getPool()
   if (isDisabledPool(pool)) {
-    return { rows: [] as T[], error: 'REVIEW_DB_NOT_CONFIGURED', disabled: true }
+    return { rows: [] as T[], error: 'REVIEW_DB_NOT_CONFIGURED', errorCode: null, errorSqlState: null, disabled: true }
   }
   try {
     const [rows] = await pool.query(sql, values)
-    return { rows: rows as T[], error: null, disabled: false }
+    return { rows: rows as T[], error: null, errorCode: null, errorSqlState: null, disabled: false }
   } catch (error) {
     if (typeof window === 'undefined') {
-      const message = error instanceof Error ? error.message.trim() : 'UNKNOWN_ERROR'
-      return { rows: [] as T[], error: message || 'UNKNOWN_ERROR', disabled: false }
+      const info = extractSqlErrorInfo(error)
+      return { rows: [] as T[], error: info.message || 'UNKNOWN_ERROR', errorCode: info.code, errorSqlState: info.sqlState, disabled: false }
     }
     throw error
   }
@@ -162,14 +193,26 @@ export async function runReviewDbQueryWithError<T>(
 export async function runReviewDbExecute<T>(sql: string, values: unknown[] = []) {
   const pool = await getPool()
   if (isDisabledPool(pool)) {
-    return { affectedRows: 0, insertId: 0, changedRows: 0 } as unknown as T
+    return { affectedRows: 0, insertId: 0, changedRows: 0, error: 'REVIEW_DB_NOT_CONFIGURED', errorCode: null, errorSqlState: null } as unknown as T
   }
   try {
     const [result] = await pool.query(sql, values)
-    return result as T
+    return Object.assign({}, result as object, { error: null, errorCode: null, errorSqlState: null }) as T
   } catch (error) {
     if (typeof window === 'undefined') {
-      return { affectedRows: 0, insertId: 0, changedRows: 0 } as unknown as T
+      const info = extractSqlErrorInfo(error)
+      // Preserve actual SQL error instead of silent 0 affectedRows.
+      if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production' || (typeof process !== 'undefined' && process.env?.DEBUG_REVIEW_DB === '1')) {
+        try {
+          console.error('[REVIEW_DB_SQL_ERROR]', {
+            errorCode: info.code,
+            errorSqlState: info.sqlState,
+            message: info.message,
+            sql: sql.substring(0, 200),
+          })
+        } catch {}
+      }
+      return { affectedRows: 0, insertId: 0, changedRows: 0, error: info.message || 'UNKNOWN_ERROR', errorCode: info.code, errorSqlState: info.sqlState } as unknown as T
     }
     throw error
   }

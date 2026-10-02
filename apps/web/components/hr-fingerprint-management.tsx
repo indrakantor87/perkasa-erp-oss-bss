@@ -257,10 +257,16 @@ export function HrFingerprintManagement({
     return mappings.filter((m) => m.machineId === Number(mappingFilterMachine))
   }, [mappings, mappingFilterMachine])
 
+  const EXCLUDED_EMP_STATUS = ['RESIGN','RESIGNED','NONAKTIF','INACTIVE','KELUAR']
+
   const employeesFiltered = useMemo(() => {
+    const activeOnly = employees.filter((e) => {
+      const s = String(e.employmentStatus ?? 'ACTIVE').toUpperCase()
+      return !EXCLUDED_EMP_STATUS.includes(s)
+    })
     const q = employeeQuery.trim().toLowerCase()
-    if (!q) return employees.slice(0, 50)
-    return employees
+    if (!q) return activeOnly.slice(0, 50)
+    return activeOnly
       .filter((e) => {
         const code = (e.employeeCode || '').toLowerCase()
         const name = (e.fullName || '').toLowerCase()
@@ -926,11 +932,17 @@ export function HrFingerprintManagement({
                     className="mt-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   >
                     <option value="">Pilih karyawan...</option>
-                    {employees.slice(0, 500).map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.employeeCode} · {e.fullName}
-                      </option>
-                    ))}
+                    {employees
+                      .filter((e) => {
+                        const s = String(e.employmentStatus ?? 'ACTIVE').toUpperCase()
+                        return !EXCLUDED_EMP_STATUS.includes(s)
+                      })
+                      .slice(0, 500)
+                      .map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.employeeCode} · {e.fullName}
+                        </option>
+                      ))}
                   </select>
                 </label>
                 <label className="flex flex-col gap-1">

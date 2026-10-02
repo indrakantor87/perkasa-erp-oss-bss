@@ -5,6 +5,7 @@ import {
   addColumnIfMissing,
   invalidateReviewDbColumnCache,
   hasReviewDbColumn,
+  type SqlExecuteResult,
 } from '@/lib/review-db'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { MockFingerprintConnector } from './mock-connector'
@@ -149,6 +150,7 @@ export function validateFingerprintEncryptionConfiguredOrThrow(): void {
 
 async function ensureHrFpMachinesHybridAlign() {
   const tableName = 'hr_fp_machines'
+  const alterErrors: string[] = []
   if (!(await hasReviewDbColumn(tableName, 'ip'))) {
     await addColumnIfMissing(tableName, 'ip', 'ip VARCHAR(64) NOT NULL DEFAULT \'__legacy_missing__\'', 'id')
   }
@@ -227,32 +229,55 @@ async function ensureHrFpMachinesHybridAlign() {
     await runReviewDbExecute<ExecuteResult>(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER employee_id`,
     )
-  } catch {}
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    alterErrors.push(`event_timestamp_original: ${msg}`)
+  }
   try {
     await runReviewDbExecute<ExecuteResult>(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER event_timestamp_original`,
     )
-  } catch {}
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    alterErrors.push(`event_timestamp_normalized: ${msg}`)
+  }
   try {
     await runReviewDbExecute<ExecuteResult>(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED' AFTER event_type_raw`,
     )
-  } catch {}
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    alterErrors.push(`event_mode: ${msg}`)
+  }
   try {
     await runReviewDbExecute<ExecuteResult>(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS raw_payload_json TEXT NULL AFTER is_processed`,
     )
-  } catch {}
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    alterErrors.push(`raw_payload_json: ${msg}`)
+  }
   try {
     await runReviewDbExecute<ExecuteResult>(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER raw_payload_json`,
     )
-  } catch {}
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    alterErrors.push(`received_at: ${msg}`)
+  }
   try {
     await runReviewDbExecute<ExecuteResult>(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS processing_notes TEXT NULL AFTER received_at`,
     )
-  } catch {}
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    alterErrors.push(`processing_notes: ${msg}`)
+  }
+  if (alterErrors.length > 0) {
+    throw new Error(
+      `hr_fp_raw_events hybrid align ALTER TABLE failures (${alterErrors.length}): ` + alterErrors.join(' ; '),
+    )
+  }
   invalidateReviewDbColumnCache(tableName)
   invalidateReviewDbColumnCache('hr_fp_sync_runs')
   invalidateReviewDbColumnCache('hr_fp_employee_mappings')
@@ -737,12 +762,27 @@ export async function syncNow(
   const startedAt = new Date()
   const startedAtSql = toSqlDateTime(startedAt)
 
+  const requiredRawCols = [
+    'event_timestamp_original',
+    'event_timestamp_normalized',
+    'event_mode',
+    'raw_payload_json',
+    'received_at',
+    'processing_notes',
+  ] as const
+  const missingCols: string[] = []
+  for (const col of requiredRawCols) {
+    if (!(await hasReviewDbColumn('hr_fp_raw_events', col))) {
+      missingCols.push(col)
+    }
+  }
+
   const machine = await getDeviceRawUnmasked(machineId)
   if (!machine) {
     throw new Error('MACHINE_NOT_FOUND')
   }
 
-  const insertRunResult = await runReviewDbExecute<ExecuteResult>(
+  const insertRunResult = await runReviewDbExecute<SqlExecuteResult & ExecuteResult>(
     `
       INSERT INTO hr_fp_sync_runs (
         machine_id,
@@ -754,13 +794,61 @@ export async function syncNow(
         total_duplicates_skipped,
         total_unmapped,
         total_failed_parse,
-        final_status
+        final_status,
+        error_summary
       )
-      VALUES (?, ?, ?, ?, 0, 0, 0, 0, 0, 'SUCCESS')
+      VALUES (?, ?, ?, ?, 0, 0, 0, 0, 0, ?, ?)
     `,
-    [machineId, actorUserId, syncMode, startedAtSql],
+    [
+      machineId,
+      actorUserId,
+      syncMode,
+      startedAtSql,
+      missingCols.length > 0 ? 'FAILED' : 'SUCCESS',
+      missingCols.length > 0 ? `SCHEMA_MISMATCH Missing hr_fp_raw_events columns: ${missingCols.join(', ')}. Jalankan migration hr_fp_raw_events additive 6 required columns terlebih dahulu.` : null,
+    ],
   )
   const runId = Number(insertRunResult.insertId ?? 0)
+
+  if (missingCols.length > 0 || insertRunResult.error !== null) {
+    const msg =
+      missingCols.length > 0
+        ? `SCHEMA_MISMATCH Missing hr_fp_raw_events columns: ${missingCols.join(', ')}. Jalankan migration hr_fp_raw_events additive 6 required columns terlebih dahulu.`
+        : `SYNC_PRECONDITION_FAILED: ${insertRunResult.errorCode != null ? `[SQL_ERROR:${insertRunResult.errorCode}] ` : ''}${insertRunResult.error || 'unknown precondition error'}`
+    const now = new Date()
+    const durationMs = Math.max(1, now.getTime() - startedAt.getTime())
+    const finishedAtSql = toSqlDateTime(now)
+    await runReviewDbExecute<ExecuteResult>(
+      `
+        UPDATE hr_fp_sync_runs
+        SET
+          finished_at = ?,
+          duration_ms = ?,
+          final_status = ?,
+          error_summary = ?
+        WHERE id = ?
+      `,
+      [finishedAtSql, durationMs, 'FAILED', msg, runId],
+    )
+    await updateMachineConnectionStatus(machineId, 'SYNC_ERROR')
+    return {
+      id: runId,
+      machineId,
+      actorUserId,
+      syncMode,
+      startedAt: startedAtSql,
+      finishedAt: finishedAtSql,
+      durationMs,
+      totalRecordsFetched: 0,
+      totalNewValid: 0,
+      totalDuplicatesSkipped: 0,
+      totalUnmapped: 0,
+      totalFailedParse: 0,
+      finalStatus: 'FAILED',
+      errorSummary: msg,
+      cursorAdvanced: false,
+    }
+  }
 
   const cursorSinceRaw = machine.lastSyncAt
   const cursorSince: Date | null = cursorSinceRaw ? new Date(cursorSinceRaw) : null
@@ -893,14 +981,21 @@ export async function syncNow(
 
       if (checkExisting.length > 0) {
         totalDuplicatesSkipped += 1
-        await runReviewDbExecute<ExecuteResult>(
+        const dupOkMsg =
+          `[DUP_OK] Duplicate existing dedup hash id=${String(checkExisting[0]?.id ?? '')} machine_user_id=${String(ev.machineUserId ?? '')} ts_local=${tsLocalSql}`
+        if (errorSummary === null) {
+          errorSummary = dupOkMsg
+        } else if (errorSummary.length < 8000) {
+          errorSummary = errorSummary + ' | ' + dupOkMsg
+        }
+        await runReviewDbExecute<SqlExecuteResult & ExecuteResult>(
           `UPDATE hr_fp_raw_events SET is_processed = is_processed WHERE id = ?`,
           [checkExisting[0].id],
         )
         continue
       }
 
-      const insertRaw = await runReviewDbExecute<ExecuteResult>(
+      const insertRaw = await runReviewDbExecute<SqlExecuteResult & ExecuteResult>(
         `
           INSERT INTO hr_fp_raw_events (
             machine_id,
@@ -938,9 +1033,17 @@ export async function syncNow(
         totalNewValid += 1
       } else if (rowsAffected === 0 && checkExisting.length === 0) {
         totalFailedParse += 1
-        const errMsg =
-          'INSERT hr_fp_raw_events affectedRows=0 not duplicate ' +
-          `[machine_user_id=${String(ev.machineUserId ?? '')}, ts_local=${tsLocalSql}, ts_utc=${tsUtcSql}]`
+        let errMsg: string
+        if (insertRaw.error !== null || insertRaw.errorCode !== null || insertRaw.errorSqlState != null) {
+          const prefix = `[SQL_ERROR${insertRaw.errorCode != null ? `:${String(insertRaw.errorCode)}` : ''}]`
+          errMsg =
+            `${prefix} ${insertRaw.error || 'SQL_FAILURE unknown'} ` +
+            `[machine_user_id=${String(ev.machineUserId ?? '')}, ts_local=${tsLocalSql}, ts_utc=${tsUtcSql}]`
+        } else {
+          errMsg =
+            'INSERT hr_fp_raw_events affectedRows=0 not duplicate ' +
+            `[machine_user_id=${String(ev.machineUserId ?? '')}, ts_local=${tsLocalSql}, ts_utc=${tsUtcSql}]`
+        }
         if (errorSummary === null) {
           errorSummary = errMsg
         } else if (errorSummary.length < 8000) {
@@ -1162,6 +1265,30 @@ export async function createMapping(
 
   await autoRevokeResignedEmployeeMappings()
 
+  const empCheck = await runReviewDbQuery<Record<string, unknown>>(
+    `SELECT id, employment_status, full_name, employee_code FROM hr_employees WHERE id = ? LIMIT 1`,
+    [employeeId],
+  )
+  if (empCheck.length === 0) {
+    throw new Error('EMPLOYEE_NOT_FOUND')
+  }
+  const empStatus = String(empCheck[0].employment_status ?? 'ACTIVE').toUpperCase()
+  if (['RESIGN','RESIGNED','NONAKTIF','INACTIVE','KELUAR'].includes(empStatus)) {
+    throw new Error('EMPLOYEE_RESIGNED_CANNOT_MAP')
+  }
+
+  const deviceCheck = await runReviewDbQuery<Record<string, unknown>>(
+    `SELECT id, active FROM hr_fp_machines WHERE id = ? LIMIT 1`,
+    [machineId],
+  )
+  if (deviceCheck.length === 0) {
+    throw new Error('DEVICE_NOT_FOUND')
+  }
+  const devActive = Number(deviceCheck[0].active ?? 0)
+  if (devActive !== 1) {
+    throw new Error('DEVICE_NOT_ACTIVE')
+  }
+
   const existingCheck = await runReviewDbQuery<Record<string, unknown>>(
     `
       SELECT id, enrollment_status
@@ -1309,13 +1436,38 @@ export async function updateMapping(
     throw new Error('VALIDATION_ERROR')
   }
 
+  if (nextEmployeeId !== Number(current.employee_id)) {
+    const empCheck = await runReviewDbQuery<Record<string, unknown>>(
+      `SELECT id, employment_status, full_name, employee_code FROM hr_employees WHERE id = ? LIMIT 1`,
+      [nextEmployeeId],
+    )
+    if (empCheck.length === 0) {
+      throw new Error('EMPLOYEE_NOT_FOUND')
+    }
+    const empStatus = String(empCheck[0].employment_status ?? 'ACTIVE').toUpperCase()
+    if (['RESIGN','RESIGNED','NONAKTIF','INACTIVE','KELUAR'].includes(empStatus)) {
+      throw new Error('EMPLOYEE_RESIGNED_CANNOT_MAP')
+    }
+  }
+
+  const deviceCheck = await runReviewDbQuery<Record<string, unknown>>(
+    `SELECT id, active FROM hr_fp_machines WHERE id = ? LIMIT 1`,
+    [currentMachineId],
+  )
+  if (deviceCheck.length === 0) {
+    throw new Error('DEVICE_NOT_FOUND')
+  }
+  if (Number(deviceCheck[0].active ?? 0) !== 1) {
+    throw new Error('DEVICE_NOT_ACTIVE')
+  }
+
   if (
     nextMachineUserId !== String(current.machine_user_id ?? '') ||
     currentMachineId !== Number(current.machine_id)
   ) {
     const duplicateCheck = await runReviewDbQuery<Record<string, unknown>>(
       `
-        SELECT id
+        SELECT id, enrollment_status
         FROM hr_fp_employee_mappings
         WHERE machine_id = ?
           AND machine_user_id = ?
@@ -1325,15 +1477,18 @@ export async function updateMapping(
       [currentMachineId, nextMachineUserId, safeId],
     )
     if (duplicateCheck.length > 0) {
-      return {
-        mapping: mapRowToMapping({
-          ...current,
-          machine_id: currentMachineId,
-          machine_user_id: nextMachineUserId,
-          employee_id: nextEmployeeId,
-        }),
-        updated: false,
-        conflict: true,
+      const dupStatus = String(duplicateCheck[0].enrollment_status ?? 'ENROLLED').toUpperCase()
+      if (dupStatus !== 'REVOKED') {
+        return {
+          mapping: mapRowToMapping({
+            ...current,
+            machine_id: currentMachineId,
+            machine_user_id: nextMachineUserId,
+            employee_id: nextEmployeeId,
+          }),
+          updated: false,
+          conflict: true,
+        }
       }
     }
   }

@@ -59,6 +59,9 @@ export async function POST(request: Request) {
     )
   }
 
+  let machineId = 0
+  let machineUserId = ''
+  let employeeId = 0
   try {
     await ensureFingerprintTables()
 
@@ -69,9 +72,9 @@ export async function POST(request: Request) {
       enrollmentStatus?: unknown
     }
 
-    const machineId = Number.parseInt(String(payload.machineId ?? ''), 10)
-    const machineUserId = String(payload.machineUserId ?? '').trim()
-    const employeeId = Number.parseInt(String(payload.employeeId ?? ''), 10)
+    machineId = Number.parseInt(String(payload.machineId ?? ''), 10)
+    machineUserId = String(payload.machineUserId ?? '').trim()
+    employeeId = Number.parseInt(String(payload.employeeId ?? ''), 10)
     const enrollmentStatusRaw = String(payload.enrollmentStatus ?? 'ENROLLED').trim().toUpperCase()
 
     const enrollmentStatus =
@@ -115,10 +118,26 @@ export async function POST(request: Request) {
       created: result.created,
     })
   } catch (error) {
-    const msg = error instanceof Error && error.message === 'VALIDATION_ERROR'
-      ? 'Validasi input mapping fingerprint gagal. Pastikan machine_id, machine_user_id, dan employee_id terisi valid.'
-      : getReviewDbErrorDetail(error)
-    return Response.json({ message: msg }, { status: 500 })
+    const errMsg = error instanceof Error ? error.message : ''
+    if (errMsg === 'VALIDATION_ERROR') {
+      return Response.json(
+        { message: 'Validasi input mapping fingerprint gagal. Pastikan machine_id, machine_user_id, dan employee_id terisi valid.' },
+        { status: 400 },
+      )
+    }
+    if (errMsg === 'EMPLOYEE_NOT_FOUND') {
+      return Response.json({ message: `Employee dengan ID ${employeeId} tidak ditemukan di master data karyawan.` }, { status: 404 })
+    }
+    if (errMsg === 'EMPLOYEE_RESIGNED_CANNOT_MAP') {
+      return Response.json({ message: 'Employee dengan status resign/nonaktif tidak dapat dibuatkan mapping fingerprint baru.' }, { status: 400 })
+    }
+    if (errMsg === 'DEVICE_NOT_FOUND') {
+      return Response.json({ message: `Perangkat fingerprint dengan ID ${machineId} tidak ditemukan di registry device.` }, { status: 404 })
+    }
+    if (errMsg === 'DEVICE_NOT_ACTIVE') {
+      return Response.json({ message: 'Perangkat fingerprint dalam status nonaktif. Aktifkan device sebelum membuat mapping.' }, { status: 400 })
+    }
+    return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
   }
 }
 
@@ -194,10 +213,26 @@ export async function PUT(request: Request) {
       updated: result.updated,
     })
   } catch (error) {
-    const msg = error instanceof Error && error.message === 'VALIDATION_ERROR'
-      ? 'Validasi update mapping fingerprint gagal. Pastikan ID mapping, machine_user_id, dan employee_id terisi valid.'
-      : getReviewDbErrorDetail(error)
-    return Response.json({ message: msg }, { status: 500 })
+    const errMsg = error instanceof Error ? error.message : ''
+    if (errMsg === 'VALIDATION_ERROR') {
+      return Response.json(
+        { message: 'Validasi update mapping fingerprint gagal. Pastikan ID mapping, machine_user_id, dan employee_id terisi valid.' },
+        { status: 400 },
+      )
+    }
+    if (errMsg === 'EMPLOYEE_NOT_FOUND') {
+      return Response.json({ message: 'Employee tujuan tidak ditemukan di master data karyawan.' }, { status: 404 })
+    }
+    if (errMsg === 'EMPLOYEE_RESIGNED_CANNOT_MAP') {
+      return Response.json({ message: 'Employee dengan status resign/nonaktif tidak dapat di-assign ke mapping fingerprint.' }, { status: 400 })
+    }
+    if (errMsg === 'DEVICE_NOT_FOUND') {
+      return Response.json({ message: 'Perangkat fingerprint tidak ditemukan di registry device.' }, { status: 404 })
+    }
+    if (errMsg === 'DEVICE_NOT_ACTIVE') {
+      return Response.json({ message: 'Perangkat fingerprint dalam status nonaktif. Aktifkan device sebelum mengupdate mapping.' }, { status: 400 })
+    }
+    return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
   }
 }
 

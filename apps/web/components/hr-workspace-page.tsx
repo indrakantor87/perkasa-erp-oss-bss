@@ -1237,6 +1237,10 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
   const [syncNowMessage, setSyncNowMessage] = useState<string | null>(null)
   const [syncNowTone, setSyncNowTone] = useState<'success' | 'danger' | 'info' | 'warning'>('info')
 
+  const [schemaHealthStatus, setSchemaHealthStatus] = useState<LoadStatus>('idle')
+  const [schemaOk, setSchemaOk] = useState<boolean>(true)
+  const [schemaMissingCols, setSchemaMissingCols] = useState<string[]>([])
+
   useEffect(() => {
     let cancelled = false
     async function fetchDaily() {
@@ -1408,11 +1412,46 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
     return () => { cancelled = true }
   }, [activeWorkspace, syncRefreshCounter])
 
+  useEffect(() => {
+    let cancelled = false
+    async function fetchSchemaHealth() {
+      if (activeWorkspace !== 'attendance') return
+      setSchemaHealthStatus('loading')
+      try {
+        const url = '/api/hr/fingerprint/devices/schema-health'
+        const res = await fetch(url)
+        if (!res.ok) {
+          setSchemaHealthStatus('error')
+          return
+        }
+        const json = await res.json()
+        if (!cancelled) {
+          const ok = Boolean(json?.schemaOk)
+          setSchemaOk(ok)
+          setSchemaMissingCols(Array.isArray(json?.missingColumns) ? json.missingColumns : [])
+          setSchemaHealthStatus('loaded')
+        }
+      } catch {
+        if (!cancelled) {
+          setSchemaHealthStatus('error')
+        }
+      }
+    }
+    void fetchSchemaHealth()
+    return () => { cancelled = true }
+  }, [activeWorkspace])
+
   async function handleSyncDevice() {
     const deviceId = selectedDeviceId
     if (!deviceId || !Number.isFinite(deviceId)) {
       setSyncNowTone('danger')
       setSyncNowMessage('Pilih perangkat fingerprint yang valid.')
+      setSyncNowStatus('error')
+      return
+    }
+    if (!schemaOk) {
+      setSyncNowTone('danger')
+      setSyncNowMessage(`⚠️ SKEMA TIDAK SESUAI — hr_fp_raw_events kekurangan kolom: ${schemaMissingCols.join(', ')}. Jalankan migration terlebih dahulu sebelum sinkronisasi.`)
       setSyncNowStatus('error')
       return
     }
@@ -1456,17 +1495,21 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
         durationMs: Number(run.durationMs ?? 0),
       }
       const summaryLine = `${counters.totalRecordsFetched} fetched, ${counters.totalNewValid} baru, ${counters.totalDuplicatesSkipped} duplikat, ${counters.totalUnmapped} unmapped, ${counters.totalFailedParse} gagal. ${counters.cursorAdvanced ? 'Cursor MAJU.' : 'Cursor TIDAK MAJU.'}`
+      const rawErr = String(run.errorSummary ?? '')
+      const sqlErrorCount = (rawErr.match(/\[SQL_ERROR/g) || []).length
+      const duplicateOkCount = (rawErr.match(/\[DUP_OK\]/g) || []).length
+      const classificationLine = (sqlErrorCount > 0 || duplicateOkCount > 0)
+        ? ` Classification: SQL_ERROR=${sqlErrorCount}, DUPLICATE_OK=${duplicateOkCount}.`
+        : ''
       if (fs === 'SUCCESS') {
         setSyncNowTone('success')
-        setSyncNowMessage(`Sukses Sinkron Mesin. ${summaryLine}`)
+        setSyncNowMessage(`Sukses Sinkron Mesin. ${summaryLine}${classificationLine}`)
       } else if (fs === 'PARTIAL') {
-        setSyncNowTone('warning')
-        const err = run.errorSummary ? ` Detail error: ${String(run.errorSummary).substring(0, 400)}.` : ''
-        setSyncNowMessage(`Sinkron Parsial. ${summaryLine}${err}`)
+        const err = rawErr ? ` Detail error: ${rawErr.substring(0, 500)}.` : ''
+        setSyncNowMessage(`Sinkron Parsial. ${summaryLine}${classificationLine}${err}`)
       } else {
-        setSyncNowTone('danger')
-        const err = run.errorSummary ? ` Detail: ${String(run.errorSummary).substring(0, 400)}.` : ''
-        setSyncNowMessage(`Sinkron GAGAL. ${summaryLine}${err}`)
+        const err = rawErr ? ` Detail: ${rawErr.substring(0, 500)}.` : ''
+        setSyncNowMessage(`Sinkron GAGAL. ${summaryLine}${classificationLine}${err}`)
       }
       setSyncNowStatus('loaded')
       setSyncRefreshCounter(c => c + 1)
@@ -1611,6 +1654,16 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
                     </select>
                   )}
                 </div>
+                {activeWorkspace === 'attendance' && schemaHealthStatus !== 'idle' && !schemaOk ? (
+                  <div className="flex items-start gap-2">
+                    <StatusBadge
+                      tone="danger"
+                      label={`⚠️ SKEMA hr_fp_raw_events TIDAK SESUAI. Missing: ${schemaMissingCols.join(', ')}. Jalankan migration sebelum sinkronisasi.`}
+                      size="sm"
+                      uppercase={false}
+                    />
+                  </div>
+                ) : null}
                 {selectedDeviceId && devicesStatus === 'loaded' ? (
                   <div className="flex gap-1">
                     {(() => {
@@ -1637,7 +1690,8 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
                   !reviewDbReady ||
                   !selectedDeviceId ||
                   devicesList.length === 0 ||
-                  syncNowStatus === 'loading'
+                  syncNowStatus === 'loading' ||
+                  !schemaOk
                 }
               >
                 {syncNowStatus === 'loading' ? (

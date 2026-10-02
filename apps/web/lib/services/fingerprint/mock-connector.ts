@@ -11,6 +11,7 @@ type MockConnectorOptions = {
   duplicateCount?: number
   unmappedCount?: number
   throwOnConnect?: ThrowOnConnectMode
+  referenceDate?: Date
 }
 
 const ASIA_JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000
@@ -40,13 +41,17 @@ function buildJakartaLocalDate(
   return new Date(utcMs)
 }
 
-function generateWorkdayTapTimestamp(random: () => number, baseYear: number, baseMonth: number): Date {
-  let dayOffset = Math.floor(random() * 20) + 1
-  let candidate = new Date(baseYear, baseMonth - 1, dayOffset)
+function generateWorkdayTapTimestamp(random: () => number, referenceDate: Date): Date {
+  const refYear = referenceDate.getFullYear()
+  const refMonth = referenceDate.getMonth()
+  const refDay = referenceDate.getDate()
+
+  let dayOffset = Math.floor(random() * 14)
+  let candidate = new Date(refYear, refMonth, refDay - dayOffset)
   let safety = 0
   while (!isWorkday(candidate) && safety < 60) {
     dayOffset += 1
-    candidate = new Date(baseYear, baseMonth - 1, dayOffset)
+    candidate = new Date(refYear, refMonth, refDay - dayOffset)
     safety += 1
   }
   const year = candidate.getFullYear()
@@ -57,16 +62,16 @@ function generateWorkdayTapTimestamp(random: () => number, baseYear: number, bas
   if (morningRoll < 0.52) {
     const hour = 7 + Math.floor(random() * 2)
     const minute = Math.floor(random() * 60)
-    return buildJakartaLocalDate(year, month, day, hour, minute, Math.floor(random() * 60))
+    return buildJakartaLocalDate(year, month + 1, day, hour, minute, Math.floor(random() * 60))
   }
   if (morningRoll < 0.82) {
     const hour = 11 + Math.floor(random() * 2)
     const minute = Math.floor(random() * 60)
-    return buildJakartaLocalDate(year, month, day, hour, minute, Math.floor(random() * 60))
+    return buildJakartaLocalDate(year, month + 1, day, hour, minute, Math.floor(random() * 60))
   }
   const hour = 15 + Math.floor(random() * 3)
   const minute = Math.floor(random() * 60)
-  return buildJakartaLocalDate(year, month, day, hour, minute, Math.floor(random() * 60))
+  return buildJakartaLocalDate(year, month + 1, day, hour, minute, Math.floor(random() * 60))
 }
 
 export class MockFingerprintConnector implements FingerprintMachineConnector {
@@ -75,6 +80,7 @@ export class MockFingerprintConnector implements FingerprintMachineConnector {
   private readonly duplicateCount: number
   private readonly unmappedCount: number
   private readonly throwOnConnect: ThrowOnConnectMode
+  private readonly referenceDate: Date
   private connected: boolean
 
   constructor(
@@ -86,6 +92,9 @@ export class MockFingerprintConnector implements FingerprintMachineConnector {
     this.duplicateCount = options.duplicateCount ?? 1
     this.unmappedCount = options.unmappedCount ?? 1
     this.throwOnConnect = options.throwOnConnect ?? null
+    this.referenceDate = options.referenceDate instanceof Date && Number.isFinite(options.referenceDate.getTime())
+      ? new Date(options.referenceDate.getTime())
+      : new Date()
     this.connected = false
   }
 
@@ -142,14 +151,9 @@ export class MockFingerprintConnector implements FingerprintMachineConnector {
   private pullClean(sinceTimestamp?: Date | null): RawFingerprintEvent[] {
     const seedBase =
       this.machineConfig.id * 1315423911 +
-      Math.floor((sinceTimestamp?.getTime() ?? 0) / 1000) * 2654435761
+      Math.floor((sinceTimestamp?.getTime() ?? 0) / 1000) * 2654435761 +
+      Math.floor(this.referenceDate.getTime() / 1000) * 7
     const random = seededRandom(seedBase)
-
-    const now = new Date()
-    const baseYear = now.getFullYear()
-    const baseMonth = sinceTimestamp
-      ? sinceTimestamp.getMonth() + 1
-      : Math.max(1, now.getMonth() + 1)
 
     const uniqueCount = Math.max(1, this.fakeTotalEvents - this.duplicateCount - this.unmappedCount)
 
@@ -157,7 +161,7 @@ export class MockFingerprintConnector implements FingerprintMachineConnector {
 
     for (let i = 0; i < uniqueCount; i += 1) {
       const empId = (i % 20) + 1
-      const ts = generateWorkdayTapTimestamp(random, baseYear, baseMonth)
+      const ts = generateWorkdayTapTimestamp(random, this.referenceDate)
       events.push({
         machineUserId: String(empId),
         eventTimestampLocal: ts,
@@ -184,7 +188,7 @@ export class MockFingerprintConnector implements FingerprintMachineConnector {
     }
 
     for (let u = 0; u < this.unmappedCount; u += 1) {
-      const ts = generateWorkdayTapTimestamp(random, baseYear, baseMonth)
+      const ts = generateWorkdayTapTimestamp(random, this.referenceDate)
       events.push({
         machineUserId: '999',
         eventTimestampLocal: ts,
@@ -198,12 +202,15 @@ export class MockFingerprintConnector implements FingerprintMachineConnector {
       })
     }
 
+    const refMs = this.referenceDate.getTime()
+    let filtered = events.filter((ev) => ev.eventTimestampLocal.getTime() <= refMs)
+
     if (sinceTimestamp) {
       const sinceMs = sinceTimestamp.getTime()
-      return events.filter((ev) => ev.eventTimestampLocal.getTime() >= sinceMs)
+      filtered = filtered.filter((ev) => ev.eventTimestampLocal.getTime() >= sinceMs)
     }
 
-    return events
+    return filtered
   }
 
   private pullWithMalformed(sinceTimestamp?: Date | null): RawFingerprintEvent[] {
