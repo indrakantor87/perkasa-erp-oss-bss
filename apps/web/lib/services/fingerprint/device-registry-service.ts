@@ -225,49 +225,73 @@ async function ensureHrFpMachinesHybridAlign() {
       `ALTER TABLE hr_fp_raw_events MODIFY COLUMN machine_user_id VARCHAR(64) NOT NULL`,
     )
   } catch {}
+
+  async function execAlter(sqlWithAfter: string, sqlWithoutAfter: string, colKey: string) {
+    let r = (await runReviewDbExecute<ExecuteResult & { error?: string | null }>(sqlWithAfter))
+    if (r?.error) {
+      r = (await runReviewDbExecute<ExecuteResult & { error?: string | null }>(sqlWithoutAfter))
+    }
+    if (r?.error) {
+      alterErrors.push(`${colKey}: ${r.error}`)
+    }
+  }
+  void runReviewDbExecute
+
   try {
-    await runReviewDbExecute<ExecuteResult>(
+    await execAlter(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER employee_id`,
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+      'event_timestamp_original',
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     alterErrors.push(`event_timestamp_original: ${msg}`)
   }
   try {
-    await runReviewDbExecute<ExecuteResult>(
+    await execAlter(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER event_timestamp_original`,
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+      'event_timestamp_normalized',
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     alterErrors.push(`event_timestamp_normalized: ${msg}`)
   }
   try {
-    await runReviewDbExecute<ExecuteResult>(
+    await execAlter(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED' AFTER event_type_raw`,
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED'`,
+      'event_mode',
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     alterErrors.push(`event_mode: ${msg}`)
   }
   try {
-    await runReviewDbExecute<ExecuteResult>(
+    await execAlter(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS raw_payload_json TEXT NULL AFTER is_processed`,
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS raw_payload_json TEXT NULL`,
+      'raw_payload_json',
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     alterErrors.push(`raw_payload_json: ${msg}`)
   }
   try {
-    await runReviewDbExecute<ExecuteResult>(
+    await execAlter(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER raw_payload_json`,
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+      'received_at',
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     alterErrors.push(`received_at: ${msg}`)
   }
   try {
-    await runReviewDbExecute<ExecuteResult>(
+    await execAlter(
       `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS processing_notes TEXT NULL AFTER received_at`,
+      `ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS processing_notes TEXT NULL`,
+      'processing_notes',
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

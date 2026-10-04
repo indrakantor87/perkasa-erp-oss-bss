@@ -236,7 +236,25 @@ export async function hasReviewDbColumn(tableName: string, columnName: string) {
       [tableName, columnName],
     )
 
-    const exists = Number(rows[0]?.total ?? 0) > 0
+    let exists = Number(rows[0]?.total ?? 0) > 0
+
+    if (!exists) {
+      try {
+        await runReviewDbQuery<unknown[]>(
+          `SELECT ${columnName} FROM ${tableName} LIMIT 1`,
+        )
+        exists = true
+      } catch (errProbe) {
+        const msg = errProbe instanceof Error ? errProbe.message : String(errProbe)
+        const unknownCol =
+          msg.toLowerCase().includes(`unknown column '${columnName.toLowerCase()}'`) ||
+          msg.toLowerCase().includes(`unknown column \`${columnName.toLowerCase()}\``)
+        if (!unknownCol) {
+          exists = true
+        }
+      }
+    }
+
     reviewDbColumnCache.set(cacheKey, exists)
     return exists
   } catch {
@@ -305,9 +323,21 @@ export async function addColumnIfMissing(
     ? ` AFTER ${afterColumnName}`
     : ''
 
-  await runReviewDbExecute(
+  let result = (await runReviewDbExecute(
     `ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}${afterClause}`,
-  )
+  )) as unknown as { error?: string | null; errorCode?: string | null }
+
+  if (afterClause && result?.error) {
+    result = (await runReviewDbExecute(
+      `ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}`,
+    )) as unknown as { error?: string | null; errorCode?: string | null }
+  }
+
+  if (result?.error) {
+    throw new Error(
+      `addColumnIfMissing failed for ${tableName}.${columnName}: ${result.error}`,
+    )
+  }
 
   invalidateReviewDbColumnCache(tableName, columnName)
 }
