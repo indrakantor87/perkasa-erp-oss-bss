@@ -28,16 +28,16 @@ export function PageHeader({
   return (
     <div
       className={[
-        'flex flex-col gap-4 sm:gap-5 lg:flex-row lg:items-end lg:justify-between',
+        'flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-end lg:justify-between',
         className,
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      <div className="min-w-0 space-y-3">
+      <div className="min-w-0 space-y-1.5">
         {breadcrumbs && breadcrumbs.length > 0 ? (
           <nav aria-label="Breadcrumb" className="min-w-0 flex items-center gap-1.5 overflow-x-auto">
-            <ol className="flex items-center gap-1 text-xs">
+            <ol className="flex items-center gap-1 text-[11px] leading-none">
               {breadcrumbs.map((item, index) => {
                 const last = index === breadcrumbs.length - 1
                 const content = last ? (
@@ -88,14 +88,14 @@ export function PageHeader({
           </nav>
         ) : null}
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           {eyebrow ? (
-            <p className="section-title !text-muteStrong">{eyebrow}</p>
+            <p className="section-title !text-muteStrong text-[11px] leading-none">{eyebrow}</p>
           ) : null}
           <h1
             className={[
               'font-[family-name:var(--font-heading)] tracking-tight text-inkStrong leading-tight',
-              'text-[26px] font-semibold sm:text-[28px] lg:text-3xl',
+              'text-[20px] font-semibold sm:text-[22px] lg:text-2xl',
               titleClassName,
             ]
               .filter(Boolean)
@@ -104,9 +104,7 @@ export function PageHeader({
             {title}
           </h1>
           {description ? (
-            <p className="max-w-3xl text-sm leading-6 text-mute">
-              {description}
-            </p>
+            <p className="max-w-3xl text-xs leading-5 text-mute line-clamp-2">{description}</p>
           ) : null}
         </div>
       </div>

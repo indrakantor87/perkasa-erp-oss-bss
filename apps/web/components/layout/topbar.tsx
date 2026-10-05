@@ -65,8 +65,9 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
     <div className="flex flex-wrap items-center justify-end gap-2.5 sm:gap-3">
       <ShellIconButton
         variant="soft"
+        size="sm"
         label={searchLabel}
-        icon={<IconSearch className="h-5 w-5" />}
+        icon={<IconSearch className="h-4 w-4" />}
         onClick={() => {
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('perkasa:open-command'))
@@ -74,7 +75,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
         }}
       />
       <div
-        className="inline-flex items-center gap-1 rounded-full border border-line bg-surfaceSoft p-1"
+        className="inline-flex items-center gap-1 rounded-full border border-line bg-surfaceSoft p-0.5"
         role="group"
         aria-label={themeLabel}
       >
@@ -92,19 +93,19 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
               aria-label={label}
               title={label}
               aria-pressed={active ? 'true' : undefined}
-              className={`tap-44 h-11 w-11 inline-flex items-center justify-center rounded-full transition duration-fast ui-standard focus-visible:shadow-focus ${
+              className={`tap-44 h-9 w-9 inline-flex items-center justify-center rounded-full transition duration-fast ui-standard focus-visible:shadow-focus ${
                 active
                   ? 'bg-accent text-accentInk shadow-soft'
                   : 'text-mute hover:text-inkStrong hover:bg-surface'
               }`}
             >
-              <Ico className="h-5 w-5" aria-hidden="true" />
+              <Ico className="h-4 w-4" aria-hidden="true" />
             </button>
           )
         })}
       </div>
       <div
-        className="inline-flex items-center gap-1 rounded-full border border-line bg-surfaceSoft p-1"
+        className="inline-flex items-center gap-1 rounded-full border border-line bg-surfaceSoft p-0.5"
         role="group"
         aria-label={translateUiText('Bahasa', language)}
       >
@@ -121,7 +122,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
               aria-label={label}
               title={label}
               aria-pressed={active ? 'true' : undefined}
-              className={`tap-44 h-11 min-w-[52px] inline-flex items-center justify-center rounded-full px-2 text-[11px] font-bold tracking-wide transition duration-fast ui-standard focus-visible:shadow-focus ${
+              className={`tap-44 h-9 min-w-9 inline-flex items-center justify-center rounded-full px-2.5 text-xs font-semibold transition duration-fast ui-standard focus-visible:shadow-focus ${
                 active
                   ? 'bg-accent text-accentInk shadow-soft'
                   : 'text-mute hover:text-inkStrong hover:bg-surface'
@@ -134,11 +135,11 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
       </div>
       {session ? (
         <div
-          className="surface-soft flex items-center gap-2 rounded-full border border-line bg-surfaceSoft px-1.5 py-1.5 sm:gap-3 sm:px-2.5"
+          className="surface-soft flex items-center gap-2 rounded-full border border-line bg-surfaceSoft px-1.5 py-1 sm:gap-2.5 sm:px-2"
           title={session.displayName}
         >
           <div
-            className="tap-44 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+            className="tap-44 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
             style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)' }}
           >
             {session.displayName
@@ -160,7 +161,7 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
         <Link
           href="/import"
           prefetch={false}
-          className="inline-flex h-11 items-center rounded-full border border-line bg-surfaceSoft px-4 text-sm font-semibold text-ink transition duration-fast ui-standard hover:[border-color:var(--color-line-strong)] hover:bg-surface cursor-pointer select-none focus-visible:shadow-focus"
+          className="inline-flex h-9 items-center rounded-full border border-line bg-surfaceSoft px-3 text-xs font-semibold text-ink transition duration-fast ui-standard hover:[border-color:var(--color-line-strong)] hover:bg-surface cursor-pointer select-none focus-visible:shadow-focus"
         >
           {importLabel}
         </Link>
@@ -168,9 +169,10 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
 
       <form action="/api/auth/logout" method="post">
         <ShellIconButton
-          variant="soft"
-          label={logoutLabel}
-          icon={<IconLogout className="h-5 w-5" />}
+          variant="surface"
+        size="sm"
+        label={logoutLabel}
+        icon={<IconLogout className="h-4 w-4" />}
           type="submit"
         />
       </form>
@@ -178,14 +180,14 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
   )
 
   return (
-    <header className="pb-3 lg:pb-4" suppressHydrationWarning>
+    <header className="pb-2" suppressHydrationWarning>
       <PageHeader
         eyebrow={activeDescription}
         title={activeTitle}
         description={workspaceDescription}
         breadcrumbs={breadcrumbs}
         actions={actions}
-        className="gap-2 sm:gap-3"
+        className="gap-2"
       />
     </header>
   )
