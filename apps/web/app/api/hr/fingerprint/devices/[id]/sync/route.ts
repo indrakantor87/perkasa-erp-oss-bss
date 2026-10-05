@@ -54,7 +54,11 @@ export async function POST(
     }
 
     await ensureFingerprintTables()
-    const result = await syncNow(id, session.userId ?? null, syncMode)
+    const url = new URL(request.url)
+    const backfillRaw = url.searchParams.get('backfillDays')
+    const backfillParsed = backfillRaw != null ? Number.parseInt(String(backfillRaw).trim(), 10) : NaN
+    const backfillDays = Number.isFinite(backfillParsed) && backfillParsed > 0 ? backfillParsed : undefined
+    const result = await syncNow(id, session.userId ?? null, syncMode, backfillDays)
 
     const summary = `${result.totalRecordsFetched} fetched, ${result.totalNewValid} baru, ${result.totalDuplicatesSkipped} duplikat, ${result.totalUnmapped} unmapped, ${result.totalFailedParse} gagal parse. Cursor: ${result.cursorAdvanced ? 'MAJU' : 'TIDAK MAJU'}`
 

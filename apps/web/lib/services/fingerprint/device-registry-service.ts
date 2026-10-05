@@ -791,6 +791,7 @@ export async function syncNow(
   machineId: number,
   actorUserId: number | null,
   syncMode: SyncMode = 'MANUAL',
+  backfillDays?: number,
 ): Promise<SyncRunSummary> {
   validateFingerprintEncryptionConfiguredOrThrow()
   await ensureFingerprintTables()
@@ -887,7 +888,11 @@ export async function syncNow(
   }
 
   const cursorSinceRaw = machine.lastSyncAt
-  const cursorSince: Date | null = cursorSinceRaw ? new Date(cursorSinceRaw) : null
+  const cursorSince: Date | null = backfillDays && Number.isFinite(backfillDays) && backfillDays > 0
+    ? new Date(Date.now() - backfillDays * 86400000)
+    : cursorSinceRaw
+      ? new Date(cursorSinceRaw)
+      : null
 
   let finalStatus: SyncRunFinalStatus = 'SUCCESS'
   let totalRecordsFetched = 0
