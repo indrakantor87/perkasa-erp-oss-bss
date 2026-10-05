@@ -41,6 +41,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const id = parsePositiveInt(idLocal)
     if (!id) return Response.json({ message: 'id karyawan tidak valid (integer positif).' }, { status: 400 })
 
+    await runReviewDbQuery<any>(
+      `
+      SELECT he.id
+      FROM hr_disciplinary_records hdr
+      JOIN hr_employees he
+        ON he.id = hdr.employee_id
+      LEFT JOIN org_divisions od
+        ON od.id = he.division_id
+      WHERE hdr.id IN (SELECT MIN(ih.id) FROM hr_disciplinary_records ih)
+      LIMIT 1
+    `,
+      [],
+    ).catch(() => [])
+
     let identRows: MinimalIdentRow[] = []
     try {
       identRows = await runReviewDbQuery<MinimalIdentRow>(
