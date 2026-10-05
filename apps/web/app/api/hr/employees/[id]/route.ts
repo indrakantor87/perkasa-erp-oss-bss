@@ -10,34 +10,38 @@ import { ensureHrEmployeeKpiTable } from '@/lib/services/hr-employee-kpi-service
 
 type EmployeeCoreRow = {
   id: number
-  employee_code: string | null
-  full_name: string | null
-  branch_id: number | null
-  division_id: number | null
-  team_id: number | null
-  position_id: number | null
-  supervisor_id: number | null
-  position_name: string | null
-  employment_status: string | null
-  join_date: string | null
-  contract_doc_id: number | null
-  contract_start_date: string | null
-  contract_end_date: string | null
-  exit_date: string | null
-  exit_reason: string | null
-  user_id: number | null
-  base_salary: string | number | null
+  employeeCode: string | null
+  fullName: string | null
+  branchId: number | null
+  divisionId: number | null
+  teamId: number | null
+  positionId: number | null
+  supervisorId: number | null
+  positionLabelLegacy: string | null
+  employmentStatus: string | null
+  joinDate: string | null
+  contractDocId: number | null
+  contractStartDate: string | null
+  contractEndDate: string | null
+  exitDate: string | null
+  exitReason: string | null
+  userId: number | null
+  baseSalary: string | number | null
   phone: string | null
   whatsapp: string | null
-  email_corporate: string | null
+  emailCorporate: string | null
   status: string | null
-  created_at: string | null
-  updated_at: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  branchName: string | null
+  divisionName: string | null
+  teamName: string | null
+  positionName: string | null
+  supervisorName: string | null
+  supervisorCode: string | null
 }
 
 type CountTotalRow = { total: number }
-
-type NameRow = { name: string | null; employee_code?: string | null; full_name?: string | null }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: idLocal } = await params
@@ -51,93 +55,160 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     await ensureHrDisciplinaryRecordsTable()
 
     const id = parsePositiveInt(idLocal)
-    if (!id) return Response.json({ message: 'id karyawan tidak valid (harus integer positif).' }, { status: 400 })
+    if (!id) return Response.json({ message: 'id karyawan tidak valid (integer positif).' }, { status: 400 })
 
-    const coreRows = await runReviewDbQuery<EmployeeCoreRow>(
+    const primaryRows = await runReviewDbQuery<EmployeeCoreRow>(
       `
       SELECT
-        id,
-        employee_code,
-        full_name,
-        branch_id,
-        division_id,
-        team_id,
-        position_id,
-        supervisor_id,
-        position_name,
-        employment_status,
-        CAST(join_date AS CHAR) AS join_date,
-        contract_doc_id,
-        CAST(contract_start_date AS CHAR) AS contract_start_date,
-        CAST(contract_end_date AS CHAR) AS contract_end_date,
-        CAST(exit_date AS CHAR) AS exit_date,
-        exit_reason,
-        user_id,
-        base_salary,
-        phone,
-        whatsapp,
-        email_corporate,
-        status,
-        CAST(created_at AS CHAR) AS created_at,
-        CAST(updated_at AS CHAR) AS updated_at
-      FROM hr_employees
-      WHERE id = ?
+        he.id AS id,
+        he.employee_code AS employeeCode,
+        he.full_name AS fullName,
+        he.branch_id AS branchId,
+        he.division_id AS divisionId,
+        he.team_id AS teamId,
+        he.position_id AS positionId,
+        he.supervisor_id AS supervisorId,
+        he.position_name AS positionLabelLegacy,
+        he.employment_status AS employmentStatus,
+        CAST(he.join_date AS CHAR) AS joinDate,
+        he.contract_doc_id AS contractDocId,
+        CAST(he.contract_start_date AS CHAR) AS contractStartDate,
+        CAST(he.contract_end_date AS CHAR) AS contractEndDate,
+        CAST(he.exit_date AS CHAR) AS exitDate,
+        he.exit_reason AS exitReason,
+        he.user_id AS userId,
+        he.base_salary AS baseSalary,
+        he.phone AS phone,
+        he.whatsapp AS whatsapp,
+        he.email_corporate AS emailCorporate,
+        he.status AS status,
+        CAST(he.created_at AS CHAR) AS createdAt,
+        CAST(he.updated_at AS CHAR) AS updatedAt,
+        ob.name AS branchName,
+        od.name AS divisionName,
+        ot.name AS teamName,
+        op.name AS positionName,
+        sup.full_name AS supervisorName,
+        sup.employee_code AS supervisorCode
+      FROM hr_disciplinary_records hdr
+      JOIN hr_employees he
+        ON he.id = hdr.employee_id
+      LEFT JOIN org_branches ob
+        ON ob.id = he.branch_id
+      LEFT JOIN org_divisions od
+        ON od.id = he.division_id
+      LEFT JOIN org_teams ot
+        ON ot.id = he.team_id
+      LEFT JOIN org_positions op
+        ON op.id = he.position_id
+      LEFT JOIN hr_employees sup
+        ON sup.id = he.supervisor_id
+      WHERE he.id = ?
       LIMIT 1
     `,
       [id],
     )
 
-    if (coreRows.length === 0) {
+    let core = primaryRows[0] || null
+
+    if (!core) {
+      const fallbackRows = await runReviewDbQuery<EmployeeCoreRow>(
+        `
+        SELECT
+          he.id AS id,
+          he.employee_code AS employeeCode,
+          he.full_name AS fullName,
+          he.branch_id AS branchId,
+          he.division_id AS divisionId,
+          he.team_id AS teamId,
+          he.position_id AS positionId,
+          he.supervisor_id AS supervisorId,
+          he.position_name AS positionLabelLegacy,
+          he.employment_status AS employmentStatus,
+          CAST(he.join_date AS CHAR) AS joinDate,
+          he.contract_doc_id AS contractDocId,
+          CAST(he.contract_start_date AS CHAR) AS contractStartDate,
+          CAST(he.contract_end_date AS CHAR) AS contractEndDate,
+          CAST(he.exit_date AS CHAR) AS exitDate,
+          he.exit_reason AS exitReason,
+          he.user_id AS userId,
+          he.base_salary AS baseSalary,
+          he.phone AS phone,
+          he.whatsapp AS whatsapp,
+          he.email_corporate AS emailCorporate,
+          he.status AS status,
+          CAST(he.created_at AS CHAR) AS createdAt,
+          CAST(he.updated_at AS CHAR) AS updatedAt,
+          NULL AS branchName,
+          NULL AS divisionName,
+          NULL AS teamName,
+          NULL AS positionName,
+          NULL AS supervisorName,
+          NULL AS supervisorCode
+        FROM hr_employees he
+        WHERE he.id = ?
+        LIMIT 1
+        `,
+        [id],
+      )
+      core = fallbackRows[0] || null
+    }
+
+    if (!core) {
       return Response.json({ message: `Karyawan dengan id=${id} tidak ditemukan di hr_employees.` }, { status: 404 })
     }
-    const core = coreRows[0]
 
-    const [branchRows, divisionRows, teamRows, positionRows, supervisorRows, kpiCount, loansCount, disciplinaryCount, slipsCount, attendanceCount30d] =
-      await Promise.all([
-        core.branch_id ? runReviewDbQuery<NameRow>(`SELECT name FROM org_branches WHERE id = ? LIMIT 1`, [core.branch_id]).catch(() => []) : Promise.resolve([] as NameRow[]),
-        core.division_id ? runReviewDbQuery<NameRow>(`SELECT name FROM org_divisions WHERE id = ? LIMIT 1`, [core.division_id]).catch(() => []) : Promise.resolve([] as NameRow[]),
-        core.team_id ? runReviewDbQuery<NameRow>(`SELECT name FROM org_teams WHERE id = ? LIMIT 1`, [core.team_id]).catch(() => []) : Promise.resolve([] as NameRow[]),
-        core.position_id ? runReviewDbQuery<NameRow>(`SELECT name FROM org_positions WHERE id = ? LIMIT 1`, [core.position_id]).catch(() => []) : Promise.resolve([] as NameRow[]),
-        core.supervisor_id ? runReviewDbQuery<NameRow>(`SELECT employee_code, full_name FROM hr_employees WHERE id = ? LIMIT 1`, [core.supervisor_id]).catch(() => []) : Promise.resolve([] as NameRow[]),
-        runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_employee_kpis WHERE employee_id = ? LIMIT 1`, [id]).catch(() => [{ total: 0 }] as CountTotalRow[]),
-        runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_loans WHERE employee_id = ? LIMIT 1`, [id]).catch(() => [{ total: 0 }] as CountTotalRow[]),
-        runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_disciplinary_records WHERE employee_id = ? LIMIT 1`, [id]).catch(() => [{ total: 0 }] as CountTotalRow[]),
-        runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_salary_slips WHERE employee_id = ? LIMIT 1`, [id]).catch(() => [{ total: 0 }] as CountTotalRow[]),
-        runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_attendance WHERE employee_id = ? AND attendance_date >= CURRENT_DATE - INTERVAL 30 DAY LIMIT 1`, [id]).catch(() => [{ total: 0 }] as CountTotalRow[]),
-      ])
+    const [kpiCount, loansCount, disciplinaryCount, slipsCount, attendanceCount30d] = await Promise.all([
+      runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_employee_kpis WHERE employee_id = ? LIMIT 1`, [id]).catch(
+        () => [{ total: 0 }] as CountTotalRow[],
+      ),
+      runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_loans WHERE employee_id = ? LIMIT 1`, [id]).catch(
+        () => [{ total: 0 }] as CountTotalRow[],
+      ),
+      runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_disciplinary_records WHERE employee_id = ? LIMIT 1`, [id]).catch(
+        () => [{ total: 0 }] as CountTotalRow[],
+      ),
+      runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_salary_slips WHERE employee_id = ? LIMIT 1`, [id]).catch(
+        () => [{ total: 0 }] as CountTotalRow[],
+      ),
+      runReviewDbQuery<CountTotalRow>(
+        `SELECT COUNT(*) AS total FROM hr_attendance WHERE employee_id = ? AND attendance_date >= CURRENT_DATE - INTERVAL 30 DAY LIMIT 1`,
+        [id],
+      ).catch(() => [{ total: 0 }] as CountTotalRow[]),
+    ])
 
     const data = {
       id: core.id,
-      employeeCode: core.employee_code,
-      fullName: core.full_name,
-      branchId: core.branch_id,
-      branchName: branchRows[0]?.name ?? null,
-      divisionId: core.division_id,
-      divisionName: divisionRows[0]?.name ?? null,
-      teamId: core.team_id,
-      teamName: teamRows[0]?.name ?? null,
-      positionId: core.position_id,
-      positionName: positionRows[0]?.name ?? core.position_name ?? null,
-      positionLabelLegacy: core.position_name,
-      supervisorId: core.supervisor_id,
-      supervisorName: supervisorRows[0]?.full_name ?? null,
-      supervisorCode: supervisorRows[0]?.employee_code ?? null,
-      contractDocId: core.contract_doc_id,
-      contractStartDate: core.contract_start_date,
-      contractEndDate: core.contract_end_date,
-      exitDate: core.exit_date,
-      exitReason: core.exit_reason,
-      userId: core.user_id,
-      employmentStatus: core.employment_status || 'KARYAWAN',
+      employeeCode: core.employeeCode,
+      fullName: core.fullName,
+      branchId: core.branchId,
+      branchName: core.branchName,
+      divisionId: core.divisionId,
+      divisionName: core.divisionName,
+      teamId: core.teamId,
+      teamName: core.teamName,
+      positionId: core.positionId,
+      positionName: core.positionName || core.positionLabelLegacy,
+      positionLabelLegacy: core.positionLabelLegacy,
+      supervisorId: core.supervisorId,
+      supervisorName: core.supervisorName,
+      supervisorCode: core.supervisorCode,
+      contractDocId: core.contractDocId,
+      contractStartDate: core.contractStartDate,
+      contractEndDate: core.contractEndDate,
+      exitDate: core.exitDate,
+      exitReason: core.exitReason,
+      userId: core.userId,
+      employmentStatus: core.employmentStatus || 'KARYAWAN',
       employmentType: null,
-      baseSalary: core.base_salary,
+      baseSalary: core.baseSalary,
       phone: core.phone,
       whatsapp: core.whatsapp,
-      emailCorporate: core.email_corporate,
-      joinDate: core.join_date,
+      emailCorporate: core.emailCorporate,
+      joinDate: core.joinDate,
       status: core.status,
-      createdAt: core.created_at,
-      updatedAt: core.updated_at,
+      createdAt: core.createdAt,
+      updatedAt: core.updatedAt,
       nickname: null,
       gender: null,
       placeOfBirth: null,
@@ -168,7 +239,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       totalAttendanceRecords30Days: Number(attendanceCount30d[0]?.total ?? 0),
     }
 
-    return Response.json({ data, summaryRelations })
+    return Response.json({ data, summaryRelations, resolvedQuery: core.divisionName !== undefined ? 'primary-DISCPLINARY-JOIN' : 'fallback-hr_employees-direct' })
   } catch (error) {
     return Response.json({ message: getReviewDbErrorDetail(error) }, { status: 500 })
   }
