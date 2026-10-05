@@ -1236,6 +1236,7 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
   const [syncNowStatus, setSyncNowStatus] = useState<LoadStatus>('idle')
   const [syncNowMessage, setSyncNowMessage] = useState<string | null>(null)
   const [syncNowTone, setSyncNowTone] = useState<'success' | 'danger' | 'info' | 'warning'>('info')
+  const [backfillDays, setBackfillDays] = useState<string>('0')
 
   const [schemaHealthStatus, setSchemaHealthStatus] = useState<LoadStatus>('idle')
   const [schemaOk, setSchemaOk] = useState<boolean>(true)
@@ -1464,9 +1465,18 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
     setSyncNowId(deviceId)
     setSyncNowStatus('loading')
     setSyncNowTone('info')
-    setSyncNowMessage('Menarik data dari mesin fingerprint, harap tunggu...')
+    const backfillN = Number.parseInt(backfillDays || '0', 10)
+    const baseSyncUrl = `/api/hr/fingerprint/devices/${encodeURIComponent(String(deviceId))}/sync`
+    const syncUrl = Number.isFinite(backfillN) && backfillN > 0
+      ? `${baseSyncUrl}?backfillDays=${encodeURIComponent(String(backfillN))}`
+      : baseSyncUrl
+    setSyncNowMessage(
+      backfillN > 0
+        ? `Menarik data dari mesin fingerprint (BACKFILL ${backfillN} hari), harap tunggu...`
+        : 'Menarik data dari mesin fingerprint, harap tunggu...',
+    )
     try {
-      const res = await fetch(`/api/hr/fingerprint/devices/${encodeURIComponent(String(deviceId))}/sync`, {
+      const res = await fetch(syncUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ syncMode: 'MANUAL' }),
@@ -1680,6 +1690,22 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
                   })()}
                   </div>
                 ) : null}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-mute">Backfill (Tarik N Hari)</label>
+                  <select
+                    value={backfillDays}
+                    onChange={(ev) => setBackfillDays(ev.target.value)}
+                    disabled={syncNowStatus === 'loading'}
+                    className="w-full rounded-2xl border border-line bg-white px-3 py-2 text-sm focus:border-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-950/10 disabled:opacity-60"
+                  >
+                    <option value="0">Hanya delta terakhir (default)</option>
+                    <option value="7">Backfill 7 hari terakhir</option>
+                    <option value="14">Backfill 14 hari terakhir</option>
+                    <option value="30">Backfill 30 hari terakhir</option>
+                    <option value="90">Backfill 90 hari terakhir</option>
+                    <option value="365">Backfill 365 hari (FULL PULL)</option>
+                  </select>
+                </div>
               </div>
               <UiButton
                 variant="secondary"

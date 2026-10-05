@@ -888,11 +888,14 @@ export async function syncNow(
   }
 
   const cursorSinceRaw = machine.lastSyncAt
-  const cursorSince: Date | null = backfillDays && Number.isFinite(backfillDays) && backfillDays > 0
-    ? new Date(Date.now() - backfillDays * 86400000)
-    : cursorSinceRaw
-      ? new Date(cursorSinceRaw)
-      : null
+  const cursorSince: Date | null =
+    backfillDays && Number.isFinite(backfillDays) && backfillDays >= 14
+      ? null
+      : backfillDays && Number.isFinite(backfillDays) && backfillDays > 0
+        ? new Date(Date.now() - backfillDays * 86400000)
+        : cursorSinceRaw
+          ? new Date(cursorSinceRaw)
+          : null
 
   let finalStatus: SyncRunFinalStatus = 'SUCCESS'
   let totalRecordsFetched = 0
