@@ -100,6 +100,96 @@ function sourceBadgeIconAndLabel(source: SourceType): { icon: string; label: str
   }
 }
 
+function pad2(n: number) { return String(n).padStart(2, '0') }
+
+function buildDemoDailyRows(
+  filterFrom: string,
+  filterTo: string,
+): AttendanceDailyRow[] {
+  function parseDateYYYYMMDD(v: string): Date | null {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v.trim())
+    if (!m) return null
+    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3])
+    const dt = new Date(y, mo - 1, d)
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null
+    return dt
+  }
+  const fromD = parseDateYYYYMMDD(filterFrom)
+  const toD = parseDateYYYYMMDD(filterTo)
+  const today = new Date()
+  const from = fromD || new Date(today.getFullYear(), today.getMonth(), today.getDate() - 13)
+  const to = toD || new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const workdays: string[] = []
+  const cur = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  let safety = 0
+  while (cur.getTime() <= to.getTime() && safety < 120) {
+    const dw = cur.getDay()
+    if (dw >= 1 && dw <= 5) {
+      workdays.push(`${cur.getFullYear()}-${pad2(cur.getMonth() + 1)}-${pad2(cur.getDate())}`)
+    }
+    cur.setDate(cur.getDate() + 1)
+    safety += 1
+  }
+  const lastDays = workdays.slice(-10)
+  const DEMO_EMPLOYEES: Omit<AttendanceDailyRow, 'id' | 'attendance_date' | 'check_in' | 'check_out' | 'worked_hours' | 'status' | 'tap_count' | 'overtime_hours' | 'locked_by_admin' | 'source_type' | 'fingerprint_device_id'>[] = [
+    { employee_id: 2, employee_code: 'EMP-202610-0002', employee_name: 'Iman', division: 'HUMAN CAPITAL', team: 'HR OPERASIONAL', position: 'HR ADMIN' },
+    { employee_id: 1, employee_code: 'EMP-202610-0001', employee_name: 'Chintia', division: 'FINANCE & HR', team: 'FINANCE', position: 'FINANCE STAFF' },
+    { employee_id: 4, employee_code: 'EMP-202610-0004', employee_name: 'Dhimas', division: 'OPERASIONAL', team: 'TIM LAPANGAN', position: 'FIELD ENGINEER' },
+    { employee_id: 3, employee_code: 'EMP-202610-0003', employee_name: 'Chalis', division: 'OPERASIONAL', team: 'TIM LAPANGAN', position: 'FIELD SUPERVISOR' },
+    { employee_id: 5, employee_code: 'EMP-202610-0005', employee_name: 'Anya', division: 'MARKETING', team: 'SALES & CRM', position: 'SALES ADMIN' },
+  ]
+  const out: AttendanceDailyRow[] = []
+  for (const emp of DEMO_EMPLOYEES) {
+    for (let di = 0; di < lastDays.length; di += 1) {
+      const dateStr = lastDays[di]
+      const seed = ((emp.employee_id * 31) + (di * 7) + 0x9e3779b9) >>> 0
+      const rnd = (mod: number, shift: number) => {
+        const s = (seed >>> shift) ^ ((seed << (shift + 3)) >>> 0)
+        return Math.abs(s >>> 0) % mod
+      }
+      const isLate = rnd(10, 2) < 2
+      const isHalfDay = rnd(20, 5) < 1
+      const inHour = isLate ? 9 : 7 + rnd(2, 7)
+      const inMin = isLate ? 45 + rnd(20, 11) : 30 + rnd(30, 13)
+      const outHour = 16 + rnd(2, 17)
+      const outMin = 15 + rnd(40, 19)
+      const checkIn = `${dateStr} ${pad2(inHour)}:${pad2(inMin)}:${pad2(rnd(60, 23))}`
+      const checkOut = isHalfDay ? null : `${dateStr} ${pad2(outHour)}:${pad2(outMin)}:${pad2(rnd(60, 29))}`
+      const workedHours = (() => {
+        if (!checkOut) return '4j 0m'
+        const cin = new Date(`${dateStr}T${pad2(inHour)}:${pad2(inMin)}:00`)
+        const cout = new Date(`${dateStr}T${pad2(outHour)}:${pad2(outMin)}:00`)
+        const diff = cout.getTime() - cin.getTime()
+        if (diff <= 0) return '-'
+        const m = Math.floor(diff / 60000)
+        return `${Math.floor(m / 60)}j ${m % 60}m`
+      })()
+      const statusVal =
+        isHalfDay ? 'HALF_DAY' :
+        isLate ? 'LATE' :
+        'PRESENT'
+      out.push({
+        ...emp,
+        id: `demo-fp-ui-${emp.employee_id}-${dateStr}`,
+        attendance_date: dateStr,
+        check_in: checkIn,
+        check_out: checkOut,
+        worked_hours: workedHours,
+        status: statusVal,
+        source_type: 'FINGERPRINT_MACHINE',
+        fingerprint_device_id: 2,
+        tap_count: isHalfDay ? 1 : 2,
+        overtime_hours: rnd(10, 31) < 1 ? 60 + rnd(180, 37) : 0,
+        locked_by_admin: false,
+      })
+    }
+  }
+  return out.sort((a, b) => {
+    if (a.attendance_date !== b.attendance_date) return a.attendance_date < b.attendance_date ? 1 : -1
+    return String(a.employee_code).localeCompare(String(b.employee_code))
+  })
+}
+
 function connectionTone(status: ConnectionStatus): 'success' | 'warning' | 'danger' | 'neutral' {
   switch (status) {
     case 'ONLINE':
@@ -958,75 +1048,93 @@ function AttendanceDailyView({
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-[0.14em] text-mute dark:bg-slate-800/50">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold">Kode</th>
-                <th className="px-4 py-3 text-left font-semibold">Nama Karyawan</th>
-                <th className="px-4 py-3 text-left font-semibold">Divisi</th>
-                <th className="px-4 py-3 text-left font-semibold">Tanggal</th>
-                <th className="px-4 py-3 text-left font-semibold">Clock IN</th>
-                <th className="px-4 py-3 text-left font-semibold">Clock OUT</th>
-                <th className="px-4 py-3 text-left font-semibold">Jam Kerja</th>
-                <th className="px-4 py-3 text-left font-semibold">Status</th>
-                <th className="px-4 py-3 text-left font-semibold">Sumber Data</th>
-                <th className="px-4 py-3 text-left font-semibold">Jumlah Tap</th>
-                <th className="px-4 py-3 text-right font-semibold">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {status === 'loaded' && rows.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="px-4 py-10 text-center text-mute">
-                    Data absensi tidak tersedia untuk periode ini.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => {
-                  const src = sourceBadgeIconAndLabel(row.source_type)
-                  return (
-                    <tr key={row.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                      <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">
-                        {row.employee_code}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-950 dark:text-white">
-                          {row.employee_name}
-                        </div>
-                        <div className="text-xs text-mute">
-                          {row.team} · {row.position}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-mute">{row.division}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                        {row.attendance_date}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-emerald-700 dark:text-emerald-300">
-                        {extractTimeOnly(row.check_in)}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-rose-700 dark:text-rose-300">
-                        {extractTimeOnly(row.check_out)}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300">
-                        {row.worked_hours}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge
-                          tone={statusTone(row.status)}
-                          label={statusLabel(row.status)}
-                          size="sm"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1">
-                          <StatusBadge tone={src.tone} label={`${src.icon} ${src.label}`} size="sm" uppercase={false} />
-                          {src.note ? (
-                            <span className="text-[8px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-400">
-                              {src.note}
-                            </span>
-                          ) : null}
-                        </div>
+        <div className="space-y-3">
+          {(() => {
+            const useDemo = status === 'loaded' && rows.length === 0
+            const displayRows: AttendanceDailyRow[] = useDemo
+              ? buildDemoDailyRows(filterFrom, filterTo)
+              : rows
+            return (
+              <>
+                {useDemo ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-700/50 dark:bg-amber-950/30">
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">⚠️ DATA DEMO UI ABSENSI (Data dari mesin fingerprint BELUM terintegrasi SDK)</p>
+                    <p className="mt-1 text-xs leading-5 text-amber-800/90 dark:text-amber-200/85">
+                      SDK ZKTeco asli untuk baca transaction log mesin IP 103.162.16.14:4370 BELUM di-integrasi ke sistem. Saat ini connector masih menggunakan simulasi Mock.
+                      Tampilan di bawah adalah contoh UI jika data fingerprint BENAR-BENAR terisi (5 karyawan × 10 hari kerja).
+                      Integrasi SDK asli = scope work terpisah berikutnya.
+                    </p>
+                  </div>
+                ) : null}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-[0.14em] text-mute dark:bg-slate-800/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">Kode</th>
+                        <th className="px-4 py-3 text-left font-semibold">Nama Karyawan</th>
+                        <th className="px-4 py-3 text-left font-semibold">Divisi</th>
+                        <th className="px-4 py-3 text-left font-semibold">Tanggal</th>
+                        <th className="px-4 py-3 text-left font-semibold">Clock IN</th>
+                        <th className="px-4 py-3 text-left font-semibold">Clock OUT</th>
+                        <th className="px-4 py-3 text-left font-semibold">Jam Kerja</th>
+                        <th className="px-4 py-3 text-left font-semibold">Status</th>
+                        <th className="px-4 py-3 text-left font-semibold">Sumber Data</th>
+                        <th className="px-4 py-3 text-left font-semibold">Jumlah Tap</th>
+                        <th className="px-4 py-3 text-right font-semibold">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {status === 'loaded' && displayRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={11} className="px-4 py-10 text-center text-mute">
+                            Data absensi tidak tersedia untuk periode ini.
+                          </td>
+                        </tr>
+                      ) : (
+                        displayRows.map((row) => {
+                          const src = sourceBadgeIconAndLabel(row.source_type)
+                          return (
+                            <tr key={row.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                              <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">
+                                {row.employee_code}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-semibold text-slate-950 dark:text-white">
+                                  {row.employee_name}
+                                </div>
+                                <div className="text-xs text-mute">
+                                  {row.team} · {row.position}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-mute">{row.division}</td>
+                              <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                                {row.attendance_date}
+                              </td>
+                              <td className="px-4 py-3 font-mono text-emerald-700 dark:text-emerald-300">
+                                {extractTimeOnly(row.check_in)}
+                              </td>
+                              <td className="px-4 py-3 font-mono text-rose-700 dark:text-rose-300">
+                                {extractTimeOnly(row.check_out)}
+                              </td>
+                              <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300">
+                                {row.worked_hours}
+                              </td>
+                              <td className="px-4 py-3">
+                                <StatusBadge
+                                  tone={statusTone(row.status)}
+                                  label={statusLabel(row.status)}
+                                  size="sm"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-col gap-1">
+                                  <StatusBadge tone={src.tone} label={`${src.icon} ${src.label}`} size="sm" uppercase={false} />
+                                  {src.note ? (
+                                    <span className="text-[8px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-400">
+                                      {src.note}
+                                    </span>
+                                  ) : null}
+                                </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="badge border-slate-200 bg-white text-slate-700 dark:bg-slate-800 dark:text-slate-200">
@@ -1044,6 +1152,10 @@ function AttendanceDailyView({
               )}
             </tbody>
           </table>
+        </div>
+              </>
+            )
+          })()}
         </div>
       )}
     </section>
