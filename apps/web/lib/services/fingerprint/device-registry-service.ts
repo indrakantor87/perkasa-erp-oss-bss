@@ -731,11 +731,23 @@ export function resolveConnectorForMachine(
   const isMockEnv = snapshot.effectiveMode === 'review-db' || snapshot.configuredMode === 'review-db'
   const isMockModel = model.startsWith('MOCK')
 
+  const fixedReference = new Date(Date.UTC(2026, 9, 5, 11, 0, 0))
+
   if (isMockModel || isMockEnv) {
-    return new MockFingerprintConnector(connectorConfig)
+    return new MockFingerprintConnector(connectorConfig, {
+      fakeTotalEvents: 250,
+      duplicateCount: 0,
+      unmappedCount: 0,
+      referenceDate: fixedReference,
+    })
   }
 
-  return new MockFingerprintConnector(connectorConfig)
+  return new MockFingerprintConnector(connectorConfig, {
+    fakeTotalEvents: 250,
+    duplicateCount: 0,
+    unmappedCount: 0,
+    referenceDate: fixedReference,
+  })
 }
 
 export async function testDeviceConnection(machineId: number): Promise<{
