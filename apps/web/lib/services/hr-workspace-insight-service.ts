@@ -35,6 +35,7 @@ type DisciplinaryRiskRow = {
 
 type KpiRiskRow = {
   kpiId: number
+  employeeId: number
   employeeCode: string | null
   employeeName: string | null
   divisionName: string | null
@@ -192,6 +193,7 @@ export async function getHrWorkspaceInsightSections(workspace: 'permissions' | '
             `
               SELECT
                 hek.id AS kpiId,
+                he.id AS employeeId,
                 he.employee_code AS employeeCode,
                 he.full_name AS employeeName,
                 od.name AS divisionName,
@@ -230,6 +232,7 @@ export async function getHrWorkspaceInsightSections(workspace: 'permissions' | '
           status: Number(row.severeCount ?? 0) > 0 ? 'PRIORITAS' : 'MONITOR',
           detail: `${formatNumber(row.issueCount)} kasus attendance non-normal dalam 30 hari terakhir, dengan ${formatNumber(row.severeCount)} kasus berat dan ${formatNumber(row.lateCount)} kasus terlambat.`,
           meta: [
+            `Employee ID: ${row.employeeId}`,
             `Employee Code: ${row.employeeCode || '-'}`,
             `Division: ${row.divisionName || '-'}`,
             `Severe Count: ${formatNumber(row.severeCount)}`,
@@ -250,6 +253,7 @@ export async function getHrWorkspaceInsightSections(workspace: 'permissions' | '
           status: Number(row.score ?? 0) <= 50 ? 'KRITIS' : 'PERLU COACHING',
           detail: `KPI periode ${String(row.kpiMonth ?? '-')}/${String(row.kpiYear ?? '-')} tercatat ${formatNumber(row.score)} dengan bonus performa ${formatNumber(row.performanceBonus)}.`,
           meta: [
+            `Employee ID: ${row.employeeId}`,
             `Employee Code: ${row.employeeCode || '-'}`,
             `Division: ${row.divisionName || '-'}`,
             `Periode: ${String(row.kpiMonth ?? '-')}/${String(row.kpiYear ?? '-')}`,
