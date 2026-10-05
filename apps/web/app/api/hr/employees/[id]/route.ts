@@ -8,61 +8,36 @@ import {
 } from '@/lib/services/hr-disciplinary-schema-ensure'
 import { ensureHrEmployeeKpiTable } from '@/lib/services/hr-employee-kpi-service'
 
-type EmployeeDetailRow = {
+type EmployeeCoreRow = {
   id: number
-  employeeCode: string
-  fullName: string
-  branchId: number | null
-  branchName: string | null
-  divisionId: number | null
-  divisionName: string | null
-  teamId: number | null
-  teamName: string | null
-  positionId: number | null
-  positionName: string | null
-  positionLabelLegacy: string | null
-  supervisorId: number | null
-  supervisorName: string | null
-  supervisorCode: string | null
-  contractDocId: number | null
-  contractStartDate: string | null
-  contractEndDate: string | null
-  exitDate: string | null
-  exitReason: string | null
-  userId: number | null
-  employmentStatus: string
-  baseSalary: string | number | null
+  employee_code: string | null
+  full_name: string | null
+  branch_id: number | null
+  division_id: number | null
+  team_id: number | null
+  position_id: number | null
+  supervisor_id: number | null
+  position_name: string | null
+  employment_status: string | null
+  join_date: string | null
+  contract_doc_id: number | null
+  contract_start_date: string | null
+  contract_end_date: string | null
+  exit_date: string | null
+  exit_reason: string | null
+  user_id: number | null
+  base_salary: string | number | null
   phone: string | null
   whatsapp: string | null
-  emailCorporate: string | null
-  joinDate: string | null
+  email_corporate: string | null
   status: string | null
-  createdAt: string | null
-  updatedAt: string | null
-  employmentType: string | null
-  nickname: string | null
-  gender: string | null
-  placeOfBirth: string | null
-  dateOfBirth: string | null
-  idNumber: string | null
-  taxId: string | null
-  bloodType: string | null
-  religion: string | null
-  maritalStatus: string | null
-  address: string | null
-  city: string | null
-  postalCode: string | null
-  personalEmail: string | null
-  emergencyContactName: string | null
-  emergencyContactPhone: string | null
-  emergencyContactRelation: string | null
-  bankAccountNumber: string | null
-  bankName: string | null
-  bpjsKetenagakerjaan: string | null
-  bpjsKesehatan: string | null
+  created_at: string | null
+  updated_at: string | null
 }
 
 type CountTotalRow = { total: number }
+
+type NameRow = { name: string | null; employee_code?: string | null; full_name?: string | null }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: idLocal } = await params
@@ -78,107 +53,112 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const id = parsePositiveInt(idLocal)
     if (!id) return Response.json({ message: 'id karyawan tidak valid (harus integer positif).' }, { status: 400 })
 
-    const employees = await runReviewDbQuery<EmployeeDetailRow>(
+    const coreRows = await runReviewDbQuery<EmployeeCoreRow>(
       `
       SELECT
-        he.id AS id,
-        he.employee_code AS employeeCode,
-        he.full_name AS fullName,
-        he.branch_id AS branchId,
-        ob.name AS branchName,
-        he.division_id AS divisionId,
-        od.name AS divisionName,
-        he.team_id AS teamId,
-        ot.name AS teamName,
-        he.position_id AS positionId,
-        op.name AS positionName,
-        he.position_name AS positionLabelLegacy,
-        he.supervisor_id AS supervisorId,
-        sup.full_name AS supervisorName,
-        sup.employee_code AS supervisorCode,
-        he.contract_doc_id AS contractDocId,
-        CAST(he.contract_start_date AS CHAR) AS contractStartDate,
-        CAST(he.contract_end_date AS CHAR) AS contractEndDate,
-        CAST(he.exit_date AS CHAR) AS exitDate,
-        he.exit_reason AS exitReason,
-        he.user_id AS userId,
-        COALESCE(NULLIF(TRIM(he.employment_status), ''), 'KARYAWAN') AS employmentStatus,
-        he.base_salary AS baseSalary,
-        he.phone AS phone,
-        he.whatsapp AS whatsapp,
-        he.email_corporate AS emailCorporate,
-        CAST(he.join_date AS CHAR) AS joinDate,
-        he.status AS status,
-        CAST(he.created_at AS CHAR) AS createdAt,
-        CAST(he.updated_at AS CHAR) AS updatedAt,
-        NULL AS employmentType,
-        NULL AS nickname,
-        NULL AS gender,
-        NULL AS placeOfBirth,
-        NULL AS dateOfBirth,
-        NULL AS idNumber,
-        NULL AS taxId,
-        NULL AS bloodType,
-        NULL AS religion,
-        NULL AS maritalStatus,
-        NULL AS address,
-        NULL AS city,
-        NULL AS postalCode,
-        NULL AS personalEmail,
-        NULL AS emergencyContactName,
-        NULL AS emergencyContactPhone,
-        NULL AS emergencyContactRelation,
-        NULL AS bankAccountNumber,
-        NULL AS bankName,
-        NULL AS bpjsKetenagakerjaan,
-        NULL AS bpjsKesehatan
-      FROM hr_employees he
-      LEFT JOIN org_branches ob ON ob.id = he.branch_id
-      LEFT JOIN org_divisions od ON od.id = he.division_id
-      LEFT JOIN org_teams ot ON ot.id = he.team_id
-      LEFT JOIN org_positions op ON op.id = he.position_id
-      LEFT JOIN hr_employees sup ON sup.id = he.supervisor_id
-      WHERE he.id = ?
+        id,
+        employee_code,
+        full_name,
+        branch_id,
+        division_id,
+        team_id,
+        position_id,
+        supervisor_id,
+        position_name,
+        employment_status,
+        CAST(join_date AS CHAR) AS join_date,
+        contract_doc_id,
+        CAST(contract_start_date AS CHAR) AS contract_start_date,
+        CAST(contract_end_date AS CHAR) AS contract_end_date,
+        CAST(exit_date AS CHAR) AS exit_date,
+        exit_reason,
+        user_id,
+        base_salary,
+        phone,
+        whatsapp,
+        email_corporate,
+        status,
+        CAST(created_at AS CHAR) AS created_at,
+        CAST(updated_at AS CHAR) AS updated_at
+      FROM hr_employees
+      WHERE id = ?
       LIMIT 1
     `,
       [id],
     )
 
-    if (employees.length === 0) {
+    if (coreRows.length === 0) {
       return Response.json({ message: `Karyawan dengan id=${id} tidak ditemukan di hr_employees.` }, { status: 404 })
     }
-    const data = employees[0]
+    const core = coreRows[0]
 
-    const countPromises: Array<Promise<CountTotalRow[]>> = [
-      runReviewDbQuery<CountTotalRow>(
-        `SELECT COUNT(*) AS total FROM hr_employee_kpis WHERE employee_id = ? LIMIT 1`,
-        [id],
-      ).catch(() => [{ total: 0 }] as CountTotalRow[]),
-      runReviewDbQuery<CountTotalRow>(
-        `SELECT COUNT(*) AS total FROM hr_loans WHERE employee_id = ? LIMIT 1`,
-        [id],
-      ).catch(() => [{ total: 0 }] as CountTotalRow[]),
-      runReviewDbQuery<CountTotalRow>(
-        `SELECT COUNT(*) AS total FROM hr_disciplinary_records WHERE employee_id = ? LIMIT 1`,
-        [id],
-      ).catch(() => [{ total: 0 }] as CountTotalRow[]),
-      runReviewDbQuery<CountTotalRow>(
-        `SELECT COUNT(*) AS total FROM hr_salary_slips WHERE employee_id = ? LIMIT 1`,
-        [id],
-      ).catch(() => [{ total: 0 }] as CountTotalRow[]),
-      runReviewDbQuery<CountTotalRow>(
-        `
-          SELECT COUNT(*) AS total
-          FROM hr_attendance
-          WHERE employee_id = ?
-            AND attendance_date >= CURRENT_DATE - INTERVAL 30 DAY
-          LIMIT 1
-        `,
-        [id],
-      ).catch(() => [{ total: 0 }] as CountTotalRow[]),
-    ]
+    const [branchRows, divisionRows, teamRows, positionRows, supervisorRows, kpiCount, loansCount, disciplinaryCount, slipsCount, attendanceCount30d] =
+      await Promise.all([
+        core.branch_id ? runReviewDbQuery<NameRow>(`SELECT name FROM org_branches WHERE id = ? LIMIT 1`, [core.branch_id]).catch(() => []) : Promise.resolve([] as NameRow[]),
+        core.division_id ? runReviewDbQuery<NameRow>(`SELECT name FROM org_divisions WHERE id = ? LIMIT 1`, [core.division_id]).catch(() => []) : Promise.resolve([] as NameRow[]),
+        core.team_id ? runReviewDbQuery<NameRow>(`SELECT name FROM org_teams WHERE id = ? LIMIT 1`, [core.team_id]).catch(() => []) : Promise.resolve([] as NameRow[]),
+        core.position_id ? runReviewDbQuery<NameRow>(`SELECT name FROM org_positions WHERE id = ? LIMIT 1`, [core.position_id]).catch(() => []) : Promise.resolve([] as NameRow[]),
+        core.supervisor_id ? runReviewDbQuery<NameRow>(`SELECT employee_code, full_name FROM hr_employees WHERE id = ? LIMIT 1`, [core.supervisor_id]).catch(() => []) : Promise.resolve([] as NameRow[]),
+        runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_employee_kpis WHERE employee_id = ? LIMIT 1`, [id]).catch(() => [{ total: 0 }] as CountTotalRow[]),
+        runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_loans WHERE employee_id = ? LIMIT 1`, [id]).catch(() => [{ total: 0 }] as CountTotalRow[]),
+        runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_disciplinary_records WHERE employee_id = ? LIMIT 1`, [id]).catch(() => [{ total: 0 }] as CountTotalRow[]),
+        runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_salary_slips WHERE employee_id = ? LIMIT 1`, [id]).catch(() => [{ total: 0 }] as CountTotalRow[]),
+        runReviewDbQuery<CountTotalRow>(`SELECT COUNT(*) AS total FROM hr_attendance WHERE employee_id = ? AND attendance_date >= CURRENT_DATE - INTERVAL 30 DAY LIMIT 1`, [id]).catch(() => [{ total: 0 }] as CountTotalRow[]),
+      ])
 
-    const [kpiCount, loansCount, disciplinaryCount, slipsCount, attendanceCount30d] = await Promise.all(countPromises)
+    const data = {
+      id: core.id,
+      employeeCode: core.employee_code,
+      fullName: core.full_name,
+      branchId: core.branch_id,
+      branchName: branchRows[0]?.name ?? null,
+      divisionId: core.division_id,
+      divisionName: divisionRows[0]?.name ?? null,
+      teamId: core.team_id,
+      teamName: teamRows[0]?.name ?? null,
+      positionId: core.position_id,
+      positionName: positionRows[0]?.name ?? core.position_name ?? null,
+      positionLabelLegacy: core.position_name,
+      supervisorId: core.supervisor_id,
+      supervisorName: supervisorRows[0]?.full_name ?? null,
+      supervisorCode: supervisorRows[0]?.employee_code ?? null,
+      contractDocId: core.contract_doc_id,
+      contractStartDate: core.contract_start_date,
+      contractEndDate: core.contract_end_date,
+      exitDate: core.exit_date,
+      exitReason: core.exit_reason,
+      userId: core.user_id,
+      employmentStatus: core.employment_status || 'KARYAWAN',
+      employmentType: null,
+      baseSalary: core.base_salary,
+      phone: core.phone,
+      whatsapp: core.whatsapp,
+      emailCorporate: core.email_corporate,
+      joinDate: core.join_date,
+      status: core.status,
+      createdAt: core.created_at,
+      updatedAt: core.updated_at,
+      nickname: null,
+      gender: null,
+      placeOfBirth: null,
+      dateOfBirth: null,
+      idNumber: null,
+      taxId: null,
+      bloodType: null,
+      religion: null,
+      maritalStatus: null,
+      address: null,
+      city: null,
+      postalCode: null,
+      personalEmail: null,
+      emergencyContactName: null,
+      emergencyContactPhone: null,
+      emergencyContactRelation: null,
+      bankAccountNumber: null,
+      bankName: null,
+      bpjsKetenagakerjaan: null,
+      bpjsKesehatan: null,
+    }
 
     const summaryRelations = {
       totalKpiRecords: Number(kpiCount[0]?.total ?? 0),
