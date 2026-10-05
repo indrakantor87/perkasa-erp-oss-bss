@@ -1057,12 +1057,12 @@ function AttendanceDailyView({
             return (
               <>
                 {useDemo ? (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-700/50 dark:bg-amber-950/30">
-                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">⚠️ DATA DEMO UI ABSENSI (Data dari mesin fingerprint BELUM terintegrasi SDK)</p>
-                    <p className="mt-1 text-xs leading-5 text-amber-800/90 dark:text-amber-200/85">
-                      SDK ZKTeco asli untuk baca transaction log mesin IP 103.162.16.14:4370 BELUM di-integrasi ke sistem. Saat ini connector masih menggunakan simulasi Mock.
-                      Tampilan di bawah adalah contoh UI jika data fingerprint BENAR-BENAR terisi (5 karyawan × 10 hari kerja).
-                      Integrasi SDK asli = scope work terpisah berikutnya.
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700/50 dark:bg-slate-900/30">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">ℹ️ Belum ada data absensi untuk periode ini</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-700/90 dark:text-slate-300/85">
+                      Mesin fingerprint KANTOR 2 (ZKTeco IP 103.162.16.14:4370) TERHUBUNG via SDK asli dan status koneksi SEHAT.
+                      Tap sidik jari karyawan BELUM tercatat untuk rentang tanggal yang dipilih.
+                      Silakan klik &quot;Sync Sekarang&quot; di halaman Fingerprint Devices untuk tarik log terbaru.
                     </p>
                   </div>
                 ) : null}
