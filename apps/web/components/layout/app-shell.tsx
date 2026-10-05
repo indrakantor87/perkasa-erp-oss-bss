@@ -31,9 +31,9 @@ export function AppShell({
         <div className="min-h-screen overflow-x-hidden bg-bg text-ink lg:flex" suppressHydrationWarning>
           <Sidebar session={session} allowedPrefixes={allowedPrefixes} />
           <main className="min-w-0 flex-1">
-            <div className="mx-auto w-full max-w-7xl px-compact py-compact sm:px-comfort sm:py-comfort lg:px-section lg:py-section xl:max-w-none xl:px-[2.5rem] xl:py-[2rem]">
+            <div className="mx-auto w-full max-w-7xl px-compact py-3 sm:px-comfort sm:py-4 lg:px-section lg:py-5 xl:max-w-none xl:px-[2rem] xl:py-[1.25rem]">
               <Topbar pathname={pathname} session={session} allowedPrefixes={allowedPrefixes} />
-              <div className="mt-4 sm:mt-5 lg:mt-6 xl:mt-8 content-fade-in">
+              <div className="mt-2 sm:mt-3 lg:mt-4 content-fade-in">
                 {children}
               </div>
             </div>

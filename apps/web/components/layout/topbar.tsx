@@ -178,13 +178,14 @@ export function Topbar({ pathname, session, allowedPrefixes }: TopbarProps) {
   )
 
   return (
-    <header className="pb-6 lg:pb-8" suppressHydrationWarning>
+    <header className="pb-3 lg:pb-4" suppressHydrationWarning>
       <PageHeader
         eyebrow={activeDescription}
         title={activeTitle}
         description={workspaceDescription}
         breadcrumbs={breadcrumbs}
         actions={actions}
+        className="gap-2 sm:gap-3"
       />
     </header>
   )
