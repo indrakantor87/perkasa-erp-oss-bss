@@ -729,13 +729,12 @@ export function resolveConnectorForMachine(
     deviceTimezone: machine.deviceTimezone || 'Asia/Jakarta',
   }
 
-  const isMockEnv = snapshot.effectiveMode === 'review-db' || snapshot.configuredMode === 'review-db'
   const isMockModel = model.startsWith('MOCK')
   const ZKTECO_SERIES = /^(ZKTECO|K20|K40|F20|F18|MB10|MB20|UF100|X100|TC550|TC200|TF1700|F22|X628|U560|TA110|TA210|TA310|GR200|GR500)/
 
   const fixedReference = new Date(Date.UTC(2026, 9, 5, 11, 0, 0))
 
-  if (isMockModel || isMockEnv) {
+  if (isMockModel) {
     return new MockFingerprintConnector(connectorConfig, {
       fakeTotalEvents: 250,
       duplicateCount: 0,
