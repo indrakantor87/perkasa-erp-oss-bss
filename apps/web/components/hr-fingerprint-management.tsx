@@ -250,6 +250,19 @@ export function HrFingerprintManagement({
   const [mappingEnrollment, setMappingEnrollment] = useState<EnrollmentStatus>('ENROLLED')
   const [mappingFilterMachine, setMappingFilterMachine] = useState<number | ''>('')
 
+  const [mappingEditOpen, setMappingEditOpen] = useState(false)
+  const [mappingEditTarget, setMappingEditTarget] = useState<FpMapping | null>(null)
+  const [mappingEditMachineUserId, setMappingEditMachineUserId] = useState('')
+  const [mappingEditEnrollment, setMappingEditEnrollment] = useState<EnrollmentStatus>('ENROLLED')
+  const [mappingEditFormStatus, setMappingEditFormStatus] = useState<LoadStatus>('idle')
+  const [mappingEditFormError, setMappingEditFormError] = useState<string | null>(null)
+  const [mappingEditFormSuccess, setMappingEditFormSuccess] = useState<string | null>(null)
+
+  const [mappingDeleteOpen, setMappingDeleteOpen] = useState(false)
+  const [mappingDeleteTarget, setMappingDeleteTarget] = useState<FpMapping | null>(null)
+  const [mappingDeleteFormStatus, setMappingDeleteFormStatus] = useState<LoadStatus>('idle')
+  const [mappingDeleteFormError, setMappingDeleteFormError] = useState<string | null>(null)
+
   const mappingsFiltered = useMemo(() => {
     if (!Number.isFinite(Number(mappingFilterMachine)) || mappingFilterMachine === '') {
       return mappings
@@ -744,6 +757,109 @@ export function HrFingerprintManagement({
     }
   }
 
+  function openMappingEdit(m: FpMapping) {
+    if (!canUpdate || !reviewDbReady) return
+    setMappingEditTarget(m)
+    setMappingEditMachineUserId(m.machineUserId || '')
+    setMappingEditEnrollment((m.enrollmentStatus || 'ENROLLED') as EnrollmentStatus)
+    setMappingEditFormStatus('idle')
+    setMappingEditFormError(null)
+    setMappingEditFormSuccess(null)
+    setMappingEditOpen(true)
+    setMappingDeleteOpen(false)
+  }
+
+  function openMappingDelete(m: FpMapping) {
+    if (!canDelete || !reviewDbReady) return
+    setMappingDeleteTarget(m)
+    setMappingDeleteFormStatus('idle')
+    setMappingDeleteFormError(null)
+    setMappingDeleteOpen(true)
+    setMappingEditOpen(false)
+  }
+
+  async function handleSubmitMappingEdit(e: FormEvent) {
+    e.preventDefault()
+    const target = mappingEditTarget
+    if (!target || !canUpdate || !reviewDbReady) return
+    const machineUserIdV = String(mappingEditMachineUserId || '').trim()
+    if (!machineUserIdV) {
+      setMappingEditFormStatus('error')
+      setMappingEditFormError('ID User pada Mesin Fingerprint wajib diisi.')
+      return
+    }
+    setMappingEditFormStatus('loading')
+    setMappingEditFormError(null)
+    setMappingEditFormSuccess(null)
+    try {
+      const res = await fetch('/api/hr/fingerprint/mappings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: target.id,
+          machineUserId: machineUserIdV,
+          enrollmentStatus: mappingEditEnrollment,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      const msg = String((json as { message?: string }).message || '')
+      if (res.status === 409) {
+        setMappingEditFormStatus('error')
+        setMappingEditFormError(msg || 'Update dibatalkan: kombinasi machine user ID untuk device ini sudah ada pada mapping lain.')
+        return
+      }
+      if (!res.ok) {
+        setMappingEditFormStatus('error')
+        setMappingEditFormError(friendlyErrorMessage(msg, 'Gagal memperbarui mapping fingerprint.'))
+        return
+      }
+      setMappingEditFormStatus('loaded')
+      setMappingEditFormSuccess(msg || 'Mapping fingerprint berhasil diperbarui.')
+      await refreshMappings()
+      setTimeout(() => {
+        setMappingEditOpen(false)
+        setMappingEditTarget(null)
+        setMappingEditFormStatus('idle')
+        setMappingEditFormSuccess(null)
+      }, 700)
+    } catch (err: any) {
+      setMappingEditFormStatus('error')
+      setMappingEditFormError(friendlyErrorMessage(err?.message || null, 'Gagal memperbarui mapping fingerprint.'))
+    }
+  }
+
+  async function handleConfirmMappingDelete() {
+    const target = mappingDeleteTarget
+    if (!target || !canDelete || !reviewDbReady) return
+    setMappingDeleteFormStatus('loading')
+    setMappingDeleteFormError(null)
+    try {
+      const res = await fetch('/api/hr/fingerprint/mappings', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: target.id }),
+      })
+      const json = await res.json().catch(() => ({}))
+      const msg = String((json as { message?: string }).message || '')
+      if (!res.ok) {
+        setMappingDeleteFormStatus('error')
+        setMappingDeleteFormError(friendlyErrorMessage(msg, 'Gagal menghapus mapping fingerprint.'))
+        return
+      }
+      setMappingDeleteFormStatus('loaded')
+      await refreshMappings()
+      setTimeout(() => {
+        setMappingDeleteOpen(false)
+        setMappingDeleteTarget(null)
+        setMappingDeleteFormStatus('idle')
+        setMappingDeleteFormError(null)
+      }, 400)
+    } catch (err: any) {
+      setMappingDeleteFormStatus('error')
+      setMappingDeleteFormError(friendlyErrorMessage(err?.message || null, 'Gagal menghapus mapping fingerprint.'))
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="panel p-2 inline-flex flex-wrap items-center gap-2 rounded-full">
@@ -979,7 +1095,16 @@ export function HrFingerprintManagement({
               </form>
             ) : null}
 
-            <MappingsTable status={mappingsStatus} mappings={mappingsFiltered} error={mappingsError} devices={devices} />
+            <MappingsTable
+              status={mappingsStatus}
+              mappings={mappingsFiltered}
+              error={mappingsError}
+              devices={devices}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+              onEdit={openMappingEdit}
+              onDelete={openMappingDelete}
+            />
           </section>
         </div>
       )}
@@ -1024,6 +1149,125 @@ export function HrFingerprintManagement({
           loadingLabel="Menghapus..."
           onConfirm={handleConfirmDelete}
           onCancel={() => { setDeleteOpen(false); setDeleteDevice(null) }}
+        />
+      ) : null}
+
+      {mappingEditOpen && mappingEditTarget ? (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => { setMappingEditOpen(false); setMappingEditTarget(null); setMappingEditFormStatus('idle'); setMappingEditFormError(null); setMappingEditFormSuccess(null) }} aria-hidden="true" />
+          <form onSubmit={handleSubmitMappingEdit} className="relative w-full max-w-xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[90vh] overflow-y-auto">
+            <div className="flex flex-col gap-3 border-b border-slate-200 p-5 md:flex-row md:items-start md:justify-between dark:border-slate-700">
+              <div>
+                <h3 className="font-[family-name:var(--font-heading)] text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
+                  Edit Mapping Fingerprint
+                </h3>
+                <p className="mt-1 text-sm text-mute">
+                  Perbarui ID user mesin fingerprint atau status enrollment untuk{' '}
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">
+                    {mappingEditTarget.fullName || `employee_id:${mappingEditTarget.employeeId}`}
+                  </span>{' '}
+                  pada device #{mappingEditTarget.machineId}.
+                </p>
+              </div>
+              <UiButton
+                variant="icon"
+                size="sm"
+                type="button"
+                ariaLabel="Tutup modal"
+                onClick={() => { setMappingEditOpen(false); setMappingEditTarget(null); setMappingEditFormStatus('idle'); setMappingEditFormError(null); setMappingEditFormSuccess(null) }}
+              >
+                ✕
+              </UiButton>
+            </div>
+            <div className="space-y-4 p-5">
+              {!reviewDbReady ? (
+                <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-200">
+                  Aksi tulis hanya tersedia saat database review benar-benar tersedia.
+                </div>
+              ) : null}
+              {mappingEditFormStatus === 'error' && mappingEditFormError ? (
+                <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-700/40 dark:bg-rose-950/30 dark:text-rose-200">
+                  {mappingEditFormError}
+                </div>
+              ) : null}
+              {mappingEditFormStatus === 'loaded' && mappingEditFormSuccess ? (
+                <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-700/40 dark:bg-emerald-950/30 dark:text-emerald-200">
+                  {mappingEditFormSuccess}
+                </div>
+              ) : null}
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="flex flex-col gap-1 md:col-span-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Karyawan (tidak dapat diubah)</span>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                    <span className="font-semibold">{mappingEditTarget.employeeCode || `ID ${mappingEditTarget.employeeId}`}</span>
+                    {' · '}
+                    {mappingEditTarget.fullName || `employee_id:${mappingEditTarget.employeeId}`}
+                  </div>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">ID User pada Mesin Fingerprint</span>
+                  <input
+                    type="text"
+                    value={mappingEditMachineUserId}
+                    onChange={(e) => setMappingEditMachineUserId(e.target.value)}
+                    placeholder="Contoh: 1 / 1001 / A-007"
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-mute">Status Mapping</span>
+                  <select
+                    value={mappingEditEnrollment}
+                    onChange={(e) => setMappingEditEnrollment(e.target.value as EnrollmentStatus)}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  >
+                    <option value="ENROLLED">Terdaftar</option>
+                    <option value="PENDING">Menunggu</option>
+                    <option value="REVOKED">Dicabut</option>
+                  </select>
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <div className="text-sm text-mute">
+                  ID mapping: <span className="font-mono text-slate-700 dark:text-slate-200">FP-MAP-{mappingEditTarget.id}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <UiButton
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    onClick={() => { setMappingEditOpen(false); setMappingEditTarget(null); setMappingEditFormStatus('idle'); setMappingEditFormError(null); setMappingEditFormSuccess(null) }}
+                  >
+                    Batal
+                  </UiButton>
+                  <UiButton
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    loading={mappingEditFormStatus === 'loading'}
+                    loadingLabel="Menyimpan..."
+                    disabled={!canUpdate || !reviewDbReady}
+                  >
+                    Simpan Perubahan
+                  </UiButton>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {mappingDeleteOpen && mappingDeleteTarget ? (
+        <ConfirmModal
+          title="Hapus mapping fingerprint karyawan ini?"
+          description={`Mapping untuk ${mappingDeleteTarget.fullName || `employee_id:${mappingDeleteTarget.employeeId}`} (ID user mesin: ${mappingDeleteTarget.machineUserId}) akan dicabut dari device. Data absensi yang sudah tersimpan TIDAK hilang, namun event tap mesin berikutnya untuk user ID ini akan menjadi unmapped sampai mapping dibuat kembali.`}
+          confirmLabel="Cabut Mapping"
+          cancelLabel="Batal"
+          tone="danger"
+          loading={mappingDeleteFormStatus === 'loading'}
+          loadingLabel="Mencabut..."
+          onConfirm={handleConfirmMappingDelete}
+          onCancel={() => { setMappingDeleteOpen(false); setMappingDeleteTarget(null); setMappingDeleteFormStatus('idle'); setMappingDeleteFormError(null) }}
         />
       ) : null}
 
@@ -1306,11 +1550,19 @@ function MappingsTable({
   mappings,
   error,
   devices,
+  canUpdate,
+  canDelete,
+  onEdit,
+  onDelete,
 }: {
   status: LoadStatus
   mappings: FpMapping[]
   error: string | null
   devices: FpMachine[]
+  canUpdate: boolean
+  canDelete: boolean
+  onEdit: (m: FpMapping) => void
+  onDelete: (m: FpMapping) => void
 }) {
   if (status === 'loading') {
     return (
@@ -1355,6 +1607,9 @@ function MappingsTable({
             <th className="px-4 py-3 text-left font-semibold">Karyawan</th>
             <th className="px-4 py-3 text-left font-semibold">Status</th>
             <th className="px-4 py-3 text-left font-semibold">Tanggal</th>
+            {(canUpdate || canDelete) ? (
+              <th className="px-4 py-3 text-right font-semibold">Aksi</th>
+            ) : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
@@ -1373,6 +1628,22 @@ function MappingsTable({
                 <div>Created: {formatDateTime(m.createdAt)}</div>
                 <div>Didaftar: {formatDateTime(m.enrolledAt)} · Dicabut: {formatDateTime(m.revokedAt)}</div>
               </td>
+              {(canUpdate || canDelete) ? (
+                <td className="px-4 py-3 text-right">
+                  <div className="inline-flex flex-wrap justify-end gap-2">
+                    {canUpdate ? (
+                      <UiButton variant="secondary" size="sm" onClick={() => onEdit(m)}>
+                        Edit
+                      </UiButton>
+                    ) : null}
+                    {canDelete ? (
+                      <UiButton variant="danger" size="sm" onClick={() => onDelete(m)}>
+                        Hapus
+                      </UiButton>
+                    ) : null}
+                  </div>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
