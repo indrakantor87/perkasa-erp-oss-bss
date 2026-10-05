@@ -9,6 +9,7 @@ import {
 } from '@/lib/review-db'
 import { getDataSourceSnapshot } from '@/lib/data-source'
 import { MockFingerprintConnector } from './mock-connector'
+import { ZktecoRealFingerprintConnector } from './zkteco-real-connector'
 import {
   ConnectionStatus,
   EnrollmentStatus,
@@ -730,6 +731,7 @@ export function resolveConnectorForMachine(
 
   const isMockEnv = snapshot.effectiveMode === 'review-db' || snapshot.configuredMode === 'review-db'
   const isMockModel = model.startsWith('MOCK')
+  const ZKTECO_SERIES = /^(ZKTECO|K20|K40|F20|F18|MB10|MB20|UF100|X100|TC550|TC200|TF1700|F22|X628|U560|TA110|TA210|TA310|GR200|GR500)/
 
   const fixedReference = new Date(Date.UTC(2026, 9, 5, 11, 0, 0))
 
@@ -740,6 +742,10 @@ export function resolveConnectorForMachine(
       unmappedCount: 0,
       referenceDate: fixedReference,
     })
+  }
+
+  if (ZKTECO_SERIES.test(model)) {
+    return new ZktecoRealFingerprintConnector(connectorConfig)
   }
 
   return new MockFingerprintConnector(connectorConfig, {
