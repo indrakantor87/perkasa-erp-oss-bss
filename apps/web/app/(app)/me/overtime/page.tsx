@@ -11,15 +11,26 @@ export default async function MeOvertimePage() {
   if (!session) redirect('/login')
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-700">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
+      <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-relaxed text-emerald-900 shadow-sm">
+        <p className="font-semibold tracking-tight">
+          📌 Self-Service Pengajuan Lembur telah tersedia.
+        </p>
+        <p className="mt-1">
+          Menu ini nantinya digunakan untuk mengajukan lembur secara mandiri, melihat kalkulasi
+          jam lembur real-time, dan memantau status approval berjenjang hingga masuk ke slip gaji.
+          Fitur CRUD formal akan segera hadir; sementara, hubungi Supervisor atau HR cabang
+          setempat untuk pengajuan manual.
+        </p>
+      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-700">
           Self-Service Karyawan
         </div>
         <h1 className="mb-2 text-2xl font-bold text-slate-950 sm:text-3xl">
           Pengajuan Lembur
         </h1>
-        <p className="mb-8 max-w-2xl text-sm leading-relaxed text-slate-600">
+        <p className="mb-5 max-w-2xl text-sm leading-relaxed text-slate-600">
           Fitur self-service untuk mengajukan lembur, melihat kalkulasi jam lembur real-time, dan
           memantau status approval Supervisor → HR sedang dalam tahap pengembangan. Sementara,
           hubungi Supervisor atau HR cabang setempat untuk proses pengajuan manual.

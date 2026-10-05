@@ -11,15 +11,25 @@ export default async function MeLeavesPage() {
   if (!session) redirect('/login')
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-700">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
+      <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-relaxed text-emerald-900 shadow-sm">
+        <p className="font-semibold tracking-tight">
+          📌 Self-Service Cuti, Izin &amp; Sakit telah tersedia.
+        </p>
+        <p className="mt-1">
+          Menu ini nantinya digunakan untuk melihat saldo cuti, mengajukan cuti/izin/sakit secara
+          mandiri, serta memantau status approval real-time. Fitur CRUD formal akan segera hadir.
+          Sementara, hubungi Supervisor atau HR cabang setempat untuk pengajuan manual.
+        </p>
+      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-700">
           Self-Service Karyawan
         </div>
         <h1 className="mb-2 text-2xl font-bold text-slate-950 sm:text-3xl">
           Cuti, Izin &amp; Sakit
         </h1>
-        <p className="mb-8 max-w-2xl text-sm leading-relaxed text-slate-600">
+        <p className="mb-5 max-w-2xl text-sm leading-relaxed text-slate-600">
           Fitur self-service untuk mengajukan cuti tahunan, izin pribadi, dan sakit beserta
           pantau status approval real-time sedang dalam tahap pengembangan. Sementara, hubungi
           Supervisor atau HR cabang setempat untuk proses pengajuan manual.

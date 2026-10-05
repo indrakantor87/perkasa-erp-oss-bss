@@ -12,15 +12,25 @@ export default async function HrOvertimeRequestsPage() {
   if (!canAccessPath(session.role, '/hr')) redirect('/dashboard')
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-700">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
+      <div role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-relaxed text-sky-900 shadow-sm">
+        <p className="font-semibold tracking-tight">
+          📌 Halaman Pengajuan Lembur telah tersedia.
+        </p>
+        <p className="mt-1">
+          Menu ini merupakan shell kerja untuk pengelolaan pengajuan lembur karyawan, kalkulasi
+          jam lembur otomatis, dan approval berjenjang Supervisor → HR yang nantinya terintegrasi
+          ke slip gaji periode berjalan. Fitur CRUD formal akan segera hadir.
+        </p>
+      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-700">
           HR Workspace
         </div>
         <h1 className="mb-2 text-2xl font-bold text-slate-950 sm:text-3xl">
           Pengajuan Lembur
         </h1>
-        <p className="mb-8 max-w-2xl text-sm leading-relaxed text-slate-600">
+        <p className="mb-5 max-w-2xl text-sm leading-relaxed text-slate-600">
           Fitur kelola pengajuan lembur karyawan, kalkulasi otomatis jam lembur sesuai ketentuan
           perusahaan dan approval berjenjang (Supervisor → HR) sedang dalam tahap pengembangan.
           Data approval akan otomatis terintegrasi dengan slip gaji periode berjalan.

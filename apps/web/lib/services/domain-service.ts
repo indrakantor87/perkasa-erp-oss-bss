@@ -5765,7 +5765,7 @@ async function getReviewDbHrSections(filters?: DomainReviewDrilldownFilters): Pr
 
   const attendanceValues: unknown[] = []
   const attendanceWhere = (() => {
-    return `ha.attendance_date = CURRENT_DATE`
+    return `ha.attendance_date BETWEEN DATE_SUB(CURRENT_DATE, INTERVAL 13 DAY) AND CURRENT_DATE`
   })()
 
   const attendances = await runReviewDbQuery<ReviewDbHrAttendanceRow>(
@@ -5783,8 +5783,8 @@ async function getReviewDbHrSections(filters?: DomainReviewDrilldownFilters): Pr
     JOIN hr_employees he
       ON he.id = ha.employee_id
     WHERE ${attendanceWhere}
-    ORDER BY COALESCE(ha.check_in, ha.created_at) DESC, ha.id DESC
-    LIMIT 5
+    ORDER BY ha.attendance_date DESC, COALESCE(ha.check_in, ha.created_at) DESC, ha.id DESC
+    LIMIT 30
   `,
     attendanceValues,
   )
