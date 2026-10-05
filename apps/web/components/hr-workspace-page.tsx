@@ -1312,7 +1312,7 @@ export function HrWorkspacePage({ content, source, capabilities, role, activeWor
   const [dailyError, setDailyError] = useState<string | null>(null)
   const [dailyFilterFrom, setDailyFilterFrom] = useState<string>(() => {
     const d = new Date()
-    d.setDate(d.getDate() - 6)
+    d.setDate(d.getDate() - 20)
     return d.toISOString().split('T')[0]
   })
   const [dailyFilterTo, setDailyFilterTo] = useState<string>(() => new Date().toISOString().split('T')[0])
