@@ -146,20 +146,34 @@ export async function ensureFpRawEventsSchemaReady() {
   for (const col of legacyRequiredColumns) {
     try {
       await runReviewDbExecute<ExecuteResult>(
-        `ALTER TABLE hr_fp_raw_events MODIFY COLUMN ${col} DATETIME NULL DEFAULT NULL`,
+        `ALTER TABLE hr_fp_raw_events ALTER COLUMN ${col} SET DEFAULT CURRENT_TIMESTAMP`,
       )
-    } catch (err) {
-      const m = String(err).toLowerCase()
-      if (m.includes("unknown column") || m.includes("duplicate column name")) {
-        continue
-      }
-      try {
-        await runReviewDbExecute<ExecuteResult>(
-          `ALTER TABLE hr_fp_raw_events MODIFY COLUMN ${col} VARCHAR(128) NULL DEFAULT NULL`,
-        )
-      } catch (_) {
-        continue
-      }
+      continue
+    } catch (_) {
+      // fallthrough: kolom bukan datetime, atau default syntax tidak didukung
+    }
+    try {
+      await runReviewDbExecute<ExecuteResult>(
+        `ALTER TABLE hr_fp_raw_events ALTER COLUMN ${col} SET DEFAULT ''`,
+      )
+      continue
+    } catch (_) {
+      // fallthrough: kolom bukan varchar / enum, atau tidak support default ''
+    }
+    try {
+      await runReviewDbExecute<ExecuteResult>(
+        `ALTER TABLE hr_fp_raw_events ALTER COLUMN ${col} SET DEFAULT 0`,
+      )
+      continue
+    } catch (_) {
+      // fallthrough: coba pendekatan terakhir MODIFY NULL
+    }
+    try {
+      await runReviewDbExecute<ExecuteResult>(
+        `ALTER TABLE hr_fp_raw_events MODIFY COLUMN ${col} TEXT NULL DEFAULT NULL`,
+      )
+    } catch (_) {
+      continue
     }
   }
 
