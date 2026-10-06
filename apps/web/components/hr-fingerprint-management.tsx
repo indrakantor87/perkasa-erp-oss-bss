@@ -250,6 +250,37 @@ export function HrFingerprintManagement({
   const [syncNowMessage, setSyncNowMessage] = useState<string | null>(null)
   const [syncNowTone, setSyncNowTone] = useState<'success' | 'danger' | 'info' | 'warning'>('info')
 
+  const [popupAnchor, setPopupAnchor] = useState<{ top: number; left: number; right: number; bottom: number; width: number; height: number } | null>(null)
+
+  function capturePopupAnchor<T extends HTMLElement>(e: React.MouseEvent<T>) {
+    const r = e.currentTarget.getBoundingClientRect()
+    setPopupAnchor({ top: r.top, left: r.left, right: r.right, bottom: r.bottom, width: r.width, height: r.height })
+  }
+
+  function anchoredStyle(options: { modalWidthPx: number; modalHeightEstimatePx?: number; prefer?: 'below' | 'above' }) {
+    if (!popupAnchor) return undefined
+    const modalW = options.modalWidthPx
+    const prefer = options.prefer ?? 'below'
+    const gap = 8
+    const margin = 16
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+
+    let left = popupAnchor.right - modalW
+    left = Math.max(margin, Math.min(left, vw - modalW - margin))
+
+    const belowTop = popupAnchor.bottom + gap
+    const aboveTop = popupAnchor.top - modalW - gap
+
+    let top: number
+    if (prefer === 'above') {
+      top = aboveTop < margin ? belowTop : aboveTop
+    } else {
+      top = belowTop + 480 > vh ? Math.max(margin, aboveTop) : belowTop
+    }
+    return { top: `${top}px`, left: `${left}px` } as React.CSSProperties
+  }
+
   const [mappingFormStatus, setMappingFormStatus] = useState<LoadStatus>('idle')
   const [mappingFormError, setMappingFormError] = useState<string | null>(null)
   const [mappingFormSuccess, setMappingFormSuccess] = useState<string | null>(null)
@@ -920,7 +951,7 @@ export function HrFingerprintManagement({
                   Refresh
                 </UiButton>
                 {canCreate ? (
-                  <UiButton variant="primary" size="sm" onClick={openCreate}>
+                  <UiButton variant="primary" size="sm" onClick={(e) => { capturePopupAnchor(e); openCreate() }}>
                     Tambah Mesin Fingerprint
                   </UiButton>
                 ) : null}
@@ -935,12 +966,12 @@ export function HrFingerprintManagement({
               canCreate={canCreate}
               canUpdate={canUpdate}
               canDelete={canDelete}
-              onEdit={openEdit}
-              onDelete={openDelete}
+              onEdit={(d, e) => { capturePopupAnchor(e); openEdit(d) }}
+              onDelete={(d, e) => { capturePopupAnchor(e); openDelete(d) }}
               onTestConnect={handleTestConnect}
               onSyncNow={handleSyncNow}
-              onSyncHistory={openSyncHistory}
-              onCreate={openCreate}
+              onSyncHistory={(d, e) => { capturePopupAnchor(e); openSyncHistory(d) }}
+              onCreate={(e) => { capturePopupAnchor(e); openCreate() }}
               testConnectId={testConnectId}
               testConnectStatus={testConnectStatus}
               testConnectMessage={testConnectMessage}
@@ -1151,6 +1182,7 @@ export function HrFingerprintManagement({
           setAuthUser={setFormAuthUser}
           authPass={formAuthPass}
           setAuthPass={setFormAuthPass}
+          anchoredStyle={anchoredStyle({ modalWidthPx: 672 })}
         />
       ) : null}
 
@@ -1165,6 +1197,7 @@ export function HrFingerprintManagement({
           loadingLabel="Menghapus..."
           onConfirm={handleConfirmDelete}
           onCancel={() => { setDeleteOpen(false); setDeleteDevice(null) }}
+          anchoredStyle={anchoredStyle({ modalWidthPx: 512 })}
         />
       ) : null}
 
@@ -1295,6 +1328,7 @@ export function HrFingerprintManagement({
           status={syncHistoryStatus}
           runs={syncHistory}
           error={syncHistoryError}
+          anchoredStyle={anchoredStyle({ modalWidthPx: 896 })}
         />
       ) : null}
     </div>
@@ -1383,12 +1417,12 @@ function DevicesTable({
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
-  onEdit: (d: FpMachine) => void
-  onDelete: (d: FpMachine) => void
+  onEdit: (d: FpMachine, e: React.MouseEvent<HTMLElement>) => void
+  onDelete: (d: FpMachine, e: React.MouseEvent<HTMLElement>) => void
   onTestConnect: (d: FpMachine) => void
   onSyncNow: (d: FpMachine) => void
-  onSyncHistory: (d: FpMachine) => void
-  onCreate: () => void
+  onSyncHistory: (d: FpMachine, e: React.MouseEvent<HTMLElement>) => void
+  onCreate: (e: React.MouseEvent<HTMLElement>) => void
   testConnectId: number | null
   testConnectStatus: LoadStatus
   testConnectMessage: string | null
@@ -1536,17 +1570,17 @@ function DevicesTable({
                       </UiButton>
                     ) : null}
                     {canView ? (
-                      <UiButton variant="secondary" size="sm" onClick={() => onSyncHistory(d)}>
+                      <UiButton variant="secondary" size="sm" onClick={(e) => onSyncHistory(d, e)}>
                         Riwayat Sync
                       </UiButton>
                     ) : null}
                     {canUpdate ? (
-                      <UiButton variant="secondary" size="sm" onClick={() => onEdit(d)}>
+                      <UiButton variant="secondary" size="sm" onClick={(e) => onEdit(d, e)}>
                         Edit
                       </UiButton>
                     ) : null}
                     {canDelete ? (
-                      <UiButton variant="danger" size="sm" onClick={() => onDelete(d)}>
+                      <UiButton variant="danger" size="sm" onClick={(e) => onDelete(d, e)}>
                         Hapus
                       </UiButton>
                     ) : null}
@@ -1685,6 +1719,7 @@ function DeviceFormModal({
   authEnabled, setAuthEnabled,
   authUser, setAuthUser,
   authPass, setAuthPass,
+  anchoredStyle,
 }: {
   mode: 'create' | 'edit'
   device: FpMachine | null
@@ -1702,12 +1737,16 @@ function DeviceFormModal({
   authEnabled: boolean; setAuthEnabled: (v: boolean) => void
   authUser: string; setAuthUser: (v: string) => void
   authPass: string; setAuthPass: (v: string) => void
+  anchoredStyle?: React.CSSProperties
 }) {
   const isUpdate = mode === 'edit' && device != null
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-start justify-end p-4 pt-[88px] md:p-8 md:pt-[104px]">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-120px)] overflow-y-auto">
+      <div
+        style={anchoredStyle}
+        className="fixed w-full max-w-xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-120px)] overflow-y-auto"
+      >
         <form onSubmit={onSubmit}>
           <div className="flex flex-col gap-3 border-b border-slate-200 p-5 md:flex-row md:items-start md:justify-between dark:border-slate-700">
             <div>
@@ -1874,6 +1913,7 @@ function ConfirmModal({
   loadingLabel,
   onConfirm,
   onCancel,
+  anchoredStyle,
 }: {
   title: string
   description: string
@@ -1884,11 +1924,15 @@ function ConfirmModal({
   loadingLabel: string
   onConfirm: () => void
   onCancel: () => void
+  anchoredStyle?: React.CSSProperties
 }) {
   return (
-    <div role="alertdialog" aria-modal="true" className="fixed inset-0 z-50 flex items-start justify-end p-4 pt-[104px] md:p-8 md:pt-[120px]">
+    <div role="alertdialog" aria-modal="true" className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onCancel} aria-hidden="true" />
-      <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl p-5 dark:border-slate-700 dark:bg-slate-900">
+      <div
+        style={anchoredStyle}
+        className="fixed w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl p-5 dark:border-slate-700 dark:bg-slate-900"
+      >
         <h3 className="font-[family-name:var(--font-heading)] text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
           {title}
         </h3>
@@ -1909,6 +1953,7 @@ function SyncHistoryDrawer({
   status,
   runs,
   error,
+  anchoredStyle,
 }: {
   open: boolean
   onClose: () => void
@@ -1916,13 +1961,17 @@ function SyncHistoryDrawer({
   status: LoadStatus
   runs: FpSyncRun[]
   error: string | null
+  anchoredStyle?: React.CSSProperties
 }) {
   if (!open) return null
   const d = device
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-start justify-end p-4 pt-[96px] md:p-8 md:pt-[112px]">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-130px)]">
+      <div
+        style={anchoredStyle}
+        className="fixed z-10 w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-130px)]"
+      >
         <div className="flex flex-col gap-3 border-b border-slate-200 p-5 md:flex-row md:items-start md:justify-between dark:border-slate-700">
           <div>
             <p className="section-title">Riwayat Sinkronisasi</p>
