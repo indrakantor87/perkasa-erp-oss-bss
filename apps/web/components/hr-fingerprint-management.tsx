@@ -1705,9 +1705,9 @@ function DeviceFormModal({
 }) {
   const isUpdate = mode === 'edit' && device != null
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-3xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[90vh] overflow-y-auto">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-start justify-end p-4 pt-[88px] md:p-8 md:pt-[104px]">
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div className="relative w-full max-w-xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-120px)] overflow-y-auto">
         <form onSubmit={onSubmit}>
           <div className="flex flex-col gap-3 border-b border-slate-200 p-5 md:flex-row md:items-start md:justify-between dark:border-slate-700">
             <div>
@@ -1886,8 +1886,8 @@ function ConfirmModal({
   onCancel: () => void
 }) {
   return (
-    <div role="alertdialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onCancel} aria-hidden="true" />
+    <div role="alertdialog" aria-modal="true" className="fixed inset-0 z-50 flex items-start justify-end p-4 pt-[104px] md:p-8 md:pt-[120px]">
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onCancel} aria-hidden="true" />
       <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl p-5 dark:border-slate-700 dark:bg-slate-900">
         <h3 className="font-[family-name:var(--font-heading)] text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
           {title}
@@ -1920,9 +1920,9 @@ function SyncHistoryDrawer({
   if (!open) return null
   const d = device
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-end p-0 md:p-4">
-      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <div className="relative z-10 h-full w-full max-w-3xl overflow-hidden rounded-none md:rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 md:h-[85vh]">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-start justify-end p-4 pt-[96px] md:p-8 md:pt-[112px]">
+      <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-130px)]">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-5 md:flex-row md:items-start md:justify-between dark:border-slate-700">
           <div>
             <p className="section-title">Riwayat Sinkronisasi</p>
