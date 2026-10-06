@@ -133,93 +133,12 @@ export function computeDedupHash(
 let _schemaBootstrapDone = false
 export async function ensureFpRawEventsSchemaReady() {
   if (_schemaBootstrapDone) return
-  _schemaBootstrapDone = true
-  await ensureHrFpMachinesHybridAlign()
-  const tableName = 'hr_fp_raw_events'
-  const alterErrors: string[] = []
-
-  async function execAlter(sqlWithAfter: string, sqlWithoutAfter: string, colKey: string) {
-    let r = (await runReviewDbExecute<ExecuteResult & { error?: string | null }>(sqlWithAfter))
-    if (r?.error) {
-      r = (await runReviewDbExecute<ExecuteResult & { error?: string | null }>(sqlWithoutAfter))
-    }
-    if (r?.error) {
-      alterErrors.push(`${colKey}: ${r.error}`)
-    }
-  }
-
-  try {
-    if (!(await hasReviewDbColumn(tableName, 'event_timestamp_original'))) {
-      await execAlter(
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER employee_id`,
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
-        'event_timestamp_original',
-      )
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    alterErrors.push(`event_timestamp_original: ${msg}`)
-  }
-  try {
-    if (!(await hasReviewDbColumn(tableName, 'event_timestamp_normalized'))) {
-      await execAlter(
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER event_timestamp_original`,
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
-        'event_timestamp_normalized',
-      )
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    alterErrors.push(`event_timestamp_normalized: ${msg}`)
-  }
-  try {
-    if (!(await hasReviewDbColumn(tableName, 'event_mode'))) {
-      await execAlter(
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED' AFTER event_type_raw`,
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED'`,
-        'event_mode',
-      )
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    alterErrors.push(`event_mode: ${msg}`)
-  }
-  try {
-    if (!(await hasReviewDbColumn(tableName, 'raw_payload_json'))) {
-      await execAlter(
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN raw_payload_json TEXT NULL AFTER is_processed`,
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN raw_payload_json TEXT NULL`,
-        'raw_payload_json',
-      )
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    alterErrors.push(`raw_payload_json: ${msg}`)
-  }
-  try {
-    if (!(await hasReviewDbColumn(tableName, 'received_at'))) {
-      await execAlter(
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER raw_payload_json`,
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
-        'received_at',
-      )
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    alterErrors.push(`received_at: ${msg}`)
-  }
-  try {
-    if (!(await hasReviewDbColumn(tableName, 'processing_notes'))) {
-      await execAlter(
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN processing_notes TEXT NULL AFTER received_at`,
-        `ALTER TABLE hr_fp_raw_events ADD COLUMN processing_notes TEXT NULL`,
-        'processing_notes',
-      )
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    alterErrors.push(`processing_notes: ${msg}`)
-  }
+  await addColumnIfMissing('hr_fp_raw_events', 'event_timestamp_original', 'event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP', 'employee_id')
+  await addColumnIfMissing('hr_fp_raw_events', 'event_timestamp_normalized', 'event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP', 'event_timestamp_original')
+  await addColumnIfMissing('hr_fp_raw_events', 'event_mode', "event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED'", 'event_type_raw')
+  await addColumnIfMissing('hr_fp_raw_events', 'raw_payload_json', 'raw_payload_json TEXT NULL', 'is_processed')
+  await addColumnIfMissing('hr_fp_raw_events', 'received_at', 'received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP', 'raw_payload_json')
+  await addColumnIfMissing('hr_fp_raw_events', 'processing_notes', 'processing_notes TEXT NULL', 'received_at')
   try {
     await runReviewDbExecute<ExecuteResult>(
       `ALTER TABLE hr_fp_raw_events ADD INDEX idx_raw_time_original (event_timestamp_original)`,
@@ -230,12 +149,7 @@ export async function ensureFpRawEventsSchemaReady() {
       `ALTER TABLE hr_fp_raw_events ADD INDEX idx_raw_sync_run (sync_run_id)`,
     )
   } catch {}
-  if (alterErrors.length > 0) {
-    throw new Error(
-      `hr_fp_raw_events schema bootstrap self-heal failures (${alterErrors.length}): ` + alterErrors.join(' ; '),
-    )
-  }
-  invalidateReviewDbColumnCache(tableName)
+  _schemaBootstrapDone = true
 }
 
 export function maskMachineAuth<T extends { authConfigEncrypted: string }>(
