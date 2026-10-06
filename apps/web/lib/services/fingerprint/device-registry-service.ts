@@ -135,6 +135,34 @@ export async function ensureFpRawEventsSchemaReady() {
   if (_schemaBootstrapDone) return
   invalidateReviewDbColumnCache('hr_fp_raw_events')
 
+  const legacyRequiredColumns = [
+    'event_timestamp_local',
+    'event_timestamp_utc',
+    'attendance_status',
+    'punch_time',
+    'punch_state',
+    'work_code',
+  ]
+  for (const col of legacyRequiredColumns) {
+    try {
+      await runReviewDbExecute<ExecuteResult>(
+        `ALTER TABLE hr_fp_raw_events MODIFY COLUMN ${col} DATETIME NULL DEFAULT NULL`,
+      )
+    } catch (err) {
+      const m = String(err).toLowerCase()
+      if (m.includes("unknown column") || m.includes("duplicate column name")) {
+        continue
+      }
+      try {
+        await runReviewDbExecute<ExecuteResult>(
+          `ALTER TABLE hr_fp_raw_events MODIFY COLUMN ${col} VARCHAR(128) NULL DEFAULT NULL`,
+        )
+      } catch (_) {
+        continue
+      }
+    }
+  }
+
   async function addRawColumn(sqlWithAfter: string, sqlWithoutAfter: string, colName: string) {
     const errs: string[] = []
     let r: ExecuteResult & { error?: string | null; errorCode?: string | null }
