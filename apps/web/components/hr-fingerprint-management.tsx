@@ -259,30 +259,45 @@ export function HrFingerprintManagement({
 
   function anchoredStyle(options: { modalWidthPx: number; modalHeightEstimatePx?: number; prefer?: 'below' | 'above' }) {
     if (!popupAnchor) return undefined
-    const modalW = options.modalWidthPx
-    const modalH = options.modalHeightEstimatePx ?? Math.max(480, Math.min(720, modalW))
+    const rawW = options.modalWidthPx
+    const rawH = options.modalHeightEstimatePx ?? Math.max(480, Math.min(720, rawW))
     const prefer = options.prefer ?? 'below'
     const gap = 8
     const margin = 16
     const vw = typeof window !== 'undefined' ? window.innerWidth : 1280
     const vh = typeof window !== 'undefined' ? window.innerHeight : 800
 
-    let left = popupAnchor.right - modalW
-    left = Math.max(margin, Math.min(left, vw - modalW - margin))
+    const modalW = Math.min(rawW, Math.max(280, vw - 2 * margin))
+    const modalH = Math.min(rawH, Math.max(320, vh - 2 * margin))
 
-    const belowTop = popupAnchor.bottom + gap
-    const aboveTop = popupAnchor.top - modalH - gap
+    const belowFits = popupAnchor.bottom + gap + modalH <= vh - margin
+    const aboveFits = popupAnchor.top - modalH - gap >= margin
 
-    const belowFits = belowTop + modalH <= vh - margin
-    const aboveFits = aboveTop >= margin
-
+    let left: number
     let top: number
+    let centerFallback = false
     if (prefer === 'above') {
-      top = aboveFits ? aboveTop : belowFits ? belowTop : Math.max(margin, (vh - modalH) / 2)
+      top = aboveFits ? popupAnchor.top - modalH - gap : belowFits ? popupAnchor.bottom + gap : (vh - modalH) / 2
     } else {
-      top = belowFits ? belowTop : aboveFits ? aboveTop : Math.max(margin, (vh - modalH) / 2)
+      top = belowFits ? popupAnchor.bottom + gap : aboveFits ? popupAnchor.top - modalH - gap : (vh - modalH) / 2
     }
-    return { top: `${top}px`, left: `${left}px` } as React.CSSProperties
+    const preferredLeft = popupAnchor.right - modalW
+    const fitsRight = preferredLeft + modalW <= vw - margin
+    const fitsLeftAny = preferredLeft >= margin
+    if (fitsRight && fitsLeftAny) {
+      left = preferredLeft
+    } else if (fitsLeftAny) {
+      left = Math.max(margin, vw - modalW - margin)
+    } else {
+      left = (vw - modalW) / 2
+      centerFallback = true
+    }
+    if (!belowFits && !aboveFits) centerFallback = true
+
+    const styleBase: React.CSSProperties = centerFallback
+      ? { width: `${modalW}px`, height: `${modalH}px` }
+      : { width: `${modalW}px` }
+    return { ...styleBase, top: `${top}px`, left: `${left}px` }
   }
 
   const [mappingFormStatus, setMappingFormStatus] = useState<LoadStatus>('idle')
