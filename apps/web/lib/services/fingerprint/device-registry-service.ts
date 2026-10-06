@@ -133,12 +133,73 @@ export function computeDedupHash(
 let _schemaBootstrapDone = false
 export async function ensureFpRawEventsSchemaReady() {
   if (_schemaBootstrapDone) return
-  await addColumnIfMissing('hr_fp_raw_events', 'event_timestamp_original', 'event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP', 'employee_id')
-  await addColumnIfMissing('hr_fp_raw_events', 'event_timestamp_normalized', 'event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP', 'event_timestamp_original')
-  await addColumnIfMissing('hr_fp_raw_events', 'event_mode', "event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED'", 'event_type_raw')
-  await addColumnIfMissing('hr_fp_raw_events', 'raw_payload_json', 'raw_payload_json TEXT NULL', 'is_processed')
-  await addColumnIfMissing('hr_fp_raw_events', 'received_at', 'received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP', 'raw_payload_json')
-  await addColumnIfMissing('hr_fp_raw_events', 'processing_notes', 'processing_notes TEXT NULL', 'received_at')
+  invalidateReviewDbColumnCache('hr_fp_raw_events')
+
+  async function addRawColumn(sqlWithAfter: string, sqlWithoutAfter: string, colName: string) {
+    const errs: string[] = []
+    let r: ExecuteResult & { error?: string | null; errorCode?: string | null }
+    try {
+      r = (await runReviewDbExecute(sqlWithAfter)) as any
+    } catch (err) {
+      r = { affectedRows: 0, insertId: 0, error: err instanceof Error ? err.message : String(err), errorCode: null } as any
+    }
+    if (r?.error) {
+      const m1 = String(r.error).toLowerCase()
+      if (m1.includes('duplicate column name') || m1.includes(`unknown column '${colName.toLowerCase()}'`)) {
+        invalidateReviewDbColumnCache('hr_fp_raw_events', colName)
+        return
+      }
+      errs.push(`AFTER: ${r.error}`)
+      try {
+        r = (await runReviewDbExecute(sqlWithoutAfter)) as any
+      } catch (err2) {
+        r = { affectedRows: 0, insertId: 0, error: err2 instanceof Error ? err2.message : String(err2), errorCode: null } as any
+      }
+      if (r?.error) {
+        const m2 = String(r.error).toLowerCase()
+        if (m2.includes('duplicate column name') || m2.includes(`unknown column '${colName.toLowerCase()}'`)) {
+          invalidateReviewDbColumnCache('hr_fp_raw_events', colName)
+          return
+        }
+        errs.push(`WITHOUT_AFTER: ${r.error}`)
+        throw new Error(
+          `addRawColumn hr_fp_raw_events.${colName} FAILED 2 attempts: ${errs.join(' ; ')}`,
+        )
+      }
+    }
+    invalidateReviewDbColumnCache('hr_fp_raw_events', colName)
+  }
+
+  await addRawColumn(
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER employee_id`,
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+    'event_timestamp_original',
+  )
+  await addRawColumn(
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER event_timestamp_original`,
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+    'event_timestamp_normalized',
+  )
+  await addRawColumn(
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED' AFTER event_type_raw`,
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED'`,
+    'event_mode',
+  )
+  await addRawColumn(
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN raw_payload_json TEXT NULL AFTER is_processed`,
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN raw_payload_json TEXT NULL`,
+    'raw_payload_json',
+  )
+  await addRawColumn(
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER raw_payload_json`,
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+    'received_at',
+  )
+  await addRawColumn(
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN processing_notes TEXT NULL AFTER received_at`,
+    `ALTER TABLE hr_fp_raw_events ADD COLUMN processing_notes TEXT NULL`,
+    'processing_notes',
+  )
   try {
     await runReviewDbExecute<ExecuteResult>(
       `ALTER TABLE hr_fp_raw_events ADD INDEX idx_raw_time_original (event_timestamp_original)`,
