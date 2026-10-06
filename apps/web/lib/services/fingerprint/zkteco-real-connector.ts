@@ -6,38 +6,107 @@ import type {
 } from './types'
 
 type ZKErrorLike = {
-  code?: string
-  message?: string
-  inner?: { code?: string; message?: string }
+  code?: unknown
+  message?: unknown
+  inner?: unknown
+  command?: unknown
+  ip?: unknown
+  name?: unknown
 }
 
-const CONNECT_TIMEOUT_MS = 10000
+const CONNECT_TIMEOUT_MS = 30000
 const DEFAULT_VERIFY_SCORE = 88
 const SOURCE_MARKER = 'zkteco-zklib-sdk'
 
-function mapErrorToStandardCode(err: unknown): string {
-  const e = err as ZKErrorLike
-  const code = String(e?.code ?? e?.inner?.code ?? '').toUpperCase()
-  const message = String(e?.message ?? e?.inner?.message ?? '').toUpperCase()
+function stringifyAny(v: unknown): string {
+  if (v === null || v === undefined) return ''
+  if (typeof v === 'string') return v
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+  try {
+    const s = JSON.stringify(v)
+    if (s && s !== '{}') return s
+  } catch {
+    // ignore
+  }
+  try {
+    return String(v)
+  } catch {
+    return ''
+  }
+}
 
-  if (code.includes('TIMEOUT') || message.includes('TIMEOUT')) return 'TIMEOUT'
-  if (
-    code.includes('ECONNREFUSED') ||
-    code.includes('EHOSTUNREACH') ||
-    code.includes('ENOTFOUND') ||
-    code.includes('EADDRINUSE')
-  ) {
-    return 'TIMEOUT'
+function flattenStrings(err: unknown): string[] {
+  const haystack: string[] = []
+  const seen = new WeakSet<object>()
+  const walk = (node: unknown, depth: number) => {
+    if (depth > 6) return
+    if (node === null || node === undefined) return
+    if (typeof node === 'object') {
+      if (seen.has(node as object)) return
+      seen.add(node as object)
+    }
+    haystack.push(stringifyAny(node).toUpperCase())
+    if (typeof node !== 'object') return
+    for (const k of ['code', 'message', 'inner', 'name', 'command', 'ip', 'stack', 'syscall', 'errno']) {
+      try {
+        walk((node as Record<string, unknown>)[k as keyof typeof node], depth + 1)
+      } catch {
+        // ignore proxy traps
+      }
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, depth + 1)
+    }
   }
+  walk(err, 0)
+  return haystack
+}
+
+function mapErrorToStandardCode(err: unknown): string {
+  const hay = flattenStrings(err).join('\n')
+
   if (
-    message.includes('AUTH') ||
-    message.includes('UNAUTHORIZED') ||
-    message.includes('DENIED')
+    hay.includes('TIMEOUT') ||
+    hay.includes('ETIMEDOUT') ||
+    hay.includes('ECONNREFUSED') ||
+    hay.includes('EHOSTUNREACH') ||
+    hay.includes('ENOTFOUND') ||
+    hay.includes('EADDRINUSE') ||
+    hay.includes('NETWORK') ||
+    hay.includes('SOCKET HANG UP') ||
+    hay.includes('DESTINATION HOST UNREACHABLE')
   ) {
-    return 'AUTH_FAILED'
+    return 'TIMEOUT_MESIN_OFFLINE'
   }
-  if (code) return code
+
+  if (
+    hay.includes('AUTH') ||
+    hay.includes('UNAUTH') ||
+    hay.includes('PASSWORD') ||
+    hay.includes('DENIED') ||
+    hay.includes('FORBIDDEN') ||
+    hay.includes('COMM_KEY') ||
+    hay.includes('COMMKEY') ||
+    hay.includes('WRONG KEY')
+  ) {
+    return 'AUTH_FAILED_COMM_KEY_SALAH'
+  }
+
+  if (hay) {
+    // fallback non-empty hay, try last 60 chars as hint
+    return `KONEKSI_GAGAL_${hay.replace(/[^A-Z0-9_]/g, ' ').trim().replace(/\s+/g, '_').slice(0, 60) || 'GENERIC'}`
+  }
   return 'CONNECTION_FAILED'
+}
+
+function deviceInfoToHumanLine(info: FingerprintDeviceInfo, ip: string, port: number): string {
+  const parts: string[] = []
+  parts.push(`Model=${info.model}`)
+  parts.push(`IP=${ip}:${port}`)
+  if (info.firmwareVersion) parts.push(`Firmware=${info.firmwareVersion}`)
+  if (info.serialNumber) parts.push(`Serial=${info.serialNumber}`)
+  parts.push(`Tz=${info.timezone}`)
+  return parts.join(' | ')
 }
 
 export class ZktecoRealFingerprintConnector implements FingerprintMachineConnector {

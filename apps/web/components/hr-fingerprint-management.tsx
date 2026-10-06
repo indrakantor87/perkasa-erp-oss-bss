@@ -171,12 +171,21 @@ function durationMsLabel(durationMs: number | null): string {
 function friendlyErrorMessage(raw: string | null, fallback: string): string {
   const msg = String(raw || '').trim()
   if (!msg) return fallback
-  const hasSql = /unknown column|duplicate entry|sqlstate|syntax error|table.*doesn/i.test(msg)
   if (msg === 'Unauthorized') return 'Sesi anda telah habis. Silakan login ulang.'
   if (msg === 'Forbidden') return 'Anda tidak memiliki izin untuk aksi ini.'
   if (/DUPLICATE_IP_PORT/i.test(msg) || /ip.*port.*sudah|duplicate.*ip/i.test(msg)) {
     return 'Kombinasi IP dan port device fingerprint sudah terdaftar. Gunakan IP/port lain.'
   }
+  if (msg === 'TIMEOUT' || /TIMEOUT_MESIN_OFFLINE/i.test(msg)) {
+    return 'MESIN FINGERPRINT TIDAK BISA DIHUBUNGI (TIMEOUT >30 detik). Kemungkinan: (1) Mesin fingerprint dalam keadaan mati / listrik padam di KANTOR 2, (2) Jaringan internet ISP kantor DOWN / router mati, (3) IP publik mesin berubah (DHCP non-static). Solusi: Cek fisik mesin (lampu indikator nyala?) + call tim IT pastikan jaringan kantor online.'
+  }
+  if (/AUTH_FAILED.*COMM.*KEY.*SALAH/i.test(msg) || msg === 'AUTH_FAILED') {
+    return 'KONEKSI KE MESIN DITOLAK (COMM KEY SALAH). Mesin ZKTeco menggunakan COMM_KEY kustom vendor (bukan default 0). Solusi: Periksa buku manual / catatan vendor untuk COMM_KEY asli mesin KANTOR 2, lalu input di kolom COMM_KEY (tersimpan terenkripsi) via tombol Edit Device.'
+  }
+  if (/ECONNREFUSED|CONNECTION_REFUSED/i.test(msg)) {
+    return 'MESIN DAPAT DICAPAI TAPI PORT 4370 DITUTUP. Kemungkinan: ZKTeco service dalam keadaan STANDBY / port 4370 firewall diblok di sisi mesin / router kantor.'
+  }
+  const hasSql = /unknown column|duplicate entry|sqlstate|syntax error|table.*doesn/i.test(msg)
   if (hasSql) return 'Terjadi kesalahan sistem. Silakan coba beberapa saat lagi.'
   return msg
 }
@@ -481,11 +490,11 @@ export function HrFingerprintManagement({
       })
       const json = await res.json().catch(() => ({}))
       const ok = Boolean((json as { ok?: boolean }).ok)
-      const info = (json as { info?: string | null })?.info || ''
+      const infoObj = (json as { info?: { model?: string; firmwareVersion?: string; serialNumber?: string; timezone?: string } | null })?.info || null
       const errMsg = (json as { errorMessage?: string | null })?.errorMessage || (json as { message?: string })?.message || ''
       if (!res.ok || !ok) {
         setTestConnectTone('danger')
-        const raw = errMsg || info || 'Gagal terhubung ke mesin fingerprint.'
+        const raw = errMsg || (typeof infoObj === 'string' ? infoObj : '') || 'Gagal terhubung ke mesin fingerprint.'
         if (errMsg === 'MACHINE_NOT_FOUND') {
           setTestConnectMessage('Device fingerprint tidak ditemukan di sistem.')
         } else if (/AUTH/i.test(raw) || /CREDENTIAL/i.test(raw)) {
@@ -498,7 +507,14 @@ export function HrFingerprintManagement({
         setTestConnectStatus('error')
       } else {
         setTestConnectTone('success')
-        setTestConnectMessage(info ? `Berhasil terhubung. ${info}` : 'Berhasil terhubung ke mesin fingerprint.')
+        const parts: string[] = []
+        if (infoObj && typeof infoObj === 'object') {
+          if (infoObj.model) parts.push(`Model=${String(infoObj.model)}`)
+          if (infoObj.firmwareVersion) parts.push(`Firmware=${String(infoObj.firmwareVersion)}`)
+          if (infoObj.serialNumber) parts.push(`Serial=${String(infoObj.serialNumber)}`)
+          if (infoObj.timezone) parts.push(`Tz=${String(infoObj.timezone)}`)
+        }
+        setTestConnectMessage(parts.length > 0 ? `Berhasil terhubung ke mesin ZKTeco. ${parts.join(' · ')}` : 'Berhasil terhubung ke mesin fingerprint (koneksi TCP sehat).')
         setTestConnectStatus('loaded')
       }
       await Promise.all([refreshDevices(), refreshSummary()]).catch(() => {})
