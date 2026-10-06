@@ -134,6 +134,7 @@ let _schemaBootstrapDone = false
 export async function ensureFpRawEventsSchemaReady() {
   if (_schemaBootstrapDone) return
   _schemaBootstrapDone = true
+  await ensureHrFpMachinesHybridAlign()
   const tableName = 'hr_fp_raw_events'
   const alterErrors: string[] = []
 
@@ -346,7 +347,7 @@ async function ensureHrFpMachinesHybridAlign() {
   void runReviewDbExecute
 
   try {
-    if (!(await hasReviewDbColumn(tableName, 'event_timestamp_original'))) {
+    if (!(await hasReviewDbColumn('hr_fp_raw_events', 'event_timestamp_original'))) {
       await execAlter(
         `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER employee_id`,
         `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
@@ -358,7 +359,7 @@ async function ensureHrFpMachinesHybridAlign() {
     alterErrors.push(`event_timestamp_original: ${msg}`)
   }
   try {
-    if (!(await hasReviewDbColumn(tableName, 'event_timestamp_normalized'))) {
+    if (!(await hasReviewDbColumn('hr_fp_raw_events', 'event_timestamp_normalized'))) {
       await execAlter(
         `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
         `ALTER TABLE hr_fp_raw_events ADD COLUMN event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
@@ -370,7 +371,7 @@ async function ensureHrFpMachinesHybridAlign() {
     alterErrors.push(`event_timestamp_normalized: ${msg}`)
   }
   try {
-    if (!(await hasReviewDbColumn(tableName, 'event_mode'))) {
+    if (!(await hasReviewDbColumn('hr_fp_raw_events', 'event_mode'))) {
       await execAlter(
         `ALTER TABLE hr_fp_raw_events ADD COLUMN event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED' AFTER event_type_raw`,
         `ALTER TABLE hr_fp_raw_events ADD COLUMN event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED'`,
@@ -382,7 +383,7 @@ async function ensureHrFpMachinesHybridAlign() {
     alterErrors.push(`event_mode: ${msg}`)
   }
   try {
-    if (!(await hasReviewDbColumn(tableName, 'raw_payload_json'))) {
+    if (!(await hasReviewDbColumn('hr_fp_raw_events', 'raw_payload_json'))) {
       await execAlter(
         `ALTER TABLE hr_fp_raw_events ADD COLUMN raw_payload_json TEXT NULL AFTER is_processed`,
         `ALTER TABLE hr_fp_raw_events ADD COLUMN raw_payload_json TEXT NULL`,
@@ -394,7 +395,7 @@ async function ensureHrFpMachinesHybridAlign() {
     alterErrors.push(`raw_payload_json: ${msg}`)
   }
   try {
-    if (!(await hasReviewDbColumn(tableName, 'received_at'))) {
+    if (!(await hasReviewDbColumn('hr_fp_raw_events', 'received_at'))) {
       await execAlter(
         `ALTER TABLE hr_fp_raw_events ADD COLUMN received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
         `ALTER TABLE hr_fp_raw_events ADD COLUMN received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
@@ -406,7 +407,7 @@ async function ensureHrFpMachinesHybridAlign() {
     alterErrors.push(`received_at: ${msg}`)
   }
   try {
-    if (!(await hasReviewDbColumn(tableName, 'processing_notes'))) {
+    if (!(await hasReviewDbColumn('hr_fp_raw_events', 'processing_notes'))) {
       await execAlter(
         `ALTER TABLE hr_fp_raw_events ADD COLUMN processing_notes TEXT NULL`,
         `ALTER TABLE hr_fp_raw_events ADD COLUMN processing_notes TEXT NULL`,
