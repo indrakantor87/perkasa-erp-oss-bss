@@ -1764,7 +1764,7 @@ function DeviceFormModal({
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
         style={anchoredStyle}
-        className="fixed z-10 rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-120px)] overflow-y-auto"
+        className="absolute z-10 rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-120px)] overflow-y-auto"
       >
         <form onSubmit={onSubmit}>
           <div className="flex flex-col gap-3 border-b border-slate-200 p-5 md:flex-row md:items-start md:justify-between dark:border-slate-700">
@@ -1950,7 +1950,7 @@ function ConfirmModal({
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onCancel} aria-hidden="true" />
       <div
         style={anchoredStyle}
-        className="fixed z-10 rounded-3xl border border-slate-200 bg-white shadow-2xl p-5 dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-120px)] overflow-y-auto"
+        className="absolute z-10 rounded-3xl border border-slate-200 bg-white shadow-2xl p-5 dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-120px)] overflow-y-auto"
       >
         <h3 className="font-[family-name:var(--font-heading)] text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
           {title}
@@ -1989,7 +1989,7 @@ function SyncHistoryDrawer({
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
         style={anchoredStyle}
-        className="fixed z-10 rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-130px)] overflow-y-auto"
+        className="absolute z-10 rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 max-h-[calc(100vh-130px)] overflow-y-auto"
       >
         <div className="flex flex-col gap-3 border-b border-slate-200 p-5 md:flex-row md:items-start md:justify-between dark:border-slate-700">
           <div>
