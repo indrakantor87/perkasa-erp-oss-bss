@@ -130,6 +130,29 @@ export function computeDedupHash(
   return createHash('sha256').update(source, 'utf-8').digest('hex')
 }
 
+let _schemaBootstrapDone = false
+export async function ensureFpRawEventsSchemaReady() {
+  if (_schemaBootstrapDone) return
+  _schemaBootstrapDone = true
+  const ddls = [
+    'ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_timestamp_original DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER employee_id',
+    'ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_timestamp_normalized DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER event_timestamp_original',
+    "ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS event_mode ENUM('IN','OUT','UNDEFINED') NOT NULL DEFAULT 'UNDEFINED' AFTER event_type_raw",
+    'ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS raw_payload_json TEXT NULL AFTER is_processed',
+    'ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER raw_payload_json',
+    'ALTER TABLE hr_fp_raw_events ADD COLUMN IF NOT EXISTS processing_notes TEXT NULL AFTER received_at',
+    'ALTER TABLE hr_fp_raw_events ADD INDEX IF NOT EXISTS idx_raw_time_original (event_timestamp_original)',
+    'ALTER TABLE hr_fp_raw_events ADD INDEX IF NOT EXISTS idx_raw_sync_run (sync_run_id)',
+  ]
+  for (const ddl of ddls) {
+    try {
+      await runReviewDbExecute<any>(ddl, [])
+    } catch {
+      // Ignore dialect / IF NOT EXISTS unsupported / already exists — handled by query failure, schema already OK.
+    }
+  }
+}
+
 export function maskMachineAuth<T extends { authConfigEncrypted: string }>(
   row: T,
 ): Omit<T, 'authConfigEncrypted'> & { authConfigEncrypted: string } {
@@ -926,6 +949,7 @@ export async function syncNow(
   const connector = resolveConnectorForMachine(machine)
 
   try {
+    await ensureFpRawEventsSchemaReady()
     await connector.connect()
   } catch (connectError) {
     const msg = connectError instanceof Error ? connectError.message : 'CONNECT_FAILED'
