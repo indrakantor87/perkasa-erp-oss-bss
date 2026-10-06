@@ -260,6 +260,7 @@ export function HrFingerprintManagement({
   function anchoredStyle(options: { modalWidthPx: number; modalHeightEstimatePx?: number; prefer?: 'below' | 'above' }) {
     if (!popupAnchor) return undefined
     const modalW = options.modalWidthPx
+    const modalH = options.modalHeightEstimatePx ?? Math.max(480, Math.min(720, modalW))
     const prefer = options.prefer ?? 'below'
     const gap = 8
     const margin = 16
@@ -270,13 +271,16 @@ export function HrFingerprintManagement({
     left = Math.max(margin, Math.min(left, vw - modalW - margin))
 
     const belowTop = popupAnchor.bottom + gap
-    const aboveTop = popupAnchor.top - modalW - gap
+    const aboveTop = popupAnchor.top - modalH - gap
+
+    const belowFits = belowTop + modalH <= vh - margin
+    const aboveFits = aboveTop >= margin
 
     let top: number
     if (prefer === 'above') {
-      top = aboveTop < margin ? belowTop : aboveTop
+      top = aboveFits ? aboveTop : belowFits ? belowTop : Math.max(margin, (vh - modalH) / 2)
     } else {
-      top = belowTop + 480 > vh ? Math.max(margin, aboveTop) : belowTop
+      top = belowFits ? belowTop : aboveFits ? aboveTop : Math.max(margin, (vh - modalH) / 2)
     }
     return { top: `${top}px`, left: `${left}px` } as React.CSSProperties
   }
@@ -1182,7 +1186,7 @@ export function HrFingerprintManagement({
           setAuthUser={setFormAuthUser}
           authPass={formAuthPass}
           setAuthPass={setFormAuthPass}
-          anchoredStyle={anchoredStyle({ modalWidthPx: 672 })}
+          anchoredStyle={anchoredStyle({ modalWidthPx: 672, modalHeightEstimatePx: 600 })}
         />
       ) : null}
 
@@ -1197,7 +1201,7 @@ export function HrFingerprintManagement({
           loadingLabel="Menghapus..."
           onConfirm={handleConfirmDelete}
           onCancel={() => { setDeleteOpen(false); setDeleteDevice(null) }}
-          anchoredStyle={anchoredStyle({ modalWidthPx: 512 })}
+          anchoredStyle={anchoredStyle({ modalWidthPx: 512, modalHeightEstimatePx: 240 })}
         />
       ) : null}
 
@@ -1328,7 +1332,7 @@ export function HrFingerprintManagement({
           status={syncHistoryStatus}
           runs={syncHistory}
           error={syncHistoryError}
-          anchoredStyle={anchoredStyle({ modalWidthPx: 896 })}
+          anchoredStyle={anchoredStyle({ modalWidthPx: 896, modalHeightEstimatePx: 680 })}
         />
       ) : null}
     </div>
