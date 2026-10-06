@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { StatusBadge, type StatusTone } from '@/components/ui-status-badge'
 import { UiButton } from '@/components/ui-button'
 
@@ -1759,7 +1760,8 @@ function DeviceFormModal({
   anchoredStyle?: React.CSSProperties
 }) {
   const isUpdate = mode === 'edit' && device != null
-  return (
+  if (typeof document === 'undefined') return null
+  return createPortal(
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
@@ -1918,7 +1920,8 @@ function DeviceFormModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1945,7 +1948,8 @@ function ConfirmModal({
   onCancel: () => void
   anchoredStyle?: React.CSSProperties
 }) {
-  return (
+  if (typeof document === 'undefined') return null
+  return createPortal(
     <div role="alertdialog" aria-modal="true" className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onCancel} aria-hidden="true" />
       <div
@@ -1961,7 +1965,8 @@ function ConfirmModal({
           <UiButton variant={tone} size="md" loading={loading} loadingLabel={loadingLabel} onClick={onConfirm}>{confirmLabel}</UiButton>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1983,8 +1988,9 @@ function SyncHistoryDrawer({
   anchoredStyle?: React.CSSProperties
 }) {
   if (!open) return null
+  if (typeof document === 'undefined') return null
   const d = device
-  return (
+  return createPortal(
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
@@ -2079,6 +2085,7 @@ function SyncHistoryDrawer({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
