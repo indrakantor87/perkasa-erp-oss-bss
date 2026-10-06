@@ -1278,7 +1278,7 @@ function AttendanceMonthlyRecapView({
                       {row.partial_morning_count}
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900 dark:text-slate-100">
-                      {row.total_ot_hours.toFixed(1)}
+                      {Number.isFinite(Number(row.total_ot_hours)) ? Number(row.total_ot_hours).toFixed(1) : '0.0'}
                     </td>
                     <td className="px-4 py-3 text-center font-mono text-emerald-700 dark:text-emerald-300">
                       {row.avg_check_in}
