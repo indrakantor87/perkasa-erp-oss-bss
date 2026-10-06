@@ -75,6 +75,7 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
     { resource: 'support', label: 'Support', actions: ['view'] },
     { resource: 'inventory', label: 'Inventory', actions: ['view'] },
     { resource: 'billing', label: 'Billing', actions: ['view', 'export'] },
+    { resource: 'hr', label: 'HR', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'leave_requests', label: 'Pengajuan Cuti/Izin/Sakit', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'overtime_requests', label: 'Pengajuan Lembur', actions: ['view', 'create', 'update', 'approve', 'export'] },
   ],
@@ -101,6 +102,7 @@ const baselineRolePermissionMatrix: Record<AppRole, PermissionMatrixEntry[]> = {
     { resource: 'customers', label: 'Customer & Subscription', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'support', label: 'Support', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'inventory', label: 'Inventory', actions: ['view', 'create', 'update', 'approve', 'export'] },
+    { resource: 'hr', label: 'HR', actions: ['view', 'create', 'update', 'approve', 'export'] },
     { resource: 'billing', label: 'Billing', actions: ['view', 'create', 'update', 'approve', 'export'] },
   ],
   FINANCE: [
