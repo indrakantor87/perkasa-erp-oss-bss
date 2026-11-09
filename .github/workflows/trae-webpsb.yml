@@ -12,7 +12,7 @@ concurrency:
 jobs:
   diag:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Install SSH Key
         env:
@@ -30,7 +30,7 @@ jobs:
           echo "key bytes: $(wc -c < $FINAL)"
           rm -f $RAW $BODY
 
-      - name: MEASURE4
+      - name: FIX5
         env:
           HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -39,25 +39,36 @@ jobs:
           KEY=$HOME/.ssh/id_ed25519_coolify
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
           ssh $OPTS "$USER@$HOST" 'bash -s' <<'REMOTE'
-          echo "===== [W1] DOCKER SYSTEM DF ====="
-          docker system df 2>&1
+          APP=pic3vleasj465ooh77ioicw6
+          DB=p50kpcya4hegfp577m855paz
+          echo "===== [X1] DISK BEFORE ====="
+          df -h / | tail -2
           echo
-          echo "===== [W2] /var/lib/docker (top) ====="
-          du -sh /var/lib/docker/* 2>/dev/null | sort -h | tail -10
+          echo "===== [X2] BUILD CACHE PRUNE ====="
+          docker builder prune -af 2>&1 | tail -5
           echo
-          echo "===== [W3] Top-level dirs on / ====="
-          du -xsh /* 2>/dev/null | sort -h | tail -14
+          echo "===== [X3] DANGLING IMAGE PRUNE ====="
+          docker image prune -f 2>&1 | tail -3
           echo
-          echo "===== [W4] IMAGES (all, by size) ====="
-          docker images --format '{{.Repository}}:{{.Tag}}|{{.Size}}|{{.CreatedSince}}' 2>&1 | head -40
+          echo "===== [X4] DISK AFTER ====="
+          df -h / | tail -2
           echo
-          echo "===== [W5] CONTAINERS (all) ====="
-          docker ps -a --format '{{.Names}}|{{.Image}}|{{.Status}}' 2>&1 | head -40
+          echo "===== [X5] RESTART DB CONTAINER ====="
+          docker restart $DB 2>&1
+          echo "restart issued, tunggu 25s..."
+          sleep 25
           echo
-          echo "===== [W6] Docker json logs >100M ====="
-          find /var/lib/docker/containers -name '*-json.log' -size +100M -printf '%s %p\n' 2>/dev/null | sort -rn | head -15
+          echo "===== [X6] DB STATE ====="
+          docker inspect -f 'Health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} Restarts={{.RestartCount}}' $DB 2>&1
+          docker exec $DB pg_isready 2>&1
           echo
-          echo "===== [W7] /data sizes ====="
-          du -sh /data/* 2>/dev/null | sort -h | tail -12
+          echo "===== [X7] DB LOGS (tail 20) ====="
+          docker logs --tail 20 $DB 2>&1
+          echo
+          echo "===== [X8] PRISMA USER COUNT ====="
+          docker exec -w /app $APP node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.user.count().then(c=>{console.log('PRISMA_OK count=',c);return p.\$disconnect()}).catch(e=>console.log('PRISMA_ERR',String(e.message).split('\n').slice(0,3).join(' | ')))" 2>&1 | head -5
+          echo
+          echo "===== [X9] LOGIN PROBE ====="
+          docker exec $APP node -e "fetch('http://127.0.0.1:3000/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'__trae_probe__',password:'__trae_probe__'})}).then(r=>r.text()).then(t=>console.log('PROBE_RESP',t)).catch(e=>console.log('PROBE_ERR',e.message))" 2>&1 | tail -2
           echo "DONE"
           REMOTE
