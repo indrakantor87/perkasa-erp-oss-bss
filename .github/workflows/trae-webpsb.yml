@@ -30,7 +30,7 @@ jobs:
           echo "key bytes: $(wc -c < $FINAL)"
           rm -f $RAW $BODY
 
-      - name: DIAGNOSE
+      - name: DIAGNOSE3
         env:
           HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -39,36 +39,37 @@ jobs:
           KEY=$HOME/.ssh/id_ed25519_coolify
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
           ssh $OPTS "$USER@$HOST" 'bash -s' <<'REMOTE'
-          echo "===== [A] CONTAINERS ====="
-          docker ps -a --format "{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}" | grep -iE "psb|perkasa|pic3v"
+          APP=pic3vleasj465ooh77ioicw6
+          DB=p50kpcya4hegfp577m855paz
+          echo "===== [P1] LOGIN PROBE (paksa error baru) ====="
+          docker exec $APP node -e "fetch('http://127.0.0.1:3000/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'__trae_probe__',password:'__trae_probe__'})}).then(r=>r.text()).then(t=>console.log('PROBE_RESP',t)).catch(e=>console.log('PROBE_ERR',e.message))" 2>&1 | tail -3
           echo
-          echo "===== [B] ENV PER CONTAINER ====="
-          for C in pic3vleasj465ooh77ioicw6 rec17-webpsb-p1 webpsb-recoverycore-customdomain web-psb-perkasa webpsb-ultrafix-backtick; do
-            if docker inspect "$C" >/dev/null 2>&1; then
-              echo "--- $C ---"
-              docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$C" | grep -iE "DATABASE_URL|DIRECT_URL|JWT_SECRET|DB_UPDATE|NODE_ENV"
-            else
-              echo "--- $C : NOT EXIST ---"
-            fi
-          done
+          echo "===== [P2] APP LOGS (tail 60) ====="
+          docker logs --tail 60 $APP 2>&1 | tail -50
           echo
-          echo "===== [C] TRAEFIK LABELS ====="
-          for C in pic3vleasj465ooh77ioicw6 rec17-webpsb-p1 webpsb-recoverycore-customdomain web-psb-perkasa webpsb-ultrafix-backtick; do
-            if docker inspect "$C" >/dev/null 2>&1; then
-              echo "--- $C ---"
-              docker inspect -f '{{range $k,$v := .Config.Labels}}{{$k}}={{$v}}{{println}}{{end}}' "$C" | grep -iE "traefik.http.routers" 
-            fi
-          done
+          echo "===== [Q1] DB HEALTH ====="
+          docker inspect -f 'Health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} Restarts={{.RestartCount}} StartedAt={{.State.StartedAt}}' $DB 2>&1
+          docker exec $DB pg_isready 2>&1
           echo
-          echo "===== [D] COOLIFY APP DIR ====="
-          ls -la /data/coolify/applications/pic3vleasj465ooh77ioicw6/ 2>&1 | head -25
-          echo "----- .env -----"
-          cat /data/coolify/applications/pic3vleasj465ooh77ioicw6/.env 2>&1 | head -50
+          echo "===== [Q2] TCP APP -> DB:5432 ====="
+          docker exec $APP node -e "const net=require('net');const s=net.connect({host:'p50kpcya4hegfp577m855paz',port:5432});s.on('connect',()=>{console.log('TCP_OK');s.end()});s.on('error',e=>console.log('TCP_ERR',e.message));setTimeout(()=>process.exit(0),5000)" 2>&1 | head -3
           echo
-          echo "===== [E] CONTENT OF COOLIFY CONTAINER ====="
-          docker exec pic3vleasj465ooh77ioicw6 node -e "fetch('http://127.0.0.1:3000/login').then(r=>r.text()).then(t=>console.log('LEN',t.length,'MARKER',t.includes('deploy-marker-20261110'))).catch(e=>console.log('ERR',e.message))" 2>&1
+          echo "===== [Q3] PRISMA QUERY DARI APP CONTAINER ====="
+          docker exec -w /app $APP node -e "try{const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.user.count().then(c=>{console.log('PRISMA_OK count=',c);return p.\$disconnect()}).catch(e=>{console.log('PRISMA_ERR',e.constructor.name,'::',String(e.message).split('\n').slice(0,5).join(' | '))})}catch(e){console.log('LOAD_ERR',e.message)}" 2>&1 | head -8
           echo
-          echo "===== [F] IMAGES pic3v ====="
-          docker images --format "{{.Repository}}:{{.Tag}} {{.CreatedSince}}" | grep -i pic3v | head -8
+          echo "===== [R] DB LOGS (tail 25) ====="
+          docker logs --tail 25 $DB 2>&1
+          echo
+          echo "===== [S] TABEL PUBLIC SCHEMA ====="
+          docker exec $DB psql -U postgres -d postgres -tc "select count(*) from information_schema.tables where table_schema='public';" 2>&1 | head -3
+          echo
+          echo "===== [T] DISK ====="
+          df -h 2>&1 | head -12
+          echo
+          echo "===== [U] COOLIFY DEPLOY QUEUE (6 terakhir) ====="
+          docker exec coolify-db psql -U coolify -d coolify -tc "select id, status, created_at from application_deployment_queues order by id desc limit 6;" 2>&1 | head -10
+          echo
+          echo "===== [V] COMPOSE FILE APP ====="
+          cat /data/coolify/applications/$APP/docker-compose.yaml 2>&1
           echo "DONE"
           REMOTE
