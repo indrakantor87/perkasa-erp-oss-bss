@@ -1,0 +1,74 @@
+name: "TRAE webpsb server access"
+
+on:
+  push:
+    branches: [trae-webpsb-fix]
+  workflow_dispatch:
+
+concurrency:
+  group: trae-webpsb-serial
+  cancel-in-progress: false
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install SSH Key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.COOLIFY_SERVER_SSH_PRIVATE_KEY }}
+        run: |
+          set -e
+          mkdir -p $HOME/.ssh && chmod 700 $HOME/.ssh
+          RAW=$HOME/.ssh/raw_key
+          FINAL=$HOME/.ssh/id_ed25519_coolify
+          printf '%s' "$SSH_PRIVATE_KEY" > $RAW
+          BODY=$RAW.body
+          tail -n +2 $RAW | head -n -1 | grep -v '^[[:space:]]*$' > $BODY || true
+          { echo "-----BEGIN OPENSSH PRIVATE KEY-----"; cat $BODY; echo "-----END OPENSSH PRIVATE KEY-----"; } > $FINAL
+          chmod 600 $FINAL
+          echo "key bytes: $(wc -c < $FINAL)"
+          rm -f $RAW $BODY
+
+      - name: DIAGNOSE
+        env:
+          HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
+          USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
+        run: |
+          set +e
+          KEY=$HOME/.ssh/id_ed25519_coolify
+          OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
+          ssh $OPTS "$USER@$HOST" 'bash -s' <<'REMOTE'
+          echo "===== [A] CONTAINERS ====="
+          docker ps -a --format "{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}" | grep -iE "psb|perkasa|pic3v"
+          echo
+          echo "===== [B] ENV PER CONTAINER ====="
+          for C in pic3vleasj465ooh77ioicw6 rec17-webpsb-p1 webpsb-recoverycore-customdomain web-psb-perkasa webpsb-ultrafix-backtick; do
+            if docker inspect "$C" >/dev/null 2>&1; then
+              echo "--- $C ---"
+              docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$C" | grep -iE "DATABASE_URL|DIRECT_URL|JWT_SECRET|DB_UPDATE|NODE_ENV"
+            else
+              echo "--- $C : NOT EXIST ---"
+            fi
+          done
+          echo
+          echo "===== [C] TRAEFIK LABELS ====="
+          for C in pic3vleasj465ooh77ioicw6 rec17-webpsb-p1 webpsb-recoverycore-customdomain web-psb-perkasa webpsb-ultrafix-backtick; do
+            if docker inspect "$C" >/dev/null 2>&1; then
+              echo "--- $C ---"
+              docker inspect -f '{{range $k,$v := .Config.Labels}}{{$k}}={{$v}}{{println}}{{end}}' "$C" | grep -iE "traefik.http.routers" 
+            fi
+          done
+          echo
+          echo "===== [D] COOLIFY APP DIR ====="
+          ls -la /data/coolify/applications/pic3vleasj465ooh77ioicw6/ 2>&1 | head -25
+          echo "----- .env -----"
+          cat /data/coolify/applications/pic3vleasj465ooh77ioicw6/.env 2>&1 | head -50
+          echo
+          echo "===== [E] CONTENT OF COOLIFY CONTAINER ====="
+          docker exec pic3vleasj465ooh77ioicw6 node -e "fetch('http://127.0.0.1:3000/login').then(r=>r.text()).then(t=>console.log('LEN',t.length,'MARKER',t.includes('deploy-marker-20261110'))).catch(e=>console.log('ERR',e.message))" 2>&1
+          echo
+          echo "===== [F] IMAGES pic3v ====="
+          docker images --format "{{.Repository}}:{{.Tag}} {{.CreatedSince}}" | grep -i pic3v | head -8
+          echo "DONE"
+          REMOTE
