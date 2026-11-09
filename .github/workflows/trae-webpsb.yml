@@ -30,7 +30,7 @@ jobs:
           echo "key bytes: $(wc -c < $FINAL)"
           rm -f $RAW $BODY
 
-      - name: DIAGNOSE3
+      - name: MEASURE4
         env:
           HOST: ${{ secrets.COOLIFY_SERVER_HOST }}
           USER: ${{ secrets.COOLIFY_SERVER_USER || 'root' }}
@@ -39,37 +39,25 @@ jobs:
           KEY=$HOME/.ssh/id_ed25519_coolify
           OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o BatchMode=yes -i $KEY"
           ssh $OPTS "$USER@$HOST" 'bash -s' <<'REMOTE'
-          APP=pic3vleasj465ooh77ioicw6
-          DB=p50kpcya4hegfp577m855paz
-          echo "===== [P1] LOGIN PROBE (paksa error baru) ====="
-          docker exec $APP node -e "fetch('http://127.0.0.1:3000/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'__trae_probe__',password:'__trae_probe__'})}).then(r=>r.text()).then(t=>console.log('PROBE_RESP',t)).catch(e=>console.log('PROBE_ERR',e.message))" 2>&1 | tail -3
+          echo "===== [W1] DOCKER SYSTEM DF ====="
+          docker system df 2>&1
           echo
-          echo "===== [P2] APP LOGS (tail 60) ====="
-          docker logs --tail 60 $APP 2>&1 | tail -50
+          echo "===== [W2] /var/lib/docker (top) ====="
+          du -sh /var/lib/docker/* 2>/dev/null | sort -h | tail -10
           echo
-          echo "===== [Q1] DB HEALTH ====="
-          docker inspect -f 'Health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} Restarts={{.RestartCount}} StartedAt={{.State.StartedAt}}' $DB 2>&1
-          docker exec $DB pg_isready 2>&1
+          echo "===== [W3] Top-level dirs on / ====="
+          du -xsh /* 2>/dev/null | sort -h | tail -14
           echo
-          echo "===== [Q2] TCP APP -> DB:5432 ====="
-          docker exec $APP node -e "const net=require('net');const s=net.connect({host:'p50kpcya4hegfp577m855paz',port:5432});s.on('connect',()=>{console.log('TCP_OK');s.end()});s.on('error',e=>console.log('TCP_ERR',e.message));setTimeout(()=>process.exit(0),5000)" 2>&1 | head -3
+          echo "===== [W4] IMAGES (all, by size) ====="
+          docker images --format '{{.Repository}}:{{.Tag}}|{{.Size}}|{{.CreatedSince}}' 2>&1 | head -40
           echo
-          echo "===== [Q3] PRISMA QUERY DARI APP CONTAINER ====="
-          docker exec -w /app $APP node -e "try{const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.user.count().then(c=>{console.log('PRISMA_OK count=',c);return p.\$disconnect()}).catch(e=>{console.log('PRISMA_ERR',e.constructor.name,'::',String(e.message).split('\n').slice(0,5).join(' | '))})}catch(e){console.log('LOAD_ERR',e.message)}" 2>&1 | head -8
+          echo "===== [W5] CONTAINERS (all) ====="
+          docker ps -a --format '{{.Names}}|{{.Image}}|{{.Status}}' 2>&1 | head -40
           echo
-          echo "===== [R] DB LOGS (tail 25) ====="
-          docker logs --tail 25 $DB 2>&1
+          echo "===== [W6] Docker json logs >100M ====="
+          find /var/lib/docker/containers -name '*-json.log' -size +100M -printf '%s %p\n' 2>/dev/null | sort -rn | head -15
           echo
-          echo "===== [S] TABEL PUBLIC SCHEMA ====="
-          docker exec $DB psql -U postgres -d postgres -tc "select count(*) from information_schema.tables where table_schema='public';" 2>&1 | head -3
-          echo
-          echo "===== [T] DISK ====="
-          df -h 2>&1 | head -12
-          echo
-          echo "===== [U] COOLIFY DEPLOY QUEUE (6 terakhir) ====="
-          docker exec coolify-db psql -U coolify -d coolify -tc "select id, status, created_at from application_deployment_queues order by id desc limit 6;" 2>&1 | head -10
-          echo
-          echo "===== [V] COMPOSE FILE APP ====="
-          cat /data/coolify/applications/$APP/docker-compose.yaml 2>&1
+          echo "===== [W7] /data sizes ====="
+          du -sh /data/* 2>/dev/null | sort -h | tail -12
           echo "DONE"
           REMOTE
